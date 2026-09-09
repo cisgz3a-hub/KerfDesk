@@ -11,6 +11,10 @@ type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
   readonly emitClose: () => void;
   readonly closeCount: () => number;
+  readonly captureCallbacks: () => {
+    readonly line: ReadonlyArray<(line: string) => void>;
+    readonly close: ReadonlyArray<() => void>;
+  };
 };
 
 function makeConnection(
@@ -56,6 +60,7 @@ function makeConnection(
       for (const handler of closeHandlers) handler();
     },
     closeCount: () => closes,
+    captureCallbacks: () => ({ line: [...lineHandlers], close: [...closeHandlers] }),
   };
 }
 
@@ -84,6 +89,29 @@ afterEach(async () => {
 });
 
 describe('serial connection epoch guards', () => {
+  it.each([
+    [
+      'a matching synthetic banner',
+      "Grbl 3.7 [FluidNC v4.0.3 (synthetic) '$' for help]",
+      'fluidnc',
+    ],
+    ['an unrecognized synthetic sign-on', 'OEM laboratory controller ready', null],
+    ['a stock-looking synthetic GRBL banner', 'Grbl 1.1h', 'grbl-v1.1'],
+    ['another recognized-family synthetic banner', 'GrblHAL 1.1f', 'grblhal'],
+  ] as const)(
+    'keeps the configured FluidNC driver for %s',
+    async (_label, banner, detectedControllerKind) => {
+      const connection = makeConnection();
+
+      await useLaserStore.getState().connect(adapterFor(connection), { controllerKind: 'fluidnc' });
+      connection.emitLine(banner);
+      await Promise.resolve();
+
+      expect(useLaserStore.getState().activeControllerKind).toBe('fluidnc');
+      expect(useLaserStore.getState().detectedControllerKind).toBe(detectedControllerKind);
+    },
+  );
+
   it('does not restart Marlin polling after Forget cancels the startup handshake', async () => {
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
@@ -204,6 +232,10 @@ describe('serial connection epoch guards', () => {
     const oldConnection = makeConnection();
     const currentConnection = makeConnection();
     await connect(oldConnection);
+    // Capture callbacks before unsubscribe, as if their delivery were already queued.
+    const staleCallbacks = oldConnection.captureCallbacks();
+    expect(staleCallbacks.line).toHaveLength(1);
+    expect(staleCallbacks.close).toHaveLength(1);
     const replacement = useLaserStore.getState().connect(adapterFor(currentConnection));
     await Promise.resolve();
     oldConnection.emitLine('Grbl 1.1h');
@@ -212,10 +244,17 @@ describe('serial connection epoch guards', () => {
     await Promise.resolve();
     const sessionEpoch = useLaserStore.getState().controllerSessionEpoch;
     const detectedControllerKind = useLaserStore.getState().detectedControllerKind;
+    const replacementState = useLaserStore.getState();
 
     oldConnection.emitLine('Grbl 1.1f');
     oldConnection.emitClose();
+    for (const line of ['[VER:old-stale]', '<Run|MPos:9,9,9|FS:100,1>', 'ok', 'Grbl 1.1f']) {
+      for (const callback of staleCallbacks.line) callback(line);
+    }
+    for (const callback of staleCallbacks.close) callback();
 
+    // Includes the replacement log, transcript, status, ACK and operation ownership.
+    expect(useLaserStore.getState()).toBe(replacementState);
     expect(useLaserStore.getState().connection).toEqual({ kind: 'connected' });
     expect(oldConnection.closeCount()).toBe(1);
     expect(useLaserStore.getState().controllerSessionEpoch).toBe(sessionEpoch);

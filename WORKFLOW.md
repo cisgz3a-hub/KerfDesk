@@ -1877,15 +1877,47 @@ ADR-279.*
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
-   use source-image pixels and preserve their separate preset values. Changes are debounced; the
+   use pixels of the decoded image grid supplied to the tracing core and preserve their separate
+   preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
+   converted using the actual width and height ratios, without rounding the internal values.
+   The preceding UI decode cap still defines that source grid. **Smoothness** and **Optimize**
+   stay visible and editable for filled outlines and Edge Detection, including values carried from
+   another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
+   recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
+   Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
+   Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
    a retired worker is ignored and cannot replace the current preview.
    A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
-   commit/export feedback. Edge Detection creates closed outlines; Centerline follows stroke centres.
+   commit/export feedback. Centerline previews and explicit Centerline SVG exports draw both
+   closed and open paths as strokes. Filled presets retain their contour fills and holes.
+   Submitted results use their captured request's paint intent; a newer preset request still
+   supersedes an older result.
+   Edge Detection creates closed outlines around dark artwork and locally
+   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
+   converted once on enlarged working rasters, including Enhance regions. Zero disables that
+   gap bridge; true-junction repairs and ring closure keep their existing separate policies.
+   Centerline removes corner spurs before condensing junctions, then carries shared junction
+   anchors through smoothing and simplification so finished branches remain attached to their
+   receiving strokes, including closed rings. Joined gaps retain both actual endpoints.
+   Filled-outline and Edge finishing check the continuous contour boundaries together.
+   When final smoothing creates a crossing or changes a counter's nesting, only the affected
+   contours are refined closer to their earlier boundaries. Valid positive gaps retain their
+   geometry, including gaps smaller than one source pixel.
+   A tiny closed contour that passes its area threshold remains present when
+   Optimize would collapse its finishing geometry. That contour uses its measured
+   boundary and participates in the same topology check as the other contours.
+   Straightening retains deep notches and narrow turns where the outline doubles
+   back along an otherwise straight edge. Increasing Smoothness still removes
+   edge waviness without increasing how far such a turn may be shortened.
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   In a CNC project, smoothing retains established stroke junctions at the
+   source image's current physical size. Selection bounds follow the conditioned
+   geometry while the trace remains registered over its full source image.
 
 **Error — worker stalls or crashes**:
 - A worker request has a bounded execution timeout. The failed worker is
@@ -1900,6 +1932,12 @@ ADR-279.*
 - Reuse is allowed only when file identity, options, boundary, and boundary mode
   match the ready preview. Otherwise commit decodes and traces the current
   source normally. Existing source-revalidation checks still apply.
+
+**Edge — an opaque region of a transparent image**:
+- **Trace alpha mask** keeps using the full source's transparency when a Crop or Enhance region
+  contains only opaque pixels. White foreground remains ink, and RGB detail inside uniform alpha
+  does not become a hole. Clear Boundary restores the full-image trace. Cutoff/Threshold keep
+  their alpha-band meaning; an originally opaque image still uses the brightness fallback.
 
 ---
 
@@ -2104,9 +2142,9 @@ streaming controls. Two buttons:
   acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
-  next WCO-bearing status frame arrives. Frame and Start switch to
-  user-origin placement only after that `ok`; they do not wait for the
-  later WCO-bearing status frame.
+  next WCO-bearing status frame arrives. Set Origin switches placement
+  to user origin after that `ok` and its bounded work-offset wait finish.
+  A cancelled action leaves placement unchanged.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -2122,6 +2160,9 @@ controller command arbiter until `ok`/`error`/`ALARM`, so Start,
 Console, settings, and other motion cannot steal its response. The two
 commands in a persistent-origin update are acknowledged one at a time;
 local origin truth changes atomically only after both succeed.
+That ownership continues through Set Origin's post-ACK work-offset wait.
+Reset, disconnect, or a replacement controller operation ends the old wait;
+its late success/failure cannot change the new owner's origin state or diagnostics.
 
 The readout and Reset action treat any nonzero WCO axis as meaningful,
 but job placement is axis-specific: only a nonzero X or Y offset proves
@@ -2140,11 +2181,13 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    || streaming`; `disabled` set by `LaserWindow` when connection
    isn't `connected`). User must connect first.
 3. **Rejected / interrupted update.** If a command is rejected, times
-   out, disconnects, or a multi-command persistent update fails after
-   its first `ok`, the cached WCO, compatibility Frame proof, and any exact
-   candidate/permit are cleared and the origin source becomes `unknown`.
+   out, or a multi-command persistent update fails after its first `ok`
+   while the transaction still owns the controller, the cached WCO,
+   compatibility Frame proof, and any exact candidate/permit are cleared
+   and the origin source becomes `unknown`.
    Custom placement remains unresolved until the operator re-establishes or
-   resets it.
+   resets it. Reset/disconnect or replacement operation state remains intact
+   when an older transaction completes or fails later.
 4. **Alarm clears origin mid-session.** Operator sets origin, then a
    limit switch triggers (or `\x18` is sent). GRBL clears G92
    internally; the alarm branch in `laser-line-handler.ts` clears
@@ -4415,6 +4458,8 @@ and lifts the command's CNC-only gate.)*
    the metadata is recorded, not authenticated. **Recorded source polarity** describes the source
    declaration; the editable mapping below controls the current materialization and may differ. A
    legacy-mesh relief has no canonical provenance object, so CurveDesk does not fabricate this group.
+   The success toast always explains that the relief is stored in either machine mode and that
+   output geometry is generated only in CNC mode, including when the mode changes during import.
 4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
    **Field geometry** block. If the stored field is `width` by `height`, its declared physical
    dimensions are `physicalWidthMm` by `physicalHeightMm`, its object transform has scales
@@ -4541,9 +4586,9 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge - laser mode and large sources
 1. The file command remains available in laser mode because importing and
-   persisting geometry is machine-agnostic. The relief is stored and the toast
-   explains that it becomes output geometry in CNC mode; no new mode guard is
-   added.
+   persisting geometry is machine-agnostic. In either mode, the success toast explains that
+   reliefs are stored in either machine mode and output geometry is generated only in CNC mode.
+   A same-document mode change during import does not make this disclosure stale.
 2. When other laser artwork makes the job emittable, Job Review warns that relief
    geometry will be skipped while remaining stored. The warning never refuses
    Frame, Start, preview, save, or output.

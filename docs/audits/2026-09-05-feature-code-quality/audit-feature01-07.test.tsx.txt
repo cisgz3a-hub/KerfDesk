@@ -1,0 +1,129 @@
+// Audit-only regression probes. They express the expected invariants and may fail
+// on the unchanged deployed commit. No hardware, network, or application edits.
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { applyTransform, createProject, IDENTITY_TRANSFORM, operationIdsForObject, type ImportedSvg } from '../core/scene';
+import { buildSelectionFlipEdit, selectionMetrics } from '../core/scene/selection-transform';
+import { useStore } from '../ui/state/store';
+import { resetStore } from '../ui/state/test-helpers';
+import { useUiStore } from '../ui/state/ui-store';
+
+const renderMock = vi.hoisted(() => ({ render: vi.fn() }));
+vi.mock('../ui/text/render-text-geometry', () => ({ renderTextGeometry: renderMock.render }));
+vi.mock('../ui/text/font-loader', () => ({
+  cssFamilyForFont: (key: string) => `lf2-${key}`,
+  ensureFontCss: vi.fn(async () => undefined),
+  loadFont: vi.fn(async () => new ArrayBuffer(8)),
+}));
+import { AddTextDialog } from '../ui/text/AddTextDialog';
+import { effectiveOperationForObject } from '../core/effective-output';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+beforeEach(() => { resetStore(); useUiStore.setState({ textDialog: null }); });
+
+function square(color: string, x: number) {
+  return { color, polylines: [{ closed: true, points: [
+    {x,y:0}, {x:x+10,y:0}, {x:x+10,y:10}, {x,y:10}, {x,y:0},
+  ] }] };
+}
+
+it('horizontal flip of a rotated selection reflects every world point about the selection X center', () => {
+  const obj: ImportedSvg = { kind:'imported-svg', id:'rotated', source:'fixture.svg',
+    bounds:{minX:0,minY:0,maxX:20,maxY:10}, transform:{...IDENTITY_TRANSFORM,x:30,y:20,rotationDeg:30},
+    paths:[{ ...square('#000000',0), polylines:[{closed:true,points:[{x:0,y:0},{x:20,y:0},{x:20,y:10},{x:0,y:10},{x:0,y:0}]}]}] };
+  const bbox=selectionMetrics([obj])!.bbox;
+  const result=buildSelectionFlipEdit([obj],'horizontal');
+  expect(result.kind).toBe('ok');
+  if(result.kind!=='ok') return;
+  const before=applyTransform({x:0,y:0},obj.transform);
+  const after=applyTransform({x:0,y:0},result.transforms[0]!.transform);
+  expect(after.x).toBeCloseTo(bbox.minX+bbox.maxX-before.x,8);
+  expect(after.y).toBeCloseTo(before.y,8);
+});
+
+it('dogbone of mixed-operation imported artwork retains both operations', () => {
+  useStore.getState().setMachineKind('cnc');
+  useStore.getState().importSvgObject({ kind:'imported-svg',id:'mixed',source:'mixed.svg',
+    bounds:{minX:0,minY:0,maxX:40,maxY:10}, transform:IDENTITY_TRANSFORM,
+    paths:[square('#ff0000',0),square('#0000ff',30)] });
+  useStore.getState().selectObject('mixed');
+  const before=useStore.getState().project.scene;
+  const ids=operationIdsForObject(before.objects[0]!,before.layers);
+  expect(ids).toHaveLength(2);
+  useStore.getState().dogboneSelection(2);
+  const after=useStore.getState().project.scene;
+  expect(after.objects[0]).not.toBe(before.objects[0]);
+  expect(operationIdsForObject(after.objects[0]!,after.layers)).toEqual(ids);
+});
+
+it('late text rendering cannot insert into a replacement document after Escape closes the dialog', async () => {
+  let resolve!: (value: unknown) => void;
+  renderMock.render.mockReturnValueOnce(new Promise(r => { resolve=r; }));
+  useUiStore.setState({ textDialog:{mode:'add'} });
+  const host=document.createElement('div'); document.body.appendChild(host);
+  const root=createRoot(host);
+  try {
+    await act(async()=>root.render(<AddTextDialog/>));
+    await act(async()=> { const textarea=host.querySelector('textarea')!; textarea.value='Old document'; Simulate.change(textarea); });
+    await act(async()=>Simulate.submit(host.querySelector('form')!));
+    expect(renderMock.render).toHaveBeenCalled();
+    await act(async()=>host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+    expect(useUiStore.getState().textDialog).toBeNull();
+    await act(async()=>useStore.getState().newProject());
+    const replacement=useStore.getState().project;
+    expect(replacement.scene.objects).toHaveLength(0);
+    await act(async()=>resolve({bounds:{minX:0,minY:0,maxX:10,maxY:10},paths:[square('#000000',0)]}));
+    expect(useStore.getState().project).toBe(replacement);
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+  } finally { await act(async()=>root.unmount()); host.remove(); }
+});
+
+it('editing text preserves its existing object power scale', () => {
+  const text = { kind:'text' as const,id:'text',content:'Before',fontKey:'roboto-regular',
+    sizeMm:10,alignment:'left' as const,lineHeight:1.2,letterSpacing:0,color:'#000000',
+    bounds:{minX:0,minY:0,maxX:10,maxY:10},transform:IDENTITY_TRANSFORM,paths:[square('#000000',0)] };
+  useStore.getState().upsertTextObject(text);
+  useStore.getState().setObjectsPowerScale(['text'],50);
+  expect(useStore.getState().project.scene.objects[0]!.powerScale).toBe(50);
+  // This is the same metadata-free text draft that commitText constructs.
+  useStore.getState().upsertTextObject({...text,content:'After'});
+  expect(useStore.getState().project.scene.objects[0]!.powerScale).toBe(50);
+});
+
+it('making a shared operation unique retains the selected artwork effective settings', () => {
+  const make=(id:string):ImportedSvg=>({kind:'imported-svg',id,source:`${id}.svg`,
+    bounds:{minX:0,minY:0,maxX:10,maxY:10},transform:IDENTITY_TRANSFORM,paths:[square('#000000',0)]});
+  useStore.getState().importSvgObject(make('a'));
+  useStore.getState().importSvgObject(make('b'));
+  const operationId=useStore.getState().project.scene.layers[0]!.id;
+  useStore.getState().useOperationForObjects(['a','b'],operationId);
+  useStore.getState().selectObject('a');
+  useStore.getState().setSelectedObjectsOperationOverride({power:10,speed:1234});
+  const before=useStore.getState().project.scene;
+  const expected=effectiveOperationForObject(before.layers[0]!,before.objects[0]!);
+  expect(expected.power).toBe(10);
+  useStore.getState().makeOperationUniqueForObjects(['a'],operationId);
+  const after=useStore.getState().project.scene;
+  const obj=after.objects[0]!;
+  const op=after.layers.find(l=>operationIdsForObject(obj,after.layers).includes(l.id))!;
+  const actual=effectiveOperationForObject(op,obj);
+  expect(actual.power).toBe(expected.power);
+  expect(actual.speed).toBe(expected.speed);
+});
+
+it('Break Apart retains each source path operation binding', () => {
+  useStore.getState().importSvgObject({kind:'imported-svg',id:'parts',source:'parts.svg',
+    bounds:{minX:0,minY:0,maxX:40,maxY:10},transform:IDENTITY_TRANSFORM,
+    paths:[square('#ff0000',0),square('#0000ff',30)]});
+  useStore.getState().selectObject('parts');
+  const before=useStore.getState().project.scene;
+  const source=before.objects[0] as ImportedSvg;
+  expect(operationIdsForObject(source,before.layers)).toHaveLength(2);
+  const expected=source.paths.map(p=>p.operationIds);
+  useStore.getState().breakApartSelection();
+  const after=useStore.getState().project.scene;
+  expect(after.objects).toHaveLength(2);
+  expect(after.objects.map(obj=>operationIdsForObject(obj,after.layers))).toEqual(expected);
+});

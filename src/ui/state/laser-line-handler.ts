@@ -201,7 +201,7 @@ function recordInboundLine(
     log: pushLog(state, line),
     transcript: appendTranscript(
       state.transcript,
-      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls),
+      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls, refs.driver.kind),
     ),
   });
   if (refs.onLineArrived !== null) {

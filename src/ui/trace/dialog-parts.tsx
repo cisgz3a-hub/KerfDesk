@@ -208,10 +208,10 @@ export function PresetHint(): JSX.Element {
       <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings. Forces
       pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
       <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
-      pixel-perfect detail, no blur. <strong>Edge Detection</strong> — single lines along the
-      brightness edges of full-colour art. Raster scan burns any preset through the Image pipeline;
-      a direct raster image still preserves grayscale shading that a binary trace intentionally
-      removes.
+      pixel-perfect detail, no blur. <strong>Edge Detection</strong> — closed outlines around dark
+      artwork and locally darker detail. Adjacent dark tones may merge into one outline. Raster scan
+      burns any preset through the Image pipeline; a direct raster image still preserves grayscale
+      shading that a binary trace intentionally removes.
     </p>
   );
 }

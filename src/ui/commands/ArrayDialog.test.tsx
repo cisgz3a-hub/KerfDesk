@@ -25,6 +25,7 @@ describe('ArrayDialog', () => {
     const tabs = [...requiredHost().querySelectorAll('[role="tab"]')];
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Grid', 'Point Rotation', 'Circular']);
     await act(async () => Simulate.click(button('Point Rotation')));
+    expect(button('Point Rotation').getAttribute('aria-selected')).toBe('true');
     await setInput('Copies (includes original)', '5');
     await setInput('Total angle (deg)', '-180');
     const form = requiredHost().querySelector('form');

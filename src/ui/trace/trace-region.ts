@@ -8,12 +8,14 @@ import {
   offsetColoredPaths,
 } from '../../core/trace';
 import { traceImageWithFallback, type TraceResult } from './use-trace-worker-client';
+import { resolveTraceSourceOptions } from '../../core/trace/trace-alpha';
 
 export async function traceImageRegion(
   image: RawImageData,
-  options: TraceOptions,
+  requestedOptions: TraceOptions,
   boundary: TraceBoundary | null | undefined,
 ): Promise<TraceResult> {
+  const options = resolveTraceSourceOptions(image, requestedOptions);
   const normalized = normalizeTraceBoundary(boundary, image.width, image.height);
   if (normalized === null) {
     return traceImageWithFallback(image, options);

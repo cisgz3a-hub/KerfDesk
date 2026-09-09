@@ -12,7 +12,7 @@ export function JobReviewEffectiveOperationRow(props: {
     <OperationDetailRow
       colSpan={props.colSpan}
       chip={null}
-      text={`Exact compiled output: ${operation.summaries.join(' | ')}`}
+      text={`Partial compiled summary (groups with matching shown values are combined): ${operation.summaries.join(' | ')}`}
     />
   );
 }

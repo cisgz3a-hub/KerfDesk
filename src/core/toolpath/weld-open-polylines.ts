@@ -19,6 +19,8 @@ export type WeldOpenPolylinesOptions = {
   readonly mmPerPx: number;
   /** Endpoint gaps at or under this weld; anything wider is drawn space. */
   readonly maxGapMm: number;
+  /** Established contacts must survive coincident-endpoint deduplication. */
+  readonly retainedPoints?: ReadonlySet<Vec2>;
 };
 
 // A welded chain only self-closes when the remaining gap is small next to
@@ -55,7 +57,7 @@ export function weldOpenPolylines(
   const open = classified.flatMap<WeldWorkChain>(({ polyline, order, isWeldable }) =>
     isWeldable ? [{ points: [...polyline.points], order, hasMerged: false }] : [],
   );
-  const pairing = weldPairs(open, maxGapPx, tangentSamplePx);
+  const pairing = weldPairs(open, maxGapPx, tangentSamplePx, options.retainedPoints);
   const welded = pairing.chains.map((chain) => ({
     polyline: selfClose(chain, maxGapPx, tangentSamplePx),
     order: chain.order,

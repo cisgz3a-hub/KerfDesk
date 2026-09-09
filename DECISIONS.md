@@ -10091,13 +10091,15 @@ into a dropdown. Changes, none touching the gate contract:
 - **Guard surface unchanged:** still one affirmative click, warnings still never block, and
   in-dialog blockers still only re-surface refusals the readiness pipeline already issues.
 
-### Amendment - exact compiled operation disclosure (2026-08-02)
+### Amendment - partial compiled operation summary (2026-08-02; clarified 2026-09-06)
 
-The editable Artwork settings rows continue to show the shared layer values, while a read-only
-detail row now reports every distinct effective operation from the exact prepared `Job`. This makes
-object overrides, per-object power scaling, split tools, and other compile-time resolution visible
-before Start instead of implying that the base layer row is the emitted truth. The disclosure is
-advisory only: it adds no guard, refusal, clamp, confirmation, or change to Frame or streamed bytes.
+The read-only detail row reports selected values from the exact prepared `Job`. It is labeled
+**Partial compiled summary**: groups within one operation with matching shown summaries are
+combined, even when an unshown setting such as CNC safe Z differs. Existing displayed depth,
+contour-entry, effective artwork override, power scaling, tool, and feed details remain available.
+The row makes these resolved values visible before Start without claiming complete operation
+identity or describing every emitted command. It is advisory only: this clarification changes no
+grouping, guard, refusal, clamp, confirmation, Frame behavior, or streamed bytes.
 
 ### Amendment - explicit settings approval (2026-08-09)
 
@@ -10662,6 +10664,22 @@ operator-authored machining values.
   condition, spindle variant, and machine rigidity. Public research and green tests do not make it a
   hardware-qualified cutting recipe.
 
+### 2026-09-06 source note: optional 500 W machine preset
+
+The optional CNC machine selector includes **Neotronics 4040 Max (500 W spindle)** with a provisional
+400 × 400 mm work area and a 12,000 RPM spindle maximum. The
+[4040 Max product page](https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct)
+lists a 400 × 400 × 75 mm work area but mixes spindle variants. The separately identified
+[CNC500W bundle](https://neotronics.co.za/index.php?product_id=297&route=product%2Fproduct) lists
+3,000–12,000 RPM operating speed. Sources were checked on 2026-09-06; these published ratings are
+an explicit 500 W assumption that the operator must confirm against the fitted machine.
+
+**Load into draft** retains its existing boundary: it copies bed dimensions and spindle maximum
+into the unsaved Machine Setup draft. It does not select a device profile or machine family, change
+the ADR-256 operation starter, or rewrite saved/manual operation settings on selection. This
+catalogue addition supplies no cutting recipe, controller observation, measured travel, or hardware
+qualification, and changes no Frame or Start policy.
+
 ---
 
 ## ADR-234 - Bounded feed-matched fill entries for the 4040-safe profile
@@ -10936,6 +10954,22 @@ dialog must not interrupt an ordinary Frame: "It should only be at the main butt
   seconds before streaming instead of before the trace.
 - The Job Review `frame` purpose ("Accept & Frame" copy) has no production caller after this
   change; it is retained for now and may be removed in a follow-up.
+
+### 2026-09-06 amendment: descriptive evidence retention
+
+Equivalent controller settings/build-info object refreshes and same-session observation
+timestamps do not revoke a clean Frame. The semantic `reportInches` interpretation remains
+bound, including at zero position/WCO, together with the existing session, origin, trusted
+position, work-Z, return and terminal-settlement facts. This narrows reference-based expiry;
+the later Start handoff and the warning-only controller policy are unchanged.
+
+The retained artifact signature excludes exactly the device profile's `name`, `vendor`,
+`model`, `profileSource`, `catalogVersion` and `evidence`. Timing calibration, `noGoZones`
+and all other or unknown fields remain included. The exact cached program, metrics and
+timing plan remain owned by the permit; neither cached-plan replacement nor Job Review's
+warning refresh loop changes. The partially adopted historical proposal and its pending
+no-go/timing portions are recorded in
+[the preservation note](docs/audits/2026-09-06-frame-advisory-retention-preservation.md).
 
 ---
 
@@ -16295,6 +16329,16 @@ second unaudited decoder.
   https://www.w3.org/TR/png-3/
 - ADR-289, relief XY scale and sampled physical-cutter qualification boundary.
 
+### 2026-09-06 clarification: mode-independent height-map success disclosure
+
+The success toast always states that the imported relief is stored in either machine mode and
+that output geometry is generated only in CNC mode. It does not depend on a project/machine
+snapshot captured before a picker or decode completes: changing mode within the same document
+must not omit that explanation or make it depend on an outdated mode. The canonical heightfield
+pipeline and exact-document ownership checks remain unchanged, including suppression of a completion
+after New/Open replaces its document. This clarification changes success copy and its context
+dependency only; it changes no import availability, geometry, Frame/Start behavior, or hardware qualification.
+
 ## ADR-291 - Photo-to-relief converges on one editable U16 heightfield pipeline (2026-08-09)
 
 **Date:** 2026-08-09
@@ -19458,3 +19502,14 @@ from its hole and change existing toolpaths merely while adding a new operation.
   qualification is claimed. The exact-job Frame policy and Job Review advisory policy are unchanged.
 
 ---
+---
+
+## Pending proposal - CNC tab count and editor synchronisation (2026-09-06)
+
+The [dated proposal](docs/proposals/2026-09-06-cnc-tab-count-sync.md) preserves the
+historical disable-editor and count/anchor synchronisation intentions under
+ADR-156 and ADR-211. It is a draft for review, not an accepted architectural
+decision; no ADR number is allocated or reserved. The bounded port uses one
+undoable settings transaction for exclusive unlocked paths. Shared-path anchor
+ownership and the existing compiler/editor color mapping remain explicit open
+follow-ups. Frame/Start policy and hardware qualification are unchanged.

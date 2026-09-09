@@ -98,12 +98,25 @@ export async function cancelThenRemountCut3D(
   await previousCanvas.press('Escape');
   await expect(previousDialog).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Open 3D cut preview' })).toBeFocused();
+
+  const readyToClose = await openReadyCut3D(page);
+  const readyWorkerClosed = readyToClose.worker.waitForEvent('close', {
+    timeout: WORKER_TIMEOUT_MS,
+  });
+  await readyToClose.dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(readyToClose.dialog).toHaveCount(0);
+  await readyWorkerClosed;
+
   const started = waitForCut3DWorker(page);
   await page.getByRole('button', { name: 'Open 3D cut preview' }).click();
   const cancellingDialog = page.getByRole('dialog', { name: 'Cut 3D preview' });
-  await started;
+  const cancellingWorker = await started;
+  const cancellingWorkerClosed = cancellingWorker.waitForEvent('close', {
+    timeout: WORKER_TIMEOUT_MS,
+  });
   await cancellingDialog.getByRole('button', { name: 'Close' }).click();
   await expect(cancellingDialog).toHaveCount(0);
+  await cancellingWorkerClosed;
 
   const remounted = await openReadyCut3D(page);
   const isFreshCanvas = await remounted.canvas.evaluate(

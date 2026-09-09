@@ -21,7 +21,8 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
-import { CncCoreCutFields, CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
+import { CncCoreCutFields, CncLayerAdvancedGroup } from './CncLayerAdvancedFields';
+import { CncTabFields } from './CncTabFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { CncOpenPathNote } from './CncOpenPathNote';
 import { CncRetractPassesField } from './CncRetractPassesField';
@@ -94,7 +95,7 @@ export function CncLayerFields(props: {
         spindleMaxRpm={spindleMaxRpm}
         onCommit={commit}
       />
-      {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
       <CncRetractPassesField layer={layer} settings={settings} onCommit={commit} />
       <CncLayerAdvancedGroup
         layer={layer}

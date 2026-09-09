@@ -50,6 +50,10 @@ export type TraceOptions = {
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly traceTransparency?: boolean;
+  // INTERNAL full-source verdict, resolved before cropping or resampling and
+  // carried only with that execution's derived options. traceTransparency
+  // remains the requested setting; an originally opaque source still uses luma.
+  readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
@@ -81,6 +85,8 @@ export type TraceOptions = {
   // gets flipped to white. Centerline uses eight-connected ink; other modes
   // retain four-connectivity. 0 or undefined disables.
   // Topology-preserving: holes inside letters (O, B, etc.) survive.
+  // Area is in the source grid supplied to the tracing core (after UI
+  // decode). The downscale wrapper converts it to fractional working area.
   readonly despeckleMinPixels?: number;
   // fillPinholeCracks: fill hairline white slivers ENCLOSED inside solid ink
   // after despeckle — thresholding artifacts that would otherwise trace as
@@ -100,6 +106,8 @@ export type TraceOptions = {
   // simplify epsilon, centerline join distance) keep their SOURCE-pixel
   // semantics on a supersampled trace. Callers never set this directly.
   readonly pixelScale?: number;
+  // Source-grid contour/hole area. Converted independently of despeckle;
+  // internal working thresholds may be fractional after downsampling.
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
@@ -114,7 +122,8 @@ export type TraceOptions = {
   readonly edgeMedianFilter?: boolean;
   // Centerline endpoint-join allowance in source-image pixels. Candidates
   // must be strictly closer than this distance and pass the tangent checks.
-  // Zero disables gap bridging.
+  // The working raster uses the validated pixelScale once. Zero disables
+  // gap bridging; true-junction repair and ring closure keep their policies.
   readonly centerlineJoinGapPx?: number;
   // Phase E.3 — image-level adjustments matching LF1's
   // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the

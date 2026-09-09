@@ -2,6 +2,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, type RawImageData, type TraceOptions } from '../../core/trace';
+import {
+  flattenStrengthFromSmoothness,
+  optimizationToleranceScaleFromOptimize,
+} from '../../core/trace/contour-trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
 import { traceImageToColoredPaths } from '../../core/trace/trace-to-paths';
 import { TraceSettingsControls } from './TraceSettingsControls';
@@ -129,6 +133,45 @@ describe('trace controls describe the options the engine actually receives', () 
       true,
     );
   });
+  it('keeps Edge finishing overrides visible and editable across preset changes and reset', async () => {
+    await withControls('Smooth', async (controls) => {
+      await controls.change('Smoothness', 0.73);
+      await controls.change('Optimize', 0.41);
+      await controls.selectPreset('Edge Detection');
+      expect(controls.number('Smoothness').value).toBe('0.73');
+      expect(controls.number('Optimize').value).toBe('0.41');
+      await controls.change('Smoothness', 0.84);
+      await controls.change('Optimize', 0.31);
+      expect(controls.options()).toEqual({
+        ...TRACE_PRESETS['Edge Detection'],
+        smoothness: 0.84,
+        optimize: 0.31,
+      });
+      await controls.selectPreset('Smooth');
+      expect(controls.number('Smoothness').value).toBe('0.84');
+      expect(controls.number('Optimize').value).toBe('0.31');
+      await controls.selectPreset('Edge Detection');
+      await controls.reset();
+      expect(controls.options()).toEqual(TRACE_PRESETS['Edge Detection']);
+      expect(controls.number('Smoothness').value).toBe('1');
+      expect(controls.number('Optimize').value).toBe('0.2');
+    });
+  });
+
+  it('shows Edge finishing defaults equivalent to the engine when options are omitted', async () => {
+    await withControls('Edge Detection', async (controls) => {
+      const options = controls.options();
+      expect(options.smoothness).toBeUndefined();
+      expect(options.optimize).toBeUndefined();
+      expect(flattenStrengthFromSmoothness(Number(controls.number('Smoothness').value))).toBe(
+        flattenStrengthFromSmoothness(options.smoothness),
+      );
+      expect(
+        optimizationToleranceScaleFromOptimize(Number(controls.number('Optimize').value)),
+      ).toBe(optimizationToleranceScaleFromOptimize(options.optimize));
+      expect(controls.options()).toEqual(options);
+    });
+  });
 });
 
 type Controls = {
@@ -137,6 +180,8 @@ type Controls = {
   readonly number: (label: string) => HTMLInputElement;
   readonly change: (label: string, value: number) => Promise<void>;
   readonly detect: (mode: string) => Promise<void>;
+  readonly selectPreset: (name: string) => Promise<void>;
+  readonly reset: () => Promise<void>;
 };
 
 async function withControls(
@@ -144,8 +189,9 @@ async function withControls(
   run: (controls: Controls) => Promise<void>,
   sourceHasTransparency = false,
 ): Promise<void> {
-  const preset = TRACE_PRESETS[name];
-  if (preset === undefined) throw new Error(`Missing preset ${name}`);
+  const initialPreset = TRACE_PRESETS[name];
+  if (initialPreset === undefined) throw new Error(`Missing preset ${name}`);
+  let preset = initialPreset;
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -173,6 +219,19 @@ async function withControls(
       host,
       options: () => mergeLightBurnTraceSettings(preset, settings),
       number,
+      selectPreset: async (nextName) => {
+        const next = TRACE_PRESETS[nextName];
+        if (next === undefined) throw new Error(`Missing preset ${nextName}`);
+        preset = next;
+        await act(async () => render());
+      },
+      reset: async () => {
+        const button = [...host.querySelectorAll('button')].find(
+          (node) => node.textContent === 'Reset trace settings',
+        );
+        if (button === undefined) throw new Error('Missing reset button');
+        await act(async () => button.click());
+      },
       change: async (label, value) => {
         await act(async () => {
           const input = number(label);

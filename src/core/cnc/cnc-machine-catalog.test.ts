@@ -19,6 +19,18 @@ describe('CNC_MACHINE_CATALOG', () => {
     }
   });
 
+  it('identifies the Neotronics 4040 Max preset as a provisional 500 W configuration', () => {
+    const neotronics = CNC_MACHINE_CATALOG.find((preset) => preset.id === 'neotronics-4040-max');
+    expect(neotronics).toMatchObject({
+      name: 'Neotronics 4040 Max (500 W spindle)',
+      bedWidthMm: 400,
+      bedHeightMm: 400,
+      spindleMaxRpm: 12000,
+    });
+    expect(neotronics?.note).toContain('assumes the 500 W spindle (12,000 RPM)');
+    expect(neotronics?.note).toContain('confirm against the fitted machine');
+  });
+
   // Regression: these two rows once shipped a different model tier's work
   // area (435×435 / 840×435 — Machinist-class numbers). These values are
   // conservative, rounded-down Elite max-travel figures for the Woodworker

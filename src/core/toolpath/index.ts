@@ -3,3 +3,4 @@
 // (visual-fidelity px domain) and core/geometry (whose barrel is at the
 // ADR-015 export cap). Cross-module consumers import from here.
 export { weldOpenPolylines, type WeldOpenPolylinesOptions } from './weld-open-polylines';
+export { preparePolylineContacts } from './prepare-polyline-contacts';

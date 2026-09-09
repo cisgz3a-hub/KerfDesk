@@ -1,0 +1,219 @@
+// Audit-only reproductions for ccaa3064. These assert the observed defects;
+// they are evidence, not proposed production regression expectations.
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../core/scene';
+import { createStreamer, step } from '../core/controllers/grbl';
+import type { PlatformAdapter, SerialConnection } from '../platform/types';
+import { useLaserStore } from '../ui/state/laser-store';
+import { useStore } from '../ui/state/store';
+import { respondToTestGrblHandshake } from '../ui/state/laser-test-start-helpers';
+import { dispatchPositionLaser } from '../ui/workspace/position-laser-click';
+import { InspectorView } from '../ui/gcode-inspector/InspectorView';
+import { inspectGcodeText } from '../ui/gcode-inspector/gcode-inspector-parse';
+import type * as Viewer3dModule from '../ui/viewer3d';
+import { transmitPreparedStart } from '../ui/laser/start-job-transmission';
+import { cancelVariableStreamAdvancement } from '../ui/laser/variable-stream-advancement';
+import { Cnc3DFullPage } from '../ui/workspace/Cnc3DFullPage';
+import { PlatformProvider } from '../ui/app/platform-context';
+import { useShortcuts } from '../ui/app/use-shortcuts';
+import { useUiStore } from '../ui/state/ui-store';
+
+const mocks = vi.hoisted(() => ({ createScene: vi.fn(), activate: vi.fn() }));
+vi.mock('../ui/viewer3d', async (load) => ({
+  ...(await load<typeof Viewer3dModule>()), createViewer3dScene: mocks.createScene,
+}));
+vi.mock('../ui/laser/start-job-execution-tracking', async (load) => ({
+  ...(await load<typeof import('../ui/laser/start-job-execution-tracking')>()),
+  activateAcceptedFreshRun: mocks.activate,
+}));
+vi.mock('../ui/workspace/use-cnc-3d-scene', () => ({
+  cnc3dPaneDisplayResolution: () => ({ reason: null }),
+  useCnc3dScene: () => ({
+    canvasRef: { current: null }, state: 'ready',
+    controls: { setDisplayMode: vi.fn(), setSectionFraction: vi.fn(), capturePng: vi.fn(), probeAt: vi.fn() },
+  }),
+}));
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const initialLaser = useLaserStore.getState();
+const initialApp = useStore.getState();
+const initialUi = useUiStore.getState();
+let closePhysical: (() => void) | null = null;
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+async function flush() { for (let i = 0; i < 40; i++) await Promise.resolve(); }
+
+function fakeConnection(writes: string[]) {
+  const lines = new Set<(line: string) => void>();
+  const closes = new Set<() => void>();
+  const emitLine = (line: string) => { for (const handler of lines) handler(line); };
+  const connection: SerialConnection & { emitLine: typeof emitLine } = {
+    write: async (data) => {
+      if (useLaserStore.getState().controllerOperation?.kind === 'connection-handshake') {
+        respondToTestGrblHandshake(data, emitLine); return;
+      }
+      writes.push(data);
+    },
+    onLine: (handler) => { lines.add(handler); return () => lines.delete(handler); },
+    onClose: (handler) => { closes.add(handler); return () => closes.delete(handler); },
+    close: async () => undefined,
+    emitLine,
+  };
+  closePhysical = () => { for (const handler of [...closes]) handler(); };
+  return connection;
+}
+async function connect(writes: string[]) {
+  const connection = fakeConnection(writes);
+  const adapter: PlatformAdapter = {
+    id: 'audit-mock', pickFilesForOpen: async () => [], pickFileForSave: async () => null,
+    serial: { isSupported: () => true, requestPort: async () => ({ open: async () => connection }) },
+  };
+  await useLaserStore.getState().connect(adapter);
+  connection.emitLine('Grbl 1.1f');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush(); connection.emitLine('ok');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush(); writes.length = 0;
+  return connection;
+}
+beforeEach(() => {
+  useStore.setState({ project: createProject() });
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+});
+afterEach(async () => {
+  cancelVariableStreamAdvancement(); closePhysical?.(); closePhysical = null;
+  vi.useRealTimers(); await useLaserStore.getState().disconnect();
+  useLaserStore.setState(initialLaser, true); useStore.setState(initialApp, true);
+  useUiStore.setState(initialUi, true);
+  vi.restoreAllMocks();
+});
+
+describe('feature 22-27 audit reproductions', () => {
+  it('reproduces stale G92 success after the acknowledged operation loses its physical port', async () => {
+    const connection = await connect([]);
+    connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+    expect(useLaserStore.getState().wcoCache).toBeNull();
+    vi.useFakeTimers();
+    const pending = useLaserStore.getState().setOriginHere();
+    await flush(); connection.emitLine('ok'); await flush();
+    expect(useLaserStore.getState().controllerOperation?.kind).toBe('interactive-command');
+    const oldEpoch = useLaserStore.getState().controllerSessionEpoch;
+    closePhysical?.();
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().controllerSessionEpoch).toBeGreaterThan(oldEpoch);
+    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    await vi.advanceTimersByTimeAsync(3100); await pending;
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(false);
+  });
+
+  it('reproduces canvas machine-coordinate target being emitted as work-coordinate absolute jog', async () => {
+    const writes: string[] = [];
+    const connection = await connect(writes);
+    const project = createProject();
+    const device = { ...project.device, origin: 'rear-left' as const };
+    useStore.setState({ project: { ...project, device } });
+    connection.emitLine('<Idle|MPos:50.000,70.000,0.000|WCO:40.000,50.000,0.000|FS:0,0>');
+    dispatchPositionLaser({ x: 100, y: 100 }, device); await flush();
+    const jog = writes.find((line) => line.startsWith('$J='));
+    expect(jog).toBe('$J=G90 G21 X100.000 Y100.000 F3000\n');
+    expect(jog).not.toContain('G53');
+    // GRBL upstream docs: G90 jogs are WPos unless G53 is supplied.
+    // With WCO=(40,50), this wire target is MPos=(140,150), not (100,100).
+    expect({ x: 100 + 40, y: 100 + 50 }).not.toEqual({ x: 100, y: 100 });
+  });
+
+  it('reproduces stale G92 owner overwriting the replacement controller work offset', async () => {
+    const original = await connect([]);
+    original.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+    vi.useFakeTimers();
+    const pending = useLaserStore.getState().setOriginHere();
+    await flush(); original.emitLine('ok'); await flush();
+    closePhysical?.();
+    const replacement = await connect([]);
+    replacement.emitLine('<Idle|MPos:50.000,70.000,0.000|WCO:40.000,50.000,0.000|FS:0,0>');
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 40, y: 50, z: 0 });
+    await vi.advanceTimersByTimeAsync(60); await pending;
+    expect(useLaserStore.getState().connection.kind).toBe('connected');
+    expect(useLaserStore.getState().workOriginSource).toBe('g92');
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 50, y: 70, z: 0 });
+  });
+
+  it('reproduces lost Show traversal moves change before asynchronous scene creation', async () => {
+    const scene = deferred<Viewer3dModule.Viewer3dSceneResult>();
+    mocks.createScene.mockReturnValue(scene.promise);
+    const program = 'G21 G90\nM3 S500\nG0 X10 Y0\nG1 X20 Y0 F600';
+    const result = inspectGcodeText(program);
+    if (result.parsed.kind !== 'ok' || !('analysis' in result)) throw new Error('fixture parse failed');
+    const host = document.createElement('div'); document.body.appendChild(host);
+    const root = createRoot(host);
+    const setTravelVisible = vi.fn();
+    const handle: Viewer3dModule.Viewer3dSceneHandle = {
+      setSegments: vi.fn(), fitToBounds: vi.fn(), setTravelVisible,
+      setPlayhead: vi.fn(), setLiveMachine: vi.fn(), recolor: vi.fn(), setView: vi.fn(),
+      captureImage: vi.fn(() => ''), setDirectionArrows: vi.fn(), resize: vi.fn(),
+      requestRender: vi.fn(), dispose: vi.fn(),
+    };
+    try {
+      await act(async () => root.render(<InspectorView model={result.parsed.model} analysis={result.analysis} source={{ kind: 'text', text: program }} sourceIndex={result.sourceIndex} />));
+      const toggle = [...host.querySelectorAll('input')].find((input) => input.title === 'Show or hide the non-cutting moves between shapes');
+      if (!toggle) throw new Error('travel control missing');
+      await act(async () => toggle.click()); expect(toggle.checked).toBe(false);
+      await act(async () => { scene.resolve({ kind: 'ok', handle }); await flush(); });
+      expect(host.querySelector('[data-viewer-state]')?.getAttribute('data-viewer-state')).toBe('ready');
+      expect(toggle.checked).toBe(false);
+      expect(setTravelVisible).not.toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
+
+  it('reproduces missed variable advancement when terminal completion precedes recovery activation', async () => {
+    const activation = deferred<void>(); mocks.activate.mockReturnValue(activation.promise);
+    const project = createProject();
+    const withVariables = { ...project, variables: { ...project.variables, advancement: 'after-successful-stream' } } as typeof project;
+    const advance = vi.fn(); useStore.setState({ project: withVariables, advanceVariablesAfter: advance });
+    const started = step(createStreamer('G1 X1')).state;
+    const startJob = vi.fn(async () => { useLaserStore.setState({ streamer: started }); });
+    const args = {
+      project: withVariables, prepared: { gcode: 'G1 X1', prepared: {}, canvasPlan: {} },
+      machineKind: 'laser', laser: {}, completedReceipt: null, checkpointToReplace: null,
+      repository: {}, reviewedAtIso: new Date().toISOString(), reviewModel: {},
+    };
+    const pending = transmitPreparedStart({
+      args, runId: 'audit-variable-run', staged: true, handoffArmed: true,
+      authorizationArgs: {}, authorization: { ok: true, laser: { startJob } },
+    } as unknown as Parameters<typeof transmitPreparedStart>[0]);
+    await flush(); expect(startJob).toHaveBeenCalledOnce(); expect(mocks.activate).toHaveBeenCalled();
+    useLaserStore.setState({ streamer: { ...started, status: 'done' } });
+    useLaserStore.setState({ streamer: null });
+    activation.resolve(); await pending;
+    expect(advance).not.toHaveBeenCalled();
+  });
+
+  it('reproduces Delete editing underlying artwork while the full-page CNC dialog is open', async () => {
+    const removeSceneObjects = vi.fn();
+    useStore.setState({ selectedObjectId: 'selected-artwork', additionalSelectedIds: new Set(), removeSceneObjects });
+    useUiStore.setState({ modalDepth: 0, textDialog: null, imageDialog: null });
+    const adapter: PlatformAdapter = { id: 'audit-mock', pickFilesForOpen: async () => [], pickFileForSave: async () => null };
+    function Shortcuts() { useShortcuts(); return null; }
+    const source = { grid: {}, moves: [], toolProfile: [] } as unknown as Parameters<typeof Cnc3DFullPage>[0]['source'];
+    const host = document.createElement('div'); document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<PlatformProvider adapter={adapter}><Shortcuts /><Cnc3DFullPage source={source} stockThicknessMm={10} scrubberT={1} live={null} onClose={vi.fn()} /></PlatformProvider>));
+      const dialog = document.querySelector('[aria-label="3D result, full page"]');
+      expect(dialog?.getAttribute('aria-modal')).toBe('true');
+      expect(useUiStore.getState().modalDepth).toBe(0);
+      const close = dialog?.querySelector('button');
+      if (!close) throw new Error('full-page Close button missing');
+      await act(async () => { close.focus(); close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true })); });
+      expect(removeSceneObjects).toHaveBeenCalledWith(['selected-artwork']);
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
+});

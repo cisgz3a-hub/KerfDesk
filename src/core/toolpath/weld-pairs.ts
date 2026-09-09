@@ -38,6 +38,7 @@ export function weldPairs(
   chains: ReadonlyArray<WeldWorkChain>,
   maxGapPx: number,
   tangentSamplePx: number,
+  retainedPoints?: ReadonlySet<Vec2>,
 ): WeldPairingResult {
   let activeChains: ReadonlyArray<WeldWorkChain> = chains.map(cloneChain);
   let state = createWeldPairingState(activeChains, maxGapPx, tangentSamplePx);
@@ -45,7 +46,7 @@ export function weldPairs(
     const taken = takeNextWeldPair(state);
     state = taken.state;
     if (taken.candidate === null) return pairingResult(activeChains, state.stats);
-    const merged = mergeSelectedChains(activeChains, taken.candidate);
+    const merged = mergeSelectedChains(activeChains, taken.candidate, retainedPoints);
     if (merged === null) continue;
     activeChains = merged.chains;
     state = replaceWeldPairAfterMerge(state, taken.candidate, merged.survivor);
@@ -55,6 +56,7 @@ export function weldPairs(
 function mergeSelectedChains(
   chains: ReadonlyArray<WeldWorkChain>,
   selection: WeldPairSelection<WeldWorkChain>,
+  retainedPoints?: ReadonlySet<Vec2>,
 ): MergeResult | null {
   if (!chains.includes(selection.a) || !chains.includes(selection.b)) return null;
   const aPoints =
@@ -64,9 +66,9 @@ function mergeSelectedChains(
   const tail = aPoints.at(-1);
   const head = bPoints[0];
   if (tail === undefined || head === undefined) return null;
-  const isCoincident = Math.hypot(tail.x - head.x, tail.y - head.y) <= WELD_COINCIDENT_EPS;
+  const canDropHead = canDiscardEndpoint(tail, head, retainedPoints);
   const survivor: WeldWorkChain = {
-    points: [...aPoints, ...(isCoincident ? bPoints.slice(1) : bPoints)],
+    points: [...aPoints, ...(canDropHead ? bPoints.slice(1) : bPoints)],
     order: Math.min(selection.a.order, selection.b.order),
     hasMerged: true,
   };
@@ -77,6 +79,15 @@ function mergeSelectedChains(
     }),
     survivor,
   };
+}
+
+function canDiscardEndpoint(tail: Vec2, head: Vec2, retainedPoints?: ReadonlySet<Vec2>): boolean {
+  const isCoincident = Math.hypot(tail.x - head.x, tail.y - head.y) <= WELD_COINCIDENT_EPS;
+  return (
+    isCoincident &&
+    (!retainedPoints?.has(head) ||
+      (tail.x === head.x && tail.y === head.y && retainedPoints.has(tail)))
+  );
 }
 
 function reversedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {

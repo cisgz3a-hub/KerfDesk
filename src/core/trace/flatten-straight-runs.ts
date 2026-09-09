@@ -24,6 +24,8 @@
 // of their fitted lines (recovering the true apex of a soft bend), falling
 // back to the projection midpoint when the fits are near-parallel. Any other
 // run endpoint projects onto its own fitted line.
+// Runs must also progress along that line: a narrow notch can have tiny
+// perpendicular residuals while doubling back far beyond the finite segment.
 
 import type { Vec2 } from '../scene';
 import { fitLineThroughRun, quadraticFitFromStats, runFrameStats, type FitLine } from './run-fit';
@@ -200,7 +202,7 @@ function classifyRun(
   end: number,
   maxDeviationPx: number,
   scale: number,
-): 'too-bumpy' | 'arc' | 'flatten' {
+): 'too-bumpy' | 'arc' | 'reversal' | 'flatten' {
   const line = fitLineThroughRun(ring, start, end);
   const stats = runFrameStats(ring, start, end, line, maxDeviationPx);
   const n = end - start + 1;
@@ -210,6 +212,9 @@ function classifyRun(
   // fits, which is worse than not flattening at all (measured).
   if (stats.maxAbsResidual > maxDeviationPx * HARD_BREAK_FACTOR) return 'too-bumpy';
   if (stats.overCapCount > Math.max(1, Math.ceil(n * OUTLIER_FRACTION))) return 'too-bumpy';
+  if (hasLongitudinalReversal(ring, start, end, line, FLAT_LINE_SLACK_PX * scale)) {
+    return 'reversal';
+  }
   const lineRms = Math.sqrt(stats.residualSumSq / n);
   if (lineRms <= FLAT_LINE_SLACK_PX * scale) return 'flatten';
   if (chordMinoritySideShare(ring, start, end, scale) < MIN_SIDE_BALANCE) return 'arc';
@@ -219,6 +224,37 @@ function classifyRun(
   return lineRms <= quadRms * LINE_VS_ARC_TOLERANCE + FLAT_LINE_SLACK_PX * scale
     ? 'flatten'
     : 'arc';
+}
+
+// Orient progress from the first endpoint toward the last. Comparing each
+// vertex with the furthest preceding projection catches both overshoots and
+// reversals wholly inside the endpoint span; per-edge checks miss a reversal
+// sampled as many small steps. Only the existing source-scaled flat-line noise
+// floor is tolerated; increasing Smoothness must not shorten a deliberate turn.
+//
+// With the residual cap, this also bounds distance to the finite projected
+// segment, not just its infinite line. Pins and joints retain their existing
+// emission semantics: their displacement from those projections adds to that
+// bound (a snapped joint stays within JOINT_SNAP_LIMIT_PX of its input vertex).
+function hasLongitudinalReversal(
+  ring: ReadonlyArray<Vec2>,
+  start: number,
+  end: number,
+  line: FitLine,
+  budget: number,
+): boolean {
+  const first = ring[start] as Vec2;
+  const last = ring[end] as Vec2;
+  const span = (last.x - first.x) * line.dx + (last.y - first.y) * line.dy;
+  const direction = span < 0 ? -1 : 1;
+  let furthest = 0;
+  for (let i = start + 1; i <= end; i += 1) {
+    const point = ring[i] as Vec2;
+    const progress = direction * ((point.x - first.x) * line.dx + (point.y - first.y) * line.dy);
+    if (furthest - progress > budget) return true;
+    furthest = Math.max(furthest, progress);
+  }
+  return false;
 }
 
 // Share of the significant chord deviations sitting on the minority side.

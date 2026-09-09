@@ -29,6 +29,7 @@ import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
 import type { RawImageData, TraceOptions } from './trace-image';
+import { resolveTraceSourceOptions } from './trace-alpha';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 // 2x is mkbitmap's documented sweet spot ("a greyscale image contains more
@@ -71,11 +72,12 @@ export function computeRegionUpscaleFactor(crop: RawImageData, options: TraceOpt
 export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<ColoredPath[]> {
   const region = normalizeTraceBoundary(args.region, args.image.width, args.image.height);
   if (region === null) return [...args.fullTracePaths];
+  const options = resolveTraceSourceOptions(args.image, args.options);
   const crop = cropRawImageData(args.image, region);
-  const factor = computeRegionUpscaleFactor(crop, args.options);
+  const factor = computeRegionUpscaleFactor(crop, options);
   const traced = await args.trace(
     factor > 1 ? upscaleBy(crop, factor) : crop,
-    optionsForRegionScale(args.options, factor),
+    optionsForRegionScale(options, factor),
   );
   const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), region.x, region.y);
   const interior = shrinkRegion(region, REGION_EDGE_MARGIN_PX);

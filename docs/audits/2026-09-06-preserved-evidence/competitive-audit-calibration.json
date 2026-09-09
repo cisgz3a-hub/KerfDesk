@@ -1,0 +1,43 @@
+{
+  "adjustments": [
+    {
+      "sector": 11,
+      "cat": "11.4",
+      "product": "KerfDesk",
+      "newScore": 7,
+      "reason": "HW-CLAIMED auto-resume, single-slot caveat; match 10.7=7* proof-debt discount vs field-proven gSender (9)."
+    },
+    {
+      "sector": 11,
+      "cat": "11.5",
+      "product": "KerfDesk",
+      "newScore": 8,
+      "reason": "Deepest preflight but silently accepts un-warned M-17 through-cut default; open in-category defect bars best-in-roster 9."
+    },
+    {
+      "sector": 11,
+      "cat": "11.8",
+      "product": "KerfDesk",
+      "newScore": 7,
+      "reason": "Safety-posture category carries open un-warned M-17 through-cut default; CODE-only, cannot hold parity-plus 8."
+    },
+    {
+      "sector": 12,
+      "cat": "12.5",
+      "product": "KerfDesk",
+      "newScore": 7,
+      "reason": "Fixture landing HW-CLAIMED, never rendered even at authoring; align to S7 design-intent ceiling; still beats LightBurn (6)."
+    }
+  ],
+  "flags": [
+    "STRUCTURAL (N/R-vs-0 convention): S14 scores CNC products (Easel, Carbide) 0 on laser-mechanism cats 14.1-14.3, while S4 (raster) and S8.5 (CNC stock-sim) correctly use N/R for the symmetric mechanism-N/A case. Coherent rule per design 3 + the internally-correct S8.5 model: sector-competes + mechanism-applies-but-missing = 0; mechanism N/A to product class = N/R. Under it, S14 14.1-14.3 Easel/Carbide should be N/R (power x speed is a laser mechanism). Not silently fixed - it removes them from S14 roll-ups and shifts P2 (CNC-beginner). Synthesis should harmonize before roll-ups.",
+    "FIDELITY CAP (5.3) - audit result, no violations: all KerfDesk fidelity cells >6 carry qualifying perceptual evidence. 3.2=8, 6.3=7, 8.1=7 are PERC re-run this audit; 3.1=7 rests on the ADR-128-recorded maintainer reference-loop pass (the 5.3 'maintainer-confirmed visual pass' carve-out), since ARCH_LOOP was not re-run this session. 4.1/4.2 correctly self-capped at 6 (TEST). Raters self-enforced the cap; no downward moves needed.",
+    "SINGLE-10 (5.1) - audit result, no demotions: no category holds two 10s; every 10 is single and correctly ordered above its runner-up. VCarve holds 10 in six S7 cats (7.1/7.2/7.4/7.5/7.6/7.7) but each singly, as the documented CNC ceiling - legitimate, not a violation. 7.3 MillMage=10 (>VCarve 8) also fine.",
+    "5.5 OVER-CLAIM PRIORITY (route to adversarial verifier): highest-risk KerfDesk win/tie cells that are >= best competitor on CODE-only or thin-PERC evidence: 6.3 (7 ties LightBurn 7 on 32x32-only PERC vs LightBurn INF-ubiquity - both arguably 6); 5.4 (8 vs LightBurn 6, un-ADR'd + low-discoverability); 2.7 (7, all competitors 0/U, unconditional-replace un-ADR'd divergence); 9.5/9.6 (9s, firmware reactions HW-CLAIMED); 11.4 (now 7, design-intent vs field-proven gSender 9).",
+    "S11 DISTRIBUTION HIGH: pre-adjust KerfDesk S11 mean 7.9 was its single highest sector, above PERC-backed S3 and TEST-backed S9 (both 7.0), despite S11 being entirely CODE/TEST with all real-world behavior HW-CLAIMED. Adjusted 11.4/11.5/11.8 down (mean now ~7.5). 11.1 (confirmed jobPlacement session-reset defect, CODE) and 11.3/11.7 (HW-CLAIMED halt/re-entry) remain at 8 and should be watched by Phase-3 refuters.",
+    "MILLMAGE EXISTENCE-8 SOFTNESS (not individually corrected - no single >=2 error; shared-LightBurn-engine partly justifies): MillMage (0.8.x, ~4 months GA, zero community quality signal) carries 8s across many sectors (S1 1.1-1.8, S9 9.3/9.4, S10 10.5/10.8, S15, S16) on [OFF] docs-nav existence only, raters flagging 'soft/depth unverified'. Per 7.2, existence != quality; treat these 8s as LOW-CONFIDENCE and bar them from headline conclusions in roll-ups.",
+    "NOTE-CONTRADICTS-STRUCTURE (already surfaced by raters; ensure gap-register carries the 5.6 severity bump): S7 7.5 KerfDesk gap 'cites a nonexistent ADR' for the tabs-off/through-cut default (grep-refuted un-ADR'd doc drift); S16 16.1 catalog claims FluidNC numeric $-writes are 'blocked in-app' when code (A.3.9) shows they are not. Both are un-ADR'd factual divergences.",
+    "OFF-NOT-COMM HEDGING: gSender 10.6=9 ('Likely sector-leading') and several sim/telemetry quality claims rest on hedged [OFF] language rather than [COMM]/[HANDS]; defensible given reputation but should not anchor a headline quality verdict without a second source (7.2)."
+  ],
+  "persisted": true
+}

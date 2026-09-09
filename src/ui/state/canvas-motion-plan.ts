@@ -218,6 +218,25 @@ function cncPassSpansOption(
   return spans === undefined ? {} : { cncPassSpans: spans };
 }
 
+const DESCRIPTIVE_DEVICE_FIELDS: ReadonlySet<keyof DeviceProfile> = new Set([
+  'name',
+  'vendor',
+  'model',
+  'profileSource',
+  'catalogVersion',
+  'evidence',
+]);
+
+function retainedDeviceFields(device: DeviceProfile): Readonly<Record<string, unknown>> {
+  // Exclude only descriptive labels. Timing calibration, no-go warnings and
+  // every other (including future) field still bind the cached artifact.
+  return Object.fromEntries(
+    Object.entries(device).filter(
+      ([key]) => !DESCRIPTIVE_DEVICE_FIELDS.has(key as keyof DeviceProfile),
+    ),
+  );
+}
+
 export function canvasPlanRetentionKey(
   project: Project,
   outputScope: OutputScope,
@@ -235,7 +254,7 @@ export function canvasPlanRetentionKey(
   const serialized = JSON.stringify({
     scene: project.scene,
     machine: project.machine,
-    device: project.device,
+    device: retainedDeviceFields(project.device),
     optimization: project.optimization,
     variables: project.variables,
     outputScope,

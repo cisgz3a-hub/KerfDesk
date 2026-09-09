@@ -26,6 +26,8 @@ export type ToolpathFairOptions = {
    *  smoothed, and chords between two nearby corners may undershoot the
    *  minimum segment (corners win over the floor). */
   readonly cornerAngleDeg: number;
+  /** Existing source contacts, identified by references retained through welding. */
+  readonly pinnedPoints?: ReadonlySet<Vec2>;
 };
 
 const MIN_FAIR_POINTS = 4;
@@ -50,7 +52,7 @@ export function fairToolpathPolylines(
   const minSegmentPx = options.minSegmentMm / options.mmPerPx;
   const maxDeviationPx = options.maxDeviationMm / options.mmPerPx;
   return polylines.map((polyline) =>
-    fairOne(polyline, minSegmentPx, maxDeviationPx, options.cornerAngleDeg),
+    fairOne(polyline, minSegmentPx, maxDeviationPx, options.cornerAngleDeg, options.pinnedPoints),
   );
 }
 
@@ -59,12 +61,13 @@ function fairOne(
   minSegmentPx: number,
   maxDeviationPx: number,
   cornerAngleDeg: number,
+  contactPins?: ReadonlySet<Vec2>,
 ): Polyline {
   if (polyline.points.length < MIN_FAIR_POINTS) return polyline;
   const ring = polyline.closed;
-  const points = ring ? stripRingDuplicate(polyline.points) : [...polyline.points];
+  const points = ring ? stripRingDuplicate(polyline.points, contactPins) : [...polyline.points];
   if (points.length < MIN_FAIR_POINTS) return polyline;
-  const pinned = pinnedIndices(points, ring, cornerAngleDeg);
+  const pinned = pinnedIndices(points, ring, cornerAngleDeg, contactPins);
   const spans = spansBetweenPins(points.length, ring, pinned);
   const out: Vec2[] = [];
   for (const span of spans) {
@@ -91,10 +94,11 @@ function fairOne(
 
 // Closed traced rings carry an explicit closing duplicate (last == first);
 // drop it for cyclic processing, re-added on output.
-function stripRingDuplicate(points: ReadonlyArray<Vec2>): Vec2[] {
+function stripRingDuplicate(points: ReadonlyArray<Vec2>, contactPins?: ReadonlySet<Vec2>): Vec2[] {
   const first = points[0];
   const last = points[points.length - 1];
   if (first === undefined || last === undefined) return [...points];
+  if (contactPins?.has(last) && (first.x !== last.x || first.y !== last.y)) return [...points];
   const dupe = Math.hypot(last.x - first.x, last.y - first.y) <= RING_DUPLICATE_EPS;
   return dupe ? points.slice(0, -1) : [...points];
 }
@@ -114,6 +118,7 @@ function pinnedIndices(
   points: ReadonlyArray<Vec2>,
   ring: boolean,
   cornerAngleDeg: number,
+  contactPins?: ReadonlySet<Vec2>,
 ): number[] {
   const n = points.length;
   const prefix = prefixArclengths(points, ring);
@@ -136,6 +141,9 @@ function pinnedIndices(
     turns[i] = Math.max(exact, windowed);
   }
   const pins = arclengthNms(turns, prefix, total, ring, cornerAngleDeg);
+  points.forEach((point, i) => {
+    if (contactPins?.has(point)) pins.push(i);
+  });
   if (!ring) {
     pins.push(0, n - 1);
   } else if (pins.length === 0) {

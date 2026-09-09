@@ -23,6 +23,7 @@ import {
   type RawImageData,
   type TraceOptions,
   buildImageTracerOptions,
+  effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
 import { downscaleTracedPaths, scaleTracedPathsUniform, upscaleBy } from './auto-upscale';
@@ -32,6 +33,7 @@ import { traceImageToEdgePathsSteps } from './edge-trace';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { runTraceSteps, type TraceStepRunner } from './trace-steps';
+import { resolveTraceSourceOptions } from './trace-alpha';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -136,9 +138,10 @@ async function loadTracer(): Promise<ImageTracerModule> {
 // between, so curve fidelity survives.
 export async function traceImageToColoredPaths(
   image: RawImageData,
-  options: TraceOptions,
+  requestedOptions: TraceOptions,
   run: TraceStepRunner = runTraceSteps,
 ): Promise<ColoredPath[]> {
+  const options = resolveTraceSourceOptions(image, requestedOptions);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the
@@ -150,8 +153,22 @@ export async function traceImageToColoredPaths(
   const scalePlan = traceScalePlan(image, options);
   if (scalePlan.kind === 'downscale') {
     const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
+    // Convert the two source-area controls once, using both actual raster
+    // dimensions. Keep fractional working thresholds; UI integer rounding
+    // must not erase the conversion. Lengths and pinhole caps retain their
+    // existing working-grid policy through pixelScale: 1 below.
+    const areaScale =
+      (workingImage.width / image.width) *
+      (workingImage.height / image.height) *
+      effectivePixelScale(options) ** 2;
     const workingOptions: TraceOptions = {
       ...options,
+      ...(options.despeckleMinPixels === undefined
+        ? {}
+        : { despeckleMinPixels: options.despeckleMinPixels * areaScale }),
+      ...(options.ignoreLessThanPixels === undefined
+        ? {}
+        : { ignoreLessThanPixels: options.ignoreLessThanPixels * areaScale }),
       supersampleContour: false,
       autoUpscaleSmallSources: false,
       upscaleSmallSmoothSources: false,
