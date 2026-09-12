@@ -46,6 +46,7 @@ export type TextDialogState =
       readonly lineHeight: number;
       readonly letterSpacing: number;
       readonly bendDeg?: number;
+      readonly weldOverlaps?: boolean;
       readonly pathText?: PathTextSettings;
       readonly variableTemplate?: VariableTemplate;
       readonly color: string;
@@ -64,6 +65,7 @@ export type TraceImageDialogState = {
 // canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
 export type ToolMode =
   | { readonly kind: 'select' }
+  | { readonly kind: 'text' }
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
   | { readonly kind: 'cnc-tabs'; readonly layerColor: string; readonly operationId?: string }

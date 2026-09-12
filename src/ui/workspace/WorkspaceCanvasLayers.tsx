@@ -6,6 +6,11 @@ import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { useCanvasMotionLayer } from './use-canvas-motion-layer';
 import type { ViewState } from './view-transform';
+import { CanvasTextEditor } from '../text/CanvasTextEditor';
+import {
+  handleCanvasDoubleClick,
+  workspaceTextPointerHandlers,
+} from './workspace-text-interaction';
 
 export function WorkspaceCanvasLayers(props: {
   readonly baseRef: React.MutableRefObject<HTMLCanvasElement | null>;
@@ -18,12 +23,12 @@ export function WorkspaceCanvasLayers(props: {
     readonly onLostPointerCapture: React.PointerEventHandler<HTMLCanvasElement>;
   };
   readonly project: Project;
+  readonly previewMode: boolean;
   readonly viewState: ViewState;
   readonly canvasMotionOverlay: CanvasMotionOverlay | null;
-  readonly onDoubleClick: React.MouseEventHandler<HTMLCanvasElement>;
-  readonly onContextMenu: React.MouseEventHandler<HTMLCanvasElement>;
 }): JSX.Element {
   const motionRef = useRef<HTMLCanvasElement | null>(null);
+  const handlers = workspaceTextPointerHandlers({ ...props, canvasRef: props.baseRef });
   useCanvasMotionLayer({
     ref: motionRef,
     project: props.project,
@@ -37,13 +42,13 @@ export function WorkspaceCanvasLayers(props: {
         ref={props.baseRef}
         width={props.canvasSize.width}
         height={props.canvasSize.height}
-        onPointerDown={props.handlers.onPointerDown}
-        onPointerMove={props.handlers.onPointerMove}
-        onPointerUp={props.handlers.onPointerUp}
-        onPointerCancel={props.handlers.onPointerCancel}
-        onLostPointerCapture={props.handlers.onLostPointerCapture}
-        onDoubleClick={props.onDoubleClick}
-        onContextMenu={props.onContextMenu}
+        onPointerDown={handlers.onPointerDown}
+        onPointerMove={handlers.onPointerMove}
+        onPointerUp={handlers.onPointerUp}
+        onPointerCancel={handlers.onPointerCancel}
+        onLostPointerCapture={handlers.onLostPointerCapture}
+        onDoubleClick={handleCanvasDoubleClick}
+        onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
         aria-label={`${APP_DISPLAY_NAME} workspace`}
       />
@@ -55,8 +60,18 @@ export function WorkspaceCanvasLayers(props: {
         aria-hidden="true"
         data-testid="canvas-motion-layer"
       />
+      <CanvasTextEditor
+        canvasRef={props.baseRef}
+        canvasSize={props.canvasSize}
+        project={props.project}
+        viewState={props.viewState}
+      />
     </>
   );
+}
+
+function suppressCanvasContextMenu(event: React.MouseEvent<HTMLCanvasElement>): void {
+  event.preventDefault();
 }
 
 const canvasStyle: React.CSSProperties = {

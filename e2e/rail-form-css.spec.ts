@@ -155,8 +155,12 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
   await page.getByRole('button', { name: 'Text...', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Text content' }).fill('CNC width check');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page
+    .getByLabel('KerfDesk workspace', { exact: true })
+    .click({ position: { x: 150, y: 200 } });
+  await page.getByRole('textbox', { name: 'Text content on canvas' }).fill('CNC width check');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
 
   const panel = page.getByLabel('Cuts / Layers resizable panel');
   const machineMaximum = panel.getByRole('button', { name: /^Machine maximum:/ });

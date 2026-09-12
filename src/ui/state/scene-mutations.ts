@@ -433,7 +433,16 @@ function addMissingReimportOperations(
 // Insert or update a TextObject by id. On edit (id matches), keeps
 // the existing object's transform so the user's position survives
 // re-renders. On add, fits to the bed like a fresh SVG import.
-export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult {
+export type TextInsertOptions = {
+  readonly placement?: 'canvas';
+  readonly variables?: NonNullable<Project['variables']>;
+};
+
+export function applyUpsertText(
+  s: StateSlice,
+  text: TextObject,
+  options?: TextInsertOptions,
+): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === text.id);
   let scene: Scene;
   let operationId: string | null = null;
@@ -457,7 +466,7 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
   } else {
     const created = createArtworkOperation(s.project.scene, text);
     const prepared =
-      text.pathText !== undefined
+      text.pathText !== undefined || options?.placement === 'canvas'
         ? created.object
         : fitObjectToBed(created.object, s.project.device.bedWidth, s.project.device.bedHeight);
     scene = addLayer(addObject(s.project.scene, prepared), created.operation);
@@ -470,10 +479,22 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
     scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, operationId, text.fontKey);
   }
   return {
-    project: { ...s.project, scene },
+    project: textProjectAfterEdit(s.project, scene, options),
     selectedObjectId: text.id,
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
+  };
+}
+
+function textProjectAfterEdit(
+  project: Project,
+  scene: Scene,
+  options?: TextInsertOptions,
+): Project {
+  return {
+    ...project,
+    scene,
+    ...(options?.variables === undefined ? {} : { variables: options.variables }),
   };
 }

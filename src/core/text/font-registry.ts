@@ -5,7 +5,7 @@
 // the registry; the keys themselves never change so a 3-year-old .lf2
 // still resolves.
 //
-// Phase D bundles thirteen outline fonts and four native CNC stroke fonts.
+// Phase D bundles twenty-one outline fonts and four native CNC stroke fonts.
 // All are redistributable under ADR-017 / ADR-226 / ADR-266 / ADR-267:
 //   - Roboto Regular          Apache-2.0     sans
 //   - Poppins Regular         OFL-1.1        sans (geometric)
@@ -15,6 +15,14 @@
 //   - Courier Prime Regular   OFL-1.1        mono (typewriter)
 //   - Pacifico Regular        OFL-1.1        script (handwritten)
 //   - Dancing Script Regular  OFL-1.1        script (calligraphic)
+//   - Great Vibes Regular     OFL-1.1        script (formal calligraphic)
+//   - Allura Regular          OFL-1.1        script (flowing calligraphic)
+//   - Alex Brush Regular      OFL-1.1        script (brush calligraphic)
+//   - Parisienne Regular      OFL-1.1        script (calligraphic, RFN)
+//   - Pinyon Script Regular   OFL-1.1        script (formal calligraphic)
+//   - Italianno Regular       OFL-1.1        script (calligraphic)
+//   - Corinthia Regular       OFL-1.1        script (calligraphic)
+//   - Cinzel Decorative       OFL-1.1        display (serif, RFN Cinzel)
 //   - Anton Regular           OFL-1.1        display (heavy condensed)
 //   - Special Elite Regular   Apache-2.0     display (distressed typewriter)
 //   - UnifrakturMaguntia Book OFL-1.1        display (blackletter, RFN)
@@ -49,6 +57,14 @@ export type KnownFontKey =
   | 'courier-prime-regular'
   | 'pacifico-regular'
   | 'dancing-script-regular'
+  | 'great-vibes-regular'
+  | 'allura-regular'
+  | 'alex-brush-regular'
+  | 'parisienne-regular'
+  | 'pinyon-script-regular'
+  | 'italianno-regular'
+  | 'corinthia-regular'
+  | 'cinzel-decorative-regular'
   | 'anton-regular'
   | 'special-elite-regular'
   | 'unifraktur-maguntia-book'
@@ -132,6 +148,62 @@ export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
     displayName: 'Dancing Script',
     license: 'OFL-1.1',
     styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'great-vibes-regular',
+    displayName: 'Great Vibes',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'allura-regular',
+    displayName: 'Allura',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'alex-brush-regular',
+    displayName: 'Alex Brush',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'parisienne-regular',
+    displayName: 'Parisienne',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'pinyon-script-regular',
+    displayName: 'Pinyon Script',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'italianno-regular',
+    displayName: 'Italianno',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'corinthia-regular',
+    displayName: 'Corinthia',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+    geometry: 'outline',
+  },
+  {
+    key: 'cinzel-decorative-regular',
+    displayName: 'Cinzel Decorative',
+    license: 'OFL-1.1',
+    styleClass: 'display',
     geometry: 'outline',
   },
   {

@@ -7,6 +7,7 @@ export type CommandHelpId = `command:${CommandId}`;
 export type MenuHelpId = `menu:${CommandFamily}`;
 export type ToolHelpKey =
   | 'select'
+  | 'text'
   | 'node'
   | 'measure'
   | 'rect'
@@ -78,6 +79,10 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
     label: 'Select / transform',
     tooltip:
       'Select, move, rotate, and resize artwork. Drag the center arrows to move a selection; Alt+click cycles crossing objects.',
+  },
+  text: {
+    label: 'Text',
+    tooltip: 'Click the canvas to type. Click existing text to edit it. Shortcut: T.',
   },
   node: {
     label: 'Edit nodes',

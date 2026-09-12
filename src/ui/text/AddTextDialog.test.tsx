@@ -17,6 +17,8 @@ const textMocks = vi.hoisted(() => ({
             points: [
               { x: 0, y: 0 },
               { x: 10, y: 0 },
+              { x: 10, y: 5 },
+              { x: 5, y: 5 },
             ],
           },
         ],

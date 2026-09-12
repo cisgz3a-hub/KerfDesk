@@ -223,6 +223,9 @@ export type TextObject = ObjectPowerScale & {
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
   readonly bendDeg?: number;
+  // Union this text object's overlapping outline glyphs while keeping its
+  // editable source. Absent/false preserves legacy independent contours.
+  readonly weldOverlaps?: boolean;
   readonly pathText?: PathTextSettings;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`
