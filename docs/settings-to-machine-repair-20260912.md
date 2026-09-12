@@ -79,6 +79,6 @@ The original immutable audit evidence remains at
 `D:\CodexWorktrees\settings-machine-audit-20260912-01a095a3\audit-evidence`.
 
 No hardware was operated, no firmware settings were written, and the exact-job Frame/Start
-policy remains unchanged. The repairs are committed locally; they have not been pushed,
-merged or deployed. The remaining operational steps are integrating and releasing this
-branch, then controlled qualification with the actual controller and material.
+policy remains unchanged. At this verification checkpoint, the repairs were committed
+locally and had not been pushed, merged or deployed. Publication and controlled
+qualification with the actual controller and material are separate evidence stages.
