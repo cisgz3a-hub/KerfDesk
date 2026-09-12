@@ -227,6 +227,8 @@ describe('editable text outline welding', () => {
         }
       }
     },
+    // Dense independent accuracy sampling is not a latency assertion.
+    30_000,
   );
 
   it('keeps open-only single-line text byte-identical', () => {
