@@ -128,7 +128,7 @@ describe('camera capture enters Trace as an atomic registered import', () => {
       expect(useUiStore.getState().imageDialog).toBe(next);
       expect(buildBitmapFromVectors).not.toHaveBeenCalled();
       await submit();
-      expect(useStore.getState().project.scene.objects).toHaveLength(4);
+      expect(useStore.getState().project.scene.objects).toHaveLength(3);
     },
   );
   it.each([false, true])('abandons the bitmap-build await, delete %s', async (remove) => {
@@ -175,6 +175,7 @@ describe('camera capture enters Trace as an atomic registered import', () => {
   );
   it('re-traces a retained camera source using the ordinary same-ID scene route', async () => {
     await open();
+    await options('vector', false);
     await submit();
     const s = useStore.getState();
     const target = s.project.scene.objects.find((o) => o.id === s.selectedObjectId)!;
@@ -182,6 +183,7 @@ describe('camera capture enters Trace as an atomic registered import', () => {
       retraceOriginalAction(s.project, target, useUiStore.getState().openImageDialog, pushToast)();
     });
     expect(useUiStore.getState().imageDialog?.replaceTraceId).toBe(target.id);
+    await options('vector', false);
     await submit();
     expect(useStore.getState().project.scene.objects.map((o) => o.id)).toEqual(
       s.project.scene.objects.map((o) => o.id),

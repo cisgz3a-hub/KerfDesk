@@ -2,8 +2,9 @@
 // File-keyed preview and worker trace pipeline. Laser projects default to
 // editable vector output (LightBurn's Trace model, ADR-238); materializing the
 // trace through the Raster/Image pipeline (ADR-235) remains selectable, and
-// CNC stays vector-only. Both outputs retain source provenance for Re-trace
-// Original. Pure UI pieces live in dialog-parts.tsx.
+// CNC stays vector-only. Both outputs retain source provenance; Re-trace
+// Original needs the source bitmap kept in the scene. Pure UI pieces live in
+// dialog-parts.tsx.
 
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
@@ -16,16 +17,9 @@ import {
 import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { Dialog } from '../kit';
 import {
   CNC_TRACE_PRESET_NAME,
   DEFAULT_TRACE_PRESET_NAME,
-  DialogActions,
-  DeleteImageAfterTraceToggle,
-  PresetHint,
-  PresetPicker,
-  SourceLabel,
-  TraceOutputFields,
   type TraceFillStyle,
   type TraceOutput,
 } from './dialog-parts';
@@ -33,7 +27,7 @@ import { readRasterSourceFile } from '../import/paged-raster-source';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PreparedTrace } from './prepared-trace';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
-import { TraceSettingsControls } from './TraceSettingsControls';
+import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
@@ -115,7 +109,7 @@ function DialogBody(props: {
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
-  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
+  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
   const boundarySelection = useBoundarySelection();
   const [busy, setBusy] = useState(false);
   const captureLifetime = useTraceCommitLifetime(props.requestToken);
@@ -135,12 +129,10 @@ function DialogBody(props: {
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
   const options = useTraceOptions(presetOptions, traceSettings);
-  const supportsTraceFillStyle = isFilledContourTraceOptions(options);
   const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
-  const onSubmit = (e: React.FormEvent): void => {
-    e.preventDefault();
+  const onSubmit = (): void => {
     submitTraceDialog({
       file,
       options,
@@ -165,32 +157,34 @@ function DialogBody(props: {
 
   // kit Dialog owns the a11y wiring (Escape, focus trap, focus return).
   return (
-    <Dialog onClose={close} ariaLabel="Trace image" as="form" onSubmit={onSubmit} size="md">
-      <h2 className="lf-dialog-title">Trace Image</h2>
-      <SourceLabel name={seed.source} />
-      <TraceOutputFields
-        machineKind={machineKind}
-        traceOutput={traceOutput}
-        onTraceOutputChange={setTraceOutput}
-        supportsFillStyle={supportsTraceFillStyle}
-        traceFillStyle={traceFillStyle}
-        onTraceFillStyleChange={setTraceFillStyle}
-      />
-      <PresetPicker machineKind={machineKind} value={preset} onChange={setPreset} />
-      <TraceSettingsControls
-        preset={presetOptions}
-        overrides={traceSettings}
-        sourceHasTransparency={traceSourceHasTransparency(preview)}
-        onChange={setTraceSettings}
-      />
-      <TracePreviewPanel preview={preview} seed={seed} boundarySelection={boundarySelection} />
-      <DeleteImageAfterTraceToggle
-        checked={deleteSourceAfterTrace}
-        onChange={setDeleteSourceAfterTrace}
-      />
-      <PresetHint />
-      <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
-    </Dialog>
+    <TraceDialogView
+      source={seed}
+      onClose={close}
+      onSubmit={onSubmit}
+      presetName={preset}
+      onPresetChange={setPreset}
+      settings={{
+        preset: presetOptions,
+        overrides: traceSettings,
+        sourceHasTransparency: traceSourceHasTransparency(preview),
+        onChange: setTraceSettings,
+      }}
+      output={{
+        machineKind,
+        traceOutput,
+        onTraceOutputChange: setTraceOutput,
+        supportsFillStyle: isFilledContourTraceOptions(options),
+        traceFillStyle,
+        onTraceFillStyleChange: setTraceFillStyle,
+      }}
+      preview={
+        <TracePreviewPanel preview={preview} seed={seed} boundarySelection={boundarySelection} />
+      }
+      deleteSource={deleteSourceAfterTrace}
+      onDeleteSourceChange={setDeleteSourceAfterTrace}
+      canSubmit={file !== null && !busy}
+      busy={busy}
+    />
   );
 }
 

@@ -5,8 +5,10 @@ import { ContourOrientation, insideContour } from './contour-orientation';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 
 type CrossingEdge = ContourBox & { readonly a: Vec2; readonly b: Vec2 };
+type MembershipResult = { readonly x: number; readonly y: number; readonly inside: boolean };
 type PreparedContour = {
   readonly bounds: ContourBox;
+  readonly membership: WeakMap<Vec2, MembershipResult>;
   index?: ContourBoxIndex<CrossingEdge>;
 };
 
@@ -24,7 +26,7 @@ export class ContourMembership {
     let contour = this.prepared.get(points);
     if (contour === undefined) {
       const bounds = contourBox(points);
-      contour = finiteContourBox(bounds) ? { bounds } : null;
+      contour = finiteContourBox(bounds) ? { bounds, membership: new WeakMap() } : null;
       this.prepared.set(points, contour);
     }
     if (contour === null || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
@@ -38,9 +40,22 @@ export class ContourMembership {
       point.y > bounds.maxY
     )
       return false;
+    // Refinement revisits the same source/candidate relationships. Cache only
+    // queries that need a ray scan; cheap bounding rejects need no retained entry.
+    const previous = contour.membership.get(point);
+    if (matchesQuery(previous, point)) return previous.inside;
     contour.index ??= yield* crossingIndexSteps(points);
-    return rayWinding(point, contour.index, this.orientation) !== 0;
+    const inside = rayWinding(point, contour.index, this.orientation) !== 0;
+    contour.membership.set(point, { x: point.x, y: point.y, inside });
+    return inside;
   }
+}
+
+function matchesQuery(
+  previous: MembershipResult | undefined,
+  point: Vec2,
+): previous is MembershipResult {
+  return previous !== undefined && previous.x === point.x && previous.y === point.y;
 }
 
 function rayWinding(

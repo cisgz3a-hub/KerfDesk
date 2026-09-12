@@ -1,56 +1,81 @@
-// TracePreview renders the Trace Image preview frame. It shows the
-// traced SVG over the source bitmap, plus preview-only LightBurn-style
-// toggles for fading the source and showing vector points.
-/* eslint-disable no-restricted-syntax -- the preview frame is a deliberate
-   LIGHT surface on the dark dialog (artwork is judged against light
-   material, ADR-047 exception): its dark-on-light status text and the
-   purple trace markers are file-local literals, not chrome tokens. */
+// Comparison, magnification and overlays are local viewing state. They never
+// change trace options or rebuild the generated trace geometry.
+/* eslint-disable no-restricted-syntax -- the artwork surface and its purple
+   trace markers deliberately stay light/material-facing (ADR-047). */
 
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { normalizeTraceBoundary, type TraceBoundary } from '../../core/trace';
+import type { TraceBoundary } from '../../core/trace';
 import type { TracePreviewState } from './use-trace-preview';
 import { traceNoticeMessage } from './trace-notices';
+import { useTracePreviewBoundary, type TracePreviewBoundaryProps } from './trace-preview-boundary';
+import { TracePreviewControls, type TracePreviewView } from './trace-preview-controls';
+import { useTracePreviewZoom } from './trace-preview-zoom';
+import { useTracePreviewImageSpace } from './trace-preview-image-space';
+import './trace-preview.css';
 
-type Props = {
+type Props = TracePreviewBoundaryProps & {
   readonly state: TracePreviewState;
   readonly sourceDataUrl?: string;
-  readonly imageSize?: { readonly width: number; readonly height: number };
-  readonly boundary?: TraceBoundary | null;
-  readonly onBoundaryChange?: (boundary: TraceBoundary) => void;
   readonly onBoundaryClear?: () => void;
 };
 
-type DragPoint = { readonly x: number; readonly y: number };
-type DragRef = { current: DragPoint | null };
+type ReadyPreview = Extract<TracePreviewState, { readonly kind: 'ready' }>;
 
 export function TracePreview(props: Props): JSX.Element {
   const { state } = props;
-  const [isSourceFaded, setIsSourceFaded] = useState(false);
+  const [selectedView, setSelectedView] = useState<TracePreviewView>('overlay');
+  const [isSourceFaded, setIsSourceFaded] = useState(true);
   const [shouldShowPoints, setShouldShowPoints] = useState(false);
+  const { zoom, viewportRef, zoomTo } = useTracePreviewZoom();
   const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
-  const canShowPoints = state.kind === 'ready';
+  const view = hasSource ? selectedView : 'trace';
+  const isLoading = state.kind === 'decoding' || state.kind === 'tracing';
   return (
-    <div style={stackStyle}>
-      <PreviewControls
+    <div className="lf-trace-preview">
+      <TracePreviewControls
+        view={view}
         hasSource={hasSource}
-        canShowPoints={canShowPoints}
-        boundary={props.boundary ?? null}
+        hasTrace={state.kind === 'ready'}
+        zoom={zoom}
+        hasBoundary={props.boundary !== undefined && props.boundary !== null}
         isSourceFaded={isSourceFaded}
         shouldShowPoints={shouldShowPoints}
+        onViewChange={setSelectedView}
+        onZoomChange={zoomTo}
         onToggleFade={() => setIsSourceFaded((next) => !next)}
         onTogglePoints={() => setShouldShowPoints((next) => !next)}
         onBoundaryClear={props.onBoundaryClear}
       />
-      <PreviewFrame
-        {...props}
-        hasSource={hasSource}
-        isSourceFaded={isSourceFaded}
-        shouldShowPoints={shouldShowPoints}
-      />
+      <div className="lf-trace-preview__surface">
+        <div
+          ref={viewportRef}
+          className="lf-trace-preview__viewport"
+          role="region"
+          aria-label="Preview viewport"
+          aria-busy={isLoading}
+          tabIndex={0}
+          title="Use the scrollbars, trackpad or arrow keys to move around a zoomed preview."
+        >
+          <PreviewFrame
+            {...props}
+            zoom={zoom}
+            view={view}
+            hasSource={hasSource}
+            isSourceFaded={isSourceFaded}
+            shouldShowPoints={shouldShowPoints}
+          />
+        </div>
+        {isLoading ? <PreviewLoading isDecoding={state.kind === 'decoding'} /> : null}
+      </div>
+      <PreviewStatus state={state} />
+      <p className="lf-trace-preview__help">
+        {props.onBoundaryChange !== undefined ? 'Drag on the image to select a boundary. ' : ''}
+        Scroll to pan when zoomed.
+      </p>
       {state.kind === 'ready'
         ? state.notices?.map((notice) => (
-            <p key={notice} role="status" style={noticeStyle}>
+            <p key={notice} role="status" className="lf-trace-preview__notice">
               {traceNoticeMessage(notice)}
             </p>
           ))
@@ -59,141 +84,170 @@ export function TracePreview(props: Props): JSX.Element {
   );
 }
 
-const noticeStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
-
-function PreviewControls(props: {
-  readonly hasSource: boolean;
-  readonly canShowPoints: boolean;
-  readonly boundary: TraceBoundary | null;
-  readonly isSourceFaded: boolean;
-  readonly shouldShowPoints: boolean;
-  readonly onToggleFade: () => void;
-  readonly onTogglePoints: () => void;
-  readonly onBoundaryClear: (() => void) | undefined;
-}): JSX.Element | null {
-  if (!props.hasSource && !props.canShowPoints && props.boundary === null) return null;
-  return (
-    <div style={buttonRowStyle}>
-      {props.hasSource ? (
-        <button
-          type="button"
-          aria-pressed={props.isSourceFaded}
-          onClick={props.onToggleFade}
-          className="lf-btn"
-          style={previewButtonSizeStyle}
-          title="Fade the source image so the traced vectors are easier to inspect."
-        >
-          Fade Image
-        </button>
-      ) : null}
-      {props.canShowPoints ? (
-        <button
-          type="button"
-          aria-pressed={props.shouldShowPoints}
-          onClick={props.onTogglePoints}
-          className="lf-btn"
-          style={previewButtonSizeStyle}
-          title="Show or hide traced vector points in the preview."
-        >
-          Show Points
-        </button>
-      ) : null}
-      {props.boundary !== null ? (
-        <button
-          type="button"
-          onClick={props.onBoundaryClear}
-          className="lf-btn"
-          style={previewButtonSizeStyle}
-          title="Clear the selected trace boundary and trace the full image again."
-        >
-          Clear Boundary
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
 function PreviewFrame(
   props: Props & {
+    readonly zoom: number;
+    readonly view: TracePreviewView;
     readonly hasSource: boolean;
     readonly isSourceFaded: boolean;
     readonly shouldShowPoints: boolean;
   },
 ): JSX.Element {
-  const dragStartRef = useRef<DragPoint | null>(null);
-  const [draftBoundary, setDraftBoundary] = useState<TraceBoundary | null>(null);
-  const activeBoundary = draftBoundary ?? props.boundary ?? null;
+  const { activeBoundary, ...dragHandlers } = useTracePreviewBoundary(props);
+  const imageSize = props.imageSize ?? (props.state.kind === 'ready' ? props.state : undefined);
+  const { stageRef, rectangle } = useTracePreviewImageSpace(imageSize, props.zoom);
   return (
     <div
-      style={frameStyle}
+      ref={stageRef}
+      className="lf-trace-preview__stage"
+      data-view={props.view}
+      style={{ width: `${props.zoom * 100}%`, height: `${props.zoom * 100}%` }}
       aria-label="Trace preview"
-      onMouseDown={(e) => startBoundaryDrag(e, props, dragStartRef, setDraftBoundary)}
-      onMouseMove={(e) => updateBoundaryDrag(e, props, dragStartRef, setDraftBoundary)}
-      onMouseUp={(e) => finishBoundaryDrag(e, props, dragStartRef, setDraftBoundary)}
+      {...dragHandlers}
     >
-      {props.hasSource ? (
-        <img
-          src={props.sourceDataUrl}
-          alt=""
-          aria-label="Trace source image"
-          style={sourceImageStyle(props.isSourceFaded)}
-        />
-      ) : null}
-      <Inner state={props.state} shouldShowPoints={props.shouldShowPoints} />
-      {activeBoundary !== null && props.imageSize !== undefined ? (
-        <BoundaryOverlay boundary={activeBoundary} imageSize={props.imageSize} />
-      ) : null}
+      <div
+        className="lf-trace-preview__artwork"
+        style={rectangle ?? fullStageStyle}
+        data-natural-fit={imageSize === undefined}
+      >
+        {props.hasSource ? (
+          <img
+            src={props.sourceDataUrl}
+            alt=""
+            aria-label="Trace source image"
+            className="lf-trace-preview__source"
+            hidden={props.view === 'trace'}
+            draggable={false}
+            style={{ opacity: props.isSourceFaded && props.view === 'overlay' ? 0.2 : 1 }}
+          />
+        ) : null}
+        {props.state.kind === 'ready' ? (
+          <TraceArtwork
+            state={props.state}
+            hidden={props.view === 'original'}
+            shouldShowPoints={props.shouldShowPoints}
+          />
+        ) : null}
+        {activeBoundary !== null && props.imageSize !== undefined ? (
+          <BoundaryOverlay boundary={activeBoundary} imageSize={props.imageSize} />
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function Inner(props: {
-  readonly state: TracePreviewState;
+function PreviewLoading({ isDecoding }: { readonly isDecoding: boolean }): JSX.Element {
+  return (
+    <div className="lf-trace-preview__loading">
+      <div
+        className="lf-trace-preview__loading-card"
+        role="progressbar"
+        aria-label={isDecoding ? 'Preparing image for tracing' : 'Tracing image'}
+      >
+        <span className="lf-trace-preview__spinner" aria-hidden="true" />
+        <strong>{isDecoding ? 'Preparing image' : 'Tracing image'}</strong>
+        <p>
+          {isDecoding
+            ? 'Reading the image before tracing begins.'
+            : 'Finding and refining the trace. Detailed images can take a moment.'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TraceArtwork(props: {
+  readonly state: ReadyPreview;
+  readonly hidden: boolean;
   readonly shouldShowPoints: boolean;
 }): JSX.Element {
   const { state } = props;
+  const vectorsRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // Change only the preview root's grid mapping, once per new SVG. Avoid
+    // copying or parsing a dense path string again on view/zoom changes.
+    vectorsRef.current?.firstElementChild?.setAttribute('preserveAspectRatio', 'none');
+  }, [state.svg]);
+  return (
+    <div className="lf-trace-preview__trace" hidden={props.hidden}>
+      <div
+        ref={vectorsRef}
+        className="lf-trace-preview__vectors"
+        // Safe WITHOUT sanitization (LU9): state.svg is built locally by
+        // coloredPathsToSvg from numbers and hex colors. Imported markup must
+        // never reach this string without first passing through sanitizeSvg.
+        dangerouslySetInnerHTML={{ __html: state.svg }}
+        aria-label={`Trace preview (${state.width}x${state.height} px)`}
+      />
+      {props.shouldShowPoints ? <TracePointsOverlay state={state} /> : null}
+    </div>
+  );
+}
+
+function PreviewStatus({ state }: { readonly state: TracePreviewState }): JSX.Element {
+  const paths = state.kind === 'ready' ? state.paths : undefined;
+  const counts = useMemo(() => countPreviewGeometry(paths), [paths]);
+  return (
+    <div
+      className="lf-trace-preview__status"
+      data-state={state.kind}
+      role={state.kind === 'error' ? 'alert' : 'status'}
+      aria-live={state.kind === 'error' ? undefined : 'polite'}
+      aria-atomic="true"
+    >
+      {state.kind === 'ready' ? (
+        <>
+          <span>
+            {counts.paths === 0
+              ? 'No trace paths found.'
+              : `Trace ready · ${countLabel(counts.paths, 'path')}`}
+            {' · '}
+            {countLabel(counts.points, 'point')}
+          </span>
+          <span className="lf-trace-preview__dimensions">
+            {state.width} × {state.height} px
+          </span>
+        </>
+      ) : (
+        <span>{previewPhaseMessage(state)}</span>
+      )}
+    </div>
+  );
+}
+
+function countPreviewGeometry(paths: ReadyPreview['paths'] | undefined): {
+  readonly paths: number;
+  readonly points: number;
+} {
+  let pathCount = 0;
+  let pointCount = 0;
+  for (const path of paths ?? []) {
+    pathCount += path.polylines.length;
+    for (const polyline of path.polylines) pointCount += polyline.points.length;
+  }
+  return { paths: pathCount, points: pointCount };
+}
+
+function countLabel(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function previewPhaseMessage(state: Exclude<TracePreviewState, ReadyPreview>): string {
   switch (state.kind) {
     case 'idle':
-      return <span style={hintStyle}>Pick an image to preview the trace.</span>;
+      return 'Preview is waiting for an image.';
     case 'decoding':
-      return <span style={hintStyle}>Decoding image...</span>;
+      return 'Decoding image...';
     case 'tracing':
-      return <span style={hintStyle}>Tracing...</span>;
+      return 'Tracing...';
     case 'error':
-      return <span style={errorStyle}>Preview failed: {state.message}</span>;
-    case 'ready':
-      return (
-        <>
-          <div
-            style={svgWrapStyle}
-            // Safe WITHOUT sanitization (LU9): state.svg is built locally by
-            // coloredPathsToSvg — a pure stringifier interpolating rounded
-            // numbers and hex colors only. No user-controlled markup can
-            // reach this string. If a future change routes imported markup
-            // here, it MUST go through sanitizeSvg first.
-            dangerouslySetInnerHTML={{ __html: state.svg }}
-            aria-label={`Trace preview (${state.width}x${state.height} px)`}
-          />
-          {props.shouldShowPoints ? <TracePointsOverlay state={state} /> : null}
-        </>
-      );
+      return `Preview failed: ${state.message}`;
   }
 }
 
-function TracePointsOverlay(props: {
-  readonly state: Extract<TracePreviewState, { readonly kind: 'ready' }>;
-}): JSX.Element {
-  const { state } = props;
-  // Memoized on the paths identity: the preview frame re-renders on every
-  // mousemove during a boundary drag, and rebuilding one <circle> element per
-  // sampled point (thousands on a busy trace) made React re-reconcile the
-  // whole overlay per pointer event. Cached element identities let React bail
-  // out of that reconciliation. Rendering ALL points stays deliberate —
-  // decimating or capping them would be a visible behavior change.
+function TracePointsOverlay({ state }: { readonly state: ReadyPreview }): JSX.Element {
+  // Keep all requested points, and cache the JSX by paths identity. View,
+  // magnification and boundary drags must not rebuild a dense point overlay.
   const circles = useMemo(
     () =>
       state.paths
@@ -203,10 +257,10 @@ function TracePointsOverlay(props: {
             key={`${index}:${point.x}:${point.y}`}
             cx={point.x}
             cy={point.y}
-            r={POINT_RADIUS_PX}
-            fill={POINT_FILL_COLOR}
-            stroke={POINT_STROKE_COLOR}
-            strokeWidth={POINT_STROKE_WIDTH_PX}
+            r={1.6}
+            fill="#7c3aed"
+            stroke="#ffffff"
+            strokeWidth={0.45}
           />
         )),
     [state.paths],
@@ -214,11 +268,11 @@ function TracePointsOverlay(props: {
   return (
     <svg
       aria-label="Trace points"
-      style={pointsOverlayStyle}
+      className="lf-trace-preview__points"
       viewBox={`0 0 ${state.width} ${state.height}`}
       width="100%"
       height="100%"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
     >
       {circles}
     </svg>
@@ -232,207 +286,23 @@ function BoundaryOverlay(props: {
   return (
     <svg
       aria-label="Trace boundary"
-      style={boundaryOverlayStyle}
+      className="lf-trace-preview__boundary"
       viewBox={`0 0 ${props.imageSize.width} ${props.imageSize.height}`}
       width="100%"
       height="100%"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
     >
       <rect
         x={props.boundary.x}
         y={props.boundary.y}
         width={props.boundary.width}
         height={props.boundary.height}
-        fill={BOUNDARY_FILL}
-        stroke={BOUNDARY_STROKE}
-        strokeWidth={BOUNDARY_STROKE_WIDTH_PX}
+        fill="rgba(124, 58, 237, 0.08)"
+        stroke="#7c3aed"
+        strokeWidth={1.2}
       />
     </svg>
   );
 }
 
-function startBoundaryDrag(
-  e: React.MouseEvent<HTMLDivElement>,
-  props: Props,
-  dragStartRef: DragRef,
-  setDraftBoundary: (boundary: TraceBoundary | null) => void,
-): void {
-  if (e.button !== 0 || props.imageSize === undefined) return;
-  const point = imagePointFromMouse(e, props.imageSize);
-  if (point === null) return;
-  dragStartRef.current = point;
-  setDraftBoundary({ x: point.x, y: point.y, width: 0, height: 0 });
-  e.preventDefault();
-}
-
-function updateBoundaryDrag(
-  e: React.MouseEvent<HTMLDivElement>,
-  props: Props,
-  dragStartRef: DragRef,
-  setDraftBoundary: (boundary: TraceBoundary | null) => void,
-): void {
-  const dragStart = dragStartRef.current;
-  if (dragStart === null || props.imageSize === undefined) return;
-  const point = imagePointFromMouse(e, props.imageSize);
-  if (point === null) {
-    setDraftBoundary(null);
-    return;
-  }
-  setDraftBoundary(boundaryFromPoints(dragStart, point));
-}
-
-function finishBoundaryDrag(
-  e: React.MouseEvent<HTMLDivElement>,
-  props: Props,
-  dragStartRef: DragRef,
-  setDraftBoundary: (boundary: TraceBoundary | null) => void,
-): void {
-  const dragStart = dragStartRef.current;
-  if (dragStart === null || props.imageSize === undefined || props.onBoundaryChange === undefined) {
-    return;
-  }
-  const point = imagePointFromMouse(e, props.imageSize);
-  dragStartRef.current = null;
-  setDraftBoundary(null);
-  if (point === null) return;
-  const boundary = normalizeTraceBoundary(
-    boundaryFromPoints(dragStart, point),
-    props.imageSize.width,
-    props.imageSize.height,
-  );
-  if (boundary !== null) props.onBoundaryChange(boundary);
-}
-
-function boundaryFromPoints(a: DragPoint, b: DragPoint): TraceBoundary {
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    width: Math.abs(b.x - a.x),
-    height: Math.abs(b.y - a.y),
-  };
-}
-
-function imagePointFromMouse(
-  e: React.MouseEvent<HTMLDivElement>,
-  imageSize: { readonly width: number; readonly height: number },
-): { readonly x: number; readonly y: number } | null {
-  const rect = e.currentTarget.getBoundingClientRect();
-  if (!isPositiveFinite(rect.width) || !isPositiveFinite(rect.height)) return null;
-  if (!isPositiveFinite(imageSize.width) || !isPositiveFinite(imageSize.height)) return null;
-  const scale = Math.min(rect.width / imageSize.width, rect.height / imageSize.height);
-  if (!isPositiveFinite(scale)) return null;
-  const drawnWidth = imageSize.width * scale;
-  const drawnHeight = imageSize.height * scale;
-  const left = rect.left + (rect.width - drawnWidth) / 2;
-  const top = rect.top + (rect.height - drawnHeight) / 2;
-  return {
-    x: clamp((e.clientX - left) / scale, 0, imageSize.width),
-    y: clamp((e.clientY - top) / scale, 0, imageSize.height),
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
-}
-
-const SOURCE_NORMAL_OPACITY = 1;
-const SOURCE_FADED_OPACITY = 0.2;
-const POINT_RADIUS_PX = 1.6;
-const POINT_STROKE_WIDTH_PX = 0.45;
-const POINT_FILL_COLOR = '#7c3aed';
-const POINT_STROKE_COLOR = '#ffffff';
-const BOUNDARY_FILL = 'rgba(124, 58, 237, 0.08)';
-const BOUNDARY_STROKE = '#7c3aed';
-const BOUNDARY_STROKE_WIDTH_PX = 1.2;
-
-const stackStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 6,
-};
-
-const buttonRowStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-};
-
-// Size-only override on .lf-btn — these are compact preview toggles.
-const previewButtonSizeStyle: React.CSSProperties = {
-  fontSize: 11,
-  padding: '2px 8px',
-};
-
-const frameStyle: React.CSSProperties = {
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: '100%',
-  height: 240,
-  background: '#fafafa',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  overflow: 'hidden',
-};
-
-function sourceImageStyle(isFaded: boolean): React.CSSProperties {
-  return {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-    opacity: isFaded ? SOURCE_FADED_OPACITY : SOURCE_NORMAL_OPACITY,
-    pointerEvents: 'none',
-  };
-}
-
-const hintStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
-  fontSize: 12,
-  // Dark-on-light, NOT the theme text vars: this text sits inside the
-  // always-light preview frame (artwork previews stay light, ADR-047).
-  color: '#666',
-  fontStyle: 'italic',
-};
-
-const errorStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
-  fontSize: 12,
-  color: '#b00020',
-  padding: 8,
-  textAlign: 'center',
-};
-
-const svgWrapStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
-  width: '100%',
-  height: '100%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const pointsOverlayStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-  zIndex: 2,
-  pointerEvents: 'none',
-};
-
-const boundaryOverlayStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-  zIndex: 3,
-  pointerEvents: 'none',
-};
+const fullStageStyle: React.CSSProperties = { left: 0, top: 0, width: '100%', height: '100%' };

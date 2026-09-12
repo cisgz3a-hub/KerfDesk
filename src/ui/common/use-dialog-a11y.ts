@@ -84,6 +84,9 @@ export function useDialogA11y(
       if (!isTopmostModal(node)) return;
       if (e.key === 'Escape' && optionsRef.current.closeOnEscape !== false) {
         e.preventDefault();
+        // Closing can remove the modal gate before this event reaches window.
+        // Keep the same Escape from also acting on the underlying workspace.
+        e.stopPropagation();
         onCloseRef.current();
         return;
       }
