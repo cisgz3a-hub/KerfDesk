@@ -72,6 +72,7 @@ function TextSessionEditor(props: Props & { readonly session: CanvasTextSession 
         className="lf-canvas-text-input"
         aria-label="Text content on canvas"
         aria-describedby="canvas-text-help"
+        title="Type and edit text on the canvas. Enter adds a line; Ctrl/Cmd+Enter saves."
         placeholder="Type here"
         wrap="off"
         spellCheck={false}

@@ -3,7 +3,9 @@ export function CanvasTextSymbols(props: {
 }): JSX.Element {
   return (
     <details className="lf-canvas-text-symbols">
-      <summary>Accents & symbols</summary>
+      <summary title="Show accented letters and symbols to insert at the cursor">
+        Accents & symbols
+      </summary>
       <div>
         {['é', 'è', 'ê', 'ë', 'á', 'à', 'â', 'ä', 'í', 'ó', 'ú', 'ñ', 'ç', 'ü', '´'].map((char) => (
           <button
@@ -11,6 +13,7 @@ export function CanvasTextSymbols(props: {
             type="button"
             className="lf-btn"
             aria-label={`Insert ${char}`}
+            title={`Insert ${char} at the cursor`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => props.onInsert(char)}
           >
