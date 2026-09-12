@@ -1,5 +1,6 @@
 import { updateLayer, type Project } from '../../core/scene';
 import {
+  applyLayerDefaultSettings,
   captureLayerDefaultSettings,
   type LayerDefaultSettings,
 } from '../layers/layer-default-settings';
@@ -78,7 +79,11 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
         if (layer === undefined) return {};
         const defaults = defaultSettingsForColor(state.layerDefaults, layer.color);
         if (Object.keys(defaults).length === 0) return {};
-        const scene = updateLayer(state.project.scene, layerId, defaults);
+        const scene = updateLayer(
+          state.project.scene,
+          layerId,
+          applyLayerDefaultSettings(layer, defaults),
+        );
         if (scene === state.project.scene) return {};
         return {
           project: { ...state.project, scene },

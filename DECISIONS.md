@@ -19595,6 +19595,40 @@ from its hole and change existing toolpaths merely while adding a new operation.
 ---
 ---
 
+### September 12, 2026 amendment: settings-to-machine audit corrections
+
+The [settings repair ledger](docs/settings-to-machine-repair-20260912.md) records the
+audit findings, counterexamples and verification for these bounded corrections:
+
+- Selected artwork shows Mixed for differing effective values, including booleans and
+  process. Bulk edits change only explicitly edited fields. Dependent grayscale minimum
+  and dot-width limits resolve per artwork, independently of selection order. Store
+  updates and selection changes cancel stale drafts. Advanced controls removed by a
+  process change cannot submit another artwork's fallback; operation Show/Output remains
+  in its operation-owned controls.
+- Profile changes restore the destination profile's saved layer defaults. Missing or
+  corrupt defaults select an empty default set instead of copying the preceding profile.
+  Persisted partial settings must satisfy project validation; legitimate imported values
+  are not clamped to compact-editor ranges merely by restoring or viewing them.
+- Layer defaults retain their broad artwork-copy semantics. Applying them, including
+  fresh raster/trace creation, uses the existing artwork-settings copy rules to preserve
+  destination Startup material/cutter ownership under ADR-306. Copied cutting numbers
+  retain manual provenance; no controller or machine configuration is written.
+- Firmware agreement requires numeric coverage of every compared profile setting.
+  Missing and invalid readback remain explicit evidence gaps. Valid reported differences
+  retain the existing writable/review-only classification and wizard flow.
+- G-code comments distinguish requested overrides from resolved hatch and image plans.
+  Inspection of a compiled program carries that snapshot's machine/power-control context
+  and counts unpowered laser feed moves as travel at their actual feed. Generic imported
+  and CNC programs retain geometric classifications; a generated unpowered laser-off
+  annotation supplies evidence only for its own line when context is absent.
+
+These repairs preserve executable output for unchanged jobs, the exact-job Frame policy,
+and Job Review advisory findings. Source, test and browser evidence do not qualify a
+physical controller, optical power, air-cut or material result.
+
+---
+
 ## ADR-318 — CNC audit repair preserves settings, registration and preparation ownership
 
 **Status:** Accepted

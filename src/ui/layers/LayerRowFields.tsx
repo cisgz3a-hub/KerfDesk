@@ -2,7 +2,8 @@ import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { useStore } from '../state';
 import { genericRunwayFallbackText } from './fill-overscan-fallback';
 import { LayerImageFields } from './LayerImageFields';
-import { useDebouncedCommit } from './use-debounced-commit';
+import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
+import type { MixedOperationFields } from './selected-operation-mixed';
 
 const fieldRowStyle: React.CSSProperties = {
   display: 'flex',
@@ -33,6 +34,8 @@ export type LayerOperationControlTarget = {
   readonly settings: LayerOperationSettings;
   readonly selectedObjectCount: number;
   readonly ariaContext?: string;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 };
 
@@ -55,7 +58,7 @@ export function LayerRowSettingsFields(props: {
       <FieldRow label="Passes">
         <PassesInput layer={layer} operationTarget={operationTarget} />
       </FieldRow>
-      {settings.mode === 'line' && (
+      {!operationTarget.mixedFields?.mode && settings.mode === 'line' && (
         <FieldRow label="Contour entry">
           <SharedRunwayInput
             layer={layer}
@@ -65,13 +68,19 @@ export function LayerRowSettingsFields(props: {
           <span style={unitStyle}>mm</span>
         </FieldRow>
       )}
-      {settings.mode === 'fill' && <FillFields layer={layer} operationTarget={operationTarget} />}
-      {settings.mode === 'image' && (
+      {!operationTarget.mixedFields?.mode && settings.mode === 'fill' && (
+        <FillFields layer={layer} operationTarget={operationTarget} />
+      )}
+      {!operationTarget.mixedFields?.mode && settings.mode === 'image' && (
         <LayerImageFields
           layer={layer}
+          reconcileKey={operationTarget.reconcileKey}
           settings={settings}
           commit={operationTarget.commit}
           labelContext={operationTarget.ariaContext ?? layer.name}
+          {...(operationTarget.mixedFields === undefined
+            ? {}
+            : { mixedFields: operationTarget.mixedFields })}
         />
       )}
     </>
@@ -112,7 +121,8 @@ function FillFields(props: {
           purpose="fill overscan"
         />
         <span style={unitStyle}>mm</span>
-        {operationTarget.settings.fillStyle === 'scanline' &&
+        {!operationTarget.mixedFields?.fillOverscanMm &&
+        operationTarget.settings.fillStyle === 'scanline' &&
         operationTarget.settings.fillOverscanMm <= 0 ? (
           <span style={FALLBACK_TEXT_STYLE}>
             {genericRunwayFallbackText(operationTarget.settings.fillOverscanMm)}
@@ -134,7 +144,10 @@ function BidirectionalInput(props: {
   return (
     <input
       type="checkbox"
-      checked={operationTarget.settings.fillBidirectional}
+      {...mixedCheckboxProps(
+        operationTarget.settings.fillBidirectional,
+        operationTarget.mixedFields?.fillBidirectional,
+      )}
       onChange={(e) => operationTarget.commit({ fillBidirectional: e.target.checked })}
       aria-label={`Bidirectional fill for ${targetAriaContext(layer, operationTarget)}`}
       title="Scan alternating fill lines in both directions to reduce travel time."
@@ -147,8 +160,10 @@ function HatchAngleInput(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.hatchAngleDeg,
+    mixed: operationTarget.mixedFields?.hatchAngleDeg,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (hatchAngleDeg) => operationTarget.commit({ hatchAngleDeg }),
     parse: (s) => clamp(numericValue(s, operationTarget.settings.hatchAngleDeg), 0, 180),
   });
@@ -159,6 +174,7 @@ function HatchAngleInput(props: {
       max={180}
       step={5}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -173,8 +189,10 @@ function HatchSpacingInput(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.hatchSpacingMm,
+    mixed: operationTarget.mixedFields?.hatchSpacingMm,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (hatchSpacingMm) => operationTarget.commit({ hatchSpacingMm }),
     parse: (s) => clamp(numericValue(s, operationTarget.settings.hatchSpacingMm), 0.05, 10),
   });
@@ -185,6 +203,7 @@ function HatchSpacingInput(props: {
       max={10}
       step={0.05}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -200,8 +219,10 @@ function SharedRunwayInput(props: {
   readonly purpose: 'contour entry' | 'fill overscan';
 }): JSX.Element {
   const { layer, operationTarget, purpose } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.fillOverscanMm,
+    mixed: operationTarget.mixedFields?.fillOverscanMm,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (fillOverscanMm) => operationTarget.commit({ fillOverscanMm }),
     parse: (s) => clamp(numericValue(s, operationTarget.settings.fillOverscanMm), 0, 25),
   });
@@ -212,6 +233,7 @@ function SharedRunwayInput(props: {
       max={25}
       step={0.5}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -234,12 +256,16 @@ function PowerInput(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.power,
+    mixed: operationTarget.mixedFields?.power,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (power) =>
       operationTarget.commit({
         power,
-        minPower: Math.min(operationTarget.settings.minPower, power),
+        ...(operationTarget.selectedObjectCount > 0
+          ? {}
+          : { minPower: Math.min(operationTarget.settings.minPower, power) }),
       }),
     parse: (s) => clamp(numericValue(s, operationTarget.settings.power), 0, 100),
   });
@@ -249,6 +275,7 @@ function PowerInput(props: {
       min={0}
       max={100}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -264,8 +291,10 @@ function SpeedInput(props: {
 }): JSX.Element {
   const { layer, operationTarget } = props;
   const maxFeed = useStore((s) => s.project.device.maxFeed);
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.speed,
+    mixed: operationTarget.mixedFields?.speed,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (speed) => operationTarget.commit({ speed }),
     parse: (s) => clamp(numericValue(s, operationTarget.settings.speed), 1, maxFeed),
   });
@@ -275,6 +304,7 @@ function SpeedInput(props: {
       min={1}
       max={maxFeed}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={wideInputStyle}
@@ -289,8 +319,10 @@ function PassesInput(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: operationTarget.settings.passes,
+    mixed: operationTarget.mixedFields?.passes,
+    reconcileKey: operationTarget.reconcileKey,
     commit: (passes) => operationTarget.commit({ passes }),
     parse: (s) => Math.max(1, Math.floor(numericValue(s, operationTarget.settings.passes))),
   });
@@ -300,6 +332,7 @@ function PassesInput(props: {
       min={1}
       step={1}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}

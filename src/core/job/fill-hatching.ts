@@ -79,9 +79,14 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
 export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<HatchPolyline> {
   return planHatching(
     input,
-    Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm),
+    effectiveHatchSpacingMm(input.hatchSpacingMm),
     Number.POSITIVE_INFINITY,
   ).hatches;
+}
+
+/** Planning pitch before output placement/rotary transforms and decimal rounding. */
+export function effectiveHatchSpacingMm(requested: number): number {
+  return Math.max(MIN_HATCH_SPACING_MM, requested);
 }
 
 export function fillHatchingExactWithBudget(input: HatchInput, maxScanlines: number): HatchPlan {
@@ -103,7 +108,7 @@ function planHatching(input: HatchInput, spacing: number, maxScanlines: number):
   const closed = input.polylines.filter(isClosedEnough);
   if (closed.length === 0) return { hatches: [], passLimited: false };
 
-  const angle = normalizeAngle(input.hatchAngleDeg);
+  const angle = normalizedHatchAngleDeg(input.hatchAngleDeg);
   const rotated = closed.map((pl) => rotatePolyline(pl, -angle));
   const yBounds = polylineYBounds(rotated);
   if (yBounds === null) return { hatches: [], passLimited: false };
@@ -179,7 +184,7 @@ function stripHatchMetadata(pl: HatchPolyline): Polyline {
 // Wrap hatch angle into [0, 180). Hatching at 200° looks identical to 20°
 // because the line is undirected — normalize so downstream comparisons
 // (and snapshot tests) get a canonical form.
-function normalizeAngle(deg: number): number {
+export function normalizedHatchAngleDeg(deg: number): number {
   if (!Number.isFinite(deg)) return 0;
   let a = deg % 180;
   if (a < 0) a += 180;

@@ -76,8 +76,16 @@ async function inspectGcodeOnMainThread(
   const text = source.kind === 'text' ? source.text : await source.blob.text();
   throwIfAborted(signal);
   return {
-    result: inspectGcodeText(text),
-    source: source.kind === 'text' ? source : { kind: 'text', text },
+    result: inspectGcodeText(text, source),
+    source:
+      source.kind === 'text'
+        ? source
+        : {
+            kind: 'text',
+            text,
+            machineKind: source.machineKind,
+            laserPowerControl: source.laserPowerControl,
+          },
   };
 }
 

@@ -4,7 +4,6 @@ import {
   operationArtworkCount,
   operationIdsForObject,
   type Layer,
-  type LayerMode,
   type SceneObject,
 } from '../../core/scene';
 import {
@@ -14,9 +13,8 @@ import {
 import { useStore } from '../state';
 import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
-import { LayerRowCutSettings } from './LayerRowCutSettings';
-import { LayerRowSettingsFields } from './LayerRowFields';
-import { useCutSettingsLauncher } from './use-cut-settings-launcher';
+import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
+import { LaserOperationFields } from './SelectedLaserOperationFields';
 
 export function SelectedOperationInspector(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -93,10 +91,8 @@ function SelectedOperationEditor(props: {
   const activeObjects = props.objects.filter((object) =>
     operationIdsForObject(object, layers).includes(props.active.id),
   );
-  const overrideEditing = activeObjects.some(
-    (object) => operationOverrideForObject(props.active, object) !== undefined,
-  );
-  const effectiveOperation = effectiveOperationForObject(props.active, activeObjects[0] ?? {});
+  const { overrideEditing, effectiveOperation, mixedFields, selectionKey, reconcileKey } =
+    selectedOperationSettings(props.active, activeObjects);
   return (
     <section
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
@@ -128,14 +124,17 @@ function SelectedOperationEditor(props: {
         <CncLayerFields layer={props.active} />
       ) : (
         <LaserOperationFields
+          key={selectionKey}
           operation={effectiveOperation}
           baseOperation={props.active}
           editObjectOverride={overrideEditing}
           objectIds={activeObjects.map((object) => object.id)}
           ariaContext={props.selectionActive ? 'selected objects' : 'inspected artwork'}
+          mixedFields={mixedFields}
+          reconcileKey={reconcileKey}
         />
       )}
-      {overrideEditing ? (
+      {overrideEditing && !hasMixedFields(mixedFields) ? (
         <p style={advisoryStyle}>
           Effective artwork override — these values drive the editor, preview, Job Review, and
           emitted operation facts for the selected artwork.
@@ -148,6 +147,22 @@ function SelectedOperationEditor(props: {
       />
     </section>
   );
+}
+
+function selectedOperationSettings(operation: Layer, objects: ReadonlyArray<SceneObject>) {
+  const settings = objects.map((object) => effectiveOperationForObject(operation, object));
+  const effectiveOperation = settings[0] ?? operation;
+  return {
+    overrideEditing: objects.some(
+      (object) => operationOverrideForObject(operation, object) !== undefined,
+    ),
+    effectiveOperation,
+    mixedFields: mixedOperationFields(effectiveOperation, settings),
+    selectionKey: JSON.stringify(objects.map((object) => object.id)),
+    // Mixed fields share a null display baseline; every selected value must
+    // participate in cancelling a draft parsed against an older store state.
+    reconcileKey: JSON.stringify(settings.map(captureLayerOperationSettings)),
+  };
 }
 
 function OperationContextActions(props: {
@@ -178,74 +193,6 @@ function OperationContextActions(props: {
         Add operation
       </button>
     </div>
-  );
-}
-
-function LaserOperationFields(props: {
-  readonly operation: Layer;
-  readonly baseOperation: Layer;
-  readonly editObjectOverride: boolean;
-  readonly objectIds: ReadonlyArray<string>;
-  readonly ariaContext: string;
-}): JSX.Element {
-  const setLayerParam = useStore((state) => state.setLayerParam);
-  const setObjectsOverride = useStore((state) => state.setObjectsOperationOverrideForOperation);
-  const setOverride = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void =>
-    setObjectsOverride(props.objectIds, props.baseOperation.id, patch);
-  const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
-    useCutSettingsLauncher();
-  const commit = (patch: Partial<ReturnType<typeof captureLayerOperationSettings>>): void => {
-    if (props.editObjectOverride) setOverride(patch);
-    else setLayerParam(props.baseOperation.id, patch);
-  };
-  const target = {
-    settings: captureLayerOperationSettings(props.operation),
-    selectedObjectCount: 0,
-    ariaContext: props.ariaContext,
-    commit,
-  };
-  return (
-    <>
-      <label style={fieldRowStyle}>
-        <span>Process</span>
-        <select
-          value={props.operation.mode}
-          aria-label={`Mode for ${props.ariaContext}`}
-          title="Choose how the laser processes the selected artwork"
-          onChange={(event) => commit({ mode: event.target.value as LayerMode })}
-        >
-          <option value="line">Line</option>
-          <option value="fill">Fill</option>
-          <option value="image">Image</option>
-        </select>
-      </label>
-      <LayerRowSettingsFields layer={props.operation} operationTarget={target} />
-      <label title="Turn job-controlled air assist on for this operation" style={airAssistStyle}>
-        <input
-          type="checkbox"
-          checked={props.operation.airAssist}
-          aria-label="Air assist for selected operation"
-          title="Turn job-controlled air assist on for this operation"
-          onChange={(event) => commit({ airAssist: event.target.checked })}
-        />{' '}
-        Air assist
-      </label>
-      <button
-        type="button"
-        title="Open advanced laser operation settings"
-        onClick={openSettings}
-        disabled={cutSettingsBlocked}
-      >
-        Advanced cut settings
-      </button>
-      {settingsOpen ? (
-        <LayerRowCutSettings
-          layer={props.operation}
-          onClose={closeSettings}
-          {...(props.editObjectOverride ? { onApply: setOverride } : {})}
-        />
-      ) : null}
-    </>
   );
 }
 
@@ -408,12 +355,11 @@ const toggleRowStyle: React.CSSProperties = {
   gap: 12,
   fontSize: 12,
 };
-const airAssistStyle: React.CSSProperties = { fontSize: 12 };
+const primaryButtonStyle: React.CSSProperties = { minHeight: 34 };
 const fieldRowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '100px 1fr',
   gap: 8,
   alignItems: 'center',
 };
-const primaryButtonStyle: React.CSSProperties = { minHeight: 34 };
 const advisoryStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-warning)', fontSize: 12 };

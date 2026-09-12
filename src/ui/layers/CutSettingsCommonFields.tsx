@@ -4,6 +4,7 @@ export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
   readonly mode: LayerMode;
   readonly maxFeed?: number;
+  readonly operationMembershipEditable?: boolean;
   readonly onModeChange: (mode: LayerMode) => void;
   readonly onPowerChange?: (power: number) => void;
 }): JSX.Element {
@@ -53,6 +54,17 @@ export function CutSettingsCommonFields(props: {
       <Field label="Passes">
         <NumberInput name="passes" value={props.layer.passes} min={1} step={1} label="passes" />
       </Field>
+      {props.operationMembershipEditable !== false ? (
+        <MembershipFields layer={props.layer} />
+      ) : null}
+      {props.mode === 'line' ? <LineModeFields layer={props.layer} /> : null}
+    </>
+  );
+}
+
+function MembershipFields(props: { readonly layer: Layer }): JSX.Element {
+  return (
+    <>
       <Field label="Visible">
         <input
           name="visible"
@@ -71,7 +83,6 @@ export function CutSettingsCommonFields(props: {
           title="Include or exclude this layer when previewing, framing, exporting, or starting jobs."
         />
       </Field>
-      {props.mode === 'line' ? <LineModeFields layer={props.layer} /> : null}
     </>
   );
 }

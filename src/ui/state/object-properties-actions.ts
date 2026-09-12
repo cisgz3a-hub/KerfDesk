@@ -1,12 +1,16 @@
 import {
   layerFromSubLayer,
   sceneObjectUsesOperation,
+  type Layer,
   type ObjectOperationOverride,
   type Project,
   type SceneObject,
   type ShapeObject,
 } from '../../core/scene';
-import { operationOverrideForObject } from '../../core/effective-output';
+import {
+  effectiveOperationForObject,
+  operationOverrideForObject,
+} from '../../core/effective-output';
 import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -163,14 +167,15 @@ function setObjectsOperationOverride(
       (operation !== undefined && !sceneObjectUsesOperation(object, operation))
     )
       return object;
+    const objectPatch = reconcileArtworkBounds(sanitized, operation, object);
     const operationOverride =
       operation === undefined
-        ? { ...(object.operationOverride ?? {}), ...sanitized }
+        ? { ...(object.operationOverride ?? {}), ...objectPatch }
         : {
             ...object.operationOverride,
             byOperation: {
               ...object.operationOverride?.byOperation,
-              [operation.id]: { ...operationOverrideForObject(operation, object), ...sanitized },
+              [operation.id]: { ...operationOverrideForObject(operation, object), ...objectPatch },
             },
           };
     if (operationOverrideEqual(object.operationOverride, operationOverride)) return object;
@@ -184,6 +189,29 @@ function setObjectsOperationOverride(
     redoStack: [],
     dirty: true,
   };
+}
+
+function reconcileArtworkBounds(
+  patch: ObjectOperationOverride,
+  operation: Layer | undefined,
+  object: SceneObject,
+): ObjectOperationOverride {
+  if (operation === undefined) return patch;
+  const current = effectiveOperationForObject(operation, object);
+  const next = { ...patch };
+  // A bulk edit respects each artwork's own ceiling. Only change a dependent
+  // field when the edit requires it; never copy the first artwork's values.
+  if (patch.power !== undefined || patch.minPower !== undefined) {
+    const maximum = patch.power ?? current.power;
+    const minimum = patch.minPower ?? current.minPower;
+    if (minimum > maximum) next.minPower = maximum;
+  }
+  if (patch.linesPerMm !== undefined || patch.dotWidthCorrectionMm !== undefined) {
+    const maximum = 1 / Math.max(1, patch.linesPerMm ?? current.linesPerMm);
+    const width = patch.dotWidthCorrectionMm ?? current.dotWidthCorrectionMm;
+    if (width > maximum) next.dotWidthCorrectionMm = maximum;
+  }
+  return next;
 }
 
 function selectedObjectIds(state: ObjectPropertiesState): Set<string> {

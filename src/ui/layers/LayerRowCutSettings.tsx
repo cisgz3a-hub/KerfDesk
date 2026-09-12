@@ -7,6 +7,7 @@ export function LayerRowCutSettings(props: {
   readonly layer: Layer;
   readonly onClose: () => void;
   readonly onApply?: (patch: LayerPatch) => void;
+  readonly selectionCount?: number;
 }): JSX.Element {
   const { layer, onClose } = props;
   const maxFeed = useStore((s) => s.project.device.maxFeed);
@@ -18,6 +19,8 @@ export function LayerRowCutSettings(props: {
     <CutSettingsDialog
       layer={layer}
       maxFeed={maxFeed}
+      operationMembershipEditable={props.onApply === undefined}
+      {...(props.selectionCount === undefined ? {} : { selectionCount: props.selectionCount })}
       onCancel={onClose}
       onApply={(patch) => {
         (props.onApply ?? ((next) => setLayerParam(layer.id, next)))(patch);

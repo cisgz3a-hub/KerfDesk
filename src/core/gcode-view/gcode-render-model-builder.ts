@@ -14,10 +14,17 @@ import {
   stripInlineComments,
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
+import {
+  createLaserRenderState,
+  isLaserOffFeed,
+  renderedPower,
+  updateLaserRenderState,
+  type LaserRenderState,
+} from './laser-render-state';
 import { expandCannedCycle } from './canned-cycle';
 import { resolveCycleParameters } from './cycle-parameters';
 import { createLineCategoryBuilder } from './line-category-builder';
-import { applyLineWords, type RenderModal } from './render-model-words';
+import { applyLineWords, freshRenderModal, type RenderModal } from './render-model-words';
 import { computeProgramStats } from './program-stats';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
@@ -41,6 +48,7 @@ const ARC_RADIUS_TOLERANCE_MM = 0.127;
 const XY_PLANE = 17;
 
 type BuildContext = {
+  readonly laser: LaserRenderState;
   readonly modal: RenderModal;
   readonly segments: SegmentBuilder;
   readonly events: ProgramEvent[];
@@ -61,7 +69,8 @@ export function createGcodeRenderModelBuilder(
   // it is opt-in: only the live countdown passes it as a responsiveness budget
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
-    modal: freshModal(options.initialPositionMm),
+    laser: createLaserRenderState(options),
+    modal: freshRenderModal(options.initialPositionMm),
     segments: createSegmentBuilder(1024),
     events: [],
     skipped: [],
@@ -128,36 +137,6 @@ export function createGcodeRenderModelBuilder(
   return { pushLine, finish };
 }
 
-function freshModal(initialPosition?: {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-}): RenderModal {
-  return {
-    motion: 0,
-    unitScale: 1,
-    absolute: true,
-    x: initialPosition?.x ?? 0,
-    y: initialPosition?.y ?? 0,
-    z: initialPosition?.z ?? 0,
-    feed: 0,
-    power: 0,
-    spindleMode: 'off',
-    coolantMist: false,
-    coolantFlood: false,
-    plane: XY_PLANE,
-    ended: false,
-    cycle: null,
-    // LinuxCNC's default retract mode is G98 (back to the initial Z).
-    retractMode: 98,
-    cycleR: null,
-    cycleZ: null,
-    cycleQ: null,
-    cycleP: null,
-    cycleInitialZ: 0,
-  };
-}
-
 function processLine(context: BuildContext, raw: string, line: number): number {
   if (raw.trim() === '') return LINE_CATEGORY.blank;
   const stripped = stripInlineComments(raw);
@@ -167,6 +146,7 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   const words = scanCompleteGcodeWords(stripped);
   if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
+  updateLaserRenderState(context.laser, words, raw);
   const outcome = applyLineWords(context.modal, words, line, {
     countUnsupported: (word, atLine) => countUnsupported(context.unsupported, word, atLine),
     pushEvent: (event) => context.events.push(event),
@@ -306,7 +286,8 @@ function emitLinear(
   const motion = modal.motion === 0 ? SEG_MOTION.rapid : SEG_MOTION.linear;
   const zOnly = xyLength <= AXIS_EPSILON;
   const zKind = dz < 0 ? SEG_KIND.plunge : SEG_KIND.retract;
-  const xyKind = modal.motion === 0 ? SEG_KIND.travel : SEG_KIND.cut;
+  const xyKind =
+    modal.motion === 0 || isLaserOffFeed(context.laser, modal) ? SEG_KIND.travel : SEG_KIND.cut;
   context.segments.push({
     x0: modal.x,
     y0: modal.y,
@@ -318,7 +299,7 @@ function emitLinear(
     motion,
     line,
     feed: modal.feed,
-    power: modal.power,
+    power: renderedPower(context.laser, modal),
     lengthMm: length,
   });
 }
@@ -425,11 +406,11 @@ function pushArcPairs(
       x1: point.x,
       y1: point.y,
       z1: z,
-      kind: SEG_KIND.cut,
+      kind: isLaserOffFeed(context.laser, modal) ? SEG_KIND.travel : SEG_KIND.cut,
       motion: clockwise ? SEG_MOTION.cw : SEG_MOTION.ccw,
       line,
       feed: modal.feed,
-      power: modal.power,
+      power: renderedPower(context.laser, modal),
       lengthMm: trueLength * share,
     });
     previous = { x: point.x, y: point.y, z };
