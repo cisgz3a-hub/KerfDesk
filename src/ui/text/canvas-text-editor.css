@@ -1,0 +1,163 @@
+.lf-canvas-text-tool-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  max-width: calc(100% - 48px);
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-1);
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.lf-canvas-text-editor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.lf-canvas-text-input {
+  position: absolute;
+  pointer-events: auto;
+  transform-origin: 0 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 1px dashed var(--lf-accent);
+  outline-offset: 2px;
+  background: transparent;
+  caret-color: var(--lf-accent);
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  box-sizing: content-box;
+}
+
+.lf-canvas-text-input::selection {
+  background: var(--lf-accent-wash);
+}
+
+.lf-canvas-text-input::placeholder {
+  color: var(--lf-text-muted);
+}
+
+.lf-canvas-text-panel {
+  position: absolute;
+  top: 12px;
+  width: 338px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 76px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+  box-shadow: var(--lf-shadow);
+  pointer-events: auto;
+  color: var(--lf-text);
+}
+
+.lf-canvas-text-heading {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-canvas-text-heading strong {
+  font-size: 16px;
+}
+
+.lf-canvas-text-heading span {
+  font-size: 11px;
+  color: var(--lf-accent-fg);
+  background: var(--lf-tint-info);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.lf-canvas-text-fields {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.lf-canvas-text-scroll {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lf-canvas-text-fields .lf-field {
+  margin: 0;
+  gap: 6px;
+}
+
+.lf-canvas-text-fields .lf-field-label--sm {
+  width: 76px;
+  min-width: 76px;
+}
+
+.lf-canvas-text-help {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--lf-text-muted);
+  line-height: 1.5;
+  padding: 0 12px;
+  margin: 4px 0;
+}
+
+.lf-canvas-text-error {
+  font-size: 12px;
+  color: var(--lf-danger-fg);
+  margin: 8px 12px;
+}
+
+.lf-canvas-text-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--lf-border);
+  margin-top: 8px;
+}
+
+.lf-canvas-text-actions > span {
+  margin-right: auto;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+
+.lf-canvas-text-symbols {
+  font-size: 12px;
+}
+
+.lf-canvas-text-symbols summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.lf-canvas-text-symbols > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.lf-canvas-text-symbols button {
+  min-width: 28px;
+  justify-content: center;
+}

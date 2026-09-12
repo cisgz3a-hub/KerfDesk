@@ -16,10 +16,8 @@ import { type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { openEditorForSelectedObject } from './open-selected-object-editor';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
-import { finishPen } from './pen-tool';
 import {
   DragOverlay,
   DragReadout,
@@ -36,7 +34,6 @@ import { usePreviewToolpath } from './use-preview-toolpath';
 import { useCncCut3DSurface } from './use-cnc-cut3d-surface';
 import { useCncRemovalGrid } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
-import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { useDragMove } from './use-workspace-drag';
 import { useWorkspaceWheelZoom } from './use-workspace-wheel';
 import { useJobEstimate } from '../laser/use-job-estimate';
@@ -46,6 +43,7 @@ import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
 import { PreviewRenderStatus } from './PreviewRenderStatus';
+import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -67,15 +65,15 @@ export function Workspace(): JSX.Element {
   const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
   const canvasSize = useCanvasBitmapSize(ref);
   const previewBitmap = usePreviewBitmapRenderer(previewMode);
+  const { displayProject, textEditing } = useCanvasTextDisplayProject(project, previewMode);
   useWorkspaceDraw({
     ref,
-    project,
-    selectedObjectId,
+    project: displayProject,
+    ...canvasTextSelection(textEditing, selectedObjectId, additionalSelectedIds),
     selectedPathNode,
     selectedPathNodes,
     showPathNodeHandles: toolMode.kind === 'node',
     ...(toolMode.kind === 'cnc-tabs' ? { cncTabLayerColor: toolMode.layerColor } : {}),
-    additionalSelectedIds,
     previewMode,
     previewToolpath,
     cncRemovalGrid,
@@ -98,12 +96,11 @@ export function Workspace(): JSX.Element {
         canvasSize={canvasSize}
         handlers={handlers}
         project={project}
+        previewMode={previewMode}
         viewState={viewState}
         canvasMotionOverlay={canvasMotionOverlay}
-        onDoubleClick={handleCanvasDoubleClick}
-        onContextMenu={suppressCanvasContextMenu}
       />
-      {project.scene.objects.length === 0 && !dragOverlay && <EmptyHint />}
+      {project.scene.objects.length === 0 && !dragOverlay && !textEditing && <EmptyHint />}
       {dragOverlay && <DragOverlay />}
       <WorkspaceInteractionOverlays
         canvasRef={ref}
@@ -160,10 +157,6 @@ function useDropPenDraftOnProjectReplace(project: Project): void {
   useEffect(() => {
     if (useUiStore.getState().penDraft !== null) useUiStore.getState().setPenDraft(null);
   }, [project]);
-}
-
-function suppressCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>): void {
-  e.preventDefault();
 }
 
 function WorkspacePreviewOverlays(props: {
@@ -369,22 +362,4 @@ function useDisplayPolylineCache(): DisplayPolylineCache {
   const cacheRef = useRef<DisplayPolylineCache | null>(null);
   if (cacheRef.current === null) cacheRef.current = createDisplayPolylineCache();
   return cacheRef.current;
-}
-
-// Phase G (B6) — double-click exits sticky shape tools; in pen mode it finishes
-// the in-progress polyline as an OPEN path. Otherwise it falls through to the
-// Phase D text-edit. Module-level so the canvas prop reference stays stable.
-function handleCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>): void {
-  if (finishDrawToolOnLeftDoubleClick(e)) return;
-  const ui = useUiStore.getState();
-  if (ui.toolMode.kind === 'draw' && ui.toolMode.shape === 'polyline') {
-    const s = useStore.getState();
-    // Gated on !previewMode so a stray dblclick can't commit into a previewed
-    // scene; the draft is preserved across a preview toggle either way.
-    if (ui.penDraft !== null && !s.previewMode) {
-      finishPen({ closed: false, project: s.project, drawShape: s.drawShape });
-    }
-    return; // in pen mode, never open the in-place editor
-  }
-  openEditorForSelectedObject();
 }

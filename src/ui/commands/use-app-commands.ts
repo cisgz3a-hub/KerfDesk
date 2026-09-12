@@ -54,7 +54,6 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const platform = usePlatform();
   const { app, laser } = useCommandStoreState();
   const pushToast = useToastStore((s) => s.pushToast);
-  const openTextDialog = useUiStore((s) => s.openTextDialog);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const setToolMode = useUiStore((s) => s.setToolMode);
   const toolMode = useUiStore((s) => s.toolMode);
@@ -71,7 +70,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
-      openTextDialog,
+      textTool: () => setToolMode({ kind: 'text' }),
       measureTool: () => setToolMode({ kind: 'measure' }),
       measureActive: toolMode.kind === 'measure',
       registrationPanelOpen,
@@ -317,7 +316,7 @@ function editCommandContext(
     clearSelection: () => app.selectObject(null),
     measureTool: dialogs.measureTool,
     measureActive: dialogs.measureActive,
-    addText: () => dialogs.openTextDialog({ mode: 'add' }),
+    addText: dialogs.textTool,
     printAndCut: dialogs.printAndCut,
   };
 }

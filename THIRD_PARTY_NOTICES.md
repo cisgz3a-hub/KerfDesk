@@ -56,6 +56,14 @@ copyright notice and license to accompany the font in any distribution.
 | Courier Prime Regular | OFL-1.1 | Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime); Alan Dague-Greene |
 | Pacifico Regular | OFL-1.1 | Copyright The Pacifico Project Authors (Vernon Adams) |
 | Dancing Script Regular | OFL-1.1 | Copyright The Dancing Script Project Authors (Pablo Impallari) |
+| Great Vibes Regular | OFL-1.1 | Embedded font: Copyright 2010 The Great Vibes Pro Project Authors; upstream OFL: Copyright 2015 The Great Vibes Pro Project Authors (https://github.com/googlefonts/great-vibes); Robert Leuschke |
+| Allura Regular | OFL-1.1 | Copyright 2010 The Allura Project Authors (https://github.com/googlefonts/allura); Robert Leuschke |
+| Alex Brush Regular | OFL-1.1 | Copyright 2011 The Alex Brush Project Authors (https://github.com/googlefonts/alex-brush); Robert Leuschke |
+| Parisienne Regular | OFL-1.1 | Copyright (c) 2012 by Brian J. Bonislawsky DBA Astigmatic (AOETI), with Reserved Font Name **Parisienne** |
+| Pinyon Script Regular | OFL-1.1 | Embedded font: Copyright 2022 The PinyonScript Project Authors; upstream OFL: Copyright 2024 The Pinyon Project Authors (https://github.com/SorkinType/Pinyon); Nicole Fally |
+| Italianno Regular | OFL-1.1 | Copyright 2009 The Italianno Project Authors (https://github.com/googlefonts/italianno); Robert Leuschke |
+| Corinthia Regular | OFL-1.1 | Copyright 2010 The Corinthia Project Authors (https://github.com/googlefonts/corinthia); Robert Leuschke |
+| Cinzel Decorative Regular | OFL-1.1 | Copyright (c) 2012 Natanael Gama (info@ndiscovered.com), with Reserved Font Name **Cinzel** |
 | Anton Regular | OFL-1.1 | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont); Vernon Adams |
 | Special Elite Regular | Apache-2.0 | Copyright (c) 2010 by Brian J. Bonislawsky DBA Astigmatic (AOETI) |
 | UnifrakturMaguntia Book | OFL-1.1 | Copyright (c) 2010 j. 'mach' wust **with Reserved Font Name UnifrakturMaguntia** |
@@ -69,18 +77,29 @@ copyright notice and license to accompany the font in any distribution.
 - **Apache-2.0** (Roboto, Special Elite): full text at
   https://www.apache.org/licenses/LICENSE-2.0 — the license and any `NOTICE`
   file must accompany the distribution.
-- **SIL Open Font License 1.1** (the fifteen OFL fonts): full text at
+- **SIL Open Font License 1.1** (the twenty-three OFL fonts): full text at
   https://openfontlicense.org — the above copyright/source notices and this
   license must be bundled with the fonts; the fonts may be redistributed but
   not sold on their own, and Reserved Font Names must not be reused for
   modified versions. The four CNC sources, pinned commits, canonical source
   hashes, and complete metadata attribution ship in
   `public/third-party-notices.txt`.
-- **Reserved Font Name declared:** UnifrakturMaguntia. We ship it unmodified
-  under its own name, which the OFL permits; a *modified* version may not reuse
-  that name. No other bundled face declares an RFN — checked against each
-  `.ttf`'s own copyright record, not against the license boilerplate, which
-  always mentions the term.
+- **Reserved Font Names declared:** UnifrakturMaguntia, Parisienne, and Cinzel.
+  We ship these fonts unmodified under their own names, which the OFL permits;
+  a *modified* version may not reuse the reserved name. These declarations
+  come from the fonts' copyright records and original distribution licenses.
+
+The eight calligraphy-collection additions, from Great Vibes through Cinzel
+Decorative in the table, are unmodified static TTF files. Seven are pinned to
+`google/fonts` commit `809e4d8b8d7e9364a914909bb777679606c178b8`; Great Vibes
+Version 1.010 is pinned to `59adf74d6054b41e8e647193c1cfa69115256843`, because
+Version 1.103 uses a glyph-substitution lookup unsupported by the current
+opentype.js renderer. No font tables or outlines were altered. Their upstream
+`OFL.txt` files are retained in `src/ui/text/fonts/licenses/` and reproduced in
+the generated release notices. The notice generator checks each TTF's SHA-256
+before use. Great Vibes and Pinyon Script have different copyright years in
+their embedded font records and upstream license files; both notices are
+preserved without alteration.
 
 > Maintainer follow-up (recommended for belt-and-suspenders): ship the verbatim
 > `OFL.txt` / Apache `LICENSE` files alongside the fonts. The exact copyright

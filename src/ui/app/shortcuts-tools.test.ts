@@ -53,6 +53,27 @@ describe('handleToolShortcut - Measure tool', () => {
   });
 });
 
+describe('handleToolShortcut - canvas text', () => {
+  it('T arms text placement while preserving the document until the canvas click', () => {
+    const ctx = makeCtx();
+    expect(handleToolShortcut(fakeKeydown({ key: 't' }), ctx)).toBe(true);
+    expect(ctx.setToolMode).toHaveBeenCalledWith({ kind: 'text' });
+  });
+
+  it.each(['input', 'textarea', 'div'])('leaves T inside an editable %s alone', (tag) => {
+    const target = document.createElement(tag);
+    if (tag === 'div') target.setAttribute('contenteditable', 'true');
+    const ctx = makeCtx();
+    expect(handleToolShortcut(fakeKeydown({ key: 't', target }), ctx)).toBe(false);
+    expect(ctx.setToolMode).not.toHaveBeenCalled();
+  });
+
+  it('does not intercept Ctrl+T for a browser tab', () => {
+    const ctx = makeCtx();
+    expect(handleToolShortcut(fakeKeydown({ key: 't', ctrlKey: true }), ctx)).toBe(false);
+  });
+});
+
 describe('handleToolShortcut - Convert to Bitmap (Ctrl/Cmd+Shift+B)', () => {
   it('Ctrl+Shift+B requests Convert to Bitmap (LightBurn §7.4 binding)', () => {
     const ctx = makeCtx();

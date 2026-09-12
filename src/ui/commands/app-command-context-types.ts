@@ -34,7 +34,7 @@ export type CommandDialogs = {
     source: RasterImage,
     options?: { readonly replaceTraceId?: string },
   ) => void;
-  readonly openTextDialog: (options: { readonly mode: 'add' }) => void;
+  readonly textTool: () => void;
   readonly measureTool: () => void;
   readonly measureActive: boolean;
   readonly registrationPanelOpen: boolean;

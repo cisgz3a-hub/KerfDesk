@@ -52,7 +52,7 @@ export function FontPicker(props: Props): JSX.Element {
     setOpen(false);
   };
   return (
-    <div ref={rootRef} style={rootStyle}>
+    <div ref={rootRef} style={rootStyle} onKeyDown={fontPickerEscapeHandler(open, close, rootRef)}>
       <button
         type="button"
         className="lf-btn"
@@ -114,6 +114,20 @@ export function FontPicker(props: Props): JSX.Element {
       )}
     </div>
   );
+}
+
+function fontPickerEscapeHandler(
+  open: boolean,
+  close: () => void,
+  root: React.RefObject<HTMLDivElement>,
+): React.KeyboardEventHandler {
+  return (event) => {
+    if (event.key !== 'Escape' || !open) return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+    root.current?.querySelector('button')?.focus();
+  };
 }
 
 function FontOptionName({ font }: { readonly font: FontEntry }): JSX.Element {

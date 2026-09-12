@@ -10,6 +10,7 @@ import { useUiStore } from '../state/ui-store';
 import { PlatformProvider } from './platform-context';
 import { useShortcuts } from './use-shortcuts';
 import { Dialog } from '../kit';
+import { useCanvasTextStore } from '../text/canvas-text-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -97,6 +98,7 @@ async function pressKey(init: KeyboardEventInit & { readonly key: string }): Pro
 }
 
 afterEach(() => {
+  useCanvasTextStore.getState().close();
   useStore.getState().newProject();
   useUiStore.setState({ textDialog: null, imageDialog: null, modalDepth: 0 });
   useToastStore.setState({ toasts: [] });
@@ -104,6 +106,25 @@ afterEach(() => {
 });
 
 describe('useShortcuts modal gate', () => {
+  it('leaves the document and view alone while a canvas text session owns keyboard input', async () => {
+    installVectorProject();
+    useCanvasTextStore.getState().beginAdd({ x: 30, y: 40 });
+    const before = useStore.getState().project;
+    const { unmount } = await renderHarness();
+    try {
+      await pressKey({ key: 'Backspace' });
+      await pressKey({ key: 'z', ctrlKey: true });
+      await pressKey({ key: 'o', ctrlKey: true });
+      await pressKey({ key: 'ArrowRight' });
+      await pressKey({ key: 'p' });
+      expect(useStore.getState().project).toBe(before);
+      expect(useStore.getState().previewMode).toBe(false);
+      expect(mockPlatform.pickFilesForOpen).not.toHaveBeenCalled();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('ignores file and edit shortcuts while the text modal is open', async () => {
     installVectorProject();
     useUiStore.setState({ textDialog: { mode: 'add' } });

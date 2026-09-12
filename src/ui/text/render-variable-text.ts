@@ -1,6 +1,7 @@
 import { bendTextRender, placeTextOnPath } from '../../core/text';
 import type { VariableTextRenderer } from '../../io/gcode';
 import { renderTextGeometry } from './render-text-geometry';
+import { applyTextWeld } from './apply-text-weld';
 
 export const renderVariableText: VariableTextRenderer = async ({ text, content, project }) => {
   const rendered = await renderTextGeometry({
@@ -22,9 +23,13 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     const placed = placeTextOnPath(rendered, guide, text.pathText);
     if (placed.kind !== 'ok') throw new Error(placed.message);
     return {
-      ...placed.rendered,
+      ...applyTextWeld(placed.rendered, text.fontKey, text.weldOverlaps),
       transform: { ...text.transform, x: placed.origin.x, y: placed.origin.y },
     };
   }
-  return bendTextRender(rendered, text.bendDeg ?? 0);
+  return applyTextWeld(
+    bendTextRender(rendered, text.bendDeg ?? 0),
+    text.fontKey,
+    text.weldOverlaps,
+  );
 };

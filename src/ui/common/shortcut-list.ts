@@ -34,6 +34,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
     {
       family: 'Tools',
       rows: [
+        { keys: 'T', action: 'type and edit text on canvas' },
         { keys: 'Ctrl+R', action: 'rectangle' },
         { keys: 'Ctrl+E', action: 'ellipse' },
         { keys: 'Ctrl+L', action: 'pen' },
