@@ -18,9 +18,18 @@ export type FirmwareDiff = {
   readonly current: string;
   // What the draft profile wants this setting to be.
   readonly desired: string;
+  readonly comparison: 'match' | 'different' | 'invalid';
   readonly differs: boolean;
   // Whether the wizard may offer to write this (GRBL 'common'-risk only).
   readonly writable: boolean;
+};
+
+export type FirmwareComparison = {
+  readonly diffs: ReadonlyArray<FirmwareDiff>;
+  readonly expectedCount: number;
+  readonly comparedCount: number;
+  readonly missingCodes: ReadonlyArray<`$${number}`>;
+  readonly invalidCodes: ReadonlyArray<`$${number}`>;
 };
 
 type DiffedSetting = {
@@ -39,6 +48,14 @@ export function computeFirmwareDiffs(
   rows: ReadonlyArray<GrblSettingRow>,
   options: ComputeFirmwareDiffOptions = {},
 ): ReadonlyArray<FirmwareDiff> {
+  return computeFirmwareComparison(draft, rows, options).diffs;
+}
+
+export function computeFirmwareComparison(
+  draft: DeviceProfile,
+  rows: ReadonlyArray<GrblSettingRow>,
+  options: ComputeFirmwareDiffOptions = {},
+): FirmwareComparison {
   const cnc = options.machine?.kind === 'cnc' ? options.machine : null;
   const activeMachineKind = cnc === null ? 'laser' : 'cnc';
   const context = {
@@ -48,13 +65,22 @@ export function computeFirmwareDiffs(
     readonly machineKinds: ReadonlyArray<MachineKind>;
     readonly activeMachineKind: MachineKind;
   };
-  return diffedSettings(draft, cnc).flatMap((setting) => {
+  const settings = diffedSettings(draft, cnc);
+  const missingCodes: Array<`$${number}`> = [];
+  const diffs = settings.flatMap((setting): ReadonlyArray<FirmwareDiff> => {
     const row = rows.find((candidate) => candidate.id === setting.id);
-    // Only diff settings the controller actually reported; an unread setting
-    // is not something we can confidently reconcile.
-    if (row === undefined) return [];
+    if (row === undefined) {
+      missingCodes.push(`$${setting.id}`);
+      return [];
+    }
     const desired = setting.desired;
     const current = row.numericValue;
+    const comparison =
+      current === null || !Number.isFinite(current)
+        ? 'invalid'
+        : numbersClose(current, desired)
+          ? 'match'
+          : 'different';
     return [
       {
         id: setting.id,
@@ -62,11 +88,22 @@ export function computeFirmwareDiffs(
         label: setting.label ?? presentGrblSetting(row, context).name,
         current: row.rawValue,
         desired: String(desired),
-        differs: current !== null && !numbersClose(current, desired),
+        comparison,
+        differs: comparison === 'different',
         writable: row.writeRisk === 'common',
       },
     ];
   });
+  const invalidCodes = diffs
+    .filter((diff) => diff.comparison === 'invalid')
+    .map((diff) => diff.code);
+  return {
+    diffs,
+    expectedCount: settings.length,
+    comparedCount: diffs.length - invalidCodes.length,
+    missingCodes,
+    invalidCodes,
+  };
 }
 
 // $30/$31/$32 share one controller PWM block, but the profile only has a

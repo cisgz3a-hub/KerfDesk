@@ -9,6 +9,7 @@ import type {
 } from '../app/inspect-current-gcode-action';
 import { useStore } from '../state';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 
 type InspectCurrentGcodeMock = (
   ctx: unknown,
@@ -108,7 +109,18 @@ describe('useCurrentGcode', () => {
     await mount(true);
     expect(compileCount()).toBe(1);
     expect(latest?.state.kind).toBe('ready');
+    expect(latest?.state).toMatchObject({
+      context: { machineKind: 'laser', laserPowerControl: 'spindle' },
+    });
     expect(latest?.stale).toBe(false);
+  });
+
+  it('carries CNC context from the compiled project into the preview', async () => {
+    useStore.setState({
+      project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    });
+    await mount(true);
+    expect(latest?.state).toMatchObject({ kind: 'ready', context: { machineKind: 'cnc' } });
   });
 
   it('does not compile while the view is hidden', async () => {

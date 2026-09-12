@@ -143,6 +143,11 @@ export type GcodeRenderModel = {
 };
 
 export type BuildRenderModelOptions = {
+  /** Explicit program context. Unspecified/CNC retains geometric G1 cutting
+   * semantics because spindle S0/M5 does not establish that a tool is clear. */
+  readonly machineKind?: 'laser' | 'cnc' | undefined;
+  /** Fan PWM applies only to a known Marlin fan laser output profile. */
+  readonly laserPowerControl?: 'spindle' | 'fan' | undefined;
   /** Line cap for the synchronous path; the Stage-11 worker path raises it. */
   /** Optional segment cap for bounded synchronous consumers. The parser
    * checks after each source line, so one expanded line may cross the cap. */

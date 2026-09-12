@@ -10,11 +10,17 @@ import { saveGcodeContext } from '../commands/gcode-command-actions';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { projectInspectionContext, type GcodeInspectionContext } from './gcode-inspection-source';
 
 export type CurrentGcode =
   | { readonly kind: 'idle' }
   | { readonly kind: 'compiling'; readonly progress?: OutputCompilationProgress }
-  | { readonly kind: 'ready'; readonly programName: string; readonly text: string }
+  | {
+      readonly kind: 'ready';
+      readonly programName: string;
+      readonly text: string;
+      readonly context: GcodeInspectionContext;
+    }
   | { readonly kind: 'empty' }
   | { readonly kind: 'stale'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
@@ -110,7 +116,7 @@ function useCurrentGcodeRefresh(args: {
       (programName, text) => {
         if (runSequence.current !== runId || controller.signal.aborted) return;
         compiledFor.current = snapshot;
-        setState({ kind: 'ready', programName, text });
+        setState({ kind: 'ready', programName, text, context: projectInspectionContext(snapshot) });
       },
       {
         signal: controller.signal,

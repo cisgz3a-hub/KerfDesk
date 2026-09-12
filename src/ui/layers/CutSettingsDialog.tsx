@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Layer, LayerMode } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { CutSettingsCommonFields } from './CutSettingsCommonFields';
@@ -9,22 +9,36 @@ import {
 import { CutSettingsFillFields } from './CutSettingsFillFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
+import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
 
 type CutSettingsDialogProps = {
   readonly layer: Layer;
   readonly maxFeed?: number;
+  readonly selectionCount?: number;
+  readonly operationMembershipEditable?: boolean;
   readonly onCancel: () => void;
   readonly onApply: (patch: LayerPatch) => void;
 } & Partial<CutSettingsDefaultHandlers>;
 
 export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
   const maxFeed = positiveFiniteLimit(props.maxFeed);
+  const changedFields = useRef(new Map<string, HTMLElement>());
+  const signature = layerFormSignature(props.layer);
+  useEffect(() => {
+    changedFields.current.clear();
+  }, [signature]);
   const onSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
+    const patch = readCutSettingsPatch(new FormData(form), props.layer, {
+      ...(maxFeed === null ? {} : { maxFeed }),
+      deferArtworkBounds: props.selectionCount !== undefined,
+    });
     props.onApply(
-      readCutSettingsPatch(new FormData(form), props.layer, maxFeed === null ? {} : { maxFeed }),
+      props.selectionCount !== undefined
+        ? changedCutSettingsPatch(form, patch, changedFields.current)
+        : patch,
     );
   };
   return (
@@ -36,17 +50,33 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       size="md"
     >
       <Header layer={props.layer} />
+      {props.selectionCount !== undefined ? (
+        <p className="lf-subheading">
+          Values start from the first selected artwork. Only fields you change are applied to all{' '}
+          {props.selectionCount} selected artworks. Each artwork keeps its own power and density
+          limits.
+        </p>
+      ) : null}
       {/* Keyed on the layer's own settings: the fields are uncontrolled drafts
           that read `defaultValue` once, and OK submits whatever the DOM holds.
           "Reset to Default" rewrites the layer in the store while the dialog is
           open, so without this remount the boxes kept the pre-reset numbers and
           OK wrote them straight back — silently undoing the reset. Typing never
           changes the stored layer, so an in-progress edit is never remounted. */}
-      <CutSettingsBody
-        key={layerFormSignature(props.layer)}
-        layer={props.layer}
-        {...(maxFeed === null ? {} : { maxFeed })}
-      />
+      <div
+        onChangeCapture={(event) => {
+          const field = cutSettingField(event.target);
+          if (field !== undefined) changedFields.current.set(field.name, field.control);
+        }}
+      >
+        <CutSettingsBody
+          key={signature}
+          layer={props.layer}
+          deferArtworkBounds={props.selectionCount !== undefined}
+          operationMembershipEditable={props.operationMembershipEditable !== false}
+          {...(maxFeed === null ? {} : { maxFeed })}
+        />
+      </div>
       {hasDefaultHandlers(props) ? <CutSettingsDefaultActions {...props} /> : null}
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -58,7 +88,12 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
   );
 }
 
-function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: number }): JSX.Element {
+function CutSettingsBody(props: {
+  readonly layer: Layer;
+  readonly maxFeed?: number;
+  readonly deferArtworkBounds: boolean;
+  readonly operationMembershipEditable: boolean;
+}): JSX.Element {
   const [mode, setMode] = useState<LayerMode>(props.layer.mode);
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
   const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
@@ -69,6 +104,7 @@ function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: numb
     <>
       <CutSettingsCommonFields
         layer={props.layer}
+        operationMembershipEditable={props.operationMembershipEditable}
         mode={mode}
         onModeChange={setMode}
         onPowerChange={setPower}
@@ -84,6 +120,7 @@ function CutSettingsBody(props: { readonly layer: Layer; readonly maxFeed?: numb
       {mode === 'image' ? (
         <CutSettingsImageFields
           layer={props.layer}
+          deferArtworkBounds={props.deferArtworkBounds}
           dither={dither}
           maxPower={power}
           imageLinesPerMm={imageLinesPerMm}

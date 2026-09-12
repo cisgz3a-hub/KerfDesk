@@ -21,7 +21,7 @@ import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
-import { assertNever, type LayerOperationSettings } from '../scene';
+import { assertNever } from '../scene';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
@@ -29,6 +29,7 @@ import { fillRunwayCommentText } from './fill-runway-comment';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
+import { operationProvenanceComment } from './operation-provenance-comment';
 
 const LINE_END = '\n';
 type CoolantMode = 'off' | 'M7' | 'M8';
@@ -183,7 +184,7 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
   chunks.push(
     `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
-  pushEffectiveOperationComment(chunks, group.operationSettings);
+  pushOperationProvenanceComment(chunks, group);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     // Re-arm with the GROUP's effective mode: a dynamic-override layer must
@@ -215,7 +216,7 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes} ${overscanText}`,
   );
-  pushEffectiveOperationComment(chunks, group.operationSettings);
+  pushOperationProvenanceComment(chunks, group);
   // Each scanline's nearby runs become continuous G1 sweeps with S0 gaps
   // (ADR-034); wide gaps split into independently planned sweeps (ADR-035).
   // Generic Scan Line gives every sweep bounded feed-matched laser-off entry
@@ -245,7 +246,7 @@ function emitOffsetFillGroup(
   chunks.push(
     `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
-  pushEffectiveOperationComment(chunks, group.operationSettings);
+  pushOperationProvenanceComment(chunks, group);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
@@ -274,31 +275,9 @@ function contourEntryComment(entryRunwayMm: number | undefined): string {
     : ` contour-entry ${formatGcodeCoordinateMm(entryRunwayMm)} mm effective laser-off feed`;
 }
 
-function pushEffectiveOperationComment(
-  chunks: string[],
-  settings: LayerOperationSettings | undefined,
-): void {
-  if (settings !== undefined) chunks.push(`; ${effectiveOperationComment(settings)}`);
-}
-
-function effectiveOperationComment(settings: LayerOperationSettings): string {
-  if (settings.mode === 'fill') {
-    return (
-      `effective override: mode fill; style ${settings.fillStyle}; ` +
-      `interval ${settings.hatchSpacingMm} mm; angle ${settings.hatchAngleDeg} deg; ` +
-      `direction ${settings.fillBidirectional ? 'bidirectional' : 'one-way'}; ` +
-      `cross-hatch ${settings.fillCrossHatch ? 'on' : 'off'}`
-    );
-  }
-  if (settings.mode === 'image') {
-    return (
-      `effective override: mode image; dither ${settings.ditherAlgorithm}; ` +
-      `lines ${settings.linesPerMm}/mm; ` +
-      `direction ${settings.imageBidirectional ? 'bidirectional' : 'one-way'}; ` +
-      `negative ${settings.negativeImage ? 'on' : 'off'}`
-    );
-  }
-  return `effective override: mode line; kerf ${settings.kerfOffsetMm} mm`;
+function pushOperationProvenanceComment(chunks: string[], group: CutGroup | FillGroup): void {
+  const comment = operationProvenanceComment(group);
+  if (comment !== undefined) chunks.push(`; ${comment}`);
 }
 
 // One planned sweep. Seek to its entry runway with the device's laser-off
@@ -397,6 +376,7 @@ function emitRasterGroupHere(
   dialect: GrblGcodeDialect,
 ): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
+  const operationComment = operationProvenanceComment(group);
   return emitRasterGroupGcode({
     sValues: group.sValues,
     ...(group.rowProvider !== undefined ? { rowProvider: group.rowProvider } : {}),
@@ -421,9 +401,7 @@ function emitRasterGroupHere(
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
-    ...(group.operationSettings === undefined
-      ? {}
-      : { effectiveOperationComment: effectiveOperationComment(group.operationSettings) }),
+    ...(operationComment === undefined ? {} : { effectiveOperationComment: operationComment }),
   });
 }
 

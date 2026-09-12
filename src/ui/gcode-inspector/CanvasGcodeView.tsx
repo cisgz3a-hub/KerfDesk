@@ -18,7 +18,11 @@ import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
   const { state, stale, refresh } = useCurrentGcode(props.active);
   const text = state.kind === 'ready' ? state.text : '';
-  const source = useMemo(() => (text === '' ? null : { kind: 'text' as const, text }), [text]);
+  const context = state.kind === 'ready' ? state.context : undefined;
+  const source = useMemo(
+    () => (text === '' ? null : { kind: 'text' as const, text, ...context }),
+    [text, context],
+  );
   const inspection = useGcodeInspection(source);
 
   return (
