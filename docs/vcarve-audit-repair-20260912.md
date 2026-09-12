@@ -97,6 +97,14 @@ continuous coverage at every setting. All 480 separate octagon corner probes ret
 positive removal after the compaction correction, with maximum depth shortfall
 **0.001859 mm**, including probes just 0.003 mm inward from the source vertices.
 
+Before publication, the repair also integrated main's filled-canvas detail cache from
+`d843225f1ca44cc9f97564691ea773a7eda4715b`. The canvas retains complete contours and
+applies each path's current winding rule through both native `Path2D` and the immediate
+fallback. A rule-only change reuses native geometry while applying the new rule.
+All **38 focused integration tests** passed, including two new tests for this composition;
+TypeScript, scoped lint and formatting passed. The hosted checks on
+[PR #784](https://github.com/cisgz3a-hub/KerfDesk/pull/784) validate the resulting commit.
+
 ## Output size and compaction
 
 The added containment reserve initially exhausted the existing 250,000-check compaction
@@ -122,6 +130,6 @@ The original audit evidence is retained at
 Repair evidence is retained at
 `C:\Users\Asus\.codex\audits\vcarve-fixes-20260912-01a09562`.
 
-This repair does not merge, publish, deploy or operate hardware. It preserves the exact-job
-Frame and advisory Job Review policies. Software containment and sampled removal checks
+Publication is tracked separately in PR #784 and its deployment workflow. The repair
+preserves the exact-job Frame and advisory Job Review policies. Software containment and sampled removal checks
 do not establish controller, packaged-desktop, air-cut or material-cut qualification.

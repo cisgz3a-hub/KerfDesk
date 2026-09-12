@@ -15,8 +15,10 @@ import { runTrace, type TracePreviewState } from './use-trace-preview';
 describe('relaxed trace settings remain visible with their recovered geometry', () => {
   it('discloses a real zero-paths retry in the preview and preserves it for commit reuse', async () => {
     const image = tinySpeck();
-    const options = TRACE_PRESETS['Sharp'];
-    if (options === undefined) throw new Error('Missing Sharp preset');
+    const preset = TRACE_PRESETS['Sharp'];
+    if (preset === undefined) throw new Error('Missing Sharp preset');
+    // Force removal of the two-pixel fixture; Sharp now preserves it by default.
+    const options = { ...preset, despeckleMinPixels: 4 };
     expect(await traceImageToColoredPaths(image, options)).toEqual([]);
     const file = new File(['source'], 'speck.png');
     const request = { file, options, boundary: null, boundaryMode: 'crop' as const };
@@ -54,8 +56,9 @@ describe('relaxed trace settings remain visible with their recovered geometry', 
   it.each(['crop', 'enhance'] as const)(
     'retains retry disclosure through %s tracing',
     async (mode) => {
-      const options = TRACE_PRESETS['Sharp'];
-      if (options === undefined) throw new Error('Missing Sharp preset');
+      const preset = TRACE_PRESETS['Sharp'];
+      if (preset === undefined) throw new Error('Missing Sharp preset');
+      const options = { ...preset, despeckleMinPixels: 4 };
       const result = await traceImageWithBoundaryMode(
         tinySpeck(),
         options,
