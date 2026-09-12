@@ -36,7 +36,39 @@ cover defaults, all six image creation paths, firmware comparison, mixed editing
 provenance, inspection workers/fallback and neighboring output/streaming behavior.
 The separate cohorts overlap and their counts must not be added.
 
-Integrated checks and browser observations are recorded here after completion.
+`pnpm release:check` completed with exit code 0 on
+`080d16f6dcc241c39cc6c5979314bc6eb792576b`, after rebasing onto the main revision above.
+The final report update changes documentation only.
+
+| Check | Result |
+| --- | --- |
+| Full Vitest suite | 2,079 files / 13,590 tests passed; 14 perceptual fixture files / 22 tests skipped; no failures. |
+| Separate release-integrity suite | 78 tests passed; no failures or skips. |
+| Root focused regression cohort | 78 tests in 9 files passed, including 21 complete mixed-Inspector cases. This overlaps the full suite. |
+| Static and repository checks | TypeScript, application/Electron lint, formatting, ADR numbers, action pins, licences, file-size limits, soft-size limits and public-export ratchet passed. |
+| Builds | Web production and Electron main-process builds passed. Vite emitted its non-failing large-chunk advisory. |
+| Browser | Fresh tabs on the repaired source verified mixed values, explicit bulk edits, Advanced scope, two independent Undo steps and compiled F0 Inspector output. No warning/error logs in those fresh tabs. |
+
+For the screenshot's synthetic rectangle, an independent straight-line calculation
+confirmed 100 powered rows, 2,000 mm of powered feed and 1,000 mm of laser-off feed
+runways. Including rapid movement gives 4,049.044363 mm of travel in Absolute Coordinates.
+The rendered Inspector agrees, displaying 2,000 mm cut, 4,049 mm travel, 401 segments,
+F1500 and S300. The fixture's profile uses S-max 1000; this is synthetic profile evidence,
+not a readback from the user's controller.
+
+All 407 sendable commands match the original audit artifact exactly, with SHA-256
+`25223b166b6a65ec75dbbf2a79ebdd585a7da67f0a95c3703e3b375c71b998ac`.
+Pure streaming simulations verified every command byte and acknowledgement for
+ping-pong / 64 bytes and character-counted / 64 and 127 bytes, including buffer limits.
+This is compiler and software transport evidence; it does not establish receipt or
+physical output on a real controller.
+
+Browser fixture pages initialise a known project before mounting the actual application.
+The checks qualify subsequent rendered application behavior, not the native file picker:
+the automation interface could not capture that picker. The temporary test server and
+tabs were closed. The user's port-5190 application remained running, and SHA-256 checks
+confirmed that all 11 pre-existing modified tracked files in the primary checkout were
+unchanged.
 
 ## Evidence and scope
 
@@ -46,6 +78,7 @@ under `delegated`. It includes red and green test reports, exact commands and so
 The original immutable audit evidence remains at
 `D:\CodexWorktrees\settings-machine-audit-20260912-01a095a3\audit-evidence`.
 
-No firmware settings, physical motion, laser/spindle state, Frame/Start policy, provider
-configuration, publication or deployment is changed by this repair. Hardware/material
-qualification and deploying the repaired application remain separate actions.
+No hardware was operated, no firmware settings were written, and the exact-job Frame/Start
+policy remains unchanged. The repairs are committed locally; they have not been pushed,
+merged or deployed. The remaining operational steps are integrating and releasing this
+branch, then controlled qualification with the actual controller and material.
