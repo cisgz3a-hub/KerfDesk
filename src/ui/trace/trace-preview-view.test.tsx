@@ -79,14 +79,19 @@ describe('TracePreview comparison and inspection', () => {
     expect(host.querySelector('[aria-label="Trace points"] circle')).toBe(firstPoint);
   });
 
-  it('keeps Original unfaded while remembering the Overlay fade preference', async () => {
+  it('starts with a faded comparison and remembers its preference without fading Original', async () => {
     await render();
-    await click('Fade Image');
     expect(source().style.opacity).toBe('0.2');
+    expect(button('Fade Image').getAttribute('aria-pressed')).toBe('true');
+    await click('Fade Image');
+    expect(source().style.opacity).toBe('1');
     await click('Original');
     expect(source().style.opacity).toBe('1');
     expect(button('Fade Image').disabled).toBe(true);
     await click('Overlay');
+    expect(source().style.opacity).toBe('1');
+    expect(button('Fade Image').getAttribute('aria-pressed')).toBe('false');
+    await click('Fade Image');
     expect(source().style.opacity).toBe('0.2');
     expect(button('Fade Image').getAttribute('aria-pressed')).toBe('true');
   });

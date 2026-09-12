@@ -69,6 +69,16 @@
   margin-left: auto;
 }
 
+.lf-trace-preview__surface {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+}
+
 .lf-trace-preview__viewport {
   position: relative;
   flex: 1 1 0;
@@ -124,6 +134,18 @@
   height: 100%;
 }
 
+/* Comparison paint only: preserve empty interiors, holes, markers and the
+   generated SVG's actual colours when the user switches to Trace view. */
+.lf-trace-preview__stage[data-view='overlay'] .lf-trace-preview__vectors [fill]:not([fill='none']) {
+  fill: var(--lf-accent);
+}
+
+.lf-trace-preview__stage[data-view='overlay']
+  .lf-trace-preview__vectors
+  [stroke]:not([stroke='none']) {
+  stroke: var(--lf-accent);
+}
+
 /* Keep edge strokes/markers visible in the letterbox, as with the full-stage
    SVG. The stage clips them at the original preview extent. */
 .lf-trace-preview__vectors > svg,
@@ -142,6 +164,59 @@
 
 .lf-trace-preview__stage [hidden] {
   display: none;
+}
+
+.lf-trace-preview__loading {
+  position: absolute;
+  inset: 1px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--lf-space-4);
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-accent-wash);
+  pointer-events: none;
+}
+
+.lf-trace-preview__loading-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--lf-space-3);
+  max-width: 320px;
+  padding: var(--lf-space-5) var(--lf-space-6);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-bg-1);
+  box-shadow: var(--lf-shadow);
+  text-align: center;
+}
+
+.lf-trace-preview__loading-card p {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.5;
+}
+
+.lf-trace-preview__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--lf-border);
+  border-top-color: var(--lf-accent);
+  border-radius: 50%;
+  animation: lf-trace-preview-spin 900ms linear infinite;
+}
+
+@keyframes lf-trace-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-trace-preview__spinner {
+    animation: none;
+  }
 }
 
 .lf-trace-preview__status {

@@ -32,7 +32,7 @@ export function TracePreviewControls(props: Props): JSX.Element {
             disabled={props.view !== 'overlay'}
             onClick={props.onToggleFade}
             className="lf-btn"
-            title="Fade the source image in Overlay view to inspect the traced vectors."
+            title="Fade the original image behind the blue trace in Overlay view."
           >
             Fade Image
           </button>
@@ -71,13 +71,13 @@ function ViewControls(props: {
 }): JSX.Element {
   return (
     <div className="lf-trace-preview__views" role="group" aria-label="Trace preview view">
-      {VIEW_CHOICES.map(([view, label, accessibleLabel]) => (
+      {VIEW_CHOICES.map(([view, label, accessibleLabel, description]) => (
         <button
           key={view}
           type="button"
           className="lf-btn"
           aria-label={accessibleLabel}
-          title={accessibleLabel}
+          title={description}
           aria-pressed={props.view === view}
           disabled={view !== 'trace' && !props.hasSource}
           onClick={() => props.onChange(view)}
@@ -131,7 +131,17 @@ function ZoomControls(props: {
 }
 
 const VIEW_CHOICES = [
-  ['original', 'Original', 'Show original image'],
-  ['trace', 'Trace', 'Show trace result'],
-  ['overlay', 'Overlay', 'Show overlay'],
+  [
+    'original',
+    'Original',
+    'Show original image',
+    'View the original image without traced vectors.',
+  ],
+  ['trace', 'Trace', 'Show trace result', 'View the trace in its actual output colours.'],
+  [
+    'overlay',
+    'Overlay',
+    'Show overlay',
+    'Compare the blue trace with the original image. Blue is for preview only.',
+  ],
 ] as const;

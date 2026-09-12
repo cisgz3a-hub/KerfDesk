@@ -32,21 +32,34 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const dialog = await openTrace(page, kerfdesk);
+  await expect(dialog.getByRole('checkbox', { name: 'Delete Image After trace' })).toBeChecked();
   await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
   await expect(dialog.getByText(/Trace ready/)).toBeVisible();
   const requestCount = await requests(page);
   expect(requestCount).toBeGreaterThan(0);
   const preview = dialog.locator('[aria-label="Trace preview (64x96 px)"]');
+  const source = dialog.getByLabel('Trace source image');
+  const ink = preview.locator('[fill]:not([fill="none"])').first();
+  await expect(dialog.getByRole('progressbar')).toHaveCount(0);
+  await expect(source).toHaveCSS('opacity', '0.2');
+  const comparisonColour = await ink.evaluate((node) => getComputedStyle(node).fill);
   await dialog.getByRole('button', { name: 'Show original image' }).click();
   await expect(preview).toBeHidden();
+  await expect(source).toHaveCSS('opacity', '1');
   await dialog.getByRole('button', { name: 'Show trace result' }).click();
   await expect(preview).toBeVisible();
+  await expect(source).toBeHidden();
+  const outputColour = await ink.evaluate((node) => getComputedStyle(node).fill);
+  expect(comparisonColour).not.toBe(outputColour);
   await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await expect(dialog.getByLabel('Preview magnification')).toHaveText('2×');
   await dialog.getByRole('button', { name: 'Show Points', exact: true }).click();
   await expect(dialog.getByLabel('Trace points')).toBeVisible();
   await dialog.getByRole('button', { name: 'Show overlay' }).click();
+  await expect(ink).toHaveCSS('fill', comparisonColour);
+  await expect(source).toHaveCSS('opacity', '0.2');
   await dialog.getByRole('button', { name: 'Fade Image', exact: true }).click();
+  await expect(source).toHaveCSS('opacity', '1');
   await dialog.getByRole('button', { name: 'Fit', exact: true }).click();
   // Allow the normal 300 ms trace debounce to reveal an accidental request.
   await page.waitForTimeout(450);
@@ -84,7 +97,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   if (saved === undefined) throw new Error('Missing saved trace project');
   const project = JSON.parse(saved) as { scene: { objects: { kind: string }[] } };
   expect(project.scene.objects.filter((object) => object.kind === 'traced-image')).toHaveLength(1);
-  expect(project.scene.objects.some((object) => object.kind === 'raster-image')).toBe(true);
+  expect(project.scene.objects.some((object) => object.kind === 'raster-image')).toBe(false);
 });
 
 test('keeps the preview and actions usable on a narrow screen and restores focus on Escape', async ({

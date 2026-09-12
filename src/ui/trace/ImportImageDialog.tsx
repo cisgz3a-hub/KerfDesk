@@ -2,8 +2,9 @@
 // File-keyed preview and worker trace pipeline. Laser projects default to
 // editable vector output (LightBurn's Trace model, ADR-238); materializing the
 // trace through the Raster/Image pipeline (ADR-235) remains selectable, and
-// CNC stays vector-only. Both outputs retain source provenance for Re-trace
-// Original. Pure UI pieces live in dialog-parts.tsx.
+// CNC stays vector-only. Both outputs retain source provenance; Re-trace
+// Original needs the source bitmap kept in the scene. Pure UI pieces live in
+// dialog-parts.tsx.
 
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
@@ -108,7 +109,7 @@ function DialogBody(props: {
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
-  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
+  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
   const boundarySelection = useBoundarySelection();
   const [busy, setBusy] = useState(false);
   const captureLifetime = useTraceCommitLifetime(props.requestToken);

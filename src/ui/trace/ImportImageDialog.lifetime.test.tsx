@@ -154,13 +154,9 @@ async function chooseOutput(output: 'vector' | 'raster', deleteSource: boolean):
     if (select === null) throw new Error('Trace output is missing');
     select.value = output;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    if (deleteSource) {
-      const toggle = host.querySelector<HTMLInputElement>(
-        'input[title="Remove the source bitmap from the workspace after creating the traced output."]',
-      );
-      if (toggle === null) throw new Error('Delete Image After trace is missing');
-      toggle.click();
-    }
+    const toggle = host.querySelector<HTMLInputElement>('.lf-trace-delete-source input');
+    if (toggle === null) throw new Error('Delete Image After trace is missing');
+    if (toggle.checked !== deleteSource) toggle.click();
   });
 }
 
@@ -219,7 +215,8 @@ describe('Trace commit dialog and document lifetime', () => {
       await act(async () => {
         next.resolve(result);
       });
-      expect(useStore.getState().project.scene.objects).toHaveLength(2);
+      expect(useStore.getState().project.scene.objects).toHaveLength(1);
+      expect(useStore.getState().project.scene.objects[0]?.kind).toBe('traced-image');
       expect(pushToast).toHaveBeenCalledTimes(1);
       expect(host.querySelector('[role="dialog"]')).toBeNull();
     },
@@ -363,6 +360,7 @@ describe('Trace commit dialog and document lifetime', () => {
         .setProject({ ...project, scene: { ...project.scene, objects: [source, target] } });
       useUiStore.getState().openImageDialog(source, { replaceTraceId: target.id });
     });
+    await chooseOutput('vector', false);
     const pending = deferred<TraceResult>();
     vi.mocked(resolveTraceCommitResult).mockReturnValueOnce(pending.promise);
     const moved = {

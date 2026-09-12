@@ -1876,8 +1876,12 @@ ADR-279.*
    The large preview and scrollable settings panel sit side by side on wide screens and stack
    on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
    or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
-   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image. **Fade Image** applies
-   to Overlay, and **Show Points** displays vector vertices. These viewing controls do not
+   Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
+   source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
+   only to Overlay. A centred loading indicator distinguishes image preparation from tracing,
+   remains visible while zoomed or panned, and disappears on completion or error.
+   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
+   **Show Points** displays vector vertices. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share
    the original image's aspect ratio even when their working grids round to different sizes.
    Escape closes the dialog and returns focus
@@ -1926,6 +1930,9 @@ ADR-279.*
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   **Delete Image After trace** starts selected and removes the source bitmap only after a
+   successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
+   and abandoned requests retain the source; Undo reverses the import and source deletion together.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. Selection bounds follow the conditioned
    geometry while the trace remains registered over its full source image.

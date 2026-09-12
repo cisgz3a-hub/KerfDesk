@@ -213,7 +213,7 @@ export function DeleteImageAfterTraceToggle(props: {
         type="checkbox"
         className="lf-checkbox"
         checked={props.checked}
-        title="Remove the source bitmap from the workspace after creating the traced output."
+        title="Remove the source bitmap after creating the trace. Uncheck to keep it for Re-trace Original."
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span>Delete Image After trace</span>

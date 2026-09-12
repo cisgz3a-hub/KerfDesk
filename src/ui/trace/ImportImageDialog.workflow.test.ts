@@ -54,6 +54,7 @@ describe('Trace Image workflow controls', () => {
     await withTraceDialog(async (host) => {
       const output = outputSelect(host);
       expect(output?.value).toBe('vector');
+      expect(checkboxByLabel(host, 'Delete Image After trace')?.checked).toBe(true);
       expect(Array.from(output?.options ?? []).map((option) => option.textContent)).toEqual([
         'Editable vectors',
         'Raster scan',

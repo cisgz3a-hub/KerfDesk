@@ -44,7 +44,7 @@ describe('TracePreview source overlay controls', () => {
     }
   });
 
-  it('dims only the source image when Fade Image is toggled', async () => {
+  it('changes only the source image opacity when Fade Image is toggled', async () => {
     const { host, root } = await renderPreview();
     try {
       const image = host.querySelector(

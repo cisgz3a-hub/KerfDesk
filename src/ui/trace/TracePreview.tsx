@@ -25,7 +25,7 @@ type ReadyPreview = Extract<TracePreviewState, { readonly kind: 'ready' }>;
 export function TracePreview(props: Props): JSX.Element {
   const { state } = props;
   const [selectedView, setSelectedView] = useState<TracePreviewView>('overlay');
-  const [isSourceFaded, setIsSourceFaded] = useState(false);
+  const [isSourceFaded, setIsSourceFaded] = useState(true);
   const [shouldShowPoints, setShouldShowPoints] = useState(false);
   const { zoom, viewportRef, zoomTo } = useTracePreviewZoom();
   const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
@@ -47,23 +47,26 @@ export function TracePreview(props: Props): JSX.Element {
         onTogglePoints={() => setShouldShowPoints((next) => !next)}
         onBoundaryClear={props.onBoundaryClear}
       />
-      <div
-        ref={viewportRef}
-        className="lf-trace-preview__viewport"
-        role="region"
-        aria-label="Preview viewport"
-        aria-busy={isLoading}
-        tabIndex={0}
-        title="Use the scrollbars, trackpad or arrow keys to move around a zoomed preview."
-      >
-        <PreviewFrame
-          {...props}
-          zoom={zoom}
-          view={view}
-          hasSource={hasSource}
-          isSourceFaded={isSourceFaded}
-          shouldShowPoints={shouldShowPoints}
-        />
+      <div className="lf-trace-preview__surface">
+        <div
+          ref={viewportRef}
+          className="lf-trace-preview__viewport"
+          role="region"
+          aria-label="Preview viewport"
+          aria-busy={isLoading}
+          tabIndex={0}
+          title="Use the scrollbars, trackpad or arrow keys to move around a zoomed preview."
+        >
+          <PreviewFrame
+            {...props}
+            zoom={zoom}
+            view={view}
+            hasSource={hasSource}
+            isSourceFaded={isSourceFaded}
+            shouldShowPoints={shouldShowPoints}
+          />
+        </div>
+        {isLoading ? <PreviewLoading isDecoding={state.kind === 'decoding'} /> : null}
       </div>
       <PreviewStatus state={state} />
       <p className="lf-trace-preview__help">
@@ -97,6 +100,7 @@ function PreviewFrame(
     <div
       ref={stageRef}
       className="lf-trace-preview__stage"
+      data-view={props.view}
       style={{ width: `${props.zoom * 100}%`, height: `${props.zoom * 100}%` }}
       aria-label="Trace preview"
       {...dragHandlers}
@@ -127,6 +131,26 @@ function PreviewFrame(
         {activeBoundary !== null && props.imageSize !== undefined ? (
           <BoundaryOverlay boundary={activeBoundary} imageSize={props.imageSize} />
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PreviewLoading({ isDecoding }: { readonly isDecoding: boolean }): JSX.Element {
+  return (
+    <div className="lf-trace-preview__loading">
+      <div
+        className="lf-trace-preview__loading-card"
+        role="progressbar"
+        aria-label={isDecoding ? 'Preparing image for tracing' : 'Tracing image'}
+      >
+        <span className="lf-trace-preview__spinner" aria-hidden="true" />
+        <strong>{isDecoding ? 'Preparing image' : 'Tracing image'}</strong>
+        <p>
+          {isDecoding
+            ? 'Reading the image before tracing begins.'
+            : 'Finding and refining the trace. Detailed images can take a moment.'}
+        </p>
       </div>
     </div>
   );
