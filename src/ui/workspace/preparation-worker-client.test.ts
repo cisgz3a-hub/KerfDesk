@@ -137,10 +137,13 @@ describe('prepareLargeJobOffThread', () => {
       ...okResult,
     } as PreparationWorkerResponse);
     await expect(first).resolves.toBeDefined();
-    // The held request dispatches once the active compute settles.
-    expect(worker.posted).toHaveLength(2);
-    worker.respond({
-      id: worker.posted[1]?.id ?? -1,
+    // Release the completed heap before constructing the held request's worker.
+    expect(worker.terminated).toBe(true);
+    const nextWorker = lastWorker();
+    expect(nextWorker).not.toBe(worker);
+    expect(nextWorker.posted).toHaveLength(1);
+    nextWorker.respond({
+      id: nextWorker.posted[0]?.id ?? -1,
       kind: 'ok',
       ...okResult,
     } as PreparationWorkerResponse);
@@ -148,6 +151,7 @@ describe('prepareLargeJobOffThread', () => {
   });
 
   it('terminates the worker and rejects stale requests when the project changes', async () => {
+    vi.useFakeTimers();
     const first = prepareLargeJobOffThread(createProject());
     if (first === null) throw new Error('expected a worker request');
     const firstWorker = lastWorker();
@@ -155,6 +159,8 @@ describe('prepareLargeJobOffThread', () => {
     if (second === null) throw new Error('expected a worker request');
     await expect(first).rejects.toThrow('superseded');
     expect(firstWorker.terminated).toBe(true);
+    expect(FakeWorker.instances).toHaveLength(1);
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
     expect(lastWorker()).not.toBe(firstWorker);
   });
 
@@ -170,7 +176,7 @@ describe('prepareLargeJobOffThread', () => {
     await expect(promise).rejects.toThrow('compile exploded');
   });
 
-  it('respawns eagerly on supersede but delays dispatch behind the quiet window', async () => {
+  it('delays worker construction and dispatch until the supersede quiet window ends', async () => {
     vi.useFakeTimers();
     const first = prepareLargeJobOffThread(createProject());
     if (first === null) throw new Error('expected a worker request');
@@ -179,12 +185,11 @@ describe('prepareLargeJobOffThread', () => {
     const second = prepareLargeJobOffThread(createProject());
     if (second === null) throw new Error('expected a worker request');
     await expect(first).rejects.toThrow('superseded by a newer project');
-    // The replacement worker spawns immediately (module-graph load overlaps
-    // the quiet window), but nothing is posted until the window elapses.
+    // No idle worker heap competes with another lane owner during the delay.
+    expect(FakeWorker.instances).toHaveLength(1);
+    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
     expect(FakeWorker.instances).toHaveLength(2);
     const worker = lastWorker();
-    expect(worker.posted).toHaveLength(0);
-    vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
     expect(worker.posted).toHaveLength(1);
     worker.respond({
       id: worker.posted[0]?.id ?? -1,
@@ -205,11 +210,11 @@ describe('prepareLargeJobOffThread', () => {
     if (latest === null) throw new Error('expected a worker request');
     await expect(first).rejects.toThrow('superseded by a newer project');
     await expect(stale).rejects.toThrow('superseded by a newer project');
-    // The second supersede found an idle worker: no second termination.
-    expect(FakeWorker.instances).toHaveLength(2);
+    // Neither replacement was constructed during the quiet window.
+    expect(FakeWorker.instances).toHaveLength(1);
     // The original deadline passes without a dispatch — the window was reset.
     vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS / 2);
-    expect(lastWorker().posted).toHaveLength(0);
+    expect(FakeWorker.instances).toHaveLength(1);
     vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS / 2);
     const worker = lastWorker();
     expect(worker.posted).toHaveLength(1);
@@ -245,10 +250,13 @@ describe('prepareLargeJobOffThread', () => {
       ...okResult,
     } as PreparationWorkerResponse);
     await expect(active).resolves.toBeDefined();
-    // The latest request dispatches once the active compute settles.
-    expect(worker.posted).toHaveLength(2);
-    worker.respond({
-      id: worker.posted[1]?.id ?? -1,
+    // The latest request dispatches on a new worker after retirement.
+    expect(worker.terminated).toBe(true);
+    const nextWorker = lastWorker();
+    expect(nextWorker).not.toBe(worker);
+    expect(nextWorker.posted).toHaveLength(1);
+    nextWorker.respond({
+      id: nextWorker.posted[0]?.id ?? -1,
       kind: 'ok',
       ...okResult,
     } as PreparationWorkerResponse);

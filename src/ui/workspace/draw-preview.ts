@@ -3,7 +3,6 @@
 // rendered as cut polylines + travel dashed lines, optionally truncated
 // at a 0..1 scrubber fraction with a red head marker at the cut point.
 
-import { canvasTheme } from '../theme/canvas-theme';
 import {
   assertNever,
   sceneLayerVisibility,
@@ -14,14 +13,7 @@ import {
   type Vec2,
   validateOutputScope,
 } from '../../core/scene';
-import {
-  buildToolpath,
-  EMPTY_JOB,
-  sliceToolpath,
-  type JobOriginPlacement,
-  type Toolpath,
-  type ToolpathStep,
-} from '../../core/job';
+import { buildToolpath, EMPTY_JOB, type JobOriginPlacement, type Toolpath } from '../../core/job';
 import { resolveGrblDialect } from '../../core/devices';
 import {
   prepareOutput,
@@ -38,9 +30,14 @@ import {
   registerExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
-import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-scene-frame';
+import {
+  mapOwnedToolpathToScene,
+  mapToolpathToScene,
+  registerPreviewJobOriginOffset,
+} from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
-import { displayPolylinePointIndices, displayStepIndices } from './preview-display-decimation';
+import { preparePreviewFrame } from './preview-route-frame';
+import { renderPreviewFrame } from './preview-route-render';
 
 type FaintVectorObject = Extract<
   SceneObject,
@@ -106,24 +103,7 @@ export function drawPreview(
   } = {},
 ): void {
   const route = previewRouteForDrawing(toolpath);
-  if (route.totalLength === 0) return;
-  const showTravel = options.showTravel !== false;
-  const showFuture = options.showFuture !== false;
-  const showEndpoints = options.showEndpoints !== false;
-  if (showFuture && scrubberT < 1) {
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    drawWholeSteps(ctx, route.steps, view, showTravel);
-    ctx.restore();
-  }
-  const sliced = sliceToolpath(route, scrubberT * route.totalLength);
-  ctx.save();
-  ctx.globalAlpha = 0.72;
-  drawWholeSteps(ctx, sliced.whole, view, showTravel);
-  if (sliced.partial !== null) drawStep(ctx, sliced.partial, view, showTravel);
-  ctx.restore();
-  if (showEndpoints) drawEndpoints(ctx, route.steps, view);
-  if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
+  renderPreviewFrame(ctx, preparePreviewFrame(route, scrubberT, options), view);
 }
 
 export function buildPreviewToolpath(
@@ -222,13 +202,16 @@ export function buildPreviewToolpathFromPrepared(
     scanningOffsets: project.device.scanningOffsets,
     bedSizeMm: { widthMm: project.device.bedWidth, heightMm: project.device.bedHeight },
   });
-  const previewToolpath = mapToolpathToScene(
-    machineToolpath,
-    prepared.jobOriginOffset,
-    project.device,
+  // The plan-preview gate already excludes streamed rasters. Their freshly
+  // built machine array has no remaining consumer, so reuse its slots instead
+  // of retaining two full routes while mapping millions of raster steps.
+  const streamedRaster = prepared.job.groups.some(
+    (group) => group.kind === 'raster' && group.rowProvider !== undefined,
   );
+  const mapPreview = streamedRaster ? mapOwnedToolpathToScene : mapToolpathToScene;
+  const previewToolpath = mapPreview(machineToolpath, prepared.jobOriginOffset, project.device);
   registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
-  if (options.executablePlan === true) {
+  if (options.executablePlan === true && !streamedRaster) {
     registerExecutablePlanPreviewRoute({
       previewToolpath,
       legacyMachineToolpath: machineToolpath,
@@ -258,138 +241,4 @@ function previewParkPoint(
 
 function emptyPreviewToolpath(previewIssue: PreviewIssue): PreviewToolpath {
   return { ...buildToolpath(EMPTY_JOB), previewIssue };
-}
-
-function drawStep(
-  ctx: CanvasRenderingContext2D,
-  step: ToolpathStep,
-  view: ViewTransform,
-  showTravel: boolean,
-): void {
-  if (step.kind === 'travel') {
-    if (showTravel) drawTravel(ctx, step.from, step.to, view, step.motion);
-  } else if (step.kind === 'plunge') {
-    // Vertical-only move — no XY extent to draw in the 2D route. The
-    // depth-shaded CNC preview (H.2 removal grid) is where plunges show.
-  } else drawCut(ctx, step.polyline, step.color, view);
-}
-
-function drawWholeSteps(
-  ctx: CanvasRenderingContext2D,
-  steps: ReadonlyArray<ToolpathStep>,
-  view: ViewTransform,
-  showTravel: boolean,
-): void {
-  for (const index of displayStepIndices(steps.length)) {
-    const step = steps[index];
-    if (step === undefined) continue;
-    drawStep(ctx, step, view, showTravel);
-  }
-}
-
-function drawHead(ctx: CanvasRenderingContext2D, head: Vec2, view: ViewTransform): void {
-  drawRouteMarker(ctx, head, view, 5, canvasTheme.previewHeadFill, canvasTheme.previewHeadStroke);
-}
-
-function drawEndpoints(
-  ctx: CanvasRenderingContext2D,
-  steps: ReadonlyArray<ToolpathStep>,
-  view: ViewTransform,
-): void {
-  const start = firstRoutePoint(steps);
-  const end = lastRoutePoint(steps);
-  if (start !== null) {
-    drawRouteMarker(
-      ctx,
-      start,
-      view,
-      3.5,
-      canvasTheme.previewHeadStroke,
-      canvasTheme.previewTravel,
-    );
-  }
-  if (end !== null) {
-    drawRouteMarker(ctx, end, view, 3.5, canvasTheme.previewTravel, canvasTheme.previewHeadStroke);
-  }
-}
-
-function drawRouteMarker(
-  ctx: CanvasRenderingContext2D,
-  head: Vec2,
-  view: ViewTransform,
-  radiusPx: number,
-  fillStyle: string,
-  strokeStyle: string,
-): void {
-  const cx = view.offsetX + head.x * view.scale;
-  const cy = view.offsetY + head.y * view.scale;
-  ctx.save();
-  ctx.fillStyle = fillStyle;
-  ctx.strokeStyle = strokeStyle;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawTravel(
-  ctx: CanvasRenderingContext2D,
-  from: Vec2,
-  to: Vec2,
-  view: ViewTransform,
-  motion: Extract<ToolpathStep, { kind: 'travel' }>['motion'],
-): void {
-  const feed = motion === 'feed';
-  ctx.strokeStyle = feed ? canvasTheme.previewFeedTravel : canvasTheme.previewTravel;
-  ctx.lineWidth = feed ? 0.75 : 0.5;
-  ctx.setLineDash(feed ? [5, 2] : [2, 3]);
-  ctx.beginPath();
-  ctx.moveTo(view.offsetX + from.x * view.scale, view.offsetY + from.y * view.scale);
-  ctx.lineTo(view.offsetX + to.x * view.scale, view.offsetY + to.y * view.scale);
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function drawCut(
-  ctx: CanvasRenderingContext2D,
-  polyline: ReadonlyArray<Vec2>,
-  _color: string,
-  view: ViewTransform,
-): void {
-  ctx.strokeStyle = canvasTheme.previewCut;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  let first = true;
-  for (const index of displayPolylinePointIndices(polyline.length)) {
-    const point = polyline[index];
-    if (point === undefined) continue;
-    const x = view.offsetX + point.x * view.scale;
-    const y = view.offsetY + point.y * view.scale;
-    if (first) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-    first = false;
-  }
-  ctx.stroke();
-}
-
-function firstRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
-  const first = steps[0];
-  if (first === undefined) return null;
-  if (first.kind === 'travel') return first.from;
-  if (first.kind === 'plunge') return first.at;
-  return first.polyline[0] ?? null;
-}
-
-function lastRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
-  for (let i = steps.length - 1; i >= 0; i -= 1) {
-    const step = steps[i];
-    if (step === undefined) continue;
-    if (step.kind === 'travel') return step.to;
-    if (step.kind === 'plunge') return step.at;
-    const end = step.polyline[step.polyline.length - 1];
-    if (end !== undefined) return end;
-  }
-  return null;
 }

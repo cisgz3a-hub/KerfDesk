@@ -21,10 +21,10 @@
 //   - A request for a DIFFERENT project while work is in flight terminates
 //     the worker (a compute cannot be interrupted cooperatively) and rejects
 //     every stale promise; callers treat rejection as "stale, ignore". The
-//     replacement worker spawns immediately so its spawn + module-graph load
-//     overlaps the supersede quiet window, and dispatch waits until the
-//     window elapses after the LAST supersede so a burst of edits costs one
-//     restart (and one structured clone of the Project), not one per edit.
+//     replacement waits for the supersede quiet window and the shared worker
+//     memory lane, so a burst of edits costs one new worker and one project
+//     clone. Each terminal result retires its worker before yielding the lane
+//     to autosave or another preparation; their heaps must not overlap.
 //   - No watchdog timeout on purpose: a 50M-pixel prepare legitimately runs
 //     minutes. Staleness is handled by supersede, crashes by onerror.
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
@@ -48,6 +48,7 @@ import {
 } from './canvas-compilation-main-bridge';
 import { PreparationResultCache } from './preparation-result-cache';
 import { PreparationTransferAssembler } from './preparation-transfer-assembler';
+import { reserveWorkerMemory } from '../worker-memory-lane';
 import type {
   PreparationTransferResponse,
   PreparationTransferAcknowledgement,
@@ -114,6 +115,10 @@ type QueuedRequest = {
 };
 
 type ActiveRequest = QueuedRequest & { readonly id: number };
+type MemoryReservation = {
+  cancel: (() => void) | null;
+  release: (() => void) | null;
+};
 
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
@@ -121,6 +126,7 @@ let activeRequest: ActiveRequest | null = null;
 let activeTransfer: PreparationTransferAssembler | null = null;
 let queuedRequests: ReadonlyArray<QueuedRequest> = [];
 let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
+let memoryReservation: MemoryReservation | null = null;
 const preparationCache = new PreparationResultCache(MAX_SETTLED_PREPARATIONS);
 
 /**
@@ -176,7 +182,7 @@ function requestPreparation(
     // full Preview, satisfying both consumers with the same compile.
     rejectQueuedRequests(new PreparationSupersededError('newer-request'), key);
   }
-  if (ensureWorker() === null) return null;
+  if (typeof Worker === 'undefined') return null;
   const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {
     const held = queuedRequests.find((request) => request.key === key);
     const progress = onProgress ?? held?.onProgress;
@@ -226,16 +232,12 @@ function hasWorkForOtherProject(project: Project): boolean {
 // old one is stale, and the worker may be mid-compute on it.
 function supersedeForNewProject(): void {
   rejectQueuedRequests(new PreparationSupersededError('newer-project'));
-  if (activeRequest !== null) {
-    const stale = activeRequest;
-    activeRequest = null;
-    // Terminating is the only way to stop the mid-compute worker; respawn
-    // immediately so the replacement's spawn + module-graph load overlaps
-    // the quiet window instead of serializing in front of the next dispatch.
-    retireWorker();
-    ensureWorker();
-    stale.reject(new PreparationSupersededError('newer-project'));
-  }
+  const stale = activeRequest;
+  activeRequest = null;
+  // Also cancel a reservation that has not been granted. Its replacement
+  // must not jump ahead of an autosave already waiting for this worker.
+  retireWorker();
+  stale?.reject(new PreparationSupersededError('newer-project'));
   armQuietWindow();
 }
 
@@ -250,21 +252,33 @@ function armQuietWindow(): void {
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
+  let created: Worker | null = null;
   try {
-    const created = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
+    const worker = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
       type: 'module',
     });
-    connectCanvasCompilationMainBridge(created);
-    created.onmessage = handleWorkerMessage;
-    created.onerror = (): void => {
-      rejectAllPendingAndRetireWorker('preparation worker errored');
+    created = worker;
+    connectCanvasCompilationMainBridge(worker);
+    worker.onmessage = (event): void => {
+      if (workerInstance === worker) handleWorkerMessage(event);
     };
-    created.onmessageerror = (): void => {
-      rejectAllPendingAndRetireWorker('preparation worker response was not cloneable');
+    worker.onerror = (): void => {
+      if (workerInstance === worker) rejectAllPendingAndRetireWorker('preparation worker errored');
     };
-    workerInstance = created;
-    return created;
+    worker.onmessageerror = (): void => {
+      if (workerInstance === worker)
+        rejectAllPendingAndRetireWorker('preparation worker response was not cloneable');
+    };
+    workerInstance = worker;
+    return worker;
   } catch {
+    if (created !== null) {
+      try {
+        retireCanvasCompilationMainBridge(created);
+      } finally {
+        created.terminate();
+      }
+    }
     return null;
   }
 }
@@ -289,7 +303,7 @@ function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
   }
   const settled = activeRequest;
   activeRequest = null;
-  activeTransfer = null;
+  retireWorker();
   if (e.data.kind === 'ok') {
     settled.resolve({
       toolpath: e.data.toolpath,
@@ -333,7 +347,7 @@ function handleTransferMessage(packet: PreparationTransferResponse): void {
     if (result === null) return;
     const settled = activeRequest;
     activeRequest = null;
-    activeTransfer = null;
+    retireWorker();
     settled?.resolve(result);
     dispatchNextRequest();
   } catch (error) {
@@ -344,14 +358,39 @@ function handleTransferMessage(packet: PreparationTransferResponse): void {
 }
 
 function dispatchNextRequest(): void {
-  if (activeRequest !== null || quietWindowTimer !== null) return;
+  if (
+    activeRequest !== null ||
+    quietWindowTimer !== null ||
+    memoryReservation !== null ||
+    queuedRequests.length === 0
+  )
+    return;
+  const reservation: MemoryReservation = { cancel: null, release: null };
+  memoryReservation = reservation;
+  reservation.cancel = reserveWorkerMemory((release) => {
+    if (memoryReservation !== reservation) {
+      release();
+      return;
+    }
+    reservation.release = release;
+    dispatchReservedRequest();
+  });
+  // A free grant can fail or even complete synchronously before reserve
+  // returns. Its old token must never overwrite or release a newer owner.
+  if (memoryReservation !== reservation) reservation.cancel();
+}
+
+function dispatchReservedRequest(): void {
+  // Options/project may have coalesced while autosave owned the lane.
   const next = queuedRequests[0];
-  if (next === undefined) return;
+  if (next === undefined || quietWindowTimer !== null) {
+    retireWorker();
+    return;
+  }
   const worker = ensureWorker();
   if (worker === null) {
-    // Worker construction succeeded at request time but fails now (only seen
-    // when the environment tears Worker down): nothing can settle these.
     rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
+    retireWorker();
     return;
   }
   queuedRequests = queuedRequests.slice(1);
@@ -399,9 +438,22 @@ function rejectAllPendingAndRetireWorker(message: string): void {
 
 function retireWorker(): void {
   activeTransfer = null;
-  if (workerInstance === null) return;
   const retired = workerInstance;
   workerInstance = null;
-  retireCanvasCompilationMainBridge(retired);
-  retired.terminate();
+  const reservation = memoryReservation;
+  memoryReservation = null;
+  try {
+    if (retired !== null) {
+      retired.onmessage = null;
+      retired.onerror = null;
+      retired.onmessageerror = null;
+      try {
+        retireCanvasCompilationMainBridge(retired);
+      } finally {
+        retired.terminate();
+      }
+    }
+  } finally {
+    (reservation?.release ?? reservation?.cancel)?.();
+  }
 }

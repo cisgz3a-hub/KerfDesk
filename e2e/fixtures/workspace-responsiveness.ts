@@ -37,6 +37,13 @@ export async function checkWorkspaceHover(page: Page): Promise<{
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
+  await expect(page.getByText('Updating route view…', { exact: true })).toBeHidden();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
   await canvas.evaluate((element) => {
     const target = window as Window & { __workspaceHover?: HoverObservation };
     const original = CanvasRenderingContext2D.prototype.clearRect;

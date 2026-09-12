@@ -48,6 +48,9 @@ function worker(): FakeWorker {
   if (instance === undefined) throw new Error('worker missing');
   return instance;
 }
+function requests(): PreparationWorkerRequest[] {
+  return FakeWorker.instances.flatMap((instance) => instance.posted);
+}
 
 beforeEach(() => {
   FakeWorker.instances = [];
@@ -95,8 +98,8 @@ describe('estimate-only preparation client', () => {
     await small;
     const full = prepareLargeJobOffThread(project);
     expect(full).not.toBe(small);
-    expect(worker().posted).toHaveLength(2);
-    expect(worker().posted[1]?.projection).toBeUndefined();
+    expect(requests()).toHaveLength(2);
+    expect(worker().posted[0]?.projection).toBeUndefined();
     worker().respond('preview');
     await expect(full).resolves.toEqual({ toolpath, estimate });
     expect(prepareJobEstimateOffThread(project)).toBe(full);
@@ -109,7 +112,7 @@ describe('estimate-only preparation client', () => {
     expect(worker().posted).toHaveLength(1);
     worker().respond();
     await expect(small).resolves.toEqual({ estimate });
-    expect(worker().posted).toHaveLength(2);
+    expect(requests()).toHaveLength(2);
     expect(prepareLargeJobOffThread(project)).toBe(full);
     expect(prepareJobEstimateOffThread(project)).toBe(full);
     worker().respond('preview');
@@ -124,13 +127,13 @@ describe('estimate-only preparation client', () => {
     expect(worker().posted).toHaveLength(1);
     worker().respond();
     await active;
-    expect(worker().posted).toHaveLength(2);
-    expect(worker().posted[1]?.projection).toBeUndefined();
+    expect(requests()).toHaveLength(2);
+    expect(worker().posted[0]?.projection).toBeUndefined();
     expect(prepareJobEstimateOffThread(project, origin)).toBe(heldPreview);
     worker().respond('preview');
     await expect(heldEstimate).resolves.toEqual({ toolpath, estimate });
     await expect(heldPreview).resolves.toEqual({ toolpath, estimate });
-    expect(worker().posted).toHaveLength(2);
+    expect(requests()).toHaveLength(2);
   });
 
   it('joins a held full Preview without cancelling it when ETA asks for the same options', async () => {
@@ -154,11 +157,11 @@ describe('estimate-only preparation client', () => {
       worker().respond();
       await pending;
     }
-    expect(worker().posted).toHaveLength(5);
+    expect(requests()).toHaveLength(5);
     const evicted = prepareJobEstimateOffThread(project, {
       jobOrigin: { startFrom: 'user-origin', anchor: anchors[0] },
     });
-    expect(worker().posted).toHaveLength(6);
+    expect(requests()).toHaveLength(6);
     worker().respond();
     await evicted;
   });
@@ -175,7 +178,7 @@ describe('estimate-only preparation client', () => {
     await expect(heldEstimate).rejects.toThrow('superseded by a newer project');
     await expect(heldPreview).rejects.toThrow('superseded by a newer project');
     expect(staleWorker.terminated).toBe(true);
-    expect(worker().posted).toHaveLength(0);
+    expect(FakeWorker.instances).toHaveLength(1);
     vi.advanceTimersByTime(SUPERSEDE_QUIET_WINDOW_MS);
     worker().respond();
     await expect(next).resolves.toEqual({ estimate });

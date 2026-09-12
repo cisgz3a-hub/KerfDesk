@@ -43,6 +43,9 @@ function worker(): FakeWorker {
   if (found === undefined) throw new Error('missing worker');
   return found;
 }
+function requests(): PreparationWorkerRequest[] {
+  return FakeWorker.instances.flatMap((instance) => instance.requests);
+}
 beforeEach(() => {
   FakeWorker.instances = [];
   vi.stubGlobal('Worker', FakeWorker);
@@ -62,10 +65,10 @@ describe('Preview request retention', () => {
     expect(prepareLargeJobOffThread(project, shifted)).toBe(replacement);
     const revisited = prepareLargeJobOffThread(project);
     expect(revisited).not.toBe(first);
-    expect(worker().requests).toHaveLength(2);
+    expect(requests()).toHaveLength(2);
     worker().respond();
     await expect(replacement).resolves.toEqual(result);
-    expect(worker().requests).toHaveLength(3);
+    expect(requests()).toHaveLength(3);
     worker().respond();
     await expect(revisited).resolves.toEqual(result);
     expect(prepareLargeJobOffThread(project)).toBe(revisited);
@@ -79,14 +82,14 @@ describe('Preview request retention', () => {
     expect(prepareJobEstimateOffThread(project)).toBe(earlier);
     worker().respond();
     await expect(earlier).resolves.toEqual(result);
-    expect(worker().requests).toHaveLength(2);
+    expect(requests()).toHaveLength(2);
     const freshEstimate = prepareJobEstimateOffThread(project);
     expect(freshEstimate).not.toBe(earlier);
     expect(prepareLargeJobOffThread(project, shifted)).toBe(latest);
     worker().respond();
     await expect(latest).resolves.toEqual(result);
-    expect(worker().requests).toHaveLength(3);
-    expect(worker().requests[2]?.projection).toBe('estimate');
+    expect(requests()).toHaveLength(3);
+    expect(worker().requests[0]?.projection).toBe('estimate');
     worker().respond();
     await expect(freshEstimate).resolves.toEqual({ estimate: result.estimate });
     expect(prepareJobEstimateOffThread(project, shifted)).toBe(latest);

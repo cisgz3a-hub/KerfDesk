@@ -44,6 +44,8 @@ import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { CanvasMotionBadge } from './canvas-motion-badge';
 import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
+import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
+import { PreviewRenderStatus } from './PreviewRenderStatus';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -64,6 +66,7 @@ export function Workspace(): JSX.Element {
   usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
   const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
   const canvasSize = useCanvasBitmapSize(ref);
+  const previewBitmap = usePreviewBitmapRenderer(previewMode);
   useWorkspaceDraw({
     ref,
     project,
@@ -80,6 +83,7 @@ export function Workspace(): JSX.Element {
     showPreviewTravel,
     viewState,
     canvasSize,
+    previewBitmap,
     artworkRunFocus,
   });
 
@@ -117,10 +121,9 @@ export function Workspace(): JSX.Element {
         cncRemovalGrid={cncRemovalGrid}
       />
       {previewMode && <PreviewScrubber />}
+      <PreviewRenderStatus pending={previewMode && previewBitmap.pending} />
       {!previewMode && <CanvasMotionBadge overlay={canvasMotionOverlay} />}
       {!previewMode && <ArtworkNumberingPrompt />}
-      {/* Bottom-right zoom controls — hidden during preview so the
-          scrubber gets the whole bottom strip. */}
       {!previewMode && <ZoomControls />}
     </>
   );
@@ -252,6 +255,7 @@ function useWorkspaceDraw(args: {
   // Not read directly — the draw effect reads canvas.width/height — but a
   // bitmap resize clears the canvas, so the effect must re-run on it.
   readonly canvasSize: CanvasBitmapSize;
+  readonly previewBitmap: ReturnType<typeof usePreviewBitmapRenderer>;
   readonly artworkRunFocus: ReturnType<typeof useUiStore.getState>['artworkRunFocus'];
 }): void {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
@@ -264,6 +268,10 @@ function useWorkspaceDraw(args: {
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
+  const previewBackgroundKey = useMemo(
+    () => [args.project, args.cncRemovalGrid, rasterRedrawTick],
+    [args.project, args.cncRemovalGrid, rasterRedrawTick],
+  );
   const displayPolylineCache = useDisplayPolylineCache();
   const requestRasterRedraw = useCallback(() => {
     setRasterRedrawTick((tick) => tick + 1);
@@ -275,6 +283,7 @@ function useWorkspaceDraw(args: {
     if (ctx === null) return;
     drawWorkspaceScene(ctx, canvas, args, {
       requestRasterRedraw,
+      previewBackgroundKey,
       displayPolylineCache,
       draftShape,
       penDraft,
@@ -298,9 +307,12 @@ function useWorkspaceDraw(args: {
     args.showPreviewTravel,
     args.viewState,
     args.canvasSize,
+    args.previewBitmap.drawRoute,
+    args.previewBitmap.revision,
     args.artworkRunFocus,
     measureDraft,
     rasterRedrawTick,
+    previewBackgroundKey,
     displayPolylineCache,
     args.previewToolpath,
     args.cncRemovalGrid,
@@ -318,6 +330,7 @@ function drawWorkspaceScene(
   args: Parameters<typeof useWorkspaceDraw>[0],
   state: {
     readonly requestRasterRedraw: () => void;
+    readonly previewBackgroundKey: object;
     readonly displayPolylineCache: DisplayPolylineCache;
     readonly draftShape: ReturnType<typeof useUiStore.getState>['draftShape'];
     readonly penDraft: ReturnType<typeof useUiStore.getState>['penDraft'];
@@ -335,6 +348,8 @@ function drawWorkspaceScene(
     preview: args.previewMode,
     scrubberT: args.scrubberT,
     previewShowTravel: args.showPreviewTravel,
+    previewRouteRenderer: args.previewBitmap.drawRoute,
+    previewBackgroundKey: state.previewBackgroundKey,
     view: args.viewState,
     onRasterBitmapReady: state.requestRasterRedraw,
     displayPolylineCache: state.displayPolylineCache,

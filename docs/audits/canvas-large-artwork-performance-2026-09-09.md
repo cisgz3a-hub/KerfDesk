@@ -65,6 +65,14 @@ importing an image or committing a trace.
   transfer; preserve rich or unsupported records on the existing object path.
   These are retained-heap measurements after collection, not a claim about
   the peak memory of the full application or universal browser limits.
+- Scene-coordinate mapping allocated a second complete route. Streamed
+  raster jobs already bypass executable-plan Preview verification, so their
+  fresh machine-route array can be consumed by replacing each slot with the
+  existing mapped step. Original step objects, shared points/polylines and
+  metadata are untouched. Other jobs retain the pure mapper and original
+  machine route for executable-plan parity. This removes the overlapping
+  route arrays during mapping; it does not prove a retained original route
+  was the cause of the later autosave failure.
 - The autosave hook added a fresh job-setup wrapper on every tick, defeating
   the existing unchanged-project memo. A per-mounted-loop snapshot memo now
   includes document epoch, placement, output scope and ordered selection.
@@ -80,6 +88,25 @@ importing an image or committing a trace.
 - Raster validation now checks canonical Base64 alphabet, padding, unused
   bits and decoded byte count in one pass without allocating a cleaned or
   decoded copy. Existing accepted whitespace and error text are preserved.
+- Required recovery serialization and validation now run in a short-lived
+  worker inside the existing durable write queue. Epoch, clear, session,
+  fallback and commit ordering remain covered by focused regressions.
+- Preview status, distance totals and pass boundaries were also recomputed
+  on unrelated cursor updates. Memoize those derived results by their actual
+  project and route inputs; meaningful changes still invalidate them.
+- Dense Preview painting uses an OffscreenCanvas worker for the existing
+  selected display commands. The client retains one image, one in-flight
+  render and the newest requested view. It shows `Updating route view…`
+  while transforming an older matching-content image during interaction.
+  Settled images preserve the previous renderer's widths, dashes and order.
+  The worker paints over a captured underlay to preserve individual stroke
+  alpha blending, and the result is copied back before outlines and rulers.
+  Route/background changes, worker errors and Preview exit release obsolete
+  images and worker state. Source geometry and display sampling are unchanged.
+  Continuous playback retains the latest completed progress image of the
+  same route/travel/background while the next frame renders. Exact readiness
+  still requires the latest scrubber value, view and size. This prevents
+  repeated progress updates from discarding every reply and blanking Preview.
 
 ## Paired browser evidence
 
@@ -124,6 +151,43 @@ nonuniform and negative transforms, context matrices, stroke styles and
 alpha. Warm dense fill submission fell from 255.9–272.1 ms to 3.3–4.0 ms;
 including forced raster readback it fell from 282.0–296.8 ms to 27.8–32.2 ms.
 These isolated numbers are separate from the full application measurements.
+
+The later Preview worker matches the previous production renderer in
+**75/75 native Chrome 153 cases**, with all **29,491,200 RGBA channels** equal.
+Cases cover dense intersections, partial progress, travel visibility,
+endpoints, the existing 120,000-step/long-polyline display boundaries and
+actual background/outlines/rulers. An initial transparent-layer approach
+changed overlapping alpha values; capturing the actual underlay eliminated
+those differences. This is settled-frame pixel evidence, separate from
+full-application interaction and memory qualification.
+
+Production testing on 2026-09-12 still reproduces a V8 memory failure when the
+normal 30-second autosave overlaps the 4096-image Preview transfer. A run
+whose autosave completed before transfer received every step and achieved
+Preview hover P95 8.5 ms, but this timing avoided the failing overlap and
+does not qualify it. The native renderer dump reports exception
+`0xE0000008` and `v8-oom-location=CALL_AND_RETRY_LAST`; the memory
+investigation is retained with the external evidence. The matching Chrome
+153 V8 HeapStats layout identifies a 4 GiB pointer-compression cage shared by
+five isolates. The first dump has 133 MiB free but a largest free region of
+13.5 MiB; the failing worker has only about 12.2 MiB live heap. A second dump
+after owned mapping reports the same reservation failure on the main
+thread, with 501.5 MiB free but a largest free region of 22.25 MiB. Both
+dumps are from this same host, with roughly 8 GB of
+system commit available; this is not a claim that Windows exhausted RAM.
+Owned mapping alone does not solve the overlapping worker lifetimes.
+Interpretation uses the exact Chrome 153 V8 revision's
+[heap statistics](https://chromium.googlesource.com/v8/v8/+/f343157cebb388bfa416baccb5d35507e6fe8cc7/src/heap/heap.cc#5123)
+and [reservation status definitions](https://chromium.googlesource.com/v8/v8/+/f343157cebb388bfa416baccb5d35507e6fe8cc7/src/base/bounded-page-allocator.h#61).
+
+Preparation and autosave now reserve one FIFO memory lane before worker
+construction or cloning. A terminal preparation retires its worker before
+releasing the lane. Autosave keeps its normal interval and snapshot but
+waits for active preparation to finish; later preparation requests cannot
+overtake it. Completed result caching and current-queue coalescing remain.
+The native browser must still verify actual heap reclamation after the
+termination request and responsiveness with recovery enabled. Final
+production qualification and merge remain pending.
 
 The same 4096 x 4096 gradient/crossing-line raster now completes its real
 background ETA at **48,441.177515398085 seconds**, displaying **13h 27m 21s**,
