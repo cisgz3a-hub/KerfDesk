@@ -24,6 +24,8 @@ export type JobReviewState =
 
 type JobReviewStore = {
   readonly state: JobReviewState;
+  /** Identity of one open review; stale async work may never close its successor. */
+  readonly requestOwner: symbol | null;
   /** One-shot resolver armed by the gate's `nextSignal`; null while unarmed. */
   readonly waiter: ((signal: JobReviewSignal) => void) | null;
   /** Highest-priority signal raised while unarmed, consumed by `nextSignal`. */
@@ -65,6 +67,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
   };
   return {
     state: { kind: 'idle' },
+    requestOwner: null,
     waiter: null,
     pendingSignal: null,
     open: (model, purpose = 'start') => {
@@ -75,6 +78,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       if (get().state.kind !== 'idle') return false;
       set({
         state: { kind: 'open', model, purpose, isPreparing: false, blocker: null },
+        requestOwner: Symbol('job-review'),
         waiter: null,
         pendingSignal: null,
       });
@@ -105,7 +109,8 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       if (state.kind !== 'open') return;
       set({ state: { ...state, isPreparing: false, blocker } });
     },
-    close: () => set({ state: { kind: 'idle' }, waiter: null, pendingSignal: null }),
+    close: () =>
+      set({ state: { kind: 'idle' }, requestOwner: null, waiter: null, pendingSignal: null }),
     confirm: () => {
       const { state } = get();
       if (state.kind !== 'open' || state.isPreparing || state.blocker !== null) return;

@@ -148,11 +148,17 @@ function cncAsCutGroups(group: CncGroup): ReadonlyArray<CutGroup> {
   const hasPlungeFedPath = group.passes.some(
     (pass) => pass.kind === 'path3d' && pass.lateralFeed === 'plunge',
   );
-  if (!hasPlungeFedPath && !hasZRateCappedPath) {
+  // Pecks (including interpolated registration-bore centres) have zero XY
+  // length. Their XYZ projection must price plunge and chip-clear moves.
+  const hasVerticalPath = group.passes.some(isVerticalPath3d);
+  if (!hasPlungeFedPath && !hasZRateCappedPath && !hasVerticalPath) {
     return [cncAsCutGroup(group, group.passes, group.feedMmPerMin)];
   }
   return group.passes.flatMap((pass) => {
-    if (pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped') {
+    if (
+      pass.kind === 'path3d' &&
+      (pass.lateralFeed === 'z-rate-capped' || isVerticalPath3d(pass))
+    ) {
       return zRateCappedPathAsCutGroups(group, pass);
     }
     return [
@@ -165,6 +171,14 @@ function cncAsCutGroups(group: CncGroup): ReadonlyArray<CutGroup> {
       ),
     ];
   });
+}
+
+function isVerticalPath3d(pass: CncGroup['passes'][number]): boolean {
+  if (pass.kind !== 'path3d') return false;
+  const first = pass.points[0];
+  return (
+    first !== undefined && pass.points.every((point) => point.x === first.x && point.y === first.y)
+  );
 }
 
 function zRateCappedPathAsCutGroups(group: CncGroup, pass: CncPath3dPass): ReadonlyArray<CutGroup> {

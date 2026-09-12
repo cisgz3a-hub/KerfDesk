@@ -213,6 +213,7 @@ export type {
   CncMachineParams,
   CncStock,
   CncTiling,
+  CncTileRegistration,
   CncTool,
   CncToolKind,
   LaserMachineConfig,

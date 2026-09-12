@@ -3,9 +3,10 @@
 // medial plan has a flat core, and a V-tip is the wrong bit for bulk floor
 // clearing. This stage pockets exactly that core with a flat clearing bit:
 // the region boundary is the inward offset at the requested-depth radial
-// envelope footprint. The pocket engine fills it at the clearing bit's stepover. The V-bit's
-// medial and flat-core routes still cover the whole shape with a small
-// overlap into the cleared floor.
+// envelope footprint. The pocket engine fills it at the clearing bit's stepover.
+// The compiler then removes only finishing spans whose whole swept cutter volume
+// is already contained in the actual clearing passes. Walls, inaccessible corners
+// and unproven floor stock retain the complete certified V-bit finish.
 
 import { insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';

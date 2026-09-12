@@ -238,6 +238,64 @@ describe('useDebouncedCommit clear-to-retype', () => {
 });
 
 describe('useDebouncedCommit external ownership', () => {
+  it('does not parse or commit an untouched saved value outside the editing range', async () => {
+    const commit = vi.fn();
+    const unmount = await renderProbe(0.5, commit);
+    await act(async () => probe.current?.onBlur());
+    expect(commit).not.toHaveBeenCalled();
+    expect(probe.current?.displayValue).toBe('0.5');
+    await unmount();
+  });
+
+  it('leaves an externally restored out-of-range value untouched on blur', async () => {
+    const commit = vi.fn();
+    const view = await renderMutableProbe(1500, commit);
+    await act(async () => typeText('2500'));
+    await view.setValue(0.5);
+    await act(async () => probe.current?.onBlur());
+    await act(async () => vi.advanceTimersByTime(400));
+    expect(commit).not.toHaveBeenCalled();
+    expect(probe.current?.displayValue).toBe('0.5');
+    await view.unmount();
+  });
+
+  it('normalizes an edited draft on blur after its own debounced store update', async () => {
+    const commit = vi.fn();
+    const view = await renderMutableProbe(1500, commit);
+    await act(async () => typeText('9999'));
+    await act(async () => vi.advanceTimersByTime(400));
+    await view.setValue(6000);
+    expect(probe.current?.displayValue).toBe('9999');
+    await act(async () => probe.current?.onBlur());
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(probe.current?.displayValue).toBe('6000');
+    await view.unmount();
+  });
+
+  it('clears native validity from a replaced invalid draft without committing the restored value', async () => {
+    const commit = vi.fn();
+    const view = await renderMutableProbe(1500, commit);
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = 'any';
+    input.value = '1e2';
+    await act(async () => {
+      probe.current?.onChange({ target: input } as React.ChangeEvent<HTMLInputElement>);
+    });
+    expect(input.validity.customError).toBe(true);
+
+    await view.setValue(0.5);
+    input.value = probe.current?.displayValue ?? '';
+    expect(probe.current?.errorMessage).toBeNull();
+    await act(async () => {
+      probe.current?.onBlur({ currentTarget: input } as React.FocusEvent<HTMLInputElement>);
+    });
+    expect(input.value).toBe('0.5');
+    expect(input.checkValidity()).toBe(true);
+    expect(commit).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
   it('cancels a pending edit when the canonical store value changes', async () => {
     const commit = vi.fn();
     const view = await renderMutableProbe(1500, commit);

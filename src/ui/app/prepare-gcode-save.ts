@@ -29,7 +29,7 @@ export async function prepareGcodeSave(
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): Promise<PreparedGcodeSave> {
   const emission = await emitSaveGcode(ctx, placement);
-  if (emission.kind === 'preparation-unavailable') {
+  if ('message' in emission) {
     jobAwareAlert(`Cannot save G-code:\n\n• ${emission.message}`);
     return { kind: 'failed' };
   }

@@ -221,6 +221,19 @@ export type CncTiling = {
   readonly tileHeightMm: number;
   readonly overlapMm: number;
   readonly registrationHoles: boolean;
+  // Independent saved cutting plan. Legacy checkbox-only projects keep this
+  // absent until the operator assigns a registration cutter and reviews it.
+  readonly registration?: CncTileRegistration;
+};
+
+export type CncTileRegistration = {
+  readonly toolId: string;
+  readonly holeDiameterMm: number;
+  readonly depthMm: number;
+  readonly depthPerPassMm: number;
+  readonly feedMmPerMin: number;
+  readonly plungeMmPerMin: number;
+  readonly spindleRpm: number;
 };
 
 export type CncMachineConfig = {

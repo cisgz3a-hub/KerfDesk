@@ -9,11 +9,15 @@
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
 import { cncHelicalContourPoints } from '../job/helical-representation';
-import type { CncTiling } from '../scene';
+import type { CncMachineConfig, CncTiling } from '../scene';
+import type { DeviceProfile } from '../devices';
 import type { CncTile, TiledJob } from './cnc-tile';
 import type { TiledJobsResult } from './tile-plan-result';
 import { planTiles } from './plan-tiles';
 import { registrationGroupForTile } from './tile-registration';
+import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-registration-plan';
+import { orderGroupsIntoToolSections } from './cnc-tool-sections';
+import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
 
 const MIN_CLIPPED_POINTS = 2;
 
@@ -23,26 +27,58 @@ export { planTiles } from './plan-tiles';
 export { REGISTRATION_HOLE_DEPTH_MM } from './tile-registration';
 
 /** Split a CNC job across a bounded effective grid, dropping motionless tiles. */
-export function tileJobs(job: Job, tiling: CncTiling): TiledJobsResult {
+export function tileJobs(
+  job: Job,
+  tiling: CncTiling,
+  context?: {
+    readonly machine: CncMachineConfig;
+    readonly device: DeviceProfile;
+  },
+): TiledJobsResult {
   const bounds = cncJobBounds(job);
   if (bounds === null) return { kind: 'empty' };
   const plan = planTiles(bounds, tiling);
   if (plan.kind === 'work-budget-exceeded') return plan;
+  const registration = registrationForGrid(tiling, plan.grid, context?.machine);
+  if (typeof registration === 'string')
+    return { kind: 'registration-invalid', message: registration };
   const out: TiledJob[] = [];
   for (const tile of plan.tiles) {
-    const groups: CncGroup[] = [];
-    for (const group of job.groups) {
-      if (group.kind !== 'cnc') continue;
-      const clipped = clipGroupToTile(group, tile);
-      if (clipped !== null) groups.push(clipped);
+    const groups = clippedGroupsForTile(job, tile);
+    if (registration !== null && context !== undefined) {
+      const registrationGroup = registrationGroupForTile(
+        tile,
+        plan.grid,
+        registration,
+        context.machine,
+        context.device,
+      );
+      if (registrationGroup !== null) groups.push(registrationGroup);
     }
-    if (tiling.registrationHoles) {
-      const registration = registrationGroupForTile(job, tile, plan.grid);
-      if (registration !== null) groups.push(registration);
-    }
-    if (groups.length > 0) out.push({ tile, job: { groups } });
+    // This ordering belongs to this indexed file only; another tile may have
+    // completed its profile in a separately executed file already.
+    if (groups.length > 0) out.push({ tile, job: { groups: orderGroupsIntoToolSections(groups) } });
   }
   return tiledJobsResult(plan.grid, out);
+}
+
+function registrationForGrid(
+  tiling: CncTiling,
+  grid: EffectiveCncTileGrid,
+  machine: CncMachineConfig | undefined,
+): ResolvedTileRegistration | string | null {
+  if (!tiling.registrationHoles || (grid.work.columns <= 1 && grid.work.rows <= 1)) return null;
+  return resolveTileRegistration(tiling.registration, machine);
+}
+
+function clippedGroupsForTile(job: Job, tile: CncTile): CncGroup[] {
+  const groups: CncGroup[] = [];
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    const clipped = clipGroupToTile(group, tile);
+    if (clipped !== null) groups.push(clipped);
+  }
+  return groups;
 }
 
 function tiledJobsResult(

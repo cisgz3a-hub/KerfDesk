@@ -74,6 +74,9 @@ export function buildCncCompilationSidecar(
       offsetFailed: ladder.offsetFailed,
       thinResidual: ladder.thinResidual,
       passLimited: ladder.passLimited,
+      ...(ladder.sourceBoundaryCoverage === undefined
+        ? {}
+        : { sourceBoundaryCoverage: ladder.sourceBoundaryCoverage }),
     })),
     // Empty arrays are authoritative too: they distinguish a fresh compile
     // whose planners did not consume these values from a legacy artifact that

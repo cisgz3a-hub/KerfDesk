@@ -1,10 +1,18 @@
-import { DEFAULT_CNC_TILING, type CncTiling } from '../../../core/scene';
+import {
+  DEFAULT_CNC_TILING,
+  type CncTiling,
+  type CncMachineConfig,
+  type CncLayerSettings,
+} from '../../../core/scene';
 import { NumberField } from '../../common/NumberField';
 import { CncTilingDisclosure, cncTilingAfterEdit } from '../../machine/CncTilingDisclosure';
 import { Row, unitStyle } from '../device-settings-shared';
+import { DeviceSetupRegistrationFields } from './DeviceSetupRegistrationFields';
 
 export function DeviceSetupCncTilingFields(props: {
   readonly tiling: CncTiling | undefined;
+  readonly machine: CncMachineConfig;
+  readonly referenceSettings?: CncLayerSettings;
   readonly onChange: (tiling: CncTiling | undefined) => void;
 }): JSX.Element {
   const edit = (patch: Partial<CncTiling>): void => {
@@ -59,6 +67,16 @@ export function DeviceSetupCncTilingFields(props: {
             <span>Drill registration holes in overlap strips</span>
           </label>
           <CncTilingDisclosure tiling={props.tiling} />
+          {props.tiling.registrationHoles ? (
+            <DeviceSetupRegistrationFields
+              machine={props.machine}
+              settings={props.tiling.registration}
+              {...(props.referenceSettings === undefined
+                ? {}
+                : { referenceSettings: props.referenceSettings })}
+              onChange={(registration) => edit({ registration })}
+            />
+          ) : null}
         </>
       )}
     </div>

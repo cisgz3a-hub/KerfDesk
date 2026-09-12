@@ -38,6 +38,7 @@ import {
 import type { Vec3 } from '../geometry/vec3';
 import type { FrameHandedness } from './machine-frame-handedness';
 import type { CncCutDirection, CncCutType, CncMachineConfig, Polyline, Vec2 } from '../scene';
+import { rampTabbedPath } from './tabbed-ramp-entry';
 
 const MIN_CLOSED_POINTS = 3;
 const MAX_RAMP_ANGLE_DEG = 45;
@@ -156,11 +157,18 @@ export function rotateStartToLongestSegment(toolpath: Polyline): Polyline {
 export function applyRampEntry(
   passes: ReadonlyArray<CncPass>,
   rampAngleDeg: number,
+  includeTabbedPaths = false,
 ): ReadonlyArray<CncPass> {
   const angle = Math.min(Math.max(rampAngleDeg, 0.5), MAX_RAMP_ANGLE_DEG);
   const tangent = Math.tan((angle * Math.PI) / 180);
   let previousZ = 0;
   return passes.map((pass) => {
+    if (includeTabbedPaths && pass.kind === 'path3d') {
+      const depth = pass.points.reduce((min, point) => Math.min(min, point.z), Infinity);
+      const fromZ = depth >= previousZ ? 0 : previousZ;
+      previousZ = depth;
+      return rampTabbedPath(pass, fromZ, tangent);
+    }
     if (pass.kind !== 'contour') return pass;
     // Contour-major ladders deepen the SAME contour step by step (ramp from
     // the previous level); a new contour starts shallow again — ramp from

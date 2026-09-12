@@ -7,9 +7,9 @@
 // the first pass already destroyed — observed in the field as "the job
 // finished, then started again in reverse slightly outside the finished path".
 //
-// A nested closed pair whose bounding boxes sit closer than the bit diameter
-// on every side cannot keep material between the two cuts, so it is treated
-// as one drawn line and only the selected edge survives. Deliberately
+// A nested closed pair whose complete boundaries stay within the bit diameter
+// of each other is treated as one drawn line and only the selected edge
+// survives. Bounding boxes only reject obviously wide pairs. Deliberately
 // conservative: anything wider (washer walls, real ring parts), anything
 // unpaired (lone contours, open paths), and crossing geometry always cut, so
 // 'both' — and every scene without tight double-lines — is byte-identical to
@@ -24,6 +24,7 @@
 import type { CncCutType, CncLayerSettings, Polyline } from '../scene';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { strictlyContainsContour } from './strict-contour-nesting';
+import { contourBoundaryWithinDistance } from './contour-boundary-proximity';
 
 export type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;
 
@@ -71,6 +72,12 @@ export function selectLineArtContours(
     const parent = directParent(ring, rings, bounds);
     if (parent === null) continue;
     if (!isTightPair(bounds.get(parent) as Bounds, bounds.get(ring) as Bounds, toolDiameterMm)) {
+      continue;
+    }
+    if (
+      !contourBoundaryWithinDistance(parent, ring, toolDiameterMm) ||
+      !contourBoundaryWithinDistance(ring, parent, toolDiameterMm)
+    ) {
       continue;
     }
     dropped.add(side === 'inner' ? parent : ring);
@@ -121,8 +128,7 @@ function directParent(
   return parent;
 }
 
-// A traced double-line hugs its partner on every side; a washer wall or any
-// legitimately nested shape leaves at least one gap wider than the bit.
+// Cheap rejection only: close bounding boxes do not prove close boundaries.
 function isTightPair(parent: Bounds, child: Bounds, toolDiameterMm: number): boolean {
   const gaps = [
     child.minX - parent.minX,

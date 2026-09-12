@@ -151,6 +151,11 @@ describe('bound CNC compilation artifact', () => {
         offsetFailed: false,
         thinResidual: false,
         passLimited: false,
+        sourceBoundaryCoverage: {
+          maxSampledResidualMm: expect.any(Number),
+          sampleCount: expect.any(Number),
+          samplingComplete: true,
+        },
       },
     ]);
     expect(structuredClone(finalized.job.cncCompilation)).toEqual(finalized.job.cncCompilation);

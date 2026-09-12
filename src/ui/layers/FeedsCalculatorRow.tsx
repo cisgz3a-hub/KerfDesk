@@ -151,6 +151,7 @@ function effectiveMaterial(
 }
 
 type MaterialFeedResult = {
+  readonly materialKey: string;
   readonly feedMmPerMin: number;
   readonly plungeMmPerMin: number;
   readonly spindleRpm: number;
@@ -174,6 +175,7 @@ function materialFeedResult(patch: Partial<CncLayerSettings> | null): MaterialFe
     return null;
   }
   return {
+    materialKey: patch.materialKey,
     feedMmPerMin: patch.feedMmPerMin,
     plungeMmPerMin: patch.plungeMmPerMin,
     spindleRpm: patch.spindleRpm,

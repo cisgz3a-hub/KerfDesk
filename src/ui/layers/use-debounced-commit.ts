@@ -51,6 +51,10 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // effect on every keystroke and wipe the user's input.
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // A displayed canonical value is not necessarily a parse/format round trip
+  // (saved values can lie outside a control's current editing range). Only an
+  // actual input change gives blur permission to parse and commit the draft.
+  const editedRef = useRef(false);
   const parseRef = useRef(parse);
   parseRef.current = parse;
   const formatRef = useRef(format);
@@ -99,6 +103,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current?.acknowledge(value);
     setErrorMessage(null);
     if (parseRef.current(draftRef.current) !== value) {
+      editedRef.current = false;
       setDraft(formatRef.current(value));
     }
   }, [value, args.reconcileKey]);
@@ -114,6 +119,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   const handlerContext: DebouncedHandlerContext<T> = {
     value,
     draft,
+    editedRef,
     debounceMs,
     parse,
     format,
@@ -133,6 +139,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
 type DebouncedHandlerContext<T> = {
   readonly value: T;
   readonly draft: string;
+  readonly editedRef: { current: boolean };
   readonly debounceMs: number;
   readonly parse: (input: string) => T;
   readonly format: (value: T) => string;
@@ -145,6 +152,7 @@ type DebouncedHandlerContext<T> = {
 function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onChange'] {
   return (event): void => {
     const nextText = event.target.value;
+    context.editedRef.current = true;
     context.setDraft(nextText);
     // Blank is a valid transient edit, but never a value to commit.
     if (nextText.trim() === '') {
@@ -168,8 +176,15 @@ function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedC
 
 function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onBlur'] {
   return (event): void => {
+    if (!context.editedRef.current) {
+      // External reconciliation can replace an invalid draft without another
+      // input event. Retire its native error without parsing the saved value.
+      setInputValidity(event?.currentTarget, '');
+      return;
+    }
     if (context.draft.trim() === '') {
       context.debouncer?.cancel();
+      context.editedRef.current = false;
       context.setDraft(context.format(context.value));
       context.setErrorMessage(null);
       setInputValidity(event?.currentTarget, '');
@@ -184,6 +199,7 @@ function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCom
     }
     const committed = context.parse(context.draft);
     context.debouncer?.flush(committed);
+    context.editedRef.current = false;
     // Reconcile clamped text even when the canonical value did not change.
     context.setDraft(context.format(committed));
     context.setErrorMessage(null);

@@ -30,6 +30,11 @@ import {
   prepareStartOutputOffThread,
   BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE,
 } from './output-preparation-worker-client';
+import { isOutputPreparationAbort, outputPreparationFailure } from './output-preparation-errors';
+import {
+  ownCurrentStartPreparation,
+  STALE_START_PREPARATION_MESSAGE,
+} from './start-preparation-owner';
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -49,7 +54,10 @@ export async function prepareCurrentStartJob(
   camera: ReturnType<typeof useCameraStore.getState>,
   resolvedJobOrigin?: JobOriginPlacement,
   requireFrame = true,
+  signal?: AbortSignal,
 ): Promise<StartJobPreparation> {
+  if (signal?.aborted === true)
+    throw new DOMException('Output preparation cancelled.', 'AbortError');
   const { project, jobPlacement } = app;
   const registration = currentPrintCutOutputRegistration(project);
   const machine = machineSnapshot(project, laser, camera);
@@ -57,6 +65,7 @@ export async function prepareCurrentStartJob(
   const outputScope = currentOutputScope(app);
   if (useSnapshot || outputPreparationShouldRunOffThread(project, outputScope)) {
     return prepareCurrentStartInBackground({
+      app,
       project,
       laser,
       machine,
@@ -66,6 +75,7 @@ export async function prepareCurrentStartJob(
       requireFrame,
       registration,
       useSnapshot,
+      ...(signal === undefined ? {} : { signal }),
     });
   }
   return prepareStartJobSnapshot(
@@ -85,6 +95,7 @@ export async function prepareCurrentStartJob(
 }
 
 async function prepareCurrentStartInBackground(args: {
+  readonly app: ReturnType<typeof useStore.getState>;
   readonly project: Project;
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly machine: ReturnType<typeof machineSnapshot>;
@@ -94,33 +105,51 @@ async function prepareCurrentStartInBackground(args: {
   readonly requireFrame: boolean;
   readonly registration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly useSnapshot: boolean;
+  readonly signal?: AbortSignal;
 }): Promise<StartJobPreparation> {
-  const background = prepareStartOutputOffThread({
-    kind: 'start',
-    project: args.project,
-    controllerSettings: args.laser.controllerSettings,
-    machine: args.machine,
-    jobPlacement: args.jobPlacement,
-    outputScope: args.outputScope,
-    ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
-    requireFrame: args.requireFrame,
-    ...(args.useSnapshot
-      ? {
-          snapshot: {
-            evaluatedAtIso: new Date().toISOString(),
-            ...(args.registration === undefined ? {} : { registration: args.registration }),
-          },
-        }
-      : {}),
-  });
-  if (background === null) {
-    return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
-  }
+  const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal);
   try {
-    return await background;
+    const background = prepareStartOutputOffThread(
+      {
+        kind: 'start',
+        project: args.project,
+        controllerSettings: args.laser.controllerSettings,
+        machine: args.machine,
+        jobPlacement: args.jobPlacement,
+        outputScope: args.outputScope,
+        ...(args.resolvedJobOrigin === undefined
+          ? {}
+          : { resolvedJobOrigin: args.resolvedJobOrigin }),
+        requireFrame: args.requireFrame,
+        ...(args.useSnapshot
+          ? {
+              snapshot: {
+                evaluatedAtIso: new Date().toISOString(),
+                ...(args.registration === undefined ? {} : { registration: args.registration }),
+              },
+            }
+          : {}),
+      },
+      undefined,
+      owner.signal,
+    );
+    if (background === null) {
+      return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
+    }
+    const prepared = await background;
+    if (owner.signal.aborted) throw new DOMException('Output preparation cancelled.', 'AbortError');
+    return prepared;
   } catch (error) {
+    if (isOutputPreparationAbort(error)) {
+      if (args.signal?.aborted !== true && owner.inputsChanged()) {
+        return { ok: false, messages: [STALE_START_PREPARATION_MESSAGE] };
+      }
+      throw error;
+    }
     console.warn('Background Start preparation failed.', error);
-    return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
+    return { ok: false, messages: [outputPreparationFailure(error).message] };
+  } finally {
+    owner.dispose();
   }
 }
 

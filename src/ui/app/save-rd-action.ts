@@ -11,6 +11,10 @@ import {
   outputPreparationShouldRunOffThread,
   prepareRdOutputOffThread,
 } from '../laser/output-preparation-worker-client';
+import {
+  isOutputPreparationAbort,
+  outputPreparationFailure,
+} from '../laser/output-preparation-errors';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { SaveGcodeCtx } from './file-actions';
 
@@ -66,8 +70,9 @@ async function prepareBackgroundRd(
   }
   try {
     return await pending;
-  } catch {
-    showBackgroundUnavailable();
+  } catch (error) {
+    if (isOutputPreparationAbort(error)) throw error;
+    showRdFailure([outputPreparationFailure(error).message]);
     return null;
   }
 }
