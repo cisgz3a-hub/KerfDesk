@@ -14,6 +14,10 @@ import {
   type VCarveMedialRegionGeometryPlan,
 } from './vcarve-medial-region-plan';
 import { passesForVCarveMedialRegion } from './vcarve-medial-region-passes';
+import {
+  measureVCarveSourceBoundaryCoverage,
+  type VCarveSourceBoundaryCoverage,
+} from './vcarve-source-boundary-coverage';
 import { vcarveMedialRegionsFromTree, type VCarveMedialRegion } from './vcarve-medial-region';
 import {
   buildVCarveSourceRegionLayout,
@@ -39,6 +43,7 @@ export type VCarveMedialRegionTask = {
 
 /** Clone-safe region output: no Delaunay graph, segments, or route scratch. */
 export type VCarveMedialRegionTaskResult = {
+  readonly sourceBoundaryCoverage?: VCarveSourceBoundaryCoverage;
   readonly normalizedIndex: number;
   readonly witness: Vec2 | undefined;
   readonly passes: ReadonlyArray<CncPass>;
@@ -105,7 +110,14 @@ export function runVCarveMedialRegionTask(
   const passes = passesForVCarveMedialRegion(unranked.plan, task.law, {
     depthPerPassMm: task.depthPerPassMm,
   });
-  return regionTaskResult(unranked.plan, unranked.witness, passes);
+  return {
+    ...regionTaskResult(unranked.plan, unranked.witness, passes),
+    sourceBoundaryCoverage: measureVCarveSourceBoundaryCoverage(
+      task.region.loops,
+      passes.passes,
+      task.law,
+    ),
+  };
 }
 
 /** Rank and merge only after every region result has returned. */
@@ -122,6 +134,24 @@ export function finalizeVCarveMedialWork(
     .sort((a, b) => a.sourceRank - b.sourceRank || a.normalizedIndex - b.normalizedIndex);
   return {
     passes: ranked.flatMap((result) => result.passes),
+    sourceBoundaryCoverage: {
+      maxSampledResidualMm: ranked.some(
+        (result) => result.sourceBoundaryCoverage?.maxSampledResidualMm == null,
+      )
+        ? null
+        : ranked.reduce(
+            (maximum, result) =>
+              Math.max(maximum, result.sourceBoundaryCoverage?.maxSampledResidualMm ?? 0),
+            0,
+          ),
+      sampleCount: ranked.reduce(
+        (count, result) => count + (result.sourceBoundaryCoverage?.sampleCount ?? 0),
+        0,
+      ),
+      samplingComplete: ranked.every(
+        (result) => result.sourceBoundaryCoverage?.samplingComplete === true,
+      ),
+    },
     offsetFailed: ranked.some((result) => result.offsetFailed),
     entryIssue: work.entryIssue,
     thinResidual: ranked.some((result) => result.thinResidual),

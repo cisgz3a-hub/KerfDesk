@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adr-314-cnc-represented-z-v1');
+    expect(EMITTER_REVISION).toBe('cnc-audit-repair-20260912-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

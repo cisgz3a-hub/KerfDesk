@@ -35,6 +35,7 @@ import { buildOffsetLadder } from '../geometry/offset-ladder';
 import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-difference';
 import type { CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
+import type { VCarveSourceBoundaryCoverage } from './vcarve-source-boundary-coverage';
 import { zPassDepths } from './depth-passes';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
 import { isVCarvableContour } from './vcarve-carvable-contours';
@@ -80,6 +81,7 @@ export type VCarveOptions = {
 };
 
 export type VCarveLadder = {
+  readonly sourceBoundaryCoverage?: VCarveSourceBoundaryCoverage;
   readonly passes: ReadonlyArray<CncPass>;
   // True when the ring ladder stopped on an offset-engine failure rather than
   // on reaching the medial axis: the carve is shallower and narrower than the

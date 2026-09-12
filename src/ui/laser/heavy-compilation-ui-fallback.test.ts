@@ -102,7 +102,9 @@ describe('heavy preparation failure never falls back to the UI thread', () => {
         placement,
       );
 
-      expect(result.kind).toBe('preparation-unavailable');
+      expect(result.kind).toBe(
+        failure === 'unavailable' ? 'preparation-unavailable' : 'preparation-error',
+      );
       expect(workerMocks.prepareSnapshot).not.toHaveBeenCalled();
     },
   );

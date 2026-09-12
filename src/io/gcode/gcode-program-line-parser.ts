@@ -27,9 +27,9 @@ import type { Vec2 } from '../../core/scene';
 export const GCODE_PREVIEW_CUT_COLOR = '#7c3aed';
 
 const AXIS_EPSILON = 1e-9;
-// GRBL validates R-form/IJ arcs to ~0.005 in; allow the same order. Mirrors
-// CIRCULAR_ARC_RADIUS_TOLERANCE_MM in core/geometry/circular-arc.ts.
-const ARC_RADIUS_TOLERANCE_MM = 0.127;
+// Stock GRBL 1.1h gcode.c: IJ discrepancy must exceed 0.005 mm and
+// either 0.5 mm or 0.1% of the starting radius to be rejected.
+// R-form feasibility is a separate discriminant check, with no tolerance.
 
 export type GcodeProgramSummary = {
   readonly lineCount: number;
@@ -265,7 +265,8 @@ function emitArc(
   if (typeof center === 'string') return center;
   const radius = Math.hypot(from.x - center.x, from.y - center.y);
   const endRadius = Math.hypot(to.x - center.x, to.y - center.y);
-  if (Math.abs(radius - endRadius) > ARC_RADIUS_TOLERANCE_MM) {
+  const radiusDifference = Math.abs(radius - endRadius);
+  if (radiusDifference > 0.005 && (radiusDifference > 0.5 || radiusDifference > 0.001 * radius)) {
     return `Line ${lineNumber}: arc radius mismatch (${radius.toFixed(3)} vs ${endRadius.toFixed(3)} mm).`;
   }
   const startAngle = Math.atan2(from.y - center.y, from.x - center.x);
@@ -312,7 +313,9 @@ function arcCenter(
   if (solved === null) {
     return `Line ${lineNumber}: R-form arc cannot start and end at the same point.`;
   }
-  if (solved.halfChordGapSq < -ARC_RADIUS_TOLERANCE_MM * solved.chordMm) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (4 * solved.radiusMm * solved.radiusMm - dx * dx - dy * dy < 0) {
     return `Line ${lineNumber}: arc radius ${solved.radiusMm.toFixed(3)} mm is too small for its chord.`;
   }
   return solved.center;

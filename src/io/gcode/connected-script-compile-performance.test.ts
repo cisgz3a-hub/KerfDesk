@@ -120,9 +120,11 @@ function recordBoundaryArraySource(source: Parameters<AsBoundaryIndex>[0]): void
 }
 
 const EXPECTED_REGION_COUNT = 12;
-const EXPECTED_GCODE_CODE_UNITS = 1_024_912;
-const EXPECTED_GCODE_SHA256 = 'dde64575fd5da13a6a62a3505eaee98e318d7165ffe65decd227a4c4ffe9d53e';
-const EXPECTED_GCODE_UTF8_BYTES = 1_024_924;
+// Retaining more normalized source corners changes the medial traversal;
+// source ownership, region count and indexed certification remain unchanged.
+const EXPECTED_GCODE_CODE_UNITS = 1_035_744;
+const EXPECTED_GCODE_SHA256 = '0088e20e062167f8070d56edfcb84a421a5cd0afa4bfb7c0c1876aae0039b272';
+const EXPECTED_GCODE_UTF8_BYTES = 1_035_756;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;

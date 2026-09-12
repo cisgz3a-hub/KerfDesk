@@ -28,6 +28,9 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   2: migrateV2OperationBindings,
   3: migrateV3ToV4,
   4: (raw) => ({ ...raw, schemaVersion: 5 }),
+  // Registration remains absent in a legacy document until explicitly
+  // configured. The version protects new plans from older readers.
+  5: (raw) => ({ ...raw, schemaVersion: 6 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

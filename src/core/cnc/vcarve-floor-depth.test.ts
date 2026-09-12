@@ -1,17 +1,8 @@
-// Perceptual DEPTH invariant for the v-carve ladder (ADR-025 pattern).
-//
-// Every existing v-carve probe measures COVERAGE — "did any cut land in this
-// cell" — which cannot tell a floor cut to the requested depth from one left
-// standing most of a millimetre high. An audit of the ADR-282 landing measured
-// 0.74 mm of uncut material at the centre of a plain depth-clamped square while
-// coverage read 100 %, and no test in the tree could have failed on it.
-//
-// The ladder's guarantee is a depth BOUND, not exactness: rings sit one pitch
-// apart, and a point between the deepest ring and the medial axis is reached
-// only by that ring's cone, so it can sit up to one ring pitch shallow. A
-// V-bit cannot flat-bottom a wide pocket at all — that is what the two-stage
-// clearing tool (ADR-280) is for. This pins the bound so the gap stays visible
-// and a regression that makes it WORSE fails loudly.
+// Current medial-engine floor depth through the real compiler and simulator.
+// Automatic flat-core pitch is 0.1 mm. A pointed cutter leaves scallops whose
+// height is at most half that pitch / tan(half angle), plus the independent
+// emitted-footprint and raster allowances below. The retired ladder's 0.75 mm
+// spacing is not a current-engine accuracy contract.
 
 import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
@@ -29,7 +20,6 @@ import {
   type Vec2,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
-import { vcarveResolutionMm } from './vcarve-ladder';
 
 const VBIT_90: CncTool = {
   id: 'v90',
@@ -76,7 +66,7 @@ function squareScene(): Scene {
           vCarveFlatDepthEnabled: true,
           depthMm: MAX_DEPTH_MM,
           depthPerPassMm: MAX_DEPTH_MM,
-          vResolutionMm: 0, // auto: diameter/8 = 0.75 mm
+          vResolutionMm: 0, // current medial flat-core target: 0.1 mm
         },
       },
     ],
@@ -103,7 +93,7 @@ function distToBoundary(p: Vec2, polygon: ReadonlyArray<Vec2>): number {
 
 describe('v-carve floor DEPTH, not just coverage', () => {
   it(
-    'never leaves more than one ring pitch of material above the analytic groove',
+    'bounds residual height by current floor pitch and the emitted conical cutter sweep',
     () => {
       const polygon = [
         { x: AT, y: AT },
@@ -135,7 +125,10 @@ describe('v-carve floor DEPTH, not just coverage', () => {
       if (result.kind === 'error') throw new Error(result.reason);
       const grid = result.grid;
 
-      const ringPitchMm = vcarveResolutionMm(0, VBIT_90.diameterMm);
+      const currentFloorPitchMm = 0.1;
+      const slope = Math.sin(Math.PI / 4) / Math.cos(Math.PI / 4);
+      const scallopMm = currentFloorPitchMm / (2 * slope);
+      const footprintCompactionMm = 0.01 / slope;
       let worstUnderCutMm = 0;
       let worstOverCutMm = 0;
       let interiorCells = 0;
@@ -161,10 +154,9 @@ describe('v-carve floor DEPTH, not just coverage', () => {
       // but outside the rasterized cone. Coverage is what the sibling probes
       // already assert; the depth bound below is this file's subject.
       expect(interiorCut / interiorCells).toBeGreaterThanOrEqual(0.999);
-      // The bound, and the reason this file exists: coverage above says "carved
-      // everywhere", while the floor is up to one ring pitch proud of the
-      // requested depth. Tightening it needs a clearing tool, not a finer ladder.
-      expect(worstUnderCutMm).toBeLessThanOrEqual(ringPitchMm + GRID_SLACK_MM);
+      expect(worstUnderCutMm).toBeLessThanOrEqual(
+        scallopMm + footprintCompactionMm + GRID_SLACK_MM,
+      );
       expect(worstUnderCutMm).toBeGreaterThan(0);
       // The gouging direction, which nothing measured before: an undercut-only
       // bound is equally satisfied by a floor cut arbitrarily too DEEP. Under an

@@ -112,7 +112,7 @@ describe('costly tiled output isolation', () => {
   ];
   it.each(cases)(
     '%s never falls back to UI-side preparation or emission',
-    async (_label, result) => {
+    async (label, result) => {
       const project = costlyTiledProject();
       expect(costlyCanvasPreparation(project)).toBe(true);
       mocks.prepareTiledOutputOffThread.mockReturnValueOnce(result());
@@ -132,7 +132,11 @@ describe('costly tiled output isolation', () => {
       expect(mocks.prepareOutput).not.toHaveBeenCalled();
       expect(mocks.finalizeTiledOutput).not.toHaveBeenCalled();
       expect(written).toEqual([]);
-      expect(mocks.alert).toHaveBeenCalledWith(expect.stringContaining('Background compilation'));
+      expect(mocks.alert).toHaveBeenCalledWith(
+        expect.stringContaining(
+          label === 'worker unavailable' ? 'Background compilation' : 'worker failed',
+        ),
+      );
     },
   );
 });

@@ -23,8 +23,8 @@
 // where a legitimate preparation can take minutes. A fatal failure rejects
 // every pending caller. Aborting active synchronous outer-worker work retires
 // that Worker and dispatches queued work on a fresh one; queued aborts are
-// removed without a restart. Costly callers surface a retryable unavailable
-// result and never retry compilation on the main thread.
+// removed without a restart. Capacity, compiler and infrastructure failures
+// remain distinct; costly callers never retry compilation on the main thread.
 
 import type { OutputScope, Project } from '../../core/scene';
 import type { StartJobPreparation } from './start-job-readiness';
@@ -46,6 +46,12 @@ import type { EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import {
+  BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE,
+  OutputPreparationError,
+  isNamedOutputPreparationError,
+} from './output-preparation-errors';
+export { BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE } from './output-preparation-errors';
+import {
   connectCanvasCompilationMainBridge,
   retireCanvasCompilationMainBridge,
 } from '../workspace/canvas-compilation-main-bridge';
@@ -60,8 +66,9 @@ export function outputPreparationShouldRunOffThread(
 export function prepareStartOutputOffThread(
   request: StartOutputPreparationRequest,
   onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
 ): Promise<StartJobPreparation> | null {
-  const pending = runWorker(request, onProgress);
+  const pending = runWorker(request, onProgress, signal);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'start') throw new Error('Background Start preparation returned no job.');
@@ -90,11 +97,12 @@ export function prepareSaveOutputOffThread(
 export function prepareOutputOffThread(
   request: PrepareOnlyOutputPreparationRequest,
   onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
 ): Promise<{
   readonly prepared: PreparedOutput;
   readonly machineWarnings: ReadonlyArray<string>;
 }> | null {
-  const pending = runWorker(request, onProgress);
+  const pending = runWorker(request, onProgress, signal);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'prepared') {
@@ -107,8 +115,9 @@ export function prepareOutputOffThread(
 export function prepareRdOutputOffThread(
   request: RdOutputPreparationRequest,
   onProgress?: (progress: OutputCompilationProgress) => void,
+  signal?: AbortSignal,
 ): Promise<EmitRdResult> | null {
-  const pending = runWorker(request, onProgress);
+  const pending = runWorker(request, onProgress, signal);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'rd') {
@@ -151,8 +160,6 @@ type PendingRequest = {
 const WORKER_ERROR_MESSAGE = 'Background output preparation worker errored.';
 const WORKER_RESET_MESSAGE = 'Background output preparation worker reset.';
 const MAX_QUEUED_REQUESTS = 1;
-export const BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE =
-  'Background compilation is unavailable. Reopen CurveDesk or enable worker support, then try again.';
 
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
@@ -187,7 +194,7 @@ function runWorker(
       queuedRequestIds = [...queuedRequestIds, requestId];
     } else {
       takePending(requestId);
-      reject(new Error('Background output preparation queue is full.'));
+      reject(new OutputPreparationError('capacity', BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE));
     }
   });
 }
@@ -199,7 +206,21 @@ function dispatchRequest(worker: Worker, requestId: number): void {
   try {
     worker.postMessage(pending.envelope);
   } catch (error) {
-    rejectAllPendingAndRetireWorker(error instanceof Error ? error : new Error(String(error)));
+    if (isNamedOutputPreparationError(error, 'DataCloneError')) {
+      // An uncloneable request never entered the worker; only its owner
+      // fails. The healthy worker and unrelated queued work remain usable.
+      takePending(requestId);
+      activeRequestId = null;
+      pending.reject(new OutputPreparationError('compilation', error.message));
+      dispatchNextRequest();
+    } else {
+      rejectAllPendingAndRetireWorker(
+        new OutputPreparationError(
+          'infrastructure',
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
   }
 }
 
@@ -211,13 +232,22 @@ function ensureWorker(): Worker | null {
       type: 'module',
     });
     connectCanvasCompilationMainBridge(created);
-    created.onmessage = handleWorkerMessage;
+    created.onmessage = (event): void => {
+      if (workerInstance === created) handleWorkerMessage(event);
+    };
     created.onerror = (): void => {
-      rejectAllPendingAndRetireWorker(new Error(WORKER_ERROR_MESSAGE));
+      if (workerInstance !== created) return;
+      rejectAllPendingAndRetireWorker(
+        new OutputPreparationError('infrastructure', WORKER_ERROR_MESSAGE),
+      );
     };
     created.onmessageerror = (): void => {
+      if (workerInstance !== created) return;
       rejectAllPendingAndRetireWorker(
-        new Error('Background output preparation response was not cloneable.'),
+        new OutputPreparationError(
+          'infrastructure',
+          'Background output preparation response was not cloneable.',
+        ),
       );
     };
     workerInstance = created;
@@ -232,7 +262,7 @@ function handleWorkerMessage(event: MessageEvent<OutputPreparationResult>): void
   const pending = pendingByRequestId.get(requestId);
   // No longer pending: the request was already settled by a retired worker.
   // Dropping it keeps a stale program from ever reaching a caller.
-  if (pending === undefined) return;
+  if (pending === undefined || requestId !== activeRequestId) return;
   if ('progress' in event.data) {
     try {
       pending.onProgress?.(event.data.progress);
@@ -244,7 +274,8 @@ function handleWorkerMessage(event: MessageEvent<OutputPreparationResult>): void
   const { response } = event.data;
   takePending(requestId);
   if (activeRequestId === requestId) activeRequestId = null;
-  if (response.kind === 'error') pending.reject(new Error(response.message));
+  if (response.kind === 'error')
+    pending.reject(new OutputPreparationError('compilation', response.message));
   else pending.resolve(response);
   dispatchNextRequest();
 }
@@ -282,7 +313,9 @@ function dispatchNextRequest(): void {
   queuedRequestIds = queuedRequestIds.slice(1);
   const worker = ensureWorker();
   if (worker === null) {
-    rejectAllPendingAndRetireWorker(new Error(WORKER_ERROR_MESSAGE));
+    rejectAllPendingAndRetireWorker(
+      new OutputPreparationError('infrastructure', WORKER_ERROR_MESSAGE),
+    );
     return;
   }
   dispatchRequest(worker, requestId);

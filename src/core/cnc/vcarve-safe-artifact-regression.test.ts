@@ -42,12 +42,6 @@ const MAX_OUTPUT_LINES = 17_000;
 const MAX_XYZ_BLOCKS = 17_000;
 const GRBL_PLANNER_WINDOW_BLOCKS = 16;
 const EXPECTED_MAX_DEPTH_MM = 5.924;
-const EXPECTED_REGION_POINT_COUNTS = [
-  [1306, 1324, 1438, 1539],
-  [802, 859, 960, 1065],
-  [918, 1000, 1166, 1388],
-  [505, 580, 730, 879],
-] as const;
 
 type SafeCompilation = Awaited<ReturnType<typeof compileSafe>>;
 
@@ -143,14 +137,15 @@ describe('recovered test11 Safe V-carve artifact regression', () => {
     const passes = safePathPasses(await SAFE_COMPILATION);
     expect(passes).toHaveLength(EXPECTED_PASSES);
     expect(passes.every((pass) => pass.lateralFeed === 'z-rate-capped')).toBe(true);
-    expect(
-      EXPECTED_REGION_POINT_COUNTS.map((_, region) =>
-        passes.slice(region * 4, region * 4 + 4).map((pass) => pass.points.length),
-      ),
-    ).toEqual(EXPECTED_REGION_POINT_COUNTS);
     const regionMinimumXs: number[] = [];
     for (let region = 0; region < EXPECTED_REGIONS; region += 1) {
       const regionPasses = passes.slice(region * 4, region * 4 + 4);
+      // Corner refinement and certified compaction may change vertex counts.
+      // The contract is complete stepped engagement for each source region.
+      const depths = regionPasses.map((pass) => -Math.min(...pass.points.map((point) => point.z)));
+      expect(depths.slice(0, 3)).toEqual([1.5, 3, 4.5]);
+      expect(depths[3]).toBeGreaterThan(4.5);
+      expect(depths[3]).toBeLessThanOrEqual(EXPECTED_MAX_DEPTH_MM);
       expect(new Set(regionPasses.map(passEndpointKey)).size).toBe(1);
       regionMinimumXs.push(Math.min(...regionPasses.map(passMinimumX)));
     }

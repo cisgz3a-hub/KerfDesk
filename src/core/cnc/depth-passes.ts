@@ -39,7 +39,7 @@ export function zPassDepths(depthMm: number, depthPerPassMm: number): ReadonlyAr
   return out;
 }
 
-function zPassCount(depthMm: number, depthPerPassMm: number): number {
+export function zPassCount(depthMm: number, depthPerPassMm: number): number {
   if (!Number.isFinite(depthMm) || depthMm <= 0) return 0;
   const perPass =
     Number.isFinite(depthPerPassMm) && depthPerPassMm > 0

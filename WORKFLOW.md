@@ -2978,7 +2978,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    **Flat depth** is off, and groove depth follows artwork width plus the
    selected bit's included angle and cutting diameter. **Detail** controls the
    vector boundary-sampling target (0 = automatic) and any necessary
-   flat-core clearing pitch.
+   flat-core clearing pitch. It is not a whole-artwork accuracy tolerance;
+   pointed cutters can leave between-pass floor scallops.
 2. Compile normalizes each closed filled region, builds sampled Delaunay
    medial-topology candidates, and accepts only finite nodes and complete XY
    chords certified inside that exact normalized region. Delaunay is not an
@@ -2998,8 +2999,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    needs floor-clearing motion even in flowing-depth mode.
 5. A selected flat clearing end mill is active only when **Flat depth** is on.
    Its floor boundary and Z passes use the same effective depth and cannot cut
-   below the V walls.
-6. Each connected medial graph is emitted as one deterministic tool-down edge
+   below the V walls. **Stepover** directly edits its clearing spacing; inlay
+   likewise exposes Stepover for the female pocket. The V-bit finish omits
+   only spans whose complete modeled cutter volume is already removed by
+   the emitted clearing paths. Residual floor, walls and corners remain in
+   the finish. This can split a route into more entries, so shorter cutting
+   distance is not a promise of a shorter cycle.
+6. Before optional rest finishing, each connected medial graph is emitted as one deterministic tool-down edge
    walk per depth level. Branches can be retraced and disconnected regions
    need separate entries, but the compiler no longer machines the whole
    V-shaped surface as a stack of global offset rings.
@@ -3521,6 +3527,12 @@ and lifts the command's CNC-only gate.)*
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
    diameter that cannot fit are blocked before output.
    Depth ladders ramp each step from the previous level.
+5. **Profile leads** on inside/outside profiles offers Arc, Line and None.
+   None persists the explicit opt-out; the other choices expose their radius
+   or length and arc sweep. An absent radius follows the cutter radius.
+   Ramp entry owns entry motion when requested, while the lead settings stay
+   stored. Tabbed profile ramps retain the raised tab windows and intentional
+   vertical tab walls, then finish the original complete contour.
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
@@ -3552,9 +3564,23 @@ and lifts the command's CNC-only gate.)*
    (clipped at boundaries, Z interpolated), translated so the tile's
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
-3. With registration holes on, adjacent tiles drill 3 mm dowel holes at
-   IDENTICAL stock positions inside the overlap strip — pins re-index
-   the stock physically between tiles.
+3. With registration holes on, **Configure registration** starts a separate
+   saved plan from the current default cutter and operation cutting values.
+   Review its cutter, hole diameter, depth, depth per pass, feed, plunge and
+   RPM. Later artwork/tool-plan edits do not rewrite this plan. Legacy
+   checkbox-only projects must configure it before a multi-tile export can
+   produce the requested holes. A missing/unsupported cutter or a cutter
+   wider than the requested hole cannot produce that cylindrical bore.
+   Saved projects use schema v6 so older builds reject the file instead of
+   silently discarding this cutter/depth plan. Existing v1-v5 projects still
+   load; migration does not invent a registration recipe.
+4. Matching flat end mills peck to the requested depth; smaller flat end mills
+   clear concentric circles at each depth step. Adjacent tiles use identical
+   stock-space centers in the overlap strip. Registration joins clearing work
+   before profiles **within each tile file**. This does not establish global
+   order across separately run indexed files: earlier files may already have
+   completed profiles. Cutter suitability and workholding remain operator
+   choices; no physical cutting recipe is inferred from these defaults.
 
 #### Error — a tile fails preflight
 1. Every tile preflights BEFORE any file is written; a failure names

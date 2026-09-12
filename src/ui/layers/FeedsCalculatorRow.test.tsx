@@ -147,7 +147,7 @@ describe('FeedsCalculatorRow', () => {
           fluteCount: 2,
         },
       });
-      expect(next.materialKey).toBeUndefined();
+      expect(next.materialKey).toBe('plywood-mdf');
       expect(next.cutType).toBe(DEFAULT_CNC_LAYER_SETTINGS.cutType);
     } finally {
       await act(async () => root.unmount());

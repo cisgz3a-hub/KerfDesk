@@ -162,7 +162,7 @@ describe('schema v5 operation override ownership', () => {
       const loaded = reopen(project);
       expect(loaded.scene.objects[0]?.operationOverride).toEqual(override);
       expect(facts(loaded)).toEqual(expected);
-      expect(loaded.schemaVersion).toBe(5);
+      expect(loaded.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     },
   );
 

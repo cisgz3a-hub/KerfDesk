@@ -260,6 +260,7 @@ export type CncGroup = {
   // relationship, not which cutter historically produced a numeric value.
   readonly layerPrimaryToolId?: string;
   readonly requestedDepthMm?: number;
+  readonly registrationHoleDiameterMm?: number;
   readonly depthPerPassMm?: number;
   readonly vResolutionMm?: number;
   readonly vCarveFlatDepthEnabled?: boolean;
@@ -320,6 +321,15 @@ export type JobDiagnostic =
 
 /** Complete compile evidence for one scheduled V-carve operation. */
 export type CncVCarveCompilationEvidence = {
+  // Finite source-boundary witnesses, independent of the sampled medial graph.
+  // This describes the full finish before clearing-stock pruning, not a
+  // whole-region accuracy bound. Pruning adds bounded emitted-grid XY rounding
+  // at split endpoints and independently rechecks source containment.
+  readonly sourceBoundaryCoverage?: {
+    readonly maxSampledResidualMm: number | null;
+    readonly sampleCount: number;
+    readonly samplingComplete: boolean;
+  };
   readonly operationIndex: number;
   readonly layerId: string;
   readonly entryIssue: string | null;

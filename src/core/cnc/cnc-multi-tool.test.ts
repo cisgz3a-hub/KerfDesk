@@ -93,8 +93,8 @@ describe('drillPeckPasses', () => {
       expect(point.x).toBe(15);
       expect(point.y).toBe(15);
     }
-    // Depth ladder 2, 4, 4.5 with clears between pecks (not after the last).
-    expect(pass.points.map((p) => p.z)).toEqual([-2, 0, -4, 0, -4.5]);
+    // Stock-top entry, then depth ladder 2, 4, 4.5 with clears between pecks.
+    expect(pass.points.map((p) => p.z)).toEqual([0, -2, 0, -4, 0, -4.5]);
   });
 
   it('ignores open paths', () => {

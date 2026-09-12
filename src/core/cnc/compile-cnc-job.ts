@@ -65,6 +65,7 @@ import {
   reliefOffsetDiagnosticsForStatus,
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
+import { restAwareVCarveGroup } from './vcarve-rest-finishing';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
@@ -313,7 +314,10 @@ function compileVectorOperationGroups(
       stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
     };
   }
-  const tagged = tagArtworkGroup(compiledGroup.group, priorityObjectId);
+  const tagged = tagArtworkGroup(
+    restAwareVCarveGroup(compiledGroup.group, secondary.groups, polylines),
+    priorityObjectId,
+  );
   return isProfileCutType(settings.cutType)
     ? {
         clearingGroups,

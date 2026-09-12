@@ -1,0 +1,79 @@
+import type { CncMachineConfig, CncTool } from '../scene';
+import type { CncTileRegistration } from '../scene/machine';
+import { zPassArrayMaterializationError, zPassCount } from './depth-passes';
+import { tileRegistrationRingCount } from './tile-registration-passes';
+
+export type ResolvedTileRegistration = {
+  readonly settings: CncTileRegistration;
+  readonly tool: CncTool;
+};
+
+const MAX_ECMASCRIPT_ARRAY_LENGTH = 0xffff_ffff;
+
+const POSITIVE_REGISTRATION_FIELDS = [
+  ['holeDiameterMm', 'hole diameter'],
+  ['depthMm', 'depth'],
+  ['depthPerPassMm', 'depth per pass'],
+  ['feedMmPerMin', 'feed'],
+  ['plungeMmPerMin', 'plunge feed'],
+  ['spindleRpm', 'spindle speed'],
+] as const;
+
+/** Missing geometry/identity cannot describe the requested bore. No fallback
+ * to another operation's cutter, depth or cutting values is permitted. */
+export function resolveTileRegistration(
+  registration: CncTileRegistration | undefined,
+  machine: CncMachineConfig | undefined,
+  maximumHolesPerTile = 1,
+): ResolvedTileRegistration | string {
+  if (registration === undefined || machine === undefined) {
+    return 'Set a registration cutter, hole diameter, depth and depth per pass in Startup Setup > Tiling before exporting registration holes.';
+  }
+  const tool = machine.tools.find((candidate) => candidate.id === registration.toolId);
+  if (tool === undefined)
+    return 'Choose an existing registration cutter in Startup Setup > Tiling.';
+  if (tool.kind !== 'end-mill')
+    return 'Tile registration bores require a flat end mill; the selected cutter does not have the supported cylindrical removal model.';
+  if (!Number.isFinite(tool.diameterMm) || tool.diameterMm <= 0)
+    return 'The registration cutter needs a finite positive cutting diameter.';
+  const fieldsError = positiveRegistrationFieldsError(registration);
+  if (fieldsError !== null) return fieldsError;
+  if (registration.holeDiameterMm < tool.diameterMm)
+    return `The ${tool.diameterMm} mm registration cutter cannot produce a ${registration.holeDiameterMm} mm hole. Choose a smaller cutter or increase the hole diameter.`;
+  const depthError = zPassArrayMaterializationError(
+    registration.depthMm,
+    registration.depthPerPassMm,
+  );
+  if (depthError !== null) return depthError;
+  const pathError = registrationPathArrayError(registration, tool.diameterMm, maximumHolesPerTile);
+  if (pathError !== null) return pathError;
+  return { settings: registration, tool };
+}
+
+function registrationPathArrayError(
+  settings: CncTileRegistration,
+  toolDiameterMm: number,
+  maximumHolesPerTile: number,
+): string | null {
+  const depths = zPassCount(settings.depthMm, settings.depthPerPassMm);
+  const wallRadius = (settings.holeDiameterMm - toolDiameterMm) / 2;
+  // Peck points stay in separate arrays for each hole. Interpolated passes
+  // are flattened into one shared array for all seam holes in the tile.
+  const pointsPerPass = wallRadius === 0 ? 2 * depths : 2;
+  const passesPerHole =
+    wallRadius === 0
+      ? 1
+      : depths * (1 + tileRegistrationRingCount(settings.holeDiameterMm, toolDiameterMm));
+  const groupPasses = maximumHolesPerTile * passesPerHole;
+  if (pointsPerPass > MAX_ECMASCRIPT_ARRAY_LENGTH || groupPasses > MAX_ECMASCRIPT_ARRAY_LENGTH)
+    return 'The registration bore path exceeds the ECMAScript Array length limit.';
+  return null;
+}
+
+function positiveRegistrationFieldsError(registration: CncTileRegistration): string | null {
+  for (const [key, label] of POSITIVE_REGISTRATION_FIELDS) {
+    if (!Number.isFinite(registration[key]) || registration[key] <= 0)
+      return `Tile registration ${label} must be a finite positive number.`;
+  }
+  return null;
+}

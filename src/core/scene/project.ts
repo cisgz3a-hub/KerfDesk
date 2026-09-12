@@ -7,7 +7,9 @@ import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
 
-export const PROJECT_SCHEMA_VERSION = 5 as const;
+// v6 readers preserve the explicit registration cutter and bore plan. Older
+// readers must not silently fall back to their inherited-tool/fixed-depth path.
+export const PROJECT_SCHEMA_VERSION = 6 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

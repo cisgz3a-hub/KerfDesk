@@ -103,7 +103,13 @@ export function passesForCncLayerWithEvidence(
   return {
     ...raw,
     passes:
-      settings.rampEntryDeg === undefined ? passes : applyRampEntry(passes, settings.rampEntryDeg),
+      settings.rampEntryDeg === undefined || settings.rampEntryDeg <= 0
+        ? passes
+        : applyRampEntry(
+            passes,
+            settings.rampEntryDeg,
+            settings.tabsEnabled && isProfileCutType(settings.cutType),
+          ),
   };
 }
 
