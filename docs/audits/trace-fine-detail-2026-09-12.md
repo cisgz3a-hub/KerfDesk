@@ -50,6 +50,10 @@ Existing antialiased-circle, ordinary-cap, subpixel, roundness and straightness
 controls passed during the finishing change.
 
 The complete tracing suite passes: 600 tests in 81 files.
+The trace interface and batch export suite passes: 319 tests in 35 files.
+Fallback disclosure fixtures explicitly request speck cleanup so they still
+exercise actual recovery; Sharp's default now retains their tiny source marks
+on the first attempt.
 
 An isolated Chrome 153 worker comparison using the actual dragon measured:
 
