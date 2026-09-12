@@ -8,9 +8,12 @@ import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-r
 import type { PreviewToolpath } from './preview-status';
 import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
-export type LargeJobPreparation = {
-  readonly toolpath: PreviewToolpath;
+export type LargeJobEstimate = {
   readonly estimate: LiveJobEstimate;
+};
+
+export type LargeJobPreparation = LargeJobEstimate & {
+  readonly toolpath: PreviewToolpath;
   /** Clone-safe carrier restored into the process-local preview association. */
   readonly jobOriginOffset?: Vec2;
 };
@@ -54,6 +57,9 @@ export function largeJobPreparationFromPrepared(
   prepared: PreparedOutput,
   options: LargeJobPreparationOptions,
 ): LargeJobPreparation {
+  // Finish the planner's temporary allocations before retaining a complete
+  // multi-million-step preview route. Both use this exact prepared output.
+  const estimate = estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true });
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
   });
@@ -63,6 +69,6 @@ export function largeJobPreparationFromPrepared(
   return {
     toolpath: serializedToolpath,
     jobOriginOffset,
-    estimate: estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true }),
+    estimate,
   };
 }

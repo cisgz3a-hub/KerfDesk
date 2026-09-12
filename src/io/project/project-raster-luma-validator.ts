@@ -1,5 +1,3 @@
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
 export function validateRasterLumaBase64(
   value: string,
   expectedLength: number,
@@ -13,46 +11,43 @@ export function validateRasterLumaBase64(
 }
 
 function decodedBase64ByteLength(value: string): number | null {
-  const clean = cleanedBase64(value);
-  if (clean === null) return null;
-  const dataLength = base64DataLength(clean);
-  if (dataLength === null) return null;
-  let bytes = 0;
-  let buffer = 0;
-  let bitCount = 0;
-  for (let index = 0; index < dataLength; index += 1) {
-    const charValue = BASE64_ALPHABET.indexOf(clean[index] ?? '');
-    buffer = (buffer << 6) | charValue;
-    bitCount += 6;
-    if (bitCount >= 8) {
-      bitCount -= 8;
-      bytes += 1;
-      buffer &= (1 << bitCount) - 1;
+  // Validate/count in place: allocating a cleaned copy of a multi-megabyte
+  // raster creates substantial garbage during autosave and project loading.
+  let dataLength = 0;
+  let padding = 0;
+  let lastValue = 0;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (isBase64Whitespace(code)) continue;
+    if (code === 61) {
+      if (++padding > 2) return null;
+      continue;
     }
+    const digit = base64Digit(code);
+    if (digit === -1 || padding !== 0) return null;
+    dataLength++;
+    lastValue = digit;
   }
-  if (bitCount > 0 && buffer !== 0) return null;
-  return bytes;
+  return validBase64Tail(dataLength, padding, lastValue) ? Math.floor((dataLength * 3) / 4) : null;
 }
 
-function cleanedBase64(value: string): string | null {
-  let clean = '';
-  for (const char of value) {
-    if (isBase64Whitespace(char)) continue;
-    if (char !== '=' && BASE64_ALPHABET.indexOf(char) === -1) return null;
-    clean += char;
-  }
-  return clean;
+function validBase64Tail(dataLength: number, padding: number, lastValue: number): boolean {
+  const remainder = dataLength % 4;
+  if (remainder === 1 || (padding !== 0 && (dataLength + padding) % 4 !== 0)) return false;
+  // Retain canonical unused-bit validation for padded AND unpadded input.
+  if ((remainder === 2 && (lastValue & 15) !== 0) || (remainder === 3 && (lastValue & 3) !== 0))
+    return false;
+  return true;
 }
 
-function base64DataLength(clean: string): number | null {
-  const paddingStart = clean.indexOf('=');
-  if (clean.length % 4 === 1) return null;
-  if (paddingStart === -1) return clean.length;
-  const paddingCount = clean.length - paddingStart;
-  if (paddingCount > 2 || clean.length % 4 !== 0) return null;
-  return clean.slice(paddingStart).replaceAll('=', '') === '' ? paddingStart : null;
+function isBase64Whitespace(code: number): boolean {
+  return code === 32 || code === 10 || code === 13 || code === 9;
 }
 
-function isBase64Whitespace(char: string): boolean {
-  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
+function base64Digit(code: number): number {
+  if (code >= 65 && code <= 90) return code - 65;
+  if (code >= 97 && code <= 122) return code - 71;
+  if (code >= 48 && code <= 57) return code + 4;
+  if (code === 43) return 62;
+  return code === 47 ? 63 : -1;
 }

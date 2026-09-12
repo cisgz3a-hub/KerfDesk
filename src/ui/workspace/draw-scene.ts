@@ -72,6 +72,15 @@ export type DrawOpts = {
   readonly displayPolylineCache?: DisplayPolylineCache;
   readonly previewToolpath?: Toolpath;
   readonly previewShowTravel?: boolean;
+  readonly previewBackgroundKey?: object;
+  readonly previewRouteRenderer?: (
+    ctx: CanvasRenderingContext2D,
+    toolpath: Toolpath,
+    view: ViewTransform,
+    scrubberT: number,
+    showTravel: boolean,
+    backgroundKey?: object,
+  ) => boolean;
   // CNC preview (H.2): the scene-space material-removal grid, depth-shaded
   // under the route lines. Null/omitted for laser projects.
   readonly cncRemovalGrid?: RemovalGrid | null;
@@ -177,6 +186,17 @@ function drawPreviewModeScene(
     drawCncRemoval(ctx, opts.cncRemovalGrid, view, stockMaterialKey(project));
   }
   if (opts.previewToolpath === undefined) return;
+  if (
+    opts.previewRouteRenderer?.(
+      ctx,
+      opts.previewToolpath,
+      view,
+      opts.scrubberT ?? 1,
+      opts.previewShowTravel !== false,
+      opts.previewBackgroundKey,
+    ) === true
+  )
+    return;
   drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
     showTravel: opts.previewShowTravel !== false,
     showFuture: true,

@@ -4,9 +4,10 @@
 // prepares the same project off-thread so both surfaces still fill in,
 // seconds-to-minutes later, without blocking a frame.
 //
-//   - One request per exact (project identity, options): the preview and
-//     estimate consumers share in-flight work and up to four recently settled
-//     preparations. The global settled-result LRU bounds retained geometry.
+//   - One cached capability per exact (project identity, options): full
+//     previews also satisfy estimates; estimates alone never satisfy Preview.
+//     Only the latest full Preview is retained, with at most four settled
+//     entries across both capabilities. Replacement releases old geometry.
 //   - ONE request is posted to the worker at a time. Further requests for the
 //     SAME project are held here until the active compute settles, and a
 //     newer same-project request rejects the held (never-started) ones —
@@ -20,10 +21,10 @@
 //   - A request for a DIFFERENT project while work is in flight terminates
 //     the worker (a compute cannot be interrupted cooperatively) and rejects
 //     every stale promise; callers treat rejection as "stale, ignore". The
-//     replacement worker spawns immediately so its spawn + module-graph load
-//     overlaps the supersede quiet window, and dispatch waits until the
-//     window elapses after the LAST supersede so a burst of edits costs one
-//     restart (and one structured clone of the Project), not one per edit.
+//     replacement waits for the supersede quiet window and the shared worker
+//     memory lane, so a burst of edits costs one new worker and one project
+//     clone. Each terminal result retires its worker before yielding the lane
+//     to autosave or another preparation; their heaps must not overlap.
 //   - No watchdog timeout on purpose: a 50M-pixel prepare legitimately runs
 //     minutes. Staleness is handled by supersede, crashes by onerror.
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
@@ -31,8 +32,13 @@
 
 import type { Project } from '../../core/scene';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
-import type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
 import type {
+  LargeJobEstimate,
+  LargeJobPreparation,
+  LargeJobPreparationOptions,
+} from './large-job-preparation';
+import type {
+  PreparationProjection,
   PreparationWorkerRequest,
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
@@ -40,8 +46,19 @@ import {
   connectCanvasCompilationMainBridge,
   retireCanvasCompilationMainBridge,
 } from './canvas-compilation-main-bridge';
+import { PreparationResultCache } from './preparation-result-cache';
+import { PreparationTransferAssembler } from './preparation-transfer-assembler';
+import { reserveWorkerMemory } from '../worker-memory-lane';
+import type {
+  PreparationTransferResponse,
+  PreparationTransferAcknowledgement,
+} from './preparation-transfer-protocol';
 
-export type { LargeJobPreparation, LargeJobPreparationOptions } from './large-job-preparation';
+export type {
+  LargeJobEstimate,
+  LargeJobPreparation,
+  LargeJobPreparationOptions,
+} from './large-job-preparation';
 
 // An over-budget prepare legitimately runs minutes; restarting it on every
 // edit of a rapid burst means it never finishes (and structured-clones the
@@ -89,25 +106,28 @@ export function isPreparationSuperseded(error: unknown): boolean {
 
 type QueuedRequest = {
   readonly project: Project;
+  readonly key: string;
   readonly options: LargeJobPreparationOptions;
-  readonly resolve: (result: LargeJobPreparation) => void;
+  readonly projection: PreparationProjection;
+  readonly resolve: (result: LargeJobPreparation | LargeJobEstimate) => void;
   readonly reject: (err: Error) => void;
   readonly onProgress?: (progress: OutputCompilationProgress) => void;
 };
 
 type ActiveRequest = QueuedRequest & { readonly id: number };
+type MemoryReservation = {
+  cancel: (() => void) | null;
+  release: (() => void) | null;
+};
 
 let workerInstance: Worker | null = null;
 let nextRequestId = 0;
 let activeRequest: ActiveRequest | null = null;
+let activeTransfer: PreparationTransferAssembler | null = null;
 let queuedRequests: ReadonlyArray<QueuedRequest> = [];
 let quietWindowTimer: ReturnType<typeof setTimeout> | null = null;
-const settledByProject = new WeakMap<Project, Map<string, Promise<LargeJobPreparation>>>();
-const settledLru: Array<{
-  readonly project: Project;
-  readonly key: string;
-  readonly promise: Promise<LargeJobPreparation>;
-}> = [];
+let memoryReservation: MemoryReservation | null = null;
+const preparationCache = new PreparationResultCache(MAX_SETTLED_PREPARATIONS);
 
 /**
  * Prepare a large job off the main thread. Returns null when workers are
@@ -121,47 +141,78 @@ export function prepareLargeJobOffThread(
   onProgress?: (progress: OutputCompilationProgress) => void,
 ): Promise<LargeJobPreparation> | null {
   const key = requestKey(options);
-  const perProject = cacheFor(project);
-  const cached = perProject.get(key);
-  if (cached !== undefined) {
-    refreshSettledEntry(project, key, cached);
-    return cached;
-  }
+  const cached = preparationCache.get(project, key);
+  if (cached?.projection === 'preview') return cached.promise;
+  preparationCache.discardSettledPreviews();
+  const requested = requestPreparation(project, options, 'preview', onProgress);
+  if (requested === null) return null;
+  const promise = requested.then((result) => {
+    if (!('toolpath' in result))
+      throw new Error('preparation worker omitted the requested preview');
+    return result;
+  });
+  preparationCache.set(project, key, { projection: 'preview', promise });
+  return promise;
+}
+
+/** Return only the exact ETA, reusing a full Preview request when already present. */
+export function prepareJobEstimateOffThread(
+  project: Project,
+  options: LargeJobPreparationOptions = {},
+): Promise<LargeJobEstimate> | null {
+  const key = requestKey(options);
+  const cached = preparationCache.get(project, key);
+  if (cached !== undefined) return cached.promise;
+  const promise = requestPreparation(project, options, 'estimate');
+  if (promise !== null) preparationCache.set(project, key, { projection: 'estimate', promise });
+  return promise;
+}
+
+function requestPreparation(
+  project: Project,
+  options: LargeJobPreparationOptions,
+  projection: PreparationProjection,
+  onProgress?: (progress: OutputCompilationProgress) => void,
+): Promise<LargeJobPreparation | LargeJobEstimate> | null {
+  const key = requestKey(options);
   if (hasWorkForOtherProject(project)) {
     supersedeForNewProject();
   } else {
-    // Same project, new options key: held requests were superseded by this
-    // one. Only the active compute keeps running — stopping it would kill
-    // the worker, and its settled result stays cached anyway.
-    rejectQueuedRequests(new PreparationSupersededError('newer-request'));
+    // Keep the same exact options: a queued estimate can be promoted to a
+    // full Preview, satisfying both consumers with the same compile.
+    rejectQueuedRequests(new PreparationSupersededError('newer-request'), key);
   }
-  if (ensureWorker() === null) return null;
-  const promise = new Promise<LargeJobPreparation>((resolve, reject) => {
-    queuedRequests = [
-      ...queuedRequests,
-      {
-        project,
-        options,
-        resolve,
-        reject,
-        ...(onProgress === undefined ? {} : { onProgress }),
+  if (typeof Worker === 'undefined') return null;
+  const promise = new Promise<LargeJobPreparation | LargeJobEstimate>((resolve, reject) => {
+    const held = queuedRequests.find((request) => request.key === key);
+    const progress = onProgress ?? held?.onProgress;
+    const next: QueuedRequest = {
+      project,
+      key,
+      options,
+      projection,
+      resolve: (result) => {
+        held?.resolve(result);
+        resolve(result);
       },
-    ];
+      reject: (error) => {
+        held?.reject(error);
+        reject(error);
+      },
+      ...(progress === undefined ? {} : { onProgress: progress }),
+    };
+    queuedRequests =
+      held === undefined
+        ? [...queuedRequests, next]
+        : queuedRequests.map((request) => (request === held ? next : request));
   });
-  perProject.set(key, promise);
-  void promise.then(
-    () => rememberSettledEntry(project, key, promise),
-    () => {
-      if (perProject.get(key) === promise) perProject.delete(key);
-    },
-  );
   dispatchNextRequest();
   return promise;
 }
 
 export function resetPreparationWorkerForTests(): void {
   rejectAllPendingAndRetireWorker('preparation worker reset');
-  clearSettledEntries();
+  preparationCache.clear();
 }
 
 function requestKey(options: LargeJobPreparationOptions): string {
@@ -170,61 +221,6 @@ function requestKey(options: LargeJobPreparationOptions): string {
     outputScope: options.outputScope ?? null,
     snapshot: options.snapshot ?? null,
   });
-}
-
-function cacheFor(project: Project): Map<string, Promise<LargeJobPreparation>> {
-  const existing = settledByProject.get(project);
-  if (existing !== undefined) return existing;
-  const created = new Map<string, Promise<LargeJobPreparation>>();
-  settledByProject.set(project, created);
-  return created;
-}
-
-function rememberSettledEntry(
-  project: Project,
-  key: string,
-  promise: Promise<LargeJobPreparation>,
-): void {
-  removeSettledEntry(project, key, promise);
-  settledLru.push({ project, key, promise });
-  while (settledLru.length > MAX_SETTLED_PREPARATIONS) {
-    const evicted = settledLru.shift();
-    if (evicted === undefined) break;
-    const cache = settledByProject.get(evicted.project);
-    if (cache?.get(evicted.key) === evicted.promise) cache.delete(evicted.key);
-  }
-}
-
-function refreshSettledEntry(
-  project: Project,
-  key: string,
-  promise: Promise<LargeJobPreparation>,
-): void {
-  const index = settledLru.findIndex(
-    (entry) => entry.project === project && entry.key === key && entry.promise === promise,
-  );
-  if (index < 0) return;
-  const [entry] = settledLru.splice(index, 1);
-  if (entry !== undefined) settledLru.push(entry);
-}
-
-function removeSettledEntry(
-  project: Project,
-  key: string,
-  promise: Promise<LargeJobPreparation>,
-): void {
-  const index = settledLru.findIndex(
-    (entry) => entry.project === project && entry.key === key && entry.promise === promise,
-  );
-  if (index >= 0) settledLru.splice(index, 1);
-}
-
-function clearSettledEntries(): void {
-  for (const entry of settledLru) {
-    const cache = settledByProject.get(entry.project);
-    if (cache?.get(entry.key) === entry.promise) cache.delete(entry.key);
-  }
-  settledLru.length = 0;
 }
 
 function hasWorkForOtherProject(project: Project): boolean {
@@ -236,16 +232,12 @@ function hasWorkForOtherProject(project: Project): boolean {
 // old one is stale, and the worker may be mid-compute on it.
 function supersedeForNewProject(): void {
   rejectQueuedRequests(new PreparationSupersededError('newer-project'));
-  if (activeRequest !== null) {
-    const stale = activeRequest;
-    activeRequest = null;
-    // Terminating is the only way to stop the mid-compute worker; respawn
-    // immediately so the replacement's spawn + module-graph load overlaps
-    // the quiet window instead of serializing in front of the next dispatch.
-    retireWorker();
-    ensureWorker();
-    stale.reject(new PreparationSupersededError('newer-project'));
-  }
+  const stale = activeRequest;
+  activeRequest = null;
+  // Also cancel a reservation that has not been granted. Its replacement
+  // must not jump ahead of an autosave already waiting for this worker.
+  retireWorker();
+  stale?.reject(new PreparationSupersededError('newer-project'));
   armQuietWindow();
 }
 
@@ -260,21 +252,33 @@ function armQuietWindow(): void {
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
   if (typeof Worker === 'undefined') return null;
+  let created: Worker | null = null;
   try {
-    const created = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
+    const worker = new Worker(new URL('./preparation-worker.ts', import.meta.url), {
       type: 'module',
     });
-    connectCanvasCompilationMainBridge(created);
-    created.onmessage = handleWorkerMessage;
-    created.onerror = (): void => {
-      rejectAllPendingAndRetireWorker('preparation worker errored');
+    created = worker;
+    connectCanvasCompilationMainBridge(worker);
+    worker.onmessage = (event): void => {
+      if (workerInstance === worker) handleWorkerMessage(event);
     };
-    created.onmessageerror = (): void => {
-      rejectAllPendingAndRetireWorker('preparation worker response was not cloneable');
+    worker.onerror = (): void => {
+      if (workerInstance === worker) rejectAllPendingAndRetireWorker('preparation worker errored');
     };
-    workerInstance = created;
-    return created;
+    worker.onmessageerror = (): void => {
+      if (workerInstance === worker)
+        rejectAllPendingAndRetireWorker('preparation worker response was not cloneable');
+    };
+    workerInstance = worker;
+    return worker;
   } catch {
+    if (created !== null) {
+      try {
+        retireCanvasCompilationMainBridge(created);
+      } finally {
+        created.terminate();
+      }
+    }
     return null;
   }
 }
@@ -289,25 +293,104 @@ function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
     }
     return;
   }
+  if (isTransferResponse(e.data)) {
+    handleTransferMessage(e.data);
+    return;
+  }
+  if (activeTransfer !== null && e.data.kind !== 'error') {
+    rejectAllPendingAndRetireWorker('preparation worker mixed response formats');
+    return;
+  }
   const settled = activeRequest;
   activeRequest = null;
+  retireWorker();
   if (e.data.kind === 'ok') {
-    settled.resolve({ toolpath: e.data.toolpath, estimate: e.data.estimate });
+    settled.resolve({
+      toolpath: e.data.toolpath,
+      estimate: e.data.estimate,
+      ...(e.data.jobOriginOffset === undefined ? {} : { jobOriginOffset: e.data.jobOriginOffset }),
+    });
+  } else if (e.data.kind === 'estimate') {
+    settled.resolve({ estimate: e.data.estimate });
   } else {
     settled.reject(new Error(e.data.message));
   }
   dispatchNextRequest();
 }
 
+function isTransferResponse(
+  response: PreparationWorkerResponse,
+): response is PreparationTransferResponse {
+  return (
+    response.kind === 'transfer-start' ||
+    response.kind === 'transfer-chunk' ||
+    response.kind === 'transfer-complete'
+  );
+}
+
+function handleTransferMessage(packet: PreparationTransferResponse): void {
+  try {
+    let result: LargeJobPreparation | null = null;
+    if (packet.kind === 'transfer-start') {
+      if (activeTransfer !== null) throw new Error('duplicate preparation transfer header');
+      activeTransfer = new PreparationTransferAssembler(packet);
+    } else {
+      if (activeTransfer === null) throw new Error('preparation transfer missing header');
+      result = activeTransfer.accept(packet);
+    }
+    const acknowledgement: PreparationTransferAcknowledgement = {
+      id: packet.id,
+      sequence: packet.sequence,
+      kind: 'transfer-ack',
+    };
+    workerInstance?.postMessage(acknowledgement);
+    if (result === null) return;
+    const settled = activeRequest;
+    activeRequest = null;
+    retireWorker();
+    settled?.resolve(result);
+    dispatchNextRequest();
+  } catch (error) {
+    // Corrupt/incomplete transfers never become a Preview or a cache entry.
+    // Retiring the worker also abandons its acknowledgement wait.
+    rejectAllPendingAndRetireWorker(error instanceof Error ? error.message : String(error));
+  }
+}
+
 function dispatchNextRequest(): void {
-  if (activeRequest !== null || quietWindowTimer !== null) return;
+  if (
+    activeRequest !== null ||
+    quietWindowTimer !== null ||
+    memoryReservation !== null ||
+    queuedRequests.length === 0
+  )
+    return;
+  const reservation: MemoryReservation = { cancel: null, release: null };
+  memoryReservation = reservation;
+  reservation.cancel = reserveWorkerMemory((release) => {
+    if (memoryReservation !== reservation) {
+      release();
+      return;
+    }
+    reservation.release = release;
+    dispatchReservedRequest();
+  });
+  // A free grant can fail or even complete synchronously before reserve
+  // returns. Its old token must never overwrite or release a newer owner.
+  if (memoryReservation !== reservation) reservation.cancel();
+}
+
+function dispatchReservedRequest(): void {
+  // Options/project may have coalesced while autosave owned the lane.
   const next = queuedRequests[0];
-  if (next === undefined) return;
+  if (next === undefined || quietWindowTimer !== null) {
+    retireWorker();
+    return;
+  }
   const worker = ensureWorker();
   if (worker === null) {
-    // Worker construction succeeded at request time but fails now (only seen
-    // when the environment tears Worker down): nothing can settle these.
     rejectQueuedRequests(new Error(WORKER_UNAVAILABLE_MESSAGE));
+    retireWorker();
     return;
   }
   queuedRequests = queuedRequests.slice(1);
@@ -318,6 +401,7 @@ function dispatchNextRequest(): void {
     id: active.id,
     project: active.project,
     ...active.options,
+    ...(active.projection === 'estimate' ? { projection: 'estimate' as const } : {}),
   };
   try {
     worker.postMessage(request);
@@ -329,9 +413,9 @@ function dispatchNextRequest(): void {
   }
 }
 
-function rejectQueuedRequests(error: Error): void {
-  const stale = queuedRequests;
-  queuedRequests = [];
+function rejectQueuedRequests(error: Error, keepKey?: string): void {
+  const stale = queuedRequests.filter((request) => request.key !== keepKey);
+  queuedRequests = queuedRequests.filter((request) => request.key === keepKey);
   for (const queued of stale) {
     queued.reject(error);
   }
@@ -353,9 +437,23 @@ function rejectAllPendingAndRetireWorker(message: string): void {
 }
 
 function retireWorker(): void {
-  if (workerInstance === null) return;
+  activeTransfer = null;
   const retired = workerInstance;
   workerInstance = null;
-  retireCanvasCompilationMainBridge(retired);
-  retired.terminate();
+  const reservation = memoryReservation;
+  memoryReservation = null;
+  try {
+    if (retired !== null) {
+      retired.onmessage = null;
+      retired.onerror = null;
+      retired.onmessageerror = null;
+      try {
+        retireCanvasCompilationMainBridge(retired);
+      } finally {
+        retired.terminate();
+      }
+    }
+  } finally {
+    (reservation?.release ?? reservation?.cancel)?.();
+  }
 }

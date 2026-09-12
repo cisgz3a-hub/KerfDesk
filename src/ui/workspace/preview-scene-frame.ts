@@ -32,12 +32,34 @@ export function mapToolpathToScene(
   jobOriginOffset: Vec2,
   device: DeviceProfile,
 ): Toolpath {
-  const mapPoint = (p: Vec2): Vec2 =>
-    toSceneCoords({ x: p.x - jobOriginOffset.x, y: p.y - jobOriginOffset.y }, device);
+  const mapPoint = scenePointMapper(jobOriginOffset, device);
   return {
     steps: toolpath.steps.map((step) => mapStep(step, mapPoint)),
     totalLength: toolpath.totalLength,
   };
+}
+
+/**
+ * Consume only a fresh buildToolpath array whose machine route is no longer
+ * needed. Replacing slots releases the old geometry as mapping advances,
+ * avoiding two complete multi-million-step routes. Step objects, shared
+ * points, polylines and metadata are never mutated.
+ */
+export function mapOwnedToolpathToScene(
+  toolpath: Toolpath,
+  jobOriginOffset: Vec2,
+  device: DeviceProfile,
+): Toolpath {
+  const steps = toolpath.steps as ToolpathStep[];
+  const mapPoint = scenePointMapper(jobOriginOffset, device);
+  steps.forEach((step, index) => {
+    steps[index] = mapStep(step, mapPoint);
+  });
+  return { steps, totalLength: toolpath.totalLength };
+}
+
+function scenePointMapper(jobOriginOffset: Vec2, device: DeviceProfile): (p: Vec2) => Vec2 {
+  return (p) => toSceneCoords({ x: p.x - jobOriginOffset.x, y: p.y - jobOriginOffset.y }, device);
 }
 
 function mapStep(step: ToolpathStep, mapPoint: (p: Vec2) => Vec2): ToolpathStep {
