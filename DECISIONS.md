@@ -16147,7 +16147,11 @@ repeated autosave serialization of an unchanged document.
   Effect setup/cleanup must retain correct ownership under development StrictMode replay and unmount.
   Estimate-only requests return the exact duration without allocating or cloning unused preview
   geometry. Full Preview may satisfy ETA; ETA alone cannot satisfy Preview. Preserve supersession,
-  quiet-window dispatch and a global four-result bound across both result capabilities.
+  quiet-window dispatch and a global four-result bound across both result capabilities. Keep only
+  one reusable full Preview and release the previous cached full result when a replacement is
+  requested; late settlement must not re-root an older full route. ETA entries remain small.
+  Calculate the prepared-output estimate before retaining the full route, so the duration planner's
+  temporary allocations do not overlap that complete geometry.
   Large full Preview responses cross the worker boundary as ordered, acknowledged chunks of at most
   2,048 steps for both legacy and verified executable-plan routes. Retain every step and header,
   including placement offsets. Publish only a complete validated route, and discard partial assembly
@@ -16156,6 +16160,9 @@ repeated autosave serialization of an unchanged document.
   Only the worker's newly constructed response may consume acknowledged step-array slots, releasing
   its original route as the receiver accumulates the copy. Never mutate nested points, metadata,
   prepared output or a shared in-process preview; keep the ordinary sender non-consuming.
+  Reconstruct ordinary received raster steps with local record layouts and share equal repeated
+  strings within the transfer. Native structured clone otherwise expands their retained heap;
+  preserve every numeric value and optional field, and retain unsupported rich records unchanged.
 - Memoize the autosave wrapper within its mounted loop using immutable Project identity, document
   epoch and persisted job setup/ordered selection. Successful unchanged saves can then be skipped;
   edits, document replacement and cleared recovery slots remain eligible. Validate raster base64

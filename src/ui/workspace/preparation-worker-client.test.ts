@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import {
   isPreparationSuperseded,
-  MAX_SETTLED_PREPARATIONS,
   PreparationSupersededError,
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
@@ -89,10 +88,9 @@ describe('prepareLargeJobOffThread', () => {
     expect(lastWorker().posted).toHaveLength(1);
   });
 
-  it('bounds exact settled preparation reuse with a global least-recently-used limit', async () => {
+  it('keeps only the latest settled full Preview reusable', async () => {
     const project = createProject();
-    const anchors = ['front-left', 'front-center', 'front-right', 'center-left', 'center'] as const;
-    expect(anchors).toHaveLength(MAX_SETTLED_PREPARATIONS + 1);
+    const anchors = ['front-left', 'center'] as const;
     let first: Promise<LargeJobPreparation> | null = null;
 
     for (const anchor of anchors) {

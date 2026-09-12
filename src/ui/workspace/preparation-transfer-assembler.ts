@@ -1,5 +1,6 @@
 import type { ToolpathStep } from '../../core/job';
 import type { LargeJobPreparation } from './large-job-preparation';
+import { PreparationStepRehydrator } from './preparation-step-rehydrator';
 import {
   PREPARATION_TRANSFER_STEP_CHUNK,
   type PreparationTransferResponse,
@@ -12,6 +13,7 @@ export class PreparationTransferAssembler {
   private receivedLegacy = 0;
   private receivedPlan = 0;
   private nextSequence = 1;
+  private readonly rehydrator = new PreparationStepRehydrator();
 
   constructor(
     private readonly start: Extract<
@@ -63,7 +65,7 @@ export class PreparationTransferAssembler {
       throw new Error('invalid preparation transfer chunk');
     }
     let cursor = received;
-    for (const step of packet.steps) target[cursor++] = step;
+    for (const step of packet.steps) target[cursor++] = this.rehydrator.rehydrate(step);
     if (packet.route === 'legacy') this.receivedLegacy += packet.steps.length;
     else this.receivedPlan += packet.steps.length;
   }

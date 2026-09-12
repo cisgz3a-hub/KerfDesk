@@ -28,7 +28,11 @@ importing an image or committing a trace.
   `Data cannot be cloned, out of memory`. Estimate requests now return only
   the exact estimate, without building that route. Full Preview results can
   satisfy ETA; an estimate result cannot satisfy Preview. Both share the
-  existing supersession queue and a global four-result cache bound.
+  existing supersession queue and a global four-result cache bound, with only
+  one reusable full Preview. A replacement releases the previous cached full
+  route before transfer, and a late older result cannot restore that cache
+  entry. Undo history retains Projects, so a weak per-Project cache alone
+  would not release those generated routes.
   Full worker responses also retain their existing placement-offset carrier,
   which the client previously discarded.
 - The full worker previously calculated its duration after retaining the
@@ -49,6 +53,18 @@ importing an image or committing a trace.
   remain untouched, and the ordinary sender remains non-consuming.
   This is a record-count bound for the many small raster steps, not a
   universal byte bound on a single enormous polyline.
+- Native worker cloning also expands ordinary raster records. In a controlled
+  200,000-step Chrome comparison using the real raster builder and scene
+  mapper, retained heap after collection was 36,432,580 bytes for local
+  construction and 56,392,100 bytes after chunked worker transfer, 54.8% more.
+  Explicit local record reconstruction with shared repeated strings reduced
+  this to 34,421,720 bytes; exact JSON SHA-256 values matched in every case.
+  Small heap snapshots confirmed duplicated kind, colour and source strings
+  and larger cloned XY record bodies. Boxed-number allocations were unchanged.
+  Reconstruct ordinary received raster records and intern equal strings per
+  transfer; preserve rich or unsupported records on the existing object path.
+  These are retained-heap measurements after collection, not a claim about
+  the peak memory of the full application or universal browser limits.
 - The autosave hook added a fresh job-setup wrapper on every tick, defeating
   the existing unchanged-project memo. A per-mounted-loop snapshot memo now
   includes document epoch, placement, output scope and ordered selection.
@@ -113,7 +129,7 @@ The same 4096 x 4096 gradient/crossing-line raster now completes its real
 background ETA at **48,441.177515398085 seconds**, displaying **13h 27m 21s**,
 the same label as the original synchronous calculation. The response contains
 the estimate and no unused toolpath; the idle-marker worker also succeeds.
-A full Preview then completes all **7,305,177 steps** across 3,567 chunks,
+A development-server full Preview completes all **7,305,177 steps** across 3,567 chunks,
 with cut/travel/total distances of **490,605.5 / 714,133.4 / 1,204,738.9 mm**
 and the same time breakdown as the baseline. Play is enabled and no worker,
 page or Preview errors occur. Observed Preview preparation took 46.2 seconds;

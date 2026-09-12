@@ -11,10 +11,11 @@ type SettledEntry = {
   readonly entry: PreparationCacheEntry;
 };
 
-/** One capability per exact project/options, with a global settled-result bound. */
+/** One reusable full Preview plus LRU-bounded estimates for exact project/options. */
 export class PreparationResultCache {
   private readonly byProject = new WeakMap<Project, Map<string, PreparationCacheEntry>>();
   private readonly settled: SettledEntry[] = [];
+  private previewGeneration = 0;
 
   constructor(private readonly limit: number) {}
 
@@ -30,6 +31,11 @@ export class PreparationResultCache {
   }
 
   set(project: Project, key: string, entry: PreparationCacheEntry): void {
+    if (entry.projection === 'preview') {
+      this.discardSettledPreviews();
+      this.previewGeneration++;
+    }
+    const previewGeneration = this.previewGeneration;
     let cache = this.byProject.get(project);
     if (cache === undefined) {
       cache = new Map();
@@ -45,6 +51,12 @@ export class PreparationResultCache {
         // A later Preview request can upgrade an in-flight estimate entry.
         // Its eventual estimate-only response must not replace that capability.
         if (currentCache.get(key) !== entry) return;
+        // Keep the promise deliverable, but an older full request finishing
+        // after a replacement began must not root another enormous route.
+        if (entry.projection === 'preview' && previewGeneration !== this.previewGeneration) {
+          currentCache.delete(key);
+          return;
+        }
         this.settled.push({ project, key, entry });
         while (this.settled.length > this.limit) {
           const evicted = this.settled.shift();
@@ -57,7 +69,18 @@ export class PreparationResultCache {
     );
   }
 
+  /** Drop completed geometry before another request is posted or materialized. */
+  discardSettledPreviews(): void {
+    for (let index = this.settled.length - 1; index >= 0; index--) {
+      const item = this.settled[index];
+      if (item === undefined || item.entry.projection !== 'preview') continue;
+      this.settled.splice(index, 1);
+      this.delete(item);
+    }
+  }
+
   clear(): void {
+    this.previewGeneration++;
     for (const item of this.settled) this.delete(item);
     this.settled.length = 0;
   }

@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { serializeProject } from '../../io/project/serialize-project';
 import { bytesToBase64 } from '../import/base64-bytes';
-import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import * as canvasPreparationPolicy from '../workspace/canvas-preparation-policy';
 import { buildMachineSetupScanFacts } from './machine-setup-scan-facts';
 
 describe('buildMachineSetupScanFacts dense accepted raster', () => {
@@ -48,7 +48,31 @@ describe('buildMachineSetupScanFacts dense accepted raster', () => {
     const reloaded = deserializeProject(serialized);
     if (reloaded.kind !== 'ok') throw new Error(`dense fixture rejected: ${reloaded.kind}`);
 
-    expect(costlyCanvasPreparation(reloaded.project)).toBe(false);
-    expect(buildMachineSetupScanFacts(reloaded.project).lowOverscanGroups).toBe(1);
+    expect(canvasPreparationPolicy.costlyCanvasPreparation(reloaded.project)).toBe(true);
+    expect(buildMachineSetupScanFacts(reloaded.project)).toMatchObject({
+      requestedImageOperations: 1,
+      requestedBidirectionalOperations: 1,
+      executableScanGroups: null,
+      lowOverscanGroups: null,
+      compiledJob: null,
+    });
+
+    // The UI correctly defers this source. Isolate only that scheduling gate
+    // to keep exercising the real dense compiler and incremental runway scan;
+    // scan facts has no separate unbounded entry point.
+    const scheduling = vi
+      .spyOn(canvasPreparationPolicy, 'costlyCanvasPreparation')
+      .mockReturnValueOnce(false);
+    try {
+      const computed = buildMachineSetupScanFacts(reloaded.project);
+      expect(computed.lowOverscanGroups).toBe(1);
+      expect(computed.compiledJob?.groups).toMatchObject([
+        { kind: 'raster', pixelWidth: width, pixelHeight: height },
+      ]);
+      expect(scheduling).toHaveBeenCalledTimes(1);
+      expect(scheduling).toHaveBeenCalledWith(reloaded.project);
+    } finally {
+      scheduling.mockRestore();
+    }
   });
 });

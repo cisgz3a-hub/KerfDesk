@@ -144,17 +144,14 @@ describe('estimate-only preparation client', () => {
     await expect(held).resolves.toEqual({ toolpath, estimate });
   });
 
-  it('uses one four-entry LRU bound across both response capabilities', async () => {
+  it('keeps settled estimate reuse within the four-entry LRU bound', async () => {
     const project = createProject();
     const anchors = ['front-left', 'front-center', 'front-right', 'center-left', 'center'] as const;
     expect(anchors).toHaveLength(MAX_SETTLED_PREPARATIONS + 1);
-    for (const [index, anchor] of anchors.entries()) {
+    for (const anchor of anchors) {
       const options = { jobOrigin: { startFrom: 'user-origin' as const, anchor } };
-      const pending =
-        index % 2 === 0
-          ? prepareJobEstimateOffThread(project, options)
-          : prepareLargeJobOffThread(project, options);
-      worker().respond(index % 2 === 0 ? 'estimate' : 'preview');
+      const pending = prepareJobEstimateOffThread(project, options);
+      worker().respond();
       await pending;
     }
     expect(worker().posted).toHaveLength(5);

@@ -6,7 +6,8 @@
 //
 //   - One cached capability per exact (project identity, options): full
 //     previews also satisfy estimates; estimates alone never satisfy Preview.
-//     At most four settled entries retain results across both capabilities.
+//     Only the latest full Preview is retained, with at most four settled
+//     entries across both capabilities. Replacement releases old geometry.
 //   - ONE request is posted to the worker at a time. Further requests for the
 //     SAME project are held here until the active compute settles, and a
 //     newer same-project request rejects the held (never-started) ones —
@@ -136,6 +137,7 @@ export function prepareLargeJobOffThread(
   const key = requestKey(options);
   const cached = preparationCache.get(project, key);
   if (cached?.projection === 'preview') return cached.promise;
+  preparationCache.discardSettledPreviews();
   const requested = requestPreparation(project, options, 'preview', onProgress);
   if (requested === null) return null;
   const promise = requested.then((result) => {

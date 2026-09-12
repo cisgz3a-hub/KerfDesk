@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene';
+import { createErrorDiffusionRowDitherer } from '../../core/raster/dither-rows';
 import { prepareOutput } from '../../io/gcode';
 import type * as DrawPreview from './draw-preview';
 import type * as LiveEstimate from '../laser/live-job-estimate';
@@ -39,9 +40,9 @@ beforeEach(() => {
 });
 
 describe('large-job preparation allocation lifetime', () => {
-  it.each([false, true])(
-    'finishes the exact estimate before retaining a full route (streamed %s)',
-    async (streamed) => {
+  it.each(['embedded', 'stateless-rows', 'error-diffusion-rows'] as const)(
+    'finishes the exact estimate before retaining a full route (%s)',
+    async (storage) => {
       const project = {
         ...createProject(),
         scene: {
@@ -76,26 +77,45 @@ describe('large-job preparation allocation lifetime', () => {
       const compiled = prepareOutput(project);
       expect(compiled.ok).toBe(true);
       if (!compiled.ok) throw new Error('fixture failed to prepare');
-      // Exercise both storage contracts without allocating a huge fixture.
-      // The row provider exposes the exact same compiled powers on every read.
-      const prepared = streamed
-        ? {
-            ...compiled,
-            job: {
-              ...compiled.job,
-              groups: compiled.job.groups.map((group) =>
-                group.kind !== 'raster'
-                  ? group
-                  : {
-                      ...group,
-                      sValues: new Float64Array(0),
-                      rowProvider: (y: number) =>
-                        group.sValues.slice(y * group.pixelWidth, (y + 1) * group.pixelWidth),
-                    },
-              ),
-            },
-          }
-        : compiled;
+      const replays: Array<{ readonly read: () => number[][]; readonly expected: number[][] }> = [];
+      // Both row storage implementations must replay when the next duration,
+      // route or second pass starts again at row zero.
+      const prepared =
+        storage !== 'embedded'
+          ? {
+              ...compiled,
+              job: {
+                ...compiled.job,
+                groups: compiled.job.groups.map((group) => {
+                  if (group.kind !== 'raster') return group;
+                  expect(group.passes).toBe(2);
+                  const rowProvider =
+                    storage === 'error-diffusion-rows'
+                      ? createErrorDiffusionRowDitherer({
+                          width: group.pixelWidth,
+                          height: group.pixelHeight,
+                          algorithm: 'floyd-steinberg',
+                          sMax: Math.max(...group.sValues),
+                          lumaRowAt: (y) =>
+                            Uint8Array.from(
+                              { length: group.pixelWidth },
+                              (_, x) => (25 + x * 53 + y * 79) % 256,
+                            ),
+                        })
+                      : (y: number) =>
+                          group.sValues.slice(y * group.pixelWidth, (y + 1) * group.pixelWidth);
+                  const read = () =>
+                    Array.from({ length: group.pixelHeight }, (_, y) => Array.from(rowProvider(y)));
+                  const expected = read();
+                  expect(read()).toEqual(expected);
+                  expect(expected.flat().some((value) => value === 0)).toBe(true);
+                  expect(expected.flat().some((value) => value > 0)).toBe(true);
+                  replays.push({ read, expected });
+                  return { ...group, sValues: new Float64Array(0), rowProvider };
+                }),
+              },
+            }
+          : compiled;
       const sourceBefore = structuredClone(project);
       const preparedBefore = structuredClone(compiled);
       const preview = await vi.importActual<typeof DrawPreview>('./draw-preview');
@@ -121,6 +141,7 @@ describe('large-job preparation allocation lifetime', () => {
       expect(retained.preview).toBe(true);
       expect(project).toEqual(sourceBefore);
       expect(structuredClone(compiled)).toEqual(preparedBefore);
+      for (const replay of replays) expect(replay.read()).toEqual(replay.expected);
     },
   );
 });
