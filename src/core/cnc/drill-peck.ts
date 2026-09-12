@@ -39,7 +39,10 @@ export function drillPeckPasses(
 }
 
 function peckCycle(at: Vec2, depths: ReadonlyArray<number>): CncPass {
-  const points = [];
+  // A path3d needs an actual segment, including when there is only one peck.
+  // Stock top is the explicit start of the drilling cycle, after the emitter
+  // has positioned at safe Z and fed to the surface.
+  const points = [{ x: at.x, y: at.y, z: PECK_CLEAR_Z_MM }];
   for (let i = 0; i < depths.length; i += 1) {
     points.push({ x: at.x, y: at.y, z: depths[i] ?? 0 });
     // Clear chips between pecks; the final depth ends the pass (the

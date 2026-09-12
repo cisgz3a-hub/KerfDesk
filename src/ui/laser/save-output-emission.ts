@@ -1,5 +1,6 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 import type { PreflightResult } from '../../core/preflight';
+import { outputPreparationFailure } from './output-preparation-errors';
 import {
   compiledVCarveLayerDepths,
   type CompiledVCarveLayerDepth,
@@ -18,7 +19,7 @@ const FACTUAL_EMISSION_REFUSAL_CODES = new Set([
  */
 export type SaveOutputEmission =
   | {
-      readonly kind: 'preparation-unavailable';
+      readonly kind: 'preparation-unavailable' | 'preparation-busy' | 'preparation-error';
       readonly gcode: '';
       readonly message: string;
       readonly preflight: PreflightResult;
@@ -77,6 +78,21 @@ export function unavailableSaveOutput(message: string): SaveOutputEmission {
     kind: 'preparation-unavailable',
     gcode: '',
     message,
+    preflight: { ok: false, issues: [] },
+  };
+}
+
+export function failedBackgroundSaveOutput(error: unknown): SaveOutputEmission {
+  const failure = outputPreparationFailure(error);
+  return {
+    kind:
+      failure.kind === 'capacity'
+        ? 'preparation-busy'
+        : failure.kind === 'infrastructure'
+          ? 'preparation-unavailable'
+          : 'preparation-error',
+    gcode: '',
+    message: failure.message,
     preflight: { ok: false, issues: [] },
   };
 }

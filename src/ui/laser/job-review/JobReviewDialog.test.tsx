@@ -13,6 +13,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { useUiStore } from '../../state/ui-store';
 import { useMachineSetupDialogStore } from '../device-setup/machine-setup-dialog-store';
+import { BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE } from '../output-preparation-errors';
 import type { JobReviewModel } from './job-review-model';
 import { useJobReviewStore } from './job-review-store';
 import { JobReviewDialog } from './JobReviewDialog';
@@ -334,5 +335,22 @@ describe('JobReviewDialog', () => {
     expect(start.disabled).toBe(true);
     await act(async () => start.click());
     expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+  });
+
+  it('offers an explicit busy-preparation retry without confirming or automatically replaying work', async () => {
+    useJobReviewStore.getState().open(model);
+    useJobReviewStore.getState().failPrepare([BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE]);
+    await render();
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+    expect(buttonByText('Start job').disabled).toBe(true);
+    await act(async () => buttonByText('Retry preparation').click());
+    expect(await useJobReviewStore.getState().nextSignal()).toBe('rebuild');
+    await act(async () => useJobReviewStore.getState().beginPrepare());
+    expect(host.textContent).not.toContain('Retry preparation');
+    expect(buttonByText('Start job').disabled).toBe(true);
+    await act(async () => useJobReviewStore.getState().completePrepare(model));
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
+    await act(async () => buttonByText('Start job').click());
+    expect(await useJobReviewStore.getState().nextSignal()).toBe('confirm');
   });
 });

@@ -53,7 +53,9 @@ describe('costly Ruida Save routing', () => {
       expect(mocks.direct).not.toHaveBeenCalled();
       expect(writes).toEqual([]);
       expect(mocks.alert).toHaveBeenCalledWith(
-        expect.stringContaining('Background compilation is unavailable'),
+        expect.stringContaining(
+          failure === 'unavailable' ? 'Background compilation is unavailable' : 'worker crashed',
+        ),
       );
     },
   );

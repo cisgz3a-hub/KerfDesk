@@ -48,7 +48,7 @@ export function applyProfileLeadPasses(
   toolDiameterMm: number,
   bed: MachineBounds,
 ): ReadonlyArray<CncPass> {
-  if (settings.rampEntryDeg !== undefined) return passes; // ramp owns the entry
+  if ((settings.rampEntryDeg ?? 0) > 0) return passes; // active ramp owns the entry
   // ADR-258 removed the `tabsEnabled` early return that used to live here. Tabs
   // are now a Z-rise inside ONE continuous path (cnc-tab-ramp.ts). Treat that
   // XY-closed path3d ring as the same contour for lead placement, while keeping

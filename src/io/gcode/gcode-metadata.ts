@@ -43,9 +43,10 @@ export type GcodeMetadata = {
  * cutter envelope, finish-only relief output when roughing has no passes, and
  * ADR-294's exact partial terminal-cell relief geometry, and ADR-313's laser
  * dialect/raster representation plus fine-contour output reconciliation, and
- * ADR-314's requested-versus-parser-represented CNC Z disclosure.
+ * ADR-314's requested-versus-parser-represented CNC Z disclosure, and the
+ * 2026-09-12 drill, tabbed-entry, registration and rest-aware V-carve repair.
  */
-export const EMITTER_REVISION = 'adr-314-cnc-represented-z-v1';
+export const EMITTER_REVISION = 'cnc-audit-repair-20260912-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

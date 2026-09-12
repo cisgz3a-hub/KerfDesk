@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { CncGroup, Job } from '../job';
 import { cncGrblStrategy } from '../output';
-import type { CncTiling } from '../scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, type CncTiling } from '../scene';
 import { tileJobs, type TiledJob } from './tile-plan';
 import { REGISTRATION_HOLE_DEPTH_MM } from './tile-registration';
 
@@ -46,8 +46,25 @@ function readyTiledJobs(job: Job, overlapMm: number): ReadonlyArray<TiledJob> {
     tileHeightMm: TILE_SIZE_MM,
     overlapMm,
     registrationHoles: true,
+    registration: {
+      toolId: 'registration',
+      holeDiameterMm: 3.175,
+      depthMm: 3,
+      depthPerPassMm: 3,
+      feedMmPerMin: 1000,
+      plungeMmPerMin: 300,
+      spindleRpm: 12000,
+    },
   };
-  const result = tileJobs(job, tiling);
+  const result = tileJobs(job, tiling, {
+    device: DEFAULT_DEVICE_PROFILE,
+    machine: {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      tools: [
+        { id: 'registration', name: 'Registration flat mill', kind: 'end-mill', diameterMm: 3.175 },
+      ],
+    },
+  });
   if (result.kind !== 'ready') throw new Error('expected materialized tile jobs');
   return result.tiles;
 }
@@ -65,7 +82,8 @@ function stockHoleKeys(
     if (pass.kind !== 'path3d') throw new Error('peck expected');
     const point = pass.points[0];
     if (point === undefined) throw new Error('peck point missing');
-    expect(point.z).toBe(-REGISTRATION_HOLE_DEPTH_MM);
+    expect(point.z).toBe(0);
+    expect(Math.min(...pass.points.map((sample) => sample.z))).toBe(-REGISTRATION_HOLE_DEPTH_MM);
     return `${point.x + entry.tile.rect.minX},${point.y + entry.tile.rect.minY}`;
   });
 }
@@ -80,7 +98,7 @@ function emittedStockHoles(
   const drill = entry.job.groups.find((group) => group.kind === 'cnc' && group.cutType === 'drill');
   if (drill?.kind !== 'cnc') throw new Error('registration group missing');
   const gcode = cncGrblStrategy.emit({ groups: [drill] }, DEFAULT_DEVICE_PROFILE);
-  return [...gcode.matchAll(/G0 X(-?\d+\.\d+) Y(-?\d+\.\d+)\r?\nG1 Z-3\.000/g)].map((match) => ({
+  return [...gcode.matchAll(/G0 X(-?\d+\.\d+) Y(-?\d+\.\d+)\r?\nG1 Z0\.000/g)].map((match) => ({
     x: Number(match[1]) + entry.tile.rect.minX,
     y: Number(match[2]) + entry.tile.rect.minY,
   }));

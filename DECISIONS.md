@@ -12101,8 +12101,11 @@ follows.
   No G-code snapshot file changed (the CNC corpus asserts inline, not via snapshots), so no
   `Snapshot change acknowledged:` line is required — but the behavior change must be called
   out in the PR body.
-- Persistence: the `profileLead` field is not yet round-tripped by the `.lf2` serializer and
-  there is no UI to set it; both are follow-ups. Default-on needs neither (absent = on).
+- Amendment (2026-09-12): `profileLead` round-trips through `.lf2`, and the
+  inside/outside profile inspector now exposes Arc, Line and explicit None.
+  Radius/length and arc sweep remain stored across cut-type changes; an absent
+  radius follows the cutter. A requested ramp owns entry while the lead settings
+  remain stored. Default-on still means an absent lead block uses a cutter-radius arc.
 - Software output is structurally verified only; a 4040 scrap-coupon burn comparing a
   square's entry edge before and after remains required before the hardware pass is
   claimed.
@@ -19590,6 +19593,60 @@ from its hole and change existing toolpaths merely while adding a new operation.
   qualification is claimed. The exact-job Frame policy and Job Review advisory policy are unchanged.
 
 ---
+---
+
+## ADR-318 — CNC audit repair preserves settings, registration and preparation ownership
+
+**Status:** Accepted
+
+**Date:** 2026-09-12
+
+### Context
+
+The September 12 audit reproduced nine CNC defects and identified three authoring gaps
+and three V-carve improvements. Passing existing tests did not cover untouched numeric
+fields, calculator provenance, shallow drilling, combined ramps/tabs, geometric contour
+pairing, tile registration ownership, external arc acceptance, or preparation races.
+
+### Decision
+
+1. Numeric fields commit only an actual edit. Calculator Apply commits the chosen material
+   and derived feed recipe together. Selecting a new cutter without flute metadata uses
+   the declared assumption for that cutter. Artwork exposes active clearing Stepover and
+   saved profile leads, including explicit None and positive-ramp precedence.
+2. Drill paths include the stock-top segment for a single peck. Rectangular tab paths retain
+   their bridge walls while composing the requested fresh-material ramp. Contour pairing
+   requires complete boundary-distance coverage in both directions. Duration includes
+   represented vertical cutting and the actual exit-to-safe-Z retract distance.
+3. Tile registration owns an explicit cutter, bore diameter, depth, depth step and feeds.
+   A matching flat end mill pecks; a smaller one clears overlapping concentric circles at
+   each depth. Unknown or geometrically incompatible cutters cannot be replaced silently.
+   Generated registration participates in clearing-before-profile tool order within each
+   indexed file. Separately executed tile files have no global operation-order guarantee.
+4. Project schema v6 prevents v5 readers from discarding the registration plan and emitting
+   their inherited-cutter, fixed-depth recipe. The v5-to-v6 migration preserves the document;
+   absent legacy plans remain absent. Configure creates an explicit draft from current
+   job/operation values for review, rather than assigning a machine recipe during load.
+5. External IJ and R arc acceptance follows tagged stock GRBL 1.1h feasibility checks.
+   Worker capacity, infrastructure, compiler failures and cancellation remain distinct.
+   Request, worker, review and exact-handoff identities prevent cancelled or stale work
+   from settling a successor. The exact-job Frame policy and advisory Job Review findings
+   are unchanged; no controller or hardware operation is part of this repair.
+6. Two-tool V-carve may shorten only constant-depth finish spans whose complete cutter
+   volume fits material removed by the actual owned clearing paths. A sweep reserve and
+   emitted-boundary recheck retain conservative fallbacks; variable-depth walls remain.
+   Corner retention covers polygon features missed by the former acute-only threshold.
+   Source-boundary witnesses are finite measurements, not a whole-artwork accuracy bound.
+   Detail remains a sampling/pitch control and pointed floor scallops remain explicit.
+
+### Verification and limits
+
+The [repair ledger](docs/cnc-repair-20260912.md) records counterexamples, focused regressions,
+native-browser checks, independent cone/boundary/removal measurements, release gates and
+exact-head integration evidence. V-carve route savings include additional fragmented passes;
+modeled timing is not a general cycle-time or physical-cut claim. Packaged-runtime, firmware,
+air-cut and material-cut qualification remain separate.
+
 ---
 
 ## Pending proposal - CNC tab count and editor synchronisation (2026-09-06)

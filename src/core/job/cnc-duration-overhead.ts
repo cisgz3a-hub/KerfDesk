@@ -7,6 +7,7 @@ import { cncSpindleTransition, type CncSpindleState } from '../cnc/spindle-trans
 import type { DeviceProfile } from '../devices';
 import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { cncPassEntryDepthMm, type CncGroup, type Job } from './job';
+import { cncPassRepresentedExitZMm } from './toolpath-cnc-representation';
 
 const SECONDS_PER_MINUTE = 60;
 
@@ -29,7 +30,8 @@ export function cncDurationOverhead(
       if (!cncPassCanEmit(pass)) continue;
       const travelZMm = safeZMm + Math.abs(cncPassEntryDepthMm(pass));
       plungeSeconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
-      retractSeconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;
+      const retractZMm = Math.abs(safeZMm - cncPassRepresentedExitZMm(pass));
+      retractSeconds += (retractZMm / retractFeed) * SECONDS_PER_MINUTE;
     }
   }
   return { plungeSeconds, retractSeconds, dwellSeconds: spindleDwellSeconds(groups) };
