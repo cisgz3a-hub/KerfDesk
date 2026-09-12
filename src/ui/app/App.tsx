@@ -19,7 +19,8 @@ import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
-import { useAutosave, useAutosaveRecovery } from './use-autosave';
+import { useAutosave } from './use-autosave';
+import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useCompactRailDefaults } from './use-compact-rail-defaults';
@@ -39,11 +40,8 @@ import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 
 export function App(): JSX.Element {
-  // Recovery first — runs once on mount, prompts the user before any
-  // edits land. Then start the 30s autosave loop for the remainder of
-  // the session. Global error handlers catch what the ErrorBoundary
-  // can't (event-handler throws + unhandled promise rejections).
-  useAutosaveRecovery();
+  // Recovery stays in a nonblocking banner. Background autosave protects
+  // edits throughout the session; global handlers catch asynchronous errors.
   usePolylineFairingUpgrade();
   useSingleArtworkSelection();
   useAutosave();
@@ -63,6 +61,7 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
+      <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
       <main style={mainStyle}>
