@@ -1,8 +1,10 @@
 # Settings-to-machine audit repair — 12 September 2026
 
 The eight recorded audit findings are addressed in branch
-`codex/fix-settings-machine-audit-20260912`, based on main
-`d843225f1ca44cc9f97564691ea773a7eda4715b`. Seven needed additional repairs;
+`codex/fix-settings-machine-audit-20260912`, initially based on main
+`d843225f1ca44cc9f97564691ea773a7eda4715b` and rebased onto
+`339e0ab019af61d4775c40f0a48a26d8a49af1a0` after the independent V-carve work merged.
+Seven needed additional repairs;
 UI-F05 was already fixed on this base and receives inspector-level regression coverage.
 The original audit examined `9134c3e74dbe1f4760729660e4d7ba56264b90fa` plus a separately
 identified older running browser build. This ledger does not replace that historical evidence.
