@@ -37,6 +37,7 @@ import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
+import { DesktopCloseNotice } from './DesktopCloseNotice';
 
 export function App(): JSX.Element {
   // Recovery first — runs once on mount, prompts the user before any
@@ -63,6 +64,7 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
+      <DesktopCloseNotice />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
       <main style={mainStyle}>

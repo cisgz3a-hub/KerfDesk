@@ -7085,6 +7085,14 @@ when signing credentials are absent, and verifies a packaged update on Windows.
 Once trusted, ADR-024's burn-safe behavior remains: background download,
 install-on-natural-quit, and no `quitAndInstall()` call.
 
+The desktop shutdown handoff waits for the renderer's active-job stop routine
+before ordinary close/quit tears it down. This uses fixed main-to-renderer script
+operations, with no preload or `ipcMain` handlers. Pending or failed preparation
+keeps recovery controls available; unconfirmed-stop guidance and unsaved edits
+must still be resolved. This is application/transport evidence, not proof of a
+physical controller stop. Forced process termination, OS shutdown, buffered
+motion, and signed installed upgrades require their own qualification.
+
 ### Consequences
 
 - An unsigned release-feed compromise cannot become a silent code-install path.

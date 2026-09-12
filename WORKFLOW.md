@@ -5544,6 +5544,12 @@ and lifts the command's CNC-only gate.)*
 - **Edge / slow or single-threaded camera.** Frame fetches for the same camera
   host are serialized and shared while in flight so preview polling and capture
   do not overload embedded camera servers.
+- **Error / oversized or incomplete camera response.** HTTP frame and discovery
+  requests cancel their response stream when decoded bytes exceed 8 MiB, even
+  without a reliable `Content-Length`. RTSP DESCRIBE allows at most 16 KiB of
+  headers and 256 KiB of body, rejects invalid lengths and truncated replies,
+  and has a five-second overall deadline in addition to its 2.5-second inactivity
+  timeout. These failures use the existing unavailable-camera response.
 - **Edge / Mac Preview RTSP qualification.** Mac Preview supports USB and
   private-network JPEG cameras. RTSP remains unqualified and follows the
   existing explicit FFmpeg-missing error path when a Finder launch cannot
@@ -5663,7 +5669,7 @@ behavior or create a second product implementation.
    supersession of the no-new-guard governance where applicable; only then may a
    new ADR, workflow, and implementation be proposed.
 
-### F-DESK2. Desktop updates (trust-gated, burn-safe)
+### F-DESK2. Desktop updates and ordinary shutdown
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Actions
@@ -5704,11 +5710,22 @@ behavior or create a second product implementation.
    failures are also logged only through `onError` and never block startup.
 
 #### Edge — a job is streaming
-1. Updates NEVER install mid-burn. Preview only opens a manual download page and
-   does not mutate the running app; signed stable waits for a natural quit, and a
-   quit cannot happen during a running job without the operator stopping it
-   (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
-   holds.
+1. Preview opens a manual download page. Signed stable downloads in the background
+   and installs only on natural quit; it does not initiate a restart during a job.
+2. An ordinary desktop close or quit keeps the renderer alive while its active-job
+   `stopJob()` handoff is pending. Repeated close requests share that attempt. A
+   failed preparation keeps the window available for recovery, and unsaved edits
+   still require the existing Leave/Stay decision before teardown.
+3. A settled transport write does not prove that controller buffers are empty or
+   the laser/spindle is off. Controllers without a realtime reset can retain queued
+   motion; follow the displayed stop-unconfirmed guidance. Forced termination,
+   power loss, operating-system shutdown, and physical stopping remain separate
+   qualification cases. Browser unload retains its best-effort stop fallback.
+4. If the renderer crashes or becomes unresponsive during close, a native recovery
+   decision defaults to **Keep app open**. Explicit **Close app** can discard the
+   unreachable window, with a warning that Abort and saving are unconfirmed.
+   Keeping the app open invalidates late close replies. Close approval is tied to
+   the reviewed document identity and the displayed stop warning.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
@@ -5791,6 +5808,31 @@ release names become KerfDesk. **Green CI does
 not prove an installer or disk image runs** (CLAUDE.md). Before either lane is
 called done, humans complete the applicable checks on real operating systems and
 real hardware:
+
+Stable publication has one shared GitHub concurrency group across all stable
+tags. Its publisher validates the current feed and rejects semantic-version
+regression before staging and rechecks that feed immediately before promotion.
+The immutable publication manifest reserves the candidate's source and exact
+bytes plus its original previous-feed snapshot. An interrupted attempt can resume
+with those exact files; a rebuild with different signed bytes or provenance must
+use a new version. It cannot overwrite that version or its rollback record.
+An exact retry after success verifies the existing objects and performs no writes.
+For a same-run Actions retry, the workflow restores its original signed artifact
+by exact run, source and artifact ID; it skips rebuilding, resigning and replacing
+the original evidence. Rebuilding is allowed only when complete prior-attempt
+records prove upload never succeeded and publication was skipped. Expired or
+missing original artifacts after upload require reviewed recovery. If a partial
+publication changed the download alias but not the feed, another candidate cannot
+replace that alias: resume the original candidate first. An intervening release
+that conflicts with an earlier candidate's immutable rollback snapshot requires
+a new version; the snapshot is never silently rewritten.
+Only a confirmed object HTTP 404 after a successful bucket-access check counts as
+first-release absence; authentication, transport, server, and malformed-metadata
+failures stop publication. Uploaded bytes and the Windows signature are checked
+before the download alias and finally `latest.yml` move. The shared workflow is
+the sole ordinary writer: this is not a distributed lock against an administrator
+or a different workflow writing directly to the bucket. Live provider, signing,
+cache, rollback, and installed upgrade tests remain release qualification work.
 
 - [ ] **Release identity:** the public prerelease names the exact source SHA; its
       SHA-256 manifest verifies all three KerfDesk assets; the dependency/SBOM

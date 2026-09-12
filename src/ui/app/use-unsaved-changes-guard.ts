@@ -6,19 +6,22 @@
 // looks like lost work. This adds the native "Leave site? Changes may not be
 // saved" confirmation when the scene is dirty.
 //
-// Deliberately gated OFF during an active job: useUnloadStop fires a
-// fire-and-forget laser-off in its own beforeunload handler, and that runs
-// BEFORE the browser decides whether to honor a prompt. If we blocked unload
+// The browser fallback is deliberately gated OFF during an active job:
+// useUnloadStop requests a best-effort Abort in its beforeunload handler, before
+// the browser decides whether to honor a prompt. If we blocked unload
 // mid-job and the user chose "Stay", the job would already have been stopped.
 // So the gate is the exact inverse of useUnloadStop's `isActiveJob` gate: the
 // prompt only fires when no unload-stop fires (idle), where the laser-off would
-// be a no-op anyway. Mid-job keeps its existing behavior (stop the laser, no
-// prompt; the scene is still persisted to the autosave slot for recovery).
+// be a no-op anyway. Browser mid-job unload retains that best-effort behavior.
+// Desktop close instead retains the renderer for its application stop handoff,
+// then prompts for dirty state before arming a one-use unload approval. Neither
+// path claims that software Abort proves the machine physically stopped.
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { desktopCloseController } from './desktop-close-runtime';
 
 export function shouldWarnBeforeUnload(args: {
   readonly dirty: boolean;
@@ -29,6 +32,9 @@ export function shouldWarnBeforeUnload(args: {
 
 export function installUnsavedChangesGuard(target: Window): () => void {
   const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+    // Desktop close already made its idle Leave/Stay decision before arming
+    // this one-use unload. Active-job close has its separate Abort handoff.
+    if (desktopCloseController.handleBeforeUnload(e)) return;
     const dirty = useStore.getState().dirty;
     const jobActive = isActiveJob(useLaserStore.getState().streamer);
     if (!shouldWarnBeforeUnload({ dirty, jobActive })) return;

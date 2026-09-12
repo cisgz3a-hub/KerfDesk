@@ -102,35 +102,21 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(runtimeAudit).toBeLessThan(packageBuild);
   });
 
-  it('stages and verifies the complete checksummed updater set before moving pointers', () => {
-    const stageExe = workflow.indexOf('"${bucket}/${stage}/${exe}"');
-    const stageBlockmap = workflow.indexOf('"${bucket}/${stage}/${exe}.blockmap"');
-    const stageFeed = workflow.indexOf('"${bucket}/${stage}/latest.yml"');
-    const fullChecksumVerification = workflow.indexOf(
-      '(cd "${verify_dir}" && sha256sum --check checksums.sha256)',
+  it('serializes stable tags through the tested publisher with the complete updater set', () => {
+    expect(workflow).toMatch(
+      /concurrency:\s*\n(?:\s*#[^\n]*\n)*\s*group: kerfdesk-stable-publication\s*\n\s*cancel-in-progress: false/u,
     );
-    const rootExe = workflow.indexOf('"${bucket}/desktop/${exe}"');
-    const rootBlockmap = workflow.indexOf('"${bucket}/desktop/${exe}.blockmap"');
-    const rootBlockmapReadback = workflow.indexOf(
-      '--file "${verify_dir}/root-${exe}.blockmap" --remote',
+    const publishIndex = workflow.indexOf('Publish installer + update feed to Cloudflare R2');
+    const publishBlock = workflow.slice(publishIndex);
+    expect(publishBlock).toContain('STABLE_PUBLICATION_GROUP: kerfdesk-stable-publication');
+    expect(publishBlock).toContain('APPROVED_RELEASE_SHA: ${{ vars.STABLE_APPROVED_RELEASE_SHA }}');
+    expect(publishBlock).toContain(
+      'node scripts/publish-stable-release.mjs "release/${VERSION}" "${VERSION}"',
     );
-    const rootBlockmapHash = workflow.indexOf('sha256sum "${verify_dir}/root-${exe}.blockmap"');
-    const rollback = workflow.indexOf('"${bucket}/desktop/rollback/latest-before-${VERSION}.yml"');
-    const stableDownload = workflow.indexOf('"${bucket}/desktop/kerfdesk-latest-x64-setup.exe"');
-    const finalFeed = workflow.lastIndexOf('"${bucket}/desktop/latest.yml"');
-
-    expect(stageExe).toBeGreaterThanOrEqual(0);
-    expect(stageBlockmap).toBeGreaterThan(stageExe);
-    expect(stageFeed).toBeGreaterThan(stageBlockmap);
-    expect(fullChecksumVerification).toBeGreaterThan(stageFeed);
-    expect(rootExe).toBeGreaterThan(fullChecksumVerification);
-    expect(rootBlockmap).toBeGreaterThan(rootExe);
-    expect(rootBlockmapReadback).toBeGreaterThan(rootBlockmap);
-    expect(rootBlockmapHash).toBeGreaterThan(rootBlockmapReadback);
-    expect(rollback).toBeGreaterThan(rootBlockmapHash);
-    expect(stableDownload).toBeGreaterThan(rollback);
-    expect(finalFeed).toBeGreaterThan(stableDownload);
-    expect(workflow).not.toContain('grep "  ${exe}$\\|  ${exe}.blockmap$"');
+    expect(workflow).not.toContain('wrangler r2 object put');
+    expect(workflow.indexOf('Upload installer + update feed as workflow artifact')).toBeLessThan(
+      publishIndex,
+    );
     expect(workflow.match(/--artifact=/gu)).toHaveLength(3);
     expect(workflow).toContain('--artifact="KerfDesk-${VERSION}-windows-x64-setup.exe"');
     expect(workflow).toContain('--artifact="KerfDesk-${VERSION}-windows-x64-setup.exe.blockmap"');
@@ -209,7 +195,40 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   });
 
   it('uses the actual tag-push predicate on every production-sensitive step', () => {
-    expect(workflow.split(tagPushPredicate)).toHaveLength(7);
+    expect(workflow.split(tagPushPredicate)).toHaveLength(10);
+  });
+
+  it('restores the same-run original artifact without rebuilding or replacing its evidence', () => {
+    const retryIndex = workflow.indexOf('Select original artifact for a same-run retry');
+    const buildIndex = workflow.indexOf('Build signed Windows installer + update feed');
+    const restoreIndex = workflow.indexOf('Restore the original signed release instance');
+    const verifyIndex = workflow.indexOf('Verify signed tag installer');
+    const evidenceIndex = workflow.indexOf(
+      'Record checksums, SBOM, and normalized build provenance',
+    );
+    const uploadIndex = workflow.indexOf('Upload installer + update feed as workflow artifact');
+    const publishIndex = workflow.indexOf('Publish installer + update feed to Cloudflare R2');
+    expect(workflow).toContain('actions: read');
+    expect(retryIndex).toBeLessThan(buildIndex);
+    expect(workflow.slice(retryIndex, buildIndex)).toContain(
+      'node scripts/stable-release-retry.mjs',
+    );
+    expect(workflow.slice(buildIndex, restoreIndex)).toContain(
+      "steps.retry.outputs.reuse-artifact == 'false'",
+    );
+    const restore = workflow.slice(restoreIndex, verifyIndex);
+    expect(restore).toContain("steps.retry.outputs.reuse-artifact == 'true'");
+    expect(restore).toContain('artifact-ids: ${{ steps.retry.outputs.artifact-id }}');
+    expect(restore).toContain('run-id: ${{ github.run_id }}');
+    expect(restore).toContain('path: release/${{ steps.version.outputs.version }}');
+    expect(restore).toContain('merge-multiple: true');
+    expect(workflow.slice(verifyIndex, evidenceIndex)).toContain('Get-AuthenticodeSignature');
+    expect(workflow.slice(evidenceIndex, uploadIndex)).toContain(
+      "steps.retry.outputs.reuse-artifact == 'false'",
+    );
+    expect(workflow.slice(uploadIndex, publishIndex)).toContain(
+      "steps.retry.outputs.reuse-artifact == 'false'",
+    );
   });
 
   it('embeds update trust only in signed tag-push builds and reads it fail-closed', () => {
@@ -229,7 +248,9 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(publishBlock).toContain(tagPushPredicate);
     expect(publishBlock).toContain('secrets.STABLE_R2_API_TOKEN');
     expect(publishBlock).not.toContain('secrets.CLOUDFLARE_API_TOKEN');
-    expect(workflow).toContain('wrangler r2 object put');
+    expect(publishBlock).toContain('node scripts/publish-stable-release.mjs');
+    expect(dryRunWorkflow).not.toContain('publish-stable-release.mjs');
+    expect(previewWorkflow).not.toContain('publish-stable-release.mjs');
     expect(workflow.indexOf('Verify signed tag installer')).toBeLessThan(publishIndex);
   });
 
@@ -245,7 +266,11 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     // the CI upload must target a bucket served at that same origin, or a
     // released app's auto-update check 404s.
     expect(repoFile('electron-builder.yml')).toContain('url: https://dl.kerfdesk.com/desktop');
-    expect(workflow).toContain('kerfdesk-downloads');
-    expect(workflow).toContain('desktop/latest.yml');
+    expect(repoFile('scripts/stable-release-store.mjs')).toContain(
+      '/r2/buckets/kerfdesk-downloads',
+    );
+    expect(repoFile('scripts/stable-release-artifacts.mjs')).toContain(
+      "STABLE_FEED_KEY = 'desktop/latest.yml'",
+    );
   });
 });

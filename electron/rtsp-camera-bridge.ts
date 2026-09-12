@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { Socket } from 'node:net';
 import { writeJson } from './bridge-json.js';
 import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 import { RtspPreviewSessions } from './rtsp-camera-session.js';
 import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
+import { sendRtspDescribe } from './rtsp-describe.js';
+
+export { completeRtspDescribeResponse } from './rtsp-describe-response.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
 
@@ -165,64 +167,6 @@ async function probeRtsp(url: URL): Promise<{ readonly codec?: string }> {
 
 export function rtspProbeIsOk(response: string): boolean {
   return /^RTSP\/\d+(?:\.\d+)?\s+200\b/i.test(response);
-}
-
-function sendRtspDescribe(host: string, port: number, url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const socket = new Socket();
-    const chunks: Buffer[] = [];
-    let settled = false;
-    const finish = (response: string): void => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(response);
-    };
-    const fail = (err: Error): void => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      reject(err);
-    };
-    socket.setTimeout(2500, () => fail(new Error('RTSP probe timed out.')));
-    socket.on('error', fail);
-    socket.on('data', (chunk) => {
-      chunks.push(Buffer.from(chunk));
-      const response = completeRtspDescribeResponse(Buffer.concat(chunks));
-      if (response !== null) finish(response);
-    });
-    socket.on('end', () => finish(Buffer.concat(chunks).toString('utf8')));
-    socket.connect(port, host, () => {
-      socket.write(
-        [`DESCRIBE ${url} RTSP/1.0`, 'CSeq: 1', 'Accept: application/sdp', '', ''].join('\r\n'),
-      );
-    });
-  });
-}
-
-export function completeRtspDescribeResponse(buffer: Buffer): string | null {
-  const headerEnd = rtspHeaderEnd(buffer);
-  if (headerEnd === null) return null;
-  const header = buffer.subarray(0, headerEnd).toString('utf8');
-  const contentLength = rtspContentLength(header);
-  const responseLength = headerEnd + contentLength;
-  if (buffer.length < responseLength) return null;
-  return buffer.subarray(0, responseLength).toString('utf8');
-}
-
-function rtspHeaderEnd(buffer: Buffer): number | null {
-  const text = buffer.toString('latin1');
-  const crlfEnd = text.indexOf('\r\n\r\n');
-  if (crlfEnd >= 0) return crlfEnd + 4;
-  const lfEnd = text.indexOf('\n\n');
-  return lfEnd >= 0 ? lfEnd + 2 : null;
-}
-
-function rtspContentLength(header: string): number {
-  const match = /^Content-Length:\s*(\d+)\s*$/im.exec(header);
-  if (match?.[1] === undefined) return 0;
-  const length = Number(match[1]);
-  return Number.isInteger(length) && length > 0 ? length : 0;
 }
 
 function parseCodec(response: string): string | undefined {
