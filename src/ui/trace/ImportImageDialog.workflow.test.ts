@@ -54,16 +54,17 @@ describe('Trace Image workflow controls', () => {
     await withTraceDialog(async (host) => {
       const output = outputSelect(host);
       expect(output?.value).toBe('vector');
+      expect(checkboxByLabel(host, 'Delete Image After trace')?.checked).toBe(true);
       expect(Array.from(output?.options ?? []).map((option) => option.textContent)).toEqual([
         'Editable vectors',
         'Raster scan',
       ]);
+      expect(host.textContent ?? '').toContain('Editable paths for line or fill operations.');
+      await changeSelect(output, 'raster');
       expect(host.textContent ?? '').toContain(
-        'Raster scan uses the same Raster/Image scan motion as a photo.',
+        'Black-and-white traced artwork engraved with image scan motion.',
       );
-      expect(host.textContent ?? '').toContain(
-        'The trace is binary artwork, not a grayscale photo',
-      );
+      expect(host.textContent ?? '').toContain('Original grayscale shading is not retained.');
     });
   });
 
@@ -94,11 +95,14 @@ describe('Trace Image workflow controls', () => {
       expect(
         Array.from(fillStyleSelect(host)?.options ?? []).map((option) => option.textContent),
       ).toEqual(['Scanline', 'Follow Shape', 'Island Fill']);
+      expect(host.textContent ?? '').toContain('Parallel scanlines fill the traced shapes.');
+      await changeSelect(fillStyleSelect(host), 'offset');
       expect(host.textContent ?? '').toContain(
-        'Follow Shape is best for closed logos, wreaths, and hollow designs.',
+        'Follows closed shapes inward, including hollow designs.',
       );
+      await changeSelect(fillStyleSelect(host), 'island');
       expect(host.textContent ?? '').toContain(
-        'Island Fill burns connected regions with short straight scanlines.',
+        'Fills connected regions with short straight scanlines.',
       );
 
       for (const preset of ['Smooth', 'Sharp']) {
@@ -147,7 +151,7 @@ describe('Trace Image workflow controls', () => {
         // Fill style is laser-only: nothing under src/core/cnc reads fillStyle,
         // so the picker is hidden rather than shown with no effect.
         expect(fillStyleSelect(host)).toBeNull();
-        expect(host.textContent ?? '').toContain('Cutting on CNC');
+        expect(host.textContent ?? '').toContain('CNC traces stay as editable vectors.');
         expect(host.textContent ?? '').not.toContain(
           'Raster scan uses the same Raster/Image scan motion',
         );
@@ -193,7 +197,7 @@ describe('Trace Image workflow controls', () => {
     await withTraceDialog(async (host) => {
       const text = host.textContent ?? '';
       for (const label of [
-        'Trace settings',
+        'Refine detail',
         'Detection',
         'Automatic (preserve pale details)',
         'Ignore Less Than',

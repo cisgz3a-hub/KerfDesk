@@ -1921,6 +1921,19 @@ ADR-279.*
 **Success**:
 1. Choose a raster image and open the trace dialog. The image is decoded at the
    preview budget and the selected preset starts tracing in a worker.
+   The large preview and scrollable settings panel sit side by side on wide screens and stack
+   on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
+   or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
+   Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
+   source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
+   only to Overlay. A centred loading indicator distinguishes image preparation from tracing,
+   remains visible while zoomed or panned, and disappears on completion or error.
+   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
+   **Show Points** displays vector vertices. These viewing controls do not
+   restart tracing or change the committed geometry. Source, trace and boundary overlays share
+   the original image's aspect ratio even when their working grids round to different sizes.
+   Escape closes the dialog and returns focus
+   to its opener without deselecting the source image.
 2. Choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
@@ -1928,9 +1941,11 @@ ADR-279.*
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. **Smoothness** and **Optimize**
-   stay visible and editable for filled outlines and Edge Detection, including values carried from
-   another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
+   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
+   for alpha-mask tracing. Sliders and numeric fields stay in sync. Manual adjustments persist
+   when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
+   restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
    Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
    Changes are debounced; the
@@ -1963,6 +1978,9 @@ ADR-279.*
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   **Delete Image After trace** starts selected and removes the source bitmap only after a
+   successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
+   and abandoned requests retain the source; Undo reverses the import and source deletion together.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. Selection bounds follow the conditioned
    geometry while the trace remains registered over its full source image.

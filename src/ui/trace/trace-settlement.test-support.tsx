@@ -142,13 +142,9 @@ export async function chooseSettlementOutput(
     if (select === null) throw new Error('Trace output missing');
     select.value = output;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    if (remove) {
-      const toggle = host.querySelector<HTMLInputElement>(
-        'input[title="Remove the source bitmap from the workspace after creating the traced output."]',
-      );
-      if (toggle === null) throw new Error('Delete source toggle missing');
-      toggle.click();
-    }
+    const toggle = host.querySelector<HTMLInputElement>('.lf-trace-delete-source input');
+    if (toggle === null) throw new Error('Delete source toggle missing');
+    if (toggle.checked !== remove) toggle.click();
   });
 }
 export function settlementReady(host: HTMLElement) {

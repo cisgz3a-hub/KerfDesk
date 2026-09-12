@@ -27,7 +27,7 @@ export function TraceDetectionControls(props: {
   const manual = mode === 'manual' || (mode === 'preset' && !automaticPreset);
   return (
     <>
-      <label style={rowStyle}>
+      <label className="lf-trace-detection">
         <span>Detection</span>
         <select
           aria-label="Trace detection"
@@ -69,15 +69,6 @@ function parseDetectionMode(value: string): TraceDetectionMode {
   return value === 'manual' || value === 'sketch' ? value : 'preset';
 }
 
-const rowStyle: React.CSSProperties = {
-  gridColumn: '1 / -1',
-  display: 'grid',
-  gridTemplateColumns: '82px 1fr',
-  gap: 6,
-  alignItems: 'center',
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
 const noteStyle: React.CSSProperties = {
   gridColumn: '1 / -1',
   margin: 0,

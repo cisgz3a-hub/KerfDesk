@@ -195,10 +195,8 @@ async function options(output: 'vector' | 'raster', remove: boolean) {
     const select = element<HTMLSelectElement>('select[aria-label="Trace output"]');
     select.value = output;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    if (remove)
-      element<HTMLInputElement>(
-        'input[title="Remove the source bitmap from the workspace after creating the traced output."]',
-      ).click();
+    const toggle = element<HTMLInputElement>('.lf-trace-delete-source input');
+    if (toggle.checked !== remove) toggle.click();
   });
 }
 function element<T extends Element>(selector: string): T {

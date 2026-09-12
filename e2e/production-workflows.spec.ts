@@ -451,6 +451,8 @@ test('imports a generated bitmap and traces it through the production worker wor
   await page.getByRole('button', { name: 'Trace Image...' }).click();
   const dialog = page.getByRole('dialog', { name: 'Trace image' });
   await expect(dialog).toBeVisible();
+  // This workflow explicitly retains the bitmap; deletion is the dialog default.
+  await dialog.getByRole('checkbox', { name: 'Delete Image After trace' }).uncheck();
   const detection = dialog.getByRole('combobox', { name: 'Trace detection' });
   const threshold = dialog.getByRole('spinbutton', { name: 'Trace Threshold', exact: true });
   await expect(detection).toHaveValue('preset');

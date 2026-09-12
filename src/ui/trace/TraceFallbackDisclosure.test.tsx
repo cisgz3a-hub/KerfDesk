@@ -45,9 +45,9 @@ describe('relaxed trace settings remain visible with their recovered geometry', 
     const root = createRoot(host);
     try {
       await act(async () => root.render(<TracePreview state={ready} />));
-      expect(host.querySelector('[role="status"]')?.textContent).toContain(
-        'Automatic retry used relaxed trace settings',
-      );
+      expect(
+        Array.from(host.querySelectorAll('[role="status"]'), (node) => node.textContent).join(' '),
+      ).toContain('Automatic retry used relaxed trace settings');
     } finally {
       await act(async () => root.unmount());
     }

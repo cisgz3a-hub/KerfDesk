@@ -1,4 +1,5 @@
-import { act } from 'react';
+import { act, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene';
@@ -29,6 +30,24 @@ const mockPlatform: PlatformAdapter = {
 function ShortcutHarness(): null {
   useShortcuts();
   return null;
+}
+
+function ClosingModalHarness(): JSX.Element {
+  useShortcuts();
+  const [open, setOpen] = useState(false);
+  const selected = useStore((state) => state.selectedObjectId);
+  return (
+    <>
+      <button type="button" disabled={selected === null} onClick={() => setOpen(true)}>
+        Open selected artwork
+      </button>
+      {open ? (
+        <Dialog ariaLabel="Artwork settings" onClose={() => flushSync(() => setOpen(false))}>
+          <button type="button">Inside settings</button>
+        </Dialog>
+      ) : null}
+    </>
+  );
 }
 
 function installVectorProject(): void {
@@ -106,6 +125,41 @@ afterEach(() => {
 });
 
 describe('useShortcuts modal gate', () => {
+  it('consumes modal Escape before synchronous teardown exposes the workspace shortcut', async () => {
+    installVectorProject();
+    const { host, unmount } = await renderHarness(<ClosingModalHarness />);
+    try {
+      const opener = host.querySelector('button');
+      if (opener === null) throw new Error('opener missing');
+      opener.focus();
+      await act(async () => opener.click());
+      const inside = host.querySelector<HTMLButtonElement>('[role="dialog"] button');
+      if (inside === null) throw new Error('modal control missing');
+      expect(document.activeElement).toBe(inside);
+      expect(useUiStore.getState().modalDepth).toBe(1);
+
+      const escape = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => inside.dispatchEvent(escape));
+
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(useUiStore.getState().modalDepth).toBe(0);
+      expect(escape.defaultPrevented).toBe(true);
+      expect(useStore.getState().selectedObjectId).toBe('vec-1');
+      expect(opener.disabled).toBe(false);
+      expect(document.activeElement).toBe(opener);
+
+      // A subsequent workspace Escape retains its ordinary deselection action.
+      await pressKey({ key: 'Escape' });
+      expect(useStore.getState().selectedObjectId).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('leaves the document and view alone while a canvas text session owns keyboard input', async () => {
     installVectorProject();
     useCanvasTextStore.getState().beginAdd({ x: 30, y: 40 });
