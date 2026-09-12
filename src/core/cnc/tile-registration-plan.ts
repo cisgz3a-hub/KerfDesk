@@ -1,11 +1,14 @@
 import type { CncMachineConfig, CncTool } from '../scene';
 import type { CncTileRegistration } from '../scene/machine';
-import { zPassArrayMaterializationError } from './depth-passes';
+import { zPassArrayMaterializationError, zPassCount } from './depth-passes';
+import { tileRegistrationRingCount } from './tile-registration-passes';
 
 export type ResolvedTileRegistration = {
   readonly settings: CncTileRegistration;
   readonly tool: CncTool;
 };
+
+const MAX_ECMASCRIPT_ARRAY_LENGTH = 0xffff_ffff;
 
 const POSITIVE_REGISTRATION_FIELDS = [
   ['holeDiameterMm', 'hole diameter'],
@@ -21,6 +24,7 @@ const POSITIVE_REGISTRATION_FIELDS = [
 export function resolveTileRegistration(
   registration: CncTileRegistration | undefined,
   machine: CncMachineConfig | undefined,
+  maximumHolesPerTile = 1,
 ): ResolvedTileRegistration | string {
   if (registration === undefined || machine === undefined) {
     return 'Set a registration cutter, hole diameter, depth and depth per pass in Startup Setup > Tiling before exporting registration holes.';
@@ -41,10 +45,29 @@ export function resolveTileRegistration(
     registration.depthPerPassMm,
   );
   if (depthError !== null) return depthError;
-  const rings = Math.ceil((registration.holeDiameterMm - tool.diameterMm) / tool.diameterMm);
-  if (!Number.isFinite(rings) || rings > 0xffff_ffff)
-    return 'The registration bore path exceeds the ECMAScript Array length limit.';
+  const pathError = registrationPathArrayError(registration, tool.diameterMm, maximumHolesPerTile);
+  if (pathError !== null) return pathError;
   return { settings: registration, tool };
+}
+
+function registrationPathArrayError(
+  settings: CncTileRegistration,
+  toolDiameterMm: number,
+  maximumHolesPerTile: number,
+): string | null {
+  const depths = zPassCount(settings.depthMm, settings.depthPerPassMm);
+  const wallRadius = (settings.holeDiameterMm - toolDiameterMm) / 2;
+  // Peck points stay in separate arrays for each hole. Interpolated passes
+  // are flattened into one shared array for all seam holes in the tile.
+  const pointsPerPass = wallRadius === 0 ? 2 * depths : 2;
+  const passesPerHole =
+    wallRadius === 0
+      ? 1
+      : depths * (1 + tileRegistrationRingCount(settings.holeDiameterMm, toolDiameterMm));
+  const groupPasses = maximumHolesPerTile * passesPerHole;
+  if (pointsPerPass > MAX_ECMASCRIPT_ARRAY_LENGTH || groupPasses > MAX_ECMASCRIPT_ARRAY_LENGTH)
+    return 'The registration bore path exceeds the ECMAScript Array length limit.';
+  return null;
 }
 
 function positiveRegistrationFieldsError(registration: CncTileRegistration): string | null {

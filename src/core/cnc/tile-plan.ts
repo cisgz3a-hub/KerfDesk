@@ -14,7 +14,7 @@ import type { DeviceProfile } from '../devices';
 import type { CncTile, TiledJob } from './cnc-tile';
 import type { TiledJobsResult } from './tile-plan-result';
 import { planTiles } from './plan-tiles';
-import { registrationGroupForTile } from './tile-registration';
+import { maximumRegistrationHolesPerTile, registrationGroupForTile } from './tile-registration';
 import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-registration-plan';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
@@ -68,7 +68,11 @@ function registrationForGrid(
   machine: CncMachineConfig | undefined,
 ): ResolvedTileRegistration | string | null {
   if (!tiling.registrationHoles || (grid.work.columns <= 1 && grid.work.rows <= 1)) return null;
-  return resolveTileRegistration(tiling.registration, machine);
+  return resolveTileRegistration(
+    tiling.registration,
+    machine,
+    maximumRegistrationHolesPerTile(grid),
+  );
 }
 
 function clippedGroupsForTile(job: Job, tile: CncTile): CncGroup[] {

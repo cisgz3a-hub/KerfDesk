@@ -68,11 +68,12 @@ it(
     if (!serial.ok || !parallel.ok) return;
     const serialEmission = emitPreparedGcode(serial);
     const parallelEmission = emitPreparedGcode(parallel);
-    expect(reviewableGcodeSnapshot(serialEmission.gcode)).toMatchSnapshot();
+    // A changed review snapshot must not mask serial/parallel byte agreement.
     expect(parallelEmission).toEqual(serialEmission);
     expect(fingerprintGcode(parallelEmission.gcode)).toEqual(
       fingerprintGcode(serialEmission.gcode),
     );
+    expect(reviewableGcodeSnapshot(serialEmission.gcode)).toMatchSnapshot();
     expect(serialElapsedMs).toBeLessThan(MAX_PREPARATION_MS);
     expect(parallelElapsedMs).toBeLessThan(MAX_PREPARATION_MS);
     console.info(

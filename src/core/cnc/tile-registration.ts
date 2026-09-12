@@ -14,6 +14,13 @@ export const REGISTRATION_HOLE_DEPTH_MM = 3;
 
 const REGISTRATION_HOLE_EDGE_FRACTIONS = [0.25, 0.75];
 
+/** Exact maximum over this regular grid, before any bore passes are allocated. */
+export function maximumRegistrationHolesPerTile(grid: EffectiveCncTileGrid): number {
+  const horizontalSeams = Math.min(2, grid.work.columns - 1);
+  const verticalSeams = Math.min(2, grid.work.rows - 1);
+  return REGISTRATION_HOLE_EDGE_FRACTIONS.length * (horizontalSeams + verticalSeams);
+}
+
 /**
  * Build the registration drill group for one tile from the same effective
  * grid that placed its clipping rectangle.

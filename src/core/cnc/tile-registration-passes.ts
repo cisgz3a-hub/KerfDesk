@@ -21,7 +21,7 @@ export function tileRegistrationPasses(
     }
     return [{ kind: 'path3d', closed: false, points }];
   }
-  const ringCount = Math.ceil(wallRadius / (toolDiameterMm / 2));
+  const ringCount = tileRegistrationRingCount(settings.holeDiameterMm, toolDiameterMm);
   const passes: CncPass[] = [];
   let previousDepth = 0;
   for (const depth of depths) {
@@ -49,4 +49,10 @@ export function tileRegistrationPasses(
     previousDepth = depth;
   }
   return passes;
+}
+
+/** Shared exact count for generation and pre-allocation representation checks. */
+export function tileRegistrationRingCount(holeDiameterMm: number, toolDiameterMm: number): number {
+  const wallRadius = (holeDiameterMm - toolDiameterMm) / 2;
+  return Math.ceil(wallRadius / (toolDiameterMm / 2));
 }

@@ -45,6 +45,22 @@ zero-ramp lead precedence, registration centre-plunge timing and the old-reader
 registration ownership loss. The final R1/v6 review records the reviewed file
 hashes in `r1-v6-independent-review-manifest.json`.
 
+Final integration review also found aggregate registration arrays could exceed
+JavaScript's representable length despite valid individual depth/ring counts.
+The repair checks each peck-point array and each tile's complete interpolated-pass
+array before generation, using the actual seam-hole count and the existing Array
+limit. Ten arithmetic/grid regressions and the seven-file, 50-test registration
+suite pass without allocating enormous paths.
+
+Two connected-script output pins changed with corner retention. Replacing only
+the new 10-degree threshold with the former 50-degree threshold reproduces both
+old programs byte for byte. Updated pins retain exact serial/parallel output and
+index-reuse assertions. Independent checks of 23,474 distinct current V chords
+observed no cutter sweep outside their normalised source boundaries. The largest
+sampled local removed-depth decrease is 0.008408 mm, below the existing radial
+compaction allowance's 0.017321 mm depth equivalent for these 60-degree cutters.
+This finite comparison is separate from the V1 clearing-removal measurements above.
+
 Integration requires the full project release gate, independent final diff review,
 exact-head PR checks, authorised merge and post-merge main checks. Their actual
 revision-correlated results belong in the associated PR checks and the repair

@@ -68,6 +68,7 @@ function ProfileLeadDimensions(
         <Row label="">
           <button
             type="button"
+            title="Remove the custom lead radius or length and follow the resolved cutter radius."
             onClick={() => {
               const { radiusMm: _radius, ...profileLead } = lead;
               props.onCommit({ profileLead });

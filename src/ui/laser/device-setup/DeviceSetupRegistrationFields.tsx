@@ -39,6 +39,7 @@ export function DeviceSetupRegistrationFields(props: {
         </p>
         <button
           type="button"
+          title="Create a separate registration cutting plan from the current default cutter and operation values, ready for review."
           onClick={() =>
             props.onChange(
               registrationDraftFromCurrentSettings(props.machine, props.referenceSettings),
@@ -59,6 +60,7 @@ export function DeviceSetupRegistrationFields(props: {
       <Row label="Cutter">
         <select
           aria-label="Registration cutter"
+          title="Choose the flat end mill used for registration holes. This choice stays independent of artwork operations."
           value={settings.toolId}
           onChange={(event) => edit({ toolId: event.target.value })}
         >
