@@ -1831,6 +1831,8 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 3. Ordinary text edits preserve translation, scale, rotation, mirrors, operation bindings, and
    artwork overrides. Path text continues to use its selected guide's placement. Bent text, text
    on a path, and native stroke fonts use a readable content box beside their live geometry.
+   Reopening and finishing text after moving or reshaping its guide saves the updated placement.
+   If the guide changes while saving, review the updated preview and choose **Done** again.
 4. Finish or cancel using the same controls as F-D1. One project Undo restores the whole committed
    edit. Draft geometry is excluded from project saves, autosave, and executable output. Replacing
    the document or edited source retires its draft; delayed font/geometry results cannot update a

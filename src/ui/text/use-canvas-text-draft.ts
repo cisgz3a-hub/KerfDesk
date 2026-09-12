@@ -24,6 +24,7 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
   const revision = useRef(0);
   useEffect(() => {
     const token = ++revision.current;
+    const controller = new AbortController();
     let active = true;
     const isCurrent = (): boolean =>
       active && revision.current === token && canvasTextSessionIsCurrent(session);
@@ -37,7 +38,7 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
     // Coalesce fast typing and IME updates; only the latest input can settle.
     const timer = window.setTimeout(() => {
       if (stableValues.content.trim() === '') return;
-      void buildCanvasTextObject(session, stableValues).then(
+      void buildCanvasTextObject(session, stableValues, controller.signal).then(
         (object) => {
           if (!isCurrent()) return;
           useCanvasTextStore.getState().setDraft(session, object);
@@ -53,6 +54,7 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
     return () => {
       active = false;
       window.clearTimeout(timer);
+      controller.abort();
     };
   }, [session, stableValues]);
   return result;
@@ -61,8 +63,9 @@ export function useCanvasTextDraft(session: CanvasTextSession, values: DialogVal
 export async function buildCanvasTextObject(
   session: CanvasTextSession,
   values: DialogValues,
+  signal?: AbortSignal,
 ): Promise<TextObject> {
-  const object = await buildTextObject(session.state, values);
+  const object = await buildTextObject(session.state, values, signal);
   const original = session.original;
   return {
     ...object,

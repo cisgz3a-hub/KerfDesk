@@ -76,6 +76,7 @@ test('welds Dancing Script joins, retains editing and saves the setting with und
   await expect(weld).toBeChecked();
   await input.fill('my name');
   await input.press('Control+Enter');
+  await expect(input).toHaveCount(0);
   expect((await savedText(page)).text).toMatchObject({ content: 'my name', weldOverlaps: true });
   expect(errors).toEqual([]);
 });

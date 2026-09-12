@@ -3,7 +3,7 @@ import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
 import { parseVariableTemplateSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
 import { renderTextGeometry } from './render-text-geometry';
-import { applyTextWeld } from './apply-text-weld';
+import { applyTextWeldInWorker } from './text-weld-worker-client';
 import {
   sanitizeTextDialogNumericValues,
   type TextDialogNumericValues,
@@ -24,7 +24,9 @@ export class TextObjectValidationError extends Error {
 export async function buildTextObject(
   state: TextDialogState,
   values: DialogValues,
+  signal?: AbortSignal,
 ): Promise<TextObject> {
+  signal?.throwIfAborted();
   const content = values.content.normalize('NFC');
   if (content.trim() === '') {
     throw new TextObjectValidationError('Type some text first.', 'warning');
@@ -42,8 +44,15 @@ export async function buildTextObject(
     letterSpacing: safeValues.letterSpacing,
     color: values.color,
   });
+  signal?.throwIfAborted();
   const placed = placeRenderedText(rendered, safeValues, values);
-  const final = applyTextWeld(placed.rendered, values.fontKey, values.weldOverlaps);
+  const final = await applyTextWeldInWorker(
+    placed.rendered,
+    values.fontKey,
+    values.weldOverlaps,
+    signal,
+  );
+  signal?.throwIfAborted();
   return {
     kind: 'text',
     id: state.mode === 'edit' ? state.id : crypto.randomUUID(),

@@ -1,4 +1,5 @@
-import { findFontEntry, weldTextRender, type TextRenderResult } from '../../core/text';
+import { findFontEntry, type TextRenderResult } from '../../core/text';
+import { weldTextRender } from '../../core/text/text-weld';
 
 /** Share the same final outline between the editor and evaluated variable output. */
 export function applyTextWeld(

@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'opentype.js';
 import { describe, expect, it } from 'vitest';
 import { flattenColoredPathCurves, type Polyline, type Vec2 } from '../../core/scene';
-import { textToPolylines, weldTextRender, type TextRenderResult } from '../../core/text';
+import { textToPolylines, type TextRenderResult } from '../../core/text';
+import { weldTextRender } from '../../core/text/text-weld';
 
 const FILES = [
   'GreatVibes-Regular.ttf',

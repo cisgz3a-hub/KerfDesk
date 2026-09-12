@@ -19756,7 +19756,9 @@ keystroke into project history, autosave, or prepared machine output.
    through the project store with one undo entry. Cancellation and empty drafts commit nothing;
    unchanged edits do not create history. Save failures leave an editable draft and its error.
    Ordinary edits preserve the existing transform, object/path operation bindings, and artwork
-   overrides. Path text retains the existing guide-owned placement rules.
+   overrides. Path text retains the existing guide-owned placement rules. Rebuilt geometry and
+   placement count as an edit after a guide changes; a save must still reference the exact guide
+   used to render it when its asynchronous work completes.
 5. Fresh canvas insertion explicitly opts into preserving authored placement in the text upsert
    action. Existing callers retain their established fit-to-bed default. Both draft preview and
    final commit reuse the text geometry builder, font resolution, bend, and path placement code.
@@ -19810,6 +19812,10 @@ interaction without requiring destructive conversion.
    instead of claiming that an unchanged fallback was welded. This introduces no machine policy,
    Frame or Start change. Existing saved geometry and the legacy V-carve rule remain authoritative
    until an explicit text edit produces replacement geometry.
+6. Browser drafts and saves run the union in an owned worker. Superseded input, cancellation, and
+   unmount terminate obsolete work so long script outlines do not block typing or Escape. Worker
+   startup or processing failures remain visible errors; a browser never falls back to a blocking
+   union on its input thread. Non-browser tests and SSR may use the same core function directly.
 
 ### Verification and limits
 

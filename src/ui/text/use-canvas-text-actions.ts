@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { TextObject } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import {
@@ -10,6 +9,7 @@ import {
 import { buildCanvasTextObject, errorMessage } from './use-canvas-text-draft';
 import type { DialogValues } from './use-text-dialog-fields';
 import type { CanvasTextVariables } from './use-canvas-text-variables';
+import { assertCanvasTextGuideCurrent, canvasTextUnchanged } from './canvas-text-save-validation';
 
 export function useCanvasTextActions(
   session: CanvasTextSession,
@@ -20,13 +20,19 @@ export function useCanvasTextActions(
   const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
   const busy = useRef(false);
+  const activeRender = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
       request.current += 1;
+      activeRender.current?.abort();
     },
     [],
   );
-  const cancel = (): void => finishSession(session);
+  const cancel = (): void => {
+    request.current += 1;
+    activeRender.current?.abort();
+    finishSession(session);
+  };
   const save = async (): Promise<void> => {
     if (busy.current || !canvasTextSessionIsCurrent(session)) return;
     if (values.content.trim() === '') {
@@ -34,13 +40,20 @@ export function useCanvasTextActions(
       return;
     }
     const token = ++request.current;
+    const controller = new AbortController();
+    const isCurrent = (): boolean =>
+      !controller.signal.aborted &&
+      request.current === token &&
+      canvasTextSessionIsCurrent(session);
+    activeRender.current = controller;
     busy.current = true;
     setSaving(true);
     setError(null);
     try {
-      const object = await buildCanvasTextObject(session, values);
-      if (request.current !== token || !canvasTextSessionIsCurrent(session)) return;
-      if (!unchangedText(session.original, object) || variables.changed) {
+      const object = await buildCanvasTextObject(session, values, controller.signal);
+      if (!isCurrent()) return;
+      assertCanvasTextGuideCurrent(values, useStore.getState().project);
+      if (!canvasTextUnchanged(session.original, object) || variables.changed) {
         useStore.getState().upsertTextObject(object, values.importedFont, {
           placement: 'canvas',
           ...(variables.changed ? { variables: variables.variables } : {}),
@@ -49,8 +62,9 @@ export function useCanvasTextActions(
       useStore.getState().selectObject(object.id);
       finishSession(session);
     } catch (cause) {
-      if (canvasTextSessionIsCurrent(session)) setError(errorMessage(cause));
+      if (isCurrent()) setError(errorMessage(cause));
     } finally {
+      if (activeRender.current === controller) activeRender.current = null;
       busy.current = false;
       if (canvasTextSessionIsCurrent(session)) setSaving(false);
     }
@@ -62,24 +76,4 @@ function finishSession(session: CanvasTextSession): void {
   if (useCanvasTextStore.getState().session !== session) return;
   useCanvasTextStore.getState().close();
   if (useUiStore.getState().toolMode.kind === 'text') useUiStore.getState().resetToolMode();
-}
-
-function unchangedText(original: TextObject | null, next: TextObject): boolean {
-  if (original === null) return false;
-  const keys = [
-    'content',
-    'fontKey',
-    'sizeMm',
-    'alignment',
-    'lineHeight',
-    'letterSpacing',
-    'color',
-  ] as const;
-  return (
-    keys.every((key) => original[key] === next[key]) &&
-    (original.bendDeg ?? 0) === (next.bendDeg ?? 0) &&
-    (original.weldOverlaps ?? false) === (next.weldOverlaps ?? false) &&
-    JSON.stringify(original.pathText) === JSON.stringify(next.pathText) &&
-    JSON.stringify(original.variableTemplate) === JSON.stringify(next.variableTemplate)
-  );
 }
