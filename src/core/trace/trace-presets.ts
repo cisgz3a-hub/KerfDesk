@@ -151,7 +151,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   Sharp: {
     // For pixel-art / blueprint inputs where every notch matters.
     // Otsu picks a clean cutoff but no median (would round notches).
-    // Smaller despeckle so single-pixel features still survive.
+    // Keep single-pixel marks and diagonal fragments. Four-connected cleanup
+    // at area 4 erased intentional fine hatching before the contour walk.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 0.5,
@@ -161,7 +162,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     lineFilter: false,
     fixedPalette: ['#ffffff', '#000000'],
     useOtsuThreshold: true,
-    despeckleMinPixels: 4,
+    despeckleMinPixels: 1,
     // Curve params that drive the contour backend (the imagetracerjs fields
     // above are inert there). smoothness scales the wobble flattener /
     // arc-evening strength: at 0.55 both are fully off, so pixel-art notches
