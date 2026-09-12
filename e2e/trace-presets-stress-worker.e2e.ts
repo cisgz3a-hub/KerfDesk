@@ -6,6 +6,7 @@ import { TRACE_PRESETS } from '../src/core/trace/trace-presets';
 import type { TraceOptions } from '../src/core/trace/trace-image';
 import type { TraceWorkerRequest, TraceWorkerResponse } from '../src/ui/trace/trace-worker';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
+import { checkWorkspaceHover } from './fixtures/workspace-responsiveness';
 
 // Exact generated image from the reported timeout, copied without decoding or re-encoding.
 const FIXTURE_NAME = 'centerline-stress-test-20260909.png';
@@ -209,6 +210,11 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
       contentType: 'application/json',
     });
     await page.screenshot({ path: testInfo.outputPath('dragon-preset-committed.png') });
+    const hover = await checkWorkspaceHover(page);
+    await testInfo.attach('dragon-workspace-hover.json', {
+      body: JSON.stringify(hover),
+      contentType: 'application/json',
+    });
   });
 }
 

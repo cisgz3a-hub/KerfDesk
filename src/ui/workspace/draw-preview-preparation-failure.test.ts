@@ -8,7 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { buildPreviewToolpath } from './draw-preview';
+import { buildPreviewToolpath, buildPreviewToolpathUnbounded } from './draw-preview';
 import { previewRouteSource } from './executable-plan-preview-route';
 import { previewIssueFor } from './preview-status';
 
@@ -30,13 +30,28 @@ describe('preview preparation failures', () => {
     });
   });
 
-  it('previews a formerly refused raster — 3000x3000 px streams (ADR-243)', () => {
+  it('defers a large embedded raster on the UI thread', () => {
+    const pending = buildPreviewToolpath(hugeRasterProject());
+
+    expect(previewIssueFor(pending)).toEqual({ kind: 'too-complex' });
+    expect(pending.steps).toEqual([]);
+  });
+
+  it('prepares the full 3000x3000 raster route without the UI scheduling gate (ADR-243/244)', () => {
     // Before ADR-243 this raster was refused for its ~78 MB materialized
-    // working set. It now compiles as a streamed group and previews normally.
-    const toolpath = buildPreviewToolpath(hugeRasterProject());
+    // working set. Workers/tests use the unbounded builder; the live UI now
+    // routes even smaller rasters to background preparation.
+    const toolpath = buildPreviewToolpathUnbounded(hugeRasterProject());
 
     expect(previewIssueFor(toolpath)).toBeNull();
     expect(previewRouteSource(toolpath)).toBe('legacy-toolpath');
+    const cuts = toolpath.steps.filter((step) => step.kind === 'cut');
+    expect(cuts).toHaveLength(3000);
+    expect(cuts.reduce((length, step) => length + step.length, 0)).toBe(900_000);
+    expect(new Set(cuts.map((step) => step.source?.rowIndex)).size).toBe(3000);
+    expect(
+      cuts.every((step) => step.source?.pixelStartX === 0 && step.source.pixelEndX === 2999),
+    ).toBe(true);
   });
 
   it('defers page-backed raster preview to asynchronous worker preparation', () => {
@@ -89,17 +104,18 @@ function hugeRasterProject(): Project {
     dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
     pixelWidth: 4,
     pixelHeight: 4,
+    lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
     dither: 'floyd-steinberg',
-    linesPerMm: 25,
+    linesPerMm: 10,
     bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
     transform: IDENTITY_TRANSFORM,
   };
   const project = createProject();
   return {
     ...project,
-    scene: addLayer(
-      addObject(project.scene, raster),
-      createLayer({ id: color, color, mode: 'image' }),
-    ),
+    scene: addLayer(addObject(project.scene, raster), {
+      ...createLayer({ id: color, color, mode: 'image' }),
+      linesPerMm: 10,
+    }),
   };
 }

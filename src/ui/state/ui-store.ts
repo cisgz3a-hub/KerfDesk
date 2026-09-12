@@ -23,6 +23,7 @@ import {
 } from './canvas-motion-preferences';
 import { artworkRunOrderUiSlice, type ArtworkRunOrderUiState } from './artwork-run-order-ui';
 import { uiRailPanelSlice, type UiRailPanelState } from './ui-rail-panel';
+import { snapGuideStateUpdate } from './snap-guide-state';
 
 export type { CutsLayersView, RailPanelId, RailPanelVisibility } from './ui-rail-panel';
 
@@ -301,7 +302,7 @@ export const useUiStore = create<UiState>((set) => ({
   snapSettings: DEFAULT_SNAP_SETTINGS,
   setSnapSettings: (next) => set((s) => ({ snapSettings: { ...s.snapSettings, ...next } })),
   snapGuides: [],
-  setSnapGuides: (next) => set({ snapGuides: next }),
+  setSnapGuides: (next) => set((state) => snapGuideStateUpdate(state, next)),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,

@@ -1,5 +1,8 @@
 import { outputVectorPreparationTooComplex } from '../../core/job/preparation-complexity';
-import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
+import {
+  rasterPreparationTooComplex,
+  rasterPreparationWorkUnits,
+} from '../../core/job/raster-preparation-complexity';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -12,6 +15,13 @@ import { effectiveOperationForObject } from '../../core/effective-output';
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 
 export type CanvasPreparationClass = 'direct' | 'background-worker';
+
+// UI execution routing, separate from the core 50M-pixel advisory. A 1254²
+// image already caused ~400ms browser tasks in ordinary Design through idle
+// markers and ETA; source decode also matters when the output grid is tiny.
+// Keep only modest source + output work direct. Workers still prepare every
+// requested pixel/pass with the same compiler, without a new output limit.
+const DIRECT_RASTER_CANVAS_WORK_BUDGET = 250_000;
 
 /** Shared routing policy for costly output-derived canvas work. */
 export function classifyCanvasPreparation(
@@ -26,9 +36,34 @@ export function classifyCanvasPreparation(
     cncReliefPreparationIsCostly(scopedProject) ||
     operationAmplifiesPreparation(scopedProject) ||
     outputVectorPreparationTooComplex(scopedProject) ||
+    interactiveRasterPreparationIsCostly(scopedProject) ||
     rasterPreparationTooComplex(scopedProject)
     ? 'background-worker'
     : 'direct';
+}
+
+function interactiveRasterPreparationIsCostly(project: Project): boolean {
+  if (project.machine?.kind === 'cnc') return false;
+  const operations = project.scene.layers.flatMap(outputOperationLayers);
+  let sourcePixels = 0;
+  for (const object of project.scene.objects) {
+    if (object.kind !== 'raster-image' || object.role === 'trace-source') continue;
+    const hasImageOutput = operations.some(
+      (operation) =>
+        sceneObjectUsesOperation(object, operation) &&
+        effectiveOperationForObject(operation, object).mode === 'image',
+    );
+    if (!hasImageOutput) continue;
+    // Decode is shared by operation consumers of the same source. Count it
+    // once per raster; output grids/passes below count every effective image
+    // operation. Visibility does not disable output. Invalid dimensions keep
+    // their existing compile-time validation rather than throwing in the UI.
+    if (object.pixelWidth > 0 && object.pixelHeight > 0) {
+      sourcePixels += object.pixelWidth * object.pixelHeight;
+    }
+    if (sourcePixels >= DIRECT_RASTER_CANVAS_WORK_BUDGET) return true;
+  }
+  return sourcePixels + rasterPreparationWorkUnits(project) >= DIRECT_RASTER_CANVAS_WORK_BUDGET;
 }
 
 function operationAmplifiesPreparation(project: Project): boolean {

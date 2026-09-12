@@ -22,7 +22,7 @@ import type { LiveJobEstimate } from './live-job-estimate';
 import type * as LiveJobEstimateModule from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
-const workerMocks = vi.hoisted(() => ({ prepareLargeJobOffThread: vi.fn() }));
+const workerMocks = vi.hoisted(() => ({ prepareJobEstimateOffThread: vi.fn() }));
 const estimateMocks = vi.hoisted(() => ({ estimateLiveJob: vi.fn() }));
 
 // Only dispatch is stubbed: the supersede error type and its guard must be the
@@ -30,7 +30,7 @@ const estimateMocks = vi.hoisted(() => ({ estimateLiveJob: vi.fn() }));
 // tested against a lookalike that instanceof can never match.
 vi.mock('../workspace/preparation-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof PreparationWorkerClient>()),
-  prepareLargeJobOffThread: workerMocks.prepareLargeJobOffThread,
+  prepareJobEstimateOffThread: workerMocks.prepareJobEstimateOffThread,
 }));
 
 vi.mock('./live-job-estimate', async (importOriginal) => {
@@ -146,8 +146,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   probe.current = null;
   settles.length = 0;
-  workerMocks.prepareLargeJobOffThread.mockReset();
-  workerMocks.prepareLargeJobOffThread.mockReturnValue(null);
+  workerMocks.prepareJobEstimateOffThread.mockReset();
+  workerMocks.prepareJobEstimateOffThread.mockReturnValue(null);
   estimateMocks.estimateLiveJob.mockClear();
   useExperimentalLaserFeatures.getState().resetFeatures();
   usePrintCutSessionStore.getState().clear();
@@ -241,7 +241,7 @@ describe('useJobEstimate debounce (H16)', () => {
   });
 
   it('resolves User Origin placement with the export fallback so the worker key matches the preview', async () => {
-    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+    workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
     useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
     const unmount = await renderProbe();
 
@@ -255,7 +255,7 @@ describe('useJobEstimate debounce (H16)', () => {
     // Disconnected machine: live resolution fails, but the preview keys its
     // worker request on the export fallback placement — the estimate must
     // pass the SAME jobOrigin or the project prepares twice, serially.
-    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
@@ -298,7 +298,7 @@ describe('useJobEstimate debounce (H16)', () => {
   it('replaces a too-large estimate with the worker result (ADR-244)', async () => {
     let resolveWorker: (value: { toolpath: unknown; estimate: LiveJobEstimate }) => void = () =>
       undefined;
-    workerMocks.prepareLargeJobOffThread.mockReturnValue(
+    workerMocks.prepareJobEstimateOffThread.mockReturnValue(
       new Promise((resolve) => {
         resolveWorker = resolve;
       }),
@@ -356,7 +356,7 @@ describe('useJobEstimate debounce (H16)', () => {
       kind: 'preparation-failed',
       message: PRINT_CUT_REGISTRATION_INVALID_MESSAGE,
     });
-    expect(workerMocks.prepareLargeJobOffThread).not.toHaveBeenCalled();
+    expect(workerMocks.prepareJobEstimateOffThread).not.toHaveBeenCalled();
     expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
 
     await unmount();
@@ -373,7 +373,7 @@ describe('useJobEstimate debounce (H16)', () => {
         printAndCutTargets: { first: { x: 0, y: 0 }, second: { x: 100, y: 0 } },
       },
     });
-    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+    workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
     const unmount = await renderProbe();
 
     expect(probe.current).toEqual({ kind: 'too-large' });
@@ -383,7 +383,7 @@ describe('useJobEstimate debounce (H16)', () => {
       vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
     });
 
-    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledTimes(1);
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(1);
     expect(estimateMocks.estimateLiveJob).not.toHaveBeenCalled();
 
     await unmount();
@@ -395,7 +395,7 @@ describe('useJobEstimate debounce (H16)', () => {
       // Rejected on demand, not up front, so the paused badge is observed
       // BEFORE the supersede lands — that is the value the fix must preserve.
       let supersede: () => void = () => undefined;
-      workerMocks.prepareLargeJobOffThread.mockReturnValue(
+      workerMocks.prepareJobEstimateOffThread.mockReturnValue(
         new Promise((_resolve, reject) => {
           supersede = () => reject(new PreparationSupersededError(reason));
         }),
@@ -427,7 +427,7 @@ describe('useJobEstimate debounce (H16)', () => {
   );
 
   it('reports a worker failure instead of leaving the estimate paused forever', async () => {
-    workerMocks.prepareLargeJobOffThread.mockRejectedValue(new Error('worker crashed'));
+    workerMocks.prepareJobEstimateOffThread.mockRejectedValue(new Error('worker crashed'));
     const unmount = await renderProbe();
 
     await act(async () => {

@@ -4,6 +4,7 @@
 // verification surface — a silently-empty preview or an unexplained red
 // outline is a trust leak.
 
+import { useMemo } from 'react';
 import { formatDuration, summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
@@ -56,7 +57,10 @@ export function PreviewStatusOverlays(props: {
   readonly toolpath: Toolpath;
   readonly resolution?: RemovalGridResolution;
 }): JSX.Element | null {
-  const model = previewStatusOverlayModel(props.project, props.toolpath);
+  const model = useMemo(
+    () => previewStatusOverlayModel(props.project, props.toolpath),
+    [props.project, props.toolpath],
+  );
   const hasResolutionNotice = props.resolution !== undefined && props.resolution.reason !== null;
   if (!model.visible && !hasResolutionNotice) return null;
   return (
@@ -91,7 +95,7 @@ export function PreviewStatsPanel(props: {
 }): JSX.Element {
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const setShowPreviewTravel = useUiStore((s) => s.setShowPreviewTravel);
-  const stats = summarizeToolpathDistances(props.toolpath);
+  const stats = useMemo(() => summarizeToolpathDistances(props.toolpath), [props.toolpath]);
   return (
     <div style={statsPanelStyle} role="group" aria-label="Preview options">
       <div style={routeLabelStyle} aria-label="Route preview scope">
@@ -156,6 +160,7 @@ export function PreviewControlsPanel(props: {
   // ADR-103 G4: present only when a CNC removal grid exists to render.
   readonly onOpen3D?: () => void;
 }): JSX.Element {
+  const passBoundaries = useMemo(() => passBoundaryFractions(props.toolpath), [props.toolpath]);
   return (
     <div
       className="lf-chip"
@@ -163,10 +168,7 @@ export function PreviewControlsPanel(props: {
       role="group"
       aria-label="Preview route controls and statistics"
     >
-      <PreviewRouteControls
-        disabled={props.disabled}
-        passBoundaries={passBoundaryFractions(props.toolpath)}
-      />
+      <PreviewRouteControls disabled={props.disabled} passBoundaries={passBoundaries} />
       {props.onOpen3D !== undefined ? (
         <button
           type="button"

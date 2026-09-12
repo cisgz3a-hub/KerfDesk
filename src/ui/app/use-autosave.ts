@@ -26,12 +26,12 @@ import {
   type AutosaveDurableSnapshot,
   type AutosaveDurableWriteResult,
 } from '../state/autosave-durable';
-import { startAutosaveLoop } from '../state/autosave-loop';
+import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-loop';
+import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
-import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -53,23 +53,23 @@ export function createAutosaveFailureReporter(pushToast: PushToast): () => void 
   };
 }
 
-function snapshotForAutosave(): {
-  readonly project: ReturnType<typeof useStore.getState>['project'];
-  readonly dirty: boolean;
-  readonly isStreaming: boolean;
-} {
-  const s = useStore.getState();
-  const ls = useLaserStore.getState();
-  const streamer = ls.streamer;
-  const isStreaming =
-    streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
-  return { project: projectWithCurrentJobSetup(s), dirty: s.dirty, isStreaming };
+function createSnapshotForAutosave(): AutosaveSnapshotFn {
+  const snapshotProject = createAutosaveProjectSnapshot();
+  return () => {
+    const s = useStore.getState();
+    const ls = useLaserStore.getState();
+    const streamer = ls.streamer;
+    const isStreaming =
+      streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+    return { project: snapshotProject(s), dirty: s.dirty, isStreaming };
+  };
 }
 
 export function useAutosave(): void {
   const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
     const reportAutosaveFailure = createAutosaveFailureReporter(pushToast);
+    const snapshotForAutosave = createSnapshotForAutosave();
     const stopInterval = startAutosaveLoop(
       snapshotForAutosave,
       AUTOSAVE_INTERVAL_MS,
@@ -99,9 +99,7 @@ export function useAutosave(): void {
 
 type AutosaveRecoveryService = {
   readLatest(): Promise<AutosaveDurableReadResult>;
-  write(
-    project: ReturnType<typeof snapshotForAutosave>['project'],
-  ): Promise<AutosaveDurableWriteResult>;
+  write(project: ReturnType<AutosaveSnapshotFn>['project']): Promise<AutosaveDurableWriteResult>;
   clearRecovered(
     snapshot: AutosaveDurableSnapshot,
     retainedStorageKey?: string,

@@ -16129,6 +16129,94 @@ the final Inspector transition still delayed input and paint.
 - NOT verified: controller execution, air-cut, material cut, physical containment, spindle load,
   cut quality, perceptual GPU fidelity, or fixed responsiveness on other CPUs.
 
+### Amendment - Dense artwork and embedded raster responsiveness (2026-09-09)
+
+Ordinary Design mode can contain hundreds of thousands of traced points or multi-megapixel embedded
+rasters. Native Chrome profiling found redundant canvas redraws on unchanged snap guides, repeated
+closure of a growing filled path, foreground raster preparation for idle markers and ETA, and
+repeated autosave serialization of an unchanged document.
+
+- Preserve snap-guide state identity when its ordered geometry is unchanged. Cursor updates alone
+  must not repaint the artwork. Filled closed contours use Canvas's implicit fill closure; stored
+  closure, stroke behavior, display sampling and even-odd/nonzero fill rules are unchanged. This
+  follows the [HTML fill steps](https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-fill).
+- Keep the core raster work advisory separate from UI scheduling. At 250,000 aggregate source pixels
+  plus effective output pixel-passes, use the existing background preparation route. Count only
+  output-bound raster sources, once per object, and include effective operations, transforms,
+  pass-through and passes in output work. Hidden output still counts; disabled output, trace-source
+  rasters and excluded selections do not. Do not decode pixels to classify work. The threshold changes
+  execution context only; it does not restrict images or alter source resolution, output or guards.
+- The initial ETA for an already-loaded costly project must enter the same worker path as an edit.
+  Effect setup/cleanup must retain correct ownership under development StrictMode replay and unmount.
+  Estimate-only requests return the exact duration without allocating or cloning unused preview
+  geometry. Full Preview may satisfy ETA; ETA alone cannot satisfy Preview. Preserve supersession,
+  quiet-window dispatch and a global four-result bound across both result capabilities. Keep only
+  one reusable full Preview and release the previous cached full result when a replacement is
+  requested; late settlement must not re-root an older full route. ETA entries remain small.
+  Calculate the prepared-output estimate before retaining the full route, so the duration planner's
+  temporary allocations do not overlap that complete geometry.
+  Large full Preview responses cross the worker boundary as ordered, acknowledged chunks of at most
+  2,048 steps for both legacy and verified executable-plan routes. Retain every step and header,
+  including placement offsets. Publish only a complete validated route, and discard partial assembly
+  on cancellation or failure. This bounds the many small raster records per message; a single large
+  polyline is not subject to a universal byte-size promise.
+  Only the worker's newly constructed response may consume acknowledged step-array slots, releasing
+  its original route as the receiver accumulates the copy. Never mutate nested points, metadata,
+  prepared output or a shared in-process preview; keep the ordinary sender non-consuming.
+  Reconstruct ordinary received raster steps with local record layouts and share equal repeated
+  strings within the transfer. Native structured clone otherwise expands their retained heap;
+  preserve every numeric value and optional field, and retain unsupported rich records unchanged.
+  Streamed rasters already bypass executable-plan Preview verification. For these jobs only, map
+  the fresh machine-route array into scene coordinates by replacing its slots with the same mapped
+  step values. Do not retain a second full array or mutate shared points, polylines or metadata.
+  Other jobs retain the pure mapper and unchanged machine route for executable-plan parity.
+- Memoize the autosave wrapper within its mounted loop using immutable Project identity, document
+  epoch and persisted job setup/ordered selection. Successful unchanged saves can then be skipped;
+  edits, document replacement and cleared recovery slots remain eligible. Validate raster base64
+  without allocating a second cleaned copy while preserving the accepted alphabet, whitespace,
+  padding and unused-bit rules.
+  Recovery JSON may omit indentation while retaining every value, typed relief array and validation;
+  manual file formatting and durable ownership/atomicity remain unchanged.
+  Prepare each durable recovery record in a short-lived worker so required serialization and
+  validation do not block canvas input. Keep preparation within the durable write queue and check
+  document/session epochs before commit. Terminate the worker on response or failure; preserve the
+  existing synchronous path where workers are unavailable.
+  Preparation and recovery workers reserve one FIFO memory lane before construction or project
+  cloning. Retire the preparation worker on terminal completion, error or supersession before
+  releasing its reservation; retain reusable completed results on the client. Cancel obsolete
+  pending reservations and re-read the coalesced preparation queue when granted. Recovery keeps its
+  normal interval but waits for an active preparation, and later preparation requests wait their
+  turn. This avoids overlapping large worker heaps in Chromium's shared pointer-compression cage.
+- Memoize Preview status, distance totals and pass boundaries by their actual project/route inputs.
+  Cursor-only store updates must not rescan millions of route steps.
+- For routes with at least 20,000 steps, paint the existing selected display commands on an
+  OffscreenCanvas worker. Keep one bitmap, one request in flight and the latest coalesced view;
+  do not send the complete route or accumulate obsolete view requests. While a replacement is
+  pending, transform the previous matching-content bitmap and show `Updating route view…`.
+  During continuous playback, keep the latest completed progress frame for the same route, travel
+  option and background; exact readiness still requires the current scrubber value, view and size.
+  Discarding every older progress reply would otherwise leave playback blank until it stops.
+  Transfer newly allocated Float64 coordinate and Uint32 command buffers for changed display
+  frames, preserving ordered commands and exact doubles without detaching source geometry.
+  Once a compatible image exists, pan/zoom reuses its transform until the viewport has been quiet
+  for 150 ms, then requests the exact final GPU paint. Changed playback progress remains immediate.
+  Cancel that timer on settled-view reuse, content invalidation, failure or Preview exit.
+  While scrubber progress changes, paint interim frames with a separate CPU-backed worker canvas
+  to avoid repeated dense GPU work stalling page presentation. After 150 ms of quiet progress,
+  reuse the same commands for the original GPU paint; only that exact final frame clears the
+  updating indicator. Interim antialiasing can differ. Keep at most these two viewport canvases,
+  one decoded command frame and the existing bounded bitmap/request ownership.
+  Capture the canvas underlay at the route's insertion point, render over it in the worker and copy
+  the completed image back before later outlines/rulers. This preserves per-stroke alpha blending;
+  compositing a transparent route layer once does not. Settled views retain the existing widths,
+  dashes, order, geometry and display sampling. Invalidate on route, scrubber, travel visibility,
+  background, view or size changes, close stale bitmaps and terminate the worker on Preview exit.
+  Unsupported environments and worker failures retain the synchronous rendering path.
+
+These changes do not change compiled motion, Frame or Start. Verification includes real-pointer
+red/green tests, native canvas pixel parity, worker/direct output parity, autosave lifecycle tests and
+before/after browser profiles. Hardware qualification is outside this display and scheduling change.
+
 ## ADR-289 - Relief XY scale is resolved before physical cutter geometry (2026-08-05)
 
 **Date:** 2026-08-05

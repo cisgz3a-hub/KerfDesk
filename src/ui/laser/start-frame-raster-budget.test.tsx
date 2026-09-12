@@ -8,8 +8,9 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
+import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
 import {
   createLayer,
   createProject,
@@ -23,6 +24,16 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { prepareStartJob } from './start-job-readiness';
 import { JobControls } from './JobControls';
+import type * as OutputWorkerModule from './output-preparation-worker-client';
+
+const outputWorkerMocks = vi.hoisted(() => ({
+  prepareStart: vi.fn<typeof OutputWorkerModule.prepareStartOutputOffThread>(),
+}));
+
+vi.mock('./output-preparation-worker-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof OutputWorkerModule>()),
+  prepareStartOutputOffThread: outputWorkerMocks.prepareStart,
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -119,6 +130,20 @@ function imageLayer(color: string): ReturnType<typeof createLayer> {
   };
 }
 
+beforeEach(() => {
+  // Large raster preparation is now scheduled off-thread. jsdom has no
+  // Worker, so use the existing transport seam while retaining the real
+  // async compiler, exact output scope and Frame candidate preparation.
+  outputWorkerMocks.prepareStart.mockReset().mockImplementation((request, onProgress) =>
+    prepareOutputRequestForTest(request, onProgress === undefined ? {} : { onProgress }).then(
+      (response) => {
+        if (response.kind !== 'start') throw new Error('Frame test adapter returned no job.');
+        return response.result;
+      },
+    ),
+  );
+});
+
 afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
@@ -159,7 +184,14 @@ async function clickFrameJob(project: Project): Promise<ReturnType<typeof vi.fn>
     if (frameButton === undefined) throw new Error('Frame job button not rendered');
     await act(async () => {
       frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      // Keep the owner mounted until its actual asynchronous preparation
+      // reaches the mocked physical dispatch; unmounting cancels that owner.
+      await vi.waitFor(() => expect(frame).toHaveBeenCalled(), {
+        timeout: LARGE_RASTER_TEST_TIMEOUT_MS,
+      });
     });
+    expect(outputWorkerMocks.prepareStart).toHaveBeenCalledTimes(1);
+    expect(outputWorkerMocks.prepareStart.mock.calls[0]?.[0].project).toBe(project);
   } finally {
     if (root !== null) {
       await act(async () => root?.unmount());

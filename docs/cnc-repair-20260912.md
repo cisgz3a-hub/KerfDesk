@@ -5,6 +5,11 @@ Baseline: `197a0956c84ceeedae025af5e260878b0b7c1e5f`, reconciled with `origin/ma
 `C:/Users/Asus/.codex/audits/cnc-system-20260912`. New observations and logs belong in
 `C:/Users/Asus/.codex/audits/cnc-repair-20260912`.
 
+Integration includes current main `25d9bef9a5defed24259acb8b1d3af69840ff983`
+(canvas-performance PR #781), which merged while the repair checks were running.
+The CNC repair's source algorithms remain unchanged by that clean integration;
+combined persistence, worker lifecycle, browser and release checks cover its interactions.
+
 This ledger tracks implementation and software verification. It does not establish
 controller, air-cut, material-cut, or packaged-runtime qualification. The separate
 canvas-performance work and PR #781 are outside this repair.

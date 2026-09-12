@@ -35,8 +35,9 @@ export function fillClosedPolylinesBatched(
   for (const polyline of polylines) {
     if (!polyline.closed) continue;
     appendPolylinePath(ctx, obj, polyline, view);
-    ctx.closePath();
   }
+  // fill() implicitly closes every subpath. Closing each contour explicitly
+  // makes Chrome repeatedly process the growing batch, stalling dense artwork.
   ctx.fill(fillRule);
 }
 

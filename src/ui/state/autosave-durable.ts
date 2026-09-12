@@ -1,7 +1,8 @@
 import type { Project } from '../../core/scene';
 import { clearAutosave } from './autosave';
 import type { AutosaveWriteFailure } from './autosave-record';
-import { prepareAutosaveRecord, type AutosaveWriteResult } from './autosave-record';
+import type { AutosaveWriteResult } from './autosave-record';
+import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
 import {
   autosaveStorageKeyForSession,
   currentAutosaveSessionId,
@@ -127,7 +128,12 @@ export class AutosaveDurableService {
   private async writeNow(project: Project, savedAt: number): Promise<AutosaveDurableWriteResult> {
     const session = await this.session();
     const storageKey = autosaveStorageKeyForSession(session.sessionId);
-    const prepared = prepareAutosaveRecord(project, savedAt, session.sessionId, storageKey);
+    const prepared = await prepareAutosaveRecordOffThread(
+      project,
+      savedAt,
+      session.sessionId,
+      storageKey,
+    );
     if (prepared.kind !== 'ok') return prepared;
     try {
       const epoch = await this.epoch(storageKey);
