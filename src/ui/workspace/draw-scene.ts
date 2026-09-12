@@ -31,6 +31,7 @@ import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
 import {
   buildDisplayPolylines,
+  buildFillDisplayPolylines,
   type DisplayPolylineCache,
   type DisplayPolylines,
 } from './display-polylines';
@@ -371,7 +372,7 @@ function drawObjectPolylines(
     }
     const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode === 'fill') {
-      const display = displayPathFor(path, obj, view, displayPolylineCache);
+      const display = displayPathFor(path, obj, view, displayPolylineCache, true);
       simplified = includesSimplifiedDisplay(simplified, display);
       drawFilledDesignGeometry(ctx, obj, display.polylines, effectiveLayer, view, layer.color);
       continue;
@@ -395,15 +396,19 @@ function displayPathFor(
   object: SceneObject,
   view: ViewTransform,
   cache: DisplayPolylineCache | undefined,
+  fill = false,
 ): DisplayPolylines {
   const objectScale = Math.max(
     Math.abs(object.transform.scaleX),
     Math.abs(object.transform.scaleY),
   );
   const toleranceMm = 0.25 / Math.max(1e-9, view.scale * objectScale);
-  if (cache !== undefined) return cache.getPath(path, toleranceMm);
+  if (cache !== undefined) {
+    return fill ? cache.getFillPath(path, toleranceMm) : cache.getPath(path, toleranceMm);
+  }
   const flattened = flattenColoredPathCurves(path, { toleranceMm });
-  return buildDisplayPolylines(flattened.kind === 'ok' ? flattened.polylines : path.polylines);
+  const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  return fill ? buildFillDisplayPolylines(polylines) : buildDisplayPolylines(polylines);
 }
 
 function includesSimplifiedDisplay(current: boolean, display: DisplayPolylines): boolean {
@@ -418,12 +423,17 @@ function drawFilledDesignGeometry(
   view: ViewTransform,
   color: string,
 ): void {
-  const closed = polylines.filter((polyline) => polyline.closed);
   const open = polylines.filter((polyline) => !polyline.closed);
 
-  if (closed.length > 0) {
+  if (polylines.some((polyline) => polyline.closed)) {
     ctx.fillStyle = color;
-    fillClosedPolylinesBatched(ctx, obj, closed, view, obj.kind === 'text' ? 'nonzero' : 'evenodd');
+    fillClosedPolylinesBatched(
+      ctx,
+      obj,
+      polylines,
+      view,
+      obj.kind === 'text' ? 'nonzero' : 'evenodd',
+    );
   }
   if (open.length === 0) return;
 

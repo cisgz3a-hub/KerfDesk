@@ -53,17 +53,17 @@ describe('trace controls describe the options the engine actually receives', () 
     });
   });
 
-  it('shows Sharp contour area 0 separately from speck area 4 and applies contour edits to holes', async () => {
+  it('shows Sharp contour area 0 separately from speck area 1 and applies contour edits to holes', async () => {
     const image = paper();
     fill(image, 10, 10, 40, 35, [0, 0, 0]);
     fill(image, 30, 25, 1, 1, [255, 255, 255]);
     await withControls('Sharp', async (controls) => {
       expect(controls.number('Ignore Less Than').value).toBe('0');
-      expect(controls.number('Remove ink specks').value).toBe('4');
+      expect(controls.number('Remove ink specks').value).toBe('1');
       expect(await loopCount(image, controls.options())).toBe(2);
       await controls.change('Ignore Less Than', 4);
       expect(await loopCount(image, controls.options())).toBe(1);
-      expect(controls.options().despeckleMinPixels).toBe(4);
+      expect(controls.options().despeckleMinPixels).toBe(1);
     });
   });
 

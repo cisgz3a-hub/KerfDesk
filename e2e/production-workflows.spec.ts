@@ -458,7 +458,7 @@ test('imports a generated bitmap and traces it through the production worker wor
 
   await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
   await expect(threshold).toHaveCount(0);
-  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('4');
+  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('1');
   await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('0');
   await detection.selectOption('manual');
   await expect(threshold).toHaveValue('128');
