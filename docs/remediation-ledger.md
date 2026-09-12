@@ -1,5 +1,20 @@
 # Audit remediation ledger
 
+Current Electron readiness implementation, 2026-09-12:
+`codex/electron-readiness-20260912`, based on main
+`25d9bef9a5defed24259acb8b1d3af69840ff983`; application source commit
+`d3afa030c263d5ff6f68ca5342cf01b20af78498`.
+All eight findings are addressed in source: patched runtime dependencies,
+coordinated desktop close/quit, serialised and resumable stable publication,
+fail-closed feed reads, bounded HTTP/RTSP camera responses, and once-per-session
+permission installation. The full local release gate passes: 13,321 tests across
+2,045 files, 22 skipped tests, and 115 release-integrity tests. Candidate files,
+packaged-runtime evidence and remaining qualification gates are recorded in
+[`audits/2026-09-12-electron-readiness-build.md`](audits/2026-09-12-electron-readiness-build.md).
+This is local implementation and unsigned Windows candidate evidence. Signed
+installed upgrades, macOS and physical controller qualification remain separate;
+the entry does not establish publication or change the Frame/Start policy.
+
 Current Grok pipelines/TIME5 audit owner, 2026-09-06:
 `codex/grok-ci-time5-20260906`, based on main `c07cea275149832909d46f21c4dd7ec74d634f4a`.
 Scope: calibrated job clocks, emitted seek/dwell timing, CNC timing categories, duration display,
