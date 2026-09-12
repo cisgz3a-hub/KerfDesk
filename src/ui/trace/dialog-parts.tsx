@@ -47,6 +47,7 @@ export function TraceDialogHeader(props: {
         type="button"
         className="lf-btn lf-trace-close"
         aria-label="Close trace image"
+        title="Close the preview without adding a trace."
         onClick={props.onClose}
       >
         <span aria-hidden="true">×</span>
@@ -72,6 +73,7 @@ export function PresetPicker(props: {
         <select
           className="lf-select"
           aria-label="Trace preset"
+          title="Choose a starting style for tracing this image."
           value={props.value}
           onChange={(e) => props.onChange(e.target.value)}
         >
@@ -141,6 +143,7 @@ export function TraceOutputPicker(props: {
         <select
           className="lf-select"
           aria-label="Trace output"
+          title="Create editable vectors or a black-and-white raster scan."
           value={props.value}
           onChange={(e) => props.onChange(e.target.value === 'raster' ? 'raster' : 'vector')}
         >
@@ -173,6 +176,7 @@ export function TraceFillStylePicker(props: {
         <select
           className="lf-select"
           aria-label="Trace fill style"
+          title="Choose how the closed traced shapes are filled."
           value={props.value}
           onChange={(e) => props.onChange(parseTraceFillStyle(e.target.value))}
         >

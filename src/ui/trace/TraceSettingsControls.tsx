@@ -71,7 +71,9 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
       </div>
       <EdgeTraceModeNote />
       <details className="lf-trace-settings-details">
-        <summary tabIndex={0}>Curve finishing</summary>
+        <summary tabIndex={0} title="Adjust edge smoothing and path simplification.">
+          Curve finishing
+        </summary>
         <ContourGeometryControls {...props} />
       </details>
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
@@ -101,12 +103,16 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
       </div>
       {props.preset.traceMode !== 'centerline' ? (
         <details className="lf-trace-settings-details">
-          <summary tabIndex={0}>Curve finishing</summary>
+          <summary tabIndex={0} title="Adjust edge smoothing and path simplification.">
+            Curve finishing
+          </summary>
           <ContourGeometryControls {...props} />
         </details>
       ) : null}
       <details className="lf-trace-settings-details">
-        <summary tabIndex={0}>Transparency</summary>
+        <summary tabIndex={0} title="Trace an image's transparency instead of its brightness.">
+          Transparency
+        </summary>
         <CheckboxRow
           label="Trace alpha mask"
           checked={alphaMask}
@@ -316,6 +322,7 @@ function NumberRow(props: {
           step={props.step}
           value={props.value}
           aria-label={`Trace ${props.label} slider`}
+          title={traceNumberTitle(props.label)}
           aria-describedby={hintId}
           onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
         />

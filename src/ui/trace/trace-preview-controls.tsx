@@ -77,6 +77,7 @@ function ViewControls(props: {
           type="button"
           className="lf-btn"
           aria-label={accessibleLabel}
+          title={accessibleLabel}
           aria-pressed={props.view === view}
           disabled={view !== 'trace' && !props.hasSource}
           onClick={() => props.onChange(view)}
@@ -98,6 +99,7 @@ function ZoomControls(props: {
         type="button"
         className="lf-btn"
         aria-label="Zoom out"
+        title="Halve preview magnification, down to Fit."
         disabled={props.zoom <= MIN_PREVIEW_ZOOM}
         onClick={() => props.onChange(props.zoom / 2)}
       >
@@ -110,6 +112,7 @@ function ZoomControls(props: {
         type="button"
         className="lf-btn"
         aria-label="Zoom in"
+        title="Double preview magnification, up to 16 times Fit."
         disabled={props.zoom >= MAX_PREVIEW_ZOOM}
         onClick={() => props.onChange(props.zoom * 2)}
       >
