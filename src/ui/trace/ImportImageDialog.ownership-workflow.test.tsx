@@ -124,9 +124,7 @@ function raster(over: Partial<RasterImage> = {}): RasterImage {
 }
 
 function traceButton(host: HTMLElement): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll('button')).find((candidate) =>
-    candidate.textContent?.includes('Trac'),
-  );
+  const button = host.querySelector('button[type="submit"]');
   if (!(button instanceof HTMLButtonElement)) throw new Error('Trace submit button missing');
   return button;
 }

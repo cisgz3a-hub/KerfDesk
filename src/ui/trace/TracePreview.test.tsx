@@ -52,7 +52,7 @@ describe('TracePreview source overlay controls', () => {
       ) as HTMLImageElement | null;
       expect(image).not.toBeNull();
       const opacityBefore = image?.style.opacity;
-      const button = host.querySelector('button');
+      const button = findButton(host, 'Fade Image');
       expect(button).not.toBeNull();
       await act(async () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

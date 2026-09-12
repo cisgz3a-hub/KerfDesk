@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { DEFAULT_LIGHTBURN_TRACE_SETTINGS, type TraceOptions } from '../../core/trace';
 import {
   DEFAULT_EDGE_DETAIL,
@@ -30,44 +31,49 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
     props.onChange({ ...props.overrides, ...patch });
   };
   return (
-    <fieldset style={fieldsetStyle}>
-      <legend style={legendStyle}>Trace settings</legend>
-      <NumberRow
-        label="Sensitivity"
-        min={0}
-        max={100}
-        step={1}
-        value={
-          props.overrides.edgeSensitivity ??
-          edgeSensitivityFromOptions(props.preset) ??
-          DEFAULT_EDGE_SENSITIVITY
-        }
-        onChange={(edgeSensitivity) => set({ edgeSensitivity })}
-      />
-      <NumberRow
-        label="Detail"
-        min={0}
-        max={100}
-        step={1}
-        value={
-          props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset) ?? DEFAULT_EDGE_DETAIL
-        }
-        onChange={(edgeDetail) => set({ edgeDetail })}
-      />
-      <NumberRow
-        label="Minimum line"
-        min={0}
-        max={1000}
-        step={1}
-        value={
-          props.overrides.edgeMinimumLinePx ??
-          props.preset.edgeMinLengthPx ??
-          DEFAULT_EDGE_MINIMUM_LINE_PX
-        }
-        onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
-      />
-      <ContourGeometryControls {...props} />
+    <fieldset className="lf-trace-settings">
+      <legend>Refine detail</legend>
+      <div className="lf-trace-settings-group">
+        <NumberRow
+          label="Sensitivity"
+          min={0}
+          max={100}
+          step={1}
+          value={
+            props.overrides.edgeSensitivity ??
+            edgeSensitivityFromOptions(props.preset) ??
+            DEFAULT_EDGE_SENSITIVITY
+          }
+          onChange={(edgeSensitivity) => set({ edgeSensitivity })}
+        />
+        <NumberRow
+          label="Detail"
+          min={0}
+          max={100}
+          step={1}
+          value={
+            props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset) ?? DEFAULT_EDGE_DETAIL
+          }
+          onChange={(edgeDetail) => set({ edgeDetail })}
+        />
+        <NumberRow
+          label="Minimum line"
+          min={0}
+          max={1000}
+          step={1}
+          value={
+            props.overrides.edgeMinimumLinePx ??
+            props.preset.edgeMinLengthPx ??
+            DEFAULT_EDGE_MINIMUM_LINE_PX
+          }
+          onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
+        />
+      </div>
       <EdgeTraceModeNote />
+      <details className="lf-trace-settings-details">
+        <summary tabIndex={0}>Curve finishing</summary>
+        <ContourGeometryControls {...props} />
+      </details>
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
   );
@@ -83,21 +89,33 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
   const alphaMask =
     !alphaMaskDisabled && traceBooleanValue(props.preset, props.overrides, 'traceTransparency');
   return (
-    <fieldset style={fieldsetStyle}>
-      <legend style={legendStyle}>Trace settings</legend>
-      <TraceDetectionControls {...props} alphaMask={alphaMask}>
-        <BrightnessBandControls {...props} />
-      </TraceDetectionControls>
-      <TraceAreaControls {...props} />
-      {props.preset.traceMode !== 'centerline' ? <ContourGeometryControls {...props} /> : null}
-      <CheckboxRow
-        label="Trace alpha mask"
-        checked={alphaMask}
-        disabled={alphaMaskDisabled}
-        onChange={(traceTransparency) => set({ traceTransparency })}
-      />
-      {alphaMaskChecking ? <AlphaMaskCheckingNote /> : null}
-      {alphaMaskUnavailable ? <AlphaMaskUnavailableNote /> : null}
+    <fieldset className="lf-trace-settings">
+      <legend>Refine detail</legend>
+      <div className="lf-trace-settings-group">
+        <TraceDetectionControls {...props} alphaMask={alphaMask}>
+          <BrightnessBandControls {...props} />
+        </TraceDetectionControls>
+      </div>
+      <div className="lf-trace-settings-group">
+        <TraceAreaControls {...props} />
+      </div>
+      {props.preset.traceMode !== 'centerline' ? (
+        <details className="lf-trace-settings-details">
+          <summary tabIndex={0}>Curve finishing</summary>
+          <ContourGeometryControls {...props} />
+        </details>
+      ) : null}
+      <details className="lf-trace-settings-details">
+        <summary tabIndex={0}>Transparency</summary>
+        <CheckboxRow
+          label="Trace alpha mask"
+          checked={alphaMask}
+          disabled={alphaMaskDisabled}
+          onChange={(traceTransparency) => set({ traceTransparency })}
+        />
+        {alphaMaskChecking ? <AlphaMaskCheckingNote /> : null}
+        {alphaMaskUnavailable ? <AlphaMaskUnavailableNote /> : null}
+      </details>
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
   );
@@ -222,12 +240,12 @@ function ResetTraceSettingsButton(props: {
   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
 }): JSX.Element {
   return (
-    <div style={resetRowStyle}>
+    <div className="lf-trace-reset-row">
       <button
         type="button"
         onClick={() => props.onChange({})}
         disabled={Object.keys(props.overrides).length === 0}
-        style={resetButtonStyle}
+        className="lf-btn"
         title="Reset all trace controls to the selected tracing preset."
       >
         Reset trace settings
@@ -265,21 +283,45 @@ function NumberRow(props: {
   readonly value: number;
   readonly onChange: (next: number) => void;
 }): JSX.Element {
+  const inputId = useId();
+  const hintId = useId();
+  const unit = props.max === 10000 ? 'px²' : props.label === 'Minimum line' ? 'px' : undefined;
+  const hasSlider = props.max <= 255;
   return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>{props.label}</span>
-      <input
-        type="number"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
-        style={numberStyle}
-        aria-label={`Trace ${props.label}`}
-        title={traceNumberTitle(props.label)}
-      />
-    </label>
+    <div className="lf-trace-number">
+      <label htmlFor={inputId}>
+        <span>{props.label}</span>
+        <span className="lf-trace-number-input">
+          <input
+            id={inputId}
+            className="lf-input"
+            type="number"
+            min={props.min}
+            max={props.max}
+            step={props.step}
+            value={props.value}
+            onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
+            aria-label={`Trace ${props.label}`}
+            aria-describedby={hintId}
+            title={traceNumberTitle(props.label)}
+          />
+          {unit === undefined ? null : <span>{unit}</span>}
+        </span>
+      </label>
+      {hasSlider ? (
+        <input
+          type="range"
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          value={props.value}
+          aria-label={`Trace ${props.label} slider`}
+          aria-describedby={hintId}
+          onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
+        />
+      ) : null}
+      <p id={hintId}>{traceNumberTitle(props.label)}</p>
+    </div>
   );
 }
 
@@ -311,13 +353,13 @@ function clamp(value: number, min: number, max: number): number {
 function traceNumberTitle(label: string): string {
   switch (label) {
     case 'Cutoff':
-      return 'Lowest brightness treated as traceable artwork.';
+      return 'Exclude artwork darker than this brightness.';
     case 'Threshold':
-      return 'Brightness split used to separate artwork from background.';
+      return 'Raise this to include lighter marks; lower it to keep darker ink.';
     case 'Ignore Less Than':
-      return 'Discard closed contours and holes smaller than this source-image pixel area. Zero keeps all areas.';
+      return 'Remove shapes and holes below this pixel area. Use 0 to keep the smallest gaps.';
     case 'Remove ink specks':
-      return 'Remove connected ink regions smaller than this source-image pixel area; holes are preserved. Zero disables this filter.';
+      return 'Remove ink marks below this pixel area. Lower values keep fine detail; holes stay intact.';
     case 'Smoothness':
       return 'Smooth traced edges to reduce jagged vector paths.';
     case 'Optimize':
@@ -342,38 +384,6 @@ function traceCheckboxTitle(label: string): string {
   }
 }
 
-const fieldsetStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '6px 10px 8px 10px',
-  margin: '4px 0',
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 6,
-};
-const legendStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  padding: '0 4px',
-};
-const rowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '82px 1fr',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-};
-const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
-const numberStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  fontSize: 12,
-};
-const resetRowStyle: React.CSSProperties = {
-  gridColumn: '1 / -1',
-  display: 'flex',
-  justifyContent: 'flex-end',
-};
 const checkboxRowStyle: React.CSSProperties = {
   gridColumn: '1 / -1',
   display: 'flex',
@@ -393,12 +403,4 @@ const alphaMaskNoteStyle: React.CSSProperties = {
   margin: '-2px 0 0 22px',
   fontSize: 12,
   color: 'var(--lf-text-muted)',
-};
-const resetButtonStyle: React.CSSProperties = {
-  fontSize: 11,
-  padding: '2px 8px',
-  background: 'transparent',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 3,
-  cursor: 'pointer',
 };

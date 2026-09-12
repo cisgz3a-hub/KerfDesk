@@ -1,13 +1,5 @@
-// Presentational pieces of ImportImageDialog — the source label, preset
-// dropdown, action row, label/field shell, and every shared style
-// constant. Split out so the dialog file holds only orchestration
-// (state, the commit flow, render) and stays under the 250-line soft
-// cap.
-//
-// No state, no effects — every component is a pure function of its
-// props. Style consts live here because they're shared across the
-// parts and would otherwise duplicate.
-
+// Presentational controls; trace requests and commit ownership stay in the dialog.
+import type { RasterImage } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
 
@@ -18,16 +10,98 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Centerline',
   'Edge Detection',
 ] as const;
-
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
-// CNC opens on Smooth (maintainer bench result, 2026-07-25: the other presets
-// leave the bit chattering on a traced cut). This is the starting selection
-// only — rule 7 / ADR-228: every preset stays selectable, and the reason
-// Smooth is preferred is stated in the picker's tooltip rather than enforced.
+// CNC starts on Smooth; every other preset remains available.
 export const CNC_TRACE_PRESET_NAME = 'Smooth';
-
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 export type TraceOutput = 'raster' | 'vector';
+
+const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'Line Art':
+    'A balanced start for logos, lettering and drawings. Automatic detection keeps pale details.',
+  Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
+  Sharp:
+    'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
+  Centerline:
+    'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
+  'Edge Detection':
+    'Outlines around dark artwork and local detail. Neighbouring dark tones may merge.',
+};
+
+export function TraceDialogHeader(props: {
+  readonly source: RasterImage;
+  readonly onClose: () => void;
+}): JSX.Element {
+  return (
+    <header className="lf-trace-dialog-header">
+      <div className="lf-trace-dialog-heading">
+        <h2 className="lf-dialog-title">Trace Image</h2>
+        <p className="lf-trace-source">
+          <span title={props.source.source}>{props.source.source}</span>
+          <span>
+            {props.source.pixelWidth} × {props.source.pixelHeight} px
+          </span>
+        </p>
+      </div>
+      <button
+        type="button"
+        className="lf-btn lf-trace-close"
+        aria-label="Close trace image"
+        onClick={props.onClose}
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    </header>
+  );
+}
+
+export function PresetPicker(props: {
+  readonly machineKind: 'laser' | 'cnc';
+  readonly value: string;
+  readonly onChange: (next: string) => void;
+  readonly hasOverrides?: boolean;
+}): JSX.Element {
+  return (
+    <section className="lf-trace-preset" aria-label="Trace style">
+      <div className="lf-trace-section-heading">
+        <h3>Trace style</h3>
+        {props.hasOverrides ? <span className="lf-trace-edited">Settings edited</span> : null}
+      </div>
+      <label className="lf-trace-preset-select">
+        <span>Preset</span>
+        <select
+          className="lf-select"
+          aria-label="Trace preset"
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+        >
+          {VISIBLE_TRACE_PRESET_NAMES.filter((name) => TRACE_PRESETS[name] !== undefined).map(
+            (name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <div className="lf-trace-preset-description">
+        <span>{props.value === 'Centerline' ? 'Single paths' : 'Closed outlines'}</span>
+        <p>{PRESET_DESCRIPTIONS[props.value]}</p>
+      </div>
+      {props.machineKind === 'cnc' ? (
+        <p className="lf-trace-hint">
+          Smooth is the CNC starting preset. All styles are available.
+        </p>
+      ) : null}
+      {props.hasOverrides ? (
+        <p className="lf-trace-hint">
+          Your adjustments stay when you switch styles. Reset trace settings to use the selected
+          preset’s defaults.
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
 export function TraceOutputFields(props: {
   readonly machineKind: 'laser' | 'cnc';
@@ -37,10 +111,6 @@ export function TraceOutputFields(props: {
   readonly traceFillStyle: TraceFillStyle;
   readonly onTraceFillStyleChange: (style: TraceFillStyle) => void;
 }): JSX.Element {
-  // Fill style is a laser control: Scanline / Follow Shape / Island Fill are
-  // read only by the laser job compiler (src/core/job). CNC pocketing derives
-  // its own hatch from tool diameter and stepover (cnc/pocket-paths.ts), so on
-  // CNC the picker changed nothing in the output — hide it there.
   const showFillStyle =
     props.machineKind === 'laser' && props.traceOutput === 'vector' && props.supportsFillStyle;
   return (
@@ -65,104 +135,67 @@ export function TraceOutputPicker(props: {
   readonly onChange: (next: TraceOutput) => void;
 }): JSX.Element {
   return (
-    <Field label="Output">
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(parseTraceOutput(e.target.value))}
-        className="lf-select"
-        style={selectStyle}
-        aria-label="Trace output"
-        title="Choose whether the traced result engraves as a raster scan or stays as editable vectors."
-      >
-        <option value="vector">Editable vectors</option>
-        <option value="raster">Raster scan</option>
-      </select>
-      <span style={fillStyleHintStyle}>
-        Raster scan uses the same Raster/Image scan motion as a photo. The trace is binary artwork,
-        not a grayscale photo; traced ink burns at one image tone. Editable vectors use line or fill
-        motion instead.
-      </span>
-    </Field>
+    <div className="lf-trace-output-field">
+      <label>
+        <span>Result</span>
+        <select
+          className="lf-select"
+          aria-label="Trace output"
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value === 'raster' ? 'raster' : 'vector')}
+        >
+          <option value="vector">Editable vectors</option>
+          <option value="raster">Raster scan</option>
+        </select>
+      </label>
+      <p className="lf-trace-hint">
+        {props.value === 'vector'
+          ? 'Editable paths for line or fill operations.'
+          : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
+      </p>
+    </div>
   );
 }
-
-function parseTraceOutput(value: string): TraceOutput {
-  return value === 'raster' ? 'raster' : 'vector';
-}
-
-export function PresetPicker(props: {
-  readonly machineKind: 'laser' | 'cnc';
-  readonly value: string;
-  readonly onChange: (next: string) => void;
-}): JSX.Element {
-  const isCnc = props.machineKind === 'cnc';
-  return (
-    <Field label="Preset">
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        className="lf-select"
-        style={selectStyle}
-        aria-label="Trace preset"
-        title={isCnc ? CNC_PRESET_PICKER_TITLE : LASER_PRESET_PICKER_TITLE}
-      >
-        {VISIBLE_TRACE_PRESET_NAMES.filter((key) => TRACE_PRESETS[key] !== undefined).map((key) => (
-          <option key={key} value={key}>
-            {key}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
-const LASER_PRESET_PICKER_TITLE =
-  'Choose a trace preset tuned for line art, smooth logos, centerlines, sharp detail, or edge-line drawings.';
-const CNC_PRESET_PICKER_TITLE =
-  'Smooth is the recommended CNC preset — the others can leave the bit chattering on a traced cut. All presets remain available.';
 
 export function TraceFillStylePicker(props: {
   readonly value: TraceFillStyle;
   readonly onChange: (next: TraceFillStyle) => void;
 }): JSX.Element {
+  const hints = {
+    scanline: 'Parallel scanlines fill the traced shapes.',
+    offset: 'Follows closed shapes inward, including hollow designs.',
+    island: 'Fills connected regions with short straight scanlines.',
+  };
   return (
-    <Field label="Fill style">
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(parseTraceFillStyle(e.target.value))}
-        className="lf-select"
-        style={selectStyle}
-        aria-label="Trace fill style"
-        title="Choose how filled-contour traces should be engraved."
-      >
-        <option value="scanline">Scanline</option>
-        <option value="offset">Follow Shape</option>
-        <option value="island">Island Fill</option>
-      </select>
-      <span style={fillStyleHintStyle}>
-        Follow Shape is best for closed logos, wreaths, and hollow designs. Island Fill burns
-        connected regions with short straight scanlines.
-      </span>
-    </Field>
+    <div className="lf-trace-output-field">
+      <label>
+        <span>Fill style</span>
+        <select
+          className="lf-select"
+          aria-label="Trace fill style"
+          value={props.value}
+          onChange={(e) => props.onChange(parseTraceFillStyle(e.target.value))}
+        >
+          <option value="scanline">Scanline</option>
+          <option value="offset">Follow Shape</option>
+          <option value="island">Island Fill</option>
+        </select>
+      </label>
+      <p className="lf-trace-hint">{hints[props.value]}</p>
+    </div>
   );
 }
 
 function parseTraceFillStyle(value: string): TraceFillStyle {
-  if (value === 'island') return value;
-  if (value === 'offset') return value;
-  return 'scanline';
+  return value === 'island' || value === 'offset' ? value : 'scanline';
 }
 
-// Trace runs on an already-imported bitmap (LightBurn's model, ADR-027),
-// so the dialog shows which image it's tracing rather than offering a
-// file pick. Long filenames truncate with an ellipsis.
-export function SourceLabel(props: { readonly name: string }): JSX.Element {
+export function CncTraceHint(): JSX.Element {
   return (
-    <Field label="Image">
-      <span style={fileNameStyle} title={props.name}>
-        {props.name}
-      </span>
-    </Field>
+    <p className="lf-trace-hint">
+      CNC traces stay as editable vectors. Outline presets follow both sides of a stroke; Centerline
+      follows its middle.
+    </p>
   );
 }
 
@@ -171,7 +204,7 @@ export function DeleteImageAfterTraceToggle(props: {
   readonly onChange: (checked: boolean) => void;
 }): JSX.Element {
   return (
-    <label style={checkboxRowStyle}>
+    <label className="lf-trace-delete-source">
       <input
         type="checkbox"
         className="lf-checkbox"
@@ -198,84 +231,3 @@ export function DialogActions(props: {
     </KitDialogActions>
   );
 }
-
-// The preset hint paragraph below the controls — kept here so the
-// copy and the styling sit together; the dialog only renders <PresetHint />
-// with no props.
-export function PresetHint(): JSX.Element {
-  return (
-    <p style={hintStyle}>
-      <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings. Forces
-      pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
-      <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
-      pixel-perfect detail, no blur. <strong>Edge Detection</strong> — closed outlines around dark
-      artwork and locally darker detail. Adjacent dark tones may merge into one outline. Raster scan
-      burns any preset through the Image pipeline; a direct raster image still preserves grayscale
-      shading that a binary trace intentionally removes.
-    </p>
-  );
-}
-
-// CNC-only advisory. Two things the operator needs: only Smooth is selectable
-// here, and Smooth is an OUTLINE preset — it traces both sides of a stroke, so
-// a thin line becomes two cuts bracketing it. Cutting out filled shapes/logos
-// (the common CNC case) is unaffected. Shown only when the machine is CNC.
-export function CncTraceHint(): JSX.Element {
-  return (
-    <p style={cncHintStyle}>
-      Cutting on CNC: tracing uses the <strong>Smooth</strong> preset — the others trace finer
-      detail than a router bit follows cleanly. Smooth traces shape edges, ideal for cutting a
-      filled shape or logo out; a thin line becomes two cuts bracketing it rather than one pass down
-      the middle.
-    </p>
-  );
-}
-
-function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
-  return (
-    <label className="lf-field">
-      <span className="lf-field-label lf-field-label--sm">{props.label}</span>
-      <span style={fieldControlStyle}>{props.children}</span>
-    </label>
-  );
-}
-
-const fieldControlStyle: React.CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  flexWrap: 'wrap',
-};
-const fileNameStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  maxWidth: 240,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
-const fillStyleHintStyle: React.CSSProperties = {
-  flexBasis: '100%',
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-};
-const checkboxRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-};
-const hintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  margin: '4px 0 0 0',
-  fontStyle: 'italic',
-};
-const cncHintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  margin: '0 0 6px 0',
-  lineHeight: 1.3,
-};
