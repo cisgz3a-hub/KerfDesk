@@ -125,11 +125,11 @@ Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `fla
 
 ### Phase D — v0.4 "Text + fonts" [Shipped]
 
-Type and edit text directly on the canvas with the Text tool or **T**; live drafts commit as one undoable edit. Formatting stays beside the lettering. **Weld overlaps** joins touching script letters while retaining editable text and letter openings; canvas and output consume the same geometry. See ADR-012, ADR-319, ADR-320, and WORKFLOW.md F-D1/F-D2.
+Type and edit text directly on the canvas with the Text tool or **T**; live drafts commit as one undoable edit. Formatting stays beside the lettering. **Weld overlaps** joins touching script letters while retaining editable text and letter openings; canvas and output consume the same geometry. See ADR-012, ADR-320, ADR-321, and WORKFLOW.md F-D1/F-D2.
 
 - Bundled permissive fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
 - Text-to-path via `opentype.js` (MIT).
-- Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, and editable glyph welding (ADR-320).
+- Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, and editable glyph welding (ADR-321).
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
 - Twenty-one bundled outline fonts cover sans, serif, monospace, script, display, and stencil text. The calligraphy collection adds Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script, Italianno, and Corinthia, with Cinzel Decorative for companion lettering. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
 - Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields;

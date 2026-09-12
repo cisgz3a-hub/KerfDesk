@@ -19727,7 +19727,7 @@ follow-ups. Frame/Start policy and hardware qualification are unchanged.
 
 ---
 
-## ADR-319 - Canvas text uses owned drafts and one explicit project commit (2026-09-12)
+## ADR-320 - Canvas text uses owned drafts and one explicit project commit (2026-09-12)
 
 **Status:** Accepted | **Date:** 2026-09-12
 
@@ -19776,7 +19776,7 @@ keystroke into project history, autosave, or prepared machine output.
 - These checks establish software behavior. This decision makes no deployment, packaged-runtime,
   controller, material, or hardware qualification claim.
 
-## ADR-320 - Editable text can weld overlapping glyph outlines (2026-09-12)
+## ADR-321 - Editable text can weld overlapping glyph outlines (2026-09-12)
 
 **Status:** Accepted
 

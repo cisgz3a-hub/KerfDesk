@@ -1804,7 +1804,7 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 
 ## Phase D flows
 
-### F-D1. Add text on the canvas (ADR-319)
+### F-D1. Add text on the canvas (ADR-320)
 
 1. Choose **Text...** in the toolbar or Tools menu, choose **Text** in the drawing rail, or press
    **T** outside an editable field. Click blank canvas space to place the text at that scene
@@ -1820,7 +1820,7 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
    adjustments in this panel remain drafts until finishing; Cancel leaves their saved values alone.
    An unchanged edit adds no undo entry.
 
-### F-D2. Edit existing text on the canvas (ADR-319)
+### F-D2. Edit existing text on the canvas (ADR-320)
 
 1. With **Select**, double-click the visible, unlocked text to edit; with **Text**, click it once.
    Editing targets the text under the pointer, including when another object was the primary
@@ -1858,7 +1858,7 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
   turning it off regenerates the original glyph outlines. A failed weld leaves the saved text
   unchanged and shows an error in the editor. Welded boundaries are finely sampled polygons;
   increasing **Size** regenerates them, while scaling an already welded object also scales the
-  approximation. See ADR-320.
+  approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
 ### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
