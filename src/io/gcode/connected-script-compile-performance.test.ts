@@ -120,11 +120,12 @@ function recordBoundaryArraySource(source: Parameters<AsBoundaryIndex>[0]): void
 }
 
 const EXPECTED_REGION_COUNT = 12;
-// Retaining more normalized source corners changes the medial traversal;
-// source ownership, region count and indexed certification remain unchanged.
-const EXPECTED_GCODE_CODE_UNITS = 1_035_744;
-const EXPECTED_GCODE_SHA256 = '0088e20e062167f8070d56edfcb84a421a5cd0afa4bfb7c0c1876aae0039b272';
-const EXPECTED_GCODE_UTF8_BYTES = 1_035_756;
+// Final-grid containment and retained cutting/surface transitions add necessary
+// detail. Mapped-first capsule searches preserve compaction within the existing
+// certificate budget; ownership, region count and index reuse stay unchanged.
+const EXPECTED_GCODE_CODE_UNITS = 1_083_328;
+const EXPECTED_GCODE_SHA256 = '7094c5de65e6f44a9b85fbf19155f5c3da9320038afb1fb10fa2ade63ce467d1';
+const EXPECTED_GCODE_UTF8_BYTES = 1_083_340;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;

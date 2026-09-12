@@ -85,10 +85,14 @@ describe('V-carve source-boundary accuracy independent of the sampled reference'
               chords,
               90,
             );
+            // The existing 1.5-micron source/output allowance now also includes
+            // the explicit final XY rounding reserve. At 90 degrees its radial
+            // allowance equals depth. Keep this independent of planner helpers.
+            const depthAllowanceMm = 0.0015 + (Math.SQRT2 * 0.001) / 2;
             expect(
               removed,
               `Detail ${detail}, source vertex ${JSON.stringify(vertex)}`,
-            ).toBeGreaterThanOrEqual(expectedDepth - 0.0015);
+            ).toBeGreaterThanOrEqual(expectedDepth - depthAllowanceMm);
           }
         expect(job.cncCompilation?.vcarveOperations[0]?.sourceBoundaryCoverage).toMatchObject({
           sampleCount: 16,
@@ -151,7 +155,7 @@ describe('V-carve source-boundary accuracy independent of the sampled reference'
 });
 
 describe('current-engine floor scallops from independent emitted cutter removal', () => {
-  it.each([60, 90, 120])(
+  it.each([30, 60, 90, 120, 150])(
     'relates %s-degree pointed and truncated floors to current Detail pitch',
     (angle) => {
       const loops = [
@@ -199,4 +203,45 @@ describe('current-engine floor scallops from independent emitted cutter removal'
     },
     60_000,
   );
+
+  it('bounds the audited narrow 30-degree flat floor by conical scallop height', () => {
+    const loops: ReadonlyArray<Polyline> = [
+      {
+        closed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 2, y: 0 },
+          { x: 2, y: 2 },
+          { x: 1.3, y: 2 },
+          { x: 1.3, y: 0.7 },
+          { x: 0, y: 0.7 },
+        ],
+      },
+    ];
+    const tool: CncTool = {
+      id: 'v30-floor',
+      name: '30-degree V-bit',
+      kind: 'v-bit',
+      diameterMm: 6,
+      tipAngleDeg: 30,
+    };
+    const floor = 0.5;
+    const slope = Math.sin(Math.PI / 12) / Math.cos(Math.PI / 12);
+    const chords = emittedFeedChords(
+      cncGrblStrategy.emit(compile(loops, tool, 0, floor), DEFAULT_DEVICE_PROFILE),
+    );
+    // The audit's actual ridge witness lies inside the depth-clamped core.
+    // A pointed bit cannot leave a planar surface between its 0.1 mm paths.
+    const probe = { x: 0.26195121951219513, y: 0.5175609756097561 };
+    const edges = sourceEdges(loops);
+    const sourceDepth = Math.min(...edges.map(([a, b]) => distanceToLine(probe, a, b))) / slope;
+    expect(sourceDepth).toBeGreaterThan(floor);
+    const removed = coneRemovedDepth(toMachineCoords(probe, DEFAULT_DEVICE_PROFILE), chords, 30);
+    const physicalScallop = 0.1 / (2 * slope);
+    const representationAllowance = 0.01 / slope + 0.002;
+    expect(removed).toBeGreaterThan(0);
+    expect(removed).toBeLessThanOrEqual(floor);
+    expect(floor - removed).toBeLessThanOrEqual(physicalScallop + representationAllowance);
+    expect(floor - removed).toBeGreaterThan(0.1);
+  });
 });

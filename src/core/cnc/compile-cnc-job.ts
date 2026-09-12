@@ -173,8 +173,8 @@ function compileCncSnapshot(
     }
   }
   // Multi-tool release ordering: all clearing phases finish before any
-  // profile can free material. Tools remain contiguous within each phase and
-  // may recur in the profile phase when physical ordering requires it.
+  // profile can free material. Group ready work by tool while preserving each
+  // operation's secondary-clearing-before-finish dependency.
   const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
   const cncCompilation = buildCncCompilationSidecar(
     vcarveLayers,

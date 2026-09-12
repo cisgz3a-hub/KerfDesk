@@ -38,6 +38,32 @@ describe('zPassDepths', () => {
       expect(depths[i]).toBeLessThan(depths[i - 1] ?? 0);
     }
   });
+
+  it.each([1e-12, Number.MIN_VALUE])(
+    'reports an impossible array before appending depth levels for %s mm/pass',
+    (depthPerPassMm) => {
+      const originalPush = Array.prototype.push;
+      let appends = 0;
+      let error: unknown;
+      try {
+        Array.prototype.push = function (...items: unknown[]) {
+          if (items.length === 1 && typeof items[0] === 'number' && items[0] < 0) {
+            appends += 1;
+            throw new Error('Test stopped unexpected depth allocation');
+          }
+          return originalPush.apply(this, items);
+        };
+        zPassDepths(1, depthPerPassMm);
+      } catch (caught) {
+        error = caught;
+      } finally {
+        Array.prototype.push = originalPush;
+      }
+      expect(error).toBeInstanceOf(RangeError);
+      expect((error as Error).message).toBe(zPassArrayMaterializationError(1, depthPerPassMm));
+      expect(appends).toBe(0);
+    },
+  );
 });
 
 describe('zPassArrayMaterializationError', () => {

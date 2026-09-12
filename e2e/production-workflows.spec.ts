@@ -275,7 +275,10 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   kerfdesk,
 }) => {
   await page.getByRole('button', { name: 'Text...' }).click();
-  await page.getByRole('textbox', { name: 'Text content' }).fill('Part-');
+  await page
+    .getByLabel('KerfDesk workspace', { exact: true })
+    .click({ position: { x: 150, y: 200 } });
+  await page.getByRole('textbox', { name: 'Text content on canvas' }).fill('Part-');
   await page.getByRole('checkbox', { name: 'Variable text' }).check();
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Import CSV...' }).click();
@@ -321,8 +324,8 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
     '101',
   );
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Add or edit text' })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
   await page.getByRole('button', { name: 'Save As...' }).click();
 
   const saved = await savedProject(kerfdesk);

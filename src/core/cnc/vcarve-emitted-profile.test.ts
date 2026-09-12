@@ -43,6 +43,16 @@ describe('emitted V-carve profile coverage', () => {
     ).toBe(false);
   });
 
+  it('certifies a long matching profile within the unchanged exact-check budget', () => {
+    // Checking eight preceding capsules before the mapped capsule used over
+    // 250,000 exact checks and rejected this geometrically identical profile.
+    const reference = Array.from({ length: 28_001 }, (_, index) => point(index, 0));
+    const candidate = reference.map((p) => ({ ...p }));
+    expect(vcarveEmittedProfileCovers(reference, candidate, POINT_ENVELOPE, TOLERANCE_MM)).toBe(
+      true,
+    );
+  });
+
   it('certifies a mixed flat-tip descent and rejects a zero-depth substitute', () => {
     const reference = [point(0, 0, 0), point(1, 0, -0.1)];
 

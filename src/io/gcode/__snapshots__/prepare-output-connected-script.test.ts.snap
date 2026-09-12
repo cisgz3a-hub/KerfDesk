@@ -3,9 +3,9 @@
 exports[`keeps real connected-script multi-operation plans and emitted bytes exact 1`] = `
 {
   "fingerprint": {
-    "chars": 345957,
-    "fnv1a": 3800803560,
-    "lines": 14132,
+    "chars": 361131,
+    "fnv1a": 827535580,
+    "lines": 14707,
   },
   "head": [
     "G21",
@@ -14,35 +14,35 @@ exports[`keeps real connected-script multi-operation plans and emitted bytes exa
     "G94",
     "G17",
   ],
-  "lineCount": 14132,
+  "lineCount": 14707,
   "samples": [
     {
       "line": "G21",
       "lineIndex": 0,
     },
     {
-      "line": "X109.089Y371.111Z-1.070",
-      "lineIndex": 2355,
+      "line": "X100.757Y361.670Z-0.538",
+      "lineIndex": 2451,
     },
     {
-      "line": "X104.113Y366.306Z-1.823",
-      "lineIndex": 4710,
+      "line": "X97.492Y368.899Z-2.184F1000",
+      "lineIndex": 4902,
     },
     {
-      "line": "X186.721Y369.454Z-1.500",
-      "lineIndex": 7066,
+      "line": "X182.124Y370.312Z-1.500",
+      "lineIndex": 7353,
     },
     {
-      "line": "X169.723Y366.031Z-3.950",
-      "lineIndex": 9421,
+      "line": "X168.690Y368.255Z-4.500",
+      "lineIndex": 9804,
     },
     {
-      "line": "X188.257Y378.629Z-3.873",
-      "lineIndex": 11776,
+      "line": "X184.894Y381.918Z-3.522",
+      "lineIndex": 12255,
     },
     {
       "line": "",
-      "lineIndex": 14131,
+      "lineIndex": 14706,
     },
   ],
   "tail": [
@@ -52,6 +52,6 @@ exports[`keeps real connected-script multi-operation plans and emitted bytes exa
     "G0 X0.000 Y0.000",
     "",
   ],
-  "utf8ByteCount": 345966,
+  "utf8ByteCount": 361140,
 }
 `;

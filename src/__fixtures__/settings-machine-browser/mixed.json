@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 6,
+  "device": {
+    "profileId": "audit-synthetic-grbl",
+    "vendor": "Generic",
+    "model": "GRBL 400x400",
+    "profileSource": "built-in",
+    "catalogVersion": "2026-06-17",
+    "capabilities": ["grbl", "wcs", "verified-origin", "scan-offsets", "no-go-zones", "rotary"],
+    "evidence": [
+      {
+        "label": "KerfDesk default",
+        "status": "default-starter",
+        "note": "Starter GRBL profile. Confirm bed size, homing, and S range before first job."
+      }
+    ],
+    "name": "SETTINGS REPAIR BROWSER FIXTURE",
+    "bedWidth": 100,
+    "bedHeight": 100,
+    "maxFeed": 6000,
+    "maxPowerS": 1000,
+    "minPowerS": 0,
+    "laserModeEnabled": true,
+    "airAssistCommand": "none",
+    "streamingMode": "char-counted",
+    "rxBufferBytes": 120,
+    "gcodeDialect": {
+      "dialectId": "grbl-dynamic"
+    },
+    "scanningOffsets": [],
+    "bidirectionalScanPolicy": "allow-requested",
+    "noGoZones": [],
+    "origin": "rear-left",
+    "homing": {
+      "enabled": false,
+      "direction": "front-left"
+    },
+    "autofocusCommand": "",
+    "accelMmPerSec2": 500,
+    "junctionDeviationMm": 0.01,
+    "framingFeedMmPerMin": 6000
+  },
+  "workspace": {
+    "width": 100,
+    "height": 100,
+    "units": "mm"
+  },
+  "optimization": {
+    "reduceTravelMoves": false,
+    "travelPolicy": "source-order",
+    "insideFirst": true,
+    "layerPriority": "project-order",
+    "pathDirection": "preserve",
+    "startPoint": "machine-origin"
+  },
+  "jobSetup": {
+    "placement": {
+      "startFrom": "user-origin",
+      "anchor": "front-left"
+    },
+    "outputScope": {
+      "cutSelectedGraphics": false,
+      "useSelectionOrigin": false,
+      "selectedObjectIds": []
+    }
+  },
+  "notes": "",
+  "scene": {
+    "objects": [
+      {
+        "kind": "imported-svg",
+        "id": "rectangle",
+        "source": "audit-analytic-rectangle.svg",
+        "bounds": {
+          "minX": 20,
+          "minY": 20,
+          "maxX": 40,
+          "maxY": 30
+        },
+        "transform": {
+          "x": 0,
+          "y": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotationDeg": 0,
+          "mirrorX": false,
+          "mirrorY": false
+        },
+        "paths": [
+          {
+            "color": "#123456",
+            "operationIds": ["fill-0"],
+            "polylines": [
+              {
+                "closed": true,
+                "points": [
+                  {
+                    "x": 20,
+                    "y": 20
+                  },
+                  {
+                    "x": 40,
+                    "y": 20
+                  },
+                  {
+                    "x": 40,
+                    "y": 30
+                  },
+                  {
+                    "x": 20,
+                    "y": 30
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "name": "Left sample",
+        "operationOverride": {
+          "minPower": 5,
+          "passes": 1,
+          "fillBidirectional": false,
+          "speed": 601,
+          "airAssist": false,
+          "hatchSpacingMm": 0.1,
+          "fillOverscanMm": 3,
+          "power": 17,
+          "hatchAngleDeg": 0
+        }
+      },
+      {
+        "kind": "imported-svg",
+        "id": "repair-sample-2",
+        "source": "audit-analytic-rectangle.svg",
+        "bounds": {
+          "minX": 20,
+          "minY": 20,
+          "maxX": 40,
+          "maxY": 30
+        },
+        "transform": {
+          "x": 35,
+          "y": 0,
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotationDeg": 0,
+          "mirrorX": false,
+          "mirrorY": false
+        },
+        "paths": [
+          {
+            "color": "#123456",
+            "operationIds": ["fill-0"],
+            "polylines": [
+              {
+                "closed": true,
+                "points": [
+                  {
+                    "x": 20,
+                    "y": 20
+                  },
+                  {
+                    "x": 40,
+                    "y": 20
+                  },
+                  {
+                    "x": 40,
+                    "y": 30
+                  },
+                  {
+                    "x": 20,
+                    "y": 30
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "name": "Right sample",
+        "operationOverride": {
+          "minPower": 11,
+          "passes": 3,
+          "fillBidirectional": true,
+          "speed": 1801,
+          "airAssist": true,
+          "hatchSpacingMm": 0.2,
+          "fillOverscanMm": 5,
+          "power": 83,
+          "hatchAngleDeg": 45
+        }
+      }
+    ],
+    "layers": [
+      {
+        "id": "fill-0",
+        "name": "Screenshot fixture",
+        "color": "#123456",
+        "mode": "fill",
+        "minPower": 0,
+        "power": 30,
+        "speed": 1500,
+        "passes": 1,
+        "visible": true,
+        "output": true,
+        "airAssist": false,
+        "kerfOffsetMm": 0,
+        "tabsEnabled": false,
+        "tabSizeMm": 0.5,
+        "tabsPerShape": 4,
+        "tabSkipInnerShapes": true,
+        "hatchAngleDeg": 0,
+        "hatchSpacingMm": 0.1,
+        "fillOverscanMm": 5,
+        "fillStyle": "scanline",
+        "fillBidirectional": false,
+        "fillCrossHatch": false,
+        "ditherAlgorithm": "floyd-steinberg",
+        "linesPerMm": 10,
+        "imageBidirectional": true,
+        "negativeImage": false,
+        "passThrough": false,
+        "dotWidthCorrectionMm": 0,
+        "subLayers": []
+      }
+    ],
+    "groups": [],
+    "artworkOrder": []
+  }
+}

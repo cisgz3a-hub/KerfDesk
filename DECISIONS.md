@@ -19595,6 +19595,40 @@ from its hole and change existing toolpaths merely while adding a new operation.
 ---
 ---
 
+### September 12, 2026 amendment: settings-to-machine audit corrections
+
+The [settings repair ledger](docs/settings-to-machine-repair-20260912.md) records the
+audit findings, counterexamples and verification for these bounded corrections:
+
+- Selected artwork shows Mixed for differing effective values, including booleans and
+  process. Bulk edits change only explicitly edited fields. Dependent grayscale minimum
+  and dot-width limits resolve per artwork, independently of selection order. Store
+  updates and selection changes cancel stale drafts. Advanced controls removed by a
+  process change cannot submit another artwork's fallback; operation Show/Output remains
+  in its operation-owned controls.
+- Profile changes restore the destination profile's saved layer defaults. Missing or
+  corrupt defaults select an empty default set instead of copying the preceding profile.
+  Persisted partial settings must satisfy project validation; legitimate imported values
+  are not clamped to compact-editor ranges merely by restoring or viewing them.
+- Layer defaults retain their broad artwork-copy semantics. Applying them, including
+  fresh raster/trace creation, uses the existing artwork-settings copy rules to preserve
+  destination Startup material/cutter ownership under ADR-306. Copied cutting numbers
+  retain manual provenance; no controller or machine configuration is written.
+- Firmware agreement requires numeric coverage of every compared profile setting.
+  Missing and invalid readback remain explicit evidence gaps. Valid reported differences
+  retain the existing writable/review-only classification and wizard flow.
+- G-code comments distinguish requested overrides from resolved hatch and image plans.
+  Inspection of a compiled program carries that snapshot's machine/power-control context
+  and counts unpowered laser feed moves as travel at their actual feed. Generic imported
+  and CNC programs retain geometric classifications; a generated unpowered laser-off
+  annotation supplies evidence only for its own line when context is absent.
+
+These repairs preserve executable output for unchanged jobs, the exact-job Frame policy,
+and Job Review advisory findings. Source, test and browser evidence do not qualify a
+physical controller, optical power, air-cut or material result.
+
+---
+
 ## ADR-318 — CNC audit repair preserves settings, registration and preparation ownership
 
 **Status:** Accepted
@@ -19649,6 +19683,72 @@ air-cut and material-cut qualification remain separate.
 
 ---
 
+## ADR-319 — V-carve conversion, clearing dependencies and final coordinate containment
+
+**Status:** Accepted
+
+**Date:** 2026-09-12
+
+### Context
+
+The V-carve audit reproduced changed cutting regions after Convert to Path, a finishing
+operation moved ahead of its own clearing tool, an impossible depth-pass array allocated
+without a guard, and represented cutting points outside the source region. Source-grid
+certification also needed to survive later job placement and tile clipping. The repaired
+engine must retain the rest-finishing work accepted in ADR-318.
+
+### Decision
+
+1. A colored path may preserve its `fillRule` and an affine `strokeTransform` for its
+   round pen. Convert to Path materializes the current centreline and composes the pen's
+   linear transform, retaining nonuniform width, rotation and reflection. V-carve expands
+   that current geometry in the pen's coordinate system. Subsequent node edits remain
+   authoritative; there is no stale copied cutting outline. Laser line and engraving
+   retain the centreline. Converted font contours retain nonzero winding through CNC
+   collection, laser fill and canvas display. Weld, copying and persistence retain the
+   corresponding semantics.
+2. Project schema v7 prevents older readers from discarding these cutting-region fields.
+   The v6-to-v7 migration preserves existing documents. Invalid fill rules or unusable
+   matrix values are rejected at load. A rank-one pen sweeps segment quadrilaterals
+   when later node edits move across its surviving axis; a zero-area sweep stays empty.
+   Unrepresentable expansion raises a factual geometry error, never a filled-centreline
+   fallback or silent partial output. Design notes handle that error without an unhandled
+   exception.
+3. Global clearing-before-profile order still applies. Within each phase, tool grouping
+   schedules only work whose earlier owned clearing stages have completed. A tool may
+   therefore recur within a phase. Ownership includes operation, source artwork and
+   primary-tool provenance; a secondary rest stage can itself depend on earlier clearing.
+   Reapplying grouping for tiled files retains these dependencies. This refines ADR-310's
+   tool-contiguity preference where it conflicts with material-removal prerequisites.
+4. `zPassDepths` checks its existing ECMAScript array-domain bound before allocating.
+   Eligibility and preflight queries use the count without materializing the array.
+   The existing output-preparation failure path recognizes this factual representation
+   failure across synchronous and worker boundaries. This is not a new machining policy
+   limit; unrelated range errors remain visible as failures of the compiler.
+5. Cutting-point membership is signed against the original normalized region. Whole
+   represented cutter chords, compaction and rest-finishing rechecks preserve a separate
+   clearance reserve for final XY rounding. V-carve depth-step and tile-split Z values
+   round toward the stock surface. Translation and exact clipping do not enlarge the
+   cutter envelope. The reserve and quality tests remain separate from the physical
+   cutter dimensions and the operator's Detail setting.
+6. Zero-depth endpoints alone cannot certify depth accuracy between them. Refinement
+   checks the intervening depth field and reports unresolved accuracy. Compaction retains
+   cutting-to-surface transitions so its footprint tolerance cannot erase a source corner.
+   Chord certificates evaluate distance residuals directly at analytic minimizing
+   candidates to avoid cancellation from large expanded-coordinate terms.
+   Pointed-bit flat floors retain physical scallops governed by path pitch and cutter
+   angle; tests measure emitted cutter removal instead of asserting a perfectly flat floor.
+
+### Verification and limits
+
+The [repair record](docs/vcarve-audit-repair-20260912.md) records desired-behavior
+counterexamples, independent final-G-code probes, persistence and native-browser checks,
+and integrated validation. The emitter revision changes with the resulting output.
+Frame remains the sole ordinary Start gate. These are software checks; packaged runtime,
+controller, air-cut and material-cut qualification remain separate.
+
+---
+
 ## Pending proposal - CNC tab count and editor synchronisation (2026-09-06)
 
 The [dated proposal](docs/proposals/2026-09-06-cnc-tab-count-sync.md) preserves the
@@ -19658,3 +19758,105 @@ decision; no ADR number is allocated or reserved. The bounded port uses one
 undoable settings transaction for exclusive unlocked paths. Shared-path anchor
 ownership and the existing compiler/editor color mapping remain explicit open
 follow-ups. Frame/Start policy and hardware qualification are unchanged.
+
+---
+
+## ADR-320 - Canvas text uses owned drafts and one explicit project commit (2026-09-12)
+
+**Status:** Accepted | **Date:** 2026-09-12
+
+### Context
+
+The modal Add Text flow separates typing from placement and hides the artwork during editing.
+Canvas editing needs native caret/selection behavior and live geometry without writing each
+keystroke into project history, autosave, or prepared machine output.
+
+### Decision
+
+1. The toolbar, Tools menu, drawing rail, and **T** activate canvas text placement. A primary click
+   creates text at the clicked scene position or edits the visible, unlocked text under it.
+   Selection-mode double-click resolves the actual canvas hit before opening its text editor.
+   Existing preview, modal, and pan interaction owners keep their established behavior.
+2. An ephemeral session owns the original object, document epoch, initial placement, draft fields,
+   and asynchronous render requests. Only the current session and latest render may publish draft
+   geometry. An edited source must still be the exact original object in the same document.
+   Closing, cancelling, replacing a document/source, or retiring a request invalidates its late
+   results. The display project may substitute a draft; the canonical project remains unchanged.
+3. A native multiline textarea supplies caret movement, character selection, clipboard behavior,
+   text undo, and IME composition. Scene shortcuts do not consume its editing keys. Formatting
+   remains in the workspace beside the text; bent, path, and native stroke text use a readable
+   content box beside the vector preview when browser text cannot represent that geometry.
+4. Finishing commits text, an imported font, and staged CSV/serial/sequence settings atomically
+   through the project store with one undo entry. Cancellation and empty drafts commit nothing;
+   unchanged edits do not create history. Save failures leave an editable draft and its error.
+   Ordinary edits preserve the existing transform, object/path operation bindings, and artwork
+   overrides. Path text retains the existing guide-owned placement rules. Rebuilt geometry and
+   placement count as an edit after a guide changes; a save must still reference the exact guide
+   used to render it when its asynchronous work completes.
+5. Fresh canvas insertion explicitly opts into preserving authored placement in the text upsert
+   action. Existing callers retain their established fit-to-bed default. Both draft preview and
+   final commit reuse the text geometry builder, font resolution, bend, and path placement code.
+   This adds no project schema, text-outline, CAM, or output algorithm change.
+6. Draft state never becomes autosave, persisted project data, or executable output before commit.
+   Frame and Job Review retain their existing exact-job contract under ADR-228/230/232/237.
+
+### Verification
+
+- Unit and DOM coverage exercises text activation, transformed pointer placement, native input
+  ownership, draft/source/document replacement, asynchronous settlement, cancel/no-op behavior,
+  atomic history, and preserved transforms/operation bindings.
+- Browser coverage exercises direct multiline typing and re-editing, formatting, variable CSV and
+  bounded sequence controls, and readable CNC operation references after committing text.
+- These checks establish software behavior. This decision makes no deployment, packaged-runtime,
+  controller, material, or hardware qualification claim.
+
+## ADR-321 - Editable text can weld overlapping glyph outlines (2026-09-12)
+
+**Status:** Accepted
+
+### Context
+
+Dancing Script and Pacifico deliberately overlap neighbouring glyphs. The text renderer retains
+each glyph's contour, so Line mode displays and cuts interior crossing lines at these joins.
+The existing generic Weld operation resolves the region but converts it to imported paths, losing
+text editing. ADR-286 already resolves a text object's non-zero region for V-carve; it does not
+change the authored outlines used by the design canvas or Line output. LightBurn's documented
+[Welded text option](https://docs.lightburnsoftware.com/2.1/Reference/Text/) demonstrates this
+interaction without requiring destructive conversion.
+
+### Decision
+
+1. Text gains optional `weldOverlaps` source metadata. New editor sessions enable it; existing
+   text with an absent or false value retains its previous outlines until the user enables it.
+   The project validator accepts only a boolean when present. The additive field uses the current
+   project format; saved geometry remains self-contained.
+2. The shared **Weld overlaps** control previews the change beside the editable text. It commits
+   with the existing one-step undo transaction and can be turned off to regenerate font contours.
+   A weld-only change counts as an edit. The native single-line font route bypasses welding,
+   including any closed-looking stroke, and disables the control.
+3. `weldTextRender` applies the existing Clipper2 non-zero union independently to each text render
+   batch after bend or path placement. Opposite-wound letter counters remain holes. It preserves
+   coordinates, bounds and operation metadata, and never unions unrelated objects or batches.
+   The same final step runs when variable content is evaluated for output.
+4. Native curves are authoritative for welding. Changed boundaries are flattened at 0.001 mm
+   local tolerance and unioned at six decimal places. The result has matching polygon and line-curve
+   geometry, so downstream curve consumers cannot restore the removed overlaps. Unchanged native
+   boundaries and open strokes retain their original representation. No new dependency is added.
+5. Core returns typed failures; the editor retains the saved source and shows an actionable error
+   instead of claiming that an unchanged fallback was welded. This introduces no machine policy,
+   Frame or Start change. Existing saved geometry and the legacy V-carve rule remain authoritative
+   until an explicit text edit produces replacement geometry.
+6. Browser drafts and saves run the union in an owned worker. Superseded input, cancellation, and
+   unmount terminate obsolete work so long script outlines do not block typing or Escape. Worker
+   startup or processing failures remain visible errors; a browser never falls back to a blocking
+   union on its input thread. Non-browser tests and SSR may use the same core function directly.
+
+### Verification and limits
+
+- Real Dancing Script and Pacifico fixtures cover joins, counters, multiline and bent text,
+  variable bend/path regeneration, native strokes, and Line compilation using the welded geometry.
+- Persistence, live draft toggles, a weld-only undo transaction and browser editing are covered.
+- The union is polygon geometry. Later object scaling also scales its approximation; increasing
+  the text's **Size** regenerates the outline at the requested size. Independent dense-reference
+  tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
+  this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.

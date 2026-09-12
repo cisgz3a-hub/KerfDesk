@@ -19,6 +19,14 @@ import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import courierPrimeUrl from './fonts/CourierPrime-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
 import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
+import greatVibesUrl from './fonts/GreatVibes-Regular.ttf?url';
+import alluraUrl from './fonts/Allura-Regular.ttf?url';
+import alexBrushUrl from './fonts/AlexBrush-Regular.ttf?url';
+import parisienneUrl from './fonts/Parisienne-Regular.ttf?url';
+import pinyonScriptUrl from './fonts/PinyonScript-Regular.ttf?url';
+import italiannoUrl from './fonts/Italianno-Regular.ttf?url';
+import corinthiaUrl from './fonts/Corinthia-Regular.ttf?url';
+import cinzelDecorativeUrl from './fonts/CinzelDecorative-Regular.ttf?url';
 import antonUrl from './fonts/Anton-Regular.ttf?url';
 import specialEliteUrl from './fonts/SpecialElite-Regular.ttf?url';
 import unifrakturMaguntiaUrl from './fonts/UnifrakturMaguntia-Book.ttf?url';
@@ -34,6 +42,14 @@ const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
   'courier-prime-regular': courierPrimeUrl,
   'pacifico-regular': pacificoUrl,
   'dancing-script-regular': dancingScriptUrl,
+  'great-vibes-regular': greatVibesUrl,
+  'allura-regular': alluraUrl,
+  'alex-brush-regular': alexBrushUrl,
+  'parisienne-regular': parisienneUrl,
+  'pinyon-script-regular': pinyonScriptUrl,
+  'italianno-regular': italiannoUrl,
+  'corinthia-regular': corinthiaUrl,
+  'cinzel-decorative-regular': cinzelDecorativeUrl,
   'anton-regular': antonUrl,
   'special-elite-regular': specialEliteUrl,
   'unifraktur-maguntia-book': unifrakturMaguntiaUrl,
@@ -83,28 +99,31 @@ export function getCachedFont(key: string): ArrayBuffer | null {
 // is registered as a FontFace under this family so the picker (and
 // any other UI that wants to preview text) can use a regular CSS
 // `font-family` rather than rasterizing the glyphs by hand.
-export function cssFamilyForFont(key: OutlineFontKey): string {
+export function cssFamilyForFont(key: string): string {
   return `lf2-${key}`;
 }
 
 // Tracks which font keys have already been added to document.fonts.
 // FontFace.load() is idempotent but adding the same FontFace twice
 // would still leak — keep one entry per key.
-const cssRegistered = new Set<OutlineFontKey>();
+const cssRegistered = new Set<string>();
 
 // Register a bundled .ttf with the browser's font system so CSS
 // `font-family: lf2-<key>` works. Pulls from the same in-memory
 // cache as opentype-side loading so we never fetch a font twice.
 // Resolves once the FontFace is fully loaded and ready for layout;
 // rejects if the file can't be parsed as a font.
-export async function ensureFontCss(key: OutlineFontKey): Promise<void> {
+export async function ensureFontCss(
+  key: string,
+  embeddedFonts?: ReadonlyArray<EmbeddedFont>,
+): Promise<void> {
   if (cssRegistered.has(key)) return;
   if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
     // Non-browser / test env — nothing to register. Calls become
     // no-ops so the picker still functions (with system fallback).
     return;
   }
-  const buf = await loadFont(key);
+  const buf = await loadFont(key, embeddedFonts);
   // FontFace accepts the raw ArrayBuffer / BufferSource directly,
   // avoiding a second network fetch on top of `loadFont`.
   const face = new FontFace(cssFamilyForFont(key), buf);

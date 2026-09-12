@@ -20,10 +20,10 @@ import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink.
 import { cutTypeNeedsClosedContours } from '../../core/cnc/closed-contour-cut-types';
-import { collectLayerPolylines } from '../../core/cnc/collect-cnc-contours';
 import { hasVCarvableContour } from '../../core/cnc/vcarve-carvable-contours';
 import { cutTypeLabel, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { cncNoteContours } from './cnc-note-contours';
 
 const NOTE_DEBOUNCE_MS = 300;
 
@@ -36,15 +36,19 @@ export function CncOpenPathNote(props: {
   const device = useStore((s) => s.project.device);
   const machine = useStore((s) => s.project.machine);
   const [isAllOpen, setIsAllOpen] = useState(false);
+  const [geometryIssue, setGeometryIssue] = useState<string | null>(null);
   const needsClosed = machine?.kind === 'cnc' && cutTypeNeedsClosedContours(settings.cutType);
 
   useEffect(() => {
     if (!needsClosed) {
       setIsAllOpen(false);
+      setGeometryIssue(null);
       return undefined;
     }
     const timer = window.setTimeout(() => {
-      const polylines = collectLayerPolylines(objects, layer, device);
+      const result = cncNoteContours(objects, layer, device);
+      const polylines = result.polylines;
+      setGeometryIssue(result.geometryIssue);
       // An empty layer is a different (and obvious) state; only artwork that
       // exists but cannot be cut is worth interrupting the operator for.
       setIsAllOpen(polylines.length > 0 && !hasVCarvableContour(polylines));
@@ -52,6 +56,12 @@ export function CncOpenPathNote(props: {
     return () => window.clearTimeout(timer);
   }, [needsClosed, objects, layer, device]);
 
+  if (geometryIssue !== null)
+    return (
+      <p role="note" style={noteStyle}>
+        {geometryIssue}
+      </p>
+    );
   if (!isAllOpen) return null;
   return (
     <p role="note" style={noteStyle}>

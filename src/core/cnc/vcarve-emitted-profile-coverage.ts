@@ -179,7 +179,18 @@ function matchingCapsuleNear(
 ): number | null {
   const start = Math.max(0, center - MAX_DISTANCE_INDEX_RADIUS);
   const end = Math.min(capsules.length, center + MAX_DISTANCE_INDEX_RADIUS + 1);
+  // The distance map or previous match is the likely capsule. Trying eight
+  // preceding neighbours first can exhaust the exact-check budget on a long
+  // script after harmless grid refinements, forcing much larger output.
+  // Search the same bounded set with the likely match first.
+  const centered = capsules[center];
+  if (centered !== undefined) {
+    work.remaining -= 1;
+    if (work.remaining < 0) return null;
+    if (vcarveCapsuleContainsChord(centered, a, b, envelope, toleranceMm)) return center;
+  }
   for (let index = start; index < end; index += 1) {
+    if (index === center) continue;
     work.remaining -= 1;
     if (work.remaining < 0) return null;
     const capsule = capsules[index];

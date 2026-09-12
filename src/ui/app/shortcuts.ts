@@ -365,6 +365,11 @@ function isConvertToBitmapChord(e: KeyboardEvent): boolean {
 
 export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
   if (isEditableTarget(e)) return false;
+  if (!hasMeta(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 't') {
+    e.preventDefault();
+    ctx.setToolMode({ kind: 'text' });
+    return true;
+  }
   if (isMeasureChord(e)) {
     e.preventDefault();
     ctx.setToolMode({ kind: 'measure' });

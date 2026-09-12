@@ -45,6 +45,16 @@ export type CurveSubpath = {
   readonly closed: boolean;
 };
 
+// Linear map of a trusted round stroke's pen into the path's local frame:
+// x' = a*x + c*y; y' = b*x + d*y. Translation does not change the pen.
+// Centreline coordinates remain authoritative, including after node edits.
+export type StrokeTransform = {
+  readonly a: number;
+  readonly b: number;
+  readonly c: number;
+  readonly d: number;
+};
+
 export type ColoredPath = {
   // Lowercase 6-digit source-artwork color, e.g. '#ff0000'. Schema-v3
   // operation bindings are explicit; color remains a legacy fallback.
@@ -55,6 +65,10 @@ export type ColoredPath = {
   // operations keep the centerline; filled-region CAM may materialize the
   // visible stroke outline without changing laser/engrave geometry.
   readonly strokeWidthMm?: number;
+  readonly strokeTransform?: StrokeTransform;
+  // Preserve an outlined font's winding semantics after Convert to Path.
+  // Absent follows the object's family (text: nonzero; other vectors: evenodd).
+  readonly fillRule?: 'nonzero' | 'evenodd';
   // Schema-v2 canonical geometry. `polylines` remains a deterministic
   // compatibility view while preview and compilation migrate subsystem by
   // subsystem; serializers always materialize this field for saved projects.
@@ -209,6 +223,9 @@ export type TextObject = ObjectPowerScale & {
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
   readonly bendDeg?: number;
+  // Union this text object's overlapping outline glyphs while keeping its
+  // editable source. Absent/false preserves legacy independent contours.
+  readonly weldOverlaps?: boolean;
   readonly pathText?: PathTextSettings;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`

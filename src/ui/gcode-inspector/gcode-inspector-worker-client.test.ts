@@ -76,10 +76,16 @@ describe('G-code Inspector worker client', () => {
 
   it('passes a Blob without reading it on the caller thread', async () => {
     const blob = new Blob(['G0 X1']);
-    const promise = inspectGcodeOffThread({ kind: 'blob', blob });
+    const source = {
+      kind: 'blob' as const,
+      blob,
+      machineKind: 'laser' as const,
+      laserPowerControl: 'fan' as const,
+    };
+    const promise = inspectGcodeOffThread(source);
     const worker = StubWorker.instances[0];
     const request = worker?.posted[0];
-    expect(request?.source).toEqual({ kind: 'blob', blob });
+    expect(request?.source).toEqual(source);
     worker?.reply({
       id: request?.id ?? -1,
       kind: 'complete',

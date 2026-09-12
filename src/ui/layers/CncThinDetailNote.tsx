@@ -11,10 +11,10 @@
 import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink.
-import { collectLayerPolylines } from '../../core/cnc/collect-cnc-contours';
 import { vcarveMedialPasses } from '../../core/cnc/vcarve-medial';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { cncNoteContours } from './cnc-note-contours';
 
 const NOTE_DEBOUNCE_MS = 300;
 export function CncThinDetailNote(props: {
@@ -26,15 +26,19 @@ export function CncThinDetailNote(props: {
   const device = useStore((s) => s.project.device);
   const machine = useStore((s) => s.project.machine);
   const [isThinResidual, setIsThinResidual] = useState(false);
+  const [geometryIssue, setGeometryIssue] = useState<string | null>(null);
   const isVCarve = machine?.kind === 'cnc' && settings.cutType === 'v-carve';
 
   useEffect(() => {
     if (!isVCarve || machine?.kind !== 'cnc') {
       setIsThinResidual(false);
+      setGeometryIssue(null);
       return undefined;
     }
     const timer = window.setTimeout(() => {
-      const polylines = collectLayerPolylines(objects, layer, device);
+      const result = cncNoteContours(objects, layer, device);
+      const polylines = result.polylines;
+      setGeometryIssue(result.geometryIssue);
       if (polylines.length === 0) {
         setIsThinResidual(false);
         return;
@@ -55,6 +59,12 @@ export function CncThinDetailNote(props: {
     return () => window.clearTimeout(timer);
   }, [isVCarve, objects, layer, device, machine, settings]);
 
+  if (geometryIssue !== null)
+    return (
+      <p role="note" style={noteStyle}>
+        {geometryIssue}
+      </p>
+    );
   if (!isThinResidual) return null;
   return (
     <p role="note" style={noteStyle}>

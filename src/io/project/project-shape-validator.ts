@@ -261,6 +261,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     optionalBoolean(obj, `${path}.locked`),
     optionalNumber(obj, `${path}.letterSpacing`),
     optionalNumber(obj, `${path}.bendDeg`),
+    optionalBoolean(obj, `${path}.weldOverlaps`),
     validatePathText(obj['pathText'], `${path}.pathText`),
     validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
     requireString(obj, `${path}.color`),

@@ -15,7 +15,10 @@ import {
   type VectorSceneObject,
 } from './vector-path-tools';
 
-type WeldBatch = Pick<NormalizedVectorPathBatch, 'color' | 'operationIds' | 'strokeWidthMm'> & {
+type WeldBatch = Pick<
+  NormalizedVectorPathBatch,
+  'color' | 'operationIds' | 'strokeWidthMm' | 'strokeTransform'
+> & {
   readonly paths: PathsD;
 };
 
@@ -62,12 +65,15 @@ function collectWeldBatches(
       // geometry without changing the independent B run.
       const bindingSets = operationBindingSets(operationIds);
       for (const bindingSet of bindingSets) {
-        const key = batchKey(batch.color, bindingSet, batch.strokeWidthMm);
+        const key = batchKey(batch.color, bindingSet, batch.strokeWidthMm, batch.strokeTransform);
         const existing = grouped.get(key);
         grouped.set(key, {
           color: batch.color,
           ...(bindingSet === undefined ? {} : { operationIds: bindingSet }),
           ...(batch.strokeWidthMm === undefined ? {} : { strokeWidthMm: batch.strokeWidthMm }),
+          ...(batch.strokeTransform === undefined
+            ? {}
+            : { strokeTransform: batch.strokeTransform }),
           paths: [...(existing?.paths ?? []), ...batch.paths],
         });
       }
@@ -103,6 +109,7 @@ function weldBatches(
       color: batch.color,
       ...(batch.operationIds === undefined ? {} : { operationIds: batch.operationIds }),
       ...(batch.strokeWidthMm === undefined ? {} : { strokeWidthMm: batch.strokeWidthMm }),
+      ...(batch.strokeTransform === undefined ? {} : { strokeTransform: batch.strokeTransform }),
       polylines: welded.value.map(pathDToPolyline),
     });
   }
@@ -120,8 +127,14 @@ function batchKey(
   color: string,
   operationIds: ReadonlyArray<string> | undefined,
   strokeWidthMm: number | undefined,
+  strokeTransform: ColoredPath['strokeTransform'],
 ): string {
-  return JSON.stringify([color.toLowerCase(), operationIds ?? null, strokeWidthMm ?? null]);
+  return JSON.stringify([
+    color.toLowerCase(),
+    operationIds ?? null,
+    strokeWidthMm ?? null,
+    strokeTransform ?? null,
+  ]);
 }
 
 function commonObjectMetadata(

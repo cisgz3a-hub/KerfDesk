@@ -18,6 +18,7 @@ import { maximumRegistrationHolesPerTile, registrationGroupForTile } from './til
 import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-registration-plan';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
+import { vcarveConservativeZ } from './vcarve-cutting-constraints';
 
 const MIN_CLIPPED_POINTS = 2;
 
@@ -184,7 +185,7 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
       }
     } else if (pass.kind === 'path3d') {
       for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
-        passes.push(clippedPath3dPass(pass, piece));
+        passes.push(clippedPath3dPass(pass, piece, group.cutType === 'v-carve'));
       }
     } else if (pass.kind === 'helical-contour') {
       for (const piece of clipPointsToRect(cncHelicalContourPoints(pass), tile.rect, false)) {
@@ -214,11 +215,16 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
 function clippedPath3dPass(
   pass: Extract<CncPass, { readonly kind: 'path3d' }>,
   points: ReadonlyArray<Xyz>,
+  vcarve: boolean,
 ): Extract<CncPass, { readonly kind: 'path3d' }> {
   return {
     kind: 'path3d',
     closed: false,
-    points,
+    // The V-carve certificate reserves final XY rounding. Keep interpolated
+    // Z shallow so this later split cannot consume an additional cone radius.
+    points: vcarve
+      ? points.map((point) => ({ ...point, z: vcarveConservativeZ(point.z) }))
+      : points,
     ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
     ...(pass.entryRamp === undefined ? {} : { entryRamp: pass.entryRamp }),
   };

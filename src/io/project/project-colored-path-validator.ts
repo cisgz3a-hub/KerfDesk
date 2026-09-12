@@ -1,5 +1,6 @@
 import { validateCurveSubpaths } from './project-curve-shape-validator';
 import { validateOperationIds } from './project-operation-id-validator';
+import { validatePathSemantics } from './project-path-semantics-validator';
 import {
   firstError,
   isObject,
@@ -22,6 +23,7 @@ function validateColoredPath(value: unknown, path: string): string | null {
     requireString(value, `${path}.color`),
     validateOperationIds(value['operationIds'], `${path}.operationIds`),
     optionalPositiveNumber(value, `${path}.strokeWidthMm`),
+    validatePathSemantics(value, path),
     validatePolylines(value['polylines'], `${path}.polylines`),
     validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);

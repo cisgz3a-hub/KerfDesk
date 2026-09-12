@@ -7,7 +7,8 @@ import {
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
 import { DITHER_ALGORITHMS, type Layer, type LayerOperationSettings } from '../../core/scene';
-import { useDebouncedCommit } from './use-debounced-commit';
+import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
+import type { MixedOperationFields } from './selected-operation-mixed';
 
 const fieldRowStyle: React.CSSProperties = {
   display: 'flex',
@@ -36,53 +37,53 @@ const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
 export function LayerImageFields(props: {
   readonly layer: Layer;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
   readonly labelContext?: string;
   readonly minPowerMax?: number;
 }): JSX.Element {
   const { layer, settings, commit } = props;
   const labelContext = props.labelContext ?? layer.color;
-  const minPowerMax = props.minPowerMax ?? layer.power;
+  const minPowerMax = props.mixedFields?.power ? 100 : (props.minPowerMax ?? layer.power);
+  const controlProps = {
+    labelContext,
+    settings,
+    commit,
+    reconcileKey: props.reconcileKey,
+    ...(props.mixedFields === undefined ? {} : { mixedFields: props.mixedFields }),
+  };
   return (
     <>
       <FieldRow label="Dither">
-        <DitherSelect labelContext={labelContext} settings={settings} commit={commit} />
+        <DitherSelect {...controlProps} />
       </FieldRow>
-      {settings.ditherAlgorithm === 'grayscale' ? (
+      {!props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale' ? (
         <FieldRow label="Min Power">
-          <MinPowerInput
-            labelContext={labelContext}
-            maxPower={minPowerMax}
-            settings={settings}
-            commit={commit}
-          />
+          <MinPowerInput {...controlProps} maxPower={minPowerMax} />
           <span style={unitStyle}>%</span>
         </FieldRow>
       ) : null}
       <FieldRow label="Line Interval">
-        <LineIntervalInput labelContext={labelContext} settings={settings} commit={commit} />
+        <LineIntervalInput {...controlProps} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="DPI">
-        <DpiInput labelContext={labelContext} settings={settings} commit={commit} />
+        <DpiInput {...controlProps} />
         <span style={unitStyle}>dpi</span>
       </FieldRow>
       <FieldRow label="Dot Width">
-        <DotWidthCorrectionInput labelContext={labelContext} settings={settings} commit={commit} />
+        <DotWidthCorrectionInput {...controlProps} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="Negative">
-        <NegativeImageCheckbox labelContext={labelContext} settings={settings} commit={commit} />
+        <NegativeImageCheckbox {...controlProps} />
       </FieldRow>
       <FieldRow label="Bidirectional">
-        <BidirectionalImageCheckbox
-          labelContext={labelContext}
-          settings={settings}
-          commit={commit}
-        />
+        <BidirectionalImageCheckbox {...controlProps} />
       </FieldRow>
       <FieldRow label="Pass-through">
-        <PassThroughCheckbox labelContext={labelContext} settings={settings} commit={commit} />
+        <PassThroughCheckbox {...controlProps} />
       </FieldRow>
     </>
   );
@@ -103,12 +104,14 @@ function FieldRow(props: {
 function DitherSelect(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   return (
     <select
-      value={settings.ditherAlgorithm}
+      value={props.mixedFields?.ditherAlgorithm ? '' : settings.ditherAlgorithm}
       onChange={(e) =>
         commit({
           ditherAlgorithm: e.target.value as Layer['ditherAlgorithm'],
@@ -118,6 +121,11 @@ function DitherSelect(props: {
       aria-label={`Dither for ${labelContext}`}
       style={ditherSelectStyle}
     >
+      {props.mixedFields?.ditherAlgorithm ? (
+        <option value="" disabled>
+          Mixed
+        </option>
+      ) : null}
       {DITHER_ALGORITHMS.map((algorithm) => (
         <option key={algorithm} value={algorithm}>
           {DITHER_LABELS[algorithm]}
@@ -144,11 +152,15 @@ const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
 function LineIntervalInput(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: displayNumber(linesPerMmToLineIntervalMm(settings.linesPerMm), 4),
+    mixed: props.mixedFields?.linesPerMm,
+    reconcileKey: props.reconcileKey,
     commit: (lineIntervalMm) => commit({ linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
     parse: (s) =>
       clamp(
@@ -164,6 +176,7 @@ function LineIntervalInput(props: {
       max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
       step={0.001}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -176,11 +189,15 @@ function LineIntervalInput(props: {
 function DpiInput(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: displayNumber(linesPerMmToDpi(settings.linesPerMm), 2),
+    mixed: props.mixedFields?.linesPerMm,
+    reconcileKey: props.reconcileKey,
     commit: (dpi) => commit({ linesPerMm: dpiToLinesPerMm(dpi) }),
     parse: (s) =>
       clamp(
@@ -196,6 +213,7 @@ function DpiInput(props: {
       max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
       step={0.01}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -209,11 +227,15 @@ function MinPowerInput(props: {
   readonly labelContext: string;
   readonly maxPower: number;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, maxPower, settings, commit } = props;
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: settings.minPower,
+    mixed: props.mixedFields?.minPower,
+    reconcileKey: props.reconcileKey,
     commit: (minPower) => commit({ minPower }),
     parse: (s) => clamp(numericValue(s, settings.minPower), 0, maxPower),
   });
@@ -223,6 +245,7 @@ function MinPowerInput(props: {
       min={0}
       max={maxPower}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -235,12 +258,16 @@ function MinPowerInput(props: {
 function DotWidthCorrectionInput(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
-  const max = dotWidthCorrectionMax(settings);
-  const debounced = useDebouncedCommit<number>({
+  const max = props.mixedFields?.linesPerMm ? 1 : dotWidthCorrectionMax(settings);
+  const debounced = useMixedOperationNumber({
     value: settings.dotWidthCorrectionMm,
+    mixed: props.mixedFields?.dotWidthCorrectionMm,
+    reconcileKey: props.reconcileKey,
     commit: (dotWidthCorrectionMm) => commit({ dotWidthCorrectionMm }),
     parse: (s) => clamp(numericValue(s, settings.dotWidthCorrectionMm), 0, max),
   });
@@ -251,6 +278,7 @@ function DotWidthCorrectionInput(props: {
       max={max}
       step={0.001}
       value={debounced.displayValue}
+      {...debounced.inputProps}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
@@ -263,13 +291,15 @@ function DotWidthCorrectionInput(props: {
 function NegativeImageCheckbox(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
-      checked={settings.negativeImage}
+      {...mixedCheckboxProps(settings.negativeImage, props.mixedFields?.negativeImage)}
       onChange={(event) => commit({ negativeImage: event.target.checked })}
       aria-label={`Negative image for ${labelContext}`}
       title="Invert image brightness before engraving this layer."
@@ -280,13 +310,15 @@ function NegativeImageCheckbox(props: {
 function BidirectionalImageCheckbox(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
-      checked={settings.imageBidirectional}
+      {...mixedCheckboxProps(settings.imageBidirectional, props.mixedFields?.imageBidirectional)}
       onChange={(event) => commit({ imageBidirectional: event.target.checked })}
       aria-label={`Bidirectional image scan for ${labelContext}`}
       title="Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift."
@@ -297,13 +329,15 @@ function BidirectionalImageCheckbox(props: {
 function PassThroughCheckbox(props: {
   readonly labelContext: string;
   readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
-      checked={settings.passThrough}
+      {...mixedCheckboxProps(settings.passThrough, props.mixedFields?.passThrough)}
       onChange={(event) => commit({ passThrough: event.target.checked })}
       aria-label={`Pass-through image for ${labelContext}`}
       title="Use image pixels as-is and skip KerfDesk image adjustment for this layer."

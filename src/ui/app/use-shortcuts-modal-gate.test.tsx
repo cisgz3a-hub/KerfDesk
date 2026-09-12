@@ -11,6 +11,7 @@ import { useUiStore } from '../state/ui-store';
 import { PlatformProvider } from './platform-context';
 import { useShortcuts } from './use-shortcuts';
 import { Dialog } from '../kit';
+import { useCanvasTextStore } from '../text/canvas-text-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -116,6 +117,7 @@ async function pressKey(init: KeyboardEventInit & { readonly key: string }): Pro
 }
 
 afterEach(() => {
+  useCanvasTextStore.getState().close();
   useStore.getState().newProject();
   useUiStore.setState({ textDialog: null, imageDialog: null, modalDepth: 0 });
   useToastStore.setState({ toasts: [] });
@@ -153,6 +155,25 @@ describe('useShortcuts modal gate', () => {
       // A subsequent workspace Escape retains its ordinary deselection action.
       await pressKey({ key: 'Escape' });
       expect(useStore.getState().selectedObjectId).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('leaves the document and view alone while a canvas text session owns keyboard input', async () => {
+    installVectorProject();
+    useCanvasTextStore.getState().beginAdd({ x: 30, y: 40 });
+    const before = useStore.getState().project;
+    const { unmount } = await renderHarness();
+    try {
+      await pressKey({ key: 'Backspace' });
+      await pressKey({ key: 'z', ctrlKey: true });
+      await pressKey({ key: 'o', ctrlKey: true });
+      await pressKey({ key: 'ArrowRight' });
+      await pressKey({ key: 'p' });
+      expect(useStore.getState().project).toBe(before);
+      expect(useStore.getState().previewMode).toBe(false);
+      expect(mockPlatform.pickFilesForOpen).not.toHaveBeenCalled();
     } finally {
       await unmount();
     }

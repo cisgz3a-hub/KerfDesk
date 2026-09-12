@@ -36,6 +36,36 @@ export type RenderModal = {
   cycleInitialZ: number;
 };
 
+export function freshRenderModal(initialPosition?: {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}): RenderModal {
+  return {
+    motion: 0,
+    unitScale: 1,
+    absolute: true,
+    x: initialPosition?.x ?? 0,
+    y: initialPosition?.y ?? 0,
+    z: initialPosition?.z ?? 0,
+    feed: 0,
+    power: 0,
+    spindleMode: 'off',
+    coolantMist: false,
+    coolantFlood: false,
+    plane: 17,
+    ended: false,
+    cycle: null,
+    // LinuxCNC's default retract mode is G98 (back to the initial Z).
+    retractMode: 98,
+    cycleR: null,
+    cycleZ: null,
+    cycleQ: null,
+    cycleP: null,
+    cycleInitialZ: 0,
+  };
+}
+
 export type LineWordOutcome = {
   readonly sawModal: boolean;
   readonly sawEvent: boolean;

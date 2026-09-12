@@ -14,6 +14,7 @@ export function CutSettingsFillDensityFields(props: {
       <Field label="Line Interval">
         <input
           type="number"
+          data-setting="hatchSpacingMm"
           min={0.05}
           max={10}
           step="any"
@@ -33,6 +34,7 @@ export function CutSettingsFillDensityFields(props: {
       <Field label="Lines / Inch">
         <input
           type="number"
+          data-setting="hatchSpacingMm"
           min={lineIntervalMmToLinesPerInch(10)}
           max={lineIntervalMmToLinesPerInch(0.05)}
           step="any"

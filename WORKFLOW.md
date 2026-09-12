@@ -712,7 +712,7 @@ the completed physical Frame is the spatial source of truth.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v5 stores canonical curve subpaths, explicit artwork-to-operation bindings, canonical relief heightfields, and operation-owned artwork overrides. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available; v4→v5 preserves existing settings and bindings unchanged (ADR-159, ADR-211, ADR-292, ADR-317). Readers supporting only v4 report a newer schema instead of silently ignoring operation ownership.
+> **Current note:** project schema v7 stores canonical curves, artwork-to-operation bindings, canonical relief heightfields, operation-owned overrides, tile registration plans, and converted text/stroke semantics. The registered v1→v2 migration promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes where exact conversion is available. The v4→v5→v6→v7 migrations preserve existing settings, bindings and geometry (ADR-159, ADR-211, ADR-292, ADR-317, ADR-318, ADR-319). Earlier readers report a newer schema instead of silently discarding cutting semantics.
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -798,6 +798,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `V` — Flip vertical
 
 #### Tools
+- `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
 - `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
 - `Cmd/Ctrl+L` - Line/pen
@@ -1803,14 +1804,61 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 
 ## Phase D flows
 
-- F-D1. Add text object
-- F-D2. Edit text content
+### F-D1. Add text on the canvas (ADR-320)
+
+1. Choose **Text...** in the toolbar or Tools menu, choose **Text** in the drawing rail, or press
+   **T** outside an editable field. Click blank canvas space to place the text at that scene
+   position. Clicking visible, unlocked text with this tool edits it instead.
+2. Type directly in the canvas text box. **Enter** starts another line. The **Text formatting**
+   panel provides the font picker and font import, alignment, size, line height, spacing, bend,
+   path text, variable text, and character insertion controls beside the live vector preview.
+3. **Done**, **Cmd/Ctrl+Enter**, or a primary click on empty canvas space finishes the edit.
+   **Escape** or **Cancel** discards it. A blank draft creates no object and does not delete an
+   existing object. Text created on the canvas retains the clicked placement and requested size.
+4. Text, any imported font, and the session's staged variable data/settings commit together in
+   one undoable project change. CSV imports, serial values, sequence settings, and Previous/Next/Reset
+   adjustments in this panel remain drafts until finishing; Cancel leaves their saved values alone.
+   An unchanged edit adds no undo entry.
+
+### F-D2. Edit existing text on the canvas (ADR-320)
+
+1. With **Select**, double-click the visible, unlocked text to edit; with **Text**, click it once.
+   Editing targets the text under the pointer, including when another object was the primary
+   selection. The text box follows workspace zoom and pan.
+2. Select characters, move the caret, cut/copy/paste, and undo typing with native text shortcuts.
+   These keys do not delete, select, move, or undo scene objects while the editor owns input.
+   IME composition stays in the text box; composition keystrokes do not finish or cancel the edit.
+3. Ordinary text edits preserve translation, scale, rotation, mirrors, operation bindings, and
+   artwork overrides. Path text continues to use its selected guide's placement. Bent text, text
+   on a path, and native stroke fonts use a readable content box beside their live geometry.
+   Reopening and finishing text after moving or reshaping its guide saves the updated placement.
+   If the guide changes while saving, review the updated preview and choose **Done** again.
+4. Finish or cancel using the same controls as F-D1. One project Undo restores the whole committed
+   edit. Draft geometry is excluded from project saves, autosave, and executable output. Replacing
+   the document or edited source retires its draft; delayed font/geometry results cannot update a
+   replacement document. A render error stays beside the editor so the content can be corrected.
+
+### Other text controls
+
+- The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
+  Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
+  serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
+  and work with **Weld overlaps**; no system-font installation or font-service connection is needed.
 - F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
   Pocket, and Fill require an outline font with closed regions. Fresh CNC
   stroke-text operations default to Engrave even when a V-bit is mounted.
 - F-D4. Adjust character spacing / line height
+- **Weld overlaps** joins overlapping outline letters without converting text to a separate shape.
+  It is enabled for new text. For existing text, double-click it, enable **Weld overlaps**, then
+  choose **Done**; the whole edit can be undone. Saved files remember the choice, including when
+  variable text is regenerated. Openings inside letters remain holes. Single-line engraving fonts
+  keep their native strokes and do not use this option. Welding happens after bend/path placement;
+  turning it off regenerates the original glyph outlines. A failed weld leaves the saved text
+  unchanged and shows an error in the editor. Welded boundaries are finely sampled polygons;
+  increasing **Size** regenerates them, while scaling an already welded object also scales the
+  approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
 ### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
@@ -3589,7 +3637,7 @@ and lifts the command's CNC-only gate.)*
    checkbox-only projects must configure it before a multi-tile export can
    produce the requested holes. A missing/unsupported cutter or a cutter
    wider than the requested hole cannot produce that cylindrical bore.
-   Saved projects use schema v6 so older builds reject the file instead of
+   The registration plan was introduced in schema v6 so earlier builds reject the file instead of
    silently discarding this cutter/depth plan. Existing v1-v5 projects still
    load; migration does not invent a registration recipe.
 4. Matching flat end mills peck to the requested depth; smaller flat end mills

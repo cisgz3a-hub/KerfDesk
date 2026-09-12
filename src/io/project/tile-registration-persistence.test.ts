@@ -48,17 +48,17 @@ describe('registration project identity', () => {
     expect(migrated).toEqual({
       kind: 'ok',
       raw: { ...legacy, schemaVersion: PROJECT_SCHEMA_VERSION },
-      steps: [5],
+      steps: [5, 6],
     });
     const result = deserializeProject(JSON.stringify(legacy));
     if (result.kind !== 'ok' || result.project.machine?.kind !== 'cnc')
       throw new Error('fixture did not reload');
     expect(result.project.machine.tiling).toEqual(DEFAULT_CNC_TILING);
     expect(result.migratedFrom).toBe(5);
-    expect(result.project.schemaVersion).toBe(6);
+    expect(result.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   });
 
-  it('writes the registration plan at v6 so older readers cannot silently ignore it', () => {
+  it('writes the registration plan at the current version so older readers cannot silently ignore it', () => {
     const project = {
       ...createProject(),
       machine: {
@@ -67,13 +67,15 @@ describe('registration project identity', () => {
       },
     };
     const written = JSON.parse(serializeProject(project)) as Record<string, unknown>;
-    expect(written['schemaVersion']).toBe(6);
+    expect(written['schemaVersion']).toBe(PROJECT_SCHEMA_VERSION);
     const result = deserializeProject(JSON.stringify(written));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') expect(result.project.machine).toEqual(project.machine);
-    expect(deserializeProject(JSON.stringify({ ...written, schemaVersion: 7 }))).toEqual({
+    expect(
+      deserializeProject(JSON.stringify({ ...written, schemaVersion: PROJECT_SCHEMA_VERSION + 1 })),
+    ).toEqual({
       kind: 'schema-too-new',
-      sawVersion: 7,
+      sawVersion: PROJECT_SCHEMA_VERSION + 1,
     });
   });
 

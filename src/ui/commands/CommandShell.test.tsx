@@ -15,8 +15,26 @@ import { CommandShell } from './CommandShell';
 
 afterEach(() => {
   resetStore();
+  useUiStore.getState().resetToolMode();
   useUiStore.getState().closeWorkspaceContextBar();
   vi.restoreAllMocks();
+});
+
+describe('CommandShell canvas text activation', () => {
+  it('arms canvas typing from the toolbar without opening the old text dialog', async () => {
+    useUiStore.setState({ textDialog: null });
+    const { host, root } = await renderShell(mockPlatform());
+    try {
+      const text = host.querySelector('button[data-help-id="command:tools.add-text"]');
+      if (!(text instanceof HTMLButtonElement)) throw new Error('Text command missing');
+      await act(async () => text.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      expect(useUiStore.getState().toolMode).toEqual({ kind: 'text' });
+      expect(useUiStore.getState().textDialog).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('CommandShell node-mode Delete', () => {

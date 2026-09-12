@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FONT_REGISTRY } from './font-registry';
 
 describe('bundled font registry', () => {
-  it('contains thirteen outline fonts and the four approved OFL CNC stroke fonts', () => {
+  it('contains twenty-one outline fonts and the four approved OFL CNC stroke fonts', () => {
     expect(FONT_REGISTRY).toEqual([
       {
         key: 'roboto-regular',
@@ -58,6 +58,62 @@ describe('bundled font registry', () => {
         displayName: 'Dancing Script',
         license: 'OFL-1.1',
         styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'great-vibes-regular',
+        displayName: 'Great Vibes',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'allura-regular',
+        displayName: 'Allura',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'alex-brush-regular',
+        displayName: 'Alex Brush',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'parisienne-regular',
+        displayName: 'Parisienne',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'pinyon-script-regular',
+        displayName: 'Pinyon Script',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'italianno-regular',
+        displayName: 'Italianno',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'corinthia-regular',
+        displayName: 'Corinthia',
+        license: 'OFL-1.1',
+        styleClass: 'script',
+        geometry: 'outline',
+      },
+      {
+        key: 'cinzel-decorative-regular',
+        displayName: 'Cinzel Decorative',
+        license: 'OFL-1.1',
+        styleClass: 'display',
         geometry: 'outline',
       },
       {
