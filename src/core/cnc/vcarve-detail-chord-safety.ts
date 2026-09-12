@@ -4,7 +4,11 @@ import {
   type VCarveBoundarySegmentSource,
 } from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
-import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
+import { radialEnvelopeSweepRadiiMm } from './radial-envelope';
+import {
+  pointInsideVCarveBoundary,
+  type VCarveCertifiedEnvelope,
+} from './vcarve-cutting-constraints';
 
 const QUADRATIC_EPSILON_MM2 = 1e-14;
 
@@ -14,9 +18,16 @@ export function emittedChordIsSafe(
   depthA: number,
   depthB: number,
   segments: VCarveBoundarySegmentSource,
-  envelope: RadialEnvelope,
+  envelope: VCarveCertifiedEnvelope,
 ): boolean {
-  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
+  if (envelope.requireInsideBoundary) {
+    if (depthA > 0 && !pointInsideVCarveBoundary(a, segments)) return false;
+    if (depthB > 0 && !pointInsideVCarveBoundary(b, segments)) return false;
+  }
+  const radii = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
+  const reserve = depthA > 0 || depthB > 0 ? (envelope.boundaryClearanceMm ?? 0) : 0;
+  const radiusA = radii[0] + reserve;
+  const radiusB = radii[1] + reserve;
   // The envelope radius varies linearly from radiusA to radiusB, so the swept
   // region cannot extend past the chord's bounding box grown by the larger of
   // the two. A segment outside that box is unreachable and therefore always
@@ -151,15 +162,19 @@ function quadraticClearanceOnInterval(
 ): boolean {
   const a = x1 * x1 + y1 * y1 - radiusSlope * radiusSlope;
   const b = 2 * (x0 * x1 + y0 * y1 - radius0 * radiusSlope);
-  const c = x0 * x0 + y0 * y0 - radius0 * radius0;
-  let minimum = Math.min(quadraticAt(a, b, c, low), quadraticAt(a, b, c, high));
+  // Evaluate the geometric residual, not the expanded polynomial. A long
+  // chord can have coefficients around 1e12 while passing within microns
+  // of a boundary; polynomial cancellation would erase the cutter radius.
+  const clearanceAt = (t: number) => {
+    const x = x0 + x1 * t;
+    const y = y0 + y1 * t;
+    const radius = radius0 + radiusSlope * t;
+    return x * x + y * y - radius * radius;
+  };
+  let minimum = Math.min(clearanceAt(low), clearanceAt(high));
   if (a > 0) {
     const vertex = -b / (2 * a);
-    if (vertex > low && vertex < high) minimum = Math.min(minimum, quadraticAt(a, b, c, vertex));
+    if (vertex > low && vertex < high) minimum = Math.min(minimum, clearanceAt(vertex));
   }
   return minimum >= -QUADRATIC_EPSILON_MM2;
-}
-
-function quadraticAt(a: number, b: number, c: number, t: number): number {
-  return (a * t + b) * t + c;
 }

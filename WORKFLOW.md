@@ -712,7 +712,7 @@ the completed physical Frame is the spatial source of truth.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v5 stores canonical curve subpaths, explicit artwork-to-operation bindings, canonical relief heightfields, and operation-owned artwork overrides. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available; v4→v5 preserves existing settings and bindings unchanged (ADR-159, ADR-211, ADR-292, ADR-317). Readers supporting only v4 report a newer schema instead of silently ignoring operation ownership.
+> **Current note:** project schema v7 stores canonical curves, artwork-to-operation bindings, canonical relief heightfields, operation-owned overrides, tile registration plans, and converted text/stroke semantics. The registered v1→v2 migration promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes where exact conversion is available. The v4→v5→v6→v7 migrations preserve existing settings, bindings and geometry (ADR-159, ADR-211, ADR-292, ADR-317, ADR-318, ADR-319). Earlier readers report a newer schema instead of silently discarding cutting semantics.
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -3571,7 +3571,7 @@ and lifts the command's CNC-only gate.)*
    checkbox-only projects must configure it before a multi-tile export can
    produce the requested holes. A missing/unsupported cutter or a cutter
    wider than the requested hole cannot produce that cylindrical bore.
-   Saved projects use schema v6 so older builds reject the file instead of
+   The registration plan was introduced in schema v6 so earlier builds reject the file instead of
    silently discarding this cutter/depth plan. Existing v1-v5 projects still
    load; migration does not invent a registration recipe.
 4. Matching flat end mills peck to the requested depth; smaller flat end mills

@@ -12,6 +12,7 @@ import {
   type Vec2,
 } from '../scene';
 import { applyTransform } from '../scene/transform';
+import { materializedStrokeFields } from './stroke-transform';
 
 export type VectorSceneObject = Extract<
   SceneObject,
@@ -64,7 +65,10 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
   const paths = object.paths.map((path) => ({
     color: path.color,
     ...(path.operationIds === undefined ? {} : { operationIds: path.operationIds }),
-    ...materializedStrokeWidth(path, object.transform),
+    ...materializedStrokeFields(path, object.transform),
+    ...(path.fillRule === undefined && object.kind !== 'text'
+      ? {}
+      : { fillRule: path.fillRule ?? ('nonzero' as const) }),
     polylines: materializationPolylines(path, object.transform).map((polyline) =>
       materializePolyline(polyline, object.transform),
     ),
@@ -107,19 +111,6 @@ function materializePolyline(polyline: Polyline, transform: SceneObject['transfo
     closed: polyline.closed,
     points: polyline.points.map((point) => cleanPoint(applyTransform(point, transform))),
   };
-}
-
-function materializedStrokeWidth(
-  path: ColoredPath,
-  transform: SceneObject['transform'],
-): Pick<ColoredPath, 'strokeWidthMm'> {
-  if (
-    path.strokeWidthMm === undefined ||
-    Math.abs(transform.scaleX) !== Math.abs(transform.scaleY)
-  ) {
-    return {};
-  }
-  return { strokeWidthMm: path.strokeWidthMm * Math.abs(transform.scaleX) };
 }
 
 function displaySource(object: VectorSceneObject): string {

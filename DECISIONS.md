@@ -19649,6 +19649,72 @@ air-cut and material-cut qualification remain separate.
 
 ---
 
+## ADR-319 — V-carve conversion, clearing dependencies and final coordinate containment
+
+**Status:** Accepted
+
+**Date:** 2026-09-12
+
+### Context
+
+The V-carve audit reproduced changed cutting regions after Convert to Path, a finishing
+operation moved ahead of its own clearing tool, an impossible depth-pass array allocated
+without a guard, and represented cutting points outside the source region. Source-grid
+certification also needed to survive later job placement and tile clipping. The repaired
+engine must retain the rest-finishing work accepted in ADR-318.
+
+### Decision
+
+1. A colored path may preserve its `fillRule` and an affine `strokeTransform` for its
+   round pen. Convert to Path materializes the current centreline and composes the pen's
+   linear transform, retaining nonuniform width, rotation and reflection. V-carve expands
+   that current geometry in the pen's coordinate system. Subsequent node edits remain
+   authoritative; there is no stale copied cutting outline. Laser line and engraving
+   retain the centreline. Converted font contours retain nonzero winding through CNC
+   collection, laser fill and canvas display. Weld, copying and persistence retain the
+   corresponding semantics.
+2. Project schema v7 prevents older readers from discarding these cutting-region fields.
+   The v6-to-v7 migration preserves existing documents. Invalid fill rules or unusable
+   matrix values are rejected at load. A rank-one pen sweeps segment quadrilaterals
+   when later node edits move across its surviving axis; a zero-area sweep stays empty.
+   Unrepresentable expansion raises a factual geometry error, never a filled-centreline
+   fallback or silent partial output. Design notes handle that error without an unhandled
+   exception.
+3. Global clearing-before-profile order still applies. Within each phase, tool grouping
+   schedules only work whose earlier owned clearing stages have completed. A tool may
+   therefore recur within a phase. Ownership includes operation, source artwork and
+   primary-tool provenance; a secondary rest stage can itself depend on earlier clearing.
+   Reapplying grouping for tiled files retains these dependencies. This refines ADR-310's
+   tool-contiguity preference where it conflicts with material-removal prerequisites.
+4. `zPassDepths` checks its existing ECMAScript array-domain bound before allocating.
+   Eligibility and preflight queries use the count without materializing the array.
+   The existing output-preparation failure path recognizes this factual representation
+   failure across synchronous and worker boundaries. This is not a new machining policy
+   limit; unrelated range errors remain visible as failures of the compiler.
+5. Cutting-point membership is signed against the original normalized region. Whole
+   represented cutter chords, compaction and rest-finishing rechecks preserve a separate
+   clearance reserve for final XY rounding. V-carve depth-step and tile-split Z values
+   round toward the stock surface. Translation and exact clipping do not enlarge the
+   cutter envelope. The reserve and quality tests remain separate from the physical
+   cutter dimensions and the operator's Detail setting.
+6. Zero-depth endpoints alone cannot certify depth accuracy between them. Refinement
+   checks the intervening depth field and reports unresolved accuracy. Compaction retains
+   cutting-to-surface transitions so its footprint tolerance cannot erase a source corner.
+   Chord certificates evaluate distance residuals directly at analytic minimizing
+   candidates to avoid cancellation from large expanded-coordinate terms.
+   Pointed-bit flat floors retain physical scallops governed by path pitch and cutter
+   angle; tests measure emitted cutter removal instead of asserting a perfectly flat floor.
+
+### Verification and limits
+
+The [repair record](docs/vcarve-audit-repair-20260912.md) records desired-behavior
+counterexamples, independent final-G-code probes, persistence and native-browser checks,
+and integrated validation. The emitter revision changes with the resulting output.
+Frame remains the sole ordinary Start gate. These are software checks; packaged runtime,
+controller, air-cut and material-cut qualification remain separate.
+
+---
+
 ## Pending proposal - CNC tab count and editor synchronisation (2026-09-06)
 
 The [dated proposal](docs/proposals/2026-09-06-cnc-tab-count-sync.md) preserves the

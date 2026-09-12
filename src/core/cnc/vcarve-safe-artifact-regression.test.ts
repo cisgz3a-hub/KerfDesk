@@ -38,8 +38,11 @@ const SAFE_SPINDLE_RPM = 12_000;
 const EXPECTED_REGIONS = 4;
 const EXPECTED_PASSES = 16;
 const MAX_OUTPUT_BYTES = 450_000;
-const MAX_OUTPUT_LINES = 17_000;
-const MAX_XYZ_BLOCKS = 17_000;
+// The final-coordinate reserve and retained surface transitions add required
+// detail (17,589 lines in the audited program). Keep bounded artifact growth;
+// the byte ceiling and per-window GRBL wire-margin assertions remain unchanged.
+const MAX_OUTPUT_LINES = 18_000;
+const MAX_XYZ_BLOCKS = 18_000;
 const GRBL_PLANNER_WINDOW_BLOCKS = 16;
 const EXPECTED_MAX_DEPTH_MM = 5.924;
 

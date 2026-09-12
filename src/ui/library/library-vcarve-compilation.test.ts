@@ -79,9 +79,11 @@ describe('design-library V-carve compilation', () => {
     );
     const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
 
-    expect(passDepths).toEqual([-0.5, -1, -1.5, -1.513, -0.5, -0.99]);
-    expect(gcode).toContain('Z-1.513');
-    expect(gcode).toContain('Z-0.990');
+    // Final-coordinate containment reserves 0.000707 mm radially. At 30°
+    // that is about 0.00264 mm of depth before conservative Z quantization.
+    expect(passDepths).toEqual([-0.5, -1, -1.5, -1.51, -0.5, -0.988]);
+    expect(gcode).toContain('Z-1.510');
+    expect(gcode).toContain('Z-0.988');
     expect(gcode).toMatch(/^G1?X-?\d+\.\d{3}Y-?\d+\.\d{3}Z-?\d+\.\d{3}/m);
   });
 

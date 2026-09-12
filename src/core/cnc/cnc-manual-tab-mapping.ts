@@ -14,6 +14,9 @@ export type CollectedCncContour = {
   // object identity, not just the family. Absent on the same legacy callers,
   // which then get no grouping.
   readonly objectId?: string;
+  // Converted font paths keep their own nonzero winding without changing
+  // their source family or the centreline used by line/engrave operations.
+  readonly fillRule?: 'nonzero' | 'evenodd';
   readonly manualTabPoints?: ReadonlyArray<Vec2>;
 };
 

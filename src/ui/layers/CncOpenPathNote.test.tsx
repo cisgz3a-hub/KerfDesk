@@ -17,6 +17,7 @@ import {
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { CncOpenPathNote } from './CncOpenPathNote';
+import { unrepresentableStrokeObject } from '../../__fixtures__/vcarve-stroke-geometry';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -97,6 +98,29 @@ afterEach(() => {
 });
 
 describe('CncOpenPathNote', () => {
+  it('shows a stroke geometry failure and clears it when the artwork is repaired', async () => {
+    vi.useFakeTimers();
+    install([unrepresentableStrokeObject()]);
+    const view = await renderNote();
+    try {
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(view.host.textContent).toContain('could not represent the stroke geometry');
+      expect(view.host.textContent).not.toContain(NOTE_TEXT);
+      await act(async () => {
+        install([stroke(true)]);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(view.host.textContent).toBe('');
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
   it('warns when every shape on a V-carve layer is an open path', async () => {
     vi.useFakeTimers();
     install([stroke(false)]);

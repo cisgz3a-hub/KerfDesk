@@ -21,6 +21,7 @@ import {
 } from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
 import { emittedChordIsSafe, sourceBoundarySegments } from './vcarve-detail-depth';
+import { vcarveEmissionConstraints } from './vcarve-cutting-constraints';
 
 // Reserve more than the worst endpoint displacement on the emitted XY grid.
 // A skipped span is justified by removed volume, never just by center coverage.
@@ -183,6 +184,7 @@ function fragmentsAreContained(
   boundary: VCarveBoundarySegmentIndex,
   envelope: RadialEnvelope,
 ): boolean {
+  const certifiedEnvelope = { ...envelope, ...vcarveEmissionConstraints(envelope) };
   for (const points of fragments) {
     for (let i = 1; i < points.length; i += 1) {
       const a = points[i - 1];
@@ -190,7 +192,7 @@ function fragmentsAreContained(
       if (
         a !== undefined &&
         b !== undefined &&
-        !emittedChordIsSafe(a, b, -a.z, -b.z, boundary, envelope)
+        !emittedChordIsSafe(a, b, -a.z, -b.z, boundary, certifiedEnvelope)
       )
         return false;
     }

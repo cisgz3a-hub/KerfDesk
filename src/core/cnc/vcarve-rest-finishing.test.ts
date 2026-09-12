@@ -113,7 +113,9 @@ describe('V-carve finish justified by actual clearing-tool removal', () => {
     const cleared = compile(loops, true);
     const before = cuttingXyLength(chords(alone, 'v-carve'));
     const after = cuttingXyLength(chords(cleared, 'v-carve'));
-    expect(before).toBeCloseTo(3414.592929, 3);
+    // The emitted-grid containment reserve and retained surface transitions
+    // change the microscopic corner ends; removal assertions retain the stock claim.
+    expect(before).toBeCloseTo(3414.581615, 3);
     expect(after).toBeLessThan(before * 0.45);
     expect(after).toBeGreaterThan(100);
     expect(
