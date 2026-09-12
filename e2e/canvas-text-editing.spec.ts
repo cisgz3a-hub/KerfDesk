@@ -83,11 +83,11 @@ test('double-click edits the text, Escape cancels, and native keyboard editing s
 }) => {
   await page.setViewportSize({ width: 1500, height: 950 });
   await page.goto('/');
-  await addText(page, 'Original');
-  await page.keyboard.press('Control+Enter');
+  const input = await addText(page, 'Original');
+  await input.press('Control+Enter');
+  await expect(input).toHaveCount(0);
   const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
   await canvas.dblclick({ position: { x: 194, y: 226 } });
-  const input = page.getByRole('textbox', { name: 'Text content on canvas' });
   await expect(input).toHaveValue('Original');
   await input.fill('Cancelled');
   await input.press('Escape');
@@ -100,6 +100,7 @@ test('double-click edits the text, Escape cancels, and native keyboard editing s
   await expect(input).toHaveValue('Edited\non canvas');
   expect((await snapshot(page)).objects[0]).toMatchObject({ content: 'Original' });
   await input.press('Control+Enter');
+  await expect(input).toHaveCount(0);
   expect((await snapshot(page)).objects[0]).toMatchObject({ content: 'Edited\non canvas' });
   await page.keyboard.press('Control+z');
   expect((await snapshot(page)).objects[0]).toMatchObject({ content: 'Original' });
@@ -118,6 +119,7 @@ test('curved lettering previews beside its editable content and remains editable
   await page.screenshot({ path: testInfo.outputPath('curved.png') });
   await input.fill('Curved café');
   await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(input).toHaveCount(0);
   expect((await snapshot(page)).objects[0]).toMatchObject({ content: 'Curved café', bendDeg: 60 });
 });
 
