@@ -1,5 +1,6 @@
 import type { CncPass } from '../job';
-import type { CncTileRegistration, Vec2 } from '../scene';
+import type { Vec2 } from '../scene';
+import type { CncTileRegistration } from '../scene/machine';
 import { zPassDepths } from './depth-passes';
 
 /** Cylindrical bore: center pecks for a matching cutter; otherwise clear

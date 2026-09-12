@@ -4,8 +4,8 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_TILING,
   PROJECT_SCHEMA_VERSION,
-  type CncTileRegistration,
 } from '../../core/scene';
+import type { CncTileRegistration } from '../../core/scene/machine';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';

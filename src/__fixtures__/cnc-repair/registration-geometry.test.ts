@@ -3,7 +3,7 @@ import { tileJobs } from '../../core/cnc/tile-plan';
 import { tileRegistrationPasses } from '../../core/cnc/tile-registration-passes';
 import { cncGrblStrategy } from '../../core/output/cnc-grbl-strategy';
 import type { CncGroup } from '../../core/job';
-import type { CncTileRegistration } from '../../core/scene';
+import type { CncTileRegistration } from '../../core/scene/machine';
 import { estimateJobDuration } from '../../core/job/estimate-duration';
 import { device, motions, xyLength } from './motion-fixture';
 

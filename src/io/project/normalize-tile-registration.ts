@@ -1,4 +1,4 @@
-import type { CncTileRegistration } from '../../core/scene';
+import type { CncTileRegistration } from '../../core/scene/machine';
 
 /** Preserve valid requested values and unknown tool identities exactly. Cutter
  * applicability is resolved when producing the bore, never by replacing it. */

@@ -1,4 +1,5 @@
-import type { CncMachineConfig, CncTileRegistration, CncTool } from '../scene';
+import type { CncMachineConfig, CncTool } from '../scene';
+import type { CncTileRegistration } from '../scene/machine';
 import { zPassArrayMaterializationError } from './depth-passes';
 
 export type ResolvedTileRegistration = {

@@ -2,8 +2,8 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   type CncLayerSettings,
   type CncMachineConfig,
-  type CncTileRegistration,
 } from '../../../core/scene';
+import type { CncTileRegistration } from '../../../core/scene/machine';
 import { NumberField } from '../../common/NumberField';
 import { Row, unitStyle } from '../device-settings-shared';
 
