@@ -31,6 +31,9 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   // Registration remains absent in a legacy document until explicitly
   // configured. The version protects new plans from older readers.
   5: (raw) => ({ ...raw, schemaVersion: 6 }),
+  // Existing paths keep their original semantics. New converted paths carry
+  // explicit winding and pen geometry that older readers cannot safely ignore.
+  6: (raw) => ({ ...raw, schemaVersion: 7 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

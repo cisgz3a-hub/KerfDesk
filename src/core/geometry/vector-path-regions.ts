@@ -18,7 +18,7 @@ export const VECTOR_PATH_PRECISION_DECIMALS = 3;
 
 export type NormalizedVectorPathBatch = Pick<
   ColoredPath,
-  'color' | 'operationIds' | 'strokeWidthMm'
+  'color' | 'operationIds' | 'strokeWidthMm' | 'strokeTransform'
 > & {
   readonly paths: PathsD;
 };
@@ -32,9 +32,9 @@ export function normalizeVectorObjectBatches(
   const materializedResult = tryVectorOp(() => materializeVectorObject(object));
   if (materializedResult.kind === 'error') return materializedResult;
   const materialized = materializedResult.value;
-  const fillRule = object.kind === 'text' ? FillRule.NonZero : FillRule.EvenOdd;
   const batches: NormalizedVectorPathBatch[] = [];
   for (const path of materialized.paths) {
+    const fillRule = path.fillRule === 'nonzero' ? FillRule.NonZero : FillRule.EvenOdd;
     const raw: PathsD = [];
     for (const polyline of path.polylines) {
       if (!isClosedPolygon(polyline)) {
@@ -58,11 +58,18 @@ export function normalizeVectorObjectBatches(
     batches.push({
       color: path.color,
       ...(operationIds === undefined ? {} : { operationIds }),
-      ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm }),
+      ...strokeFields(path),
       paths: normalized.value,
     });
   }
   return ok(batches);
+}
+
+function strokeFields(path: ColoredPath): Pick<ColoredPath, 'strokeWidthMm' | 'strokeTransform'> {
+  return {
+    ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm }),
+    ...(path.strokeTransform === undefined ? {} : { strokeTransform: path.strokeTransform }),
+  };
 }
 
 /** Union already-normalized render batches into one visible object region. */

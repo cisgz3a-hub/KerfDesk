@@ -9,6 +9,9 @@ export const PROGRAM_MATERIALIZATION_FAILED_MESSAGE =
  * programming defects that must remain visible to diagnostics.
  */
 export function isProgramMaterializationRangeError(error: unknown): boolean {
+  // The depth planner proves an impossible Array length before allocating.
+  // Worker bridges retain its exact message but may reconstruct plain Error.
+  if (isImpossibleZPassArray(error)) return true;
   if (!isNamedRangeError(error)) return false;
   const message = error.message;
   return (
@@ -20,6 +23,17 @@ export function isProgramMaterializationRangeError(error: unknown): boolean {
       message,
     )
   );
+}
+
+function isImpossibleZPassArray(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const message = (error as { readonly message?: unknown }).message;
+  if (typeof message !== 'string') return false;
+  const count =
+    /^Z-pass count (Infinity|\d+(?:\.\d+)?(?:e\+\d+)?) exceeds the ECMAScript Array length limit\.$/.exec(
+      message,
+    )?.[1];
+  return count !== undefined && Number(count) > 0xffff_ffff;
 }
 
 export function programMaterializationFailure(): PreflightResult {

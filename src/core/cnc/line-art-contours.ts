@@ -97,7 +97,10 @@ export function lineArtPairableSet(
 ): ReadonlySet<Polyline> | undefined {
   if (sources.length === 0) return undefined;
   const pairable = sources.filter(
-    (source) => source.sourceKind !== 'text' && source.sourceKind !== 'shape',
+    (source) =>
+      source.sourceKind !== 'text' &&
+      source.sourceKind !== 'shape' &&
+      source.fillRule !== 'nonzero',
   );
   if (pairable.length === sources.length) return undefined;
   return new Set(pairable.map((source) => source.polyline));

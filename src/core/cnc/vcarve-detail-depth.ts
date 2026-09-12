@@ -18,6 +18,7 @@ import {
 } from './vcarve-detail-geometry';
 import { validDepthInputs, validDepthTolerance, type DetailDepthLaw } from './vcarve-detail-input';
 import { radialEnvelopeDepthMm, radialEnvelopeSweepRadiiMm } from './radial-envelope';
+import { pointInsideVCarveBoundary } from './vcarve-cutting-constraints';
 
 export type { BoundarySegment } from './vcarve-detail-geometry';
 export type { DetailDepthLaw } from './vcarve-detail-input';
@@ -95,7 +96,10 @@ export function detailPath3dPlan(
   const collapsed = collapseAtEmitPrecision(pointsForLeaves(leaves), polyline.closed);
   return {
     points: collapsed.points,
-    toleranceMet: state.toleranceMet && !collapsed.changed,
+    toleranceMet:
+      state.toleranceMet &&
+      !collapsed.changed &&
+      stitchedDepthQualityMet(collapsed.points, boundary, law, toleranceMm),
   };
 }
 
@@ -123,10 +127,26 @@ function refineDepthSpan(
       pending.push({ a: midpoint, b: span.b }, { a: span.a, b: midpoint });
       continue;
     }
-    state.toleranceMet = false;
-    leaves.push(conservativeLeaf(span.a, span.b, boundary, law));
+    const leaf = conservativeLeaf(span.a, span.b, boundary, law);
+    state.toleranceMet = state.toleranceMet && depthQualityMet(leaf, boundary, law, toleranceMm);
+    leaves.push(leaf);
   }
   return leaves;
+}
+
+function stitchedDepthQualityMet(
+  points: ReadonlyArray<Vec3>,
+  boundary: VCarveBoundarySegmentIndex,
+  law: DetailDepthLaw,
+  toleranceMm: number,
+): boolean {
+  return points.every((b, index) => {
+    const a = points[index - 1];
+    return (
+      a === undefined ||
+      depthQualityMet({ a, b, depthA: -a.z, depthB: -b.z }, boundary, law, toleranceMm)
+    );
+  });
 }
 
 function plannedLeaf(
@@ -158,7 +178,12 @@ function conservativeLeaf(
   const a = emittedPoint(rawA);
   const b = emittedPoint(rawB);
   const clearanceMm = minimumVCarveBoundaryChordDistance(boundary, a, b);
-  const boundaryDepthMm = radialEnvelopeDepthMm(law, clearanceMm);
+  const inside =
+    !law.requireInsideBoundary ||
+    (pointInsideVCarveBoundary(a, boundary) && pointInsideVCarveBoundary(b, boundary));
+  const boundaryDepthMm = inside
+    ? radialEnvelopeDepthMm(law, clearanceMm - (law.boundaryClearanceMm ?? 0))
+    : 0;
   const depth = quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
     boundaryDepthMm > law.maxDepthMm + 1e-9,
@@ -175,12 +200,17 @@ function depthQualityMet(
   const a = emittedPoint(leaf.a);
   const b = emittedPoint(leaf.b);
   if (Math.min(leaf.depthA, leaf.depthB) + toleranceMm >= law.maxDepthMm) return true;
-  if (!(leaf.depthA > 0) && !(leaf.depthB > 0)) return true;
-  const [radiusA, radiusB] = radialEnvelopeSweepRadiiMm(
+  const radii = radialEnvelopeSweepRadiiMm(
     law,
     leaf.depthA + toleranceMm,
     leaf.depthB + toleranceMm,
   );
+  // Refine against the intentionally reserved depth field. The independent
+  // route-precision check still measures total loss using the physical cutter.
+  // Otherwise a narrow-angle bit spends its whole refinement budget trying
+  // to recover material deliberately reserved for the final coordinate grid.
+  const radiusA = radii[0] + (law.boundaryClearanceMm ?? 0);
+  const radiusB = radii[1] + (law.boundaryClearanceMm ?? 0);
   // Distance to one closed segment is convex along this chord, while the
   // allowed radius interpolates linearly. If one boundary segment is within
   // the allowed radius at both endpoints, convexity certifies the whole span.
@@ -208,8 +238,9 @@ function emittedSafeDepth(
   boundary: VCarveBoundarySegmentIndex,
   law: DetailDepthLaw,
 ): number {
+  if (law.requireInsideBoundary && !pointInsideVCarveBoundary(point, boundary)) return 0;
   const distanceMm = minimumVCarveBoundaryPointDistance(boundary, point);
-  const boundaryDepthMm = radialEnvelopeDepthMm(law, distanceMm);
+  const boundaryDepthMm = radialEnvelopeDepthMm(law, distanceMm - (law.boundaryClearanceMm ?? 0));
   return quantizeDepth(
     Math.min(boundaryDepthMm, law.maxDepthMm),
     boundaryDepthMm > law.maxDepthMm + 1e-9,

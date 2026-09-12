@@ -374,7 +374,15 @@ function drawObjectPolylines(
     if (effectiveLayer.mode === 'fill') {
       const display = displayPathFor(path, obj, view, displayPolylineCache, true);
       simplified = includesSimplifiedDisplay(simplified, display);
-      drawFilledDesignGeometry(ctx, obj, display.polylines, effectiveLayer, view, layer.color);
+      drawFilledDesignGeometry(
+        ctx,
+        obj,
+        display.polylines,
+        effectiveLayer,
+        view,
+        layer.color,
+        path.fillRule,
+      );
       continue;
     }
     ctx.strokeStyle = layer.color;
@@ -422,6 +430,7 @@ function drawFilledDesignGeometry(
   layer: Layer,
   view: ViewTransform,
   color: string,
+  fillRule?: ColoredPath['fillRule'],
 ): void {
   const open = polylines.filter((polyline) => !polyline.closed);
 
@@ -432,7 +441,7 @@ function drawFilledDesignGeometry(
       obj,
       polylines,
       view,
-      obj.kind === 'text' ? 'nonzero' : 'evenodd',
+      fillRule ?? (obj.kind === 'text' ? 'nonzero' : 'evenodd'),
     );
   }
   if (open.length === 0) return;

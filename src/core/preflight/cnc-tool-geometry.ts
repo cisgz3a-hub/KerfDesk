@@ -1,7 +1,7 @@
 import { collectLayerPolylines } from '../cnc/collect-cnc-contours';
 import { vcarveClearanceToolpaths, vcarveHasFlatFloor } from '../cnc/vcarve-clearance';
 import { vcarveResolutionMm } from '../cnc/vcarve-ladder';
-import { zPassDepths } from '../cnc/depth-passes';
+import { zPassCount } from '../cnc/depth-passes';
 import { MIN_CNC_TIP_ANGLE_DEG, isValidCncTipAngleDeg } from '../cnc-tip-angle';
 import type { DeviceProfile } from '../devices';
 import { insetContoursChecked } from '../geometry/offset-ladder';
@@ -112,7 +112,7 @@ function invalidVCarveClearToolIssue(
   }
   const clearTool = config.tools.find((candidate) => candidate.id === settings.vClearToolId);
   if (clearTool === undefined) {
-    if (zPassDepths(settings.depthMm, settings.depthPerPassMm).length === 0) return null;
+    if (zPassCount(settings.depthMm, settings.depthPerPassMm) === 0) return null;
     if (
       !vcarveHasFlatFloor(contours, {
         vBit: layerCncTool(config, settings),
@@ -129,7 +129,7 @@ function invalidVCarveClearToolIssue(
     };
   }
   if (clearTool.kind === 'end-mill') return null;
-  if (zPassDepths(settings.depthMm, settings.depthPerPassMm).length === 0) return null;
+  if (zPassCount(settings.depthMm, settings.depthPerPassMm) === 0) return null;
   const vBit = layerCncTool(config, settings);
   const clearancePaths = vcarveClearanceToolpaths(contours, {
     vBit,
@@ -183,7 +183,7 @@ function twoStageClearanceCouldEmit(
   config: CncMachineConfig,
 ): boolean {
   if (!(settings.vCarveFlatDepthEnabled ?? true)) return false;
-  if (zPassDepths(settings.depthMm, settings.depthPerPassMm).length === 0) return false;
+  if (zPassCount(settings.depthMm, settings.depthPerPassMm) === 0) return false;
   const clearTool = config.tools.find((candidate) => candidate.id === settings.vClearToolId);
   if (clearTool === undefined || !(clearTool.diameterMm > 0)) return false;
   // At the minimum allowed angle the flat-floor clamp inset is smallest. If
