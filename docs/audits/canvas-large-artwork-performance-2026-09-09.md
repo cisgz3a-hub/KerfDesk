@@ -185,9 +185,53 @@ construction or cloning. A terminal preparation retires its worker before
 releasing the lane. Autosave keeps its normal interval and snapshot but
 waits for active preparation to finish; later preparation requests cannot
 overtake it. Completed result caching and current-queue coalescing remain.
-The native browser must still verify actual heap reclamation after the
-termination request and responsiveness with recovery enabled. Final
-production qualification and merge remain pending.
+The production browser now completes all 7,305,177 route steps at 48.3 seconds,
+retires preparation and then commits the queued normal autosave at 50.1 seconds.
+The 30-second autosave tick occurs during transfer. Recovery retains the exact
+4096 x 4096 PNG and all 16,777,216 luminance bytes, with matching SHA-256 hashes;
+this run has no page or worker error or renderer crash. This is native evidence
+for this fixture, not a guarantee of every browser's memory reclamation timing.
+Hover and Design zoom/pan have 8.5 ms frame P95, but Preview zoom/pan still have
+100/150 ms P95, requiring the display scheduling changes below.
+
+The follow-up transfers exact display coordinates and ordered commands in two
+owned buffers, avoiding the object graph clone during playback. A completed
+Preview image follows pan/zoom immediately, with exact viewport repaint after a
+150 ms quiet period. This brings native full-image Preview hover/zoom/pan P95 to
+8.5/8.4/8.5 ms. Playback still stalls on repeated dense GPU frames, despite removing
+repeated main-thread clone tasks. Progress changes therefore use a separate
+CPU-backed worker canvas temporarily. After 150 ms of quiet progress, the same
+commands are painted by the original GPU context. Interim antialiasing can differ;
+the updating indicator remains until the exact final GPU view arrives. Worker
+ownership remains bounded to two viewport canvases and one decoded command frame.
+The final production run completes transfer at **52.18 seconds** and commits
+the queued autosave at **53.81 seconds**; the normal tick occurs at 30.29 seconds,
+during transfer. All seven interaction checks pass in native Chrome 153.0.8010.37:
+
+| Interaction | Frame P95 | Maximum frame interval |
+| --- | ---: | ---: |
+| Preview hover | 8.5 ms | 8.6 ms |
+| Preview zoom | 8.5 ms | 108.3 ms |
+| Preview pan | 8.5 ms | 8.5 ms |
+| Design hover | 8.4 ms | 16.8 ms |
+| Design zoom | 8.4 ms | 8.5 ms |
+| Design pan | 8.4 ms | 8.5 ms |
+| Preview playback | 8.5 ms | 150.0 ms |
+
+Each hover delivers 48 actual canvas pointer moves with zero canvas redraws.
+Playback remains visible throughout, with 267 bitmap blits during the measured
+phase. Its two main-thread long tasks are 50 and 152 ms; the initial progress
+calculation and occasional exact GPU repaint can still cause finite pauses.
+P95 here measures page frame responsiveness, not the rate of newly computed
+route images. Source image and luminance hashes match the earlier exact values,
+and there are no page, worker or Preview errors. This qualifies the full-image
+workflow on this host, not arbitrary input sizes or every browser/GPU.
+
+The native CPU-to-GPU restoration matrix also passes all 75 cases: each final
+GPU frame reuses the CPU frame's decoded geometry without retransmitting it,
+and all 29,491,200 RGBA channels match the old renderer. The CPU stage exercises
+the known transient antialiasing differences. Both transferred coordinate buffers
+and all 150 underlays demonstrably detach; no source geometry is detached.
 
 The same 4096 x 4096 gradient/crossing-line raster now completes its real
 background ETA at **48,441.177515398085 seconds**, displaying **13h 27m 21s**,

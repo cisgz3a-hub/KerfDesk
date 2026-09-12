@@ -1,4 +1,4 @@
-import type { PreparedPreviewFrame } from './preview-route-frame';
+import type { PackedPreviewFrame } from './preview-route-frame-transfer';
 import type { ViewTransform } from './view-transform';
 
 export type PreviewRouteWorkerRequest = {
@@ -8,10 +8,12 @@ export type PreviewRouteWorkerRequest = {
   readonly width: number;
   readonly height: number;
   readonly view: ViewTransform;
+  /** Interim CPU paint while progress changes; quiet progress requires an exact GPU paint. */
+  readonly interactive?: boolean;
   /** Exact pixels below the route; transferred ownership ends after this paint. */
   readonly background: ImageBitmap;
   /** Required when frameId changes; viewport-only requests reuse the worker's one frame. */
-  readonly frame?: PreparedPreviewFrame;
+  readonly frame?: PackedPreviewFrame;
 };
 
 export type PreviewRouteWorkerResponse =

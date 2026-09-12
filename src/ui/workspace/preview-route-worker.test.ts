@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreparedPreviewFrame } from './preview-route-frame';
+import { packPreviewFrame } from './preview-route-frame-transfer';
 import type {
   PreviewRouteWorkerRequest,
   PreviewRouteWorkerResponse,
@@ -35,9 +36,9 @@ class TestCanvas {
   ) {
     TestCanvas.instances.push(this);
   }
-  getContext() {
+  getContext = vi.fn((_kind: string, _options?: { willReadFrequently: boolean }) => {
     return context;
-  }
+  });
   transferToImageBitmap() {
     const bitmap = { close: vi.fn() };
     bitmaps.push(bitmap);
@@ -62,7 +63,11 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function render(request: Partial<PreviewRouteWorkerRequest> = {}) {
+function render(
+  request: Omit<Partial<PreviewRouteWorkerRequest>, 'frame'> & {
+    frame?: PreparedPreviewFrame;
+  } = {},
+) {
   const background = request.background ?? newBackground();
   scope.onmessage?.({
     data: {
@@ -73,6 +78,7 @@ function render(request: Partial<PreviewRouteWorkerRequest> = {}) {
       height: 80,
       view: { scale: 1, offsetX: 0, offsetY: 0 },
       ...request,
+      ...(request.frame === undefined ? {} : { frame: packPreviewFrame(request.frame) }),
       background,
     },
   } as MessageEvent<PreviewRouteWorkerRequest>);
@@ -86,6 +92,21 @@ function newBackground(): ImageBitmap {
 }
 
 describe('Preview route worker ownership', () => {
+  it('keeps CPU progress frames separate from exact GPU repaint and reuses their geometry', () => {
+    expect(render({ frame, interactive: true }).kind).toBe('painted');
+    const interactive = TestCanvas.instances[0]!;
+    expect(interactive.getContext).toHaveBeenLastCalledWith('2d', { willReadFrequently: true });
+    expect(render({ id: 2, interactive: false }).kind).toBe('painted');
+    const settled = TestCanvas.instances[1]!;
+    expect(settled.getContext).toHaveBeenLastCalledWith('2d', { willReadFrequently: false });
+    expect(moves).toHaveBeenLastCalledWith(0, 0);
+    expect(render({ id: 3, interactive: true, width: 200 }).kind).toBe('painted');
+    expect(TestCanvas.instances).toHaveLength(2);
+    expect(interactive.width).toBe(200);
+    expect(settled.width).toBe(100);
+    expect(backgrounds.every((background) => background.close.mock.calls.length === 1)).toBe(true);
+  });
+
   it('reuses one prepared frame and canvas for new viewports, then replaces the frame', () => {
     expect(render({ frame }).kind).toBe('painted');
     expect(scope.postMessage.mock.calls[0]?.[1]).toEqual([bitmaps[0]]);

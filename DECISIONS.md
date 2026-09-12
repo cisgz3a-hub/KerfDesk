@@ -16193,6 +16193,16 @@ repeated autosave serialization of an unchanged document.
   During continuous playback, keep the latest completed progress frame for the same route, travel
   option and background; exact readiness still requires the current scrubber value, view and size.
   Discarding every older progress reply would otherwise leave playback blank until it stops.
+  Transfer newly allocated Float64 coordinate and Uint32 command buffers for changed display
+  frames, preserving ordered commands and exact doubles without detaching source geometry.
+  Once a compatible image exists, pan/zoom reuses its transform until the viewport has been quiet
+  for 150 ms, then requests the exact final GPU paint. Changed playback progress remains immediate.
+  Cancel that timer on settled-view reuse, content invalidation, failure or Preview exit.
+  While scrubber progress changes, paint interim frames with a separate CPU-backed worker canvas
+  to avoid repeated dense GPU work stalling page presentation. After 150 ms of quiet progress,
+  reuse the same commands for the original GPU paint; only that exact final frame clears the
+  updating indicator. Interim antialiasing can differ. Keep at most these two viewport canvases,
+  one decoded command frame and the existing bounded bitmap/request ownership.
   Capture the canvas underlay at the route's insertion point, render over it in the worker and copy
   the completed image back before later outlines/rulers. This preserves per-stroke alpha blending;
   compositing a transparent route layer once does not. Settled views retain the existing widths,

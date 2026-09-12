@@ -2,18 +2,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import { PreviewBitmapRenderer } from './preview-bitmap-renderer';
 import { preparePreviewFrame } from './preview-route-frame';
+import { unpackPreviewFrame, type PackedPreviewFrame } from './preview-route-frame-transfer';
 import type { ViewTransform } from './view-transform';
 
 vi.mock('./preview-route-frame', () => ({
-  preparePreviewFrame: vi.fn(() => ({ testFrame: true })),
+  preparePreviewFrame: vi.fn(() => ({
+    futureSteps: [],
+    wholeSteps: [],
+    partial: null,
+    head: null,
+    start: null,
+    end: null,
+  })),
 }));
-type Request = { id: number; frameId: number; frame?: unknown; view: ViewTransform };
+type Request = {
+  id: number;
+  frameId: number;
+  frame?: PackedPreviewFrame;
+  view: ViewTransform;
+  interactive: boolean;
+};
 class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
   onmessageerror: (() => void) | null = null;
-  postMessage = vi.fn<(_request: Request) => void>();
+  postMessage = vi.fn<(_request: Request, _transfers: Transferable[]) => void>();
   terminate = vi.fn();
   constructor() {
     FakeWorker.instances.push(this);
@@ -31,6 +45,7 @@ const route: Toolpath = { steps: Array.from({ length: 20_000 }, () => step), tot
 let renderers: PreviewBitmapRenderer[] = [];
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('Worker', FakeWorker);
   vi.stubGlobal('OffscreenCanvas', vi.fn());
   vi.stubGlobal(
@@ -44,6 +59,7 @@ afterEach(() => {
   renderers.forEach((renderer) => renderer.clear(false));
   renderers = [];
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function image() {
@@ -91,8 +107,88 @@ describe('Preview bitmap ownership and viewport scheduling', () => {
     expect(f.drawImage).toHaveBeenLastCalledWith(bitmap, 0, 0, 800, 600);
     expect(f.changed).toHaveBeenLastCalledWith(false, false);
     await f.draw({ ...view, offsetX: 50 });
+    await vi.advanceTimersByTimeAsync(150);
+    await f.draw({ ...view, offsetX: 50 });
     expect(request(worker, 1).frame).toBeUndefined();
     expect(preparePreviewFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it('transfers newly packed display buffers with the underlay and preserves the prepared frame', async () => {
+    const f = fixture();
+    await f.draw();
+    const worker = FakeWorker.instances[0]!;
+    const packed = request(worker).frame!;
+    expect(worker.postMessage.mock.calls[0]![1]).toEqual([
+      expect.objectContaining({ close: expect.any(Function) }),
+      packed.coordinates.buffer,
+      packed.commands.buffer,
+    ]);
+    expect(unpackPreviewFrame(packed)).toEqual(
+      vi.mocked(preparePreviewFrame).mock.results[0]!.value,
+    );
+  });
+
+  it('moves the completed image during a gesture and paints only the final settled viewport', async () => {
+    const f = fixture();
+    await f.draw();
+    const worker = FakeWorker.instances[0]!;
+    const bitmap = worker.reply(request(worker));
+    let nextView = view;
+    for (let offset = 20; offset <= 200; offset += 20) {
+      nextView = { ...view, offsetX: offset };
+      await f.draw(nextView);
+      await vi.advanceTimersByTimeAsync(80);
+      expect(worker.postMessage).toHaveBeenCalledTimes(1);
+    }
+    expect(f.drawImage).toHaveBeenLastCalledWith(bitmap, 190, 0, 800, 600);
+    expect(f.changed).toHaveBeenLastCalledWith(true, false);
+    await vi.advanceTimersByTimeAsync(70);
+    expect(f.changed).toHaveBeenLastCalledWith(true, true);
+    await f.draw(nextView);
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    expect(request(worker, 1).view).toEqual(nextView);
+    const final = worker.reply(request(worker, 1));
+    await f.draw(nextView);
+    expect(f.drawImage).toHaveBeenLastCalledWith(final, 0, 0, 800, 600);
+    expect(f.changed).toHaveBeenLastCalledWith(false, false);
+  });
+
+  it.each(['clear', 'error', 'return', 'background'] as const)(
+    'cancels a waiting viewport repaint after %s',
+    async (action) => {
+      const f = fixture();
+      await f.draw();
+      const worker = FakeWorker.instances[0]!;
+      worker.reply(request(worker));
+      const moved = { ...view, offsetX: 60 };
+      await f.draw(moved);
+      if (action === 'clear') f.renderer.clear();
+      else if (action === 'error') worker.onerror?.();
+      else if (action === 'return') await f.draw();
+      else await f.draw(moved, route, 1, true, {});
+      const changes = f.changed.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(f.changed).toHaveBeenCalledTimes(changes);
+      expect(worker.postMessage).toHaveBeenCalledTimes(action === 'background' ? 2 : 1);
+    },
+  );
+
+  it('starts changed playback progress immediately while a viewport repaint is waiting', async () => {
+    const f = fixture();
+    await f.draw();
+    const worker = FakeWorker.instances[0]!;
+    worker.reply(request(worker));
+    const moved = { ...view, offsetX: 60 };
+    await f.draw(moved);
+    expect(worker.postMessage).toHaveBeenCalledTimes(1);
+    await f.draw(moved, route, 0.5);
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    expect(preparePreviewFrame).toHaveBeenLastCalledWith(route, 0.5, expect.any(Object));
+    const changes = f.changed.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(200);
+    expect(f.changed).toHaveBeenCalledTimes(changes + 1);
+    expect(f.changed).toHaveBeenLastCalledWith(true, true);
+    expect(request(worker, 1).interactive).toBe(true);
   });
 
   it('coalesces viewport changes and replaces the temporary transformed bitmap with the exact view', async () => {
@@ -167,8 +263,18 @@ describe('Preview bitmap ownership and viewport scheduling', () => {
     await f.draw(view, route, 0.5);
     expect(second.close).toHaveBeenCalledTimes(1);
     expect(f.drawImage).toHaveBeenLastCalledWith(final, 0, 0, 800, 600);
-    expect(f.changed).toHaveBeenLastCalledWith(false, false);
+    expect(f.changed).toHaveBeenLastCalledWith(true, false);
     expect(worker.postMessage).toHaveBeenCalledTimes(3);
+    expect(request(worker, 2).interactive).toBe(true);
+    await vi.advanceTimersByTimeAsync(150);
+    await f.draw(view, route, 0.5);
+    expect(request(worker, 3).interactive).toBe(false);
+    expect(request(worker, 3).frame).toBeUndefined();
+    const settled = worker.reply(request(worker, 3));
+    await f.draw(view, route, 0.5);
+    expect(f.drawImage).toHaveBeenLastCalledWith(settled, 0, 0, 800, 600);
+    expect(f.changed).toHaveBeenLastCalledWith(false, false);
+    expect(worker.postMessage).toHaveBeenCalledTimes(4);
   });
 
   it('keeps an already-correct bitmap when the user returns to it before an older view finishes', async () => {
@@ -176,6 +282,8 @@ describe('Preview bitmap ownership and viewport scheduling', () => {
     await f.draw();
     const worker = FakeWorker.instances[0]!;
     const correct = worker.reply(request(worker));
+    await f.draw({ ...view, offsetX: 70 });
+    await vi.advanceTimersByTimeAsync(150);
     await f.draw({ ...view, offsetX: 70 });
     await f.draw();
     const obsolete = worker.reply(request(worker, 1));
@@ -215,7 +323,7 @@ describe('Preview bitmap ownership and viewport scheduling', () => {
         worker.postMessage.mockImplementationOnce(() => {
           throw new Error('clone failed');
         });
-        expect(await f.draw({ ...view, offsetX: 60 })).toBe(true);
+        expect(await f.draw(view, route, 0.5)).toBe(true);
       } else if (failure === 'error') worker.onerror?.();
       else worker.onmessageerror?.();
       expect(worker.terminate).toHaveBeenCalledTimes(1);

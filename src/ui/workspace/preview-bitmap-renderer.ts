@@ -1,6 +1,7 @@
 import type { Toolpath } from '../../core/job';
 import { previewRouteForDrawing } from './executable-plan-preview-route';
 import { preparePreviewFrame } from './preview-route-frame';
+import { packPreviewFrame, packedPreviewFrameTransfers } from './preview-route-frame-transfer';
 import type {
   PreviewRouteWorkerRequest,
   PreviewRouteWorkerResponse,
@@ -10,13 +11,16 @@ import {
   drawTransformedBitmap,
   frameKey,
   paintMatchesTarget,
+  previewPaintPending,
   sameContent,
+  sameViewport,
   type FrameKey,
   type Painted,
   type Target,
 } from './preview-bitmap-view';
 
 const ASYNC_PREVIEW_STEP_THRESHOLD = 20_000;
+const VIEW_SETTLE_MS = 150;
 type Pending = { readonly id: number; readonly frameId: number; readonly target: Target };
 
 // One rendered viewport, one in-flight capture/paint, and one coalesced target.
@@ -30,6 +34,8 @@ export class PreviewBitmapRenderer {
   private latest: Target | null = null;
   private pending: Pending | null = null;
   private painted: Painted | null = null;
+  private viewTimer: ReturnType<typeof setTimeout> | null = null;
+  private progressTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly onChange: (pending: boolean, repaint: boolean) => void) {}
 
@@ -51,10 +57,20 @@ export class PreviewBitmapRenderer {
       return false;
     }
     const key = frameKey(this.latest?.key, route, scrubberT, showTravel);
-    this.latest = { key, backgroundKey, view, width: ctx.canvas.width, height: ctx.canvas.height };
+    const previous = this.latest;
+    this.scheduleProgress(key, backgroundKey);
+    this.latest = {
+      key,
+      backgroundKey,
+      view,
+      width: ctx.canvas.width,
+      height: ctx.canvas.height,
+      interactive: this.progressTimer !== null,
+    };
     if (this.painted !== null && !sameContent(this.painted.target, this.latest)) this.dropBitmap();
     const ready = paintMatchesTarget(this.painted, this.latest);
-    this.onChange(!ready, false);
+    this.scheduleViewport(previous, ready);
+    this.onChange(previewPaintPending(this.painted, this.latest), false);
     // Capture the freshly drawn underlay before any old bitmap or rulers are
     // painted. createImageBitmap copies canvas pixels before resolving its promise.
     if (!ready) this.flush(ctx.canvas);
@@ -70,6 +86,52 @@ export class PreviewBitmapRenderer {
     this.sentKey = null;
     this.failed = false;
     if (notify) this.onChange(false, false);
+  }
+
+  private scheduleViewport(previous: Target | null, ready: boolean): void {
+    if (ready || this.painted === null || previous?.key !== this.latest?.key) {
+      this.cancelViewTimer();
+      return;
+    }
+    if (previous === null || this.latest === null || sameViewport(previous, this.latest)) return;
+    // Moving the completed image is cheap. Repaint its exact stroke widths and
+    // newly exposed area once the gesture settles, instead of flooding the GPU.
+    this.cancelViewTimer();
+    this.viewTimer = setTimeout(() => {
+      this.viewTimer = null;
+      this.onChange(true, true);
+    }, VIEW_SETTLE_MS);
+  }
+
+  private scheduleProgress(key: FrameKey, backgroundKey: object): void {
+    const previous = this.latest;
+    if (
+      previous === null ||
+      previous.key.route !== key.route ||
+      previous.key.showTravel !== key.showTravel ||
+      previous.backgroundKey !== backgroundKey
+    ) {
+      this.cancelProgressTimer();
+      return;
+    }
+    if (previous.key.scrubberT === key.scrubberT) return;
+    this.cancelProgressTimer();
+    // CPU-backed interim frames avoid dense GPU work blocking the page during
+    // playback. Quiet progress always returns to the original exact GPU paint.
+    this.progressTimer = setTimeout(() => {
+      this.progressTimer = null;
+      this.onChange(true, true);
+    }, VIEW_SETTLE_MS);
+  }
+
+  private cancelProgressTimer(): void {
+    if (this.progressTimer !== null) clearTimeout(this.progressTimer);
+    this.progressTimer = null;
+  }
+
+  private cancelViewTimer(): void {
+    if (this.viewTimer !== null) clearTimeout(this.viewTimer);
+    this.viewTimer = null;
   }
 
   private ensureWorker(): boolean {
@@ -107,6 +169,7 @@ export class PreviewBitmapRenderer {
   }
 
   private flush(canvas: HTMLCanvasElement): void {
+    if (this.viewTimer !== null) return;
     const worker = this.worker;
     if (worker === null || this.pending !== null || this.latest === null) return;
     const target = this.latest;
@@ -142,6 +205,15 @@ export class PreviewBitmapRenderer {
   ): void {
     const target = pending.target;
     try {
+      const frame = changedFrame
+        ? packPreviewFrame(
+            preparePreviewFrame(target.key.route, target.key.scrubberT, {
+              showTravel: target.key.showTravel,
+              showFuture: true,
+              showEndpoints: true,
+            }),
+          )
+        : undefined;
       const request: PreviewRouteWorkerRequest = {
         kind: 'render',
         id: pending.id,
@@ -149,18 +221,14 @@ export class PreviewBitmapRenderer {
         width: target.width,
         height: target.height,
         view: target.view,
+        interactive: target.interactive,
         background,
-        ...(changedFrame
-          ? {
-              frame: preparePreviewFrame(target.key.route, target.key.scrubberT, {
-                showTravel: target.key.showTravel,
-                showFuture: true,
-                showEndpoints: true,
-              }),
-            }
-          : {}),
+        ...(frame === undefined ? {} : { frame }),
       };
-      worker.postMessage(request, [background]);
+      worker.postMessage(request, [
+        background,
+        ...(frame === undefined ? [] : packedPreviewFrameTransfers(frame)),
+      ]);
       this.sentKey = target.key;
     } catch {
       background.close();
@@ -188,7 +256,7 @@ export class PreviewBitmapRenderer {
       this.painted = { bitmap: reply.bitmap, target: pending.target };
     } else reply.bitmap.close();
     // A coalesced view must start after drawScene rebuilds its actual underlay.
-    this.onChange(!paintMatchesTarget(this.painted, this.latest), true);
+    this.onChange(previewPaintPending(this.painted, this.latest), true);
   }
 
   private fail(): void {
@@ -201,6 +269,8 @@ export class PreviewBitmapRenderer {
   }
 
   private releaseWorker(): void {
+    this.cancelViewTimer();
+    this.cancelProgressTimer();
     if (this.worker !== null) {
       this.worker.onmessage = null;
       this.worker.onerror = null;

@@ -12,6 +12,7 @@ export type Target = {
   readonly view: ViewTransform;
   readonly width: number;
   readonly height: number;
+  readonly interactive: boolean;
 };
 export type Painted = { readonly bitmap: ImageBitmap; readonly target: Target };
 
@@ -45,11 +46,22 @@ export function paintMatchesTarget(painted: Painted | null, target: Target | nul
   return (
     sameContent(previous, target) &&
     previous.key.scrubberT === target.key.scrubberT &&
-    previous.width === target.width &&
-    previous.height === target.height &&
-    previous.view.scale === target.view.scale &&
-    previous.view.offsetX === target.view.offsetX &&
-    previous.view.offsetY === target.view.offsetY
+    previous.interactive === target.interactive &&
+    sameViewport(previous, target)
+  );
+}
+
+export function previewPaintPending(painted: Painted | null, target: Target | null): boolean {
+  return target?.interactive === true || !paintMatchesTarget(painted, target);
+}
+
+export function sameViewport(a: Target, b: Target): boolean {
+  return (
+    a.width === b.width &&
+    a.height === b.height &&
+    a.view.scale === b.view.scale &&
+    a.view.offsetX === b.view.offsetX &&
+    a.view.offsetY === b.view.offsetY
   );
 }
 
