@@ -57,7 +57,7 @@ test('real multi-artwork Dancing Script compiles off-thread and becomes ready in
   expect(workerUrls.some((url) => url.includes('canvas-compilation-worker'))).toBe(true);
   assertOffThreadPhase(testInfo, 'connected-script G-code off-thread compilation', compilation);
 
-  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({
+  await expect(page.getByLabel('Playback estimate', { exact: true })).toBeVisible({
     timeout: READINESS_TIMEOUT_MS,
   });
 
@@ -84,7 +84,7 @@ test('real multi-artwork Dancing Script compiles off-thread and becomes ready in
   await expect(inspector.getByLabel('Program health')).toBeVisible({
     timeout: READINESS_TIMEOUT_MS,
   });
-  await expect(inspector.getByLabel('Playback', { exact: true })).toBeVisible({
+  await expect(inspector.getByLabel('Playback estimate', { exact: true })).toBeVisible({
     timeout: READINESS_TIMEOUT_MS,
   });
   await page.waitForTimeout(POST_COMPLETION_WINDOW_MS);

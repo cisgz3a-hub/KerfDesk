@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 const DEFAULT_READINESS_TIMEOUT_MS = 30_000;
 const REFRESH_BUTTON_SELECTOR = 'button[title="Recompile this project\'s G-code"]';
-const PLAYBACK_SELECTOR = '[aria-label="Playback"]';
+const PLAYBACK_SELECTOR = '[aria-label="Playback estimate"]';
 const READY_SCENE_SELECTOR = '[data-viewer-state="ready"]';
 
 /** Waits through a cheap DOM predicate so the probe excludes Playwright tree traversal. */

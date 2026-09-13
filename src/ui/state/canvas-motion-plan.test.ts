@@ -23,6 +23,7 @@ import {
   reportedWorkPositionMm,
 } from './canvas-motion-plan';
 import { canvasExecutablePlan } from './canvas-preview-motion';
+import { canvasProgramSource } from './canvas-program-source';
 
 const JOB: Job = {
   groups: [
@@ -266,6 +267,7 @@ describe('CanvasMotionPlan', () => {
     });
     expect(grbl.capability).toBe('realtime');
     expect(canvasExecutablePlan(grbl)?.compatibility.exactProgram).toBe(gcode);
+    expect(canvasProgramSource(grbl)).toBe(gcode);
     expect(canvasExecutablePlan(grbl)?.controller.emitter).toBe('grbl');
     expect(JSON.stringify(grbl)).not.toContain('curvedesk.executable-plan');
     expect(grbl.framePerimeter[0]).toEqual({ x: 10, y: 20 });

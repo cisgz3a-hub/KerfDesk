@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PerspectiveCamera, Vector3 } from 'three';
 import type { AxisBounds } from '../../core/gcode-view';
 import {
   boundsCenter,
@@ -12,6 +13,28 @@ import {
 const BOUNDS: AxisBounds = { minX: 0, maxX: 100, minY: 0, maxY: 60, minZ: -10, maxZ: 0 };
 
 describe('cameraPlacement', () => {
+  it('fits every job corner in wide and narrow viewports, including elevated Z', () => {
+    const bounds = { ...BOUNDS, minZ: 100, maxZ: 140 };
+    for (const aspect of [0.4, 1, 2]) {
+      for (const preset of CAMERA_PRESETS) {
+        const view = cameraPlacement(preset, bounds, aspect);
+        const camera = new PerspectiveCamera(40, aspect, 0.1, 100_000);
+        camera.position.set(view.position.x, view.position.y, view.position.z);
+        camera.up.set(view.up.x, view.up.y, view.up.z);
+        camera.lookAt(view.target.x, view.target.y, view.target.z);
+        camera.updateMatrixWorld();
+        for (const x of [bounds.minX, bounds.maxX]) {
+          for (const y of [bounds.minY, bounds.maxY]) {
+            for (const z of [bounds.minZ, bounds.maxZ]) {
+              const projected = new Vector3(x, y, z).project(camera);
+              expect(Math.abs(projected.x)).toBeLessThan(1);
+              expect(Math.abs(projected.y)).toBeLessThan(1);
+            }
+          }
+        }
+      }
+    }
+  });
   it('always targets the centre of the job', () => {
     for (const preset of CAMERA_PRESETS) {
       expect(cameraPlacement(preset, BOUNDS).target).toEqual({ x: 50, y: 30, z: -5 });

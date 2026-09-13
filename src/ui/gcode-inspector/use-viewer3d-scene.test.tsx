@@ -47,6 +47,8 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     setLiveMachine: SCENE_MOCKS.setLiveMachine,
     recolor: SCENE_MOCKS.recolor,
     setView: vi.fn(),
+    setCameraTracking: vi.fn(),
+    onCameraInteraction: vi.fn(),
     captureImage: vi.fn(() => ''),
     setDirectionArrows: SCENE_MOCKS.setDirectionArrows,
     resize: vi.fn(),

@@ -28,7 +28,6 @@ export type CameraPlacement = {
   readonly up: Vec3;
 };
 
-const FIT_DISTANCE_FACTOR = 1.7;
 const DEFAULT_VIEW_MM = 100;
 const MIN_EXTENT_MM = 10;
 
@@ -50,15 +49,33 @@ const UPS: Readonly<Record<CameraPreset, Vec3>> = {
   right: { x: 0, y: 0, z: 1 },
 };
 
-export function cameraPlacement(preset: CameraPreset, bounds: AxisBounds | null): CameraPlacement {
+export function cameraPlacement(
+  preset: CameraPreset,
+  bounds: AxisBounds | null,
+  aspect = 1,
+): CameraPlacement {
   const target = boundsCenter(bounds);
-  const distance = boundsExtent(bounds) * FIT_DISTANCE_FACTOR;
+  const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const halfFov = Math.atan(Math.tan(Math.PI / 9) * Math.min(1, safeAspect));
+  const radius =
+    bounds === null
+      ? DEFAULT_VIEW_MM / 2
+      : Math.max(
+          MIN_EXTENT_MM,
+          Math.hypot(
+            bounds.maxX - bounds.minX,
+            bounds.maxY - bounds.minY,
+            bounds.maxZ - bounds.minZ,
+          ),
+        ) / 2;
+  const distance = (radius / Math.sin(halfFov)) * 1.12;
   const direction = DIRECTIONS[preset];
+  const scale = distance / Math.hypot(direction.x, direction.y, direction.z);
   return {
     position: {
-      x: target.x + direction.x * distance,
-      y: target.y + direction.y * distance,
-      z: target.z + direction.z * distance,
+      x: target.x + direction.x * scale,
+      y: target.y + direction.y * scale,
+      z: target.z + direction.z * scale,
     },
     target,
     up: UPS[preset],
