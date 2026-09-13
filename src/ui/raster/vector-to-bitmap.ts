@@ -1,6 +1,6 @@
 // ADR-029 Convert to Bitmap public UI entrypoint.
 //
-// The expensive production path prefers a Web Worker so vector rasterization
+// The expensive production path requires a Web Worker so vector rasterization
 // and PNG/luma encoding do not pin the React thread. The pure assembly
 // helpers stay exported for tests and worker reuse. Conversion takes the
 // whole selection: a multi-selection merges into ONE bitmap, matching
@@ -20,8 +20,7 @@ import {
   type ConvertibleVector,
   type ConvertToBitmapRenderType,
 } from './bitmap-assembly';
-import { canConvertBitmapInline, convertBitmapInWorker } from './convert-bitmap-worker-client';
-import { lumaToBitmap } from './luma-bitmap';
+import { convertBitmapInWorker } from './convert-bitmap-worker-client';
 
 export {
   DEFAULT_CONVERT_TO_BITMAP_DPI,
@@ -48,28 +47,21 @@ export type {
 export async function buildBitmapFromVectors(
   objects: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions = {},
+  signal?: AbortSignal,
 ): Promise<RasterImage> {
+  if (signal?.aborted === true) throw new DOMException('Bitmap conversion cancelled', 'AbortError');
   const id = crypto.randomUUID();
   const plan = estimateBitmapConversion(bitmapConversionTarget(objects), options.dpi);
   if (plan.verdict.kind !== 'ok') {
     throw new Error(
-      `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI or scale the artwork down before converting to bitmap.`,
+      `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.`,
     );
   }
-  const workerResult = convertBitmapInWorker(objects, options, id);
-  if (workerResult !== null) {
-    try {
-      return await workerResult;
-    } catch (err) {
-      if (!canConvertBitmapInline(plan)) {
-        throw err instanceof Error ? err : new Error(String(err));
-      }
-    }
-  }
-  if (!canConvertBitmapInline(plan)) {
+  const workerResult = convertBitmapInWorker(objects, options, id, signal);
+  if (workerResult === null) {
     throw new Error(
-      'Convert to Bitmap worker is unavailable for this large conversion. Reload the app and try again, or lower DPI before converting.',
+      'Convert to Bitmap worker is unavailable. Reload the app or use a browser that supports Web Workers before converting.',
     );
   }
-  return assembleBitmapAsync(objects, lumaToBitmap, id, options);
+  return workerResult;
 }

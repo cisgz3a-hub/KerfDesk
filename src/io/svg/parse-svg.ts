@@ -35,6 +35,7 @@ import {
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
+import { inheritedSvgFillRule } from './svg-fill-rule';
 
 export { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
@@ -113,6 +114,7 @@ type Matrix = SvgMatrix;
 type PresentationState = {
   readonly stroke: string | null;
   readonly fill: string | null;
+  readonly fillRule: ColoredPath['fillRule'];
   readonly transform: Matrix;
   readonly hidden: boolean;
   readonly opacity: number;
@@ -126,6 +128,7 @@ const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const INITIAL_PRESENTATION_STATE: PresentationState = {
   stroke: null,
   fill: null,
+  fillRule: undefined,
   transform: IDENTITY_MATRIX,
   hidden: false,
   opacity: 1,
@@ -134,7 +137,12 @@ const INITIAL_PRESENTATION_STATE: PresentationState = {
   visibility: null,
 };
 
-type PathBucket = { readonly polylines: Polyline[]; readonly curves: CurveSubpath[] };
+type PathBucket = {
+  readonly color: string;
+  readonly fillRule: ColoredPath['fillRule'];
+  readonly polylines: Polyline[];
+  readonly curves: CurveSubpath[];
+};
 
 // Everything the walk carries besides the element and its inherited state.
 // Bundled so the id resolver reaches <use> expansion without pushing the
@@ -228,7 +236,15 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
-  const bucket = context.byColor.get(color) ?? { polylines: [], curves: [] };
+  // Explicit SVG rules apply to each element's compound path. Different
+  // elements paint independently even when their colours/rules match.
+  const key = state.fillRule === undefined ? color : `${color}:${context.byColor.size}`;
+  const bucket = context.byColor.get(key) ?? {
+    color,
+    fillRule: state.fillRule,
+    polylines: [],
+    curves: [],
+  };
   for (const sub of subs) {
     reserveSvgPolyline(color, sub.points.length, context.budget);
     const points = sub.points.map((p) => applySvgMatrix(state.transform, p));
@@ -244,7 +260,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
         : transformSvgCurveSubpath(sub.curve, state.transform),
     );
   }
-  context.byColor.set(color, bucket);
+  context.byColor.set(key, bucket);
 }
 
 function isDefinitionContainer(el: Element): boolean {
@@ -292,6 +308,7 @@ function presentationStateFor(el: Element, parent: PresentationState): Presentat
   return {
     stroke,
     fill,
+    fillRule: inheritedSvgFillRule(presentationValue(el, styles, 'fill-rule'), parent.fillRule),
     transform,
     hidden,
     opacity,
@@ -376,8 +393,9 @@ export function parseSvgDocument(
     unitScale,
   );
 
-  const paths: ColoredPath[] = [...byColor.entries()].map(([color, bucket]) => ({
-    color,
+  const paths: ColoredPath[] = [...byColor.values()].map((bucket) => ({
+    color: bucket.color,
+    ...(bucket.fillRule === undefined ? {} : { fillRule: bucket.fillRule }),
     polylines: bucket.polylines,
     curves: bucket.curves,
   }));

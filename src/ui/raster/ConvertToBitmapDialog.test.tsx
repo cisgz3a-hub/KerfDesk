@@ -129,7 +129,7 @@ describe('ConvertToBitmapDialog', () => {
     try {
       expect(host.textContent).toContain('7782 x 5050 px');
       expect(host.textContent).toContain(
-        '~300 MB materialized working set exceeds the 64 MB budget',
+        'bitmap encoding and geometry need about 1200 MB, above the 64 MB conversion budget',
       );
 
       const convert = findButton(host, 'Convert');
@@ -156,8 +156,7 @@ async function renderDialog(opts: {
     root.render(
       <ConvertToBitmapDialog
         sourceName="logo.svg"
-        bounds={opts.bounds}
-        transform={IDENTITY_TRANSFORM}
+        target={{ bounds: opts.bounds, transform: IDENTITY_TRANSFORM }}
         onCancel={vi.fn()}
         onConvert={opts.onConvert ?? vi.fn()}
       />,

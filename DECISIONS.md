@@ -1429,6 +1429,43 @@ The follow-up from amendment (i) §5 shipped the same day:
 4. **Naming:** a multi-object result is labeled `N objects (bitmap)`; the dialog shows `N objects` and estimates from the combined bounds, so the size preview still matches exactly what the builder produces.
 5. The worker protocol carries the full selection (`vectors`); budget refusal (4 M px) applies to the combined grid, refusing up front in the dialog.
 
+### Amendment 2026-09-13 — fill fidelity and cancellable conversion
+
+The Convert to Bitmap audit confirmed lost operation overlap, dropped path winding rules,
+zero-extent placement, blocking fallback, stale worker timers, underestimated allocation,
+and requests publishing after relevant cut settings changed. This amendment supersedes
+the historical grouping and resource descriptions above.
+
+1. **Resolve fill at the correct boundary.** Each path retains its explicit `evenodd` or
+   `nonzero` rule; text without an explicit rule uses nonzero. Paths paint together within
+   an object. Fill All keeps deliberate even-odd interaction across selected objects.
+   Use Cut Settings applies that interaction within each operation, then paints independent
+   operation coverage together. A grouped scanline sweep avoids intermediate polygon
+   booleans and additional full-image grids.
+2. **Preserve explicit SVG input semantics.** Import retains explicit, inherited and inline
+   style fill rules, keeping separate SVG elements separate even when colour and rule
+   match. Import without an explicit rule retains its existing legacy interpretation;
+   changing that default across existing imports is outside this amendment.
+3. **Give a zero extent a physical pixel.** A horizontal or vertical vector receives a
+   centred one-pixel physical footprint on its zero axis. Planning, rasterization and
+   output placement use the same bounds. Invalid or unrepresentable bounds are refused.
+4. **Keep work cancellable.** One request owns one worker. Success, failure, timeout,
+   supersession and cancellation settle and retire that worker. No error is replayed on
+   the UI thread. A worker-unavailable error leaves the source intact.
+5. **Account for conversion resources.** The existing 64 MiB working allowance now uses
+   conservative conversion accounting: 32 bytes per output pixel for overlapping encoding
+   representations, source geometry accounting, and a request-wide flattened-segment
+   allowance. These are accounting estimates, not measurements or guarantees of total
+   browser memory. Encoding passes the existing RGBA array into ImageData without a
+   second RGBA allocation. Admitted geometry is never silently simplified to fit.
+   The shared tracer Raster Image output also uses this allowance; large conversions
+   previously admitted by the incomplete estimate can now be refused.
+6. **Own the pending UI and inputs.** The dialog stays open with indeterminate progress
+   and Cancel. Settings and repeat submission are disabled while busy. Cancel, Escape
+   and unmount abort work. Changing the source, document, or rendering-relevant operation
+   settings invalidates and aborts the request. An encoding error retains settings for
+   retry; success replaces sources in the existing single undo entry.
+
 ---
 
 ## ADR-030 — Trace control model realigned to LightBurn (Cutoff/Threshold band)

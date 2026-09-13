@@ -224,7 +224,7 @@ describe('Convert to Bitmap canonical curve authority', () => {
     },
   );
 
-  it('does not replace a large canonical path with an empty compatibility cache', () => {
+  it('refuses excessive canonical geometry instead of replacing it with an empty cache', () => {
     const source = canonicalSquare([]);
     const segments = Array.from({ length: 200_001 }, (_, index) => ({
       kind: 'line' as const,
@@ -251,6 +251,6 @@ describe('Convert to Bitmap canonical curve authority', () => {
         },
       ],
     };
-    expect(new Set(pixelsOf(large, 127).luma)).toEqual(new Set([127]));
+    expect(() => pixelsOf(large, 127)).toThrow(/conversion budget/);
   });
 });

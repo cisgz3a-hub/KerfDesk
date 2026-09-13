@@ -22,6 +22,7 @@ import {
   type ShapeObject,
   type TextObject,
   type TracedImage,
+  type Transform,
 } from '../../core/scene';
 import { flattenColoredPathCurvesForTransform } from '../../core/scene/curve-path';
 import {
@@ -31,6 +32,8 @@ import {
   type BitmapConversionTarget,
 } from './bitmap-conversion-plan';
 import type { BitmapFields } from './luma-bitmap';
+import { bitmapFillGroups, type BitmapFillObject } from './bitmap-fill-groups';
+import { estimateBitmapGeometryResources } from './bitmap-conversion-resources';
 
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
@@ -66,7 +69,11 @@ export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
 export function bitmapConversionTarget(
   objects: ReadonlyArray<ConvertibleVector>,
 ): BitmapConversionTarget {
-  return { bounds: combinedConvertibleBounds(objects), transform: IDENTITY_TRANSFORM };
+  return {
+    bounds: combinedConvertibleBounds(objects),
+    transform: IDENTITY_TRANSFORM,
+    geometryStats: estimateBitmapGeometryResources(objects),
+  };
 }
 
 // Display name for a conversion: the object's own label, or a count for a
@@ -107,14 +114,9 @@ function rasterizeConvertibles(
   readonly plan: BitmapConversionPlan;
   readonly raster: VectorRaster;
 } {
-  // Bake every object into scene space and rasterize the concatenated
-  // contours as ONE even-odd render. Cross-object even-odd is deliberate:
-  // it matches both LightBurn's "areas between outlines" Fill All and our
-  // own Fill mode, which hatches a layer's contours together — a shape
-  // nested inside another object's shape reads as a hole.
-  const bounds = combinedConvertibleBounds(objects);
-  const plan = estimateBitmapConversion({ bounds, transform: IDENTITY_TRANSFORM }, options.dpi);
+  const plan = estimateBitmapConversion(bitmapConversionTarget(objects), options.dpi);
   assertBitmapConversionFits(plan);
+  const bounds = plan.bounds;
   // Resolve canonical geometry at the actual rounded pixel pitch, in scene mm.
   // The flattener accounts for each object's largest axis scale before baking.
   const toleranceMm =
@@ -123,12 +125,12 @@ function rasterizeConvertibles(
       (bounds.maxX - bounds.minX) / plan.pixelWidth,
       (bounds.maxY - bounds.minY) / plan.pixelHeight,
     );
-  const baked = objects.map((object) => bakeConvertibleTransform(object, toleranceMm));
-  const paths = baked.flatMap((b) => b.paths);
-  const { fillPolylines, outlinePolylines } = conversionPolylineGroups(paths, options);
+  const budget = { remaining: plan.maxFlattenedSegments };
+  const baked = objects.map((object) => bakeConvertibleTransform(object, toleranceMm, budget));
+  const { fillGroups, outlinePolylines } = bitmapFillGroups(baked, options);
   const raster = rasterizeVectorToLuma({
-    polylines: paths.flatMap((p) => p.polylines),
-    fillPolylines,
+    polylines: [],
+    fillGroups,
     outlinePolylines,
     bounds,
     pixelWidth: plan.pixelWidth,
@@ -141,11 +143,11 @@ function rasterizeConvertibles(
 }
 
 // Union of the selection's transformed (rotation-aware) AABBs. Callers gate
-// on a non-empty convertible selection; an empty array degrades to a zero
-// rect, which the raster budget then rejects as invalid.
+// on a non-empty convertible selection; invalid empty input is refused.
 function combinedConvertibleBounds(objects: ReadonlyArray<ConvertibleVector>): Bounds {
   let bounds: Bounds | null = null;
   for (const o of objects) {
+    if (!validSourceBounds(o.bounds)) return { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
     const b = transformedBBox(o);
     bounds =
       bounds === null
@@ -157,102 +159,67 @@ function combinedConvertibleBounds(objects: ReadonlyArray<ConvertibleVector>): B
             maxY: Math.max(bounds.maxY, b.maxY),
           };
   }
-  return bounds ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return bounds ?? { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
 }
 
-function conversionPolylineGroups(
-  paths: ReadonlyArray<ColoredPath>,
-  options: BitmapConversionOptions,
-): {
-  readonly fillPolylines: ReadonlyArray<Polyline>;
-  readonly outlinePolylines: ReadonlyArray<Polyline>;
-} {
-  const renderType = options.renderType ?? 'fill-all';
-  if (renderType === 'fill-all') {
-    return { fillPolylines: paths.flatMap((p) => p.polylines), outlinePolylines: [] };
-  }
-  if (renderType === 'outlines') {
-    return { fillPolylines: [], outlinePolylines: paths.flatMap((p) => p.polylines) };
-  }
-  const layerModesById = new Map(
-    options.layers?.flatMap((operation) =>
-      operation.id === undefined ? [] : [[operation.id, operation.mode] as const],
-    ) ?? [],
+function validSourceBounds(bounds: Bounds): boolean {
+  return (
+    Object.values(bounds).every(Number.isFinite) &&
+    bounds.minX <= bounds.maxX &&
+    bounds.minY <= bounds.maxY
   );
-  const legacyLayerModesByColor = new Map(
-    options.layers?.map((operation) => [operation.color.toLowerCase(), operation.mode]) ?? [],
-  );
-  const fillPolylines: Polyline[] = [];
-  const outlinePolylines: Polyline[] = [];
-  for (const path of paths) {
-    appendCutSettingPolylines(
-      path,
-      layerModesById,
-      legacyLayerModesByColor,
-      fillPolylines,
-      outlinePolylines,
-    );
-  }
-  return { fillPolylines, outlinePolylines };
-}
-
-function appendCutSettingPolylines(
-  path: ColoredPath,
-  layerModesById: ReadonlyMap<string, LayerMode>,
-  legacyLayerModesByColor: ReadonlyMap<string, LayerMode>,
-  fillPolylines: Polyline[],
-  outlinePolylines: Polyline[],
-): void {
-  const modes = cutSettingModes(path, layerModesById, legacyLayerModesByColor);
-  if (modes.includes('fill')) fillPolylines.push(...path.polylines);
-  if (modes.some((mode) => mode !== 'fill')) outlinePolylines.push(...path.polylines);
-}
-
-function cutSettingModes(
-  path: ColoredPath,
-  layerModesById: ReadonlyMap<string, LayerMode>,
-  legacyLayerModesByColor: ReadonlyMap<string, LayerMode>,
-): ReadonlyArray<LayerMode> {
-  if (path.operationIds === undefined) {
-    return [legacyLayerModesByColor.get(path.color.toLowerCase()) ?? 'line'];
-  }
-  const modes = path.operationIds.flatMap((id) => {
-    const mode = layerModesById.get(id);
-    return mode === undefined ? [] : [mode];
-  });
-  return modes.length === 0 ? ['line'] : modes;
 }
 
 function bakeConvertibleTransform(
   o: ConvertibleVector,
   toleranceMm: number,
-): {
-  readonly bounds: Bounds;
-  readonly paths: ReadonlyArray<ColoredPath>;
-} {
+  budget: { remaining: number },
+): BitmapFillObject {
   return {
-    bounds: transformedBBox(o),
     paths: o.paths.map((path) => {
       const operationIds = path.operationIds ?? o.operationIds;
-      const flattened = flattenColoredPathCurvesForTransform(path, o.transform, {
-        toleranceMm,
-        // Match compilation: canonical geometry never falls back to a stale
-        // compatibility cache merely because the path is large.
-        segmentBudget: Number.MAX_SAFE_INTEGER,
-      });
-      if (flattened.kind !== 'ok') {
-        throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
-      }
+      const polylines = flattenBitmapPath(path, o.transform, toleranceMm, budget);
       return {
         color: path.color,
+        fillRule: path.fillRule ?? (o.kind === 'text' ? 'nonzero' : 'evenodd'),
         ...(operationIds === undefined ? {} : { operationIds }),
-        polylines: flattened.polylines.map((polyline) => ({
+        polylines: polylines.map((polyline) => ({
           closed: polyline.closed,
           points: polyline.points.map((point) => applyTransform(point, o.transform)),
         })),
       };
     }),
   };
+}
+
+function flattenBitmapPath(
+  path: ColoredPath,
+  transform: Transform,
+  toleranceMm: number,
+  budget: { remaining: number },
+): ReadonlyArray<Polyline> {
+  const flatten = (part: ColoredPath): ReadonlyArray<Polyline> => {
+    const result = flattenColoredPathCurvesForTransform(part, transform, {
+      toleranceMm,
+      segmentBudget: Math.max(1, budget.remaining),
+    });
+    if (result.kind !== 'ok' || result.segmentCount > budget.remaining) {
+      throw new Error(
+        'Converted bitmap geometry exceeds the conversion memory budget. Lower DPI or simplify the artwork.',
+      );
+    }
+    budget.remaining -= result.segmentCount;
+    return result.polylines;
+  };
+  if (path.curves === undefined) return flatten(path);
+  const polylines: Polyline[] = [];
+  // Enforce the shared remainder after every subpath. The generic flattener
+  // clamps each subpath's allowance to one, so passing a whole multi-subpath
+  // path could temporarily exceed a just-exhausted request budget.
+  for (const curve of path.curves) {
+    polylines.push(...flatten({ color: path.color, polylines: [], curves: [curve] }));
+  }
+  return polylines;
 }
 
 function buildRasterImage(

@@ -14,21 +14,13 @@ import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog'
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
-import {
-  ConvertToBitmapDialog,
-  type ConvertToBitmapDialogOptions,
-} from '../raster/ConvertToBitmapDialog';
-import {
-  bitmapConversionTarget,
-  conversionSourceLabel,
-  type ConvertibleVector,
-} from '../raster/vector-to-bitmap';
+import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { useImportDragDrop } from '../app/use-import-drag-drop';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
-import { convertSelectedVectorsToBitmap } from './bitmap-conversion';
+import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
 import { runImagePickAction } from './image-pick-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
@@ -56,9 +48,7 @@ type SettingsDialogKind =
   | null;
 
 export function CommandShell(): JSX.Element {
-  const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
   const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
-  const closeConvertBitmapDialog = useUiStore((s) => s.closeConvertBitmapDialog);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
@@ -70,7 +60,6 @@ export function CommandShell(): JSX.Element {
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const gcodeInspector = useCommandShellGcodeInspector();
-  const selectedConvertibles = useSelectedConvertibles();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
   const onMultiFileTracePick = useMultiFileTracePickHandler();
@@ -106,9 +95,7 @@ export function CommandShell(): JSX.Element {
       <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
-      {convertDialogOpen && selectedConvertibles.length > 0 ? (
-        <ConvertDialog convertibles={selectedConvertibles} onClose={closeConvertBitmapDialog} />
-      ) : null}
+      <BitmapDialog />
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
       ) : null}
@@ -140,6 +127,13 @@ function useCommandShellGcodeInspector(): ReturnType<typeof useGcodeInspectorSlo
   const inspector = useGcodeInspectorSlot();
   useImportDragDrop(inspector.open);
   return inspector;
+}
+
+function BitmapDialog(): JSX.Element | null {
+  const open = useUiStore((state) => state.convertBitmapDialogOpen);
+  const close = useUiStore((state) => state.closeConvertBitmapDialog);
+  const convertibles = useSelectedConvertibles();
+  return open ? <ConvertBitmapDialogHost convertibles={convertibles} onClose={close} /> : null;
 }
 
 function GcodeSaveDialogHost(): JSX.Element | null {
@@ -257,37 +251,6 @@ function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Elemen
         props.onClose();
         pushToast('Updated optimization settings.', 'success');
       }}
-    />
-  );
-}
-
-function ConvertDialog(props: {
-  readonly convertibles: ReadonlyArray<ConvertibleVector>;
-  readonly onClose: () => void;
-}): JSX.Element {
-  const layers = useStore((s) => s.project.scene.layers);
-  const convertToBitmap = useStore((s) => s.convertToBitmap);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const onConvert = (options: ConvertToBitmapDialogOptions): void => {
-    props.onClose();
-    void convertSelectedVectorsToBitmap(
-      props.convertibles,
-      layers,
-      options,
-      convertToBitmap,
-      pushToast,
-    );
-  };
-  // The selection's combined rotation-aware AABB + IDENTITY — exactly the
-  // target the builder rasterizes, so the size estimate always matches.
-  const target = bitmapConversionTarget(props.convertibles);
-  return (
-    <ConvertToBitmapDialog
-      sourceName={conversionSourceLabel(props.convertibles)}
-      bounds={target.bounds}
-      transform={target.transform}
-      onCancel={props.onClose}
-      onConvert={onConvert}
     />
   );
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createProject,
+  createLayer,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Project,
@@ -65,6 +66,80 @@ beforeEach(() => {
 });
 
 describe('Convert to Bitmap document ownership', () => {
+  it('aborts worker work immediately on cancellation and never publishes a late result', async () => {
+    const source = svg('cancel.svg');
+    useStore.setState({ project: projectWith(source) });
+    const pending = deferred<RasterImage>();
+    const apply = vi.fn();
+    const toast = vi.fn();
+    const controller = new AbortController();
+    vi.mocked(buildBitmapFromVectors).mockReturnValue(pending.promise);
+    const conversion = convertSelectedVectorsToBitmap(
+      [source],
+      [],
+      { renderType: 'fill-all', dpi: 254, brightnessPercent: 50 },
+      apply,
+      toast,
+      controller.signal,
+    );
+    const workerSignal = vi.mocked(buildBitmapFromVectors).mock.calls[0]?.[2];
+    controller.abort();
+    expect(workerSignal?.aborted).toBe(true);
+    pending.resolve(raster());
+    expect(await conversion).toEqual({ kind: 'cancelled' });
+    expect(apply).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('aborts Use Cut Settings when operation mode changes without changing source identity', async () => {
+    const source = svg('cut-settings.svg');
+    const layer = createLayer({ id: 'operation', color: '#000000', mode: 'fill' });
+    const project = projectWith(source);
+    useStore.setState({ project: { ...project, scene: { ...project.scene, layers: [layer] } } });
+    const pending = deferred<RasterImage>();
+    const apply = vi.fn();
+    vi.mocked(buildBitmapFromVectors).mockReturnValue(pending.promise);
+    const conversion = convertSelectedVectorsToBitmap(
+      [source],
+      [layer],
+      { renderType: 'use-cut-settings', dpi: 254, brightnessPercent: 50 },
+      apply,
+      vi.fn(),
+    );
+    const workerSignal = vi.mocked(buildBitmapFromVectors).mock.calls[0]?.[2];
+    useStore.getState().setLayerParam(layer.id, { mode: 'line' });
+    expect(workerSignal?.aborted).toBe(true);
+    pending.resolve(raster());
+    expect(await conversion).toEqual({ kind: 'stale' });
+    expect(apply).not.toHaveBeenCalled();
+    expect(useStore.getState().project.scene.objects[0]).toBe(source);
+  });
+
+  it('keeps conversion current when unrelated operation speed changes', async () => {
+    const source = svg('cut-settings.svg');
+    const layer = createLayer({ id: 'operation', color: '#000000', mode: 'fill' });
+    const project = projectWith(source);
+    useStore.setState({ project: { ...project, scene: { ...project.scene, layers: [layer] } } });
+    const pending = deferred<RasterImage>();
+    const apply = vi.fn();
+    vi.mocked(buildBitmapFromVectors).mockReturnValue(pending.promise);
+    const conversion = convertSelectedVectorsToBitmap(
+      [source],
+      [layer],
+      { renderType: 'use-cut-settings', dpi: 254, brightnessPercent: 50 },
+      apply,
+      vi.fn(),
+    );
+    const workerSignal = vi.mocked(buildBitmapFromVectors).mock.calls[0]?.[2];
+    useStore.getState().setLayerParam(layer.id, { speed: layer.speed + 100 });
+    expect(workerSignal?.aborted).toBe(false);
+    pending.resolve(raster());
+    expect(await conversion).toEqual({ kind: 'converted' });
+    expect(apply).toHaveBeenCalledOnce();
+    useStore.setState({ project: createProject() });
+    expect(workerSignal?.aborted).toBe(false);
+  });
+
   it('does not replace same-id artwork in a project opened while conversion is pending', async () => {
     const sourceA = svg('project-a.svg');
     const sourceB = svg('project-b.svg');

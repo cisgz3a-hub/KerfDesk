@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { DEFAULT_BITMAP_BRIGHTNESS_PERCENT } from '../../core/raster';
-import type { Bounds, Transform } from '../../core/scene';
 import {
   DEFAULT_CONVERT_TO_BITMAP_DPI,
   estimateBitmapConversion,
   MAX_CONVERT_TO_BITMAP_DPI,
   MIN_CONVERT_TO_BITMAP_DPI,
   normalizeConvertToBitmapDpi,
+  type BitmapConversionTarget,
 } from './bitmap-conversion-plan';
 import { type ConvertToBitmapRenderType } from './vector-to-bitmap';
 
@@ -22,8 +22,9 @@ export type ConvertToBitmapDialogOptions = {
 
 export function ConvertToBitmapDialog(props: {
   readonly sourceName: string;
-  readonly bounds: Bounds;
-  readonly transform: Transform;
+  readonly target: BitmapConversionTarget;
+  readonly busy?: boolean;
+  readonly error?: string | null;
   readonly onCancel: () => void;
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
@@ -33,21 +34,18 @@ export function ConvertToBitmapDialog(props: {
   // The live estimate and the submit normalize; the field never fights back.
   const [dpiText, setDpiText] = useState(String(DEFAULT_CONVERT_TO_BITMAP_DPI));
   const plan = useMemo(
-    () =>
-      estimateBitmapConversion(
-        { bounds: props.bounds, transform: props.transform },
-        parseDpi(dpiText),
-      ),
-    [dpiText, props.bounds, props.transform],
+    () => estimateBitmapConversion(props.target, parseDpi(dpiText)),
+    [dpiText, props.target],
   );
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
+    if (props.busy) return;
     const form = e.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
     submitConvert(form, plan.verdict.kind, props.onConvert);
   };
   const onConvertClick = (): void => {
-    if (formRef.current === null) return;
+    if (props.busy || formRef.current === null) return;
     submitConvert(formRef.current, plan.verdict.kind, props.onConvert);
   };
   // kit Dialog owns the a11y wiring; the inner <form> keeps its ref so the
@@ -62,18 +60,32 @@ export function ConvertToBitmapDialog(props: {
             {props.sourceName}
           </span>
         </Field>
-        <RenderTypeField />
-        <DpiField dpiText={dpiText} normalizedDpi={plan.dpi} onChange={setDpiText} />
-        <BrightnessField />
+        <fieldset disabled={props.busy} aria-label="Conversion settings" style={settingsStyle}>
+          <RenderTypeField />
+          <DpiField dpiText={dpiText} normalizedDpi={plan.dpi} onChange={setDpiText} />
+          <BrightnessField />
+        </fieldset>
         <BitmapEstimate plan={plan} />
+        {props.busy ? (
+          <div role="status" style={progressStyle}>
+            <progress aria-label="Converting to bitmap" style={{ width: '100%' }} />
+            <strong>Converting to bitmap…</strong>
+            <span>You can cancel without changing your artwork.</span>
+          </div>
+        ) : null}
+        {props.error ? (
+          <div role="alert" style={errorStyle}>
+            {props.error}
+          </div>
+        ) : null}
         <DialogActions>
           <Button onClick={props.onCancel}>Cancel</Button>
           <Button
             variant="primary"
             onClick={onConvertClick}
-            disabled={plan.verdict.kind === 'too-large'}
+            disabled={props.busy || plan.verdict.kind === 'too-large'}
           >
-            Convert
+            {props.busy ? 'Converting…' : 'Convert'}
           </Button>
         </DialogActions>
       </form>
@@ -214,6 +226,14 @@ const formStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 10,
 };
+const settingsStyle: React.CSSProperties = {
+  ...formStyle,
+  border: 0,
+  padding: 0,
+  margin: 0,
+  minWidth: 0,
+};
+const progressStyle: React.CSSProperties = { ...formStyle, fontSize: 13, padding: '8px 0' };
 const controlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
