@@ -28,7 +28,12 @@ export async function convertSelectedVectorsToBitmap(
   if (!conversionOwnerIsCurrent(owner)) return { kind: 'stale' };
   signal?.addEventListener('abort', cancel, { once: true });
   let stale = false;
-  const unsubscribe = useStore.subscribe(() => {
+  const unsubscribe = useStore.subscribe((state, previous) => {
+    if (
+      state.project === previous.project &&
+      state.projectDocumentEpoch === previous.projectDocumentEpoch
+    )
+      return;
     if (conversionOwnerIsCurrent(owner)) return;
     stale = true;
     controller.abort();
@@ -89,7 +94,6 @@ function conversionOwnerIsCurrent(owner: {
       return false;
   }
   if (owner.sources.length === 0) return false;
-  return owner.sources.every(
-    (source) => state.project.scene.objects.find((object) => object.id === source.id) === source,
-  );
+  const currentObjects = new Map(state.project.scene.objects.map((object) => [object.id, object]));
+  return owner.sources.every((source) => currentObjects.get(source.id) === source);
 }
