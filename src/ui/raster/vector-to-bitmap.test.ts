@@ -133,7 +133,7 @@ function makeHugeSvg(): ImportedSvg {
 function makeHugeFittedSvg(): ImportedSvg {
   return {
     ...makeHugeSvg(),
-    transform: { ...IDENTITY_TRANSFORM, scaleX: 0.25, scaleY: 0.25 },
+    transform: { ...IDENTITY_TRANSFORM, scaleX: 0.2, scaleY: 0.2 },
   };
 }
 
@@ -381,8 +381,8 @@ describe('assembleBitmap', () => {
     const encode = vi.fn(fakeEncode);
     const result = assembleBitmap([makeHugeFittedSvg()], encode, 'new-id');
 
-    expect(result.pixelWidth).toBe(1946);
-    expect(result.pixelHeight).toBe(1263);
+    expect(result.pixelWidth).toBe(1556);
+    expect(result.pixelHeight).toBe(1010);
     expect(result.linesPerMm).toBe(10);
     expect(evaluateRasterBudget(result.pixelWidth, result.pixelHeight).kind).toBe('ok');
     expect(encode).toHaveBeenCalledTimes(1);
@@ -392,7 +392,7 @@ describe('assembleBitmap', () => {
     const encode = vi.fn(fakeEncode);
 
     expect(() => assembleBitmap([makeHugeSvg()], encode, 'new-id')).toThrow(
-      /materialized working set exceeds the 64 MB budget/,
+      /above the 64 MB conversion budget/,
     );
     expect(encode).not.toHaveBeenCalled();
   });

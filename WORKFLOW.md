@@ -2523,8 +2523,10 @@ including mixed selections with a raster among the vectors,
 mirroring LightBurn's greyed menu item. A multi-selection merges
 into **one** bitmap spanning the selection's combined bounds
 (LightBurn-faithful, ADR-029 amendment ii): Fill All renders
-even-odd across the whole selection — a shape nested inside another
-object's shape becomes a hole, exactly like our Fill layer mode —
+each path's fill rule first, then even-odd across objects — a shape nested inside another
+object's shape becomes a hole. Use Cut Settings combines independent operation fills
+without cancelling their overlap. Text retains its nonzero fill and SVG import retains
+explicit fill rules. In all modes,
 every source vector is deleted, and the whole swap is one undo
 entry. The result is labeled `N objects (bitmap)`.
 
@@ -2538,7 +2540,16 @@ ADR-029 amendment), and **Default Brightness** (percent, default
 below the Threshold cutoff so converted ink always burns — M7). The
 dialog shows the estimated bitmap pixel size for the current DPI —
 computed from the selection's full transform including rotation —
-and disables Convert when it exceeds the raster budget.
+and disables Convert when the pixel and geometry estimate exceeds the conversion budget.
+The 64 MiB allowance includes conservative encoding and geometry costs. Very large or
+complex artwork can require lower DPI or simplification; accepted artwork keeps its detail.
+
+After Convert, the dialog stays open with **Converting to bitmap…** progress and
+**Cancel**. Settings are disabled until completion. Cancel or Escape stops work without
+changing the artwork. If the artwork or relevant cut settings change during conversion,
+the result is discarded and the dialog asks you to review and retry. Errors retain your
+settings for retry. Conversion requires a working browser worker; failures are never
+retried as blocking work on the main UI thread.
 
 **What it does.** Rasterizes the selected vector into a
 `RasterImage` at the chosen DPI (default 254 = 10 lines/mm, a
@@ -2549,6 +2560,8 @@ carries the transformed axis-aligned bounds with an IDENTITY
 transform, so it lands exactly where the vector was. Later object rotation is
 also supported by the raster compiler's transformed machine-grid sampler;
 baking simply leaves the conversion result with no residual transform.
+A horizontal or vertical line gets one centred pixel of physical thickness on its zero
+axis, so its bitmap remains visible and correctly positioned.
 **The source vector is deleted** (LightBurn discards the original);
 the swap is one undo entry, so Ctrl+Z restores the vector — replacing
 LightBurn's manual "duplicate first" guidance.
@@ -2571,10 +2584,9 @@ LightBurn's manual "duplicate first" guidance.
    fills closed shapes only, LightBurn's same closed-shape rule. The
    convert still succeeds; the operator sees a blank engrave source
    and can undo. (Outlines mode in A3 will render open paths.)
-4. **Encode failure (edge).** If the browser cannot create a 2D
-   canvas context (`toDataURL` unavailable), the build throws and is
-   caught → error toast "Could not convert to bitmap: `<message>`";
-   the scene is left unchanged (the swap never dispatched).
+4. **Failure or cancellation.** A missing worker, encoding error, timeout, or resource
+   refusal leaves the scene unchanged. Failures show an error and keep the dialog open
+   for retry. Cancel and Escape close the dialog and terminate conversion work.
 
 **Verification status.** Fill + PNG-encode + luma fidelity verified
 in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
@@ -2585,10 +2597,11 @@ re-verification (isolated, no live scene): the production rasterizer
 matches the perceptual-harness reference pixel-for-pixel (IoU 1.0000
 on a star + annulus), and rendered PNGs of Fill All / Outlines / a
 rotated + scaled bake were eyeballed correct, bounds matching the
-transform math exactly. **Not yet verified:** the live in-app
-render/placement of the swapped bitmap on the workspace canvas, and
-a side-by-side pixel comparison against LightBurn's own Convert
-output — both deferred (need a live import or a LightBurn session).
+transform math exactly. The 2026-09-13 browser regression checks additionally cover
+native worker conversion, explicit SVG nonzero overlap, independent operation coverage,
+visible zero-extent line placement, byte-matched PNG/luma, Undo/Redo, and cancellation
+followed by retry. A side-by-side comparison against LightBurn, packaged desktop runtime,
+and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 

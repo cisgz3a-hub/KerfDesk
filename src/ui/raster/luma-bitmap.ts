@@ -45,7 +45,7 @@ export async function lumaToBitmap(raster: VectorRaster): Promise<BitmapFields> 
 }
 
 // Expand one-byte-per-pixel luma into opaque RGBA (grey = R=G=B=luma).
-export function lumaToRgba(raster: VectorRaster): Uint8ClampedArray {
+export function lumaToRgba(raster: VectorRaster): Uint8ClampedArray<ArrayBuffer> {
   const { luma, width, height } = raster;
   const rgba = new Uint8ClampedArray(width * height * RGBA_CHANNELS);
   for (let i = 0; i < width * height; i += 1) {

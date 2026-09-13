@@ -1,11 +1,15 @@
 import {
-  evaluateRasterBudget,
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
   MM_PER_INCH,
   type RasterBudgetVerdict,
 } from '../../core/raster';
 import { transformedBounds, type Bounds, type Transform } from '../../core/scene';
+import { bitmapConversionBounds } from './bitmap-conversion-bounds';
+import {
+  bitmapConversionResources,
+  type BitmapGeometryResources,
+} from './bitmap-conversion-resources';
 
 const MIN_PIXEL_DIM = 1;
 const DEFAULT_LINES_PER_MM = 10;
@@ -24,9 +28,12 @@ export const MAX_CONVERT_TO_BITMAP_DPI = MAX_RASTER_LINES_PER_MM * MM_PER_INCH;
 export type BitmapConversionTarget = {
   readonly bounds: Bounds;
   readonly transform: Transform;
+  readonly geometryStats?: BitmapGeometryResources;
 };
 
 export type BitmapConversionPlan = {
+  readonly bounds: Bounds;
+  readonly maxFlattenedSegments: number;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
   readonly linesPerMm: number;
@@ -44,17 +51,20 @@ export function estimateBitmapConversion(
   // footprint, and the builder rasterizes into exactly this baked AABB — the
   // dialog estimate and the conversion must agree or the dialog approves
   // conversions the builder then refuses (2026-07-07 audit finding).
-  const displayed = transformedBounds(target.bounds, target.transform);
+  const displayed = conversionBoundsInScene(target, linesPerMm);
   const physicalWidthMm = Math.max(0, displayed.maxX - displayed.minX);
   const physicalHeightMm = Math.max(0, displayed.maxY - displayed.minY);
   const pixelWidth = convertedPixelExtent(physicalWidthMm, linesPerMm);
   const pixelHeight = convertedPixelExtent(physicalHeightMm, linesPerMm);
+  const resources = bitmapConversionResources(pixelWidth, pixelHeight, target.geometryStats);
   return {
+    bounds: displayed,
+    maxFlattenedSegments: resources.maxFlattenedSegments,
     pixelWidth,
     pixelHeight,
     linesPerMm,
     dpi: normalizedDpi,
-    verdict: evaluateRasterBudget(pixelWidth, pixelHeight),
+    verdict: resources.verdict,
   };
 }
 
@@ -72,4 +82,16 @@ export function normalizeConvertToBitmapDpi(dpi: number): number {
 
 function convertedPixelExtent(mm: number, linesPerMm: number): number {
   return Math.max(MIN_PIXEL_DIM, Math.round(Math.max(0, mm) * Math.max(0, linesPerMm)));
+}
+
+function conversionBoundsInScene(target: BitmapConversionTarget, linesPerMm: number): Bounds {
+  const { bounds } = target;
+  if (
+    !Object.values(bounds).every(Number.isFinite) ||
+    bounds.maxX < bounds.minX ||
+    bounds.maxY < bounds.minY
+  ) {
+    return { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+  }
+  return bitmapConversionBounds(transformedBounds(bounds, target.transform), linesPerMm);
 }
