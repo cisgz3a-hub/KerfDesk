@@ -13,9 +13,10 @@ test('opens a large G-code file through the real production worker', async ({ pa
   await runMenuCommand(page, 'File', 'Open G-code...');
   const dialog = page.getByRole('dialog', { name: 'G-code Inspector: large-worker.nc' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('status')).toContainText('all 260,100 segments are shown', {
-    timeout: 60_000,
-  });
+  await expect(dialog.getByRole('status').filter({ hasText: 'Large preview:' })).toContainText(
+    'all 260,100 segments are shown',
+    { timeout: 60_000 },
+  );
   await expect(dialog.getByLabel('Program source')).toContainText('G1 X1');
 
   expect(workerUrls.some((url) => url.includes('gcode-inspector-worker'))).toBe(true);
