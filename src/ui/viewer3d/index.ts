@@ -24,3 +24,4 @@ export {
 } from './camera-presets';
 export { directionArrows, type ArrowPlacement } from './direction-arrows';
 export { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
+export type { CameraMode, CameraTracking } from './camera-tracking';

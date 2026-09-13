@@ -157,6 +157,8 @@ async function runStartJob(
         Date.now(),
         validatedStartJobTimingPlan(gcode, options, state),
         isImmediateToolChange ? 'tool-change' : 'running',
+        stepped.state.queued,
+        gcode,
       ),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',

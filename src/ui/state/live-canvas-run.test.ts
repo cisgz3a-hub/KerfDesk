@@ -17,6 +17,7 @@ import {
   liveCanvasStatusPatch,
 } from './live-canvas-run';
 import type { LaserState } from './laser-store';
+import { canvasProgramMatchesRunQueue, registerCanvasProgramSource } from './canvas-program-source';
 
 const gcode = 'G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X10 S500';
 
@@ -70,6 +71,55 @@ function acceptedStreamer(): StreamerState {
 }
 
 describe('live canvas status reconciliation', () => {
+  it('binds the production source without reading or splitting queue lines at Start', () => {
+    const startedPlan = plan();
+    registerCanvasProgramSource(startedPlan, gcode);
+    const queue = new Proxy(createStreamer(gcode).queued, {
+      get() {
+        throw new Error('Start must not inspect queue lines for viewer identity');
+      },
+    });
+    const run = liveCanvasStartPatch(
+      startedPlan,
+      1000,
+      undefined,
+      'running',
+      queue,
+      gcode,
+    ).liveCanvasRun;
+    if (run == null) throw new Error('Expected run');
+    expect(canvasProgramMatchesRunQueue(run, queue)).toBe(true);
+    const differentQueue = createStreamer(gcode).queued;
+    const different = liveCanvasStartPatch(
+      startedPlan,
+      2000,
+      undefined,
+      'running',
+      differentQueue,
+      `${gcode}\n; changed`,
+    ).liveCanvasRun;
+    if (different == null) throw new Error('Expected run');
+    expect(canvasProgramMatchesRunQueue(different, differentQueue)).toBe(false);
+  });
+
+  it('binds the exact started queue without adopting a later same-bytes stream', () => {
+    const startedPlan = plan();
+    registerCanvasProgramSource(startedPlan, gcode);
+    const firstQueue = createStreamer(gcode).queued;
+    const started = liveCanvasStartPatch(
+      startedPlan,
+      1000,
+      undefined,
+      'running',
+      firstQueue,
+    ).liveCanvasRun;
+    if (started == null) throw new Error('Expected started run');
+    expect(canvasProgramMatchesRunQueue(started, firstQueue)).toBe(true);
+    const nextQueue = createStreamer(gcode).queued;
+    expect(liveCanvasStartPatch(undefined, 2000, undefined, 'running', nextQueue)).toEqual({});
+    expect(canvasProgramMatchesRunQueue(started, nextQueue)).toBe(false);
+  });
+
   it('does not move the confirmed trail when only queue/ack state advances', () => {
     const current = state();
     const patch = liveCanvasStatusPatch(current, report(0), acceptedStreamer());

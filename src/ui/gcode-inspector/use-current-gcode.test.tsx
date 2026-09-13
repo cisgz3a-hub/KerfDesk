@@ -9,7 +9,15 @@ import type {
 } from '../app/inspect-current-gcode-action';
 import { useStore } from '../state';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
-import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { createStreamer } from '../../core/controllers/grbl';
+import { useLaserStore } from '../state/laser-store';
+import { initialLaserState } from '../state/laser-store-helpers';
+import {
+  registerCanvasProgramRun,
+  registerCanvasProgramSource,
+} from '../state/canvas-program-source';
+import { LIVE_PROGRAM, liveInspectorRun, liveInspectorState } from './inspector-live-test-fixture';
 
 type InspectCurrentGcodeMock = (
   ctx: unknown,
@@ -86,6 +94,7 @@ function compileCount(): number {
 
 beforeEach(() => {
   useStore.getState().newProject();
+  useStore.setState({ project: createProject() });
   inspectMocks.handleInspectCurrentGcode.mockReset();
   inspectMocks.handleInspectCurrentGcode.mockImplementation(
     async (_ctx: unknown, openInspector: (programName: string, text: string) => void) => {
@@ -94,6 +103,7 @@ beforeEach(() => {
     },
   );
   latest = null;
+  useLaserStore.setState(initialLaserState());
 });
 
 afterEach(async () => {
@@ -102,9 +112,100 @@ afterEach(async () => {
   root = null;
   host = null;
   useStore.getState().newProject();
+  useLaserStore.setState(initialLaserState());
 });
 
 describe('useCurrentGcode', () => {
+  it('shows the exact started program instead of recompiling during a run', async () => {
+    useLaserStore.setState(liveInspectorState());
+    await mount(true);
+    const context = latest?.state.kind === 'ready' ? latest.state.context : null;
+    await commitAnEdit();
+    await act(async () => latest?.refresh());
+    expect(compileCount()).toBe(0);
+    expect(latest?.state).toMatchObject({ text: LIVE_PROGRAM, liveLifecycle: 'running' });
+    expect(latest?.stale).toBe(false);
+    expect(latest?.state.kind === 'ready' ? latest.state.context : null).toBe(context);
+  });
+
+  it('keeps the started program visible while its accepted queue drains', async () => {
+    useLaserStore.setState(liveInspectorState(LIVE_PROGRAM, 'done'));
+    await mount(true);
+    expect(compileCount()).toBe(0);
+    expect(latest?.state).toMatchObject({ text: LIVE_PROGRAM, programName: 'Running program' });
+  });
+
+  it('retains a finished program until Refresh returns to the current design', async () => {
+    useLaserStore.setState({ liveCanvasRun: { ...liveInspectorRun(), lifecycle: 'finished' } });
+    await mount(true);
+    expect(latest?.state).toMatchObject({ text: LIVE_PROGRAM, liveLifecycle: 'finished' });
+    await act(async () => latest?.refresh());
+    expect(compileCount()).toBe(1);
+    expect(latest?.state).toMatchObject({ text: 'G21 G90\nG1 X10 F600\n' });
+  });
+
+  it('does not substitute an older retained plan for a different active stream', async () => {
+    useLaserStore.setState({
+      liveCanvasRun: liveInspectorRun(),
+      streamer: { ...createStreamer('G1 X50'), status: 'streaming' },
+    });
+    await mount(true);
+    expect(compileCount()).toBe(1);
+    expect(latest?.state).toMatchObject({ text: 'G21 G90\nG1 X10 F600\n' });
+  });
+
+  it('uses the started machine and fan-power context even after the project changes', async () => {
+    const state = liveInspectorState();
+    const plan = {
+      ...state.liveCanvasRun.plan,
+      device: {
+        ...state.liveCanvasRun.plan.device,
+        controllerKind: 'marlin' as const,
+        gcodeDialect: { dialectId: 'marlin-fan' as const },
+      },
+    };
+    registerCanvasProgramSource(plan, LIVE_PROGRAM);
+    registerCanvasProgramRun(
+      plan,
+      state.streamer.queued,
+      state.liveCanvasRun.startedAtMs,
+      LIVE_PROGRAM,
+    );
+    useLaserStore.setState({ ...state, liveCanvasRun: { ...state.liveCanvasRun, plan } });
+    useStore.setState({
+      project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    });
+    await mount(true);
+    expect(latest?.state).toMatchObject({
+      kind: 'ready',
+      text: LIVE_PROGRAM,
+      context: { machineKind: 'laser', laserPowerControl: 'fan' },
+    });
+    expect(compileCount()).toBe(0);
+  });
+
+  it('cancels a design compilation when a live run takes over and ignores its late output', async () => {
+    let lateOutput: ((name: string, text: string) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    let finish: ((result: InspectCurrentGcodeResult) => void) | undefined;
+    inspectMocks.handleInspectCurrentGcode.mockImplementationOnce(async (_ctx, open, options) => {
+      lateOutput = open;
+      signal = options?.signal;
+      return await new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    await mount(true);
+    await act(async () => useLaserStore.setState(liveInspectorState()));
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      lateOutput?.('obsolete', 'G1 X999');
+      finish?.({ kind: 'ready' });
+    });
+    expect(latest?.state).toMatchObject({ text: LIVE_PROGRAM, liveLifecycle: 'running' });
+    expect(compileCount()).toBe(1);
+  });
+
   it('compiles once when the view becomes active', async () => {
     await mount(true);
     expect(compileCount()).toBe(1);

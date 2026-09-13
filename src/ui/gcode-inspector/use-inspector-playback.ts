@@ -30,7 +30,11 @@ export type PlaybackState = {
   readonly restart: () => void;
 };
 
-export function useInspectorPlayback(totalSeconds: number): PlaybackState {
+export function useInspectorPlayback(
+  totalSeconds: number,
+  enabled = true,
+  program?: unknown,
+): PlaybackState {
   const [transport, setTransport] = useState<TransportState>(() => initialTransport(totalSeconds));
   const [speed, setSpeed] = useState(1);
   const transportRef = useRef(transport);
@@ -43,10 +47,10 @@ export function useInspectorPlayback(totalSeconds: number): PlaybackState {
   // A new program opens fully drawn, so the whole job is visible at once.
   useEffect(() => {
     commit(initialTransport(totalSeconds));
-  }, [commit, totalSeconds]);
+  }, [commit, totalSeconds, program]);
 
   useEffect(() => {
-    if (!transport.playing || totalSeconds <= 0) return;
+    if (!enabled || !transport.playing || totalSeconds <= 0) return;
     let frame = 0;
     let last = performance.now();
     const tick = (now: number): void => {
@@ -58,11 +62,11 @@ export function useInspectorPlayback(totalSeconds: number): PlaybackState {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [commit, transport.playing, speed, totalSeconds]);
+  }, [commit, enabled, transport.playing, speed, totalSeconds]);
 
   return {
     routeMm: transport.seconds,
-    playing: transport.playing,
+    playing: enabled && transport.playing,
     speed,
     setRouteMm: (seconds) => commit(scrubTo(seconds, totalSeconds)),
     setSpeed,

@@ -31,6 +31,7 @@ import { buildExecutablePlanSidecar } from '../../io/gcode/executable-plan';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
 import { registerCanvasExecutablePlan } from './canvas-preview-motion';
+import { registerCanvasProgramSource } from './canvas-program-source';
 import type { LiveJobTiming } from './live-job-timing';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
@@ -123,6 +124,7 @@ export function buildCanvasMotionPlan(
     ...(initial === null ? {} : { initialPosition: initial }),
   });
   const plan = assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
+  registerCanvasProgramSource(plan, args.gcode);
   if (plan.capability === 'realtime' || plan.capability === 'settle-only') {
     const sidecar = buildExecutablePlanSidecar(args.gcode, args.prepared.project);
     if (sidecar.kind === 'ok') registerCanvasExecutablePlan(plan, sidecar.plan);
@@ -300,7 +302,7 @@ export function rebuildCanvasPlanForGcode(
   // A resume program renumbers every line, so the original run's pass spans
   // no longer describe it. Dropping them beats displaying a wrong pass.
   const { cncPassSpans: _stale, ...base } = plan;
-  return {
+  const resumedPlan: CanvasMotionPlan = {
     ...base,
     manifest,
     fingerprint: fingerprintGcode(gcode),
@@ -311,6 +313,8 @@ export function rebuildCanvasPlanForGcode(
         : mapControllerPointToScene(initialPosition, plan),
     resumed: true,
   };
+  registerCanvasProgramSource(resumedPlan, gcode);
+  return resumedPlan;
 }
 
 export function mapControllerPointToScene(

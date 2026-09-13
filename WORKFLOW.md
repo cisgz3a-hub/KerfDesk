@@ -6095,6 +6095,27 @@ validation must be supervised without cutting load.
    variable text.
 4. Choosing **Design** returns to the canvas with the artwork untouched.
 
+#### Success — follow playback or a running program
+
+1. **Auto views** follows the current tool position and eases between elevated
+   viewpoints as progress advances. **Follow** keeps a steady viewing angle;
+   **Manual** leaves orbit, pan, and zoom to the operator. Dragging or zooming
+   immediately selects Manual. **Fit** restores the whole program. Reduced-motion
+   preferences keep a steady angle and remove animated camera transitions.
+2. Playback shows completed motion, a partial active move, and a faint outline
+   of the program for context. Its timeline is labelled **Playback estimate**.
+3. During a run, the canvas displays the exact retained started program. The
+   Inspector follows live progress only when its source matches that program and
+   its stream identity. Progress comes from the reconciled confirmed route, not
+   acknowledged-line counts; the camera uses the reported work-coordinate head.
+4. A paused or draining controller keeps its run view. Uncertain position,
+   disconnection, or a changed position reference removes the live camera target
+   and explains the missing report. Finished or interrupted runs retain their
+   confirmed trail as **Recorded run progress**. Unknown progress has no percentage.
+5. **Preview playback** temporarily explores the program independently; **Watch
+   live run** restores reported progress. These controls never command the machine.
+   After a terminal run, **Current design** recompiles the design for inspection.
+
 #### Empty — nothing to compile
 
 1. A project with no artwork shows "This design produces no G-code yet."

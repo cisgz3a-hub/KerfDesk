@@ -207,6 +207,8 @@ describe('feature controller and workspace regressions', () => {
     const setTravelVisible = vi.fn();
     const handle: Viewer3dModule.Viewer3dSceneHandle = {
       setSegments: vi.fn(),
+      setCameraTracking: vi.fn(),
+      onCameraInteraction: vi.fn(),
       fitToBounds: vi.fn(),
       setTravelVisible,
       setPlayhead: vi.fn(),
