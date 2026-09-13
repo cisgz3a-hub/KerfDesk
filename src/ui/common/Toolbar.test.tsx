@@ -154,6 +154,7 @@ describe('Toolbar Convert to Bitmap', () => {
             expect.objectContaining({ color: '#0000ff', mode: 'fill' }),
           ],
         }),
+        expect.any(AbortSignal),
       );
     } finally {
       if (root !== null) await act(async () => root?.unmount());
