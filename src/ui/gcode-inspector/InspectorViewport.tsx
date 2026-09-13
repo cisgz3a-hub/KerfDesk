@@ -52,6 +52,7 @@ export function InspectorViewport(props: {
           <input
             type="checkbox"
             checked={props.travelVisible}
+            title="Show or hide non-cutting travel moves"
             onChange={(event) => props.onTravelChange(event.currentTarget.checked)}
           />{' '}
           Travel

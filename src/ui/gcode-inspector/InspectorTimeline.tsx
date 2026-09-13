@@ -109,7 +109,12 @@ function PlaybackTransport(props: {
   return (
     <div className="gcode-viewer-transport">
       <div className="gcode-viewer-transport-buttons" role="group" aria-label="Playback transport">
-        <button type="button" className="lf-btn gcode-viewer-button" onClick={playback.restart}>
+        <button
+          type="button"
+          className="lf-btn gcode-viewer-button"
+          onClick={playback.restart}
+          title="Restart preview playback from the beginning"
+        >
           Restart
         </button>
         <button
@@ -126,6 +131,7 @@ function PlaybackTransport(props: {
           type="button"
           className="lf-btn gcode-viewer-button gcode-viewer-play-button"
           onClick={playback.togglePlay}
+          title={playback.playing ? 'Pause preview playback' : 'Play the estimated toolpath'}
           aria-pressed={playback.playing}
           disabled={total <= 0}
         >
@@ -151,6 +157,7 @@ function PlaybackTransport(props: {
         value={position}
         onChange={(event) => playback.setRouteMm(Number(event.currentTarget.value))}
         aria-label="Program time"
+        title="Scrub through the estimated program time"
         aria-valuetext={`${formatClock(position)} of ${formatClock(total)} estimated`}
         disabled={total <= 0}
       />
@@ -160,6 +167,7 @@ function PlaybackTransport(props: {
           value={playback.speed}
           onChange={(event) => playback.setSpeed(Number(event.currentTarget.value))}
           aria-label="Playback speed"
+          title="Change preview playback speed"
         >
           {SPEEDS.map((speed) => (
             <option key={speed} value={speed}>

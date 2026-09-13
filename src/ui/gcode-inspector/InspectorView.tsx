@@ -166,6 +166,7 @@ function ViewerHeader(props: {
             type="button"
             className="lf-btn"
             aria-pressed={props.sourceVisible}
+            title="Show or hide the G-code source beside the 3D view"
             onClick={props.onSourceToggle}
           >
             {props.sourceVisible ? 'Hide source' : 'Show source'}
