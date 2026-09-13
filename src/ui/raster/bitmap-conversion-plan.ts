@@ -71,7 +71,7 @@ export function estimateBitmapConversion(
 export function assertBitmapConversionFits(plan: BitmapConversionPlan): void {
   if (plan.verdict.kind === 'ok') return;
   throw new Error(
-    `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI or scale the artwork down before converting to bitmap.`,
+    `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.`,
   );
 }
 

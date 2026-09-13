@@ -54,7 +54,7 @@ export async function buildBitmapFromVectors(
   const plan = estimateBitmapConversion(bitmapConversionTarget(objects), options.dpi);
   if (plan.verdict.kind !== 'ok') {
     throw new Error(
-      `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI or scale the artwork down before converting to bitmap.`,
+      `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.`,
     );
   }
   const workerResult = convertBitmapInWorker(objects, options, id, signal);
