@@ -1,6 +1,8 @@
 import { useEffect, useState, type RefObject } from 'react';
-import type { CameraMode, CameraTracking, Viewer3dSceneHandle } from '../viewer3d';
+import type { CameraTracking, Viewer3dSceneHandle } from '../viewer3d';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
+
+type CameraMode = CameraTracking['mode'];
 
 export function useInspectorCamera(
   handleRef: RefObject<Viewer3dSceneHandle | null>,

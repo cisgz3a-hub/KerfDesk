@@ -1,4 +1,4 @@
-import type { CameraMode, CameraPreset, Viewer3dSceneHandle } from '../viewer3d';
+import type { CameraTracking, CameraPreset, Viewer3dSceneHandle } from '../viewer3d';
 import { InspectorViewControls } from './InspectorViewControls';
 import type { PlayheadState } from './playhead';
 import type { InspectorLiveProgress } from './use-inspector-live-progress';
@@ -9,8 +9,8 @@ export function InspectorViewport(props: {
   readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
   readonly reason: string;
-  readonly cameraMode: CameraMode;
-  readonly onCameraModeChange: (mode: CameraMode) => void;
+  readonly cameraMode: CameraTracking['mode'];
+  readonly onCameraModeChange: (mode: CameraTracking['mode']) => void;
   readonly live: InspectorLiveProgress | null;
   readonly playhead: PlayheadState;
   readonly activeLine: number | null;
