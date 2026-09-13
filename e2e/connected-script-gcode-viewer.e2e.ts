@@ -16,7 +16,7 @@ const MAX_COMPILE_ELAPSED_MS = 30_000;
 const APP_ROUTE = '/';
 const CANVAS_LABEL = 'G-code canvas view';
 const REFRESH_BUTTON_NAME = 'Refresh';
-const PLAYBACK_LABEL = 'Playback';
+const PLAYBACK_LABEL = 'Playback estimate';
 const RESPONSIVENESS_PHASE = 'connected-script G-code 3D initial open';
 const REQUIRED_WORKER_URL_PARTS = [
   'output-preparation-worker',
