@@ -1,5 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import type * as LumaBitmapModule from '../raster/luma-bitmap';
+import { lumaToBitmap } from '../raster/luma-bitmap';
+import {
+  assembleBitmapAsync,
+  type BitmapConversionOptions,
+  type ConvertibleVector,
+} from '../raster/bitmap-assembly';
+
+// jsdom has no native workers. Keep the real assembly, bounds and luma path
+// behind a transport double; browser coverage verifies native worker encoding.
+vi.mock('../raster/convert-bitmap-worker-client', () => ({
+  convertBitmapInWorker: (
+    vectors: ReadonlyArray<ConvertibleVector>,
+    options: BitmapConversionOptions,
+    id: string,
+  ) => assembleBitmapAsync(vectors, lumaToBitmap, id, options),
+}));
 
 vi.mock('../raster/luma-bitmap', async (importOriginal) => {
   const actual = await importOriginal<typeof LumaBitmapModule>();
