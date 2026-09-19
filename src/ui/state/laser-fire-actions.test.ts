@@ -40,7 +40,7 @@ function readyState(): LaserState {
   };
 }
 
-function harness(write = vi.fn(async () => undefined)): {
+function harness(write = vi.fn<Parameters<typeof fireActions>[2]>(async () => undefined)): {
   readonly get: () => LaserState;
   readonly setFireActive: LaserState['setFireActive'];
   readonly write: typeof write;

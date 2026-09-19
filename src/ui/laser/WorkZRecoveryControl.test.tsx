@@ -35,8 +35,12 @@ function setCncState(input?: {
   readonly connection?: 'connected' | 'disconnected';
   readonly controllerState?: 'Idle' | 'Run';
   readonly controllerKind?: ControllerKind;
-  readonly recover?: ReturnType<typeof vi.fn>;
-}): ReturnType<typeof vi.fn> {
+  readonly recover?: ReturnType<
+    typeof vi.fn<ReturnType<typeof useLaserStore.getState>['recoverWorkZFromController']>
+  >;
+}): ReturnType<
+  typeof vi.fn<ReturnType<typeof useLaserStore.getState>['recoverWorkZFromController']>
+> {
   const recover = input?.recover ?? vi.fn(async () => undefined);
   useStore.setState({
     project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
