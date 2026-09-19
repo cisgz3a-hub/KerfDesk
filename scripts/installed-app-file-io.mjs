@@ -252,6 +252,7 @@ async function createProject(context) {
     fixture,
     'import-dialog',
   );
+  await context.page.getByRole('tab', { name: 'Run order', exact: true }).click();
   await context.page
     .getByRole('article', { name: 'Run 1: installed qualification artwork', exact: true })
     .waitFor({ state: 'visible' });
@@ -288,6 +289,7 @@ async function reopenProject(context) {
     'open-dialog',
   );
   await waitCleanTitle(context, args.project);
+  await context.page.getByRole('tab', { name: 'Run order', exact: true }).click();
   await context.page
     .getByRole('article', { name: 'Run 1: installed qualification artwork', exact: true })
     .waitFor({ state: 'visible' });
