@@ -72,8 +72,6 @@ function Get-EligibleAppProcesses($Processes, [int]$RootProcessId, [string]$Exec
 }
 
 function Initialize-WindowTools {
-  Add-Type -AssemblyName UIAutomationClient
-  Add-Type -AssemblyName UIAutomationTypes
   Add-Type -AssemblyName System.Drawing
   Add-Type -TypeDefinition @'
 using System;
@@ -84,18 +82,50 @@ public static class QualificationWindows {
   public delegate bool EnumWindowProc(IntPtr hwnd, IntPtr parameter);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowProc callback, IntPtr parameter);
+  [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumWindowProc callback, IntPtr parameter);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern bool IsChild(IntPtr parent, IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
   [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode)] private static extern IntPtr SendText(IntPtr hwnd, uint message, UIntPtr wparam, string text, uint flags, uint timeout, out UIntPtr result);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode)] private static extern IntPtr ReadText(IntPtr hwnd, uint message, UIntPtr wparam, StringBuilder text, uint flags, uint timeout, out UIntPtr result);
+  [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")] private static extern IntPtr SendCommand(IntPtr hwnd, uint message, UIntPtr wparam, IntPtr lparam, uint flags, uint timeout, out UIntPtr result);
   public static IntPtr[] ForProcess(int pid) {
     var matches = new List<IntPtr>();
     EnumWindows((hwnd, parameter) => { uint candidate; GetWindowThreadProcessId(hwnd, out candidate); if (candidate == pid) matches.Add(hwnd); return true; }, IntPtr.Zero);
     return matches.ToArray();
+  }
+  public static IntPtr[] Children(IntPtr parent) {
+    var matches = new List<IntPtr>();
+    EnumChildWindows(parent, (hwnd, parameter) => { matches.Add(hwnd); return true; }, IntPtr.Zero);
+    return matches.ToArray();
+  }
+  public static void SetFilename(IntPtr hwnd, string path) {
+    UIntPtr result;
+    if (SendText(hwnd, 0x000C, UIntPtr.Zero, path, 0x22, 5000, out result) == IntPtr.Zero || result == UIntPtr.Zero)
+      throw new InvalidOperationException("Native WM_SETTEXT failed or timed out.");
+  }
+  public static string ReadFilename(IntPtr hwnd) {
+    var text = new StringBuilder(32768); UIntPtr result;
+    if (ReadText(hwnd, 0x000D, (UIntPtr)text.Capacity, text, 0x22, 5000, out result) == IntPtr.Zero)
+      throw new InvalidOperationException("Native WM_GETTEXT failed or timed out.");
+    return text.ToString();
+  }
+  public static bool ClickAccept(IntPtr hwnd) {
+    UIntPtr result;
+    // The button may be destroyed while confirming. Actual dialog dismissal
+    // and the independently checked project file determine success.
+    return SendCommand(hwnd, 0x00F5, UIntPtr.Zero, IntPtr.Zero, 0x2, 5000, out result) != IntPtr.Zero;
   }
   public static string ClassName(IntPtr hwnd) { var text = new StringBuilder(256); GetClassName(hwnd, text, text.Capacity); return text.ToString(); }
   public static string Title(IntPtr hwnd) { var text = new StringBuilder(2048); GetWindowText(hwnd, text, text.Capacity); return text.ToString(); }
@@ -169,19 +199,53 @@ function Save-WindowScreenshot([IntPtr]$WindowHandle, [string]$Name) {
   }
 }
 
-function Get-Controls($Element) {
-  $controls = $Element.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
-  $rows = @()
-  for ($index = 0; $index -lt [Math]::Min($controls.Count, 400); $index++) {
-    $control = $controls.Item($index)
-    $rows += [pscustomobject]@{
-      name = $control.Current.Name; id = $control.Current.AutomationId
-      type = $control.Current.ControlType.ProgrammaticName; enabled = $control.Current.IsEnabled
-      className = $control.Current.ClassName
+function Get-NativeControls($Dialog) {
+  foreach ($control in [QualificationWindows]::Children([IntPtr]$Dialog.handle)) {
+    if (-not [QualificationWindows]::IsChild([IntPtr]$Dialog.handle, $control)) { throw 'Native control left the verified dialog.' }
+    $controlProcessId = [uint32]0
+    [QualificationWindows]::GetWindowThreadProcessId($control, [ref]$controlProcessId) | Out-Null
+    [pscustomobject]@{
+      handle = $control.ToInt64(); parentHandle = [QualificationWindows]::GetParent($control).ToInt64()
+      processId = $controlProcessId; controlId = [QualificationWindows]::GetDlgCtrlID($control)
+      className = [QualificationWindows]::ClassName($control)
+      visible = [QualificationWindows]::IsWindowVisible($control); enabled = [QualificationWindows]::IsWindowEnabled($control)
     }
   }
-  Write-JsonFile 'controls.json' $rows
-  return $controls
+}
+
+function Select-FileDialogControls($Controls, [long]$DialogHandle, [int]$DialogProcessId) {
+  $byHandle = @{}
+  foreach ($control in $Controls) {
+    if ($byHandle.ContainsKey($control.handle)) { throw 'Ambiguous native control snapshot.' }
+    $byHandle[$control.handle] = $control
+  }
+  $edits = @(); $buttons = @()
+  foreach ($control in $Controls) {
+    if (-not $control.visible -or -not $control.enabled) { continue }
+    $current = $control; $filenameCombo = $false; $ownedAncestry = $false; $seen = @{}
+    for ($depth = 0; $depth -lt 16 -and $null -ne $current; $depth++) {
+      if ($seen.ContainsKey($current.handle) -or $current.processId -ne $DialogProcessId) { break }
+      $seen[$current.handle] = $true
+      if ($current.className -in @('ComboBox', 'ComboBoxEx32') -and $current.controlId -eq 1148 -and $current.visible -and $current.enabled) { $filenameCombo = $true }
+      if ($current.parentHandle -eq $DialogHandle) { $ownedAncestry = $true; break }
+      $current = $byHandle[$current.parentHandle]
+    }
+    if (-not $ownedAncestry) { continue }
+    if ($control.className -eq 'Edit' -and $filenameCombo) { $edits += $control }
+    if ($control.className -eq 'Button' -and $control.controlId -eq 1) { $buttons += $control }
+  }
+  return [pscustomobject]@{ edits = $edits; buttons = $buttons }
+}
+
+function Assert-OwnedControls($Dialog, $Selection) {
+  Assert-OwnedDialog $Dialog
+  $fresh = Select-FileDialogControls @(Get-NativeControls $Dialog) $Dialog.handle $Dialog.processId
+  if ($fresh.edits.Count -ne 1 -or $fresh.buttons.Count -ne 1) { throw 'Native controls disappeared or became ambiguous.' }
+  foreach ($kind in @('edits', 'buttons')) {
+    foreach ($property in @('handle', 'parentHandle', 'processId', 'controlId', 'className')) {
+      if ($fresh.$kind[0].$property -ne $Selection.$kind[0].$property) { throw 'Native control identity changed.' }
+    }
+  }
 }
 
 function Wait-NativeDialog {
@@ -203,27 +267,28 @@ function Complete-FileDialog {
   if ($Action -eq 'Save' -and [IO.File]::Exists($FilePath)) { throw 'Save target already exists; refusing overwrite.' }
   $dialog = Wait-NativeDialog
   $result.dialog = $dialog
-  $element = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$dialog.handle)
-  $controls = Get-Controls $element
-  $edits = @($controls | Where-Object {
-    $_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and
-    ($_.Current.AutomationId -eq '1001' -or $_.Current.Name -match '^File name:?$')
-  })
-  if ($edits.Count -ne 1) { throw "Expected one File name edit, found $($edits.Count)." }
-  $value = $edits[0].GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
-  Assert-OwnedDialog $dialog
-  $value.SetValue($FilePath)
-  $result.enteredPath = $value.Current.Value
-  if ($result.enteredPath -ne $FilePath) { throw 'Native filename edit did not retain the requested path.' }
-  $buttons = @($controls | Where-Object {
-    $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.AutomationId -eq '1'
-  })
-  if ($buttons.Count -ne 1) { throw "Expected one native accept button, found $($buttons.Count)." }
-  $result.acceptButton = $buttons[0].Current.Name
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  do {
+    Assert-OwnedDialog $dialog
+    $controls = @(Get-NativeControls $dialog)
+    Write-JsonFile 'controls.json' $controls
+    $selection = Select-FileDialogControls $controls $dialog.handle $dialog.processId
+    if ($selection.edits.Count -gt 1 -or $selection.buttons.Count -gt 1) { throw 'Ambiguous native filename or accept control.' }
+    if ($selection.edits.Count -eq 1 -and $selection.buttons.Count -eq 1) { break }
+    if ([DateTime]::UtcNow -ge $deadline) { throw 'Native filename and accept controls did not become ready.' }
+    Start-Sleep -Milliseconds 150
+  } while ($true)
+  $result.controls = $selection
+  $result.controlMethod = 'owned native HWND messages'
+  Assert-OwnedControls $dialog $selection
+  [QualificationWindows]::SetFilename([IntPtr]$selection.edits[0].handle, $FilePath)
+  $result.enteredPath = [QualificationWindows]::ReadFilename([IntPtr]$selection.edits[0].handle)
+  if (-not [string]::Equals($result.enteredPath, $FilePath, [StringComparison]::Ordinal)) { throw 'Native filename edit did not retain the requested path.' }
   Save-WindowScreenshot ([IntPtr]$dialog.handle) 'dialog-filled.png'
-  $invoke = $buttons[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
-  Assert-OwnedDialog $dialog
-  $invoke.Invoke()
+  Assert-OwnedControls $dialog $selection
+  [QualificationWindows]::SetForegroundWindow([IntPtr]$dialog.handle) | Out-Null
+  if ([QualificationWindows]::GetForegroundWindow().ToInt64() -ne $dialog.handle) { throw 'The verified native file dialog is not active.' }
+  $result.acceptMessageCompleted = [QualificationWindows]::ClickAccept([IntPtr]$selection.buttons[0].handle)
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     $remaining = @(Get-OwnedWindowInventory | Where-Object { $_.visible -and $_.className -eq '#32770' })

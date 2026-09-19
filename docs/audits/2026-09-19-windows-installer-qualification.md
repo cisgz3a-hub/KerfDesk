@@ -37,8 +37,8 @@ The qualification checks these transitions:
    retained, then reinstall and reopen the retained project. Finally uninstall
    again and retain project/profile evidence.
 
-The external harness uses loopback CDP for renderer interaction and Windows
-UIAutomation for native file dialogs. It does not enable the application's smoke
+The external harness uses loopback CDP for renderer interaction and bounded
+Windows control messages for native file dialogs. It does not enable the application's smoke
 mode, replace file picker APIs, simulate file writes or issue machine commands.
 Missing CDP access, a noninteractive runner desktop or native-dialog failure
 fails qualification; it must not be reported as a product pass.
@@ -57,6 +57,15 @@ desktop session and valid creation-time ancestry. It rechecks process and
 owner-window ancestry before changing a filename or confirming a dialog, and
 refuses multiple matching dialogs. The [shipped Windows chooser factory](https://github.com/chromium/chromium/blob/148.0.7778.280/chrome/browser/win/chrome_select_file_dialog_factory.cc)
 passes the app's owner window to a separate utility service.
+
+Some runner UI Automation providers expose the filename edit and accept button
+as generic panes. The helper therefore enumerates native child handles only
+inside that verified dialog. It requires one visible, enabled `Edit` inside the
+filename combo (native ID 1148) and one `Button` with native ID 1. Process, parent,
+class and control identity are revalidated before each action; the filename is
+read back exactly before accepting. [Windows message timeouts](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw)
+bound each call. A returned message alone never proves success: the dialog must
+close and the renderer/disk assertions must independently pass.
 
 Electron 42 checks existing File System Access grants with a null frame and
 WebContents. The permission policy therefore accepts the exact `fileSystem`
