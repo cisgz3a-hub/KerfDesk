@@ -296,7 +296,7 @@ describe('live countdown lifecycle integration', () => {
       const heldStreamer = { ...streamingAfterAcks(5), status: streamStatus };
       const held = liveCanvasStatusPatch(
         { ...current, liveCanvasRun: running },
-        report(8, controllerState),
+        { ...report(8, controllerState), subState: controllerState === 'Hold' ? 0 : null },
         heldStreamer,
         2_000,
       ).liveCanvasRun;

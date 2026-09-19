@@ -19,6 +19,7 @@ export function laserParkTarget(
   dialect: GrblGcodeDialect,
   finishPosition: OutputEmitOptions['finishPosition'],
 ): Vec2 | null {
+  if (finishPosition === null) return null;
   return finishPosition ?? (dialect.parkAtOriginAfterJob ? { x: 0, y: 0 } : null);
 }
 
@@ -33,7 +34,7 @@ export function resolveJobParkTarget(
   if (machineKind === 'cnc') {
     const cncGroups = collectIndexedCncGroups(job);
     const last = cncGroups[cncGroups.length - 1];
-    return last === undefined ? null : parkTarget(last.group, finishPosition);
+    return last === undefined ? null : parkTarget(last.group, finishPosition ?? undefined);
   }
   return laserParkTarget(resolveGrblDialect(device), finishPosition);
 }

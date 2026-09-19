@@ -220,6 +220,10 @@ function requestKey(options: LargeJobPreparationOptions): string {
     jobOrigin: options.jobOrigin ?? null,
     outputScope: options.outputScope ?? null,
     snapshot: options.snapshot ?? null,
+    initialPosition:
+      options.initialPosition === undefined
+        ? null
+        : [options.initialPosition.x, options.initialPosition.y, options.initialPosition.z ?? null],
   });
 }
 

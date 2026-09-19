@@ -1,7 +1,6 @@
-// Smoothieware lifecycle characterization: GRBL-style realtime bytes with
-// Marlin-style gaps (no $J/$$/$X/$SLP), halt recovery via M999, and — the
-// key divergence — realtime pause allowed WITHOUT the $32 laser-mode proof,
-// since Smoothie has no $-settings to prove it with.
+// Smoothieware lifecycle characterization: realtime status with no
+// $J/$$/$X/$SLP, halt recovery via M999, and stream-side pause without
+// unqualified GRBL !/~ bytes or a $32 laser-mode proof.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -213,7 +212,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(sim.state().pos.x).toBe(39);
   });
 
-  it('resumes timing and settles when the paused final line already acknowledged', async () => {
+  it('keeps buffered timing active and settles when the paused final line already acknowledged', async () => {
     const sim = await connectSmoothieIdle({ motionMs: 2_000 });
     await startTestLaserJob(DRAINED_PAUSE_JOB, {
       streamingMode: 'ping-pong',
@@ -223,9 +222,16 @@ describe('Smoothieware lifecycle against the simulator', () => {
 
     await useLaserStore.getState().pauseJob();
     await pump(20);
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
+    // Native Smoothie Pause only freezes the sender. The acknowledged final
+    // move is still executing, so fresh Run must keep its clock active.
+    await pump(1_000);
+    expect(useLaserStore.getState().statusReport?.state).toBe('Run');
+    expect(sim.state().pendingMotions).toBeGreaterThan(0);
+    expect(sim.outbound()).not.toContain('!');
     expect(useLaserStore.getState()).toMatchObject({
       streamer: { status: 'paused', completed: 1, inFlight: [] },
-      liveCanvasRun: { timing: { kind: 'paused' } },
+      liveCanvasRun: { timing: { kind: 'running' } },
     });
 
     await useLaserStore.getState().resumeJob();
@@ -234,13 +240,11 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(useLaserStore.getState()).toMatchObject({
       streamer: { status: 'done' },
       controllerOperation: { kind: 'post-job-settle', phase: 'dwell' },
-      liveCanvasRun: { timing: { kind: 'running' } },
-    });
-
-    sim.port.emitLine('<Run|MPos:10.0000,0.0000,0.0000|WPos:10.0000,0.0000,0.0000|F:600.0,100.0>');
-    expect(useLaserStore.getState()).toMatchObject({
       liveCanvasRun: { lifecycle: 'running', timing: { kind: 'running' } },
     });
+    await pump(20);
+    expect(sim.state().pendingMotions).toBeGreaterThan(0);
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).not.toBe('complete');
 
     await pump(4_000);
     expect(useLaserStore.getState()).toMatchObject({

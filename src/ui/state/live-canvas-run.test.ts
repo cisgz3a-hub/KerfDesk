@@ -134,7 +134,7 @@ describe('live canvas status reconciliation', () => {
     const pausedStreamer = { ...acceptedStreamer(), status: 'paused' as const };
     const paused = liveCanvasStatusPatch(
       { ...current, liveCanvasRun: advanced },
-      report(8, 'Hold'),
+      { ...report(8, 'Hold'), subState: 0 },
       pausedStreamer,
     ).liveCanvasRun;
     expect(paused?.lifecycle).toBe('paused');

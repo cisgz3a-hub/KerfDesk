@@ -201,14 +201,27 @@ function timeTile(
   estimate: PreparedCurrentStart['metrics']['duration'],
   machineKind: MachineKind,
 ): JobReviewStatTile {
+  if (estimate.unavailableReason !== undefined)
+    return {
+      label: 'Estimated time',
+      value: 'Unavailable',
+      detail: estimate.unavailableReason,
+    };
   const cutLabel = machineKind === 'cnc' ? 'Cut + plunge' : 'Cut';
-  const dwell = estimate.breakdown.dwellSeconds ?? 0;
+  const dwellLabel = machineKind === 'cnc' ? 'spindle dwell' : 'dwell';
+  const details = [
+    `${cutLabel} ${formatDuration(estimate.breakdown.cutSeconds)}`,
+    `travel ${formatDuration(estimate.breakdown.travelSeconds)}`,
+  ];
+  if ((estimate.breakdown.dwellSeconds ?? 0) > 0)
+    details.push(`${dwellLabel} ${formatDuration(estimate.breakdown.dwellSeconds ?? 0)}`);
+  if ((estimate.breakdown.transportSeconds ?? 0) >= 0.5)
+    details.push(`streaming ${formatDuration(estimate.breakdown.transportSeconds ?? 0)}`);
+  if ((estimate.manualPauseCount ?? 0) > 0) details.push('plus manual tool-change time');
   return {
     label: 'Estimated time',
     value: formatDuration(estimate.totalSeconds),
-    detail:
-      `${cutLabel} ${formatDuration(estimate.breakdown.cutSeconds)} · travel ${formatDuration(estimate.breakdown.travelSeconds)}` +
-      (dwell > 0 ? ` · spindle dwell ${formatDuration(dwell)}` : ''),
+    detail: details.join(' · '),
   };
 }
 

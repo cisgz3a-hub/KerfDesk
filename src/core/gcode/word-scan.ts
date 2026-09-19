@@ -40,16 +40,21 @@ export function scanGcodeWords(line: string): ReadonlyArray<GcodeWordMatch> {
  * trailing text is merely ignored. Returning `null` is diagnostic only; it
  * does not reject an import or make external G-code executable.
  */
-export function scanCompleteGcodeWords(line: string): ReadonlyArray<GcodeWordMatch> | null {
+export function scanCompleteGcodeWords(
+  line: string,
+  parseValue?: (letter: string, text: string) => number,
+): ReadonlyArray<GcodeWordMatch> | null {
   const framed = stripDiagnosticBlockFraming(line);
   const words: GcodeWordMatch[] = [];
   let consumedThrough = 0;
   for (const match of framed.matchAll(GCODE_WORD_PATTERN)) {
     const start = match.index;
     if (framed.slice(consumedThrough, start).trim() !== '') return null;
+    const letter = (match[1] ?? '').toUpperCase();
+    const text = match[2] ?? '0';
     words.push({
-      letter: (match[1] ?? '').toUpperCase(),
-      value: Number.parseFloat(match[2] ?? '0'),
+      letter,
+      value: parseValue === undefined ? Number.parseFloat(text) : parseValue(letter, text),
       matchedLength: match[0].length,
     });
     consumedThrough = start + match[0].length;

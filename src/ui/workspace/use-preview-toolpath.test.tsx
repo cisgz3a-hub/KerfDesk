@@ -168,6 +168,7 @@ describe('usePreviewToolpath', () => {
   });
 
   it('fills a paused over-budget preview in from the preparation worker (ADR-244)', async () => {
+    useLaserStore.setState({ statusReport: idleReport(300, 0) });
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {
       scheduled = work;
@@ -188,6 +189,11 @@ describe('usePreviewToolpath', () => {
 
     await renderHarness(true, scheduleBuild);
     await act(async () => scheduled?.());
+
+    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
+      project,
+      expect.objectContaining({ initialPosition: { x: 300, y: 0, z: 0 } }),
+    );
 
     expect(
       (probe.current as { readonly previewIssue?: { kind: string } } | null)?.previewIssue,

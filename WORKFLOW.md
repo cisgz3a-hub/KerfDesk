@@ -1203,10 +1203,17 @@ and the Machine rail may retain its detailed progress bar. Both update whenever 
 advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
 reconciliation; it is not presented as elapsed-time or remaining-time progress.
 
-Before Start, the existing project estimate remains visible. Once the exact output artifact exists,
-the in-job remaining-time baseline comes from the exact emitted G-code timeline: modeled motion and
-every deterministic timing command, including CNC `G4` spindle spin-up dwells. A deterministic dwell
-keeps its emitted duration and is never multiplied by an observed motion-pacing correction. Motion
+Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
+and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
+head position contributes approach time in every placement mode. Job Review reuses the prepared
+program's timing baseline when available, and Start retains the same cut/travel calibration.
+The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
+and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and
+dwell; only delivery delays extend the estimate. This is an earliest-arrival serial model, not a
+simulation of controller RX buffers, acknowledgement latency or host scheduling. Ruida binary job
+execution does not use the serial G-code delivery model. Manual tool-change time is disclosed but
+cannot be predicted. Deterministic dwell and serial delivery are never multiplied by motion
+calibration or an observed motion-pacing correction. Motion
 lookahead also restarts where the emitted program makes the controller drain its planner: dwell/
 pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `M3`/`M4`/`M7`/`M8`/
 `M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
@@ -1233,6 +1240,10 @@ model:
   `Run` report proves execution while the first write is settling. The baseline pace applies until
   fresh route samples calibrate it, while deterministic dwell always retains its emitted duration.
 - **Paused:** the last estimate freezes; hold time does not silently consume the remaining estimate.
+  Pausing the sender alone does not stop the execution clock. Fresh `Run` and `Hold:1` reports
+  continue it through queued motion or deceleration; confirmed `Hold:0` and settled `Door:0/1`
+  freeze it. Smoothie `Hold` without a substate remains supported. Marlin's position-only `M114`
+  response does not prove execution drained, even when represented as `Idle` by the adapter.
   A host-side CNC `M0` alone is not physical pause proof: the clock keeps running through the
   buffered pre-`M0` tail and freezes only after the existing fresh `Idle` tool-change proof.
 - **Disconnected:** remaining time is unavailable rather than counting down or carrying a stale
@@ -1242,6 +1253,9 @@ model:
   line acknowledgement alone does not select this state or remove the numeric countdown.
 - **Complete:** the active-driver settle marker has completed and the required stable `Idle` reports
   have released the job. An acknowledged final line alone cannot select this state.
+
+Positive subsecond estimates display `<1s`. An exhausted estimate while the job remains active
+displays that it is waiting for the controller; numerical rounding never implies completion.
 
 The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
 session, position epoch, active driver, and current-session detected-family evidence. If any of that

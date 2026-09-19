@@ -1,4 +1,5 @@
 import { rotaryAppliesTo, type JobOriginPlacement } from '../../core/job';
+import { machineKindOf } from '../../core/scene';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import type { ControllerSettingsSnapshot, PreflightOptions } from '../../core/preflight';
 import type { PreparedOutput } from '../../io/gcode';
@@ -70,6 +71,7 @@ export function okPreparation(
     prepared.project.device,
     reportedWorkPositionMm(machine, reportInches),
     {
+      machineKind: machineKindOf(prepared.project.machine),
       controllerSessionEpoch: machine.controllerSessionEpoch,
       positionEpoch: machine.trustedPositionEpoch,
       activeControllerKind: machine.activeControllerKind,
@@ -88,7 +90,15 @@ export function okPreparation(
     gcode,
     warnings,
     prepared,
-    metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan),
+    metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
+      gcode,
+      ...(jobTimingPlan.kind === 'ok'
+        ? { timeline: jobTimingPlan.plan }
+        : { unavailableReason: jobTimingPlan.reason }),
+      ...(jobTimingPlan.evidence.initialPosition === null
+        ? {}
+        : { initialPosition: jobTimingPlan.evidence.initialPosition }),
+    }),
     ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
     canvasPlan,
     jobTimingPlan,

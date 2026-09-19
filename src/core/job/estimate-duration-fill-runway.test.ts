@@ -52,7 +52,12 @@ describe('4040 fill runway duration', () => {
     const planned = estimateJobDuration({ groups: [policy] }, controller);
     const reference = estimateJobDuration({ groups: [continuous] }, controller);
 
-    expect(planned.totalSeconds).toBeCloseTo(reference.totalSeconds, 6);
+    // The same continuous route has equal motion time. Its extra S0 commands
+    // have their own transmission cost, so total wall times need not match.
+    expect(planned.breakdown.cutSeconds + planned.breakdown.travelSeconds).toBeCloseTo(
+      reference.breakdown.cutSeconds + reference.breakdown.travelSeconds,
+      6,
+    );
     expect(planned.breakdown.cutSeconds).toBeLessThan(reference.breakdown.cutSeconds);
     expect(planned.breakdown.feedTravelSeconds).toBeGreaterThan(0);
     expect(planned.breakdown.rapidTravelSeconds).toBeCloseTo(

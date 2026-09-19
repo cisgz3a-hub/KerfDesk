@@ -2,8 +2,8 @@
 // entering Preview can paint first and cancel stale builds before they start.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildToolpath, EMPTY_JOB } from '../../core/job';
-import type { Project } from '../../core/scene';
+import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
+import type { OutputScope, Project } from '../../core/scene';
 import {
   resolveExportJobPlacement,
   resolveJobPlacement,
@@ -21,6 +21,7 @@ import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-sc
 import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -116,10 +117,7 @@ function runScheduledPreviewBuild(args: {
     });
     return;
   }
-  const options: LargeJobPreparationOptions = {
-    ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
-    outputScope: args.outputScope,
-  };
+  const options = previewPreparationOptions(resolved.jobOrigin, args.outputScope);
   const registration = currentPrintCutOutputRegistration(args.project);
   const needsSnapshot = hasVariableText(args.project) || registration !== undefined;
   const backgroundOptions: LargeJobPreparationOptions = {
@@ -143,6 +141,25 @@ function runScheduledPreviewBuild(args: {
       setToolpath: args.setToolpath,
     });
   });
+}
+
+function previewPreparationOptions(
+  jobOrigin: JobOriginPlacement | undefined,
+  outputScope: OutputScope,
+): LargeJobPreparationOptions {
+  // Preview geometry does not depend on the physical head in fixed-origin
+  // modes. Read it only when building so Preview and ETA share the same
+  // worker cache entry without rebuilding geometry on every head move.
+  const machine = useLaserStore.getState();
+  const initialPosition = reportedWorkPositionMm(
+    machine,
+    machine.controllerSettings?.reportInches === true,
+  );
+  return {
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+    ...(initialPosition === null ? {} : { initialPosition }),
+    outputScope,
+  };
 }
 
 function usePreviewPlacement(jobPlacement: JobPlacementSettings) {

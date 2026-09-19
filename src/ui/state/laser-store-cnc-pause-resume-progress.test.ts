@@ -54,7 +54,7 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
 
     expect(observed.result()).toBe('pending');
     expect(useLaserStore.getState().statusReport).toMatchObject({ state: 'Door', subState: 2 });
-    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
     expect(harness.writes).not.toContain(RT_SOFT_RESET);
 
     harness.emitStatus(PARKED_STATUS);
@@ -62,6 +62,7 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
     expect(observed.result()).toBe('resolved');
     expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
   });
 
   it('keeps Resume alive through stock Door:3 restore and refills exactly once after Run', async () => {

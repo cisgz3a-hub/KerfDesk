@@ -9973,6 +9973,37 @@ pacing still require physical calibration; controller reports and simulator evid
 them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
 Frame authorization, controller command, settle contract, or other safety boundary.
 
+### Amendment 2026-09-19 — one emitted baseline for estimates and remaining time
+
+Pre-job estimates, prepared Job Review and the live countdown share the emitted-program timing
+model and device cut/travel calibration. CNC pecks, helical entry, XYZ motion, represented feeds,
+retracts, dwell and parking are timed from native output. Junction planning retains XYZ direction;
+arc timing uses the circular or helical route length rather than the shorter display chords.
+
+Serial delivery contributes only delay that cannot overlap earlier modeled execution. It counts
+the sender's trimmed UTF-8 lines, newline and 8N1 framing at the configured or driver-default baud.
+Host-managed tool changes restart the delivery window; their operator wait is excluded and
+disclosed. Motion calibration and observed route pacing do not scale dwell or serial delay.
+Ruida binary output does not use the G-code serial model.
+
+Known physical XYZ is an estimate input for every placement mode. It is separate from any final
+Current Position parking target and participates in background cache identity by coordinate
+values. A preloaded large job requests background estimation on initial mount. Superseded replies
+cannot replace the current result. The existing bounded Start timing sidecar keeps an unavailable
+result without retrying an unbounded parse or introducing a new Start gate.
+
+Freezing the sender is not proof of a physical hold. Run/deceleration continues consuming the
+estimate until fresh controller evidence establishes a settled hold or the existing host-tool-change
+boundary. Marlin position-only reports do not prove drain. Rounding is applied to total seconds
+before formatting units; an exhausted estimate continues to show that execution is awaiting
+controller completion. Only the established completion contract selects Complete.
+
+Geometric Preview playback incorporates the same total but distributes non-motion time over its
+route; it does not represent exact command-event placement. The estimator remains a model of
+configured motion limits and earliest serial arrival. RX/ACK behavior, host scheduling, overrides,
+spindle behavior and actual material/machine pacing require separate physical qualification. The
+Frame-first authorization contract and the emitted machine commands are unchanged by timing.
+
 ---
 
 ## ADR-222 - Single-artwork scenes select the artwork by default

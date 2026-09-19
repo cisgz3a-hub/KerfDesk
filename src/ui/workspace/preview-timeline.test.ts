@@ -23,6 +23,18 @@ const mixed: Toolpath = {
 };
 
 describe('preview timeline', () => {
+  it('includes deterministic waits and serial overhead in the playback total', () => {
+    const timeline = buildPreviewTimeline(mixed, {
+      cutSeconds: 90,
+      travelSeconds: 10,
+      dwellSeconds: 7,
+      transportSeconds: 13,
+    });
+    expect(timeline.totalSeconds).toBe(120);
+    expect(elapsedSecondsAtScrubber(timeline, 1)).toBeCloseTo(120, 8);
+    expect(scrubberAtElapsedSeconds(timeline, 110)).toBeLessThan(1);
+    expect(scrubberAtElapsedSeconds(timeline, 120)).toBe(1);
+  });
   it('paces rapid and laser-off feed travel from separate timing buckets', () => {
     const detailed: Toolpath = {
       totalLength: 300,

@@ -49,7 +49,8 @@ export {
 export { computeSceneOutputBounds } from './scene-output-bounds';
 export { computeRegistrationBoxBounds } from './registration-placement';
 export type { JobDurationEstimate } from './estimate-duration';
-export { estimateJobDuration, formatDuration } from './estimate-duration';
+export { estimateJobDuration } from './estimate-duration';
+export { formatDuration } from './format-duration';
 export { optimizePaths } from './optimize-paths';
 export { applyRotaryYScale } from './rotary-transform';
 export { machineSpaceJob, rotaryAppliesTo, rotaryWrapLimitMm } from './rotary-job';
