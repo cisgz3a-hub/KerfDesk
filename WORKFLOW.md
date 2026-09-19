@@ -906,6 +906,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
    Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
    non-Frame-validity policy findings remain warnings.
+   Dense programs above the optional analysis budget keep their complete G-code and motion route
+   while omitting duplicate executable-plan analysis. Frame bounds and Start authorization are
+   unchanged. GRBL-compatible position reports with extra axes retain their reported XYZ values;
+   additional axes do not make an otherwise valid position disappear.
 5. **Job Review runs at Start (ADR-237).** Frame dispatches dialog-free; the warnings, exact
    artifact, and — when preparation changed G55-G59 to G54 — the durable WCS disclosure ride the
    review-pending permit. Pressing Start opens the one Job Review; the operator confirms with

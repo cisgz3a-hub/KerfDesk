@@ -7,9 +7,11 @@ import {
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { MachineKind } from '../../core/scene/machine';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
+import {
+  CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
+  canvasProgramExceedsLineBudget,
+} from './canvas-program-analysis-budget';
 
-const MAX_LIVE_COUNTDOWN_LINES = 25_000;
-const MAX_LIVE_COUNTDOWN_SEGMENTS = 25_000;
 const INITIAL_POSITION_TOLERANCE_MM = 0.05;
 
 export type CanvasJobTimingEvidence = {
@@ -44,7 +46,7 @@ export function canvasJobTimingPlan(
     initialPosition,
     ...context,
   };
-  if (exceedsLineBudget(gcode, MAX_LIVE_COUNTDOWN_LINES)) {
+  if (canvasProgramExceedsLineBudget(gcode)) {
     return {
       kind: 'unavailable',
       reason: 'Exact emitted program exceeds the live countdown line budget.',
@@ -74,7 +76,7 @@ export function canvasJobTimingPlan(
     },
     initialPosition,
     {
-      maxSegments: MAX_LIVE_COUNTDOWN_SEGMENTS,
+      maxSegments: CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
       machineKind,
       timeCalibration: profileTimeCalibration(device),
     },
@@ -139,14 +141,4 @@ function positionsMatch(left: MotionPoint | null, right: MotionPoint | null): bo
 
 function usesMillisecondDwellP(controllerKind: ControllerKind): boolean {
   return controllerKind === 'marlin' || controllerKind === 'smoothieware';
-}
-
-function exceedsLineBudget(gcode: string, maximumLines: number): boolean {
-  let lines = 1;
-  for (let index = 0; index < gcode.length; index += 1) {
-    if (gcode.charCodeAt(index) !== 10) continue;
-    lines += 1;
-    if (lines > maximumLines) return true;
-  }
-  return false;
 }
