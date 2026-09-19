@@ -1,6 +1,10 @@
 # Visual tutorial verification
 
-Implementation: `codex/visual-tutorials-20260919`, based on main `7d4b82812f4ee059edb6f077b8ec6870d06356e2`. Checked locally on Windows with Chrome on 19 September 2026. No merge, deployment or machine operation was performed.
+Implementation: `codex/visual-tutorials-20260919`, initially based on main `7d4b82812f4ee059edb6f077b8ec6870d06356e2`, refreshed through main `f16e0feadbbe9c3c35a2c26871e051f985ff2f64`. Checked locally on Windows with Chrome on 19 September 2026. No deployment or machine operation was performed during these local checks.
+
+## Integration review
+
+After the main refresh and a frozen-lockfile install, **165 tests across 23 affected suites** passed on Vitest 4.1.11. This includes shared dialogs, menus, drawing controls, tutorial content/delivery, CNC selectors and cut-settings form/reset/submission behavior. Two independently reported issues were reproduced with failing regressions and corrected: the ordinary Help → Visual tutorials command restores focus to Help when closed, and Cut Settings opens the lesson for its current unsaved mode. The latter preserves edited values, returns focus, never submits through Tutorial, and follows a store-side reset.
 
 ## Picture and accuracy revision
 

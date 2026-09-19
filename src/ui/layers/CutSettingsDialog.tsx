@@ -51,14 +51,6 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       onSubmit={onSubmit}
       size="md"
     >
-      <Header layer={props.layer} />
-      {props.selectionCount !== undefined ? (
-        <p className="lf-subheading">
-          Values start from the first selected artwork. Only fields you change are applied to all{' '}
-          {props.selectionCount} selected artworks. Each artwork keeps its own power and density
-          limits.
-        </p>
-      ) : null}
       {/* Keyed on the layer's own settings: the fields are uncontrolled drafts
           that read `defaultValue` once, and OK submits whatever the DOM holds.
           "Reset to Default" rewrites the layer in the store while the dialog is
@@ -74,6 +66,7 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
         <CutSettingsBody
           key={signature}
           layer={props.layer}
+          selectionCount={props.selectionCount}
           deferArtworkBounds={props.selectionCount !== undefined}
           operationMembershipEditable={props.operationMembershipEditable !== false}
           {...(maxFeed === null ? {} : { maxFeed })}
@@ -92,6 +85,7 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
 
 function CutSettingsBody(props: {
   readonly layer: Layer;
+  readonly selectionCount: number | undefined;
   readonly maxFeed?: number;
   readonly deferArtworkBounds: boolean;
   readonly operationMembershipEditable: boolean;
@@ -104,6 +98,14 @@ function CutSettingsBody(props: {
   const maxFeedProps = props.maxFeed === undefined ? {} : { maxFeed: props.maxFeed };
   return (
     <>
+      <Header layer={props.layer} mode={mode} />
+      {props.selectionCount !== undefined ? (
+        <p className="lf-subheading">
+          Values start from the first selected artwork. Only fields you change are applied to all{' '}
+          {props.selectionCount} selected artworks. Each artwork keeps its own power and density
+          limits.
+        </p>
+      ) : null}
       <CutSettingsCommonFields
         layer={props.layer}
         operationMembershipEditable={props.operationMembershipEditable}
@@ -157,7 +159,7 @@ function hasDefaultHandlers(
   );
 }
 
-function Header({ layer }: { readonly layer: Layer }): JSX.Element {
+function Header({ layer, mode }: { readonly layer: Layer; readonly mode: LayerMode }): JSX.Element {
   return (
     <header style={headerStyle}>
       {/* The swatch background is scene data (the layer color), inline by
@@ -168,7 +170,7 @@ function Header({ layer }: { readonly layer: Layer }): JSX.Element {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >
           <h2 className="lf-dialog-title">Cut Settings</h2>
-          <TutorialButton tutorialId={laserOperationTutorial(layer.mode)} />
+          <TutorialButton tutorialId={laserOperationTutorial(mode)} />
         </div>
         <p className="lf-subheading">{layer.color}</p>
       </div>

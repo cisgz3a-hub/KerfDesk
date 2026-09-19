@@ -134,7 +134,11 @@ function MenuItem(props: {
         title={controlHelp(commandHelp, command.disabledReason)}
         data-help-id={commandHelp}
         style={{ ...menuItemStyle, flex: 1 }}
-        onClick={() => {
+        onClick={(event) => {
+          if (command.id === 'help.tutorials') {
+            // The menu row disappears before the tutorial captures its return target.
+            event.currentTarget.closest('details')?.querySelector('summary')?.focus();
+          }
           if (runCommand(command)) props.onCommandRun();
         }}
       >

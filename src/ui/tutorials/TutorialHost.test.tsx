@@ -273,6 +273,31 @@ describe('TutorialHost learning flow', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('returns to Help after opening the tutorial library through its ordinary menu command', async () => {
+    const command: AppCommand = {
+      id: 'help.tutorials',
+      family: 'help',
+      label: 'Visual tutorials…',
+      title: 'Browse visual tutorials',
+      enabled: true,
+      invoke: () => useTutorialStore.getState().openTutorial(),
+    };
+    await render(
+      <>
+        <AppMenuBar commands={[command]} machineKind="laser" />
+        <TutorialHost />
+      </>,
+    );
+    const summary = element<HTMLElement>('summary[data-menu-family-summary="help"]');
+    await click(summary);
+    await click(element('[data-help-id="command:help.tutorials"]'));
+    expect(document.querySelector('.lf-learn')).not.toBeNull();
+    expect(summary.getAttribute('aria-expanded')).toBe('false');
+    await escape();
+    expect(document.activeElement).toBe(summary);
+    expect(useUiStore.getState().modalDepth).toBe(0);
+  });
+
   it('makes a disabled command lesson usable without running that command or losing menu focus', async () => {
     const invoke = vi.fn();
     const command: AppCommand = {
