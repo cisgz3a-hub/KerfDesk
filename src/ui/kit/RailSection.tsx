@@ -4,6 +4,8 @@
 // boxed, some bare — which is exactly the inconsistency the operations-rail
 // redesign removes. Styling lives in tokens.css (.lf-section*).
 
+import { TutorialButton } from '../tutorials/TutorialButton';
+
 export function RailSection(props: {
   readonly label: string;
   /** Right-aligned muted status: a count ("20") or a state ("Off"). */
@@ -12,6 +14,7 @@ export function RailSection(props: {
   readonly hint: string;
   /** Force the open state on render; omit for ordinary uncontrolled toggling. */
   readonly open?: boolean;
+  readonly tutorialId?: string;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
@@ -20,7 +23,14 @@ export function RailSection(props: {
         <span>{props.label}</span>
         {props.badge === undefined ? null : <span className="lf-section-badge">{props.badge}</span>}
       </summary>
-      <div className="lf-section-body">{props.children}</div>
+      <div className="lf-section-body">
+        {props.tutorialId === undefined ? null : (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <TutorialButton tutorialId={props.tutorialId} />
+          </div>
+        )}
+        {props.children}
+      </div>
     </details>
   );
 }

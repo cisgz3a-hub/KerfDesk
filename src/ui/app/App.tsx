@@ -39,6 +39,7 @@ import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
+import { TutorialHost } from '../tutorials/TutorialHost';
 
 export function App(): JSX.Element {
   // Recovery stays in a nonblocking banner. Background autosave protects
@@ -93,6 +94,7 @@ export function App(): JSX.Element {
       <MachineSetupDialogHost />
       <ImageEditorHost />
       <DesignStudioHost />
+      <TutorialHost />
     </div>
   );
 }

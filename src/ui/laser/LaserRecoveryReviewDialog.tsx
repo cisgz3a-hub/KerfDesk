@@ -19,7 +19,12 @@ export type LaserRecoveryReviewDialogProps = {
 export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps): JSX.Element {
   const start = useRecoveryStart(props);
   return (
-    <Dialog title="Review interrupted laser job" size="md" onClose={start.closeReadOnly}>
+    <Dialog
+      tutorialId="recovery"
+      title="Review interrupted laser job"
+      size="md"
+      onClose={start.closeReadOnly}
+    >
       <RecoveryReviewContent capsule={props.capsule} />
       {start.state === 'failed' ? (
         <div role="alert" aria-live="polite" style={failureStyle}>

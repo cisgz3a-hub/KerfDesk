@@ -1,5 +1,6 @@
 import type { EditorSession } from './editor-session';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 export type ImageEditorTopBarActions = {
   readonly undo: () => void;
@@ -28,6 +29,7 @@ export function ImageEditorTopBar(props: {
       </strong>
       <EditorAdjustMenus />
       <span style={topActionsStyle}>
+        <TutorialButton tutorialId="image-studio" />
         <button
           type="button"
           className={props.isHistoryOpen ? 'lf-btn' : 'lf-btn lf-btn--ghost'}

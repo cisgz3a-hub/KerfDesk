@@ -11,6 +11,7 @@ import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { shortcutHint } from './shortcut-list';
 import { ToolbarIcon } from './ToolbarIcon';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 export function Toolbar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -26,6 +27,7 @@ export function Toolbar(props: {
       <ConnectionBadge />
       <ToolbarSeparator className="lf-toolbar-identity-separator" />
       <ToolbarButtons commands={props.commands} />
+      <TutorialButton label="Learn" />
       {/* No separator before the hint: margin-left auto already isolates it,
           and a lone rule floating in the stretch of empty bar looked stray. */}
       <button

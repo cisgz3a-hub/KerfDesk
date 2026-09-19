@@ -5,6 +5,20 @@ import { LayerRowSettingsFields } from './LayerRowFields';
 import { hasMixedFields, type MixedOperationFields } from './selected-operation-mixed';
 import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
+import { TutorialButton } from '../tutorials/TutorialButton';
+import { laserOperationTutorial } from './operation-tutorial';
+
+function ProcessTutorial(props: {
+  readonly mode: LayerMode;
+  readonly mixed: boolean;
+}): JSX.Element {
+  return (
+    <TutorialButton
+      tutorialId={props.mixed ? 'operations' : laserOperationTutorial(props.mode)}
+      label="Process tutorial"
+    />
+  );
+}
 
 export function LaserOperationFields(props: {
   readonly operation: Layer;
@@ -48,6 +62,7 @@ export function LaserOperationFields(props: {
         onChange={(mode) => commit({ mode })}
       />
       <LayerRowSettingsFields layer={props.operation} operationTarget={target} />
+      <ProcessTutorial mode={props.operation.mode} mixed={props.mixedFields.mode === true} />
       <label title="Turn job-controlled air assist on for this operation" style={airAssistStyle}>
         <input
           type="checkbox"

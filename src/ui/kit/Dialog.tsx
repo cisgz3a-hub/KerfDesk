@@ -8,6 +8,7 @@
 import { useId, useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -16,6 +17,8 @@ export function Dialog(props: {
   // Accessible name: a visible title (renders an h2) or an aria-label.
   readonly title?: string;
   readonly ariaLabel?: string;
+  /** Explicit lesson for this feature; omitted on transient confirmation dialogs. */
+  readonly tutorialId?: string;
   readonly size?: DialogSize;
   /** Optional feature-specific panel class; shared dialog chrome remains intact. */
   readonly panelClassName?: string;
@@ -33,10 +36,21 @@ export function Dialog(props: {
     .filter((value) => value !== undefined && value !== '')
     .join(' ');
   const heading =
-    props.title === undefined ? null : (
-      <h2 className="lf-dialog-title" id={titleId}>
-        {props.title}
-      </h2>
+    props.tutorialId === undefined ? (
+      props.title === undefined ? null : (
+        <h2 className="lf-dialog-title" id={titleId}>
+          {props.title}
+        </h2>
+      )
+    ) : (
+      <div style={headingStyle}>
+        {props.title === undefined ? null : (
+          <h2 className="lf-dialog-title" id={titleId} style={{ margin: 0 }}>
+            {props.title}
+          </h2>
+        )}
+        <TutorialButton tutorialId={props.tutorialId} />
+      </div>
     );
   return (
     <div
@@ -67,3 +81,11 @@ export function Dialog(props: {
 export function DialogActions(props: { readonly children: React.ReactNode }): JSX.Element {
   return <div className="lf-dialog-actions">{props.children}</div>;
 }
+
+const headingStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  flexWrap: 'wrap',
+  gap: 8,
+};

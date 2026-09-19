@@ -3,6 +3,7 @@
 // new transparent layer you then position with Move / Ctrl+T. Modal card;
 // Ctrl+Enter commits (Enter stays a newline in the textarea), Esc cancels.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useRef } from 'react';
 import { FONT_REGISTRY } from '../../core/text';
 import { useDialogA11y } from '../common/use-dialog-a11y';
@@ -38,7 +39,12 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
       }}
     >
       <div style={cardStyle}>
-        <strong style={{ fontSize: 13 }}>Add text</strong>
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+        >
+          <strong style={{ fontSize: 13 }}>Add text</strong>
+          <TutorialButton tutorialId="image-text" compact label="Image text tutorial" />
+        </div>
         <textarea
           value={state.text}
           onChange={(e) => state.setText(e.target.value)}

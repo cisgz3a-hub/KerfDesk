@@ -13,6 +13,7 @@
 import { canRedo, canUndo } from './design-history';
 import { useDesignApply } from './use-design-apply';
 import { useDesignStudioStore } from './design-studio-store';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -28,6 +29,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
   return (
     <header style={barStyle}>
       <h2 style={titleStyle}>Design Studio</h2>
+      <TutorialButton tutorialId="design-studio" />
 
       <BarButton
         label="Undo"
@@ -133,6 +135,7 @@ function BarToggle(props: {
 
 const barStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 6,
   padding: '6px 10px',

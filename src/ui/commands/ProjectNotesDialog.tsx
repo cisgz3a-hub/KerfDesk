@@ -8,7 +8,14 @@ export function ProjectNotesDialog(props: {
 }): JSX.Element {
   const [draft, setDraft] = useState(props.notes);
   return (
-    <Dialog title="Project Notes" size="md" onClose={props.onCancel} as="form" onSubmit={submit}>
+    <Dialog
+      tutorialId="project-notes"
+      title="Project Notes"
+      size="md"
+      onClose={props.onCancel}
+      as="form"
+      onSubmit={submit}
+    >
       <label style={fieldStyle}>
         <span style={labelStyle}>Notes</span>
         <textarea

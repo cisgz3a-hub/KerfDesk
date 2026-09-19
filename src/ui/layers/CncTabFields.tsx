@@ -3,6 +3,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { CncTabPositionControls } from './CncTabPositionControls';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 // Holding tabs stay with the core profile controls so part retention remains
 // prominent before the Advanced helper and specialist section.
@@ -26,6 +27,7 @@ export function CncTabFields(props: {
           aria-label={`Holding tabs for ${layer.color}`}
           title="Leave small bridges on the deepest passes so cut-out parts stay attached."
         />
+        <TutorialButton tutorialId="cnc-tabs" compact label="Holding tabs tutorial" />
       </Row>
       {settings.tabsEnabled ? (
         <>

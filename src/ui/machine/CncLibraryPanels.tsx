@@ -51,6 +51,7 @@ export function CncToolManager(props: {
   };
   return (
     <RailSection
+      tutorialId="tool-library"
       label="Manage bits"
       badge={String(props.machine.tools.length)}
       hint="Add or remove custom bits (saved across projects)."

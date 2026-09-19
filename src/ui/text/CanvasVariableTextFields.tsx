@@ -1,3 +1,4 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useToastStore } from '../state/toast-store';
 import { VariableTextControls } from './VariableTextControls';
 import type { CanvasTextVariables } from './use-canvas-text-variables';
@@ -12,6 +13,7 @@ export function CanvasVariableTextFields(props: {
   const { fields, variables } = props;
   return (
     <section aria-label="Variable text" style={sectionStyle}>
+      <TutorialButton tutorialId="variable-text" label="Variable text tutorial" />
       <label style={toggleStyle}>
         <input
           type="checkbox"

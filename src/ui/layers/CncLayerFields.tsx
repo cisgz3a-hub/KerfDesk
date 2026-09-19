@@ -29,6 +29,8 @@ import { CncRetractPassesField } from './CncRetractPassesField';
 import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { CncSetupReferenceFields } from './CncSetupReferenceFields';
+import { TutorialButton } from '../tutorials/TutorialButton';
+import { cncOperationTutorial } from './operation-tutorial';
 
 export function CncLayerFields(props: {
   readonly layer: Layer;
@@ -54,6 +56,10 @@ export function CncLayerFields(props: {
   return (
     <>
       <CncSetupReferenceFields settings={settings} hasReliefObjects={hasReliefObjects} />
+      <TutorialButton
+        tutorialId={cncOperationTutorial(settings.cutType)}
+        label="Cut type tutorial"
+      />
       <Row label="Cut type">
         <select
           value={settings.cutType}

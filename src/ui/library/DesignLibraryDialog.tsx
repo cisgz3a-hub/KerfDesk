@@ -51,7 +51,13 @@ function OpenDesignLibraryDialog(): JSX.Element {
   }, []);
   const browser = useDesignLibraryBrowser(close, captureInsertOwner);
   return (
-    <Dialog title="Design Library" size="xl" panelClassName="lf-library-dialog" onClose={close}>
+    <Dialog
+      tutorialId="design-library"
+      title="Design Library"
+      size="xl"
+      panelClassName="lf-library-dialog"
+      onClose={close}
+    >
       <div className="lf-library-dialog__close">
         <IconButton icon="close" label="Close Design Library" onClick={close} size="sm" />
       </div>

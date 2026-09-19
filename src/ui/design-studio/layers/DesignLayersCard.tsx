@@ -3,6 +3,7 @@
 // layers meaning — New layer and Assign selection. Layer edits ride the sketch
 // history, so Ctrl+Z walks them like any drawing step.
 
+import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useMemo } from 'react';
 import type { Sketch } from '../../../core/design';
 import { entityDesignLayer, sketchLayers, type DesignLayer } from '../../../core/design/layers';
@@ -120,6 +121,7 @@ function LayersCardHeader(props: {
   return (
     <header style={headerStyle}>
       <h3 style={titleStyle}>Carve layers</h3>
+      <TutorialButton tutorialId="operations" compact label="Carve layers tutorial" />
       <button
         type="button"
         title={

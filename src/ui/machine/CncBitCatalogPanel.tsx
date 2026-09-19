@@ -59,6 +59,7 @@ export function CncBitCatalogPanel(
 
   return (
     <RailSection
+      tutorialId="tool-library"
       label="Add from bit catalog"
       badge={`${MODELED_CNC_BIT_CATALOG.length} modeled envelopes`}
       hint="Browse researched cutter families and common nominal envelope sizes."

@@ -19905,3 +19905,25 @@ interaction without requiring destructive conversion.
   the text's **Size** regenerates the outline at the requested size. Independent dense-reference
   tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
   this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.
+
+## ADR-322 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
+
+**Status:** Accepted
+
+### Context
+
+Short hover descriptions name controls but do not teach unfamiliar drawing, image, CAM and machine workflows. Users need a visual explanation close to the tool they are using, plus a searchable place to discover the rest of the application.
+
+### Decision
+
+Provide explicit Tutorial buttons in feature dialogs, rails, active tool controls and command menus. Add Learn to the toolbar and Visual tutorials to Help. All entry points open one lazy-loaded, accessible learning surface with a searchable, machine-filtered catalog. Never open a tutorial automatically at startup.
+
+Lessons contain source-verified instructions, expected results and bundled SVG examples with manually selectable Before/Action/Result stages and optional finite playback. Illustrations are separate sample artwork, not a controller simulation. Retain static stage controls under reduced motion. Persist only local lesson position/completion, tolerating unavailable or malformed storage.
+
+Keep tutorial UI state separate from project data, undo and machine actions. Opening, browsing, replaying and closing help must preserve the working project and any underlying dialog draft. Reuse modal registration, focus trapping and focus restoration, portal above editor dialogs, and preserve the existing live-motion bar's highest stacking order. Opening help must never submit a tool form. Contextual menu help remains usable for a disabled command without invoking it.
+
+Use explicit stable lesson IDs, an exhaustive command mapping, source entry-point coverage tests and renderer/interaction tests. New tool controls should wire their lesson at the same time. Do not advertise planned tools as working features, prescribe universal machining values, or change Frame, Start, review policy or output semantics. The existing exact-job Frame and Start-time Job Review contract remains authoritative.
+
+### Consequences
+
+The catalog and visuals work from the bundled app, including its precached offline assets, without new dependencies or video hosting. Schematic illustrations are inexpensive to maintain but do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.

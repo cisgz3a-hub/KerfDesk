@@ -6669,3 +6669,24 @@ the edge it sits on, and a midpoint over the same edge.
 #### Edge — same bit on every layer
 
 1. One tool section, no tool-change pause: exactly the pre-layer behavior.
+
+## F-LEARN1. Contextual visual tutorials
+
+### Success
+
+1. The user selects **Learn**, **Help > Visual tutorials**, a menu item's tutorial icon, or **Tutorial** within a tool. The current tool and its draft stay in place.
+2. Global entry points show a searchable library with categories and machine filters. A contextual entry opens that feature's lesson directly, regardless of the library's current filters.
+3. The user reads the prerequisite/location, chooses a numbered step, and compares the illustrated Before/Action/Result stages. Optional playback changes only the example. Next, Back and Restart navigate the lesson.
+4. **Finish lesson** records completion on this device. Closing or Escape returns focus to the originating control when it remains available. Closing nested help leaves the underlying editor/dialog open.
+
+### Error
+
+Unavailable or invalid local storage does not prevent learning. Treat malformed saved progress as empty, clamp saved step positions to the available lesson, and continue in memory when storage writes fail. An unrecognised contextual ID returns to the library; automated coverage checks reject missing IDs before release.
+
+### Empty
+
+No search matches: show a clear empty state and **Show all tutorials**, which clears the query, category and machine filter. No saved progress: start a lesson at its first step.
+
+### Edge
+
+Tutorials never open automatically, submit forms, invoke tool commands, change artwork or send controller commands. A disabled menu command can still expose its tutorial. Reduced motion keeps explicit static example-stage controls. The learning surface registers as a modal to isolate application shortcuts, appears above studio dialogs, and stays below the live-motion control bar. Completion is a reading aid, not a qualification or prerequisite for using a tool or starting a job.

@@ -10,6 +10,7 @@
 // entity kind: a rectangle shows corner radius, a circle shows diameter and
 // circumference, an arc shows sweep and chord — all from the same render.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect, useRef, useState } from 'react';
 import { findEntity, type SketchEntity } from '../../core/design';
 import { entityFields, type FieldGroup } from './design-entity-fields';
@@ -65,6 +66,7 @@ export function ShapeInspector(): JSX.Element | null {
         {entity.construction === true ? <span style={badgeStyle}>guide</span> : null}
       </header>
       <div style={bodyStyle}>
+        <TutorialButton tutorialId="design-precision" label="Precision tutorial" />
         {GROUPS.map((group) => (
           <FieldGroupRows
             key={group.group}

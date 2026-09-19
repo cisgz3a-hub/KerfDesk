@@ -81,7 +81,7 @@ export function CncRecoveryPreviewWizard(props: {
     if (started) props.onClose();
   };
   return (
-    <Dialog title="Supervised CNC recovery" size="lg" onClose={closeReadOnly}>
+    <Dialog tutorialId="recovery" title="Supervised CNC recovery" size="lg" onClose={closeReadOnly}>
       <RecoverySafetyWarning />
       <p style={stepLabelStyle}>
         Step {stepIndex + 1} of {STEPS.length}: {stepTitle(step)}

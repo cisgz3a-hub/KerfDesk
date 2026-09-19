@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PaintColor } from '../../core/image-edit';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { TutorialButton } from '../tutorials/TutorialButton';
 import {
   hexToRgb,
   hsvToRgb,
@@ -55,7 +56,12 @@ export function ColorPickerDialog(props: {
       }}
     >
       <div style={cardStyle}>
-        <strong style={{ fontSize: 13 }}>{props.title}</strong>
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+        >
+          <strong style={{ fontSize: 13 }}>{props.title}</strong>
+          <TutorialButton tutorialId="image-paint" compact label="Paint colours tutorial" />
+        </div>
         <ColorPickerPad hsv={hsv} onChange={setHsv} />
         <input
           type="range"

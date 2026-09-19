@@ -1,6 +1,7 @@
 // JobControls — Machine-rail setup, detailed run status, overrides, and progress.
 // Canonical live-job actions live in the App-shell LiveMotionBar (ADR-207).
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { progress } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
@@ -93,7 +94,12 @@ export function JobControls(props: Props): JSX.Element {
   return (
     <div style={containerStyle}>
       <OriginRow disabled={disabled} streaming={controlsBusy} />
-      <span style={sectionCaptionStyle}>Job</span>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+      >
+        <span style={sectionCaptionStyle}>Job</span>
+        <TutorialButton tutorialId="frame-start" label="Frame & Start tutorial" />
+      </div>
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}

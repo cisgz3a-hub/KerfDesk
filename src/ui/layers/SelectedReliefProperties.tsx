@@ -4,6 +4,7 @@
 // project with exactly one relief selected (the laser Shape Properties
 // panel is the mirror case — ADR-101 §3).
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 // Deep import: core/relief's public barrel is a ratcheted over-cap legacy
 // barrel and may only shrink; keep the established exports intact.
@@ -30,6 +31,15 @@ import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
+function ReliefHeading(): JSX.Element {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <h3 style={headingStyle}>Relief</h3>
+      <TutorialButton tutorialId="cnc-relief" compact label="Relief tutorial" />
+    </div>
+  );
+}
+
 export function SelectedReliefProperties(): JSX.Element | null {
   const relief = useStore((s) => {
     if (machineKindOf(s.project.machine) !== 'cnc') return null;
@@ -48,7 +58,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
   const widthMm = reliefPropertyWidthMm(relief, physical.targetScaleX);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
-      <h3 style={headingStyle}>Relief</h3>
+      <ReliefHeading />
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>

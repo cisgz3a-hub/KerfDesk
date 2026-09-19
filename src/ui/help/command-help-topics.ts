@@ -359,6 +359,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Show KerfDesk build and version information.',
   },
+  'help.tutorials': {
+    family: 'help',
+    tooltip: 'Browse step-by-step visual tutorials for tools, artwork, and machine workflows.',
+  },
   'help.connection': {
     family: 'help',
     tooltip: "Steps to fix a machine that won't connect, including USB driver help.",

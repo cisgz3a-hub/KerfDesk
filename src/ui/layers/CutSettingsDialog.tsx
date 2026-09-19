@@ -1,3 +1,4 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect, useRef, useState } from 'react';
 import type { Layer, LayerMode } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
@@ -10,6 +11,7 @@ import { CutSettingsFillFields } from './CutSettingsFillFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
 import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
+import { laserOperationTutorial } from './operation-tutorial';
 
 type CutSettingsDialogProps = {
   readonly layer: Layer;
@@ -162,7 +164,12 @@ function Header({ layer }: { readonly layer: Layer }): JSX.Element {
           the ADR-047 dynamic-styles policy. */}
       <span style={{ ...swatchStyle, background: layer.color }} />
       <div>
-        <h2 className="lf-dialog-title">Cut Settings</h2>
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+        >
+          <h2 className="lf-dialog-title">Cut Settings</h2>
+          <TutorialButton tutorialId={laserOperationTutorial(layer.mode)} />
+        </div>
         <p className="lf-subheading">{layer.color}</p>
       </div>
     </header>

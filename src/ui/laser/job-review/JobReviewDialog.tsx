@@ -53,7 +53,7 @@ function OpenJobReview(props: {
       ? blocker.join('\n')
       : null;
   return (
-    <Dialog title={copy.dialogTitle} size="xl" onClose={handleCancel}>
+    <Dialog tutorialId="frame-start" title={copy.dialogTitle} size="xl" onClose={handleCancel}>
       <span ref={topAnchorRef} aria-hidden="true" />
       <JobReviewHeader machineKind={model.machineKind} />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />

@@ -1,3 +1,5 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
+
 type ArtworkRunOrderToolbarProps = {
   readonly search: string;
   readonly total: number;
@@ -79,6 +81,7 @@ function RunOrderTools(
 ): JSX.Element {
   return (
     <section aria-label="Artwork run order tools" style={toolbarStyle}>
+      <TutorialButton tutorialId="operations" label="Run order tutorial" />
       <div style={searchRowStyle}>
         <input
           type="search"
