@@ -132,6 +132,53 @@ describe('desktop application close handoff', () => {
     expect(h.controller.approve(2)).toEqual({ status: 'approved' });
   });
 
+  it('ignores stale approval while a newer close owns the pending stop and unload veto', async () => {
+    const h = harness();
+    const first = h.controller.prepare(1);
+    h.controller.cancel(1);
+    expect(await first).toEqual({ status: 'cancelled' });
+    const second = h.controller.prepare(2);
+    const reply = vi.fn();
+    void second.then(reply);
+    const notice = h.controller.getNotice();
+
+    expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+    await Promise.resolve();
+    expect(reply).not.toHaveBeenCalled();
+    expect(h.controller.ownsUnload).toBe(true);
+    expect(h.controller.getNotice()).toBe(notice);
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    expect(h.controller.handleBeforeUnload(event)).toBe(true);
+    expect(event.defaultPrevented).toBe(true);
+
+    h.patch({ active: false });
+    h.pending.resolve();
+    expect(await second).toEqual({ status: 'ready', dirty: true });
+    expect(h.controller.approve(2)).toEqual({ status: 'approved' });
+  });
+
+  it('ignores stale approval without consuming a newer ready close or its approval', async () => {
+    const h = harness(false);
+    await h.controller.prepare(1);
+    h.controller.cancel(1);
+    const second = h.controller.prepare(2);
+    expect(await second).toEqual({ status: 'ready', dirty: true });
+
+    expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+    expect(h.controller.ownsUnload).toBe(true);
+    expect(h.controller.prepare(2)).toBe(second);
+    expect(h.controller.approve(2)).toEqual({ status: 'approved' });
+    expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+    const allowed = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    expect(h.controller.handleBeforeUnload(allowed)).toBe(true);
+    expect(allowed.defaultPrevented).toBe(false);
+    const repeated = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    expect(h.controller.handleBeforeUnload(repeated)).toBe(true);
+    expect(repeated.defaultPrevented).toBe(true);
+    expect(h.stop).not.toHaveBeenCalled();
+  });
+
   it('rejects preparation if a new run, new dirty state or new warning arrives before approval', async () => {
     for (const patch of [
       { active: true, epoch: 2 },
@@ -143,6 +190,7 @@ describe('desktop application close handoff', () => {
       await h.controller.prepare(1);
       h.patch(patch);
       expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+      expect(h.controller.ownsUnload).toBe(false);
     }
   });
 

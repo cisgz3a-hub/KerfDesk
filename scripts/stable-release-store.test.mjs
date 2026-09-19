@@ -100,8 +100,38 @@ test('object paths cannot escape the stable release namespace', async () => {
 });
 
 test('oversized declared responses are rejected before buffering', async () => {
+  let reads = 0;
+  let cancellations = 0;
+  const body = new ReadableStream(
+    {
+      pull() {
+        reads += 1;
+      },
+      cancel() {
+        cancellations += 1;
+      },
+    },
+    { highWaterMark: 0 },
+  );
   const { store } = await setup(
-    () => new Response('oversized', { headers: { 'content-length': '300000001' } }),
+    () => new Response(body, { headers: { 'content-length': '300000001' } }),
   );
   await assert.rejects(store.get('desktop/latest.yml'), /object response/u);
+  assert.equal(reads, 0);
+  assert.equal(cancellations, 1);
+  assert.equal(body.locked, false);
+});
+
+test('a null object body is invalid without trying to cancel it', async () => {
+  const { store } = await setup(() => new Response(null));
+  await assert.rejects(store.get('desktop/latest.yml'), /object response/u);
+});
+
+test('an oversized response remains rejected when cancellation fails', async () => {
+  const cancellationError = new Error('synthetic cancellation failure');
+  const body = new ReadableStream({ cancel: () => Promise.reject(cancellationError) });
+  const { store } = await setup(
+    () => new Response(body, { headers: { 'content-length': '300000001' } }),
+  );
+  await assert.rejects(store.get('desktop/latest.yml'), (error) => error === cancellationError);
 });

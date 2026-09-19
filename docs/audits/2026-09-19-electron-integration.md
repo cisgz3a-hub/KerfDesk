@@ -44,6 +44,26 @@ The first pnpm-wrapped attempts rejected 42.11.6 before test execution; those lo
 are retained separately from the successful checks. Camera tests also passed via
 the already installed Vitest runner without changing dependency policy.
 
+## PR review follow-up
+
+Review of PR #792 identified four further source issues:
+
+- A stale close approval could clear a newer renderer close attempt. Mismatched
+  IDs now leave the current attempt and its pending stop ownership intact.
+- The stable release validator checked SBOM structure without binding its bytes
+  to the generated inventory. The SBOM now has a digest and byte length in
+  provenance and a checksum entry, with valid-JSON mutation coverage.
+- A temporary-directory cleanup failure could mask the original installer
+  signature or write failure. The primary failure is retained and cleanup
+  problems are reported separately; cleanup-only failures still reject.
+- A declared oversized R2 response was rejected without cancelling its body.
+  Rejection now releases the response stream immediately.
+
+The first local full gate at `1aa3222e` reported 13,916 passing tests and 22 skips,
+but exited with one Vitest `onTaskUpdate` worker communication timeout. That run
+is a failed gate, not passing release evidence. Its log and receipt are retained
+with the commit in their filenames. Final verification follows the review fixes.
+
 Full release, browser and packaged-app results are recorded against the final
 candidate in its pull request and local receipts under
 `artifacts/electron-integration-20260919/`. A green PR check applies to its exact

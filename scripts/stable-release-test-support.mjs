@@ -32,7 +32,11 @@ export function releaseFixture(
     { name: 'latest.yml', bytes: feed },
   ];
   const sourceSha = 'a'.repeat(40);
-  const artifacts = files.map(({ name, bytes }) => ({
+  const sbom = {
+    name: 'release-sbom.spdx.json',
+    bytes: Buffer.from(JSON.stringify({ spdxVersion: 'SPDX-2.3', packages: [] })),
+  };
+  const artifacts = [...files, sbom].map(({ name, bytes }) => ({
     name,
     bytes: bytes.length,
     sha256: sha256(bytes),
@@ -47,10 +51,7 @@ export function releaseFixture(
           .join('\n')}\n`,
       ),
     },
-    {
-      name: 'release-sbom.spdx.json',
-      bytes: Buffer.from(JSON.stringify({ spdxVersion: 'SPDX-2.3', packages: [] })),
-    },
+    sbom,
     {
       name: 'release-provenance.json',
       bytes: Buffer.from(JSON.stringify({ version, sourceSha, artifacts })),

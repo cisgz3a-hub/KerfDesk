@@ -121,9 +121,10 @@ export function validateStableRelease(release) {
   if (provenance.sourceSha !== release.sourceSha || provenance.version !== release.version)
     throw new Error('Release provenance identity mismatch.');
   const inventory = provenance.artifacts;
-  if (!Array.isArray(inventory) || inventory.length !== artifacts.length)
+  const evidencedArtifacts = [...artifacts, 'release-sbom.spdx.json'];
+  if (!Array.isArray(inventory) || inventory.length !== evidencedArtifacts.length)
     throw new Error('Release provenance artifact set mismatch.');
-  for (const name of artifacts) {
+  for (const name of evidencedArtifacts) {
     const entries = inventory.filter((entry) => entry.name === name);
     if (
       entries.length !== 1 ||
@@ -133,7 +134,9 @@ export function validateStableRelease(release) {
       throw new Error(`Release provenance hash mismatch: ${name}`);
   }
   const checksums = files.get('checksums.sha256').toString('utf8').trimEnd().split(/\r?\n/u).sort();
-  const expectedChecksums = artifacts.map((name) => `${sha256(files.get(name))}  ${name}`).sort();
+  const expectedChecksums = evidencedArtifacts
+    .map((name) => `${sha256(files.get(name))}  ${name}`)
+    .sort();
   if (JSON.stringify(checksums) !== JSON.stringify(expectedChecksums))
     throw new Error('Release checksum manifest mismatch.');
   const sbom = JSON.parse(files.get('release-sbom.spdx.json').toString('utf8'));

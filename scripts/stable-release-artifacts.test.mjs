@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   compareStableVersions,
   parseStableFeed,
+  sha256,
   validateStableRelease,
 } from './stable-release-artifacts.mjs';
 import { feedOf, releaseFixture } from './stable-release-test-support.mjs';
@@ -60,4 +61,48 @@ test('tampered installer, blockmap, checksum, source identity and SBOM are refus
     () => validateStableRelease({ ...releaseFixture(), sourceSha: 'b'.repeat(40) }),
     /identity mismatch/u,
   );
+});
+
+test('requires exactly one SBOM entry in provenance and checksums', () => {
+  const sbomName = 'release-sbom.spdx.json';
+  for (const duplicate of [false, true]) {
+    const provenanceFixture = releaseFixture();
+    const provenanceFile = provenanceFixture.files.find(
+      ({ name }) => name === 'release-provenance.json',
+    );
+    const provenance = JSON.parse(provenanceFile.bytes.toString('utf8'));
+    provenance.artifacts = duplicate
+      ? [...provenance.artifacts, provenance.artifacts.find(({ name }) => name === sbomName)]
+      : provenance.artifacts.filter(({ name }) => name !== sbomName);
+    provenanceFile.bytes = Buffer.from(JSON.stringify(provenance));
+    assert.throws(() => validateStableRelease(provenanceFixture), /artifact set mismatch/u);
+
+    const checksumFixture = releaseFixture();
+    const checksumFile = checksumFixture.files.find(({ name }) => name === 'checksums.sha256');
+    const lines = checksumFile.bytes.toString('utf8').trimEnd().split('\n');
+    const entries = duplicate
+      ? [...lines, lines.find((line) => line.endsWith(sbomName))]
+      : lines.filter((line) => !line.endsWith(sbomName));
+    checksumFile.bytes = Buffer.from(`${entries.join('\n')}\n`);
+    assert.throws(() => validateStableRelease(checksumFixture), /checksum manifest mismatch/u);
+  }
+});
+
+test('checksums independently reject changed SBOM bytes even when provenance agrees', () => {
+  const fixture = releaseFixture();
+  const sbom = fixture.files.find(({ name }) => name === 'release-sbom.spdx.json');
+  const changed = JSON.parse(sbom.bytes.toString('utf8'));
+  changed.packages.push({ name: 'unexpected-package', versionInfo: '9.9.9' });
+  sbom.bytes = Buffer.from(JSON.stringify(changed));
+  const provenanceFile = fixture.files.find(({ name }) => name === 'release-provenance.json');
+  const provenance = JSON.parse(provenanceFile.bytes.toString('utf8'));
+  Object.assign(
+    provenance.artifacts.find(({ name }) => name === sbom.name),
+    {
+      sha256: sha256(sbom.bytes),
+      bytes: sbom.bytes.length,
+    },
+  );
+  provenanceFile.bytes = Buffer.from(JSON.stringify(provenance));
+  assert.throws(() => validateStableRelease(fixture), /checksum manifest mismatch/u);
 });

@@ -103,7 +103,9 @@ export class DesktopCloseController {
 
   approve(id: number): DesktopCloseReply {
     const attempt = this.attempt;
-    if (attempt?.id !== id || !this.matchesPreparedState(attempt)) {
+    // A late approval has no authority over the newer attempt that owns unload.
+    if (attempt?.id !== id) return { status: 'retry' };
+    if (!this.matchesPreparedState(attempt)) {
       this.keepOpen();
       return { status: 'retry' };
     }

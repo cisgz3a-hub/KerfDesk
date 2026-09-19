@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { inspect, promisify } from 'node:util';
 import { loadStableRelease, stableVersionParts } from './stable-release-artifacts.mjs';
 import { publishStableRelease } from './stable-release-publisher.mjs';
 import { createStableReleaseStore } from './stable-release-store.mjs';
@@ -29,24 +29,44 @@ export function requireStablePublishContext(env, version) {
     );
 }
 
-async function verifyInstaller(bytes) {
-  const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-stable-signature-'));
-  try {
-    const executable = join(directory, 'installer.exe');
-    await writeFile(executable, bytes);
-    await execFileAsync(
-      'pwsh',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        '$signature = Get-AuthenticodeSignature -LiteralPath $env:KERFDESK_RELEASE_VERIFY_PATH; if ($signature.Status -ne "Valid" -or [string]::IsNullOrWhiteSpace($signature.SignerCertificate.Subject)) { throw "Stable installer Authenticode verification failed." }',
-      ],
-      { env: { ...process.env, KERFDESK_RELEASE_VERIFY_PATH: executable }, windowsHide: true },
-    );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
+export function createInstallerVerifier({
+  io = { mkdtemp, rm, writeFile },
+  execute = execFileAsync,
+  stderr = process.stderr,
+} = {}) {
+  return async (bytes) => {
+    const directory = await io.mkdtemp(join(tmpdir(), 'kerfdesk-stable-signature-'));
+    let failure;
+    try {
+      const executable = join(directory, 'installer.exe');
+      await io.writeFile(executable, bytes);
+      await execute(
+        'pwsh',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '$signature = Get-AuthenticodeSignature -LiteralPath $env:KERFDESK_RELEASE_VERIFY_PATH; if ($signature.Status -ne "Valid" -or [string]::IsNullOrWhiteSpace($signature.SignerCertificate.Subject)) { throw "Stable installer Authenticode verification failed." }',
+        ],
+        { env: { ...process.env, KERFDESK_RELEASE_VERIFY_PATH: executable }, windowsHide: true },
+      );
+    } catch (error) {
+      failure = { error };
+    }
+    try {
+      await io.rm(directory, { recursive: true, force: true });
+    } catch (error) {
+      try {
+        stderr.write(
+          `Stable installer cleanup failed at ${directory}; contents may be partially removed: ${inspect(error)}\n`,
+        );
+      } catch {
+        // Diagnostic output must not replace either verification or cleanup failure.
+      }
+      failure ??= { error };
+    }
+    if (failure !== undefined) throw failure.error;
+  };
 }
 
 async function main() {
@@ -59,7 +79,11 @@ async function main() {
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
   });
-  const result = await publishStableRelease({ release, store, verifyInstaller });
+  const result = await publishStableRelease({
+    release,
+    store,
+    verifyInstaller: createInstallerVerifier(),
+  });
   process.stdout.write(`Stable release ${result.version}: ${result.status}.\n`);
 }
 

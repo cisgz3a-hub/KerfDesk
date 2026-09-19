@@ -66,8 +66,11 @@ function objectUrl(bucketUrl, key) {
 }
 
 async function readObjectBytes(response) {
-  if (response.body === null || Number(response.headers.get('content-length')) > MAX_OBJECT_BYTES)
+  if (response.body === null) throw new Error('Invalid stable R2 object response.');
+  if (Number(response.headers.get('content-length')) > MAX_OBJECT_BYTES) {
+    await response.body.cancel();
     throw new Error('Invalid stable R2 object response.');
+  }
   const reader = response.body.getReader();
   const chunks = [];
   let size = 0;

@@ -5,9 +5,10 @@ Current Electron integration follow-up, 2026-09-19:
 Electron 42.11.5 maintenance pin, and the reproduced skipped-build retry repair
 are documented in
 [`audits/2026-09-19-electron-integration.md`](audits/2026-09-19-electron-integration.md).
-Exact-head PR/main CI and fresh package receipts establish integration evidence;
-the earlier candidate's results below remain historical. Signed installed
-updates, macOS, installer execution and hardware qualification are separate.
+Integration is qualified by exact-head PR CI and fresh package receipts.
+Merged-main CI and web publication are reported separately after merge; the
+earlier candidate's results below remain historical. Signed installed updates,
+macOS, installer execution and hardware qualification are separate.
 
 Historical Electron readiness implementation, 2026-09-12:
 `codex/electron-readiness-20260912`, based on main
