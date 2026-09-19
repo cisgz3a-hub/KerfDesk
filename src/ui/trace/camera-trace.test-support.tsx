@@ -98,7 +98,7 @@ function deferred<T>() {
 }
 let host: HTMLDivElement;
 let root: Root | undefined;
-let pushToast: ReturnType<typeof vi.fn>;
+let pushToast: ReturnType<typeof vi.fn<ReturnType<typeof useToastStore.getState>['pushToast']>>;
 const originalToast = useToastStore.getState().pushToast;
 
 beforeEach(async () => {

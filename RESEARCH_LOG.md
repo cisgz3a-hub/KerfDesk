@@ -1520,3 +1520,11 @@ above are no longer current output behavior.
 - **Confidence boundary:** high for source behavior, exact artifact structure, mathematical depth,
   deterministic output, and software tests. No hardware air-cut or material cut was performed;
   physical tracking, loads, bit truth, and finish remain unverified.
+
+## 2026-09-19 - Development-tool security updates
+
+- Evaluator: Codex. Purpose: remediate the 32 development-tool audit entries at main `7d4b8281`; production-only audit was already clean.
+- Selected: Vitest/mocker/V8 coverage 4.1.11; xmldom 0.8.15; baseline-browser-mapping 2.11.0; browserslist 4.28.7; fast-uri 3.1.6; nanoid 3.3.19; postcss 8.5.28; sharp 0.35.4; Undici 6.28.1 and 7.29.1. Licenses: MIT, Apache-2.0, BSD-3-Clause. Latest selected release date: 2026-09-10; registry metadata checked 2026-09-19.
+- Reason: security fixes on compatible release lines. Vitest 3.x has no backport for [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9), requiring paired runner/provider migration. Vitest 5 and broad unrelated tooling updates were rejected as unnecessary scope; cross-major overrides and audit suppression were rejected.
+- Compatibility: [Vitest 4 migration](https://v4.vitest.dev/guide/migration) supports existing Vite 6 and Node 22. Test helpers use concrete callable signatures. A real V8 coverage fixture checks brace inclusion and uncovered source; production coverage policy is unchanged. Frozen install retains release-age policy. Full and production-only audit results are recorded independently.
+- Details and qualification evidence: `docs/audits/2026-09-19-development-tool-advisories.md`.

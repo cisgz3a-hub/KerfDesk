@@ -26,15 +26,50 @@ test('coverage runner records totals without turning perceptual timing into a co
   assert.doesNotMatch(source, /coverage\.threshold|--coverage\.threshold/);
 });
 
-test('the installed coverage glob expands braces through its actual dependency closure', () => {
-  const coverageRequire = createRequire(require.resolve('@vitest/coverage-v8'));
-  const excludeRequire = createRequire(coverageRequire.resolve('test-exclude'));
-  const { globSync } = excludeRequire('glob');
-  const found = globSync('src/ui/image-editor/editor-session{,-fill}.ts', { cwd: repository });
-  assert.deepEqual(found.map((file) => file.replaceAll('\\', '/')).sort(), [
-    'src/ui/image-editor/editor-session-fill.ts',
-    'src/ui/image-editor/editor-session.ts',
-  ]);
+test('the installed coverage provider includes brace patterns and uncovered source files', async () => {
+  // Keep the fixture under the repository so its imports resolve the installed
+  // Vitest/provider pair, without depending on their private dependency graph.
+  const fixture = await mkdtemp(path.join(repository, '.coverage-braces-'));
+  try {
+    await writeFile(path.join(fixture, 'first.ts'), 'export const first = () => 1;\n');
+    await writeFile(path.join(fixture, 'second.ts'), 'export const second = () => 2;\n');
+    await writeFile(
+      path.join(fixture, 'probe.test.ts'),
+      "import { expect, test } from 'vitest';\n" +
+        "import { first } from './first';\n" +
+        "test('covered source', () => expect(first()).toBe(1));\n",
+    );
+    const config = path.join(fixture, 'vitest.config.mjs');
+    await writeFile(
+      config,
+      "export default { test: { environment: 'node', maxWorkers: 1, " +
+        "coverage: { provider: 'v8', include: ['{first,second}.ts'], " +
+        "reporter: ['json-summary'] } } };\n",
+    );
+    const vitest = path.join(path.dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
+    const result = spawnSync(process.execPath, [vitest, 'run', '--config', config, '--coverage'], {
+      cwd: fixture,
+      encoding: 'utf8',
+      timeout: 60_000,
+      windowsHide: true,
+    });
+    assert.equal(result.status, 0, result.stderr || result.error?.message || result.stdout);
+    const summary = JSON.parse(
+      await readFile(path.join(fixture, 'coverage', 'coverage-summary.json'), 'utf8'),
+    );
+    const files = Object.entries(summary).filter(([name]) => name !== 'total');
+    assert.deepEqual(files.map(([name]) => path.basename(name)).sort(), ['first.ts', 'second.ts']);
+    assert.equal(
+      files.find(([name]) => path.basename(name) === 'first.ts')[1].functions.covered,
+      1,
+    );
+    assert.equal(
+      files.find(([name]) => path.basename(name) === 'second.ts')[1].functions.covered,
+      0,
+    );
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
+  }
 });
 
 test('the installed ESLint CLI enumerates brace patterns without a dependency API error', async () => {
