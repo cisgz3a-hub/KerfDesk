@@ -1,8 +1,9 @@
+import { applicationHeader } from './fixtures/workspace-ui';
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('banner', { name: 'Toolbar' })).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk');
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 10_000 });
 });
 
@@ -34,6 +35,9 @@ test.describe('workspace shell acceptance', () => {
     await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+    await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
     const expandMachine = page.getByRole('button', {
       name: 'Expand Laser panel',
@@ -67,7 +71,7 @@ test.describe('workspace shell acceptance', () => {
   test('keeps a usable overflow-free canvas at compact sizes', async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 450 });
 
-    await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
     await expectNoPageOverflow(page);
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
     await expectOneToolbarRow(page);
@@ -78,19 +82,56 @@ test.describe('workspace shell acceptance', () => {
     expect(compactBox?.height ?? 0).toBeGreaterThan(200);
 
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
-    await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
-    const expandMachine = page.getByRole('button', {
-      name: 'Expand Laser panel',
-      exact: true,
-    });
-    await expandMachine.focus();
-    await page.keyboard.press('Enter');
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
     expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(150);
 
+    await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
+    const panels = page.getByRole('region', { name: 'Workspace side panels' });
+    expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
+    await expect(page.getByRole('region', { name: 'Job actions' })).toHaveCount(0);
+    expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(500);
     await page.setViewportSize({ width: 1024, height: 700 });
     await page.setViewportSize({ width: 640, height: 450 });
     await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
+    expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
+    await expectNoPageOverflow(page);
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+    await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
+    await expectInsideViewport(page, page.getByRole('region', { name: 'Job actions' }));
+  });
+
+  test('collapsed laptop rails return canvas space and restore through tabs, F12 and reset', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    const panels = page.getByRole('region', { name: 'Workspace side panels' });
+    const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+    const expandedWidth = (await canvas.boundingBox())?.width ?? 0;
+    await page
+      .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
+      .click();
+    expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
+    expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(expandedWidth + 250);
+    await expect(page.getByRole('region', { name: 'Job actions' })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Job actions' })).toBeVisible();
+
+    await page.keyboard.press('F12');
+    expect((await panels.boundingBox())?.width ?? 0).toBeLessThanOrEqual(49);
+    await page.keyboard.press('F12');
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await page.keyboard.press('F12');
+    await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Reset Workspace Layout', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Job actions' })).toBeVisible();
+    expect((await canvas.boundingBox())?.width ?? 0).toBeCloseTo(expandedWidth, 0);
+
+    await page.setViewportSize({ width: 1024, height: 700 });
+    await page.getByRole('button', { name: 'Workspace layout', exact: true }).click();
+    await page.getByRole('menuitemradio', { name: 'Spacious', exact: true }).click();
+    await expect(panels).toHaveAttribute('data-layout', 'spacious');
+    expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(300);
     await expectNoPageOverflow(page);
   });
 
@@ -99,13 +140,16 @@ test.describe('workspace shell acceptance', () => {
 
     await page.keyboard.press('F12');
     await expect(page.getByLabel('Artwork / Operations panel collapsed')).toBeVisible();
+    await page.keyboard.press('F12');
+    await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+    await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
+    await page.keyboard.press('F12');
     await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
-
     await page.keyboard.press('F12');
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Cuts / Layers', exact: true }).click();
+    await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
     await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
     await page
       .getByRole('button', { name: 'Collapse Artwork / Operations panel', exact: true })
@@ -116,7 +160,7 @@ test.describe('workspace shell acceptance', () => {
     await page.getByRole('menuitem', { name: 'Reset Workspace Layout', exact: true }).click();
 
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
-    await page.getByRole('tab', { name: 'Cuts / Layers', exact: true }).click();
+    await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
     await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
   });
 
@@ -175,7 +219,11 @@ async function expectOneToolbarRow(page: Page): Promise<void> {
     .locator('button')
     .evaluateAll(
       (buttons) =>
-        new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().top))).size,
+        new Set(
+          buttons
+            .filter((button) => button.getClientRects().length > 0)
+            .map((button) => Math.round(button.getBoundingClientRect().top)),
+        ).size,
     );
   expect(rows).toBe(1);
 }

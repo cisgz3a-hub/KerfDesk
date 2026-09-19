@@ -28,13 +28,20 @@ export function WorkspaceSidePanels(): JSX.Element {
 
   if (layout === 'compact') {
     const wide = active === 'layers' && runOrderOpen;
+    const collapsed = active === 'layers' ? !layersExpanded : !machinePanel.isExpanded;
     return (
       <section
         aria-label="Workspace side panels"
         data-layout="compact"
         className={`lf-workspace-panels lf-workspace-panels--compact${wide ? ' lf-workspace-panels--run-order' : ''}`}
+        style={collapsed ? collapsedCompactPanelStyle : undefined}
       >
-        <CompactPanelTabs panelId={panelId} active={active} onSelect={selectPanel} />
+        <CompactPanelTabs
+          panelId={panelId}
+          active={active}
+          collapsed={collapsed}
+          onSelect={selectPanel}
+        />
         <div
           id={panelId}
           role="tabpanel"
@@ -43,7 +50,7 @@ export function WorkspaceSidePanels(): JSX.Element {
         >
           {active === 'layers' ? <CutsLayersPanel /> : <LaserWindow dockedJobActions />}
         </div>
-        <WorkspaceJobActions />
+        {!collapsed ? <WorkspaceJobActions /> : null}
       </section>
     );
   }
@@ -90,10 +97,16 @@ export function WorkspaceSidePanels(): JSX.Element {
 function CompactPanelTabs(props: {
   readonly panelId: string;
   readonly active: RailPanelId;
+  readonly collapsed: boolean;
   readonly onSelect: (panel: RailPanelId) => void;
 }): JSX.Element {
   return (
-    <div role="tablist" aria-label="Side panel" className="lf-workspace-panel-tabs">
+    <div
+      role="tablist"
+      aria-label="Side panel"
+      aria-orientation={props.collapsed ? 'vertical' : 'horizontal'}
+      className={`lf-workspace-panel-tabs${props.collapsed ? ' lf-workspace-panel-tabs--collapsed' : ''}`}
+    >
       <PanelTab
         id={`${props.panelId}-layers`}
         controls={props.panelId}
@@ -138,23 +151,31 @@ function useWorkspacePanelFocus(
 }
 
 function moveTabFocus(event: KeyboardEvent<HTMLButtonElement>): void {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const vertical =
+    event.currentTarget.parentElement?.getAttribute('aria-orientation') === 'vertical';
+  const [previousKey, nextKey] = vertical ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
+    return;
+  // Both arrow axes belong to the focused tabs. Even an unused axis must not
+  // bubble to the window's selected-artwork nudge shortcut.
+  event.preventDefault();
+  event.stopPropagation();
+  if (![previousKey, nextKey, 'Home', 'End'].includes(event.key)) return;
   const buttons = Array.from(
     event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
   );
   if (buttons.length === 0) return;
-  event.preventDefault();
-  // These arrows belong to the tabs, not the window's selected-artwork nudge.
-  event.stopPropagation();
   const index = buttons.indexOf(event.currentTarget);
   const next =
     event.key === 'Home'
       ? 0
       : event.key === 'End'
         ? buttons.length - 1
-        : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-  buttons[next]?.click();
-  buttons[next]?.focus();
+        : (index + (event.key === nextKey ? 1 : -1) + buttons.length) % buttons.length;
+  const target = buttons[next];
+  if (target === undefined) return;
+  target.click();
+  target.focus();
 }
 
 function PanelTab(props: {
@@ -170,6 +191,7 @@ function PanelTab(props: {
       id={props.id}
       type="button"
       role="tab"
+      aria-label={props.label}
       aria-controls={props.controls}
       aria-selected={props.selected}
       tabIndex={props.selected ? 0 : -1}
@@ -179,7 +201,7 @@ function PanelTab(props: {
       onKeyDown={moveTabFocus}
     >
       <Icon name={props.icon} size={15} />
-      {props.label}
+      <span className="lf-workspace-panel-label">{props.label}</span>
     </button>
   );
 }
@@ -234,6 +256,11 @@ const resizablePanelStyle: React.CSSProperties = {
   minHeight: 0,
   resize: 'horizontal',
   overflow: 'hidden',
+};
+const collapsedCompactPanelStyle: React.CSSProperties = {
+  width: COLLAPSED_RAIL_WIDTH_PX,
+  maxWidth: COLLAPSED_RAIL_WIDTH_PX,
+  boxSizing: 'border-box',
 };
 const collapsedResizablePanelStyle: React.CSSProperties = {
   ...resizablePanelStyle,

@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import {
   assertResponsivePhase,
@@ -79,7 +80,7 @@ test('mixed-operation Preview and Cut 3D complete without a delayed UI stall', a
   await clearCanvasProject(page);
   await installMixedCanvasProject(page);
 
-  const previewButton = page.getByRole('button', { name: 'Preview', exact: true });
+  const previewButton = await toolbarCommand(page, 'Preview');
   await expect(previewButton).toBeEnabled();
   await startResponsivenessProbe(page);
   await previewButton.click();

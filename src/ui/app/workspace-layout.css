@@ -55,6 +55,20 @@
   height: 19px;
 }
 
+.lf-workspace-panel-tabs--collapsed {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 4px;
+}
+
+.lf-workspace-panel-tabs--collapsed > button {
+  min-height: 36px;
+  padding: 6px;
+}
+
+.lf-workspace-panel-tabs--collapsed .lf-workspace-panel-label {
+  display: none;
+}
+
 .lf-workspace-panel-body,
 .lf-workspace-machine-body {
   flex: 1;

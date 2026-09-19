@@ -1,3 +1,4 @@
+import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -25,11 +26,11 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
   );
   await page.getByRole('button', { name: 'Nest selection' }).click();
 
-  await page.getByRole('button', { name: 'Preview' }).click();
+  await (await toolbarCommand(page, 'Preview')).click();
   await expect(
     page.getByRole('group', { name: 'Preview route controls and statistics' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBe(4);
@@ -44,6 +45,7 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   await page
     .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })
@@ -54,14 +56,14 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   await page.getByRole('button', { name: 'Go to step 6: Review & save', exact: true }).click();
   await page.getByRole('button', { name: 'Save machine setup', exact: true }).click();
 
-  await page.getByRole('button', { name: 'Preview' }).click();
+  await (await toolbarCommand(page, 'Preview')).click();
   const panel = page.getByRole('group', { name: 'Preview route controls and statistics' });
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('Cut time');
   await expect(panel).toContainText('Travel time');
   await panel.screenshot({ path: testInfo.outputPath('calibrated-preview-timing.png') });
 
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
     estimateCutTimeScale: 1.18,
@@ -82,7 +84,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
   await page.getByRole('button', { name: 'Nest selection' }).click();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects).toHaveLength(2);
@@ -102,12 +104,12 @@ test('imports SVG through the real picker and creates a circular array', async (
       text: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><path d="M0 10 C10 0 30 20 40 10" fill="none" stroke="#00ff00"/></svg>',
     },
   ]);
-  await page.getByRole('button', { name: 'Import...' }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await selectAll(page);
   await runMenuCommand(page, 'Arrange', 'Array...');
   await page.getByRole('tab', { name: 'Circular' }).click();
   await page.getByRole('button', { name: 'Create array' }).click();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBeGreaterThan(6);
@@ -125,7 +127,7 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   await page.getByLabel('Rotary millimetres per rotation').fill('360');
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Generate test pattern' }).click();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device.rotary).toMatchObject({
@@ -155,7 +157,7 @@ test('exports rotary raster through the configured machine-space transform', asy
   await kerfdesk.setOpenFiles([
     { name: 'rotary-raster.png', kind: 'png-fixture', width: 16, height: 16 },
   ]);
-  await page.getByRole('button', { name: 'Import...' }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await runMenuCommand(page, 'File', 'Save G-code...');
   await choosePreparedGcodeDestination(page);
 
@@ -168,7 +170,7 @@ test('exports rotary raster through the configured machine-space transform', asy
 });
 
 test('gates camera bed alignment behind Labs and homing capability', async ({ page }) => {
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await (await toolbarCommand(page, 'Camera')).click();
   const align = page.getByRole('button', { name: 'Align to bed…' });
   await expect(align).toBeDisabled();
   await expect(align).toHaveAttribute('title', /Tools > Labs/);
@@ -187,6 +189,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   kerfdesk,
 }) => {
   await enableLab(page, 'Print and Cut');
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
@@ -241,7 +244,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await expect(failedSave).toContainText('No final file was selected or modified');
   await failedSave.getByRole('button', { name: 'Cancel' }).click();
 
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.printAndCutTargets).toEqual({
@@ -326,7 +329,7 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   );
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.variables?.csv).toMatchObject({
@@ -364,7 +367,6 @@ test('configures the Creality Falcon profile through the complete setup wizard',
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
-  await page.getByRole('button', { name: 'Expand Laser panel' }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
   await expect(setup).toContainText('Step 1 of 6');
@@ -382,7 +384,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   expect((finishBox?.x ?? 0) + (finishBox?.width ?? 0)).toBeLessThanOrEqual(390);
   expect((finishBox?.y ?? 0) + (finishBox?.height ?? 0)).toBeLessThanOrEqual(844);
   await page.getByRole('button', { name: 'Save machine setup' }).click();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -399,6 +401,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   page,
   kerfdesk,
 }) => {
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await kerfdesk.emitSerialLine("Grbl 1.1h ['$' for help]");
@@ -421,7 +424,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
     await setup.getByRole('button', { name: 'Next', exact: true }).click();
   }
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -445,7 +448,7 @@ test('imports a generated bitmap and traces it through the production worker wor
   await kerfdesk.setOpenFiles([
     { name: 'trace-square.png', kind: 'png-fixture', width: 64, height: 64 },
   ]);
-  await page.getByRole('button', { name: 'Import...' }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Trace Image...' })).toBeEnabled();
   await page.getByRole('button', { name: 'Trace Image...' }).click();
@@ -480,7 +483,7 @@ test('imports a generated bitmap and traces it through the production worker wor
   await expect(page.getByRole('dialog', { name: 'Trace image' })).not.toBeVisible({
     timeout: 30_000,
   });
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.some((object) => object['kind'] === 'traced-image')).toBe(true);
@@ -692,7 +695,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await selectAll(page);
   await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('10');
   await fillAndCommit(page, 'Selection X position', '47');
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const currentProject = await savedProject(kerfdesk);
   const savedBeforeReview = fileSavedCount(await kerfdesk.events());
   const writesBeforeReview = serialWriteBytes(await kerfdesk.events());
@@ -707,7 +710,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).not.toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
 
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect
     .poll(async () => fileSavedCount(await kerfdesk.events()))
     .toBeGreaterThan(savedBeforeReview);
@@ -823,6 +826,7 @@ async function enableLab(page: Page, label: string): Promise<void> {
 }
 
 async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Home', exact: true }).click();

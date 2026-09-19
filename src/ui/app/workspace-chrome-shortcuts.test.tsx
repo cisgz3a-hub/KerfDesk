@@ -78,6 +78,39 @@ afterEach(async () => {
 
 describe('Workspace chrome keyboard ownership', () => {
   it.each([false, true])(
+    'consumes the unused arrow axis before and after restoring collapsed tabs (Shift=%s)',
+    async (shiftKey) => {
+      const before = useStore.getState().project;
+      await act(async () =>
+        useUiStore.setState({ railPanelVisibility: { layers: false, machine: false } }),
+      );
+      const artwork = required<HTMLElement>('[role="tab"][aria-selected="true"]');
+      artwork.focus();
+      for (const key of ['ArrowLeft', 'ArrowRight']) {
+        const event = await press(artwork, key, shiftKey);
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(artwork);
+        expect(useStore.getState().project).toBe(before);
+      }
+
+      await press(artwork, 'ArrowDown', shiftKey);
+      const machine = document.activeElement as HTMLElement;
+      expect(machine.getAttribute('aria-label')).toBe('Machine');
+      expect(useUiStore.getState().railPanelVisibility.machine).toBe(true);
+      for (const key of ['ArrowUp', 'ArrowDown']) {
+        const event = await press(machine, key, shiftKey);
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(machine);
+        expect(useStore.getState().project).toBe(before);
+      }
+      expect(useStore.getState().undoStack).toHaveLength(0);
+      expect(useStore.getState().dirty).toBe(false);
+      await press(document.body, 'ArrowRight');
+      expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(1);
+    },
+  );
+
+  it.each([false, true])(
     'switches sidebar tabs without editing selected artwork (Shift=%s)',
     async (shiftKey) => {
       const before = useStore.getState().project;

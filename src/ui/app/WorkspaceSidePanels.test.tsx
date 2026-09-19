@@ -6,7 +6,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { SINGLE_PANEL_QUERY } from './use-workspace-layout';
-import { resetWorkspaceLayout } from './workspace-panel-actions';
+import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from './workspace-panel-actions';
 
 const media = vi.hoisted(() => ({
   compact: false,
@@ -183,6 +183,80 @@ describe('WorkspaceSidePanels', () => {
       expect(host.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(
         document.activeElement?.id,
       );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it.each(['layers', 'machine'] as const)(
+    'reclaims compact width when %s collapses and restores it from its tab',
+    async (panel) => {
+      media.compact = true;
+      const { host, root } = await renderPanels();
+      try {
+        const label = panel === 'layers' ? 'Artwork' : 'Machine';
+        const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][aria-label="${label}"]`);
+        await act(async () => tab?.click());
+        const shell = requiredPanel(host, 'Workspace side panels');
+        await act(async () => useUiStore.getState().setRailPanelVisible(panel, false));
+        expect(shell.style.width).toBe(COLLAPSED_PANEL_WIDTH_CSS);
+        expect(shell.style.boxSizing).toBe('border-box');
+        expect(host.querySelector('[aria-label="Job actions"]')).toBeNull();
+        expect(host.querySelector('[role="tablist"]')?.getAttribute('aria-orientation')).toBe(
+          'vertical',
+        );
+
+        await act(async () => tab?.click());
+        expect(useUiStore.getState().railPanelVisibility[panel]).toBe(true);
+        expect(shell.style.width).toBe('');
+        expect(host.querySelector('[aria-label="Job actions"]')).not.toBeNull();
+        expect(tab?.getAttribute('aria-selected')).toBe('true');
+      } finally {
+        await act(async () => root.unmount());
+      }
+    },
+  );
+
+  it.each([
+    ['ArrowDown', 'Machine'],
+    ['ArrowUp', 'Machine'],
+    ['End', 'Machine'],
+    ['Home', 'Artwork'],
+  ])('restores a collapsed panel with the vertical tab key %s', async (key, label) => {
+    media.compact = true;
+    toggleWorkspaceSidePanels(useUiStore.getState());
+    const { host, root } = await renderPanels();
+    try {
+      const tab = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+      tab?.focus();
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      await act(async () => tab?.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement?.getAttribute('aria-label')).toBe(label);
+      expect(document.activeElement?.getAttribute('aria-selected')).toBe('true');
+      expect(requiredPanel(host, 'Workspace side panels').style.width).toBe('');
+      expect(host.querySelector('[aria-label="Job actions"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('collapses and restores the compact column through the shared Window/F12 action and reset', async () => {
+    media.compact = true;
+    const { host, root } = await renderPanels();
+    try {
+      const shell = requiredPanel(host, 'Workspace side panels');
+      await act(async () => toggleWorkspaceSidePanels(useUiStore.getState()));
+      expect(shell.style.width).toBe(COLLAPSED_PANEL_WIDTH_CSS);
+      await act(async () => toggleWorkspaceSidePanels(useUiStore.getState()));
+      expect(shell.style.width).toBe('');
+      expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
+
+      await act(async () => toggleWorkspaceSidePanels(useUiStore.getState()));
+      await act(async () => resetWorkspaceLayout(useUiStore.getState()));
+      expect(shell.style.width).toBe('');
+      expect(useWorkspaceLayoutStore.getState().preference).toBe('auto');
+      expect(useUiStore.getState().railPanelVisibility).toEqual({ layers: true, machine: true });
     } finally {
       await act(async () => root.unmount());
     }

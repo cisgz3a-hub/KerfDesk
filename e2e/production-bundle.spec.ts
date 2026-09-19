@@ -1,3 +1,4 @@
+import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 
 test('loads the hashed production bundle and edits script through its outline worker', async ({
@@ -17,7 +18,7 @@ test('loads the hashed production bundle and edits script through its outline wo
   await page.setViewportSize({ width: 1500, height: 950 });
   const documentResponse = await page.goto('/');
   expect(documentResponse?.status()).toBe(200);
-  await expect(page.getByRole('banner', { name: 'Toolbar' })).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk');
 
   const scriptSources = await page
     .locator('script[src]')

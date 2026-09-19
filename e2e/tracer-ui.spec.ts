@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -89,7 +90,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await expect(submit).toBeFocused();
   await submit.click();
   await expect(dialog).toBeHidden();
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('traced-image'),
   );
@@ -136,7 +137,7 @@ async function openTrace(page: Page, fixture: KerfDeskFixture) {
   await fixture.setOpenFiles([
     { name: 'tracer-ui.png', kind: 'png-fixture', width: 64, height: 96 },
   ]);
-  await page.getByRole('button', { name: 'Import...', exact: true }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   const notifications = page.getByRole('button', { name: /^Dismiss .* notification:/ });
   while (await notifications.count()) await notifications.first().click();

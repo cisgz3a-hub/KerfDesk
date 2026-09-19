@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 
 const FILLER_CHUNKS = 6_144;
@@ -54,7 +55,7 @@ test('imports a 24 MiB SVG through the production worker while the UI stays resp
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   });
-  await page.getByRole('button', { name: 'Import...' }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
 
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 120_000 });
   await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();

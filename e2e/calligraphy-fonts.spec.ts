@@ -1,5 +1,7 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { AppState } from '../src/ui/state/store';
+import { CANVAS_PADDING_PX } from '../src/ui/workspace/canvas-layout';
 
 const FONTS = [
   ['Great Vibes', 'great-vibes-regular'],
@@ -63,7 +65,7 @@ for (const [name, fontKey] of FONTS) {
       true,
     );
     await page.screenshot({ path: testInfo.outputPath(`${fontKey}.png`) });
-    await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+    await (await toolbarCommand(page, 'Save As...')).click();
     await expect
       .poll(async () =>
         Object.values(await kerfdesk.savedFiles()).some(
@@ -76,7 +78,10 @@ for (const [name, fontKey] of FONTS) {
     const contourPoint = points[Math.floor(points.length / 2)];
     const canvasBounds = await canvas.boundingBox();
     if (contourPoint === undefined || canvasBounds === null) throw new Error('Lettering missing');
-    const scale = Math.min((canvasBounds.width - 48) / 400, (canvasBounds.height - 48) / 400);
+    const scale = Math.min(
+      (canvasBounds.width - CANVAS_PADDING_PX * 2) / 400,
+      (canvasBounds.height - CANVAS_PADDING_PX * 2) / 400,
+    );
     await canvas.dblclick({
       position: {
         x:

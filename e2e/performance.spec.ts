@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures/kerfdesk-test';
@@ -35,7 +36,7 @@ test('opens and previews a 2,000-object project inside browser budgets', async (
   expect(Date.now() - openStarted).toBeLessThan(15_000);
 
   const previewStarted = Date.now();
-  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await (await toolbarCommand(page, 'Preview')).click();
   await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible({
     timeout: 20_000,
   });

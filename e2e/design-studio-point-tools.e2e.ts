@@ -1,8 +1,9 @@
+import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test, type Locator, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('banner', { name: 'Toolbar' })).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk');
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 10_000 });
   await page.getByRole('button', { name: 'Open Design Studio', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Design Studio' })).toBeVisible();
