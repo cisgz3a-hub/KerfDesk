@@ -18,7 +18,7 @@ import {
   summarizeDialogResults,
   validateProject,
 } from './installed-app-evidence.mjs';
-import { bounded, launchInstalledApp } from './installed-app-process.mjs';
+import { bounded, findDebugger, launchInstalledApp } from './installed-app-process.mjs';
 
 const ENV = {
   GITHUB_ACTIONS: 'true',
@@ -107,6 +107,35 @@ test('unresponsive protocol calls have a bounded failure', async () => {
     /Timed out: renderer probe/,
   );
   assert.equal(await bounded(Promise.resolve('ready'), 'ready probe', 10), 'ready');
+});
+
+test('debugger discovery retries a transient Windows file lock but requires the exact owned endpoint', async () => {
+  const endpoint = 'ws://127.0.0.1:9234/devtools/browser/owned-fixture';
+  const app = { error: null, exit: null, stderr: `DevTools listening on ${endpoint}` };
+  const profile = join(tmpdir(), 'owned-qualification-profile');
+  let reads = 0;
+  const discovered = await findDebugger(app, profile, async (path, encoding) => {
+    assert.equal(path, join(profile, 'DevToolsActivePort'));
+    assert.equal(encoding, 'utf8');
+    reads++;
+    if (reads === 1) throw Object.assign(new Error('Writer still owns file'), { code: 'EBUSY' });
+    if (reads === 2) return '9234\n';
+    if (reads === 3) return '9234\n/devtools/browser/unrelated-target';
+    return '9234\n/devtools/browser/owned-fixture';
+  });
+  assert.equal(reads, 4);
+  assert.equal(discovered.endpoint, endpoint);
+  assert.deepEqual(discovered.activePort, {
+    port: 9234,
+    pathname: '/devtools/browser/owned-fixture',
+  });
+  const denied = Object.assign(new Error('Permanent access failure'), { code: 'EACCES' });
+  await assert.rejects(
+    findDebugger(app, profile, async () => {
+      throw denied;
+    }),
+    (error) => error === denied,
+  );
 });
 
 test('CLI parses paths with spaces and rejects ambiguous, missing or unsupported arguments', () => {

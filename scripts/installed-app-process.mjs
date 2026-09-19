@@ -111,7 +111,7 @@ export async function launchInstalledApp(args, observe = observeChild) {
   return observed;
 }
 
-export async function findDebugger(app, profile) {
+export async function findDebugger(app, profile, readFile = fs.readFile) {
   const endpoint = await waitUntil(async () => {
     if (app.error || app.exit)
       throw new Error(`Installed app exited before CDP: ${app.error ?? JSON.stringify(app.exit)}`);
@@ -123,13 +123,14 @@ export async function findDebugger(app, profile) {
   }, 'installed app loopback DevTools endpoint');
   const activePort = await waitUntil(async () => {
     try {
-      const text = await fs.readFile(join(profile, 'DevToolsActivePort'), 'utf8');
+      const text = await readFile(join(profile, 'DevToolsActivePort'), 'utf8');
       const [port, pathname] = text.trim().split(/\r?\n/);
       return `ws://127.0.0.1:${port}${pathname}` === endpoint
         ? { port: Number(port), pathname }
         : false;
     } catch (error) {
-      if (error.code === 'ENOENT') return false;
+      // Windows can briefly lock this file while Chromium publishes the port.
+      if (error.code === 'ENOENT' || error.code === 'EBUSY') return false;
       throw error;
     }
   }, 'matching DevToolsActivePort in the expected profile');
