@@ -38,7 +38,7 @@ export function DogboneRow(): JSX.Element | null {
     <section aria-label="Dogbone corners" style={sectionStyle}>
       <span style={labelStyle}>Dogbone</span>
       <span style={controlStyle}>
-        <TutorialButton tutorialId="dogbone" compact label="Dogbone corners tutorial" />
+        <TutorialButton tutorialId="dogbone" compact label="Dogbone corners" />
         <ClearableNumberField
           ariaLabel="Dogbone bit diameter"
           title="Bit diameter used to size the corner overcut circles."

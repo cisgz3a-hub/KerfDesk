@@ -232,7 +232,7 @@ function Header(): JSX.Element {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <h2 style={headingStyle}>Material Library</h2>
-        <TutorialButton tutorialId="materials" compact label="Material library tutorial" />
+        <TutorialButton tutorialId="materials" compact label="Material library" />
       </div>
       <SavedLibrariesButton />
     </div>

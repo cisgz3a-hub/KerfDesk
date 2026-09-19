@@ -53,7 +53,7 @@ function CameraPanelOpen(): JSX.Element {
     >
       <div style={headerStyle}>
         <strong>Camera</strong>
-        <TutorialButton tutorialId="camera" compact label="Camera tutorial" />
+        <TutorialButton tutorialId="camera" compact label="Camera" />
         <button
           type="button"
           className="lf-btn"

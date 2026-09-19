@@ -21,7 +21,7 @@ function AdjustmentHeading(props: { readonly label: string }): JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <strong style={{ fontSize: 13 }}>{props.label}</strong>
-      <TutorialButton tutorialId="image-tone" compact label="Image adjustments tutorial" />
+      <TutorialButton tutorialId="image-tone" compact label="Image adjustments" />
     </div>
   );
 }

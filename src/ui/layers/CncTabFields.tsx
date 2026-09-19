@@ -27,7 +27,7 @@ export function CncTabFields(props: {
           aria-label={`Holding tabs for ${layer.color}`}
           title="Leave small bridges on the deepest passes so cut-out parts stay attached."
         />
-        <TutorialButton tutorialId="cnc-tabs" compact label="Holding tabs tutorial" />
+        <TutorialButton tutorialId="cnc-tabs" compact label="Holding tabs" />
       </Row>
       {settings.tabsEnabled ? (
         <>

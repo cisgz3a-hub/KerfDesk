@@ -39,7 +39,7 @@ export function LayersPanel(): JSX.Element | null {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <strong style={headerStyle}>Layers</strong>
-        <TutorialButton tutorialId="image-layers" compact label="Image layers tutorial" />
+        <TutorialButton tutorialId="image-layers" compact label="Image layers" />
       </div>
       <LayerActions canMerge={session.layers.length > 1} />
       {active === undefined ? null : <ActiveLayerControls active={active} />}

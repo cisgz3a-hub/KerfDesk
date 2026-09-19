@@ -21,7 +21,7 @@ export function CameraWizardFrame(props: {
     <div style={headerStyle}>
       <strong>{props.title}</strong>
       <div style={buttonRowStyle}>
-        <TutorialButton tutorialId="camera" compact label="Camera calibration tutorial" />
+        <TutorialButton tutorialId="camera" compact label="Camera calibration" />
         <button
           type="button"
           className="lf-btn"

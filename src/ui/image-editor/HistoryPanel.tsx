@@ -51,7 +51,7 @@ export function HistoryPanel(): JSX.Element | null {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <strong style={headerStyle}>History</strong>
-        <TutorialButton tutorialId="image-layers" compact label="Image history tutorial" />
+        <TutorialButton tutorialId="image-layers" compact label="Image history" />
       </div>
       <div style={listStyle}>
         {rows.map((row) => (

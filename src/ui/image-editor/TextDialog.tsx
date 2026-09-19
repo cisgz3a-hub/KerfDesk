@@ -43,7 +43,7 @@ function TextDialogBody(props: { readonly state: TextDialogState }): JSX.Element
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >
           <strong style={{ fontSize: 13 }}>Add text</strong>
-          <TutorialButton tutorialId="image-text" compact label="Image text tutorial" />
+          <TutorialButton tutorialId="image-text" compact label="Image text" />
         </div>
         <textarea
           value={state.text}

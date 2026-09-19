@@ -121,7 +121,7 @@ function LayersCardHeader(props: {
   return (
     <header style={headerStyle}>
       <h3 style={titleStyle}>Carve layers</h3>
-      <TutorialButton tutorialId="operations" compact label="Carve layers tutorial" />
+      <TutorialButton tutorialId="operations" compact label="Carve layers" />
       <button
         type="button"
         title={

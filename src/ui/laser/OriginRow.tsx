@@ -120,7 +120,7 @@ export function OriginRow(props: {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <span style={sectionCaptionStyle}>Origin</span>
-        <TutorialButton tutorialId="origin" compact label="Origin tutorial" />
+        <TutorialButton tutorialId="origin" compact label="Origin" />
       </div>
       <div style={actionGridStyle}>
         <SetOriginButton

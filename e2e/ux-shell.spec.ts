@@ -135,7 +135,9 @@ test.describe('workspace shell acceptance', () => {
     expect(await unnamedVisibleControls(page)).toEqual([]);
 
     await page.getByText('Help', { exact: true }).click();
-    await expect(page.getByRole('menuitem', { name: /connect|troubleshoot/i })).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: "Can't connect? (Troubleshooting)", exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /safety/i })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /about kerfdesk/i })).toBeVisible();
   });

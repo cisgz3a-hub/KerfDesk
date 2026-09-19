@@ -216,7 +216,7 @@ function PanelHeader(props: {
   return (
     <header style={headerStyle}>
       <strong>Place Board</strong>
-      <TutorialButton tutorialId="board" compact label="Place board tutorial" />
+      <TutorialButton tutorialId="board" compact label="Place board" />
       <Button
         variant="ghost"
         aria-label="Close board capture panel"

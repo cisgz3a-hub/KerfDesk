@@ -61,6 +61,7 @@ export function TutorialExample(props: {
           <span>{showPhoto ? 'Generated learning example' : 'Diagram view'}</span>
           <button
             type="button"
+            title={photoToggleTitle(showPhoto)}
             onClick={() => {
               setPlaying(false);
               setDiagram(showPhoto);
@@ -73,6 +74,12 @@ export function TutorialExample(props: {
       )}
     </figure>
   );
+}
+
+function photoToggleTitle(showPhoto: boolean): string {
+  return showPhoto
+    ? 'Show the diagram instead of the generated picture.'
+    : 'Show the generated picture instead of the diagram.';
 }
 
 function photoCaption(photo: Photo, phase: number): string {

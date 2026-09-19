@@ -35,7 +35,7 @@ function ReliefHeading(): JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <h3 style={headingStyle}>Relief</h3>
-      <TutorialButton tutorialId="cnc-relief" compact label="Relief tutorial" />
+      <TutorialButton tutorialId="cnc-relief" compact label="Relief" />
     </div>
   );
 }

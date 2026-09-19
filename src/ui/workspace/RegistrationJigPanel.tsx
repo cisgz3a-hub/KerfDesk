@@ -71,7 +71,7 @@ export function RegistrationJigPanel(): JSX.Element | null {
         >
           Registration Jig
         </strong>
-        <TutorialButton tutorialId="registration" compact label="Registration jig tutorial" />
+        <TutorialButton tutorialId="registration" compact label="Registration jig" />
         <Button variant="ghost" aria-label="Close registration jig panel" onClick={close}>
           ×
         </Button>

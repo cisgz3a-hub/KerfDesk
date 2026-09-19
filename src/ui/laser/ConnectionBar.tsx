@@ -40,7 +40,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           disabled={disabled}
         />
         <StatusDot connection={connection} />
-        <TutorialButton tutorialId="connection" compact label="Connection tutorial" />
+        <TutorialButton tutorialId="connection" compact label="Connection" />
         {connection.kind === 'failed' && <span style={errorStyle}>Failed: {connection.error}</span>}
       </div>
       <QualificationNotice

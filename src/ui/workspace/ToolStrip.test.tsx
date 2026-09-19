@@ -48,7 +48,7 @@ describe('ToolStrip', () => {
     const project = useStore.getState().project;
     const h = await render(<ToolStrip />);
     const lesson = h.querySelector<HTMLButtonElement>('[data-tutorial-id="rectangle"]');
-    expect(lesson?.getAttribute('aria-label')).toBe('Draw rectangle tutorial');
+    expect(lesson?.getAttribute('aria-label')).toBe('Tutorial: Draw rectangle');
     await act(async () => lesson?.click());
     expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'rectangle' });
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'rect' });

@@ -60,7 +60,7 @@ export function ColorPickerDialog(props: {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >
           <strong style={{ fontSize: 13 }}>{props.title}</strong>
-          <TutorialButton tutorialId="image-paint" compact label="Paint colours tutorial" />
+          <TutorialButton tutorialId="image-paint" compact label="Paint colours" />
         </div>
         <ColorPickerPad hsv={hsv} onChange={setHsv} />
         <input

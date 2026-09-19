@@ -30,7 +30,7 @@ export function CanvasTextPanel(props: {
       <div className="lf-canvas-text-heading">
         <strong>Text</strong>
         <span>Editing on canvas</span>
-        <TutorialButton tutorialId="text" compact label="Text tutorial" />
+        <TutorialButton tutorialId="text" compact label="Text" />
       </div>
       <div className="lf-canvas-text-scroll">
         <fieldset className="lf-canvas-text-fields" disabled={actions.saving}>

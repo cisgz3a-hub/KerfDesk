@@ -17,7 +17,7 @@ export function RailPanelHeading(props: {
         {props.title}
       </h2>
       {props.tutorialId === undefined ? null : (
-        <TutorialButton tutorialId={props.tutorialId} compact label={`${props.title} tutorial`} />
+        <TutorialButton tutorialId={props.tutorialId} compact label={props.title} />
       )}
       <IconButton
         icon="chevron-right"

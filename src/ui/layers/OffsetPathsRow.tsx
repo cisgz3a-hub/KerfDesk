@@ -30,7 +30,7 @@ export function OffsetPathsRow(): JSX.Element | null {
     <section aria-label="Offset paths" style={sectionStyle}>
       <span style={labelStyle}>Offset</span>
       <span style={controlStyle}>
-        <TutorialButton tutorialId="offset" compact label="Offset paths tutorial" />
+        <TutorialButton tutorialId="offset" compact label="Offset paths" />
         <ClearableNumberField
           ariaLabel="Offset distance"
           title="Distance in millimeters between the shape and its offset copy."

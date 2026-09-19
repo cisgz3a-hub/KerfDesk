@@ -16,7 +16,14 @@ export function CncToolPicture(props: {
       data-cnc-tool-picture={picture.key}
       style={cardStyle}
     >
-      <summary style={summaryStyle}>
+      <summary
+        style={summaryStyle}
+        title={
+          open
+            ? 'Hide the reference picture for this bit.'
+            : 'Show a generic reference picture of this bit shape, with what it is good for.'
+        }
+      >
         {open ? 'Hide picture' : 'Show picture'}: {props.label ?? picture.label}
       </summary>
       {open ? <PictureContent key={picture.key} picture={picture} /> : null}

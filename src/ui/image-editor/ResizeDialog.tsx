@@ -46,7 +46,7 @@ function ResizeBody(props: { readonly dialog: ResizeDialog }): JSX.Element {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >
           <strong style={{ fontSize: 13 }}>{title}</strong>
-          <TutorialButton tutorialId="image-transform" compact label="Image size tutorial" />
+          <TutorialButton tutorialId="image-transform" compact label="Image size" />
         </div>
         <DimensionField
           label="Width (px)"

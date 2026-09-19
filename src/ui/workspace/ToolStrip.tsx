@@ -44,7 +44,7 @@ export function ToolStrip(): JSX.Element {
       <TutorialButton
         tutorialId={workspaceToolTutorial(toolMode)}
         compact
-        label={`${activeTool === undefined ? 'Drawing tools' : TOOL_HELP[activeTool.helpKey].label} tutorial`}
+        label={activeTool === undefined ? 'Drawing tools' : TOOL_HELP[activeTool.helpKey].label}
       />
       {TOOLS.map((tool) => (
         <IconButton

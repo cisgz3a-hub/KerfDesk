@@ -169,7 +169,7 @@ export function PreviewControlsPanel(props: {
       role="group"
       aria-label="Preview route controls and statistics"
     >
-      <TutorialButton tutorialId="preview" compact label="Preview tutorial" />
+      <TutorialButton tutorialId="preview" compact label="Preview" />
       <PreviewRouteControls disabled={props.disabled} passBoundaries={passBoundaries} />
       {props.onOpen3D !== undefined ? (
         <button

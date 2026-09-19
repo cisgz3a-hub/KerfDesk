@@ -85,6 +85,10 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
 
   const submit = dialog.getByRole('button', { name: 'Trace', exact: true });
   await dialog.getByRole('button', { name: 'Close trace image' }).focus();
+  // The header tutorial button precedes Close in the cycle; from the first
+  // control the focus trap wraps to the primary action.
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Tutorial', exact: true })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(submit).toBeFocused();
   await submit.click();
