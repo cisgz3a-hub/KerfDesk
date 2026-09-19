@@ -2349,6 +2349,18 @@ Coordinates all require an exact completed Frame before ordinary Start.
 The raw placement dropdown and advanced origin controls remain available for
 fixtures and deliberately manually-homed Absolute Coordinates workflows.
 
+**Releasing the motors after a job.** GRBL holds the steppers energized when
+motion stops — `$1` (step idle delay) decides for how long, and 255 holds them
+indefinitely — so a finished burn normally leaves the gantry immovable by hand.
+The Position job card leaves the rail once an origin is settled, which every
+completed job guarantees, so the Origin row carries **Release motors** whenever
+the card is not showing it (either homing is enabled, or an origin is settled).
+Release is refused until the controller reports Idle, so it stays blocked
+through the "Machine finishing" window while the postamble park rapid is still
+running. `$SLP` clears the work origin and invalidates any Verified Frame; the
+top-level **Controller is asleep** banner offers Wake (Ctrl-X), and on a
+no-homing profile the Position job card returns to guide the re-set.
+
 ---
 
 ### F-BC1. Capture a placed board's corners (ADR-124)
