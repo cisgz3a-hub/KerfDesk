@@ -91,7 +91,12 @@ Focused behavioural checks cover public image output, streamed rows, native powe
 host controller lifecycle and acknowledgements, persistence, variant bounds, air command ordering,
 settings adoption, compatibility warnings, native inspection/countdown and setup UI.
 
-- Local validation used Node 24.15.0, pnpm 11.3.0 and Vitest 3.2.6 on Windows.
+- Initial local validation used Node 24.15.0, pnpm 11.3.0 and Vitest 3.2.6 on Windows.
+  After incorporating main's dependency update, all 47 affected test files (392 tests) passed
+  on Vitest 4.1.11, including the native Marlin off/re-arm timing regression.
+- Both affected Chrome setup workflows passed: Falcon preserves its vendor command set and
+  358 × 268 mm travel; xTool selects the explicit 20 W head. E2E type checking and scoped lint
+  and formatting checks passed.
 - The full test run completed 2,147 files: 2,127 passed, six reported failures and 14 were already
   skipped. The failures identified two stale output snapshots, the old qualification label, a
   pre-native Marlin acknowledgement assumption, missing controller context in an inspection
