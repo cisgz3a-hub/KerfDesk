@@ -129,7 +129,15 @@ test('keeps the preview and actions usable on a narrow screen and restores focus
   await dialog.screenshot({ path: testInfo.outputPath('tracer-mobile.png') });
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeFocused();
+  const more = page.getByRole('button', { name: 'More commands', exact: true });
+  await expect(more).toBeFocused();
+  await more.press('ArrowDown');
+  const trace = page.getByRole('menuitem', { name: 'Trace Image...', exact: true });
+  await trace.focus();
+  await trace.press('Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
 });
 

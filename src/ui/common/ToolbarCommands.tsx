@@ -9,17 +9,18 @@ export function ToolbarCommands(props: {
   readonly commands: ReadonlyArray<AppCommand>;
 }): JSX.Element {
   const layout = useToolbarOverflow(props.commands);
+  const moreId = useId();
   return (
     <div ref={layout.containerRef} className="lf-toolbar-command-groups">
       {toolbarGroups(layout.primary, true).map((group, index) => (
         <Fragment key={group[0]?.id}>
           {index > 0 ? <ToolbarSeparator /> : null}
           {group.map((command) => (
-            <ToolbarButton key={command.id} command={command} />
+            <ToolbarButton key={command.id} command={command} focusFallbackId={moreId} />
           ))}
         </Fragment>
       ))}
-      {layout.overflow.length > 0 ? <ToolbarMore commands={layout.overflow} /> : null}
+      {layout.overflow.length > 0 ? <ToolbarMore id={moreId} commands={layout.overflow} /> : null}
       <div ref={layout.measureRef} className="lf-toolbar-measure" aria-hidden="true">
         {toolbarGroups(props.commands)
           .flat()
@@ -40,7 +41,10 @@ export function ToolbarCommands(props: {
   );
 }
 
-function ToolbarMore(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
+function ToolbarMore(props: {
+  readonly id: string;
+  readonly commands: ReadonlyArray<AppCommand>;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   const [initialFocus, setInitialFocus] = useState<string | undefined>(undefined);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,6 +57,7 @@ function ToolbarMore(props: { readonly commands: ReadonlyArray<AppCommand> }): J
   return (
     <>
       <button
+        id={props.id}
         ref={triggerRef}
         type="button"
         className="lf-btn lf-toolbar-command lf-toolbar-more"
@@ -137,7 +142,10 @@ function OverflowCommand(props: {
   );
 }
 
-function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
+function ToolbarButton(props: {
+  readonly command: AppCommand;
+  readonly focusFallbackId: string;
+}): JSX.Element {
   const { command } = props;
   return (
     <button
@@ -146,6 +154,7 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
       aria-label={command.label}
       title={toolbarTitle(command)}
       data-help-id={commandHelpId(command.id)}
+      data-dialog-focus-fallback={props.focusFallbackId}
       disabled={!command.enabled}
       {...(command.active === undefined ? {} : { 'aria-pressed': command.active })}
       onClick={() => runCommand(command)}
