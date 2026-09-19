@@ -32,6 +32,7 @@ import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { cncPassRouteSpans, type CncPassRouteSpan } from './canvas-pass-progress';
 import { registerCanvasExecutablePlan } from './canvas-preview-motion';
 import { registerCanvasProgramSource } from './canvas-program-source';
+import { canvasExecutableSidecarWithinBudget } from './canvas-program-analysis-budget';
 import type { LiveJobTiming } from './live-job-timing';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
@@ -125,7 +126,10 @@ export function buildCanvasMotionPlan(
   });
   const plan = assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
   registerCanvasProgramSource(plan, args.gcode);
-  if (plan.capability === 'realtime' || plan.capability === 'settle-only') {
+  if (
+    (plan.capability === 'realtime' || plan.capability === 'settle-only') &&
+    canvasExecutableSidecarWithinBudget(args.gcode, manifest)
+  ) {
     const sidecar = buildExecutablePlanSidecar(args.gcode, args.prepared.project);
     if (sidecar.kind === 'ok') registerCanvasExecutablePlan(plan, sidecar.plan);
   }

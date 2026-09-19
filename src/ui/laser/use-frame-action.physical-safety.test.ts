@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseStatusReport } from '../../core/controllers/grbl';
 import { computeJobMotionBounds, machineSpaceJob, type JobBounds } from '../../core/job';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
@@ -149,6 +150,35 @@ afterEach(() => {
 });
 
 describe('Frame source-of-truth contract', () => {
+  it.each(['absolute', 'user-origin', 'current-position'] as const)(
+    'frames %s artwork using the XYZ position in a four-axis Falcon report',
+    async (startFrom) => {
+      installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
+      const frame = completingFrame();
+      const customOrigin = startFrom !== 'absolute';
+      const offsetField = customOrigin ? '|WCO:100.000,50.000,0.000,0.000' : '';
+      const report = parseStatusReport(
+        `<Idle|MPos:191.500,106.500,-21.100,0.000|Bf:512,65535|FS:0,0${offsetField}>`,
+      );
+      useStore.setState({ jobPlacement: { startFrom, anchor: 'front-left' } });
+      useLaserStore.setState({
+        statusReport: report,
+        wcoCache: report?.wco ?? null,
+        workOriginActive: customOrigin,
+        homingState: 'confirmed',
+        frame,
+      });
+
+      await expect(runFrameNow()).resolves.toBe(true);
+
+      expect(frame).toHaveBeenCalledOnce();
+      expect(useLaserStore.getState().framedRun?.candidate.returnToWorkPosition).toEqual({
+        x: customOrigin ? 91.5 : 191.5,
+        y: customOrigin ? 56.5 : 106.5,
+      });
+    },
+  );
+
   it.each([
     [{ maxPowerS: 255, laserModeEnabled: true }, '$30'],
     [{ maxPowerS: 1000, laserModeEnabled: false }, '$32=0'],
