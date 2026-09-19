@@ -35,6 +35,7 @@ import {
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
+import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
@@ -98,6 +99,11 @@ export function buildJobReviewModel(args: {
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
+      ...detectAirAssistStartWarnings(
+        args.prepared.prepared.job,
+        args.project.device,
+        args.project.scene.layers,
+      ),
       ...detectParkOutsideFrameWarningsFromMetrics(
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,

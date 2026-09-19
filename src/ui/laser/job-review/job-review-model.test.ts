@@ -308,6 +308,23 @@ describe('buildJobReviewModel', () => {
     expect(model.warnings).toContainEqual(expect.stringContaining('manual air pump'));
   });
 
+  it('discloses that a job never sends M8 when every operation runs with air off (ADR-323)', async () => {
+    // The fixture layer keeps the Air default (off) while the device is wired
+    // for job-controlled air — the Falcon A1 Pro "shadows at the start" setup.
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...state.project.device, airAssistCommand: 'M8' },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.warnings).toContainEqual(expect.stringContaining('never sends M8'));
+    // rule 7 / ADR-228: disclosure only — it never forces acknowledgement.
+    expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
+  });
+
   it('discloses the park rapid that exits the framed outline (laser)', async () => {
     // The line object spans X/Y 1..9 while the default GRBL dialect parks at
     // work 0,0 — the job's final rapid leaves the framed motion envelope.
