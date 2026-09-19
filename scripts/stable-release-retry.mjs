@@ -80,6 +80,15 @@ function requireNeverUploaded(jobs, runId, sourceSha) {
     )
   )
     return;
+  // GitHub still reports a skipped dependent job after tag validation fails,
+  // but that job has no executed steps. It could not have produced an artifact.
+  if (
+    builds.length === 1 &&
+    builds[0].conclusion === 'skipped' &&
+    (builds[0].steps === undefined ||
+      (Array.isArray(builds[0].steps) && builds[0].steps.length === 0))
+  )
+    return;
   if (builds.length !== 1 || !Array.isArray(builds[0].steps))
     throw new Error('Prior stable build steps are unavailable.');
   const upload = builds[0].steps.find((step) => step.name === UPLOAD_STEP);

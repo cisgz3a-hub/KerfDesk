@@ -1,5 +1,9 @@
 # KerfDesk Electron readiness implementation
 
+This report records the 12 September candidate. See the
+[19 September integration follow-up](2026-09-19-electron-integration.md) for the
+current-main reconciliation and subsequent maintenance/retry changes.
+
 This implements the eight findings from the 12 September 2026 Electron audit on
 `25d9bef9a5defed24259acb8b1d3af69840ff983`. The branch is
 `codex/electron-readiness-20260912`. The original dirty LaserForge checkout is

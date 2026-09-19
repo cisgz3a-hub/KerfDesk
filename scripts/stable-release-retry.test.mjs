@@ -99,6 +99,35 @@ test('a failed build before upload can rebuild only after every prior attempt is
   assert.ok(calls[2].url.endsWith('/attempts/2/jobs?per_page=100'));
 });
 
+test('a build skipped by failed tag validation can start on the next attempt', async () => {
+  for (const steps of [undefined, []]) {
+    const previous = previousJobs();
+    previous.jobs[0].conclusion = 'skipped';
+    previous.jobs[0].steps = steps;
+    previous.jobs.unshift({
+      name: 'Validate stable release tag',
+      run_id: 900,
+      head_sha: 'a'.repeat(40),
+      status: 'completed',
+      conclusion: 'failure',
+      steps: [],
+    });
+    previous.total_count = previous.jobs.length;
+    const { plan } = await retryPlan([artifactList(), previous]);
+    assert.deepEqual(plan, { reuseArtifact: false });
+  }
+});
+
+test('skipped-job recovery cannot excuse executed uploads or a cancelled job with no steps', async () => {
+  const uploaded = previousJobs('success');
+  uploaded.jobs[0].conclusion = 'skipped';
+  await assert.rejects(retryPlan([artifactList(), uploaded]), /Original stable artifact/u);
+  const cancelled = previousJobs();
+  cancelled.jobs[0].conclusion = 'cancelled';
+  cancelled.jobs[0].steps = [];
+  await assert.rejects(retryPlan([artifactList(), cancelled]), /Cannot prove/u);
+});
+
 test('retry lookup and job-history errors never become permission to rebuild', async () => {
   for (const status of [401, 404, 429, 500]) {
     await assert.rejects(retryPlan([new Response('failure', { status })]), /lookup failed/u);

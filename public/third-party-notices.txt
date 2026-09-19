@@ -3248,7 +3248,7 @@ SOFTWARE.
 
 == Electron desktop runtime package ==
 
---- Package: electron@42.11.3 (MIT) ---
+--- Package: electron@42.11.5 (MIT) ---
 License source(s): LICENSE
 Copyright (c) Electron contributors
 Copyright (c) 2013-2020 GitHub Inc.

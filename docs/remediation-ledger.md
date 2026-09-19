@@ -1,6 +1,15 @@
 # Audit remediation ledger
 
-Current Electron readiness implementation, 2026-09-12:
+Current Electron integration follow-up, 2026-09-19:
+`codex/electron-readiness-20260912`. Current-main reconciliation, an eligible
+Electron 42.11.5 maintenance pin, and the reproduced skipped-build retry repair
+are documented in
+[`audits/2026-09-19-electron-integration.md`](audits/2026-09-19-electron-integration.md).
+Exact-head PR/main CI and fresh package receipts establish integration evidence;
+the earlier candidate's results below remain historical. Signed installed
+updates, macOS, installer execution and hardware qualification are separate.
+
+Historical Electron readiness implementation, 2026-09-12:
 `codex/electron-readiness-20260912`, based on main
 `25d9bef9a5defed24259acb8b1d3af69840ff983`; application source commit
 `d3afa030c263d5ff6f68ca5342cf01b20af78498`.
