@@ -38,7 +38,9 @@ function projectWithRaster(): Project {
   };
 }
 
-let openEditorSpy: ReturnType<typeof vi.fn>;
+let openEditorSpy: ReturnType<
+  typeof vi.fn<ReturnType<typeof useImageEditorStore.getState>['openEditor']>
+>;
 
 beforeEach(() => {
   resetStore();

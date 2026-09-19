@@ -25,8 +25,10 @@ function fakeKeydown(opts: {
 }
 
 function makeCtx(): ToolCtx & {
-  readonly setToolMode: ReturnType<typeof vi.fn>;
-  readonly openConvertToBitmap: ReturnType<typeof vi.fn>;
+  readonly setToolMode: ReturnType<typeof vi.fn<ToolCtx['setToolMode']>>;
+  readonly openConvertToBitmap: ReturnType<
+    typeof vi.fn<NonNullable<ToolCtx['openConvertToBitmap']>>
+  >;
 } {
   return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn() };
 }

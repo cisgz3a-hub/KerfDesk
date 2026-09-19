@@ -9,6 +9,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { projectOpenRequestEpochCallbacks } from '../../__fixtures__/file-actions';
+import type { ToastVariant } from '../state/toast-store';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import { handleOpenProject } from './file-actions';
 import { handleOpenGcodePreview } from './gcode-open-action';
@@ -123,7 +124,10 @@ function platformFor(file: FileHandle): PlatformAdapter {
   };
 }
 
-type Run = (platform: PlatformAdapter, pushToast: ReturnType<typeof vi.fn>) => Promise<void>;
+type Run = (
+  platform: PlatformAdapter,
+  pushToast: ReturnType<typeof vi.fn<(message: string, variant?: ToastVariant) => void>>,
+) => Promise<void>;
 
 const handleProject: Run = async (platform, pushToast) => {
   await handleOpenProject({
