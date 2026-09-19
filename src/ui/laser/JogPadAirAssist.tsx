@@ -6,64 +6,87 @@ import {
   type AirAssistDefaultSyncSummary,
 } from '../state/air-assist-default-actions';
 import { useLaserStore } from '../state/laser-store';
+import { openMachineSetup } from './device-setup';
+
+// Manual Air has two distinct "not ready" states and they need different
+// exits (maintainer, 2026-09-19 — the old single Proceed card silently did
+// nothing when the device had no air output, then came straight back):
+//   - no M7/M8 output on the device: nothing here can turn a pump on, so the
+//     only honest action is to open Machine Setup at the air-assist row;
+//   - output configured but project Job Air defaults are off: Proceed applies
+//     the listed defaults and then turns manual air on, in one click.
+type AirAssistReadiness = 'ready' | 'no-output' | 'defaults';
 
 export function JogPadAirAssist(): JSX.Element {
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
   const project = useStore((s) => s.project);
   const syncProjectAirAssistDefaults = useStore((s) => s.syncProjectAirAssistDefaults);
   const airAssistOn = useLaserStore((s) => s.airAssistOn);
   const setAirAssistEnabled = useLaserStore((s) => s.setAirAssistEnabled);
   const setupSummary = projectAirAssistDefaultSyncSummary(project);
+  const readiness = airAssistReadiness(setupSummary);
   const handleToggle = (enabled: boolean): void => {
-    if (enabled && setupSummary.needsSync) {
-      setSetupOpen(true);
+    if (enabled && readiness !== 'ready') {
+      setNoticeOpen(true);
       return;
     }
-    if (!enabled) setSetupOpen(false);
+    if (!enabled) setNoticeOpen(false);
     void setAirAssistEnabled(enabled).catch(() => undefined);
   };
-  const proceedWithSetup = (): void => {
+  const proceedWithDefaults = (): void => {
     syncProjectAirAssistDefaults();
-    setSetupOpen(false);
-    // Never guess M7 or M8. With no verified relay command, Proceed only
-    // normalizes the per-job Air flags; the external/manual pump stays a
-    // physical operator action disclosed in Job Review.
-    if (!setupSummary.airOutputUnset) {
-      void setAirAssistEnabled(true).catch(() => undefined);
-    }
+    setNoticeOpen(false);
+    void setAirAssistEnabled(true).catch(() => undefined);
+  };
+  const openAirOutputSetup = (): void => {
+    setNoticeOpen(false);
+    // The air-assist output row lives on the Machine step, which the wizard
+    // renders together with the Confirm step.
+    openMachineSetup({ kind: 'step', step: 'confirm' });
   };
   return (
     <>
       <AirAssistControl
         command={project.device.airAssistCommand}
         enabled={airAssistOn}
-        setupNeeded={setupSummary.needsSync}
+        readiness={readiness}
         onToggle={handleToggle}
       />
-      {setupOpen && setupSummary.needsSync ? (
+      {noticeOpen && readiness === 'no-output' ? (
+        <AirOutputUnsetNotice
+          onOpenSetup={openAirOutputSetup}
+          onCancel={() => setNoticeOpen(false)}
+        />
+      ) : null}
+      {noticeOpen && readiness === 'defaults' ? (
         <AirAssistSetupWarning
           summary={setupSummary}
-          onProceed={proceedWithSetup}
-          onCancel={() => setSetupOpen(false)}
+          onProceed={proceedWithDefaults}
+          onCancel={() => setNoticeOpen(false)}
         />
       ) : null}
     </>
   );
 }
 
+function airAssistReadiness(summary: AirAssistDefaultSyncSummary): AirAssistReadiness {
+  if (summary.airOutputUnset) return 'no-output';
+  if (summary.disabledOutputLayerCount > 0 || summary.disabledObjectOverrideCount > 0) {
+    return 'defaults';
+  }
+  return 'ready';
+}
+
 function AirAssistControl(props: {
   readonly command: DeviceProfile['airAssistCommand'];
   readonly enabled: boolean;
-  readonly setupNeeded: boolean;
+  readonly readiness: AirAssistReadiness;
   readonly onToggle: (enabled: boolean) => void;
 }): JSX.Element {
-  const commandAvailable = props.command !== 'none';
   const label = props.enabled
     ? 'Turn manual air assist off (M9)'
-    : `Turn manual air assist on (${props.setupNeeded ? 'setup needed' : props.command})`;
-  const title = props.setupNeeded
-    ? 'Review and apply missing air-assist settings before turning manual air on.'
-    : `${label}. Jobs use each layer's Job Air checkbox automatically.`;
+    : `Turn manual air assist on (${controlSuffix(props.readiness, props.command)})`;
+  const title = controlTitle(props.readiness, label);
   return (
     <button
       type="button"
@@ -71,14 +94,76 @@ function AirAssistControl(props: {
       aria-label={label}
       aria-pressed={props.enabled}
       title={title}
-      style={airAssistButtonStyle(props.enabled, props.setupNeeded)}
+      style={airAssistButtonStyle(props.enabled, props.readiness)}
     >
       <span style={airAssistTitleStyle}>Manual Air</span>
       <span style={airAssistStateStyle}>{props.enabled ? 'ON' : 'OFF'}</span>
-      <span style={airAssistCommandStyle}>
-        {props.setupNeeded ? 'Setup needed' : commandAvailable ? props.command : 'Not set'}
-      </span>
+      <span style={airAssistCommandStyle}>{controlCaption(props.readiness, props.command)}</span>
     </button>
+  );
+}
+
+function controlSuffix(
+  readiness: AirAssistReadiness,
+  command: DeviceProfile['airAssistCommand'],
+): string {
+  if (readiness === 'no-output') return 'no air output';
+  if (readiness === 'defaults') return 'setup needed';
+  return command;
+}
+
+function controlCaption(
+  readiness: AirAssistReadiness,
+  command: DeviceProfile['airAssistCommand'],
+): string {
+  if (readiness === 'no-output') return 'No air output';
+  if (readiness === 'defaults') return 'Setup needed';
+  return command;
+}
+
+function controlTitle(readiness: AirAssistReadiness, label: string): string {
+  if (readiness === 'no-output') {
+    return 'No M7/M8 air output is configured for this machine, so there is nothing to switch. Open Machine Setup to set one after a hardware test.';
+  }
+  if (readiness === 'defaults') {
+    return 'Review and apply missing air-assist settings before turning manual air on.';
+  }
+  return `${label}. Jobs use each layer's Job Air checkbox automatically.`;
+}
+
+function AirOutputUnsetNotice(props: {
+  readonly onOpenSetup: () => void;
+  readonly onCancel: () => void;
+}): JSX.Element {
+  return (
+    <div style={airSetupWarningStyle} role="status">
+      <div style={airSetupWarningTextStyle}>
+        <strong>Manual Air has no M7/M8 output to switch.</strong>
+        <span>
+          Set the air output in Machine Setup only after a hardware test, or run the external air
+          pump by hand.
+        </span>
+      </div>
+      <div style={airSetupWarningActionStyle}>
+        <button
+          type="button"
+          onClick={props.onCancel}
+          aria-label="Cancel air assist setup"
+          title="Keep manual air off."
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={props.onOpenSetup}
+          aria-label="Open Machine Setup for air assist"
+          title="Open Machine Setup at the machine step that holds the air-assist output."
+          style={airSetupProceedButtonStyle}
+        >
+          Open Machine Setup
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -124,15 +209,14 @@ function airSetupSummaryText(summary: AirAssistDefaultSyncSummary): string {
   if (summary.disabledObjectOverrideCount > 0) {
     changes.push(`clear ${summary.disabledObjectOverrideCount} stale object air override(s)`);
   }
-  const updates = changes.length === 0 ? '' : ` This will ${changes.join(', ')}.`;
-  const outputNotice = summary.airOutputUnset
-    ? ' No M7/M8 output will be selected; configure one in Machine Setup only after a hardware test, or operate the external air pump manually.'
-    : '';
-  return `${updates}${outputNotice}`;
+  return changes.length === 0 ? '' : `This will ${changes.join(', ')}, then turn manual air on.`;
 }
 
-function airAssistButtonStyle(enabled: boolean, setupNeeded: boolean): React.CSSProperties {
-  if (setupNeeded && !enabled) {
+function airAssistButtonStyle(
+  enabled: boolean,
+  readiness: AirAssistReadiness,
+): React.CSSProperties {
+  if (readiness !== 'ready' && !enabled) {
     return {
       ...airAssistButtonBaseStyle,
       borderColor: 'var(--lf-warning)',
@@ -178,11 +262,14 @@ const airAssistCommandStyle: React.CSSProperties = {
   fontSize: 11,
   lineHeight: 1.2,
 };
+// Spans the jog grid's full width (the "warning" row) and stacks its text
+// over its actions: the rail is narrow, and a side-by-side layout squeezed
+// the sentence into a five-word column beside the buttons.
 const airSetupWarningStyle: React.CSSProperties = {
   gridArea: 'warning',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  flexDirection: 'column',
+  alignItems: 'stretch',
   gap: 8,
   padding: '8px 10px',
   borderLeft: '3px solid var(--lf-warning)',
@@ -201,6 +288,7 @@ const airSetupWarningTextStyle: React.CSSProperties = {
 const airSetupWarningActionStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'flex-end',
   gap: 6,
   flexShrink: 0,
 };

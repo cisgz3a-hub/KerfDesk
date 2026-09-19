@@ -1,9 +1,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createLayer, createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import {
+  closeMachineSetup,
+  useMachineSetupDialogStore,
+} from './device-setup/machine-setup-dialog-store';
 import { JogPad } from './JogPad';
 import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
@@ -175,54 +179,86 @@ describe('JogPad accessible labels', () => {
     await unmount();
   });
 
-  it('keeps the air assist setup path clickable until a device coolant command is configured', async () => {
+  it('keeps Manual Air clickable and names the missing output until a device coolant command is configured', async () => {
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
+    const air = buttonByLabel(host, 'Turn manual air assist on (no air output)');
     expect(air?.disabled).toBe(false);
-    expect(air?.textContent).toContain('Setup needed');
+    expect(air?.textContent).toContain('No air output');
 
     await unmount();
   });
 
-  it('shows a Proceed warning before using Manual Air to configure missing project air settings', async () => {
+  // The old card offered "Proceed" with no output configured: Proceed could
+  // never turn air on, so it silently closed and came straight back on the
+  // next click. With no M7/M8 output the only honest exit is Machine Setup.
+  it('offers Machine Setup instead of a dead-end Proceed when the device has no air output', async () => {
     const setAirAssistEnabled = vi.fn(async () => undefined);
     useLaserStore.setState({ setAirAssistEnabled });
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
-    if (air === null) throw new Error('air assist setup button missing');
-    expect(air.disabled).toBe(false);
+    const air = buttonByLabel(host, 'Turn manual air assist on (no air output)');
+    if (air === null) throw new Error('air assist button missing');
     await act(async () => {
       air.click();
     });
 
+    expect(host.textContent).toContain('Manual Air has no M7/M8 output to switch.');
+    expect(buttonByLabel(host, 'Proceed with air assist setup')).toBeNull();
+    const openSetup = buttonByLabel(host, 'Open Machine Setup for air assist');
+    if (openSetup === null) throw new Error('Machine Setup button missing');
+    await act(async () => {
+      openSetup.click();
+    });
+
+    expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+      kind: 'open',
+      target: { kind: 'step', step: 'confirm' },
+    });
+    expect(useStore.getState().project.device.airAssistCommand).toBe('none');
+    expect(setAirAssistEnabled).not.toHaveBeenCalled();
+    // The notice is dismissed by opening setup, and the same click path stays
+    // available afterwards (it does not loop on a stale "setup" state).
+    expect(host.textContent).not.toContain('Manual Air has no M7/M8 output to switch.');
+    closeMachineSetup();
+
+    await unmount();
+  });
+
+  it('applies the missing Job Air defaults and turns manual air on when an output is configured', async () => {
+    const setAirAssistEnabled = vi.fn(async () => undefined);
+    useLaserStore.setState({ setAirAssistEnabled });
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          layers: [
+            { ...createLayer({ id: 'cut', color: '#ff0000' }), output: true, airAssist: false },
+          ],
+        },
+      },
+    }));
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
+    if (air === null) throw new Error('air assist setup button missing');
+    await act(async () => {
+      air.click();
+    });
     expect(host.textContent).toContain('Manual Air will update project air-assist settings.');
-    expect(buttonByLabel(host, 'Proceed with air assist setup')).not.toBeNull();
+    expect(host.textContent).toContain('enable Job Air on 1 output layer(s)');
     expect(setAirAssistEnabled).not.toHaveBeenCalled();
 
-    await unmount();
-  });
-
-  it('applies Job Air defaults but leaves manual air off until an output is hardware-tested', async () => {
-    const setAirAssistEnabled = vi.fn(async () => undefined);
-    useLaserStore.setState({ setAirAssistEnabled });
-    const { host, unmount } = await renderJogPad();
-
-    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
-    if (air === null) throw new Error('air assist setup button missing');
-    await act(async () => {
-      air.click();
-    });
     const proceed = buttonByLabel(host, 'Proceed with air assist setup');
     if (proceed === null) throw new Error('air assist proceed button missing');
     await act(async () => {
       proceed.click();
     });
 
-    expect(useStore.getState().project.device.airAssistCommand).toBe('none');
     expect(useStore.getState().project.scene.layers.every((layer) => layer.airAssist)).toBe(true);
-    expect(setAirAssistEnabled).not.toHaveBeenCalled();
+    expect(setAirAssistEnabled).toHaveBeenCalledWith(true);
 
     await unmount();
   });

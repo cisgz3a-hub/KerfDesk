@@ -9267,7 +9267,7 @@ ordinary Start guard.
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17, 2026-09-19
 
 ### Context
 
@@ -9303,6 +9303,32 @@ longer stack competing Abort buttons, and transient jog state no longer moves th
 the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
+
+### Amendment (2026-09-19) — overlaid on the canvas, never in normal flow
+
+**Context.** In normal flow between the workspace and the status bar, the bar's arrival and
+departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
+maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
+decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
+lower edge.
+
+**Decision.**
+
+- The bar is absolutely positioned on the lower edge of the canvas area (`App.tsx` `CanvasArea`),
+  so mounting or unmounting it never changes the size or position of the workspace, the tool strip,
+  or either rail. Living inside the canvas area it can only cover drawing surface (and the canvas
+  zoom controls while motion is active) — never a rail control — which preserves the intent of
+  "cannot cover unrelated controls" without reserving permanent space.
+- It is a single wrapping line (state · progress · safety note) beside the unchanged ≥48 px
+  controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
+  order, and still directs the operator to the physical E-stop or power isolation.
+- Toasts leave the rails for the same reason: they overlay the top-centre of the canvas under the
+  view switch, use a tinted surface with a coloured edge instead of a solid fill, and a success
+  confirmation auto-dismisses in 4 s (advisories and failures keep 8 s).
+
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the overlay
+anchoring. The zoom buttons at the canvas's bottom-right are covered only while motion is active
+(wheel and keyboard zoom keep working). The Machine rail is unchanged.
 
 ---
 

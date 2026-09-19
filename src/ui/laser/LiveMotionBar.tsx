@@ -180,35 +180,43 @@ function jobProgress(streamer: Streamer): string {
   return `${streamer.completed} / ${streamer.total} lines · ${percent}%`;
 }
 
+// Overlaid on the canvas's lower edge (ADR-207 amendment, 2026-09-19). In
+// normal flow between the workspace and the status bar, every jog, auto-focus,
+// or job starting and settling resized the canvas — the whole screen jumped.
+// Absolutely positioned inside the canvas area it takes no layout space and
+// can only ever cover drawing surface, never a rail or tool-strip control.
 const barStyle: React.CSSProperties = {
-  position: 'relative',
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
   zIndex: MAXIMUM_STACKING_ORDER,
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'center',
-  gap: '10px 18px',
-  width: '100%',
+  gap: '6px 16px',
   minWidth: 0,
   boxSizing: 'border-box',
-  padding: '10px 16px',
-  flexShrink: 0,
+  padding: '6px 14px',
   background: 'var(--lf-bg-1)',
-  borderTop: '1px solid var(--lf-border)',
-  borderBottom: '3px solid var(--lf-danger)',
+  borderTop: '3px solid var(--lf-danger)',
   boxShadow: 'var(--lf-shadow)',
 };
+// One wrapping line — heading · detail · safety note — so the bar is no taller
+// than its 48 px controls instead of stacking a second text row beside them.
 const statusStyle: React.CSSProperties = {
   display: 'flex',
   flex: '1 1 280px',
-  flexDirection: 'column',
-  gap: 3,
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: '2px 12px',
   minWidth: 0,
 };
 const statusLineStyle: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'baseline',
-  gap: '4px 12px',
+  gap: '2px 10px',
 };
 const headingStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', fontSize: 15 };
 const detailStyle: React.CSSProperties = {

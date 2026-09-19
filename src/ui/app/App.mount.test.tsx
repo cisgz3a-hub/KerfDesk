@@ -14,6 +14,18 @@ import { useUiStore } from '../state/ui-store';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 
+// The Windows module runner cannot turn the PWA plugin's virtual id into a
+// file path, so this file failed at collection on a Windows checkout (it was
+// fine on CI). Stub the hook the way PwaUpdateWatcher.test.tsx does; the
+// update watcher's own behaviour is covered there, not here.
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    offlineReady: [false, vi.fn()],
+    needRefresh: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}));
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -98,7 +110,7 @@ describe('App mount', () => {
     },
   );
 
-  it('anchors the live motion bar below the workspace so jog controls do not move', async () => {
+  it('overlays the live motion bar inside the canvas so mounting it never reflows the workspace', async () => {
     useLaserStore.setState({ motionOperation: startMotionOperation('jog') });
 
     await act(async () => {
@@ -112,9 +124,15 @@ describe('App mount', () => {
     });
 
     const workspace = host.querySelector('main');
-    const liveMotionBar = host.querySelector('[aria-label="Live Motion"]');
+    const liveMotionBar = host.querySelector<HTMLElement>('[aria-label="Live Motion"]');
     expect(liveMotionBar).not.toBeNull();
-    expect(workspace?.nextElementSibling).toBe(liveMotionBar);
+    // In flow between <main> and the status bar, the bar resized the canvas
+    // every time a jog or auto-focus started and settled. Absolutely
+    // positioned inside the canvas area it takes no layout space, so the
+    // rails and the drawing stay exactly where they were (ADR-207 amendment).
+    expect(workspace?.contains(liveMotionBar)).toBe(true);
+    expect(liveMotionBar?.style.position).toBe('absolute');
+    expect(liveMotionBar?.style.bottom).toBe('0px');
   });
 });
 
