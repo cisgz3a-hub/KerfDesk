@@ -145,17 +145,18 @@ export function CameraScene({
   phase,
   kind,
 }: SceneProps & { readonly kind: CameraKind }): JSX.Element {
+  if (kind === 'jig') return <RegistrationJigScene phase={phase} />;
   return (
     <g>
       <rect x="60" y="40" width="400" height="185" rx="4" fill="#e2e9e5" stroke="#9eb4b0" />
-      <MaterialReference phase={phase} kind={kind} />
+      <MaterialReference phase={phase} />
       {kind === 'camera' ? (
         <g transform="translate(37 16)">
           <rect width="38" height="24" rx="4" fill={INK} />
           <circle cx="19" cy="12" r="7" fill={TEAL_LIGHT} />
         </g>
       ) : null}
-      {kind !== 'jig' ? <ReferenceMarks registered={phase === 2} /> : null}
+      <ReferenceMarks registered={phase === 2} />
       <Label x={260} y={257}>
         {
           [
@@ -169,30 +170,89 @@ export function CameraScene({
   );
 }
 
-function MaterialReference({
-  phase,
-  kind,
-}: SceneProps & { readonly kind: CameraKind }): JSX.Element {
+function RegistrationJigScene({ phase }: SceneProps): JSX.Element {
+  return (
+    <g>
+      <Label x={260} y={30}>
+        {
+          [
+            '1 · Outline only: burn the rectangle on wood',
+            '2 · Place the leather keychain inside it',
+            '3 · Artwork only: engrave the leather',
+          ][phase]
+        }
+      </Label>
+      <rect
+        x="66"
+        y="54"
+        width="388"
+        height="170"
+        rx="4"
+        fill="#d5bc91"
+        stroke="#9b7d50"
+        strokeWidth="2"
+      />
+      <path d="M80 77h68m252 0h38M80 184h57m254 0h47" fill="none" stroke="#baa076" />
+      <rect x="162" y="88" width="196" height="94" fill="none" stroke="#714d2c" strokeWidth="2.5" />
+      {phase > 0 ? (
+        <g>
+          <rect x="164" y="93" width="192" height="90" rx="15" fill="#75512f" />
+          <rect
+            x="164"
+            y="90"
+            width="192"
+            height="90"
+            rx="15"
+            fill="#c7945d"
+            stroke="#8c5a32"
+            strokeWidth="2"
+          />
+          <rect
+            x="172"
+            y="98"
+            width="176"
+            height="74"
+            rx="10"
+            fill="none"
+            stroke="#e8bf89"
+            strokeDasharray="3 3"
+          />
+          <circle cx="186" cy="135" r="7" fill="#d5bc91" stroke="#85582e" strokeWidth="2" />
+          {phase === 2 ? (
+            <text
+              x="278"
+              y="146"
+              textAnchor="middle"
+              fontFamily="Georgia, serif"
+              fontSize="30"
+              fill="#4f301a"
+            >
+              Kai
+            </text>
+          ) : null}
+        </g>
+      ) : null}
+      <Label x={260} y={211}>
+        {phase === 0
+          ? 'Empty wood: the leather blank is absent'
+          : 'Rounded leather blank inside the rectangular outline'}
+      </Label>
+      <Label x={260} y={252}>
+        {phase === 2
+          ? 'Artwork on leather · locating outline on wood'
+          : 'Fixed wood + unchanged origin = known placement'}
+      </Label>
+    </g>
+  );
+}
+
+function MaterialReference({ phase }: SceneProps): JSX.Element {
   return (
     <g
       data-move="true"
       transform={phase === 2 ? 'translate(122 66)' : 'translate(147 48) rotate(8 130 67)'}
     >
       <rect width="270" height="134" rx="3" fill="#ead9b7" stroke="#bfa579" strokeWidth="2" />
-      {kind === 'jig'
-        ? [0, 1, 2].map((i) => (
-            <rect
-              key={i}
-              x={15 + i * 86}
-              y="28"
-              width="68"
-              height="80"
-              fill="none"
-              stroke={TEAL}
-              strokeWidth="2"
-            />
-          ))
-        : null}
       {phase > 0 ? (
         <text
           x="135"

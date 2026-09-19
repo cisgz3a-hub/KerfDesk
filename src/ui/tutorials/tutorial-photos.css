@@ -1,0 +1,35 @@
+.lf-learn-photo-viewport {
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  position: relative;
+}
+.lf-learn-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.lf-learn-photo-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--lf-border);
+  background: var(--lf-bg-1);
+  color: var(--lf-text-muted);
+  font-size: 10px;
+}
+.lf-learn-photo-note button {
+  background: transparent;
+  color: var(--lf-accent);
+  font-size: 11px;
+  border: 0;
+  padding: 3px 0;
+}
+.lf-learn-example:has(.lf-learn-photo-viewport) figcaption {
+  padding-top: 12px;
+  line-height: 1.6;
+}
+.lf-learn-example-controls {
+  flex-wrap: wrap;
+}

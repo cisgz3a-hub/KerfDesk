@@ -122,7 +122,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose distance and speed',
         instruction:
-          'Find Step and Speed in Jog. Step is the distance of a single arrow click; Speed is the travel rate. Use the illustrated example to compare a coarse move with a fine adjustment.',
+          'Find Step and Speed in Jog. Step is the distance of a single arrow click; Speed is the travel rate. Choose a smaller Step for fine placement and check the physical route before requesting a larger move.',
         focus: 'Step · Speed',
         result: 'Distance and travel rate are separate choices.',
       },
@@ -138,7 +138,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
         instruction:
           'Some controllers offer continuous jogging by holding an arrow; the tooltip states when this is available. Releasing ends that request. Position the head at the intended reference before setting an origin.',
         focus: 'Click or supported hold',
-        result: 'The example distinguishes one fixed step from a sustained movement request.',
+        result:
+          'A click requests one fixed step; a supported hold requests continued movement until release.',
         visual: 'origin',
       },
     ],

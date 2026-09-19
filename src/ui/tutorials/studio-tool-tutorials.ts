@@ -57,9 +57,9 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
     prepare:
       'Choose Line in the Studio creation toolbar. Turn on Snap if the endpoints should meet existing geometry.',
     gesture:
-      'Click the start, then click the end. Hold Shift to constrain the line to a 45-degree direction.',
+      'Press at the start, keep the pointer held down while dragging to the end, then release. Hold Shift during the drag to constrain the line to a 45-degree direction.',
     finish:
-      'Switch to Select and click the line. Inspect its dimensions, adjust an editable field if needed, then Apply when the drawing is ready.',
+      'Switch to Select and click the line. Enter an exact Length or Angle in the properties and press Enter, then Apply when the drawing is ready.',
     tip: 'Use Polyline when you want several segments to form one connected path.',
   }),
   studioToolLesson({
@@ -132,8 +132,9 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
     visual: 'trim',
     summary: 'Replace a sharp corner with a straight bevel.',
     prepare:
-      'Choose Chamfer and enter Distance in millimetres. This is the setback along each of the two adjoining edges.',
-    gesture: 'Click the corner to flatten it. On a rectangle, the tool chamfers all four corners.',
+      'Choose a sharp rectangle or a polyline corner. If a rectangle is rounded, set its Corner radius to zero first. Choose Chamfer and enter Distance in millimetres.',
+    gesture:
+      'Click the corner to flatten it. A sharp rectangle becomes a closed path with all four corners chamfered; a polyline changes at the clicked corner.',
     finish:
       'Inspect the bevel and the remaining edge lengths. Undo if it removes too much, reduce the distance and retry before Apply.',
     tip: 'Distance measures back along both legs of the corner. It is not the diagonal length of the new bevel.',

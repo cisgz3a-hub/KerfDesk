@@ -77,7 +77,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Resize or turn it',
         instruction:
-          'Drag a size handle to resize, or a rotation handle to turn. The size drag keeps proportions by default; hold Shift to resize freely. Use the numeric transform fields for an exact position or size.',
+          'Drag a corner size handle to resize proportionally; hold Shift to resize freely. Edge handles change one dimension. Use a rotation handle to turn, or the numeric transform fields for an exact position or size.',
         focus: 'Size and rotation handles',
         result: 'The selection fits the intended space on your material.',
       },

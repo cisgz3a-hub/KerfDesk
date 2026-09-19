@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { TutorialVisual } from './tutorial-types';
 import { TutorialIllustration } from './TutorialIllustration';
+import { TutorialPhoto } from './TutorialPhoto';
+import { TUTORIAL_PHOTOS, type TutorialPhoto as Photo } from './tutorial-photos';
+import './tutorial-photos.css';
 
 export function TutorialExample(props: {
+  readonly tutorialId?: string;
   readonly visual: TutorialVisual;
   readonly phase: number;
   readonly focus: string;
@@ -10,6 +14,15 @@ export function TutorialExample(props: {
 }): JSX.Element {
   const [phase, setPhase] = useState(props.phase);
   const [playing, setPlaying] = useState(false);
+  const [diagram, setDiagram] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const photo = TUTORIAL_PHOTOS[props.tutorialId ?? ''];
+  const showPhoto = photo !== undefined && !diagram && !imageFailed;
+  const labels = showPhoto
+    ? photo.frames.map((frame) => frame.label)
+    : ['Before', 'Action', 'Result'];
+  const shownPhase = labels.length === 1 ? 0 : phase;
+  const caption = showPhoto ? photoCaption(photo, shownPhase) : props.focus;
   useEffect(() => {
     if (!playing) return;
     const timer = window.setTimeout(() => {
@@ -21,41 +34,80 @@ export function TutorialExample(props: {
   return (
     <figure className="lf-learn-example">
       <div className="lf-learn-example-heading">
-        <span>ILLUSTRATED EXAMPLE</span>
-        <span>{['Before', 'Action', 'Result'][phase]}</span>
+        <span>{showPhoto ? 'PICTURE EXAMPLE' : 'ILLUSTRATED EXAMPLE'}</span>
+        <span>{labels[shownPhase]}</span>
       </div>
-      <TutorialIllustration visual={props.visual} phase={phase} focus={props.focus} />
-      <div className="lf-learn-example-controls" role="group" aria-label="Example stages">
-        {['Before', 'Action', 'Result'].map((label, index) => (
+      {showPhoto ? (
+        <TutorialPhoto photo={photo} phase={shownPhase} onError={() => setImageFailed(true)} />
+      ) : (
+        <TutorialIllustration visual={props.visual} phase={phase} focus={props.focus} />
+      )}
+      <ExampleControls
+        labels={labels}
+        phase={shownPhase}
+        playing={playing}
+        select={(index) => {
+          setPlaying(false);
+          setPhase(index);
+        }}
+        togglePlay={() => {
+          if (!playing) setPhase(0);
+          setPlaying(!playing);
+        }}
+      />
+      <figcaption>{caption}</figcaption>
+      {photo === undefined ? null : (
+        <div className="lf-learn-photo-note">
+          <span>{showPhoto ? 'Generated learning example' : 'Diagram view'}</span>
           <button
             type="button"
-            key={label}
-            title={`Show the ${label.toLowerCase()} illustration`}
-            aria-pressed={phase === index}
             onClick={() => {
               setPlaying(false);
-              setPhase(index);
+              setDiagram(showPhoto);
+              setImageFailed(false);
             }}
           >
-            {label}
+            {showPhoto ? 'Show diagram' : 'Show picture'}
           </button>
-        ))}
+        </div>
+      )}
+    </figure>
+  );
+}
+
+function photoCaption(photo: Photo, phase: number): string {
+  return (photo.frames[phase] ?? photo.frames[0]).caption;
+}
+
+function ExampleControls(props: {
+  readonly labels: readonly string[];
+  readonly phase: number;
+  readonly playing: boolean;
+  readonly select: (phase: number) => void;
+  readonly togglePlay: () => void;
+}): JSX.Element | null {
+  if (props.labels.length === 1) return null;
+  return (
+    <div className="lf-learn-example-controls" role="group" aria-label="Example stages">
+      {props.labels.map((label, index) => (
         <button
           type="button"
-          className="lf-learn-play"
-          title={playing ? 'Pause example playback' : 'Play the three example stages'}
-          onClick={() => {
-            if (playing) setPlaying(false);
-            else {
-              setPhase(0);
-              setPlaying(true);
-            }
-          }}
+          key={label}
+          title={`Show the ${label.toLowerCase()} illustration`}
+          aria-pressed={props.phase === index}
+          onClick={() => props.select(index)}
         >
-          {playing ? 'Pause' : '▶ Play example'}
+          {label}
         </button>
-      </div>
-      <figcaption>{props.focus}</figcaption>
-    </figure>
+      ))}
+      <button
+        type="button"
+        className="lf-learn-play"
+        title={props.playing ? 'Pause example playback' : 'Play the three example stages'}
+        onClick={props.togglePlay}
+      >
+        {props.playing ? 'Pause' : '▶ Play example'}
+      </button>
+    </div>
   );
 }

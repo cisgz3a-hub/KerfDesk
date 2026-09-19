@@ -80,7 +80,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
         instruction:
           'Set Tab height, Tab width and Tabs per shape. Height is measured up from the cut floor; width is the length along the contour.',
         focus: 'Height · Width · Count',
-        result: 'The example makes the height of the retained bridge and its length visible.',
+        result: 'The operation has an explicit bridge height, length and requested count.',
       },
       {
         title: 'Move tabs on the contour',
@@ -124,9 +124,10 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Identify the cutter geometry',
         instruction:
-          'Open CNC Startup Setup and inspect the Bit library. Choose the matching bit, or add a custom bit with its name, kind, diameter and actual flute count.',
+          'Open CNC Startup Setup and inspect the Bit library. Use Show picture to recognise the cutter family. Choose the matching bit, or add a custom bit with its name, kind, diameter and actual flute count.',
         focus: 'Bit library',
-        result: 'Your cutter has a geometry the toolpath planner can use.',
+        result:
+          'The picture explains the cutter shape; its actual specifications define the geometry the planner uses.',
       },
       {
         title: 'Complete angled-bit details',

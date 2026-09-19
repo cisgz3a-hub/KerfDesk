@@ -75,10 +75,10 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
     prepare:
       'Choose Marquee for a rectangle or ellipse, Lasso for a freehand outline, or Magic wand for similar pixels. M cycles marquee shapes.',
     action:
-      'Drag the marquee or lasso, or click with the wand. Shift adds to the selection and Alt subtracts. For the wand, tune Tolerance and Contiguous to control which pixels match.',
+      'Drag the marquee or lasso, or click with the wand. Once a selection exists, hold Shift before the next gesture to add, or Alt to subtract. Set wand Tolerance and Contiguous before clicking.',
     finish:
-      'Check the selection edge before Fill, Delete or an adjustment. Use Deselect when finished so your next edit can reach the whole image, then Apply to update the project.',
-    tip: 'Invert selects the opposite region. The Modify controls grow, shrink or soften a selection by the entered pixel amount.',
+      'Check the selection edge, then perform the pixel edit you need. Use Deselect when finished so the next edit can reach the whole active layer. Apply commits pixel changes; selecting alone does not change the project.',
+    tip: 'With no existing selection, Shift makes a square or circular marquee and Alt draws it from the centre. Invert selects the opposite region; Modify changes the selection by a pixel amount.',
     keywords: ['selection', 'marquee', 'lasso', 'wand', 'tolerance', 'invert'],
   }),
   imageToolLesson({
@@ -88,9 +88,9 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
     visual: 'image-fill',
     summary: 'Fill a connected region or blend between two colours.',
     prepare:
-      'Choose foreground and background colours. Select a region first if the fill should be limited to that area.',
+      'Choose the active layer and foreground and background colours. Select a region first if the fill should be limited to that area. The bucket finds its boundary from the visible composite and paints on the active layer.',
     action:
-      'With Paint bucket, click the region to fill and adjust Tolerance or Contiguous if the boundary is wrong. With Gradient, choose Linear or Radial and drag from foreground towards background.',
+      'For Paint bucket, set Tolerance and Contiguous, then click the region. If the boundary is wrong, Undo, change the settings and click again. For Gradient, choose Linear or Radial and drag from foreground towards background.',
     finish:
       'Check that the fill has reached the intended area and preserved nearby detail. Undo and refine the selection if needed, then Apply.',
     tip: 'G cycles the bucket and gradient tools. A short gradient drag makes a faster tonal transition; a longer drag spreads it out.',
@@ -148,12 +148,12 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
     visual: 'image-transform',
     summary: 'Reposition image content or change its pixel dimensions.',
     prepare:
-      'Select pixels and choose Move to reposition them. Use Ctrl+T for free transform of a selection or the image; inspect the transform before committing.',
+      'Choose the active layer. Select pixels, then choose Move and drag to reposition them. Ctrl+A selects the whole layer. Ctrl+T starts free transform of the selection, or the whole active layer when nothing is selected.',
     action:
       'Use transform handles to adjust the pixels, then Enter to commit or Escape to cancel. Image → Image Size resamples pixel dimensions while retaining workspace millimetres. Canvas Size changes the canvas without scaling its content.',
     finish:
       'For Image Size, keep Constrain proportions on to preserve the ratio. For Canvas Size, choose the anchor that should stay fixed. Click OK, inspect the result and Apply.',
-    tip: 'Image Size changes pixel density, not the physical workspace size. Resize the artwork on the main canvas to change its millimetre dimensions.',
+    tip: 'Image Size retains the physical size; Canvas Size changes the extent at the same pixel density. Both resize every Studio layer and clear its pixel-edit history. Revert restores the as-opened image at the current resolution.',
     keywords: ['move', 'transform', 'resize', 'image size', 'canvas size', 'scale'],
   }),
   imageToolLesson({
@@ -167,7 +167,7 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
     action:
       'Choose a bundled font, Size in pixels and black or white Ink. Click OK or press Ctrl+Enter to rasterise the lettering onto a new transparent layer.',
     finish:
-      'Use Move or free transform to position the new lettering layer. Check its legibility at the final size and click Apply.',
+      'Keep the new lettering layer active. Press Ctrl+A to select it, then choose Move and drag, or use Ctrl+T for free transform and Enter to commit. Check its legibility at the final size and click Apply.',
     tip: 'Studio text becomes image pixels. Use the main workspace Text tool when you want editable vector lettering.',
     keywords: ['text', 'lettering', 'font', 'pixels', 'raster'],
   }),
@@ -178,7 +178,7 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
     visual: 'image-tone',
     summary: 'Refine contrast, tonal detail or image texture inside the Studio.',
     prepare:
-      'Choose an area first if only part should change. Open Adjust for Brightness / Contrast, Levels, Curves or Threshold, or open Filter for effects such as Gaussian Blur and Unsharp Mask.',
+      'Choose the layer to edit and select an area if only part should change. Adjust and Filter affect that active layer. Open Adjust for Brightness / Contrast, Levels, Curves or Threshold, or Filter for Gaussian Blur and Unsharp Mask.',
     action:
       'For a dialog-based effect, leave Preview enabled and make a small change. Levels sets tonal endpoints and gamma; Curves shapes tone with editable points. Threshold creates a black-and-white split.',
     finish:

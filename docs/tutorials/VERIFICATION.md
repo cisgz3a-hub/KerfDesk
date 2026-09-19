@@ -2,6 +2,30 @@
 
 Implementation: `codex/visual-tutorials-20260919`, based on main `7d4b82812f4ee059edb6f077b8ec6870d06356e2`. Checked locally on Windows with Chrome on 19 September 2026. No merge, deployment or machine operation was performed.
 
+## Picture and accuracy revision
+
+The source audits cover the principal instructions in all 93 lessons. Eight generated material/example pictures serve nine lessons; fifteen cutter pictures cover the CNC catalog families and custom engraving tip shapes. All 46 responsive WebP files together occupy **508,300 bytes**. The diagrams remain available and teach software actions that a generic photograph cannot show accurately. See [picture decisions and prompts](generated-pictures.md) and [CNC manufacturer references](cnc-bit-picture-research.md).
+
+Focused verification across the final affected suites passed **107 unique tests in 15 suites**: 63 tutorial tests, 13 PWA/delivery tests and 31 CNC selection/form tests. These are cumulative focused results, not a new full-repository run. The asset tests read real WebP dimensions, bytes and content hashes. Reader and chooser checks exercise deferred images, correct registration stages, failure/retry, default/inherited selections, existing draft/save behavior, the retained 3D toast and project-state isolation. A stale-progress fixture was corrected to use a valid saved step, and the repository-wide AST audit now filters irrelevant files before parsing and has an explicit filesystem-audit time allowance; its assertions are retained.
+
+Changed-source ESLint and formatting passed, as did the file-size, export and ADR gates. `pnpm build:web` passed with TypeScript checking and 2,651 transformed modules. The deferred tutorial chunk is **206.48 kB / 61.87 kB gzip**. The build retains the pre-existing large core/workbench chunk warnings. The generated service worker has 186 precache entries and **zero tutorial picture entries**; all 46 picture files are present in the production output.
+
+An independent source/visual review found no actionable findings in the photo renderer, corrected lesson text, new SVG scenes, image cache policy, CNC mapping or selector integrations. It inspected all eight compressed tutorial photos. Root also inspected every cutter picture and corrected the O-flute ball-nose helix before shipping the selected variant.
+
+Production Chrome checks at `http://127.0.0.1:5297/` used a fresh browser context, the real service worker, and disabled ordinary HTTP caching:
+
+- Startup, service-worker installation and the tutorial library made **zero `/tutorial-images/` requests**.
+- Opening Registration requested one 960-pixel storyboard, **85,476 bytes**. Advancing through its four written steps used the same candidate. The runtime cache stored it with `image/webp`.
+- Show diagram and Show picture worked. The reader stayed within its width at 390 × 844 (370-pixel client and scroll widths).
+- The app and the visited desktop picture reopened offline. An unseen Pocket picture fell back to the diagram and readable instructions; Show picture retried successfully after returning online.
+- Responsive sizes are separate cached URLs. An unvisited size can also require the diagram offline, even if a different size of the same picture was viewed earlier. The successful visited-picture check uses the same viewport/candidate.
+- CNC Startup Setup initially mounted no pictures. Selecting ball nose and then downcut requested only those two small files and updated the description. The open card stayed within its width on mobile (330-pixel client and scroll widths), and the setup was cancelled without saving.
+- No page JavaScript errors were observed. Expected failed requests for unseen offline pictures are distinct from page errors.
+
+Local browser receipts and screenshots are in `C:/Users/Asus/.codex/visualizations/2026/09/19/01a0b94a-ca80-72d2-9225-51add3eb8b5b/tutorials/`, including `picture-browser-receipt.json` and the `production-*.png` captures. The browser harness was adjusted to keep the visited responsive candidate consistent and distinguish an opened chooser card from the closed catalog card for the same family; these were verification-selector corrections, not application changes.
+
+No hardware, packaged-desktop qualification, publication or new release-readiness claim is included in this revision.
+
 ## Coverage
 
 The library contains 93 lessons. The command map covers every registered command explicitly; contextual bindings cover workspace tools, shipped Design Studio tools, Image Studio workflows, laser/CNC operations, generators, calibration, placement, libraries and machine controls.

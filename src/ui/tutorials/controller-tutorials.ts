@@ -113,7 +113,8 @@ export const CONTROLLER_TUTORIALS: readonly Tutorial[] = [
         instruction:
           'Read the saved progress and diagnostics. Controller acknowledgements show accepted traffic; inspect the workpiece to determine what actually completed and whether the original reference is still valid.',
         focus: 'Progress evidence',
-        result: 'The example distinguishes reported progress from a verified completed cut.',
+        result:
+          'The transcript records controller communication; it does not measure the material left to cut.',
         visual: 'console',
       },
       {

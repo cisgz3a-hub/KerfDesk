@@ -10,7 +10,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
     minutes: 3,
     location: 'Select closed artwork > Cut type: Inlay pair (pocket + insert)',
     prerequisites: 'CNC mode, closed vector artwork and an end mill assigned to the operation.',
-    visual: 'pocket',
+    visual: 'cnc-inlay',
     steps: [
       {
         title: 'Choose the shared outline',
@@ -33,7 +33,6 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
           'Set Pair spacing to separate the generated parts. Open Preview and inspect the pocket, mirrored insert, full footprint and any holding tabs before preparing the physical setup.',
         focus: 'Pair spacing and preview',
         result: 'You can see both generated pieces and their placement in the planned output.',
-        visual: 'preview',
       },
     ],
     tip: 'This is an end-mill pocket-and-insert operation. Use the separate V-carve lesson for angled-bit lettering whose depth follows stroke width.',

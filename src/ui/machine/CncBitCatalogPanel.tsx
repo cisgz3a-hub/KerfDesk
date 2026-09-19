@@ -8,6 +8,7 @@ import {
   type ReferenceCncBitCatalogEntry,
 } from './cnc-bit-catalog';
 import { RailSection } from '../kit';
+import { CncToolPicture } from './CncToolPicture';
 import {
   addedStyle,
   catalogListStyle,
@@ -110,6 +111,7 @@ function CatalogResults(props: {
       {props.groups.map((group) => (
         <section key={group.label} aria-label={group.label} style={familyStyle}>
           <h4 style={familyHeadingStyle}>{group.label}</h4>
+          {group.entries[0] === undefined ? null : <CncToolPicture tool={group.entries[0].tool} />}
           <ul style={rowsStyle}>
             {group.entries.map((entry) => (
               <ModeledCatalogRow

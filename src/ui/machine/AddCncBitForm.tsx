@@ -8,6 +8,7 @@ import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import type { CncTool, CncToolKind } from '../../core/scene';
 import { useStore } from '../state';
+import { CncToolPicture } from './CncToolPicture';
 
 const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly label: string }> = [
   { value: 'end-mill', label: 'End mill' },
@@ -32,6 +33,7 @@ export function AddCncBitForm(
   const [tipAngle, setTipAngle] = useState('');
   const [tipDiameter, setTipDiameter] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [pictureRequested, setPictureRequested] = useState(false);
   const needsAngle = kind === 'v-bit' || kind === 'engraving';
   // Only an engraving bit has a flat land at the tip; a v-bit comes to a point
   // by definition, which is the physical difference between the two kinds.
@@ -83,6 +85,7 @@ export function AddCncBitForm(
         onNameChange={setName}
         onKindChange={(value) => {
           setKind(value);
+          setPictureRequested(true);
           setHasSubmitted(false);
         }}
         onDiameterChange={setDiameter}
@@ -93,12 +96,22 @@ export function AddCncBitForm(
       <button type="button" onClick={handleAdd} aria-label="Add bit" title="Add the custom bit.">
         Add
       </button>
-      {hasSubmitted && error !== null ? (
-        <span role="alert" style={errorStyle}>
-          {error}
-        </span>
-      ) : null}
+      <CncToolPicture
+        key={kind}
+        tool={{ kind, tipDiameterMm: Number(tipDiameter) }}
+        initiallyOpen={pictureRequested}
+        label="New bit shape"
+      />
+      <BitError message={hasSubmitted ? error : null} />
     </div>
+  );
+}
+
+function BitError(props: { readonly message: string | null }): JSX.Element | null {
+  return props.message === null ? null : (
+    <span role="alert" style={errorStyle}>
+      {props.message}
+    </span>
   );
 }
 

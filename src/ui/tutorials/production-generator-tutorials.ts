@@ -58,7 +58,7 @@ export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
     minutes: 3,
     location: 'Tools > Box Fit Test',
     prerequisites: 'A sample of the actual sheet material and a suitable cutting operation for it.',
-    visual: 'box',
+    visual: 'box-fit',
     steps: [
       {
         title: 'Build a clearance ladder',
@@ -74,7 +74,6 @@ export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
           'Choose Generate to add the tab comb and slot strip. Give both pieces the intended cut operation and inspect Preview. For a real test, complete Frame for that exact job, open Start and review it before starting.',
         focus: 'Two mating strips',
         result: 'The two coupon pieces let you compare the resulting physical fit.',
-        visual: 'preview',
       },
       {
         title: 'Transfer the winning clearance',

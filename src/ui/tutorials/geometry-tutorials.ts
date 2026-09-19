@@ -91,11 +91,11 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'convert',
     title: 'Convert paths and bitmaps',
-    summary: 'Choose editable path geometry or image pixels for the next process.',
+    summary: 'Make plain vector paths, or rasterise artwork in laser mode.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 3,
-    location: 'Tools → Convert to Path or Convert to Bitmap',
+    location: 'Tools → Convert to Path; laser mode also offers Convert to Bitmap',
     prerequisites:
       'Selected vector artwork. Keep a duplicate if you need the original text or shape controls.',
     visual: 'nodes',
@@ -103,7 +103,7 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the representation',
         instruction:
-          'Use paths when you need nodes and contours. Use a bitmap when you want to process the artwork as image pixels. Duplicate the source if you want both versions.',
+          'Use paths when you need nodes and contours. In laser mode, use a bitmap when you want to process the artwork as image pixels. Duplicate the source if you want both versions.',
         focus: 'Paths or pixels',
         result: 'You choose a conversion that matches the next task.',
       },
@@ -116,11 +116,11 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
           'The outline is available for path editing; original text or shape parameters are no longer the editing model.',
       },
       {
-        title: 'Or create a bitmap',
+        title: 'Create a bitmap in laser mode',
         instruction:
-          'Choose Convert to Bitmap. Set Render Type, DPI and brightness, review the size estimate, then click Convert. Check the image at its final physical size.',
+          'In laser mode, choose Convert to Bitmap. Set Render Type, DPI and Default Brightness, review the size estimate, then click Convert. In CNC mode, keep the converted paths for a vector operation.',
         focus: 'Render Type · DPI · Convert',
-        result: 'The vector artwork has been rasterised for image-based processing.',
+        result: 'Laser mode produces image pixels; CNC mode keeps vector paths for its cut types.',
         visual: 'image',
       },
     ],

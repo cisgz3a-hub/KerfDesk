@@ -12,6 +12,7 @@ import {
 import { ArrangeScene, BooleanScene } from './layout-scenes';
 import { ImageEditorScene } from './image-editor-scenes';
 import { VariableTextScene } from './variable-text-scenes';
+import { BoxFitScene, CncInlayScene, CncTilingScene } from './production-example-scenes';
 import { IntervalTestScene, ProbeScene, ScanOffsetScene } from './calibration-scenes';
 import { CameraScene, ImageScene } from './image-scenes';
 import {
@@ -100,6 +101,9 @@ const SCENES: Record<TutorialVisual, (props: SceneProps) => JSX.Element> = {
   'print-cut': (p) => <CameraScene {...p} kind="print-cut" />,
   rotary: RotaryScene,
   box: BoxScene,
+  'box-fit': BoxFitScene,
+  'cnc-tiling': CncTilingScene,
+  'cnc-inlay': CncInlayScene,
   calibration: CalibrationScene,
   'scan-offset': ScanOffsetScene,
   'interval-test': IntervalTestScene,

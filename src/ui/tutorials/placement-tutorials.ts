@@ -22,7 +22,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Calibrate the lens',
         instruction:
-          'Open Calibrate lens. Enter the checkerboard’s inner-corner counts and measured square size. Use a flat board in several positions and angles, then solve, review and save the calibration.',
+          'Open Calibrate lens. Enter the checkerboard’s inner-corner counts and measured square size. Capture a flat board in several positions and angles, choose Solve calibration, review the result, then Apply calibration.',
         focus: 'Inner corners, not squares',
         result: 'Lens calibration describes how the camera distorts the image.',
       },
@@ -49,53 +49,64 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'registration',
-    title: 'Position repeat jobs with a registration jig',
-    summary: 'Make an outline on a fixture, fit the artwork, then run the separate artwork job.',
+    title: 'Engrave a leather keychain using a registration jig',
+    summary:
+      'Burn an outline on wood, place the leather keychain inside it, then engrave the leather.',
     category: 'Layout & production',
     machine: 'laser',
     minutes: 5,
     location: 'Tools > Registration Jig',
-    prerequisites: 'Measured blanks and suitable fixture material for the outline run.',
+    prerequisites:
+      'A measured leather keychain blank, a secured piece of scrap wood, and artwork for the leather.',
     visual: 'jig',
     steps: [
       {
-        title: 'Create outlines that match the blanks',
+        title: 'Create a rectangle for the keychain’s bounds',
+        examplePhase: 0,
         instruction:
-          'Choose Rectangle or Circle and enter the blank dimensions. Set Rows, Columns and spacing if you need multiple positions, then create the jig set.',
-        focus: 'Blank shape and grid',
-        result: 'The canvas shows the fixture outlines that will locate the physical pieces.',
-      },
-      {
-        title: 'Run the outline job first',
-        instruction:
-          'Choose Outline only and inspect Jig outline laser settings. Check the next-run message and Preview. Complete Frame for this exact outline job, then choose Start to open Job Review and Start job to produce the fixture marks.',
-        focus: 'Outline only → Frame → review',
-        result: 'The first run marks the blank positions using the outline operation.',
-        visual: 'frame',
-      },
-      {
-        title: 'Fit artwork to the marked positions',
-        instruction:
-          'Place the blanks on the fixture marks. Select the design and use Auto-fit artwork in outline, or Auto-fit + copy artwork to all for a grid. Inspect its size and position in each outline.',
-        focus: 'Auto-fit and copy',
+          'For this rounded rectangular leather blank, choose Rectangle and enter its measured overall width and height. Use one row and one column, then create the outline. Position it over the fixed wood and establish the job’s placement and origin before either run.',
+        focus: 'Rectangle = the leather blank’s overall bounds',
         result:
-          'The artwork is arranged inside the jig positions without changing the physical fixture.',
+          'The rectangle locates the blank’s outside edges; it does not copy its rounded corners.',
       },
       {
-        title: 'Frame and review the artwork run',
+        title: 'Burn the outline onto the wood first',
+        examplePhase: 0,
         instruction:
-          'Switch to Artwork only and confirm the next-run message. Complete a new Frame for this exact artwork job. Start then opens Job Review; inspect the job and warnings before choosing Start job.',
-        focus: 'Artwork only → new Frame → review',
-        result: 'The second run processes the artwork instead of repeating the jig outline.',
-        visual: 'frame',
+          'Leave the leather keychain off the wood. Choose Outline only and set Jig outline laser settings for marking this wood. Inspect Preview, complete Frame for this exact outline job, then choose Start framed job and Start job in Job Review.',
+        focus: 'Run 1: burn the outline on empty wood',
+        result:
+          'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',
+      },
+      {
+        title: 'Place the real keychain on the burned outline',
+        examplePhase: 1,
+        instruction:
+          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Auto-fit artwork in outline, then check clearance from the rounded edges and hole.',
+        focus: 'Place the leather; keep the wood and origin fixed',
+        result:
+          'Known coordinates locate the artwork on the placed leather. The machine does not detect the keychain.',
+      },
+      {
+        title: 'Burn the artwork onto the keychain',
+        examplePhase: 2,
+        instruction:
+          'Choose Artwork only, check the artwork’s settings for the leather, and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then Start framed job, review the warnings, and Start job.',
+        focus: 'Run 2: burn the artwork on the leather',
+        result:
+          'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',
       },
     ],
-    tip: 'Outline only and Artwork only produce different jobs. A Frame completed for the outline does not cover the later artwork run.',
+    tip: 'For a batch, create a Rows × Columns grid, burn all outlines, place one blank in each, and use Auto-fit + copy artwork to all. Each of the two output jobs needs its own completed Frame.',
     keywords: [
       'registration',
       'jig',
       'fixture',
       'repeat',
+      'keychain',
+      'leather',
+      'wood',
+      'place blank',
       'blanks',
       'outline only',
       'artwork only',

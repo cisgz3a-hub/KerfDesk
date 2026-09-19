@@ -74,7 +74,7 @@ describe('tutorial catalog coverage', () => {
     const bindings = uiSources().flatMap(sourceBindings);
     expect(bindings.length).toBeGreaterThan(0);
     expect(unresolved(bindings)).toEqual([]);
-  });
+  }, 20_000); // Repository-wide file/AST audit, not a UI response-time assertion.
 
   it('gives every shipped Design Studio tool a specific help-table entry', () => {
     const source = readSource(join(UI_ROOT, 'design-studio/DesignOptionsBar.tsx'));
@@ -147,17 +147,27 @@ function uiSources(): readonly Source[] {
       const file = join(dir, entry.name);
       if (entry.isDirectory()) return walk(file);
       return /\.(ts|tsx)$/u.test(entry.name) && !entry.name.includes('.test.')
-        ? [readSource(file)]
+        ? relevantSource(file)
         : [];
     });
   sourceCache = walk(UI_ROOT);
   return sourceCache;
 }
 
-function readSource(file: string): Source {
+function relevantSource(file: string): Source[] {
+  const text = readFileSync(file, 'utf8');
+  // Parse every possible help binding and all lesson modules, without building
+  // thousands of unrelated UI ASTs just to discover that they have no bindings.
+  return dirname(file) === TUTORIAL_ROOT ||
+    /tutorialId|openTutorial|_TUTORIALS|_LESSONS/u.test(text)
+    ? [readSource(file, text)]
+    : [];
+}
+
+function readSource(file: string, text = readFileSync(file, 'utf8')): Source {
   return {
     file,
-    ast: ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true),
+    ast: ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true),
   };
 }
 

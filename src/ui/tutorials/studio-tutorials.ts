@@ -98,8 +98,8 @@ export const STUDIO_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Duplicate or make a guide',
         instruction:
-          'Use Duplicate in the shape inspector for a copy. Mark a shape Construction when it is only a drawing guide and should be omitted from output.',
-        focus: 'Duplicate · Construction',
+          'Use Duplicate in the shape inspector for a copy. Click Guide to mark the selected shape as construction geometry when it should be omitted from output.',
+        focus: 'Duplicate · Guide',
         result: 'Repeated geometry and reference geometry have clear roles.',
       },
       {

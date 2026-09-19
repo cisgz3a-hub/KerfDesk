@@ -23,6 +23,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
       },
       {
         title: 'Complete the physical Frame',
+        examplePhase: 0,
         instruction:
           'On the real machine, choose Frame job or Set up & Frame and watch the full generated motion envelope with the tool off. Wait for Frame to complete successfully.',
         focus: 'Frame job',
@@ -31,19 +32,21 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
       },
       {
         title: 'Open Job Review at Start',
+        examplePhase: 1,
         instruction:
           'Choose Start framed job. Job Review opens with the prepared job, operation values and warnings. Read those warnings and check that the physical workpiece and clearance match your intended run.',
         focus: 'Start framed job → Job Review',
         result: 'The review is shown at Start; ordinary Frame does not open this review dialog.',
-        visual: 'layers',
+        visual: 'frame',
       },
       {
         title: 'Make the final start decision',
+        examplePhase: 2,
         instruction:
           'Choose Start job in the review when you intend to run. If you change the artwork, output settings or origin so the prepared job no longer matches, complete Frame again for the changed job.',
         focus: 'Start job',
         result: 'The reviewed, framed job is handed to the controller for this run.',
-        visual: 'machine',
+        visual: 'frame',
       },
     ],
     tip: 'Warnings remain information for your review. A completed Frame for the exact job is the ordinary Start policy gate; the controller and executable handoff must also be able to accept the run.',

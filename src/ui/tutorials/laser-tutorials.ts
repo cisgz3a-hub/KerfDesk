@@ -77,7 +77,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
           'In Advanced cut settings, compare Scanline, Follow Shape and Island Fill under Style. For Scanline, change Scan angle and Line Interval; smaller intervals place rows closer together.',
         focus: 'Style · Scan angle · Line Interval',
         result:
-          'The example changes from edge-following paths to parallel rows, or to smaller fill regions.',
+          'The selected style determines whether the operation uses parallel rows, follows the shape, or divides the fill into smaller regions.',
       },
       {
         title: 'Review extra movement and passes',
@@ -125,7 +125,8 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
         instruction:
           'Open Advanced cut settings and compare Dither choices. Threshold separates light and dark; dithering uses dot patterns; Grayscale uses a power range and exposes Min Power.',
         focus: 'Dither',
-        result: 'The visual example shows different ways to represent the same shading.',
+        result:
+          'The algorithm determines whether shading becomes dot patterns or varying laser power.',
       },
       {
         title: 'Choose the row density',

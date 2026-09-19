@@ -115,7 +115,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose its next step',
         instruction:
-          'Assign a suitable operation to vectors. For an image, open Adjust Image for raster preparation or Trace Image to turn its features into vector paths.',
+          'Assign a suitable operation to vectors. In laser mode, Adjust Image prepares a bitmap for engraving. In either machine mode, Trace Image turns its features into editable vectors. Use the CNC relief workflow for an STL model.',
         focus: 'Artwork / Operations',
         result: 'The imported content follows the right process for the result you need.',
         visual: 'layers',
@@ -153,8 +153,8 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Make room',
         instruction:
-          'Collapse a side panel when you need more canvas. F12 toggles both panels; Window → Reset Layout restores the standard visible layout.',
-        focus: 'Window → Reset Layout',
+          'Collapse a side panel when you need more canvas. F12 toggles both panels; Window → Reset Workspace Layout restores the standard visible layout.',
+        focus: 'Window → Reset Workspace Layout',
         result: 'The workspace adapts without changing your artwork.',
       },
     ],

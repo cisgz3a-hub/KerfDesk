@@ -22,7 +22,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a local edit',
         instruction:
-          'Use Brush or Eraser for direct marks, a selection tool to isolate an area, or Adjust and Filter for image-wide changes. Use Panels to show layers and history.',
+          'Use Panels to show layers and history, then choose the layer to edit. Use Brush or Eraser for direct marks, a selection tool to isolate an area, or Adjust and Filter to change the active layer.',
         focus: 'Tool → options → image',
         result: 'The Studio previews your image edits before project output changes.',
       },
@@ -66,8 +66,8 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check density and apply',
         instruction:
-          'Check Line Interval or DPI at the final image size, then apply the changes. Use Preview and a material test to assess the intended output.',
-        focus: 'Line Interval · DPI · Apply',
+          'Check Line Interval or DPI at the final image size, then click OK to keep the changes. Use Preview and a material test to assess the intended output.',
+        focus: 'Line Interval · DPI · OK',
         result: 'The image adjustments and Image operation processing are updated.',
       },
     ],
@@ -133,7 +133,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Refine the preview',
         instruction:
-          'Compare the trace with the source, including small holes and thin lines. Adjust the detail controls gradually. Threshold affects detected tones; Curve finishing adjusts smoothing and simplification for supported styles.',
+          'Compare small holes and thin lines with the source. For Line Art, Smooth or Sharp, choose Detection → Manual brightness band when you need Cutoff and Threshold controls. Expand Curve finishing to adjust the outline; Centerline has no Curve finishing section.',
         focus: 'Refine detail',
         result: 'The preview preserves useful features while reducing unwanted marks.',
       },

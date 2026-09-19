@@ -76,6 +76,9 @@ export type TutorialVisual =
   | 'rotary'
   | 'print-cut'
   | 'box'
+  | 'box-fit'
+  | 'cnc-tiling'
+  | 'cnc-inlay'
   | 'calibration'
   | 'scan-offset'
   | 'interval-test'
@@ -91,6 +94,8 @@ export type TutorialStep = {
   readonly focus: string;
   readonly result: string;
   readonly visual?: TutorialVisual;
+  /** A lesson can have more written steps than the three example stages. */
+  readonly examplePhase?: 0 | 1 | 2;
 };
 
 export type Tutorial = {

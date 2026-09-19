@@ -96,7 +96,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a pattern',
         instruction:
-          'For a sheet of labels, choose Grid and set Rows, Columns and spacing. Circular uses a centre, radius, count and start angle. Point Rotation uses a count and total angle.',
+          'Grid uses Rows, Columns and gaps between repeated units. Circular places units around a chosen centre and radius. Point Rotation turns them about the selection centre; Copies includes the original, with Total angle divided equally by that count.',
         focus: 'Grid · Circular · Point Rotation',
         result: 'The dialog defines the number and placement of copies.',
       },

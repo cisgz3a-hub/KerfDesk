@@ -174,10 +174,11 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     location: 'CNC startup setup > Tiling; File > Save G-code',
     prerequisites:
       'A CNC project and a physical plan for holding, indexing and referencing the stock.',
-    visual: 'array',
+    visual: 'cnc-tiling',
     steps: [
       {
         title: 'Define the area of each tile',
+        examplePhase: 0,
         instruction:
           'In Tiling, enable Split this job into indexed tiles on export. Set Tile width and Tile height for the usable area in your setup, then choose the requested Overlap.',
         focus: 'Tile size + overlap',
@@ -185,6 +186,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       },
       {
         title: 'Read the effective indexing plan',
+        examplePhase: 1,
         instruction:
           'Check the effective overlap and tile step readout instead of relying only on the requested value. If needed, enable Drill registration holes in overlap strips and Configure registration with the actual cutter and intended hole settings.',
         focus: 'Effective overlap · tile step',
@@ -193,20 +195,20 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       },
       {
         title: 'Save the setup and export the files',
+        examplePhase: 2,
         instruction:
           'Save CNC startup setup, then use File > Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
         focus: 'Save setup → indexed files',
         result:
           'Each file contains the output for its own tile rather than one continuous machine run.',
-        visual: 'gcode',
       },
       {
         title: 'Inspect each tile before machining',
+        examplePhase: 2,
         instruction:
           'Open each exported file in the G-code inspector and check its extents and operations. Plan how to reposition the stock and establish the correct XY reference for each tile in your machining workflow.',
         focus: 'Inspect file · index stock · reference',
         result: 'The file sequence is paired with an explicit physical setup for every tile.',
-        visual: 'preview',
       },
     ],
     tip: 'Tiling exports separate programs. It does not move the stock automatically or establish a cutting order across separate files.',

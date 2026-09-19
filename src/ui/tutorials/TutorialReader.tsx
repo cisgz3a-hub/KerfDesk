@@ -89,8 +89,9 @@ function VisualColumn({
     <div className="lf-learn-visual-column">
       <TutorialExample
         key={`${tutorial.id}-${stepIndex}`}
+        tutorialId={tutorial.id}
         visual={step.visual ?? tutorial.visual}
-        phase={Math.min(stepIndex, 2)}
+        phase={step.examplePhase ?? Math.min(stepIndex, 2)}
         focus={step.focus}
         result={step.result}
       />

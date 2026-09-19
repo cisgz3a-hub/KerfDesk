@@ -97,14 +97,14 @@ export const TEXT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Import personalised records',
         instruction:
-          'Choose Import CSV and select your file. Use the CSV field button to insert the first column, then choose the current Record. Inspect the evaluated text before continuing.',
+          'Choose Import CSV and select your file. Use the CSV field button to insert the first column, then choose the current Record. The editor shows field syntax; finish with Done and open Preview to inspect evaluated values.',
         focus: 'Import CSV · Record',
         result: 'Text can use a value from the embedded data instead of a fixed word.',
       },
       {
         title: 'Define the sequence',
         instruction:
-          'Set Record start and end, Serial start and Advance by. Enable Wrap serial only if the counter should return from its end to its start. Previous, Next and Reset let you inspect the sequence.',
+          'Set Record start and end, Serial start and Advance by. To wrap the counter, enable Wrap serial and set Serial end. Reset moves to the configured start; Previous and Next change the current Record and Serial.',
         focus: 'Sequence',
         result: 'The intended record range and numbering pattern are defined.',
       },
