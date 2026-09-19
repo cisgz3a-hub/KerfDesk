@@ -36,7 +36,7 @@ function rejectedRun(overrides, escapeEvidence = false) {
       ],
       {
         encoding: 'utf8',
-        timeout: 15000,
+        timeout: 30_000,
         windowsHide: true,
         env: {
           ...process.env,

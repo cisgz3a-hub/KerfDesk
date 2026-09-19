@@ -69,7 +69,7 @@ test(
         },
         windowsHide: true,
         encoding: 'utf8',
-        timeout: 15_000,
+        timeout: 30_000,
       },
     );
     assert.ifError(result.error);
@@ -128,7 +128,7 @@ test(
         },
         windowsHide: true,
         encoding: 'utf8',
-        timeout: 15_000,
+        timeout: 30_000,
       },
     );
     assert.ifError(result.error);

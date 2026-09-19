@@ -311,9 +311,11 @@ test(
       {
         env: { ...process.env, QUALIFICATION_SCRIPT_PATH: script },
         encoding: 'utf8',
-        timeout: 10_000,
+        // Fresh hosted Windows images can spend over ten seconds starting PowerShell.
+        timeout: 30_000,
       },
     );
+    assert.ifError(parse.error);
     assert.equal(parse.status, 0, parse.stderr);
     const guarded = spawnSync(
       'powershell.exe',
@@ -332,9 +334,10 @@ test(
       {
         env: { ...process.env, GITHUB_ACTIONS: 'false', RUNNER_ENVIRONMENT: 'local' },
         encoding: 'utf8',
-        timeout: 10_000,
+        timeout: 30_000,
       },
     );
+    assert.ifError(guarded.error);
     assert.equal(guarded.status, 1);
     assert.match(guarded.stderr, /restricted to disposable GitHub-hosted Windows runners/);
   },
