@@ -151,7 +151,7 @@ async function attach(context) {
     void dialog.dismiss().catch(() => undefined);
   });
   await context.page
-    .getByRole('button', { name: 'Import...', exact: true })
+    .getByRole('banner', { name: 'Toolbar', exact: true })
     .waitFor({ state: 'visible' });
   // Observe transient errors and actual clicks without replacing any app or picker API.
   await context.page.exposeFunction('recordInstalledUiEvidence', (event) => {
@@ -223,10 +223,34 @@ async function attach(context) {
   await context.page.screenshot({ path: join(args['output-root'], 'initial.png') });
 }
 
+async function fileCommand(page, name) {
+  const toolbar = page.getByRole('banner', { name: 'Toolbar', exact: true });
+  const button = toolbar.getByRole('button', { name, exact: true });
+  if (await button.isVisible()) return button;
+  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
+  if (!(await menu.isVisible())) {
+    await toolbar.getByRole('button', { name: 'More commands', exact: true }).click();
+  }
+  const command = menu.getByRole('menuitem', { name, exact: true });
+  await command.waitFor({ state: 'visible' });
+  return command;
+}
+
+async function showRunOrder(page) {
+  const panels = page.getByRole('region', { name: 'Workspace side panels', exact: true });
+  await panels.waitFor({ state: 'visible' });
+  const artwork = panels.getByRole('tab', { name: /^(Artwork|Cuts \/ Layers)$/ });
+  if (await artwork.isVisible()) await artwork.click();
+  await panels.getByRole('tab', { name: 'Run order', exact: true }).click();
+}
+
 async function useFileDialog(context, button, action, target, label) {
+  // Resolve the real visible command first; overflow navigation must not consume
+  // the native dialog's deadline or trigger a picker before the helper is ready.
+  const command = await fileCommand(context.page, button);
   // Run the native helper before clicking: a modal picker can block the CDP click reply.
   const helper = runNativeHelper(context.args, action, label, context.app.child.pid, target);
-  const click = context.page.getByRole('button', { name: button, exact: true }).click();
+  const click = command.click();
   const settled = await Promise.allSettled([helper, click]);
   const attempt = summarizeDialogResults(label, button, settled);
   context.manifest.dialogAttempts.push(attempt);
@@ -252,7 +276,7 @@ async function createProject(context) {
     fixture,
     'import-dialog',
   );
-  await context.page.getByRole('tab', { name: 'Run order', exact: true }).click();
+  await showRunOrder(context.page);
   await context.page
     .getByRole('article', { name: 'Run 1: installed qualification artwork', exact: true })
     .waitFor({ state: 'visible' });
@@ -289,7 +313,7 @@ async function reopenProject(context) {
     'open-dialog',
   );
   await waitCleanTitle(context, args.project);
-  await context.page.getByRole('tab', { name: 'Run order', exact: true }).click();
+  await showRunOrder(context.page);
   await context.page
     .getByRole('article', { name: 'Run 1: installed qualification artwork', exact: true })
     .waitFor({ state: 'visible' });
