@@ -97,7 +97,7 @@ function completeFrame(candidate: FramedRunCandidate): void {
   }));
 }
 
-function successfulFrame(): ReturnType<typeof vi.fn> {
+function successfulFrame(): ReturnType<typeof vi.fn<typeof originalFrame>> {
   return vi.fn(async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
     if (candidate === undefined) throw new Error('Frame candidate was not supplied');
     dispatchedFrame(candidate);
@@ -105,7 +105,9 @@ function successfulFrame(): ReturnType<typeof vi.fn> {
   });
 }
 
-function selectG54WithFreshIdle(): ReturnType<typeof vi.fn> {
+function selectG54WithFreshIdle(): ReturnType<
+  typeof vi.fn<typeof originalSelectPrimaryWcsForFrame>
+> {
   return vi.fn(async () => {
     useLaserStore.setState({ activeWcs: 'G54', statusReport: null });
     setTimeout(() => {

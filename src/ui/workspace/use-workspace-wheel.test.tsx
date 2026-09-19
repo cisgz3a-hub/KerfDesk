@@ -1,6 +1,6 @@
 import { act, useRef, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
 import { useWorkspaceWheelZoom } from './use-workspace-wheel';
@@ -105,7 +105,7 @@ function WheelHarness(): JSX.Element {
 
 async function renderHarness(): Promise<{
   readonly canvas: HTMLCanvasElement;
-  readonly addEventListenerSpy: ReturnType<typeof vi.spyOn>;
+  readonly addEventListenerSpy: MockInstance<HTMLCanvasElement['addEventListener']>;
 }> {
   const addEventListenerSpy = vi.spyOn(HTMLCanvasElement.prototype, 'addEventListener');
   const host = document.createElement('div');
