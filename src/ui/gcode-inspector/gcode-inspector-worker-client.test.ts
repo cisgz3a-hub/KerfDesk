@@ -74,25 +74,28 @@ describe('G-code Inspector worker client', () => {
     expect(inspectGcodeOffThread({ kind: 'text', text: 'G0 X1' })).toBeNull();
   });
 
-  it('passes a Blob without reading it on the caller thread', async () => {
-    const blob = new Blob(['G0 X1']);
-    const source = {
-      kind: 'blob' as const,
-      blob,
-      machineKind: 'laser' as const,
-      laserPowerControl: 'fan' as const,
-    };
-    const promise = inspectGcodeOffThread(source);
-    const worker = StubWorker.instances[0];
-    const request = worker?.posted[0];
-    expect(request?.source).toEqual(source);
-    worker?.reply({
-      id: request?.id ?? -1,
-      kind: 'complete',
-      result,
-    });
-    await expect(promise).resolves.toMatchObject({ sourceLineCount: 0 });
-  });
+  it.each(['fan', 'smoothieware'] as const)(
+    'passes a %s Blob without reading it on the caller thread',
+    async (laserPowerControl) => {
+      const blob = new Blob(['G0 X1']);
+      const source = {
+        kind: 'blob' as const,
+        blob,
+        machineKind: 'laser' as const,
+        laserPowerControl,
+      };
+      const promise = inspectGcodeOffThread(source);
+      const worker = StubWorker.instances[0];
+      const request = worker?.posted[0];
+      expect(request?.source).toEqual(source);
+      worker?.reply({
+        id: request?.id ?? -1,
+        kind: 'complete',
+        result,
+      });
+      await expect(promise).resolves.toMatchObject({ sourceLineCount: 0 });
+    },
+  );
 
   it('queues requests and reports worker phases', async () => {
     const progress = vi.fn();

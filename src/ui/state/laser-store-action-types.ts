@@ -1,5 +1,5 @@
 import type { JogParams, RealtimeOverrideByte } from '../../core/controllers/grbl';
-import type { ControllerKind } from '../../core/devices';
+import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
@@ -11,6 +11,7 @@ import type { WorkZRecoveryConfirmation } from './work-z-recovery-actions';
 
 export type ConnectControllerOptions = {
   readonly controllerKind?: ControllerKind | undefined;
+  readonly controllerCommandSet?: ControllerCommandSet | undefined;
   readonly baudRate?: number | undefined;
 };
 

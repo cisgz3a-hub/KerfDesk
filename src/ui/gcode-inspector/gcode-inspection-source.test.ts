@@ -29,4 +29,16 @@ describe('compiled Inspector source context', () => {
       projectInspectionContext({ ...project, device: { ...device, controllerKind: 'grbl-v1.1' } }),
     ).toEqual({ machineKind: 'laser', laserPowerControl: 'spindle' });
   });
+
+  it('selects native Smoothie power only for the compiled laser profile', () => {
+    const project = createProject();
+    const device = { ...project.device, controllerKind: 'smoothieware' as const };
+    expect(projectInspectionContext({ ...project, device })).toEqual({
+      machineKind: 'laser',
+      laserPowerControl: 'smoothieware',
+    });
+    expect(
+      projectInspectionContext({ ...project, device, machine: DEFAULT_CNC_MACHINE_CONFIG }),
+    ).toEqual({ machineKind: 'cnc' });
+  });
 });

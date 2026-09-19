@@ -38,8 +38,7 @@ describe('DeviceSetupWizard router commit', () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       detectedControllerKind: 'grblhal',
-      // $32=0 - a router with laser mode off, which is what makes $30 the
-      // spindle ceiling rather than the laser PWM scale.
+      // CNC mode allows an explicit S-to-RPM mapping; it does not establish it.
       detectedSettings: {
         maxPowerS: 24000,
         bedWidth: 750,
@@ -58,6 +57,7 @@ describe('DeviceSetupWizard router commit', () => {
     try {
       await act(async () => button(view.host, 'Next').click()); // choose your machine
       await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await act(async () => input(view.host, 'Use S maximum as spindle RPM').click());
       await act(async () => button(view.host, 'Use detected values').click());
       await act(async () => button(view.host, 'Next').click()); // confirm settings
       expect(input(view.host, 'Bed width (mm)').value).toBe('750');

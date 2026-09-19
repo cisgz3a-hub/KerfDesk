@@ -388,8 +388,9 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   expect(saved.device).toMatchObject({
     profileId: 'creality-falcon-a1-pro-grblhal',
     controllerKind: 'grblhal',
-    bedWidth: 400,
-    bedHeight: 400,
+    controllerCommandSet: 'creality-falcon-a1-pro',
+    bedWidth: 358,
+    bedHeight: 268,
     framingFeedMmPerMin: 10000,
   });
 });
@@ -415,8 +416,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
     marlinCard.getByRole('button', { name: 'Use Generic Marlin laser 300×200' }),
   ).toBeEnabled();
 
-  const xToolCard = page.locator('article').filter({ hasText: 'xTool D1 Pro' });
-  await xToolCard.getByRole('button', { name: 'Use xTool D1 Pro' }).click();
+  await page.getByRole('button', { name: 'Use xTool D1 Pro (20 W)', exact: true }).click();
   for (let step = 0; step < 4; step += 1) {
     await setup.getByRole('button', { name: 'Next', exact: true }).click();
   }

@@ -1,6 +1,6 @@
 // cnc-detected-apply — decide what the connected controller's detected `$$`
-// settings can fill on the CNC machine (ADR-111). GRBL $30 (max spindle RPM)
-// fills the CNC params' spindleMaxRpm; $130/$131 (max travel) fill the shared
+// settings can fill on the CNC machine. $30 is a configured S scale: only an
+// explicit RPM mapping copies it to spindleMaxRpm. $130/$131 fill the shared
 // device bed — NOT the stock, which is the workpiece on the bed, not the
 // machine envelope. Pure so the panel row and its test share one source of
 // truth, and so the row renders (and Apply acts) only when something differs.
@@ -18,18 +18,29 @@ export type CncDetectedApply = {
 
 type BedDims = { readonly bedWidth: number; readonly bedHeight: number };
 
+export function cncDetectedSpindleScale(
+  detected: Pick<ControllerSettingsSnapshot, 'maxPowerS' | 'laserModeEnabled'> | null,
+): number | undefined {
+  const value = detected?.maxPowerS;
+  return detected?.laserModeEnabled === false &&
+    value !== undefined &&
+    Number.isFinite(value) &&
+    value > 0
+    ? value
+    : undefined;
+}
+
 export function computeCncDetectedApply(
   detected: ControllerSettingsSnapshot,
   machine: CncMachineConfig,
   device: BedDims,
+  useSpindleScaleAsRpm = false,
 ): CncDetectedApply | null {
-  // On a hybrid machine $30 is laser PWM scale while $32=1, not spindle RPM.
-  // Offer it as a CNC spindle ceiling only when the controller itself reports
-  // CNC mode; otherwise applying a laser $30=1000 would invent a 1000 RPM cap.
-  const spindleMaxRpm =
-    detected.laserModeEnabled === false
-      ? pickChanged(detected.maxPowerS, machine.params.spindleMaxRpm)
-      : undefined;
+  // Even with $32=0, some spindle controllers use S1000 as a PWM scale.
+  // CNC mode alone does not establish a numerical mapping to physical RPM.
+  const spindleMaxRpm = useSpindleScaleAsRpm
+    ? pickChanged(cncDetectedSpindleScale(detected), machine.params.spindleMaxRpm)
+    : undefined;
   const bedWidth = pickChanged(detected.bedWidth, device.bedWidth);
   const bedHeight = pickChanged(detected.bedHeight, device.bedHeight);
   const paramsPatch = spindleMaxRpm === undefined ? {} : { spindleMaxRpm };
@@ -38,7 +49,9 @@ export function computeCncDetectedApply(
     ...(bedHeight === undefined ? {} : { bedHeight }),
   };
   const summary = [
-    ...(spindleMaxRpm === undefined ? [] : [`spindle max ${spindleMaxRpm} RPM`]),
+    ...(spindleMaxRpm === undefined
+      ? []
+      : [`spindle maximum ${spindleMaxRpm} RPM from selected S mapping`]),
     ...bedSummary(bedWidth, bedHeight),
   ].join(', ');
   if (summary === '') return null;
@@ -47,12 +60,18 @@ export function computeCncDetectedApply(
 
 // A detected value worth offering: present AND different from the current one.
 function pickChanged(detectedValue: number | undefined, current: number): number | undefined {
-  return detectedValue !== undefined && detectedValue !== current ? detectedValue : undefined;
+  return detectedValue !== undefined &&
+    Number.isFinite(detectedValue) &&
+    detectedValue > 0 &&
+    detectedValue !== current
+    ? detectedValue
+    : undefined;
 }
 
 function bedSummary(bedWidth: number | undefined, bedHeight: number | undefined): string[] {
-  if (bedWidth !== undefined && bedHeight !== undefined) return [`bed ${bedWidth}×${bedHeight} mm`];
-  if (bedWidth !== undefined) return [`bed width ${bedWidth} mm`];
-  if (bedHeight !== undefined) return [`bed height ${bedHeight} mm`];
+  if (bedWidth !== undefined && bedHeight !== undefined)
+    return [`configured travel ${bedWidth}×${bedHeight} mm`];
+  if (bedWidth !== undefined) return [`configured X travel ${bedWidth} mm`];
+  if (bedHeight !== undefined) return [`configured Y travel ${bedHeight} mm`];
   return [];
 }

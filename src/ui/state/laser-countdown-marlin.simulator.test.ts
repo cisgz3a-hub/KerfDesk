@@ -11,8 +11,9 @@ import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
-const SETTLE_JOB = 'G1 X10 Y0 F600 S100\nM5\n';
-const DRAINED_PAUSE_JOB = 'G1 X10 Y0 F600 S100\n';
+// No synchronizing footer: the move's ACK leaves buffered motion for M400.
+const BUFFERED_MOTION_JOB = 'G1 X10 Y0 F600 S100\n';
+const INLINE_OFF_JOB = `M3 I S0\n${BUFFERED_MOTION_JOB}M5 I\n`;
 const MARLIN_COUNTDOWN_RETENTION_KEY = 'marlin-countdown';
 
 beforeEach(() => {
@@ -83,7 +84,7 @@ async function startCountdownJob(gcode: string): Promise<void> {
 describe('Marlin countdown settlement against the simulator', () => {
   it('uses M400, never the GRBL dwell, and completes only after Marlin settles', async () => {
     const sim = await connectMarlinIdle({ motionMs: 2_000 });
-    await startCountdownJob(SETTLE_JOB);
+    await startCountdownJob(BUFFERED_MOTION_JOB);
 
     await pump(100);
     expect(useLaserStore.getState()).toMatchObject({
@@ -104,11 +105,46 @@ describe('Marlin countdown settlement against the simulator', () => {
     });
   });
 
+  it('waits for motion before acknowledging native M5 I and completing the stream', async () => {
+    const sim = await connectMarlinIdle({ motionMs: 2_000 });
+    await startCountdownJob(INLINE_OFF_JOB);
+
+    await pump(100);
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: { status: 'streaming', completed: 2, inFlight: [{ line: 'M5 I\n' }] },
+      controllerOperation: null,
+      liveCanvasRun: { timing: { kind: 'running' } },
+    });
+    expect(sim.state()).toMatchObject({
+      pendingMotions: 1,
+      laserMode: 'continuous',
+      inlineBurnPowers: [100],
+    });
+    expect(sim.outbound()).toContain('M5 I\n');
+    expect(sim.outbound()).not.toContain('M400\n');
+
+    await pump(1_880);
+    expect(sim.state().pendingMotions).toBe(1);
+    expect(useLaserStore.getState().streamer?.completed).toBe(2);
+    expect(sim.outbound()).not.toContain('M400\n');
+
+    await pump(40);
+    expect(sim.state()).toMatchObject({ pendingMotions: 0, laserMode: 'standard' });
+    expect(sim.outbound()).toContain('M400\n');
+
+    await pump(2_000);
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      liveCanvasRun: { timing: { kind: 'complete' } },
+    });
+  });
+
   it('keeps a failed M400 settlement unavailable after later position reports', async () => {
     const sim = await connectMarlinIdle({
       rejectLines: [{ pattern: /^M400$/, error: 'Unknown command' }],
     });
-    await startCountdownJob(SETTLE_JOB);
+    await startCountdownJob(BUFFERED_MOTION_JOB);
 
     await pump(100);
     expect(sim.outbound()).toContain('M400\n');
@@ -131,7 +167,7 @@ describe('Marlin countdown settlement against the simulator', () => {
 
   it('settles a paused stream whose final acknowledgement arrived before Resume', async () => {
     const sim = await connectMarlinIdle({ motionMs: 2_000 });
-    await startCountdownJob(DRAINED_PAUSE_JOB);
+    await startCountdownJob(BUFFERED_MOTION_JOB);
 
     await useLaserStore.getState().pauseJob();
     await pump(20);

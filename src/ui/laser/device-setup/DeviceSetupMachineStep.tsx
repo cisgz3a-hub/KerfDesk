@@ -21,7 +21,10 @@ export function DeviceSetupMachineStep(props: DeviceSetupStepProps): JSX.Element
 }
 
 function LaserMachineStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
-  const driver = selectControllerDriver(state.draft.controllerKind);
+  const driver = selectControllerDriver(
+    state.draft.controllerKind,
+    state.draft.controllerCommandSet,
+  );
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
     <section style={sectionStyle}>

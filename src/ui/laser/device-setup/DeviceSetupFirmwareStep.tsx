@@ -26,7 +26,7 @@ export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProp
   const connection = useLaserStore((s) => s.connection);
   const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
-  const guide = machineSetupControllerGuide(controllerKind);
+  const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
   const settingsContext = machineSettingsContext(state);
 
   if (guide.writePolicy !== 'guarded-single-setting') {

@@ -19,7 +19,7 @@ import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 
 afterEach(() => {
   resetStore();
-  useLaserStore.setState({ controllerSettings: null });
+  useLaserStore.setState({ controllerSettings: null, controllerSessionEpoch: 0 });
 });
 
 function cncMachine(): Extract<
@@ -66,6 +66,11 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
     useLaserStore.setState({ controllerSettings: detected });
     const { host, root } = await render();
     try {
+      const mapping = host.querySelector<HTMLInputElement>(
+        '[aria-label="Use S maximum as spindle RPM"]',
+      );
+      expect(mapping?.checked).toBe(false);
+      await act(async () => mapping?.click());
       const button = host.querySelector('button');
       if (button === null) throw new Error('Apply button missing');
       await act(async () => button.click());
@@ -119,6 +124,11 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
     });
     const { host, root } = await render();
     try {
+      await act(async () =>
+        host
+          .querySelector<HTMLInputElement>('[aria-label="Use S maximum as spindle RPM"]')
+          ?.click(),
+      );
       const button = host.querySelector('button');
       if (button === null) throw new Error('Apply button missing');
       await act(async () => button.click());
@@ -171,6 +181,48 @@ describe('CncDetectedSettingsRow (ADR-111)', () => {
       if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
       expect(machine.params.spindleMaxRpm).toBe(12000);
       expect(state.project.device.bedWidth).toBe(300);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('copies configured travel without adopting an unselected CNC S scale as RPM', async () => {
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000, laserModeEnabled: false, bedWidth: 300 },
+    });
+    const { host, root } = await render();
+    try {
+      expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+      await act(async () => host.querySelector('button')?.click());
+      const project = useStore.getState().project;
+      if (project.machine?.kind !== 'cnc') throw new Error('Expected CNC');
+      expect(project.machine.params.spindleMaxRpm).toBe(12000);
+      expect(project.device.bedWidth).toBe(300);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('requires a new RPM mapping after reconnecting to a controller with the same S scale', async () => {
+    const settings = { maxPowerS: 1000, laserModeEnabled: false, bedWidth: 300 };
+    useLaserStore.setState({ controllerSettings: settings, controllerSessionEpoch: 1 });
+    const { host, root } = await render();
+    const checkbox = () => host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    try {
+      await act(async () => checkbox()?.click());
+      expect(checkbox()?.checked).toBe(true);
+      await act(async () => useLaserStore.setState({ controllerSettings: null }));
+      await act(async () =>
+        useLaserStore.setState({ controllerSettings: { ...settings }, controllerSessionEpoch: 2 }),
+      );
+      expect(checkbox()?.checked).toBe(false);
+      await act(async () => host.querySelector('button')?.click());
+      const project = useStore.getState().project;
+      if (project.machine?.kind !== 'cnc') throw new Error('Expected CNC');
+      expect(project.machine.params.spindleMaxRpm).toBe(12000);
+      expect(project.device.bedWidth).toBe(300);
     } finally {
       await act(async () => root.unmount());
       host.remove();

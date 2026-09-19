@@ -1,5 +1,5 @@
-import { selectControllerDriver } from '../../../core/controllers';
-import type { ControllerKind } from '../../../core/devices';
+import { selectControllerDriver, type ControllerDriver } from '../../../core/controllers';
+import type { ControllerCommandSet, ControllerKind } from '../../../core/devices/device-profile';
 
 export type MachineSetupWritePolicy =
   | 'guarded-single-setting'
@@ -28,21 +28,24 @@ export type MachineSetupControllerGuide = {
  * one pure table and checked against the actual driver so setup copy cannot
  * silently drift away from connection, homing, status, or streaming behavior.
  */
-export function machineSetupControllerGuide(kind: ControllerKind): MachineSetupControllerGuide {
-  const driver = selectControllerDriver(kind);
-  const common = {
-    kind,
-    label: driver.label,
-    transportLabel: driver.capabilities.transport === 'serial' ? 'USB serial' : 'File export',
-    defaultBaudRate: driver.defaultBaudRate,
-    homeCommand: driver.commands.home,
-    statusCommand: driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery,
-    streamingExplanation:
-      kind === 'marlin' || kind === 'smoothieware'
-        ? 'One line is sent only after the previous line is acknowledged.'
-        : 'Commands use the controller receive window for buffered streaming.',
-    cncSupported: driver.capabilities.cncJobs,
-  } as const;
+export function machineSetupControllerGuide(
+  kind: ControllerKind,
+  commandSet?: ControllerCommandSet,
+): MachineSetupControllerGuide {
+  const driver = selectControllerDriver(kind, commandSet);
+  const common = commonControllerGuide(kind, driver);
+
+  if (driver.commandSet === 'creality-falcon-a1-pro') {
+    return {
+      ...common,
+      identityCommands: [],
+      settingsCommands: [],
+      configurationSurface: 'Creality Falcon A1 Pro vendor configuration',
+      writePolicy: 'external-config',
+      writeExplanation:
+        'Creality disables settings fetch and native $J jogging in its A1 Pro device file. Use the vendor workflow for firmware settings. KerfDesk uses finite, tool-off G1 jogs and frames, and homes X then Y; native jog cancellation is unavailable.',
+    };
+  }
 
   switch (kind) {
     case 'grbl-v1.1':
@@ -93,7 +96,7 @@ export function machineSetupControllerGuide(kind: ControllerKind): MachineSetupC
         configurationSurface: 'Smoothieware SD-card config file',
         writePolicy: 'external-config',
         writeExplanation:
-          'Edit the controller config file through the Smoothieware USB/SD workflow, then reset and reconnect.',
+          'Match laser_module_maximum_s_value to the profile and set laser_module_minimum_power to 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
       return {
@@ -108,8 +111,24 @@ export function machineSetupControllerGuide(kind: ControllerKind): MachineSetupC
   }
 }
 
+function commonControllerGuide(kind: ControllerKind, driver: ControllerDriver) {
+  return {
+    kind,
+    label: driver.label,
+    transportLabel: driver.capabilities.transport === 'serial' ? 'USB serial' : 'File export',
+    defaultBaudRate: driver.defaultBaudRate,
+    homeCommand: driver.commands.home,
+    statusCommand: driver.realtime.statusQuery ?? driver.commands.queuedStatusQuery,
+    streamingExplanation:
+      kind === 'marlin' || kind === 'smoothieware'
+        ? 'One line is sent only after the previous line is acknowledged.'
+        : 'Commands use the controller receive window for buffered streaming.',
+    cncSupported: driver.capabilities.cncJobs,
+  } as const;
+}
+
 export function machineSetupControllerGuides(): ReadonlyArray<MachineSetupControllerGuide> {
   return (['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const).map(
-    machineSetupControllerGuide,
+    (kind) => machineSetupControllerGuide(kind),
   );
 }

@@ -75,7 +75,10 @@ function ConnectionReview(props: {
   readonly onEdit: () => void;
 }): JSX.Element {
   const { state } = props;
-  const guide = machineSetupControllerGuide(state.draft.controllerKind ?? 'grbl-v1.1');
+  const guide = machineSetupControllerGuide(
+    state.draft.controllerKind ?? 'grbl-v1.1',
+    state.draft.controllerCommandSet,
+  );
   const baud =
     guide.transportLabel === 'USB serial'
       ? String(state.draft.baudRate ?? guide.defaultBaudRate)
@@ -126,7 +129,10 @@ function WorkspaceReview(props: {
   readonly onEdit: () => void;
 }): JSX.Element {
   const { state } = props;
-  const guide = machineSetupControllerGuide(state.draft.controllerKind ?? 'grbl-v1.1');
+  const guide = machineSetupControllerGuide(
+    state.draft.controllerKind ?? 'grbl-v1.1',
+    state.draft.controllerCommandSet,
+  );
   const homing = state.draft.homing.enabled
     ? `${guide.homeCommand ?? 'enabled'} toward ${state.draft.homing.direction}`
     : 'Disabled';

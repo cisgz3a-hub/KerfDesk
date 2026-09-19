@@ -19,6 +19,8 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { nativeLaserProject } from '../../__fixtures__/controllers/native-laser-project';
+import { emitGcode } from '../../io/gcode/emit-gcode';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 const DRAINED_PAUSE_JOB = 'G1 X10 Y0 F600 S100\n';
@@ -139,22 +141,60 @@ describe('Smoothieware lifecycle against the simulator', () => {
   });
 
   it('jogs via G21/G91/G0/G90 and observes Run→Idle through status reports', async () => {
-    const sim = await connectSmoothieIdle({ motionMs: 300 });
+    const sim = await connectSmoothieIdle({ motionMs: 300, initialManualFire: true });
     await useLaserStore.getState().jog({ dx: 7, feed: 900 });
-    expect(sim.outbound().at(-1)).toBe('G21\nG91\nG0 X7.000 F900\nG90\n');
+    expect(sim.outbound().at(-1)).toBe(
+      'fire off\nM400\nM221 S0\nM5\nM9\nG21\nG91\nG0 X7.000 F900\nG90\n',
+    );
     await pump(900);
     expect(useLaserStore.getState().motionOperation).toBeNull();
     expect(sim.state().pos.x).toBe(7);
+    expect(sim.state().manualFire).toBe(false);
+    expect(sim.state().laserScale).toBe(0);
+  });
+
+  it('streams public image output twice using the native fire-off completion and power re-arm', async () => {
+    const sim = await connectSmoothieIdle({ initialManualFire: true });
+    const output = emitGcode(nativeLaserProject('smoothieware'));
+    expect(output.preflight.issues).toEqual([]);
+    expect(output.gcode.startsWith('fire off\n')).toBe(true);
+    for (let run = 0; run < 2; run += 1) {
+      await startTestLaserJob(output.gcode, { streamingMode: 'ping-pong' });
+      await pump(4000);
+      expect(useLaserStore.getState().streamer).toBeNull();
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+      expect(sim.state().manualFire).toBe(false);
+      expect(sim.state().laserScale).toBe(0);
+      expect(sim.state().burnPowers).toEqual(Array.from({ length: run + 1 }, () => 0.25));
+    }
+    expect(sim.outbound().filter((line) => line === 'fire off\n')).toHaveLength(2);
+    expect(sim.outbound()).not.toContain('FIRE OFF\n');
   });
 
   it('homes with G28.2 and confirms after fresh Idle', async () => {
-    const sim = await connectSmoothieIdle();
+    const sim = await connectSmoothieIdle({ initialManualFire: true });
     const home = useLaserStore.getState().home();
     await pump(1000);
     await home;
     expect(useLaserStore.getState().homingState).toBe('confirmed');
     expect(sim.outbound()).toContain('G28.2\n');
     expect(sim.state().isHomed).toBe(true);
+    expect(sim.state().manualFire).toBe(false);
+    expect(sim.state().laserScale).toBe(0);
+  });
+
+  it('acknowledges native beam-off cleanup before Frame motion', async () => {
+    const sim = await connectSmoothieIdle({ initialManualFire: true });
+    const frame = useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 1000);
+    await pump(4000);
+    await frame;
+    expect(useLaserStore.getState().motionOperation).toBeNull();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(sim.state().manualFire).toBe(false);
+    expect(sim.state().laserScale).toBe(0);
+    const lines = sim.outbound();
+    expect(lines.indexOf('fire off\n')).toBeLessThan(lines.findIndex((line) => /^G0\b/.test(line)));
+    expect(lines).toContain('M221 S0\n');
   });
 
   it('pauses the host stream without unqualified !/~ bytes', async () => {

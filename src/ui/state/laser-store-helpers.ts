@@ -10,7 +10,7 @@ import {
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
-import { grblDriver, type ControllerDriver } from '../../core/controllers';
+import type { ControllerDriver } from '../../core/controllers';
 import * as controllerOperation from './laser-controller-operation';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
@@ -18,6 +18,7 @@ import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-s
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
+import { initialControllerConnectionState } from './laser-controller-initial-state';
 import {
   isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
@@ -323,6 +324,7 @@ type InitialLaserState = Pick<
   LaserState,
   | 'capabilities'
   | 'activeControllerKind'
+  | 'activeControllerCommandSet'
   | 'detectedControllerKind'
   | 'connection'
   | 'serialPortInfo'
@@ -384,12 +386,7 @@ type InitialLaserState = Pick<
 
 export function initialLaserState(): InitialLaserState {
   return {
-    capabilities: grblDriver.capabilities,
-    activeControllerKind: grblDriver.kind,
-    detectedControllerKind: null,
-    connection: { kind: 'disconnected' },
-    serialPortInfo: null,
-    statusReport: null,
+    ...initialControllerConnectionState(),
     controllerSessionEpoch: 0,
     statusSequence: 0,
     statusObservation: null,

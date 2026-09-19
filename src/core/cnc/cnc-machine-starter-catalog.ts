@@ -13,8 +13,9 @@ export type CncMachineStarter = {
   readonly revision: number;
   readonly label: string;
   // 'engineering-starter' = derived from public specs and chipload math;
-  // 'maintainer-verified' = set from cutting experience on the physical machine.
-  readonly confidence: 'engineering-starter' | 'maintainer-verified';
+  // 'maintainer-verified' requires an attributable physical cutting record;
+  // 'unverified-starter' retains legacy values without inventing qualification.
+  readonly confidence: 'engineering-starter' | 'maintainer-verified' | 'unverified-starter';
   readonly operatorNotice: string;
   readonly sources: ReadonlyArray<{
     readonly label: string;
@@ -46,8 +47,9 @@ const NEOTRONICS_4040_MACHINE_FAMILY = 'neotronics-4040-max';
 const DEFAULT_END_MILL_TOOL_ID = 'em-3175';
 const DEFAULT_END_MILL_DIAMETER_MM = 3.175;
 const DEFAULT_END_MILL_FLUTE_COUNT = 2;
-// ADR-256: feed/plunge set by the maintainer from experience on the physical
-// 4040 (2026-07-25), replacing the revision-1 engineering guesses (600 / 120).
+// Retain revision-2 cutting values. The historical ADR-256 physical-experience
+// assertion has no independently attributable qualification record attached;
+// correcting the label does not silently change a saved recipe.
 const NEOTRONICS_4040_FEED_MM_PER_MIN = 300;
 const NEOTRONICS_4040_PLUNGE_MM_PER_MIN = 250;
 const NEOTRONICS_4040_SPINDLE_RPM = 12_000;
@@ -59,19 +61,20 @@ export const CNC_MACHINE_STARTER_CATALOG: ReadonlyArray<CncMachineStarter> = [
     id: 'neotronics-4040-shallow-wood-mdf',
     revision: 2,
     label: 'Neotronics 4040 shallow wood / MDF starter',
-    confidence: 'maintainer-verified',
+    confidence: 'unverified-starter',
     operatorNotice:
-      'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
+      'Unverified cutting starter: retained legacy values for a 3.175 mm 2-flute cutter and assumed 500 W spindle. Public specifications do not provide this recipe, and no attributable physical cutting record is attached. Confirm the fitted spindle, bit, stock and cut before production.',
     sources: [
       {
         label: 'Neotronics 4040 Max product specification',
         url: 'https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct',
-        supports: '400 x 400 x 75 mm envelope and default 500 W spindle; no cut recipe published',
+        supports:
+          '400 x 400 x 75 mm envelope and multiple spindle variants; no cut recipe published',
       },
       {
         label: 'Neotronics 500 W spindle specification',
         url: 'https://neotronics.co.za/index.php?limit=25&order=ASC&path=113_115&product_id=297&route=product%2Fproduct&sort=p.price',
-        supports: '12,000 RPM maximum for the default 500 W spindle',
+        supports: '12,000 RPM maximum for the assumed 500 W spindle variant, not all bundles',
       },
       {
         label: 'GRBL v1.1 settings documentation',

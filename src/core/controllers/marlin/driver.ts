@@ -37,10 +37,10 @@ export const marlinDriver: ControllerDriver = {
     settings: 'none',
     unlock: false,
     sleep: false,
-    // Marlin supports G92 like Smoothie (audit F9): user-origin workflows
-    // work, matching LightBurn's Marlin behavior. G92.1 (clear) requires a
-    // build without NO_WORKSPACE_OFFSETS — community-verification pending
-    // like the rest of this driver (ADR-095).
+    // Qualified origin contract: CNC_COORDINATE_SYSTEMS on a non-SCARA build.
+    // G92 itself is more widely available, but Marlin 2.1.2.6 compiles G92.1
+    // only with that prerequisite; NO_WORKSPACE_OFFSETS alone is insufficient.
+    // This is a documented build requirement, not detected firmware evidence.
     wcs: 'g92-only',
     homing: true,
     console: true,

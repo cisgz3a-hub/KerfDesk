@@ -2,6 +2,7 @@
 // geometry as typed arrays plus events, accountability, and stats.
 
 export { buildGcodeRenderModel } from './gcode-render-model';
+export { laserPowerControlForDevice } from './laser-power-control';
 export { countBySeverity, findProgramIssues } from './program-findings';
 export type { FindingSeverity, ProgramFinding } from './finding-types';
 export { computeProgramStats } from './program-stats';
