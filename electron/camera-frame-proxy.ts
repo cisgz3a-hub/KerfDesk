@@ -11,6 +11,7 @@
 import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { cameraFrameUrlPolicy } from './camera-frame-proxy-policy.js';
+import { cancelCameraFrameBody, readCameraFrameBody } from './camera-frame-body.js';
 import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 
 // Timeouts sized to the real hardware (ADR-116 hardware pass): the Falcon's
@@ -19,7 +20,6 @@ import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 // frame rather than abort into it.
 const HTTP_FRAME_TIMEOUT_MS = 10000;
 const DISCOVER_PROBE_TIMEOUT_MS = 5000;
-const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const JPEG_MAGIC = [0xff, 0xd8] as const;
 
 // Falcon A1 Pro candidate snapshot URLs — mirrors NETWORK_CAMERA_HOSTS in
@@ -132,13 +132,11 @@ export async function fetchFrameBytes(url: string, timeoutMs: number): Promise<F
       redirect: 'error',
     });
     if (!response.ok) {
+      await cancelCameraFrameBody(response);
       return { kind: 'failed', reason: `Camera returned HTTP ${response.status}.` };
     }
-    const bytes = Buffer.from(await response.arrayBuffer());
+    const bytes = await readCameraFrameBody(response);
     if (bytes.length === 0) return { kind: 'failed', reason: 'Camera returned an empty frame.' };
-    if (bytes.length > MAX_FRAME_BYTES) {
-      return { kind: 'failed', reason: 'Camera frame is too large.' };
-    }
     const contentType = response.headers.get('content-type') ?? '';
     const isJpegMagic = bytes[0] === JPEG_MAGIC[0] && bytes[1] === JPEG_MAGIC[1];
     if (!contentType.startsWith('image/') && !isJpegMagic) {

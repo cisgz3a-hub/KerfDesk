@@ -8,8 +8,9 @@
 //     apply the update on the next natural quit.
 //   * We NEVER call `quitAndInstall()`. Force-installing mid-session could abort
 //     a running burn (PROJECT.md non-negotiable #9). Install-on-quit is the only
-//     path, and a quit cannot happen mid-burn without the operator stopping the
-//     job first (`src/ui/app/use-unload-stop.ts` soft-resets on unload).
+//     path. Ordinary desktop quit retains the renderer until its application
+//     stop handoff settles or the operator cancels closing. This is not proof
+//     of a physical stop, and forced process termination bypasses the handoff.
 // Because the check lives in main, the renderer CSP is untouched and no
 // preload/IPC surface is needed — the OS-native "update ready" notification
 // from `checkForUpdatesAndNotify` is the entire user-facing surface.

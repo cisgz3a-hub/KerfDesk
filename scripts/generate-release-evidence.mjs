@@ -12,14 +12,9 @@ function argument(name) {
 export function generateReleaseEvidence(options) {
   const releaseDir = path.resolve(options.releaseDir);
   const files = publishedArtifactNames(releaseDir, options.artifactNames);
-  const artifacts = files.map((name) => {
-    const bytes = fs.readFileSync(path.join(releaseDir, name));
-    return {
-      name,
-      bytes: bytes.length,
-      sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-    };
-  });
+  const artifacts = files.map((name) =>
+    artifactRecord(name, fs.readFileSync(path.join(releaseDir, name))),
+  );
   const packageFile = path.resolve(options.packageFile);
   const packageDir = path.dirname(packageFile);
   const rootPackage = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
@@ -51,6 +46,10 @@ export function generateReleaseEvidence(options) {
     },
     packages: components,
   };
+  // Bind the exact generated inventory before provenance/checksums are emitted.
+  // The SBOM is derived here, so callers still name only their binary/feed inputs.
+  const sbomBytes = Buffer.from(`${JSON.stringify(sbom, null, 2)}\n`);
+  artifacts.push(artifactRecord('release-sbom.spdx.json', sbomBytes));
   const provenance = {
     schemaVersion: 1,
     generatedAt: options.generatedAt,
@@ -71,10 +70,7 @@ export function generateReleaseEvidence(options) {
     ],
     artifacts,
   };
-  fs.writeFileSync(
-    path.join(releaseDir, 'release-sbom.spdx.json'),
-    `${JSON.stringify(sbom, null, 2)}\n`,
-  );
+  fs.writeFileSync(path.join(releaseDir, 'release-sbom.spdx.json'), sbomBytes);
   fs.writeFileSync(
     path.join(releaseDir, 'release-provenance.json'),
     `${JSON.stringify(provenance, null, 2)}\n`,
@@ -84,6 +80,14 @@ export function generateReleaseEvidence(options) {
     `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.name}`).join('\n')}\n`,
   );
   return { artifacts, sbom, provenance };
+}
+
+function artifactRecord(name, bytes) {
+  return {
+    name,
+    bytes: bytes.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  };
 }
 
 function flattenDependencies(tree, rootPackage, packageDir, releaseVersion) {

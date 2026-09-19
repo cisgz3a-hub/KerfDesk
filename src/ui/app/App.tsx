@@ -38,6 +38,7 @@ import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
+import { DesktopCloseNotice } from './DesktopCloseNotice';
 
 export function App(): JSX.Element {
   // Recovery stays in a nonblocking banner. Background autosave protects
@@ -61,6 +62,7 @@ export function App(): JSX.Element {
   return (
     <div style={shellStyle}>
       <CommandShell />
+      <DesktopCloseNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />

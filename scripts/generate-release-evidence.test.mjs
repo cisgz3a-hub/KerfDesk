@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { generateReleaseEvidence } from './generate-release-evidence.mjs';
+import { loadStableRelease, stableArtifactNames } from './stable-release-artifacts.mjs';
+import { releaseFixture } from './stable-release-test-support.mjs';
 
 test('emits deterministic checksums, SPDX inventory, and exact toolchain provenance', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-release-evidence-'));
@@ -42,13 +45,19 @@ test('emits deterministic checksums, SPDX inventory, and exact toolchain provena
   });
   assert.deepEqual(
     result.artifacts.map((artifact) => artifact.name),
-    ['KerfDesk.exe', 'KerfDesk.exe.blockmap', 'latest.yml'],
+    ['KerfDesk.exe', 'KerfDesk.exe.blockmap', 'latest.yml', 'release-sbom.spdx.json'],
   );
+  const sbomBytes = fs.readFileSync(path.join(releaseDir, 'release-sbom.spdx.json'));
+  assert.deepEqual(result.provenance.artifacts.at(-1), {
+    name: 'release-sbom.spdx.json',
+    bytes: sbomBytes.length,
+    sha256: createHash('sha256').update(sbomBytes).digest('hex'),
+  });
   assert.equal(result.provenance.toolchain.pnpm, 'pnpm@11.3.0');
   assert.ok(result.sbom.packages.some((entry) => entry.name === 'react'));
   assert.match(
     fs.readFileSync(path.join(releaseDir, 'checksums.sha256'), 'utf8'),
-    /^[0-9a-f]{64} {2}KerfDesk\.exe\n[0-9a-f]{64} {2}KerfDesk\.exe\.blockmap\n[0-9a-f]{64} {2}latest\.yml\n$/u,
+    /^[0-9a-f]{64} {2}KerfDesk\.exe\n[0-9a-f]{64} {2}KerfDesk\.exe\.blockmap\n[0-9a-f]{64} {2}latest\.yml\n[0-9a-f]{64} {2}release-sbom\.spdx\.json\n$/u,
   );
 });
 
@@ -66,6 +75,46 @@ test('fails closed when a declared published artifact is absent', () => {
         generatedAt: '2026-08-26T00:00:00.000Z',
       }),
     /Published artifact does not exist/u,
+  );
+});
+
+test('stable publication rejects a valid SPDX package mutation after evidence generation', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-sbom-integrity-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const releaseDir = path.join(root, 'release');
+  fs.mkdirSync(releaseDir);
+  const release = releaseFixture();
+  const artifactNames = stableArtifactNames(release.version);
+  for (const file of release.files.filter(({ name }) => artifactNames.includes(name))) {
+    fs.writeFileSync(path.join(releaseDir, file.name), file.bytes);
+  }
+  const packageFile = path.join(root, 'package.json');
+  const dependencyJson = path.join(root, 'dependencies.json');
+  fs.writeFileSync(packageFile, JSON.stringify({ name: 'laserforge', version: '0.1.0' }));
+  fs.writeFileSync(dependencyJson, JSON.stringify([{ name: 'laserforge', version: '0.1.0' }]));
+  generateReleaseEvidence({
+    releaseDir,
+    version: release.version,
+    sourceSha: release.sourceSha,
+    dependencyJson,
+    packageFile,
+    artifactNames,
+    generatedAt: '2026-09-19T00:00:00.000Z',
+  });
+  assert.equal(
+    (await loadStableRelease(releaseDir, release.version, release.sourceSha)).files.length,
+    6,
+  );
+  const sbomPath = path.join(releaseDir, 'release-sbom.spdx.json');
+  const original = fs.readFileSync(sbomPath);
+  const changed = JSON.parse(original.toString('utf8'));
+  changed.packages[0].versionInfo = '9.9.9';
+  const mutated = Buffer.from(`${JSON.stringify(changed, null, 2)}\n`);
+  assert.equal(mutated.length, original.length, 'the mutation must preserve byte length');
+  fs.writeFileSync(sbomPath, mutated);
+  await assert.rejects(
+    loadStableRelease(releaseDir, release.version, release.sourceSha),
+    /Release provenance hash mismatch: release-sbom\.spdx\.json/u,
   );
 });
 
@@ -148,4 +197,8 @@ test('reads pnpm keyed dependency nodes and installed license facts, including n
     ],
   );
   assert.ok(result.sbom.packages.every((entry) => entry.licenseConcluded === 'NOASSERTION'));
+  assert.deepEqual(
+    result.artifacts.map(({ name }) => name),
+    ['installer.exe', 'release-sbom.spdx.json'],
+  );
 });

@@ -93,7 +93,8 @@ import {
   resolveDesktopUpdateModes,
 } from './update-channel-trust.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
-import { installWindowUnloadDecision } from './window-unload-decision.js';
+import { installDesktopWindowClose } from './desktop-window-close.js';
+import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { revealPrimaryWindow } from './single-instance-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -166,6 +167,11 @@ const CSP_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ');
 let cameraBridge: RtspCameraBridgeHandle | null = null;
+let quitRequested = false;
+app.on('before-quit', () => {
+  quitRequested = true;
+});
+const installSessionPermissions = sessionPermissionsOnce(installPermissionHandlers);
 
 type ElectronSerialPort = ElectronSerialPortSummary & {
   readonly vendorId?: string;
@@ -412,18 +418,13 @@ async function createWindow(): Promise<void> {
   });
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
-  installWindowUnloadDecision(window, () => {
-    const response = dialog.showMessageBoxSync(window, {
-      type: 'question',
-      buttons: ['Leave', 'Stay'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      title: 'Unsaved changes',
-      message: 'Leave without saving?',
-      detail: 'Changes you made may not be saved.',
-    });
-    return response === 0 ? 'leave' : 'stay';
+  installDesktopWindowClose(window, {
+    isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
+    isQuitRequested: () => quitRequested,
+    cancelQuit: () => {
+      quitRequested = false;
+    },
+    quit: () => app.quit(),
   });
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers
@@ -491,7 +492,6 @@ async function createWindow(): Promise<void> {
   // routes navigator.wakeLock.request('screen') through these handlers as
   // 'screen-wake-lock'; without the allowlist entry the request rejects and
   // keep-awake silently dies on the desktop build only.
-  installPermissionHandlers(session.defaultSession);
   await loadRenderer(window);
 
   // Surface renderer console output to the main process stdout so dev runs
@@ -518,10 +518,14 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       // which fails fast if this handler isn't installed yet.
       const distRoot = path.join(__dirname, '..', 'dist', 'web');
       protocol.handle('app', makeAppProtocolHandler(distRoot));
+      // A Session survives macOS window closure; install its listeners once,
+      // before the first renderer, rather than adding another picker on reopen.
+      installSessionPermissions(session.defaultSession);
       if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
       // Background auto-update against our self-hosted feed (ADR-024/135). This is
       // inert until production artifacts are code-signed; once trusted, updates
-      // install on quit and never mid-burn. Check errors are never fatal to startup.
+      // install on quit after the application close handoff. This does not prove
+      // the machine physically stopped. Check errors are never fatal to startup.
       configureAutoUpdater(autoUpdater, {
         isPackaged: app.isPackaged,
         isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,

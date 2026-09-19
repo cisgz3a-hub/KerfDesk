@@ -7,30 +7,33 @@
 // covers the other abandonment paths: tab close, window close, and navigation
 // away.
 //
-// The page is being torn down, so the write cannot be awaited; initiating the
-// soft-reset write is the most WebSerial allows during unload. Both
+// Web pages cannot await a write during teardown. The Electron shell retains
+// its renderer and awaits the application stop handoff before retrying close.
+// Both
 // `beforeunload` and `pagehide` are registered: beforeunload fires on
 // window-close attempts, pagehide on actual navigations (and is the more
-// reliable of the two on mobile/bfcache). stopJob is idempotent on the wire; a
-// duplicate 0x18 is harmless.
+// reliable of the two on mobile/bfcache). Both hooks join an outstanding stop;
+// they must not reset the controller twice during one pending close.
 
 import { useEffect } from 'react';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { desktopCloseController, installDesktopCloseReceiver } from './desktop-close-runtime';
 
 export function installUnloadStop(target: Window): () => void {
-  const onUnload = (): void => {
-    const state = useLaserStore.getState();
-    if (!isActiveJob(state.streamer)) return;
-    // Fire-and-forget: a failed write means the port is already gone and
-    // nothing more can be done from a dying page.
-    void state.stopJob().catch(() => undefined);
+  const removeReceiver = installDesktopCloseReceiver(target);
+  const onBeforeUnload = (event: BeforeUnloadEvent): void => {
+    if (!desktopCloseController.handleBeforeUnload(event)) {
+      desktopCloseController.bestEffortStop();
+    }
   };
-  target.addEventListener('beforeunload', onUnload);
-  target.addEventListener('pagehide', onUnload);
+  const onPageHide = (): void => {
+    if (!desktopCloseController.ownsUnload) desktopCloseController.bestEffortStop();
+  };
+  target.addEventListener('beforeunload', onBeforeUnload);
+  target.addEventListener('pagehide', onPageHide);
   return () => {
-    target.removeEventListener('beforeunload', onUnload);
-    target.removeEventListener('pagehide', onUnload);
+    target.removeEventListener('beforeunload', onBeforeUnload);
+    target.removeEventListener('pagehide', onPageHide);
+    removeReceiver();
   };
 }
 
