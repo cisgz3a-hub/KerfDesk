@@ -6,6 +6,12 @@ name: Desktop Packaging Dry Run
 # This workflow never references those credentials or the legacy secret names.
 on:
   workflow_dispatch:
+    inputs:
+      qualify_installer:
+        description: Install, save/reopen, upgrade and uninstall on this disposable runner
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: release-desktop-dry-run-${{ github.ref }}
@@ -18,6 +24,7 @@ jobs:
   build-windows:
     name: Build unsigned Windows installer
     runs-on: windows-latest
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -36,12 +43,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify installer qualification guards and evidence checks
+        if: inputs.qualify_installer
+        run: node --test scripts/qualify-windows-installer.test.mjs scripts/installed-app-file-io.test.mjs
+
+      - name: Verify disposable Windows desktop availability
+        if: inputs.qualify_installer
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or -not [Environment]::UserInteractive -or (Get-Process -Id $PID).SessionId -eq 0) {
+            throw 'Native installer qualification requires an interactive disposable Windows desktop.'
+          }
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture
+
       - name: Derive dry-run version
         id: version
         shell: bash
         run: |
           VERSION="0.0.0-dispatch.${GITHUB_RUN_NUMBER}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "upgrade_version=${VERSION}.1" >> "${GITHUB_OUTPUT}"
           echo "Dry-run version: ${VERSION}"
 
       - name: Verify canonical release repository
@@ -58,6 +79,7 @@ jobs:
           pnpm exec electron-builder --win --x64 \
             --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
             --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
             --config.forceCodeSigning=false \
             --publish never
         env:
@@ -75,7 +97,57 @@ jobs:
           $executable = "release/$env:VERSION/win-unpacked/KerfDesk.exe"
           & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
 
+      - name: Build unsigned upgrade candidate
+        if: inputs.qualify_installer
+        shell: bash
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.upgrade_version }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          pnpm build:web
+          pnpm build:electron-main
+          pnpm exec electron-builder --win --x64 \
+            --config.extraMetadata.version="${{ steps.version.outputs.upgrade_version }}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+
+      - name: Qualify installed application and manual upgrade
+        if: inputs.qualify_installer
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          UPGRADE_VERSION: ${{ steps.version.outputs.upgrade_version }}
+        run: |
+          & ./scripts/qualify-windows-installer.ps1 `
+            -Installer "$env:GITHUB_WORKSPACE/release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe" `
+            -UpgradeInstaller "$env:GITHUB_WORKSPACE/release/$env:UPGRADE_VERSION/KerfDesk-$env:UPGRADE_VERSION-windows-x64-setup.exe" `
+            -Version $env:VERSION -UpgradeVersion $env:UPGRADE_VERSION `
+            -SourceCommit $env:GITHUB_SHA `
+            -EvidenceRoot "$env:GITHUB_WORKSPACE/artifacts/installed-qualification"
+
+      - name: Upload installed application qualification evidence
+        if: always() && inputs.qualify_installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kerfdesk-installed-qualification-${{ steps.version.outputs.version }}
+          path: artifacts/installed-qualification/
+          if-no-files-found: warn
+
+      - name: Upload unsigned upgrade artifact
+        if: always() && inputs.qualify_installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kerfdesk-windows-upgrade-${{ steps.version.outputs.upgrade_version }}
+          path: |
+            release/${{ steps.version.outputs.upgrade_version }}/*.exe
+            release/${{ steps.version.outputs.upgrade_version }}/*.exe.blockmap
+            release/${{ steps.version.outputs.upgrade_version }}/latest.yml
+          if-no-files-found: warn
+
       - name: Upload unsigned dry-run artifact
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kerfdesk-windows-dry-run-${{ steps.version.outputs.version }}
