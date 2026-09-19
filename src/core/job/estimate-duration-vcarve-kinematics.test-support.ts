@@ -62,12 +62,15 @@ function appendMove(
   const dz = to.z - from.z;
   const distance = Math.hypot(dx, dy, dz);
   if (distance <= 1e-9) return;
-  const risingVertically = Math.hypot(dx, dy) <= 1e-9 && dz > 0;
+  // Every feed move inside the cut belongs to the cut bucket, rises included:
+  // drilling.test.ts pins that a peck cycle prices each vertical peck *and its
+  // chip clear* rather than their zero XY projection, and the emitter draws no
+  // distinction either. Only a rapid is travel.
   moves.push({
     distance,
     direction: { x: dx / distance, y: dy / distance, z: dz / distance },
     velocity: Math.min(feed, DEFAULT_DEVICE_PROFILE.maxFeed) / 60,
-    bucket: rapid ? 'rapid' : risingVertically ? 'feedTravel' : 'cut',
+    bucket: rapid ? 'rapid' : 'cut',
     stopAfter,
   });
 }

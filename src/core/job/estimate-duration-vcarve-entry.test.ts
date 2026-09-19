@@ -133,7 +133,9 @@ describe('V-carve ramp duration', () => {
 
     expect(emitted).toContain('X0.000Y0.000Z0.000F1000');
     expectMotion(estimate, representedPoints, [1000]);
-    expect(estimate.breakdown.feedTravelSeconds).toBeGreaterThan(0);
+    // The rise is priced, not dropped for its zero XY projection; it is cut
+    // time because the tool is still in the material at working feed.
+    expect(estimate.breakdown.cutSeconds).toBeGreaterThan(0);
   });
 
   it('prices entry and retract travel from represented safe Z and entry Z', () => {
@@ -177,10 +179,13 @@ describe('V-carve ramp duration', () => {
     );
 
     expectMotion(estimate, points, [PLUNGE_FEED_MM_PER_MIN]);
-    // Reversal stops the entry plunge. A pure +Z G1 is feed travel, and
-    // the preserved rapid/feed boundary also stops before the G0 retract.
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(5 / 5 + 5 / 500, 9);
-    expect(estimate.breakdown.feedTravelSeconds).toBeCloseTo(1 / 5 + 5 / 500, 9);
+    // Reversal stops the entry plunge, and the preserved rapid/feed boundary
+    // stops again before the G0 retract. The rise is cut time: the tool is
+    // still 1-2 mm into the material at working feed, exactly as the mirror
+    // descent above is. drilling.test.ts pins the same rule for a peck's chip
+    // clear, so a feed-rate +Z move is never priced as travel.
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(5 / 5 + 5 / 500 + 1 / 5 + 5 / 500, 9);
+    expect(estimate.breakdown.feedTravelSeconds ?? 0).toBe(0);
   });
 });
 

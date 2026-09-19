@@ -82,7 +82,11 @@ describe('estimateJobDuration follows emitted CNC commands', () => {
     expect(result.unavailableReason).toBeUndefined();
     expect(result.totalSeconds).toBeGreaterThanOrEqual(105 + 0.2 + 3);
     expect(result.totalSeconds).toBeLessThan(109);
-    expect(result.breakdown.feedTravelSeconds).toBeGreaterThanOrEqual(45);
+    // All 105 mm of G1 is cut time. The 45 mm of chip-clear returns are feed
+    // moves with the tool still in the hole, so they are priced with the
+    // descents, not as travel (drilling.test.ts pins the same rule).
+    expect(result.breakdown.cutSeconds).toBeGreaterThanOrEqual(105);
+    expect(result.breakdown.feedTravelSeconds ?? 0).toBe(0);
   });
 
   it('uses full XYZ distance and plunge feed for internal vertical path3d moves', () => {
@@ -109,9 +113,10 @@ describe('estimateJobDuration follows emitted CNC commands', () => {
     expect(program).toContain('G1 X1.000 Y0.000 Z-11.000 F1200');
     expect(program).toContain('G1 X1.000 Y0.000 Z-1.000 F60');
     // Entry is 6 mm at 1 mm/s; diagonal is sqrt(1²+10²) mm at 20 mm/s;
-    // the vertical return is another 10 mm at 1 mm/s.
-    expect(result.breakdown.cutSeconds).toBeGreaterThanOrEqual(6 + Math.sqrt(101) / 20);
-    expect(result.breakdown.feedTravelSeconds).toBeGreaterThanOrEqual(10);
+    // the vertical return is another 10 mm at 1 mm/s. The return is still a
+    // feed move inside the material, so it is cut time too.
+    expect(result.breakdown.cutSeconds).toBeGreaterThanOrEqual(6 + Math.sqrt(101) / 20 + 10);
+    expect(result.breakdown.feedTravelSeconds ?? 0).toBe(0);
     expect(result.totalSeconds).toBeGreaterThanOrEqual(16 + Math.sqrt(101) / 20 + 3);
   });
 

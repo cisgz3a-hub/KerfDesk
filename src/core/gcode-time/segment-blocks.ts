@@ -58,7 +58,11 @@ function segmentDistance(model: GcodeRenderModel, index: number, chordLength: nu
 
 function isCutting(model: GcodeRenderModel, index: number): boolean {
   const kind = model.segKind[index];
-  return kind === SEG_KIND.cut || kind === SEG_KIND.plunge;
+  if (kind === SEG_KIND.cut || kind === SEG_KIND.plunge) return true;
+  // A Z-only retract commanded at feed rate is the chip clear inside a peck
+  // cycle, not a seek: the tool is still in the hole at working feed and the
+  // preview counts it in the cut step. Only a rapid retract is travel.
+  return kind === SEG_KIND.retract && model.segMotion[index] !== SEG_MOTION.rapid;
 }
 
 // A feed move with no F word is a program defect (Program Health reports it);
