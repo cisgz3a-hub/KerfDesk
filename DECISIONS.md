@@ -19938,8 +19938,10 @@ maps all eleven findings to primary sources and scoped verification.
 1. Raster compilation preserves sufficient PWM resolution and returns power in the profile's
    original S units. Controller exporters convert stored and streamed rows once without consuming
    or mutating their providers. Vectors retain percentage-based power.
-2. Marlin inline output explicitly enters `M3 I S0` and exits `M5 I`, and omits G54/G94 from the
-   inherited GRBL preamble. Compensation depends on the firmware build. Fan output retains its
+2. Marlin inline output clears stale mode with `M5 I`, enters `M3 I S0` and exits `M5 I`, and
+   omits G54/G94 from the inherited GRBL preamble. Re-entry first settles and disables power with
+   `M5 I`, preserving an explicit timing boundary with either `LASER_POWER_SYNC` build choice
+   without assuming idle laser blanking. Compensation depends on the firmware build. Fan output retains its
    separate M106/M107 contract. Supported build prerequisites are disclosed during setup.
 3. Smoothieware V1 uses settled M221 native power modes and the exact `fire off` shell completion
    for acknowledgement. Jobs, Frame, jog and Home clear native manual firing. The profile must

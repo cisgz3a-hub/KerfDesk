@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { buildGcodeRenderModel, type GcodeRenderModel } from '../gcode-view';
+import { buildProgramTime } from '../gcode-time';
 import type { Group, Job } from '../job';
 import { marlinStrategy } from './marlin-strategy';
 import { smoothiewareStrategy } from './smoothieware-strategy';
@@ -47,6 +49,58 @@ const JOB: Job = {
     vector('dynamic'),
   ],
 };
+
+const FILL_TO_CUT_JOB: Job = {
+  groups: [
+    {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#ff0000',
+      power: 50,
+      powerMode: 'dynamic',
+      speed: 6000,
+      passes: 1,
+      airAssist: false,
+      overscanMm: 1,
+      segments: [
+        {
+          polyline: [
+            { x: 10, y: 10 },
+            { x: 20, y: 10 },
+          ],
+          closed: false,
+          reverse: false,
+        },
+      ],
+    },
+    {
+      kind: 'cut',
+      layerId: 'cut',
+      color: '#ff0000',
+      power: 50,
+      powerMode: 'constant',
+      speed: 6000,
+      passes: 1,
+      airAssist: false,
+      segments: [
+        {
+          polyline: [
+            { x: 22, y: 10 },
+            { x: 30, y: 10 },
+          ],
+          closed: false,
+        },
+      ],
+    },
+  ],
+};
+
+function renderModel(gcode: string): GcodeRenderModel {
+  const parsed = buildGcodeRenderModel(gcode, { machineKind: 'laser' });
+  if (parsed.kind !== 'ok') throw new Error(parsed.reason);
+  expect(parsed.model.unsupportedWords).toEqual([]);
+  return parsed.model;
+}
 
 function sValue(line: string, fallback: number): number {
   const value = /\bS([\d.]+)/.exec(line)?.[1];
@@ -96,6 +150,8 @@ describe('native controller power modes', () => {
         power = 0;
         if (/\bI\b/.test(line)) mode = 'standard';
       } else if (/^M[34]\b/.test(line)) {
+        // Every native entry follows a drain that applies PWM zero before ACK.
+        expect(mode).toBe('standard');
         if (/\bI\b/.test(line)) mode = line.startsWith('M3') ? 'continuous' : 'dynamic';
         power = sValue(line, power);
       } else if (/^G0\b/.test(line)) power = 0;
@@ -111,5 +167,54 @@ describe('native controller power modes', () => {
     expect(out[0]).toBe('M5 I');
     expect(out.some((line) => /^M4\b/.test(line))).toBe(false);
     expect(out.slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 S0']);
+  });
+
+  it('drains and turns off before repeated Marlin inline entry after S0', () => {
+    const output = marlinStrategy.emit(FILL_TO_CUT_JOB, {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'marlin',
+      maxPowerS: 255,
+      gcodeDialect: { dialectId: 'marlin-inline' },
+    });
+    const lines = output.trim().split('\n');
+    const leadOutLine = lines.indexOf('G0 X21.000 Y10.000 S0');
+    const approachLine = lines.indexOf('G0 X22.000 Y10.000 S0');
+    expect(leadOutLine).toBeGreaterThan(0);
+    expect(approachLine).toBeGreaterThan(leadOutLine);
+    expect(lines.slice(leadOutLine, leadOutLine + 3)).toEqual([
+      'G0 X21.000 Y10.000 S0',
+      'M5 I',
+      'M3 I S0',
+    ]);
+    const model = renderModel(output);
+    expect(model.events).toContainEqual({
+      kind: 'synchronization',
+      line: leadOutLine + 1,
+      code: 'spindle',
+      isBeforeMotion: true,
+    });
+    // Explicit off/on events establish the stop for both LASER_POWER_SYNC
+    // builds, even though the previous motion already commanded S0.
+    expect(model.events).toContainEqual({
+      kind: 'synchronization',
+      line: leadOutLine + 2,
+      code: 'spindle',
+      isBeforeMotion: true,
+    });
+    const limits = { accelMmPerSec2: 500, junctionDeviationMm: 0.01, maxFeedMmPerMin: 6000 };
+    const timed = buildProgramTime(model, limits);
+    const leadOut = [...model.segLine].indexOf(leadOutLine);
+    const approach = [...model.segLine].indexOf(approachLine);
+    expect(leadOut).toBeGreaterThanOrEqual(0);
+    expect(approach).toBe(leadOut + 1);
+    expect(timed.segExitVelocityMmPerSec[leadOut]).toBe(0);
+    expect(timed.segEntryVelocityMmPerSec[approach]).toBe(0);
+    const withoutTeardown = buildProgramTime(
+      renderModel(output.replace(/^M5 I\n(?=M3 I S0)/gm, '')),
+      limits,
+    );
+    expect(withoutTeardown.segExitVelocityMmPerSec[leadOut]).toBeGreaterThan(0);
+    expect(withoutTeardown.segEntryVelocityMmPerSec[approach]).toBeGreaterThan(0);
+    expect(timed.totalSeconds).toBeGreaterThan(withoutTeardown.totalSeconds);
   });
 });

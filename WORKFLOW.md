@@ -5083,8 +5083,10 @@ and lifts the command's CNC-only gate.)*
    host stops sending and requests `M5 I` + `M107` cleanup.
 4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
 5. Inline export targets modern Marlin `LASER_FEATURE` with PWM, researched against 2.1.2.6:
-   `M3 I` enters continuous inline mode, each move carries its requested S power, and `M5 I`
-   exits the mode. `CUTTER_POWER_UNIT` determines S units; `LASER_POWER_TRAP` determines
+   `M5 I` settles and disables power before inline entry or re-entry with `M3 I S0`, each move
+   carries its requested S power, and `M5 I` exits the mode. This explicit boundary applies with
+   either `LASER_POWER_SYNC` build choice. `CUTTER_POWER_UNIT` determines S units;
+   `LASER_POWER_TRAP` determines
    acceleration compensation. The per-layer GRBL Constant/Dynamic selector is replaced by a
    firmware explanation. Origin reset requires `CNC_COORDINATE_SYSTEMS` and a non-SCARA build.
    The emitted preamble does not assume `G54` or `G94` support.

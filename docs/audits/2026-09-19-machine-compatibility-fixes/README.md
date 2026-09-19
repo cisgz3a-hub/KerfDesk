@@ -11,7 +11,7 @@ families and one researched cutting starter. These categories overlap.
 | Audit finding | Corrected behaviour | Independent basis |
 | --- | --- | --- |
 | MC-01 Smoothieware raster power | Compile/dither at sufficient PWM resolution, preserve original-unit job values, then convert stored or streamed rows once at output. At an S1 maximum, black-image 25/50/100% emits S0.25/S0.5/S1. | Native Laser module S scaling and public exporter regression cases. |
-| MC-02 Marlin inline mode and preamble | Normalize stale inline mode, enter `M3 I S0`, retain per-move S and exit with `M5 I`. Omit GRBL-specific G54/G94 assumptions. The UI identifies firmware-defined acceleration compensation. | Marlin 2.1.2.6 native M3/M4/M5 and motion dispatch. M4 I is feedrate-derived, not a replacement for GRBL dynamic power. |
+| MC-02 Marlin inline mode and preamble | Clear stale inline mode with `M5 I`, enter `M3 I S0`, retain per-move S and exit with `M5 I`. Re-entry first settles and disables power with `M5 I`. Omit GRBL-specific G54/G94 assumptions. The UI identifies firmware-defined acceleration compensation. | Marlin 2.1.2.6 native M3/M4/M5 and motion dispatch. Native off/re-arm boundaries remove the timing difference between LASER_POWER_SYNC builds without assuming idle laser blanking. M4 I is feedrate-derived, not a replacement for GRBL dynamic power. |
 | MC-03 Onefinity compatibility | Retain useful geometry templates with explicit controller/postprocessor limitations, generation notes, dated sources, and unchanged selected-controller disclosure. | Onefinity distinguishes Buildbotics, MASSO and Redline. MASSO G04 P uses milliseconds; a GRBL file is not thereby qualified. |
 | MC-04 Falcon A1 Pro | Vendor configuration supplies **X358/Y268**, 115200 baud, S1000, M8 air and `$HZ1` autofocus. An explicit command-set field disables settings fetch and native `$J` jogging, uses bounded tool-off G1 jog/Frame, and acknowledges `$HX` then `$HY` independently. | Creality's downloadable LightBurn device configuration, recovered after the original audit could not load the guide. Its Width/Height fields resolve the axis assignment absent from the product's 268 x 358 prose. |
 | MC-05 Sculpfun air | Stock S30 emits M8/M9 when air is requested; a separate manual-pump preset emits no pump command. | Sculpfun's stock pump specification plus actual output tests. |
@@ -31,7 +31,7 @@ Generated-file inspection and countdown use the same native contracts. Marlin's 
 flag is recognized on its laser mode commands; Smoothieware `M221 S` remains a percentage
 override separate from motion S. Native powered moves remain cutting segments in current-job,
 streamed and retained-run inspection. Export provenance uses emitter revision
-`machine-compatibility-20260919-v1`, and headers describe the actual native power commands.
+`machine-compatibility-20260919-v2`, and headers describe the actual native power commands.
 
 ## Supported contracts and remaining limits
 
@@ -42,7 +42,9 @@ streamed and retained-run inspection. Export provenance uses emitter revision
   Existing saved profiles require deliberate preset reapplication to adopt the new command set;
   custom machine settings are not silently migrated.
 - **Marlin:** inline contract researched against 2.1.2.6 `LASER_FEATURE` with PWM. Match S maximum to
-  `CUTTER_POWER_UNIT`; `LASER_POWER_TRAP` is a build choice. Origin reset requires
+  `CUTTER_POWER_UNIT`; `LASER_POWER_TRAP` is a build choice. Native M5 I off/re-arm boundaries
+  settle builds with either `LASER_POWER_SYNC` choice, so inspection/countdown use emitted
+  boundaries instead of guessing that firmware option or assuming idle power is blanked. Origin reset requires
   `CNC_COORDINATE_SYSTEMS` on a non-SCARA build. Fan wiring uses the separate M106/M107 dialect.
 - **Smoothieware:** V1 native laser configuration and exact documented shell completion semantics.
   Set `laser_module_minimum_power` to `0` so S0 feed moves remain dark, and match
@@ -65,6 +67,7 @@ is inferred from passing software tests.
   [vendor bundle](https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip).
   The accompanying JSON records selected factual fields and the downloaded bundle's hash.
 - [Marlin M3](https://marlinfw.org/docs/gcode/M003.html),
+  [Marlin M400](https://marlinfw.org/docs/gcode/M400.html),
   [Marlin 2.1.2.6 M3/M5 source](https://github.com/MarlinFirmware/Marlin/blob/5554ccb52f4d449d97ef88b28d03b53d9d63ba70/Marlin/src/gcode/control/M3-M5.cpp),
   [Marlin G92 source](https://github.com/MarlinFirmware/Marlin/blob/5554ccb52f4d449d97ef88b28d03b53d9d63ba70/Marlin/src/gcode/geometry/G92.cpp).
 - [Smoothieware laser configuration](https://smoothieware.org/laser.html),
