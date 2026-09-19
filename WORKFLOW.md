@@ -2227,9 +2227,10 @@ streaming controls. Two buttons:
   acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
-  next WCO-bearing status frame arrives. Set Origin switches placement
-  to user origin after that `ok` and its bounded work-offset wait finish.
-  A cancelled action leaves placement unchanged.
+  next WCO-bearing status frame arrives. Set Origin upgrades an Absolute
+  Coordinates placement to User Origin after that `ok` and its bounded
+  work-offset wait finish; an explicit User, Verified, or Current Position
+  choice is kept (ADR-323). A cancelled action leaves placement unchanged.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -2340,7 +2341,9 @@ on the rail, below the job actions, as the hand-placement fallback):
 
 1. **Jog with controls.** The operator jogs to the workpiece zero and clicks
    **Set origin here** (User Origin), or selects **Current Position** in the
-   Start from dropdown and jogs to the chosen 9-dot job anchor. Set origin is
+   Start from dropdown and jogs to the chosen 9-dot job anchor (the nine anchors
+   name physical corners of the artwork as drawn on the canvas, on every machine
+   origin — ADR-323). Set origin is
    not required while Current Position is active, but the exact completed Frame
    is required in both modes. (The former "Choose jog positioning" button was
    removed as redundant with the Start from dropdown — ADR-225.)
