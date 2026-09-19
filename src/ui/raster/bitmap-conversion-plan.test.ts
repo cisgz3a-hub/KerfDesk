@@ -32,9 +32,8 @@ describe('estimateBitmapConversion transform handling', () => {
     const plan = estimateBitmapConversion({ bounds: SQUARE_180, transform: ROT_45 });
     expect(plan.pixelWidth).toBe(2546);
     expect(plan.pixelHeight).toBe(2546);
-    // This formerly tripped the blunt 4M-pixel ceiling. Its measured working
-    // set fits, so the dialog and builder now allow it.
-    expect(plan.verdict.kind).toBe('ok');
+    // The conversion peak includes encoding buffers, not only dither luma.
+    expect(plan.verdict.kind).toBe('too-large');
   });
 
   it('matches the baked-bounds estimate the builder uses, for any transform', () => {
@@ -64,6 +63,26 @@ describe('estimateBitmapConversion transform handling', () => {
     });
     expect(plan.pixelWidth).toBe(400); // 40 mm × 10 lines/mm
     expect(plan.pixelHeight).toBe(300); // 30 mm × 10 lines/mm
+  });
+
+  it.each([
+    { minX: 10, minY: 0, maxX: 0, maxY: 10 },
+    { minX: 0, minY: 10, maxX: 10, maxY: 0 },
+    { minX: NaN, minY: 0, maxX: 10, maxY: 10 },
+  ])('refuses invalid source bounds before a transformed AABB can normalize them', (bounds) => {
+    const plan = estimateBitmapConversion({ bounds, transform: ROT_45 });
+    expect(plan.verdict.kind).toBe('too-large');
+  });
+
+  it('gives a horizontal outline one centred pixel pitch without changing its length', () => {
+    const plan = estimateBitmapConversion({
+      bounds: { minX: 0, minY: 5, maxX: 10, maxY: 5 },
+      transform: IDENTITY_TRANSFORM,
+    });
+    expect(plan.verdict.kind).toBe('ok');
+    expect(plan.pixelWidth).toBe(100);
+    expect(plan.pixelHeight).toBe(1);
+    expect(plan.bounds).toEqual({ minX: 0, minY: 4.95, maxX: 10, maxY: 5.05 });
   });
 });
 

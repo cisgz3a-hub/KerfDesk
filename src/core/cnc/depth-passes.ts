@@ -25,6 +25,8 @@ export function zPassArrayMaterializationError(
 }
 
 export function zPassDepths(depthMm: number, depthPerPassMm: number): ReadonlyArray<number> {
+  const materializationError = zPassArrayMaterializationError(depthMm, depthPerPassMm);
+  if (materializationError !== null) throw new RangeError(materializationError);
   const count = zPassCount(depthMm, depthPerPassMm);
   if (count === 0) return [];
   const perPass =
@@ -39,7 +41,7 @@ export function zPassDepths(depthMm: number, depthPerPassMm: number): ReadonlyAr
   return out;
 }
 
-function zPassCount(depthMm: number, depthPerPassMm: number): number {
+export function zPassCount(depthMm: number, depthPerPassMm: number): number {
   if (!Number.isFinite(depthMm) || depthMm <= 0) return 0;
   const perPass =
     Number.isFinite(depthPerPassMm) && depthPerPassMm > 0

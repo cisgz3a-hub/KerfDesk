@@ -31,6 +31,7 @@ import {
   applyReimport,
   applyUpsertText,
   type ImportOutcome,
+  type TextInsertOptions,
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
 import {
@@ -154,11 +155,11 @@ function reimportSvgObjectAction(set: Setter, get: Getter): AppState['reimportSv
 }
 
 function upsertTextObjectAction(set: Setter): AppState['upsertTextObject'] {
-  return (text: TextObject, embeddedFont?: EmbeddedFont) => {
+  return (text: TextObject, embeddedFont?: EmbeddedFont, options?: TextInsertOptions) => {
     set((state) =>
       applyLayerDefaultsToFreshLayers(
         state.project.scene.layers,
-        applyTextAndEmbeddedFont(state, text, embeddedFont),
+        applyTextAndEmbeddedFont(state, text, embeddedFont, options),
         state.layerDefaults,
         state.cncLiveCaps,
       ),
@@ -222,8 +223,13 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
   };
 }
 
-function applyTextAndEmbeddedFont(state: AppState, text: TextObject, embeddedFont?: EmbeddedFont) {
-  const next = applyUpsertText(state, text);
+function applyTextAndEmbeddedFont(
+  state: AppState,
+  text: TextObject,
+  embeddedFont?: EmbeddedFont,
+  options?: TextInsertOptions,
+) {
+  const next = applyUpsertText(state, text, options);
   if (embeddedFont === undefined) return next;
   const existing = next.project.embeddedFonts ?? [];
   const embeddedFonts = [...existing.filter((font) => font.key !== embeddedFont.key), embeddedFont];

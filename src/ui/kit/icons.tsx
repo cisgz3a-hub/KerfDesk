@@ -26,6 +26,7 @@ export type IconName =
   | 'home'
   | 'trash'
   | 'cursor'
+  | 'text'
   | 'nodes'
   | 'square'
   | 'circle'
@@ -78,6 +79,7 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   home: <path d="M2.5 8 8 2.5 13.5 8M4.5 7v6.5h7V7" />,
   trash: <path d="M2.5 4.5h11M6.5 4.5v-2h3v2M4 4.5l.7 9h6.6l.7-9M6.5 7v4M9.5 7v4" />,
   cursor: <path d="M4 3l8 4.5-3.3 1L11 13l-1.7.8-2.3-4.5L4 11.5V3Z" />,
+  text: <path d="M3 5V3h10v2M8 3v10M5 13h6" />,
   nodes: (
     <>
       <path d="M4.5 4.5h7v7h-7Z" />

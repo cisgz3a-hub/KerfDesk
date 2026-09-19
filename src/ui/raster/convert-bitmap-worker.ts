@@ -40,8 +40,9 @@ async function encodeRasterInWorker(raster: VectorRaster): Promise<BitmapFields>
   const canvas = new OffscreenCanvas(raster.width, raster.height);
   const ctx = canvas.getContext('2d');
   if (ctx === null) throw new Error('Could not create worker canvas context for bitmap encoding.');
-  const imageData = ctx.createImageData(raster.width, raster.height);
-  imageData.data.set(rgba);
+  // ImageData adopts this array; createImageData + set would duplicate the
+  // entire RGBA buffer at the conversion's peak allocation point.
+  const imageData = new ImageData(rgba, raster.width, raster.height);
   ctx.putImageData(imageData, 0, 0);
   const blob = await canvas.convertToBlob({ type: PNG_MIME });
   return { dataUrl: blobToDataUrl(blob), lumaBase64: lumaToBase64(raster.luma) };

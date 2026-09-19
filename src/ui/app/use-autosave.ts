@@ -1,5 +1,4 @@
-// useAutosave + useAutosaveRecovery — wires the autosave module to the
-// React lifecycle. Two effects, mounted once each in App.
+// useAutosave wires the autosave module to the React lifecycle.
 //
 // useAutosave:
 //   * 30s interval that snapshots project + dirty + streaming from
@@ -9,12 +8,8 @@
 //     interval snapshot because unload cannot await IndexedDB.
 //   Stops scheduling on unmount; the browser releases session ownership.
 //
-// useAutosaveRecovery:
-//   Runs once on mount. If durable storage has an autosave AND the
-//   current project is empty (no objects), asks the user (job-aware
-//   confirm) whether to restore. Restoring keeps the slot armed until
-//   the first manual save (M15); declining discards it so the user
-//   isn't re-prompted next session.
+// Recovery is offered by AutosaveRecoveryBanner without blocking startup.
+// Restoring keeps a durable copy until the first manual save (M15).
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
@@ -28,7 +23,6 @@ import {
 } from '../state/autosave-durable';
 import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-loop';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
@@ -107,35 +101,37 @@ type AutosaveRecoveryService = {
 };
 
 export async function runAutosaveRecovery(
-  // jobAwareConfirm is a pass-through native confirm here (recovery runs at
-  // app start, before any connection), but keeps the raw-dialog lint ban
-  // (H13) airtight with a single exempt module.
-  confirmRestore: (message: string) => boolean = jobAwareConfirm,
+  chooseRestore: (ageLabel: string) => boolean | null | Promise<boolean | null>,
   service: AutosaveRecoveryService = projectAutosaveService,
 ): Promise<void> {
-  const entryDocumentEpoch = useStore.getState().projectDocumentEpoch;
+  const entryState = useStore.getState();
+  const isUntouched = (): boolean => {
+    const current = useStore.getState();
+    return (
+      current.projectDocumentEpoch === entryState.projectDocumentEpoch &&
+      current.project === entryState.project &&
+      !current.dirty &&
+      current.project.scene.objects.length === 0
+    );
+  };
   const read = await service.readLatest();
   reportRecoveryWarnings(read);
   const record = read.snapshot;
   if (record === null) return;
-  // Only prompt if the in-memory project is still the empty default.
+  // Only offer recovery if the in-memory project is still the empty default.
   // If something already loaded (URL drop, deep-link, etc.), the user
   // is mid-workflow and recovery would clobber it. Leave the slot alone
   // (M15: clearing here silently destroyed the only backup).
-  const s = useStore.getState();
-  if (
-    s.projectDocumentEpoch !== entryDocumentEpoch ||
-    s.dirty ||
-    s.project.scene.objects.length > 0
-  ) {
-    return;
-  }
+  if (!isUntouched()) return;
   const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
-  const ageLabel = ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute(s) ago`;
-  const ok = confirmRestore(
-    `CurveDesk found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
-      '(Click Cancel to discard the auto-save and start fresh.)',
-  );
+  const ageLabel =
+    ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute${ageMin === 1 ? '' : 's'} ago`;
+  const ok = await chooseRestore(ageLabel);
+  // The nonblocking choice may stay open while the user imports, edits, or
+  // starts a new document. Neither restore nor cleanup may act on that work.
+  // null means Hide/unmount: leave the only backup intact.
+  if (ok === null || !isUntouched()) return;
+  const s = useStore.getState();
   if (ok) {
     const loadResult = s.setProject(record.project);
     if (loadResult.kind === 'capability-warning') {
@@ -166,12 +162,6 @@ export async function runAutosaveRecovery(
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
   reportCleanupResult(await service.clearRecovered(record));
-}
-
-export function useAutosaveRecovery(): void {
-  useEffect(() => {
-    void runAutosaveRecovery();
-  }, []);
 }
 
 function reportRecoveryWarnings(result: AutosaveDurableReadResult): void {

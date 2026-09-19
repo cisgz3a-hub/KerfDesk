@@ -11,6 +11,7 @@ import {
   parseArgs as parseReleaseArgs,
 } from './generate-release-integrity.mjs';
 import {
+  CALLIGRAPHY_OUTLINE_FONTS,
   CNC_STROKE_FONTS,
   OPENCLIPART_ASSETS,
   OUTLINE_FONTS,
@@ -106,6 +107,20 @@ test('renders deterministic notices for every production package and artwork ass
   for (const dependency of packages) {
     assert.match(first, new RegExp(`Package: ${dependency.name.replace('/', '\\/')}@`));
   }
+  for (const font of CALLIGRAPHY_OUTLINE_FONTS) {
+    assert.equal(sha256File(path.join(REPO_ROOT, font.file)), font.sha256);
+    const originalLicense = fs
+      .readFileSync(path.join(REPO_ROOT, font.licenseFile), 'utf8')
+      .trim()
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+$/gm, '');
+    assert.match(originalLicense, /SIL OPEN FONT LICENSE Version 1\.1/);
+    assert.ok(first.includes(originalLicense), `${font.name} original license must ship`);
+    assert.ok(first.includes(font.source));
+    assert.ok(first.includes(font.sha256));
+  }
+  assert.match(first, /Copyright 2015 The Great Vibes Pro Project Authors/);
+  assert.match(first, /Copyright 2024 The Pinyon Project Authors/);
 });
 
 test('writes deterministic checksums, manifest, and CycloneDX SBOM', () => {

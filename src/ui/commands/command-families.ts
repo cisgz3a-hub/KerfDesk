@@ -86,7 +86,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       ),
       active: ctx.measureActive,
     },
-    enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
+    canvasTextCommand(ctx),
     registrationJigCommand(ctx),
     cameraCommand(ctx),
     placeBoardCommand(ctx),
@@ -149,6 +149,17 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function canvasTextCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'tools.add-text',
+    'tools',
+    'Text...',
+    'Type and edit text on the canvas',
+    ctx.addText,
+    'T',
+  );
 }
 
 function convertToPathCommand(ctx: AppCommandContext): AppCommand {

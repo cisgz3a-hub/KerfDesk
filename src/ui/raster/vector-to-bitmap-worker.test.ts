@@ -54,6 +54,8 @@ function fakeRaster(id: string): RasterImage {
 
 afterEach(() => {
   resetConvertBitmapWorkerForTests();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -86,12 +88,51 @@ describe('buildBitmapFromVectors worker selection', () => {
     expect(result.id).toBe((workerRequests[0] as { readonly rasterId: string }).rasterId);
   });
 
-  it('refuses medium-large conversions when no worker is available', async () => {
-    vi.stubGlobal('Worker', undefined);
+  it.each([10, 80])(
+    'refuses %s mm conversions when no worker is available instead of replaying geometry inline',
+    async (size) => {
+      vi.stubGlobal('Worker', undefined);
 
-    await expect(
-      buildBitmapFromVectors([svgWithBounds({ minX: 0, minY: 0, maxX: 80, maxY: 80 })]),
-    ).rejects.toThrow('Convert to Bitmap worker is unavailable for this large conversion');
+      await expect(
+        buildBitmapFromVectors([svgWithBounds({ minX: 0, minY: 0, maxX: size, maxY: size })]),
+      ).rejects.toThrow('Convert to Bitmap worker is unavailable');
+    },
+  );
+
+  it('rejects a small worker timeout without replaying the conversion on the UI thread', async () => {
+    vi.useFakeTimers();
+    const createElement = vi.spyOn(document, 'createElement');
+    vi.stubGlobal(
+      'Worker',
+      class {
+        onmessage = null;
+        onerror = null;
+        postMessage(): void {
+          /* Simulate expensive work that never replies. */
+        }
+        terminate(): void {
+          /* Worker is stopped by the deadline. */
+        }
+      },
+    );
+    const pending = buildBitmapFromVectors([
+      svgWithBounds({ minX: 0, minY: 0, maxX: 10, maxY: 10 }),
+    ]);
+    const rejected = expect(pending).rejects.toThrow('Convert to Bitmap worker timed out');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejected;
+    expect(createElement).not.toHaveBeenCalled();
+  });
+
+  it('rejects an already cancelled build before planning or starting a worker', async () => {
+    const construct = vi.fn();
+    vi.stubGlobal('Worker', construct);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(buildBitmapFromVectors([], {}, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(construct).not.toHaveBeenCalled();
   });
 
   it('retires the worker when posting a conversion request fails', async () => {

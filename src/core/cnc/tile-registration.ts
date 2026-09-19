@@ -1,46 +1,72 @@
-import type { CncGroup, CncPass, Job } from '../job';
-import type { Vec2 } from '../scene';
+import type { CncGroup } from '../job';
+import type { DeviceProfile } from '../devices';
+import type { CncMachineConfig, Vec2 } from '../scene';
 import type { CncTile } from './cnc-tile';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
+import { capFeed, capSpindle } from './compile-cnc-helpers';
+import { coolantFields } from './coolant-fields';
+import { parkFields } from './motion-polish';
+import type { ResolvedTileRegistration } from './tile-registration-plan';
+import { tileRegistrationPasses } from './tile-registration-passes';
 
-/** Depth of every optional CNC tile registration peck. */
+/** @deprecated Legacy nominal depth; emitted holes use the saved registration plan. */
 export const REGISTRATION_HOLE_DEPTH_MM = 3;
 
 const REGISTRATION_HOLE_EDGE_FRACTIONS = [0.25, 0.75];
+
+/** Exact maximum over this regular grid, before any bore passes are allocated. */
+export function maximumRegistrationHolesPerTile(grid: EffectiveCncTileGrid): number {
+  const horizontalSeams = Math.min(2, grid.work.columns - 1);
+  const verticalSeams = Math.min(2, grid.work.rows - 1);
+  return REGISTRATION_HOLE_EDGE_FRACTIONS.length * (horizontalSeams + verticalSeams);
+}
 
 /**
  * Build the registration drill group for one tile from the same effective
  * grid that placed its clipping rectangle.
  */
 export function registrationGroupForTile(
-  job: Job,
   tile: CncTile,
   grid: EffectiveCncTileGrid,
+  registration: ResolvedTileRegistration,
+  machine: CncMachineConfig,
+  device: DeviceProfile,
 ): CncGroup | null {
-  const template = job.groups.find((group) => group.kind === 'cnc');
-  if (template === undefined || template.kind !== 'cnc') return null;
   const centers = seamHoleCenters(tile, grid);
   if (centers.length === 0) return null;
-  const passes: CncPass[] = centers.map((center) => ({
-    kind: 'path3d',
-    closed: false,
-    points: [
-      {
-        x: center.x - tile.rect.minX,
-        y: center.y - tile.rect.minY,
-        z: -REGISTRATION_HOLE_DEPTH_MM,
-      },
-      { x: center.x - tile.rect.minX, y: center.y - tile.rect.minY, z: 0 },
-    ],
-  }));
-  const { vResolutionMm: _vResolutionMm, ...templateWithoutVResolution } = template;
+  const { tool, settings } = registration;
+  const isPeck = settings.holeDiameterMm === tool.diameterMm;
   return {
-    ...templateWithoutVResolution,
-    cutType: 'drill',
-    requestedDepthMm: REGISTRATION_HOLE_DEPTH_MM,
-    depthPerPassMm: REGISTRATION_HOLE_DEPTH_MM,
-    feedMmPerMin: Math.min(template.feedMmPerMin, template.plungeMmPerMin),
-    passes,
+    kind: 'cnc',
+    layerId: 'tile-registration',
+    color: '#7c3aed',
+    cutType: isPeck ? 'drill' : 'pocket',
+    toolId: tool.id,
+    toolName: tool.name,
+    toolKind: tool.kind,
+    toolDiameterMm: tool.diameterMm,
+    layerPrimaryToolId: tool.id,
+    ...(tool.fluteCount === undefined ? {} : { toolFluteCount: tool.fluteCount }),
+    requestedDepthMm: settings.depthMm,
+    registrationHoleDiameterMm: settings.holeDiameterMm,
+    depthPerPassMm: settings.depthPerPassMm,
+    feedMmPerMin: capFeed(
+      isPeck ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin) : settings.feedMmPerMin,
+      device.maxFeed,
+    ),
+    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
+    spindleRpm: capSpindle(settings.spindleRpm, machine.params.spindleMaxRpm),
+    spindleSpinupSec: Math.max(0, machine.params.spindleSpinupSec),
+    safeZMm: Math.max(0, machine.params.safeZMm),
+    ...coolantFields(machine),
+    ...parkFields(machine),
+    passes: centers.flatMap((center) =>
+      tileRegistrationPasses(
+        { x: center.x - tile.rect.minX, y: center.y - tile.rect.minY },
+        settings,
+        tool.diameterMm,
+      ),
+    ),
   };
 }
 

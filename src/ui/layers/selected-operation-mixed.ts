@@ -20,6 +20,8 @@ const OPERATION_SETTING_KEYS = [
   'hatchSpacingMm',
   'fillOverscanMm',
   'fillBidirectional',
+  'allowUncalibratedBidirectionalScan',
+  'bidirectionalScanOffsetMm',
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',

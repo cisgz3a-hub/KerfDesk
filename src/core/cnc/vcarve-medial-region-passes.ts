@@ -15,6 +15,8 @@ import {
 import type { VCarveOptions } from './vcarve-ladder';
 import { vcarveEmittedProfileCovers, vcarveRoutePrecisionMet } from './vcarve-emitted-profile';
 import type { VCarveMedialRegionGeometryPlan } from './vcarve-medial-region-plan';
+import { vcarveConservativeZ, vcarveEmissionConstraints } from './vcarve-cutting-constraints';
+import { emittedPoint } from './vcarve-detail-geometry';
 
 const MEDIAL_Z_TOLERANCE_MM = 0.05;
 // Ten microns is the emitted CAM-footprint tolerance. It is checked against
@@ -37,13 +39,14 @@ export function passesForVCarveMedialRegion(
 ): VCarveRegionPassPlan {
   const passes: CncPass[] = [];
   const depthSegments = buildVCarveBoundarySegmentIndex(sourceBoundarySegments(plan.region.loops));
+  const certifiedLaw = { ...law, ...vcarveEmissionConstraints(law) };
   let toleranceMet = true;
   let thinResidual = plan.thinResidual;
   for (let index = 0; index < plan.routes.length; index += 1) {
     const route = plan.routes[index];
     const referenceRoute = plan.referenceRoutes[index] ?? route;
     if (route === undefined || referenceRoute === undefined) continue;
-    const routePlan = passesForRoute(route, referenceRoute, depthSegments, law, options);
+    const routePlan = passesForRoute(route, referenceRoute, depthSegments, certifiedLaw, options);
     passes.push(...routePlan.passes);
     toleranceMet = toleranceMet && routePlan.toleranceMet;
     thinResidual = thinResidual || routePlan.passes.length === 0;
@@ -88,10 +91,8 @@ function passesForRoute(
     route.closed,
     depthSegments,
     {
+      ...law,
       depthPerPassMm: options.depthPerPassMm,
-      tanHalf: law.tanHalf,
-      tipRadiusMm: law.tipRadiusMm,
-      outerRadiusMm: law.outerRadiusMm,
       compactionToleranceMm: MEDIAL_COMPACTION_TOLERANCE_MM,
       sweepToleranceMm: MEDIAL_SWEEP_TOLERANCE_MM,
     },
@@ -111,7 +112,7 @@ function dotPasses(
   if (point === undefined) return [];
   const depthMm = vcarveEmittedDepthAtPoint(point, depthSegments, law);
   if (!(depthMm > 0)) return [];
-  const xyz = { x: point.x, y: point.y, z: -depthMm };
+  const xyz = { ...emittedPoint(point), z: -depthMm };
   return depthSteppedPath([xyz, xyz], false, depthPerPassMm);
 }
 
@@ -125,7 +126,10 @@ function depthSteppedPath(
   if (!(deepest < 0)) return [];
   return zPassDepths(-deepest, depthPerPassMm).map((levelZ) => ({
     kind: 'path3d' as const,
-    points: points.map((point) => ({ ...point, z: Math.max(point.z, levelZ) })),
+    points: points.map((point) => ({
+      ...point,
+      z: Math.max(point.z, vcarveConservativeZ(levelZ)),
+    })),
     closed,
     // This is a cutting profile, not an entry ramp. Flat segments keep the
     // cutting feed; descending segments are capped by their emitted Z rate.

@@ -145,7 +145,7 @@ describe('compileJob raster image groups', () => {
     expect(firstRasterGroup(job)?.bidirectional).toBe(false);
   });
 
-  it('compiles image overrides and retains their effective negative/dither/direction facts', () => {
+  it('compiles image overrides and retains their requested negative/dither/direction facts', () => {
     const image = {
       ...rasterObject('AP//AA=='),
       operationOverride: {
@@ -169,7 +169,7 @@ describe('compileJob raster image groups', () => {
       },
     });
     expect(grblStrategy.emit(job, dev)).toContain(
-      '; effective override: mode image; dither stucki; lines 2/mm; direction one-way; negative on',
+      '; requested override: mode image; dither stucki; lines 2/mm; direction one-way; negative on',
     );
   });
 

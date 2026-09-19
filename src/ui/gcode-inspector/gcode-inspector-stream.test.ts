@@ -5,6 +5,26 @@ import { inspectGcodeSource, inspectGcodeText } from './gcode-inspector-parse';
 import { readGcodeSourceLines } from './gcode-source-line-index';
 
 describe('inspectGcodeSource', () => {
+  it.each(['laser', 'cnc'] as const)(
+    'preserves %s context for text and streamed Blob input',
+    async (machineKind) => {
+      const text = 'M4 S0\nG1 X3 F1500\nX23 S300\nX26 S0';
+      const context = { machineKind };
+      const direct = inspectGcodeText(text, context);
+      const textSource = await inspectGcodeSource({ kind: 'text', text, ...context });
+      const streamed = await inspectGcodeSource({
+        kind: 'blob',
+        blob: new NodeBlob([text]) as unknown as Blob,
+        ...context,
+      });
+      expect(textSource.parsed).toEqual(direct.parsed);
+      expect(streamed.parsed).toEqual(direct.parsed);
+      expect(direct.parsed.kind).toBe('ok');
+      if (direct.parsed.kind !== 'ok') return;
+      expect(direct.parsed.model.stats.cutMm).toBe(machineKind === 'laser' ? 20 : 26);
+    },
+  );
+
   it('streams Blob input while preserving render and source-line results', async () => {
     const text = ['G21 G90', 'G0 X1 Y2', 'G1 X4 Y2', 'M2', ''].join('\r\n');
     const progress = vi.fn();

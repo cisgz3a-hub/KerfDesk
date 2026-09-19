@@ -1,5 +1,8 @@
 import { EndType, FillRule, inflatePathsD, JoinType, unionD, type PathsD } from 'clipper2-ts';
 import type { Polyline } from '../scene';
+import type { StrokeTransform } from '../scene/scene-object';
+import { applyStrokeTransform, inverseStrokeTransform } from './stroke-transform';
+import { collapsedStrokeOutline } from './collapsed-stroke-outline';
 import {
   isClosedPolygon,
   pathDToPolyline,
@@ -13,8 +16,11 @@ const PRECISION_DECIMALS = 3;
 export function roundStrokeOutline(
   polylines: ReadonlyArray<Polyline>,
   strokeWidthMm: number,
+  strokeTransform?: StrokeTransform,
 ): ReadonlyArray<Polyline> | null {
   if (!(strokeWidthMm > 0) || !Number.isFinite(strokeWidthMm)) return null;
+  if (strokeTransform !== undefined)
+    return transformedStrokeOutline(polylines, strokeWidthMm, strokeTransform);
   const open: PathsD = [];
   const closed: PathsD = [];
   for (const polyline of polylines) {
@@ -31,4 +37,33 @@ export function roundStrokeOutline(
   });
   if (outlined.kind === 'error') return null;
   return outlined.value.map(pathDToPolyline).filter(isClosedPolygon);
+}
+
+function transformedStrokeOutline(
+  polylines: ReadonlyArray<Polyline>,
+  strokeWidthMm: number,
+  strokeTransform: StrokeTransform,
+): ReadonlyArray<Polyline> | null {
+  const collapsed = collapsedStrokeOutline(polylines, strokeWidthMm / 2, strokeTransform);
+  if (collapsed !== undefined) return collapsed;
+  const inverse = inverseStrokeTransform(strokeTransform);
+  if (inverse === null) return null;
+  const local = polylines.map((polyline) => ({
+    ...polyline,
+    points: polyline.points.map((point) => applyStrokeTransform(point, inverse)),
+  }));
+  if (!finitePolylines(local)) return null;
+  const outline = roundStrokeOutline(local, strokeWidthMm);
+  if (outline === null) return null;
+  const transformed = outline.map((polyline) => ({
+    ...polyline,
+    points: polyline.points.map((point) => applyStrokeTransform(point, strokeTransform)),
+  }));
+  return finitePolylines(transformed) ? transformed : null;
+}
+
+function finitePolylines(polylines: ReadonlyArray<Polyline>): boolean {
+  return polylines.every((polyline) =>
+    polyline.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+  );
 }

@@ -1,7 +1,7 @@
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
 import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { BlobReadProgress } from '../import/blob-line-reader';
-import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeInspectionContext, GcodeInspectionSource } from './gcode-inspection-source';
 import { analyzeGcodeModel } from './gcode-inspector-analysis';
 import {
   indexGcodeBlobLines,
@@ -13,8 +13,12 @@ import {
   type GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
 
-export function inspectGcodeText(text: string): GcodeInspectorWorkerResult {
+export function inspectGcodeText(
+  text: string,
+  context: GcodeInspectionContext = {},
+): GcodeInspectorWorkerResult {
   const builder = createGcodeRenderModelBuilder({
+    ...context,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
@@ -25,8 +29,10 @@ export async function inspectGcodeSource(
   source: GcodeInspectionSource,
   onProgress?: (progress: BlobReadProgress) => void,
 ): Promise<GcodeInspectorWorkerResult> {
-  if (source.kind === 'text') return inspectGcodeText(source.text);
+  if (source.kind === 'text') return inspectGcodeText(source.text, source);
   const builder = createGcodeRenderModelBuilder({
+    machineKind: source.machineKind,
+    laserPowerControl: source.laserPowerControl,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = await indexGcodeBlobLines(

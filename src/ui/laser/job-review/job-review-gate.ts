@@ -39,6 +39,8 @@ import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
 import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
+import { isOutputPreparationAbort } from '../output-preparation-errors';
+import { ownJobReviewPreparation } from './job-review-preparation-owner';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -75,13 +77,11 @@ export async function runJobReviewGate(args: {
   let current = args.initial;
   let displayedModel = modelFor(current);
   if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
-  for (;;) {
-    const signal = await useJobReviewStore.getState().nextSignal();
-    if (reviewShouldClose(signal, args.shouldAbandon)) {
-      useJobReviewStore.getState().close();
-      return null;
-    }
-    if (signal === 'confirm') {
+  const owner = ownJobReviewPreparation();
+  try {
+    for (;;) {
+      const signal = await owner.nextSignal();
+      if (reviewShouldClose(signal, args.shouldAbandon)) return null;
       // A field commit and the review rebuild request are both debounced. A
       // fast Confirm can therefore arrive before that request. Re-prepare
       // synchronously at this handoff boundary so approval can never bind to
@@ -93,41 +93,38 @@ export async function runJobReviewGate(args: {
         purpose,
         current.frameWcsNormalizationWarning,
         args.onCompletedReplayChanged,
+        owner.signal,
       );
+      if (reviewPreparationWasCancelled(owner.signal, args.shouldAbandon)) return null;
       if (!rebuilt.ok) {
         if (presentRebuildFailure(rebuilt)) return null;
         continue;
       }
       const rebuiltModel = modelFor(rebuilt.bundle);
-      if (!sameReviewedArtifact(current, displayedModel, rebuilt.bundle, rebuiltModel)) {
-        // The operator has not yet seen this program/evidence. Display it and
-        // require a new affirmative click; this is handoff consistency, not a
-        // new policy guard.
-        current = rebuilt.bundle;
-        displayedModel = rebuiltModel;
-        useJobReviewStore.getState().completePrepare(displayedModel);
-        continue;
+      if (
+        signal === 'confirm' &&
+        sameReviewedArtifact(current, displayedModel, rebuilt.bundle, rebuiltModel)
+      ) {
+        return confirmReviewedStart(rebuilt.bundle, rebuiltModel);
       }
-      const confirmed = confirmReviewedStart(rebuilt.bundle, rebuiltModel);
-      useJobReviewStore.getState().close();
-      return confirmed;
+      // Changed bytes/evidence need a new affirmative click after display.
+      current = rebuilt.bundle;
+      displayedModel = rebuiltModel;
+      useJobReviewStore.getState().completePrepare(displayedModel);
     }
-    useJobReviewStore.getState().beginPrepare();
-    const rebuilt = await rebuildCurrentStart(
-      args.checkpointToReplace,
-      args.completedReceipt,
-      purpose,
-      current.frameWcsNormalizationWarning,
-      args.onCompletedReplayChanged,
-    );
-    if (!rebuilt.ok) {
-      if (presentRebuildFailure(rebuilt)) return null;
-      continue;
-    }
-    current = rebuilt.bundle;
-    displayedModel = modelFor(current);
-    useJobReviewStore.getState().completePrepare(displayedModel);
+  } catch (error) {
+    if (isOutputPreparationAbort(error)) return null;
+    throw error;
+  } finally {
+    owner.dispose();
   }
+}
+
+function reviewPreparationWasCancelled(
+  signal: AbortSignal,
+  shouldAbandon: (() => boolean) | undefined,
+): boolean {
+  return signal.aborted || shouldAbandon?.() === true;
 }
 
 function reviewShouldClose(
@@ -243,6 +240,7 @@ async function rebuildCurrentStart(
   purpose: JobReviewPurpose,
   frameWcsNormalizationWarning: string | undefined,
   onCompletedReplayChanged: (() => Promise<void> | void) | undefined,
+  signal: AbortSignal,
 ): Promise<RebuiltStart> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -261,6 +259,7 @@ async function rebuildCurrentStart(
     camera,
     completedReceipt?.artifact.jobOrigin,
     purpose === 'start',
+    signal,
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {

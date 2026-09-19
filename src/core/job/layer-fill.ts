@@ -207,7 +207,7 @@ function appendFillPathContours(
     }
     originalClosedContours.push(...closed);
     const resolved =
-      object.kind === 'text'
+      (path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd')) === 'nonzero'
         ? normalizeClosedPolylinesNonZeroChecked(closed)
         : normalizeClosedPolylinesEvenOddChecked(closed);
     if (resolved.kind === 'error') {

@@ -14,6 +14,7 @@ import { cncTabAnchorPosition } from './cnc-tab-anchors';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { mergeTextObjectContours } from './vcarve-text-union';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
+import { CncStrokeGeometryError } from './cnc-stroke-geometry-error';
 
 export function collectLayerPolylines(
   objects: ReadonlyArray<SceneObject>,
@@ -71,11 +72,15 @@ function appendObjectContours(
   object.paths.forEach((path, pathIndex) => {
     if (!pathUsesOperation(object, path, layer)) return;
     const sourcePolylines = compilationPolylines(path, object.transform);
+    const strokeWidthMm = layer.cnc?.cutType === 'v-carve' ? path.strokeWidthMm : undefined;
     const strokeOutline =
-      layer.cnc?.cutType === 'v-carve' && path.strokeWidthMm !== undefined
-        ? roundStrokeOutline(sourcePolylines, path.strokeWidthMm)
-        : null;
-    const usesStrokeOutline = strokeOutline !== null && strokeOutline.length > 0;
+      strokeWidthMm === undefined
+        ? null
+        : roundStrokeOutline(sourcePolylines, strokeWidthMm, path.strokeTransform);
+    if (strokeWidthMm !== undefined && strokeOutline === null) {
+      throw new CncStrokeGeometryError(object.id, pathIndex);
+    }
+    const usesStrokeOutline = strokeOutline !== null;
     const polylines = usesStrokeOutline ? strokeOutline : sourcePolylines;
     polylines.forEach((polyline, polylineIndex) => {
       if (polyline.points.length < 2) return;
@@ -93,6 +98,7 @@ function appendObjectContours(
         },
         sourceKind: object.kind,
         objectId: object.id,
+        ...(path.fillRule === undefined ? {} : { fillRule: path.fillRule }),
         ...(manualTabPoints.length === 0 ? {} : { manualTabPoints }),
       });
     });

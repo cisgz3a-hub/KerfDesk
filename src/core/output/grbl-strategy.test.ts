@@ -90,7 +90,7 @@ describe('grblStrategy single-segment job', () => {
     expect(output).toContain('F2000');
   });
 
-  it('records exact effective fill override facts in emitted comments', () => {
+  it('records requested fill override facts in emitted comments', () => {
     const operationSettings = captureLayerOperationSettings({
       ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
       fillStyle: 'offset',
@@ -102,7 +102,7 @@ describe('grblStrategy single-segment job', () => {
     const output = emit({ groups: [{ ...cutGroup, operationSettings }] });
 
     expect(output).toContain(
-      '; effective override: mode fill; style offset; interval 0.35 mm; angle 45 deg; direction one-way; cross-hatch on',
+      '; requested override: mode fill; style offset; interval 0.35 mm; angle 45 deg; direction one-way; cross-hatch on',
     );
   });
 });

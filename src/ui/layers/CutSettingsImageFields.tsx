@@ -15,10 +15,11 @@ export function CutSettingsImageFields(props: {
   readonly dither: Layer['ditherAlgorithm'];
   readonly imageLinesPerMm: number;
   readonly maxPower?: number;
+  readonly deferArtworkBounds?: boolean;
   readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
-  const maxPower = props.maxPower ?? props.layer.power;
+  const maxPower = props.deferArtworkBounds ? 100 : (props.maxPower ?? props.layer.power);
   return (
     <fieldset className="lf-fieldset">
       <legend className="lf-legend">Image</legend>
@@ -53,7 +54,7 @@ export function CutSettingsImageFields(props: {
           name="dotWidthCorrectionMm"
           value={props.layer.dotWidthCorrectionMm}
           min={0}
-          max={dotWidthCorrectionMax(props.imageLinesPerMm)}
+          max={props.deferArtworkBounds ? 1 : dotWidthCorrectionMax(props.imageLinesPerMm)}
           step={0.001}
           label="dot width correction"
         />

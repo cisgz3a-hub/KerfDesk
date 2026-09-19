@@ -16,9 +16,17 @@ import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 
 export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Element {
-  const { state, stale, refresh } = useCurrentGcode(props.active);
+  const { state, stale, refresh, followingRun } = useCurrentGcode(props.active);
+  const activeRun =
+    followingRun &&
+    state.kind === 'ready' &&
+    ['running', 'paused', 'tool-change'].includes(state.liveLifecycle ?? '');
   const text = state.kind === 'ready' ? state.text : '';
-  const source = useMemo(() => (text === '' ? null : { kind: 'text' as const, text }), [text]);
+  const context = state.kind === 'ready' ? state.context : undefined;
+  const source = useMemo(
+    () => (text === '' ? null : { kind: 'text' as const, text, ...context }),
+    [text, context],
+  );
   const inspection = useGcodeInspection(source);
 
   return (
@@ -32,11 +40,13 @@ export function CanvasGcodeView(props: { readonly active: boolean }): JSX.Elemen
           type="button"
           className="lf-btn"
           style={refreshStyle}
-          title="Recompile this project's G-code"
+          title={
+            activeRun ? 'Showing the exact started program' : "Recompile this project's G-code"
+          }
           onClick={refresh}
-          disabled={state.kind === 'compiling'}
+          disabled={state.kind === 'compiling' || activeRun}
         >
-          {state.kind === 'compiling' ? 'Compiling…' : 'Refresh'}
+          {state.kind === 'compiling' ? 'Compiling…' : followingRun ? 'Current design' : 'Refresh'}
         </button>
       </div>
       <Body inspection={inspection} state={state} />
@@ -74,6 +84,7 @@ function Body(props: {
       <InspectorView
         model={props.inspection.result.parsed.model}
         analysis={props.inspection.result.analysis}
+        source={props.inspection.source}
         variant="preview"
       />
     </>

@@ -17,7 +17,8 @@ export type CircularArcGeometry =
     }
   | { readonly kind: 'invalid' };
 
-// Match the GRBL-order tolerance used by the external G-code parser: 0.005 in.
+// Internal geometry tolerance, not a stock GRBL arc-acceptance rule.
+// The external parser separately checks IJ consistency and R feasibility.
 export const CIRCULAR_ARC_RADIUS_TOLERANCE_MM = 0.127;
 
 const AXIS_EPSILON_MM = 1e-9;

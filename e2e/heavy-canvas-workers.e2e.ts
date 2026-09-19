@@ -30,7 +30,9 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
     timeout: 60_000,
   });
-  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByLabel('Playback estimate', { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
   const initialCompileElapsedMs = Date.now() - compilationStartedAt;
   // Leave a delivery window after the real output worker has completed. A
   // stale idle reply used to commit and draw under this covering view here.
@@ -71,7 +73,9 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
     timeout: 60_000,
   });
-  await expect(page.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByLabel('Playback estimate', { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
   await page.waitForTimeout(750);
   const refresh = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'G-code canvas Refresh', refresh);
@@ -81,7 +85,9 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   const inspector = page.getByRole('dialog', { name: /G-code Inspector: .*current canvas/ });
   await expect(inspector).toBeVisible({ timeout: 60_000 });
   await expect(inspector.getByLabel('Program health')).toBeVisible({ timeout: 60_000 });
-  await expect(inspector.getByLabel('Playback', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(inspector.getByLabel('Playback estimate', { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
   await page.waitForTimeout(750);
   const inspectorOpen = await stopResponsivenessProbe(page);
   assertResponsivePhase(testInfo, 'explicit G-code Inspector open', inspectorOpen);

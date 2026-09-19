@@ -14,6 +14,7 @@ import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
+import { useCanvasTextStore } from '../text/canvas-text-store';
 import { confirmDiscardAsync } from './confirm-discard';
 import { usePlatform } from './platform-context';
 import { toggleWorkspaceSidePanels } from './workspace-panel-actions';
@@ -108,7 +109,8 @@ function useFileEditShortcutEffect(fileCtx: FileCtx, editCtx: EditCtx, toolCtx: 
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (isModalOpen(useUiStore.getState())) return;
+      if (isModalOpen(useUiStore.getState()) || useCanvasTextStore.getState().session !== null)
+        return;
       const { fileCtx, editCtx, toolCtx } = bindingsRef.current;
       if (handleFileShortcut(e, fileCtx)) return;
       if (handleToolShortcut(e, toolCtx)) return;
@@ -134,7 +136,8 @@ function useTransformViewShortcuts(): void {
   const toggleSidePanels = (): void => toggleWorkspaceSidePanels(useUiStore.getState());
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (isModalOpen(useUiStore.getState())) return;
+      if (isModalOpen(useUiStore.getState()) || useCanvasTextStore.getState().session !== null)
+        return;
       if (
         handleTransformShortcut(e, {
           project,

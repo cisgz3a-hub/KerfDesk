@@ -7,7 +7,9 @@ import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
 
-export const PROJECT_SCHEMA_VERSION = 5 as const;
+// v7 preserves converted text winding and transformed stroke pens. Older
+// readers must not silently reinterpret these paths as different cutting regions.
+export const PROJECT_SCHEMA_VERSION = 7 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

@@ -11,6 +11,7 @@ import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene'
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
   readonly maxFeed?: number;
+  readonly deferArtworkBounds?: boolean;
 };
 
 const MAX_KERF_OFFSET_MM = 10;
@@ -29,7 +30,14 @@ export function readCutSettingsPatch(
   const linesPerMm = mode === 'image' ? readImageLinesPerMm(data, layer) : layer.linesPerMm;
   const lineSettings = readLineSettingsPatch(data, layer, mode);
   const fillSettings = readFillSettingsPatch(data, layer, mode);
-  const imageSettings = readImageSettingsPatch(data, layer, mode, linesPerMm, power);
+  const imageSettings = readImageSettingsPatch(
+    data,
+    layer,
+    mode,
+    linesPerMm,
+    power,
+    limits.deferArtworkBounds === true,
+  );
   return {
     mode,
     ...readPowerModePatch(data, layer, mode),
@@ -57,6 +65,7 @@ function readImageSettingsPatch(
   mode: LayerMode,
   linesPerMm: number,
   power: number,
+  deferArtworkBounds: boolean,
 ): LayerPatch {
   if (mode !== 'image') {
     return {
@@ -68,13 +77,13 @@ function readImageSettingsPatch(
     };
   }
   return {
-    minPower: numberField(data, 'minPower', layer.minPower, 0, power),
+    minPower: numberField(data, 'minPower', layer.minPower, 0, deferArtworkBounds ? 100 : power),
     dotWidthCorrectionMm: numberField(
       data,
       'dotWidthCorrectionMm',
       layer.dotWidthCorrectionMm,
       0,
-      dotWidthCorrectionMax(linesPerMm),
+      deferArtworkBounds ? 1 : dotWidthCorrectionMax(linesPerMm),
     ),
     negativeImage: data.has('negativeImage'),
     imageBidirectional: data.has('imageBidirectional'),

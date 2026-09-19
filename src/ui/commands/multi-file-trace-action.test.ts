@@ -109,8 +109,10 @@ describe('runMultiFileTrace', () => {
     const data = new Uint8ClampedArray(16 * 16 * 4).fill(255);
     for (const y of [7, 8]) data.set([0, 0, 0, 255], (y * 16 + 7) * 4);
     const loadImage = async (): Promise<RawImageData> => ({ width: 16, height: 16, data });
-    const options = TRACE_PRESETS['Sharp'];
-    if (options === undefined) throw new Error('Missing Sharp preset');
+    const preset = TRACE_PRESETS['Sharp'];
+    if (preset === undefined) throw new Error('Missing Sharp preset');
+    // Force removal of the two-pixel fixture; Sharp now preserves it by default.
+    const options = { ...preset, despeckleMinPixels: 4 };
     const pushToast = vi.fn();
     const write = vi.fn(async () => true);
     await runMultiFileTrace([namedFile('speck.png')], pushToast, {

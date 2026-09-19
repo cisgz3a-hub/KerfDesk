@@ -10,7 +10,10 @@ import {
 const MAX_SHARP_CORNER_PROBES = 256;
 const MAX_CORNER_NODE_CANDIDATES = 64;
 const MAX_CORNER_EXACT_CHORD_CHECKS = 256;
-const CORNER_TURN_THRESHOLD_RAD = (50 * Math.PI) / 180;
+// Retain polygon features beyond just acute tips. The former 50-degree
+// threshold omitted all octagon corners even with an otherwise exact route.
+// Near-tangent curve tessellation still belongs to the Detail sampling target.
+const CORNER_TURN_THRESHOLD_RAD = (10 * Math.PI) / 180;
 
 type CornerGraph = {
   readonly nodes: Array<Vec2 & { readonly clearanceMm: number }>;

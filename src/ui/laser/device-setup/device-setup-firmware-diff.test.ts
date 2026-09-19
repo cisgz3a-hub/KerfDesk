@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { settingsMapToRows, type GrblSettingRow } from '../../../core/controllers/grbl';
-import { computeFirmwareDiffs } from './device-setup-firmware-diff';
+import { computeFirmwareComparison, computeFirmwareDiffs } from './device-setup-firmware-diff';
 
 function rows(values: Record<number, string>): ReadonlyArray<GrblSettingRow> {
   const entries = Object.entries(values).map(
@@ -122,5 +122,91 @@ describe('computeFirmwareDiffs', () => {
 
     expect(laserDiff?.label).toBe('Laser S maximum / spindle maximum');
     expect(cncDiff?.label).toBe('Spindle maximum / laser S maximum');
+  });
+});
+
+describe('computeFirmwareComparison evidence coverage', () => {
+  it.each([{}, { 999: 'vendor-only' }])('keeps missing settings explicit for %j', (values) => {
+    expect(computeFirmwareComparison(DEFAULT_DEVICE_PROFILE, rows(values))).toEqual({
+      diffs: [],
+      expectedCount: 5,
+      comparedCount: 0,
+      missingCodes: ['$30', '$31', '$32', '$130', '$131'],
+      invalidCodes: [],
+    });
+  });
+
+  it.each(['corrupt', 'Infinity', ''])('does not compare invalid readback %j', (value) => {
+    const result = computeFirmwareComparison(DEFAULT_DEVICE_PROFILE, rows({ 30: value }));
+    expect(result.comparedCount).toBe(0);
+    expect(result.invalidCodes).toEqual(['$30']);
+    expect(result.missingCodes).toEqual(['$31', '$32', '$130', '$131']);
+    expect(result.diffs[0]).toMatchObject({
+      current: value,
+      comparison: 'invalid',
+      differs: false,
+    });
+  });
+
+  it('distinguishes a match, a numeric difference, invalid readback and missing evidence', () => {
+    const result = computeFirmwareComparison(
+      DEFAULT_DEVICE_PROFILE,
+      rows({ 30: '255', 31: 'corrupt', 32: DEFAULT_DEVICE_PROFILE.laserModeEnabled ? '1' : '0' }),
+    );
+    expect(result).toMatchObject({
+      expectedCount: 5,
+      comparedCount: 2,
+      invalidCodes: ['$31'],
+      missingCodes: ['$130', '$131'],
+    });
+    expect(result.diffs.map((diff) => [diff.code, diff.comparison])).toEqual([
+      ['$30', 'different'],
+      ['$31', 'invalid'],
+      ['$32', 'match'],
+    ]);
+    expect(
+      result.diffs.filter((diff) => diff.differs && diff.writable).map((diff) => diff.code),
+    ).toEqual(['$30']);
+  });
+
+  it('counts every expected laser value in a complete matching readback', () => {
+    const draft = DEFAULT_DEVICE_PROFILE;
+    const result = computeFirmwareComparison(
+      draft,
+      rows({
+        30: String(draft.maxPowerS),
+        31: String(draft.minPowerS),
+        32: draft.laserModeEnabled ? '1' : '0',
+        130: String(draft.bedWidth),
+        131: String(draft.bedHeight),
+      }),
+    );
+    expect(result).toMatchObject({
+      expectedCount: 5,
+      comparedCount: 5,
+      missingCodes: [],
+      invalidCodes: [],
+    });
+    expect(result.diffs.every((diff) => diff.comparison === 'match')).toBe(true);
+  });
+
+  it('counts only the four defined CNC profile settings and does not require laser $31', () => {
+    const result = computeFirmwareComparison(
+      DEFAULT_DEVICE_PROFILE,
+      rows({
+        30: String(DEFAULT_CNC_MACHINE_CONFIG.params.spindleMaxRpm),
+        32: '0',
+        130: String(DEFAULT_DEVICE_PROFILE.bedWidth),
+        131: String(DEFAULT_DEVICE_PROFILE.bedHeight),
+      }),
+      { machine: DEFAULT_CNC_MACHINE_CONFIG, machineKinds: ['cnc'] },
+    );
+    expect(result).toMatchObject({
+      expectedCount: 4,
+      comparedCount: 4,
+      missingCodes: [],
+      invalidCodes: [],
+    });
+    expect(result.diffs.every((diff) => diff.comparison === 'match')).toBe(true);
   });
 });

@@ -6,6 +6,79 @@ import { fileURLToPath } from 'node:url';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+const CALLIGRAPHY_SOURCE =
+  'https://github.com/google/fonts/tree/809e4d8b8d7e9364a914909bb777679606c178b8/ofl/';
+
+export const CALLIGRAPHY_OUTLINE_FONTS = [
+  {
+    file: 'src/ui/text/fonts/GreatVibes-Regular.ttf',
+    name: 'Great Vibes',
+    spdx: 'OFL-1.1',
+    // Version 1.010 retains shaping support in opentype.js 2.0.0. Version
+    // 1.103 needs GSUB lookup type 6 format 2, which that renderer rejects.
+    source:
+      'https://github.com/google/fonts/tree/59adf74d6054b41e8e647193c1cfa69115256843/ofl/greatvibes',
+    sha256: '826eb3a5ebbbdcff40c31f475c7499ab535a67740d8f1c854192de9eccd24cae',
+    licenseFile: 'src/ui/text/fonts/licenses/GreatVibes-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/Allura-Regular.ttf',
+    name: 'Allura',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}allura`,
+    sha256: '9c142b2e515832c0dfc4ff8b8ea18f40314943bf937b72e2b23c4661bac14cc6',
+    licenseFile: 'src/ui/text/fonts/licenses/Allura-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/AlexBrush-Regular.ttf',
+    name: 'Alex Brush',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}alexbrush`,
+    sha256: 'df702038d8e27797230c77959c139eeea38cac0caf53e19ea5b513d3b0d3362d',
+    licenseFile: 'src/ui/text/fonts/licenses/AlexBrush-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/Parisienne-Regular.ttf',
+    name: 'Parisienne',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}parisienne`,
+    sha256: 'bc9ee17f022e20bc700797e5f557d14bfa43af0c98d9e6c9c5c1ca4ec7aacd57',
+    licenseFile: 'src/ui/text/fonts/licenses/Parisienne-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/PinyonScript-Regular.ttf',
+    name: 'Pinyon Script',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}pinyonscript`,
+    sha256: '4aab130a6ed27f8b8117738c84a5602edf9300cdcc0651a9a65bf96f451ac29a',
+    licenseFile: 'src/ui/text/fonts/licenses/PinyonScript-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/Italianno-Regular.ttf',
+    name: 'Italianno',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}italianno`,
+    sha256: 'f6ae96dea0da46c73370eb0575848ab0eda190315bdfda3f5b252bba3dc9173c',
+    licenseFile: 'src/ui/text/fonts/licenses/Italianno-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/Corinthia-Regular.ttf',
+    name: 'Corinthia',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}corinthia`,
+    sha256: 'ee2adb172a41a52c5f6b7de6de5953bf8e9e6bdfa5bc641fdddbdf4c737fc98e',
+    licenseFile: 'src/ui/text/fonts/licenses/Corinthia-OFL.txt',
+  },
+  {
+    file: 'src/ui/text/fonts/CinzelDecorative-Regular.ttf',
+    name: 'Cinzel Decorative',
+    spdx: 'OFL-1.1',
+    source: `${CALLIGRAPHY_SOURCE}cinzeldecorative`,
+    sha256: '5b862be329103ad287a10f0a53e27a40e8cc519999253f1a0223e2dc330b10b8',
+    licenseFile: 'src/ui/text/fonts/licenses/CinzelDecorative-OFL.txt',
+  },
+];
+
 export const OUTLINE_FONTS = [
   {
     file: 'src/ui/text/fonts/Roboto-Regular.ttf',
@@ -47,6 +120,7 @@ export const OUTLINE_FONTS = [
     name: 'Dancing Script',
     spdx: 'OFL-1.1',
   },
+  ...CALLIGRAPHY_OUTLINE_FONTS,
   {
     file: 'src/ui/text/fonts/Anton-Regular.ttf',
     name: 'Anton',

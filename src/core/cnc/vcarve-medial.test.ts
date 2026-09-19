@@ -361,13 +361,16 @@ describe('vector V-carve medial planning', () => {
 
     expect(plan.passes).toHaveLength(1);
     const pass = plan.passes[0];
-    expect(pass?.kind).toBe('path3d');
     if (pass?.kind !== 'path3d') throw new Error('Expected one variable-depth dot pass.');
     expect(pass.points.length).toBeGreaterThanOrEqual(2);
     expect(Math.min(...pass.points.map((point) => point.z))).toBeLessThan(-0.9);
+    const normalizedRadius = 1 + Math.SQRT2 * 0.0005 + NUMERIC_EPSILON_MM;
     expect(
       pass.points.every(
-        (point) => Math.hypot(point.x - center.x, point.y - center.y) <= 1 + NUMERIC_EPSILON_MM,
+        // Retained source vertices now reach the normalized polygon boundary.
+        // The established 0.001 mm XY normalization grid can displace a source
+        // vertex by at most half a cell on each axis.
+        (point) => Math.hypot(point.x - center.x, point.y - center.y) <= normalizedRadius,
       ),
     ).toBe(true);
   });

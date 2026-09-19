@@ -275,7 +275,10 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   kerfdesk,
 }) => {
   await page.getByRole('button', { name: 'Text...' }).click();
-  await page.getByRole('textbox', { name: 'Text content' }).fill('Part-');
+  await page
+    .getByLabel('KerfDesk workspace', { exact: true })
+    .click({ position: { x: 150, y: 200 } });
+  await page.getByRole('textbox', { name: 'Text content on canvas' }).fill('Part-');
   await page.getByRole('checkbox', { name: 'Variable text' }).check();
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Import CSV...' }).click();
@@ -321,8 +324,8 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   await expect(page.getByRole('spinbutton', { name: 'Variable serial', exact: true })).toHaveValue(
     '101',
   );
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Add or edit text' })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
   await page.getByRole('button', { name: 'Save As...' }).click();
 
   const saved = await savedProject(kerfdesk);
@@ -448,6 +451,8 @@ test('imports a generated bitmap and traces it through the production worker wor
   await page.getByRole('button', { name: 'Trace Image...' }).click();
   const dialog = page.getByRole('dialog', { name: 'Trace image' });
   await expect(dialog).toBeVisible();
+  // This workflow explicitly retains the bitmap; deletion is the dialog default.
+  await dialog.getByRole('checkbox', { name: 'Delete Image After trace' }).uncheck();
   const detection = dialog.getByRole('combobox', { name: 'Trace detection' });
   const threshold = dialog.getByRole('spinbutton', { name: 'Trace Threshold', exact: true });
   await expect(detection).toHaveValue('preset');
@@ -458,7 +463,7 @@ test('imports a generated bitmap and traces it through the production worker wor
 
   await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
   await expect(threshold).toHaveCount(0);
-  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('4');
+  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('1');
   await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('0');
   await detection.selectOption('manual');
   await expect(threshold).toHaveValue('128');

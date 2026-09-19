@@ -10,6 +10,8 @@ import type { Viewer3dSceneState } from './use-viewer3d-scene';
 export function useSceneSync(args: {
   readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
+  readonly model?: unknown;
+  readonly hidePlaybackMarker?: boolean;
   /** Null reveals the whole program and hides the tool marker. */
   readonly playhead: PlayheadMarker | null;
   readonly colorOf: (segmentIndex: number) => readonly [number, number, number];
@@ -19,29 +21,41 @@ export function useSceneSync(args: {
   readonly arrows: ReadonlyArray<ArrowPlacement> | null;
   readonly travelVisible: boolean;
 }): void {
-  const { handleRef, state, playhead, colorOf, live, arrows, travelVisible } = args;
+  const {
+    handleRef,
+    state,
+    model,
+    playhead,
+    colorOf,
+    live,
+    arrows,
+    travelVisible,
+    hidePlaybackMarker,
+  } = args;
 
   useEffect(() => {
     if (state !== 'ready') return;
     handleRef.current?.setTravelVisible(travelVisible);
-  }, [handleRef, state, travelVisible]);
+  }, [handleRef, state, model, travelVisible]);
 
   // Initial geometry owns the preparing phase. Sync once after ready so these
   // effects do not redraw the same scene both before and after publication.
   useEffect(() => {
     if (state !== 'ready') return;
-    handleRef.current?.setPlayhead(playhead);
-  }, [handleRef, playhead, state]);
+    handleRef.current?.setPlayhead(
+      playhead === null ? null : { ...playhead, hideMarker: hidePlaybackMarker === true },
+    );
+  }, [handleRef, playhead, state, model, hidePlaybackMarker]);
 
   useEffect(() => {
     if (state !== 'ready') return;
     handleRef.current?.recolor(colorOf);
-  }, [handleRef, colorOf, state]);
+  }, [handleRef, colorOf, state, model]);
 
   useEffect(() => {
     if (state !== 'ready') return;
     handleRef.current?.setDirectionArrows(arrows);
-  }, [handleRef, arrows, state]);
+  }, [handleRef, arrows, state, model]);
 
   // Depends on the coordinates, not the object identity: status reports
   // arrive continuously and a fresh object each poll would re-render the
@@ -50,5 +64,5 @@ export function useSceneSync(args: {
     if (state !== 'ready') return;
     handleRef.current?.setLiveMachine(live);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-  }, [handleRef, state, live?.x, live?.y, live?.z, live === null]);
+  }, [handleRef, state, model, live?.x, live?.y, live?.z, live === null]);
 }

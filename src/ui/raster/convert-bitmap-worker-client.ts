@@ -1,8 +1,8 @@
-// Main-thread Convert-to-Bitmap worker client. Keeps heavy vector rasterization
-// and PNG/luma encoding out of the UI thread when the browser supports workers.
+// One conversion owns one worker. Supersession, cancellation and every failure
+// retire that exact request, so obsolete work cannot consume resources or kill
+// a newer worker. Successful settlement also releases the worker's peak buffers.
 
 import type { RasterImage } from '../../core/scene';
-import type { BitmapConversionPlan } from './bitmap-conversion-plan';
 import type { BitmapConversionOptions, ConvertibleVector } from './bitmap-assembly';
 import type {
   ConvertBitmapWorkerRequest,
@@ -10,63 +10,44 @@ import type {
 } from './convert-bitmap-worker-protocol';
 
 const CONVERT_BITMAP_WORKER_TIMEOUT_MS = 30_000;
-export const MAX_INLINE_CONVERT_PIXELS = 500_000;
 
 type Pending = {
+  readonly id: number;
+  readonly worker: Worker;
+  readonly timer: ReturnType<typeof setTimeout>;
+  readonly signal: AbortSignal | undefined;
+  readonly onAbort: () => void;
   readonly resolve: (raster: RasterImage) => void;
   readonly reject: (err: Error) => void;
 };
 
-let workerInstance: Worker | null = null;
 let nextRequestId = 0;
-const pendingByRequestId = new Map<number, Pending>();
-
-export function canConvertBitmapInline(
-  plan: Pick<BitmapConversionPlan, 'pixelWidth' | 'pixelHeight'>,
-): boolean {
-  return plan.pixelWidth * plan.pixelHeight <= MAX_INLINE_CONVERT_PIXELS;
-}
+let activeRequest: Pending | null = null;
 
 export function convertBitmapInWorker(
   vectors: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions,
   rasterId: string,
+  signal?: AbortSignal,
 ): Promise<RasterImage> | null {
-  const worker = ensureWorker();
+  if (signal?.aborted === true) return Promise.reject(abortError());
+  if (activeRequest !== null) rejectRequest(activeRequest, abortError());
+  const worker = createWorker();
   if (worker === null) return null;
-  return requestBitmap(worker, vectors, options, rasterId);
+  return requestBitmap(worker, vectors, options, rasterId, signal);
 }
 
 export function resetConvertBitmapWorkerForTests(): void {
-  rejectAllPendingAndRetireWorker('Convert to Bitmap worker reset');
+  if (activeRequest !== null) rejectRequest(activeRequest, abortError());
 }
 
-function ensureWorker(): Worker | null {
-  if (workerInstance !== null) return workerInstance;
+function createWorker(): Worker | null {
   if (typeof Worker === 'undefined') return null;
   try {
-    workerInstance = new Worker(new URL('./convert-bitmap-worker.ts', import.meta.url), {
-      type: 'module',
-    });
-    workerInstance.onmessage = handleWorkerMessage;
-    workerInstance.onerror = (): void => {
-      rejectAllPendingAndRetireWorker('Convert to Bitmap worker errored');
-    };
-    return workerInstance;
+    return new Worker(new URL('./convert-bitmap-worker.ts', import.meta.url), { type: 'module' });
   } catch {
     return null;
   }
-}
-
-function handleWorkerMessage(e: MessageEvent<ConvertBitmapWorkerResponse>): void {
-  const pending = pendingByRequestId.get(e.data.id);
-  if (pending === undefined) return;
-  pendingByRequestId.delete(e.data.id);
-  if (e.data.kind === 'ok') {
-    pending.resolve(e.data.raster);
-    return;
-  }
-  pending.reject(new Error(e.data.message));
 }
 
 function requestBitmap(
@@ -74,47 +55,56 @@ function requestBitmap(
   vectors: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions,
   rasterId: string,
+  signal: AbortSignal | undefined,
 ): Promise<RasterImage> {
   return new Promise<RasterImage>((resolve, reject) => {
-    nextRequestId += 1;
-    const id = nextRequestId;
+    const id = ++nextRequestId;
+    const onAbort = (): void => rejectRequest(request, abortError());
     const timer = setTimeout(() => {
-      if (!pendingByRequestId.has(id)) return;
-      rejectAllPendingAndRetireWorker('Convert to Bitmap worker timed out');
+      rejectRequest(request, new Error('Convert to Bitmap worker timed out'));
     }, CONVERT_BITMAP_WORKER_TIMEOUT_MS);
-    pendingByRequestId.set(id, {
-      resolve: (raster) => {
-        clearTimeout(timer);
-        resolve(raster);
-      },
-      reject: (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    });
-    const request: ConvertBitmapWorkerRequest = { id, rasterId, vectors, options };
+    const request: Pending = { id, worker, timer, signal, onAbort, resolve, reject };
+    activeRequest = request;
+    signal?.addEventListener('abort', onAbort, { once: true });
+    worker.onmessage = (event: MessageEvent<ConvertBitmapWorkerResponse>): void => {
+      if (event.data.id !== id) return;
+      if (event.data.kind === 'ok') {
+        if (retireRequest(request)) resolve(event.data.raster);
+      } else {
+        rejectRequest(request, new Error(event.data.message));
+      }
+    };
+    worker.onerror = (): void => {
+      rejectRequest(request, new Error('Convert to Bitmap worker errored'));
+    };
+    worker.onmessageerror = (): void => {
+      rejectRequest(request, new Error('Could not read the Convert to Bitmap worker result'));
+    };
+    const message: ConvertBitmapWorkerRequest = { id, rasterId, vectors, options };
     try {
-      worker.postMessage(request);
+      worker.postMessage(message);
     } catch (err) {
-      pendingByRequestId.delete(id);
-      clearTimeout(timer);
-      retireWorker();
-      reject(err instanceof Error ? err : new Error(String(err)));
+      rejectRequest(request, err instanceof Error ? err : new Error(String(err)));
     }
   });
 }
 
-function rejectAllPendingAndRetireWorker(message: string): void {
-  const pendings = Array.from(pendingByRequestId.values());
-  pendingByRequestId.clear();
-  retireWorker();
-  for (const pending of pendings) {
-    pending.reject(new Error(message));
-  }
+function rejectRequest(request: Pending, error: Error): void {
+  if (retireRequest(request)) request.reject(error);
 }
 
-function retireWorker(): void {
-  if (workerInstance === null) return;
-  workerInstance.terminate();
-  workerInstance = null;
+function retireRequest(request: Pending): boolean {
+  if (activeRequest !== request) return false;
+  activeRequest = null;
+  clearTimeout(request.timer);
+  request.signal?.removeEventListener('abort', request.onAbort);
+  request.worker.onmessage = null;
+  request.worker.onerror = null;
+  request.worker.onmessageerror = null;
+  request.worker.terminate();
+  return true;
+}
+
+function abortError(): Error {
+  return new DOMException('Bitmap conversion cancelled', 'AbortError');
 }

@@ -28,6 +28,7 @@ export function DeviceSetupCncJobStep(props: {
   readonly onRemoveTool: (toolId: string) => void;
 }): JSX.Element {
   const machine = props.state.cncDraft;
+  const referenceSettings = props.layers.find((layer) => layer.cnc !== undefined)?.cnc;
   const editMachine = (next: CncMachineConfig): void =>
     props.dispatch({ kind: 'edit-machine', machine: next });
   const editStock = (stock: CncStock): void => editMachine({ ...machine, stock });
@@ -74,6 +75,8 @@ export function DeviceSetupCncJobStep(props: {
         <SetupCard title="Tiling">
           <DeviceSetupCncTilingFields
             tiling={machine.tiling}
+            machine={machine}
+            {...(referenceSettings === undefined ? {} : { referenceSettings })}
             onChange={(tiling) => editMachine(machineWithTiling(machine, tiling))}
           />
         </SetupCard>

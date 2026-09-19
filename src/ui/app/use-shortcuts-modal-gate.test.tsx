@@ -1,4 +1,5 @@
-import { act } from 'react';
+import { act, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene';
@@ -10,6 +11,7 @@ import { useUiStore } from '../state/ui-store';
 import { PlatformProvider } from './platform-context';
 import { useShortcuts } from './use-shortcuts';
 import { Dialog } from '../kit';
+import { useCanvasTextStore } from '../text/canvas-text-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -28,6 +30,24 @@ const mockPlatform: PlatformAdapter = {
 function ShortcutHarness(): null {
   useShortcuts();
   return null;
+}
+
+function ClosingModalHarness(): JSX.Element {
+  useShortcuts();
+  const [open, setOpen] = useState(false);
+  const selected = useStore((state) => state.selectedObjectId);
+  return (
+    <>
+      <button type="button" disabled={selected === null} onClick={() => setOpen(true)}>
+        Open selected artwork
+      </button>
+      {open ? (
+        <Dialog ariaLabel="Artwork settings" onClose={() => flushSync(() => setOpen(false))}>
+          <button type="button">Inside settings</button>
+        </Dialog>
+      ) : null}
+    </>
+  );
 }
 
 function installVectorProject(): void {
@@ -97,6 +117,7 @@ async function pressKey(init: KeyboardEventInit & { readonly key: string }): Pro
 }
 
 afterEach(() => {
+  useCanvasTextStore.getState().close();
   useStore.getState().newProject();
   useUiStore.setState({ textDialog: null, imageDialog: null, modalDepth: 0 });
   useToastStore.setState({ toasts: [] });
@@ -104,6 +125,60 @@ afterEach(() => {
 });
 
 describe('useShortcuts modal gate', () => {
+  it('consumes modal Escape before synchronous teardown exposes the workspace shortcut', async () => {
+    installVectorProject();
+    const { host, unmount } = await renderHarness(<ClosingModalHarness />);
+    try {
+      const opener = host.querySelector('button');
+      if (opener === null) throw new Error('opener missing');
+      opener.focus();
+      await act(async () => opener.click());
+      const inside = host.querySelector<HTMLButtonElement>('[role="dialog"] button');
+      if (inside === null) throw new Error('modal control missing');
+      expect(document.activeElement).toBe(inside);
+      expect(useUiStore.getState().modalDepth).toBe(1);
+
+      const escape = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => inside.dispatchEvent(escape));
+
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(useUiStore.getState().modalDepth).toBe(0);
+      expect(escape.defaultPrevented).toBe(true);
+      expect(useStore.getState().selectedObjectId).toBe('vec-1');
+      expect(opener.disabled).toBe(false);
+      expect(document.activeElement).toBe(opener);
+
+      // A subsequent workspace Escape retains its ordinary deselection action.
+      await pressKey({ key: 'Escape' });
+      expect(useStore.getState().selectedObjectId).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('leaves the document and view alone while a canvas text session owns keyboard input', async () => {
+    installVectorProject();
+    useCanvasTextStore.getState().beginAdd({ x: 30, y: 40 });
+    const before = useStore.getState().project;
+    const { unmount } = await renderHarness();
+    try {
+      await pressKey({ key: 'Backspace' });
+      await pressKey({ key: 'z', ctrlKey: true });
+      await pressKey({ key: 'o', ctrlKey: true });
+      await pressKey({ key: 'ArrowRight' });
+      await pressKey({ key: 'p' });
+      expect(useStore.getState().project).toBe(before);
+      expect(useStore.getState().previewMode).toBe(false);
+      expect(mockPlatform.pickFilesForOpen).not.toHaveBeenCalled();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('ignores file and edit shortcuts while the text modal is open', async () => {
     installVectorProject();
     useUiStore.setState({ textDialog: { mode: 'add' } });

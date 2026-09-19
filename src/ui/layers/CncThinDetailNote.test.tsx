@@ -12,6 +12,7 @@ import {
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { CncThinDetailNote } from './CncThinDetailNote';
+import { unrepresentableStrokeObject } from '../../__fixtures__/vcarve-stroke-geometry';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -77,6 +78,29 @@ afterEach(() => {
 });
 
 describe('CncThinDetailNote', () => {
+  it('shows a stroke geometry failure and clears it when the artwork is repaired', async () => {
+    vi.useFakeTimers();
+    install([unrepresentableStrokeObject()]);
+    const view = await renderNote();
+    try {
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(view.host.textContent).toContain('could not represent the stroke geometry');
+      expect(view.host.textContent).not.toContain('finer than the generated detail path');
+      await act(async () => {
+        install([artwork(0.5)]);
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(view.host.textContent).toBe('');
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
   it('stays silent when the medial planner can carve a hairline', async () => {
     vi.useFakeTimers();
     install([artwork(0.06)]);

@@ -113,7 +113,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.add-text': {
     family: 'tools',
-    tooltip: 'Create editable text artwork on the workspace.',
+    tooltip:
+      'Click the canvas to type text. Click existing text to edit it directly on the canvas (T).',
   },
   'tools.registration-jig': {
     family: 'tools',

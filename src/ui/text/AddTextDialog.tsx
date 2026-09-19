@@ -13,29 +13,13 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useEffect, useRef, useState } from 'react';
-import { bendTextRender, placeTextOnPath } from '../../core/text';
-import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
-import { parseVariableTemplateSource } from '../../core/variables';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { FontImportButton } from './FontImportButton';
-import { FontPicker } from './FontPicker';
-import { FontUsageHint } from './FontUsageHint';
-import { renderTextGeometry } from './render-text-geometry';
-import { PathTextFields } from './PathTextFields';
-import { VariableTextFields } from './VariableTextFields';
-import {
-  sanitizeTextDialogNumericValues,
-  TextDialogNumericFields,
-  type TextDialogNumericValues,
-} from './TextDialogNumericFields';
-import {
-  useTextDialogFields,
-  type DialogFields,
-  type DialogValues,
-} from './use-text-dialog-fields';
+import { buildTextObject, TextObjectValidationError } from './build-text-object';
+import { TextFormattingFields } from './TextFormattingFields';
+import { useTextDialogFields, type DialogValues } from './use-text-dialog-fields';
 
 export function AddTextDialog(): JSX.Element | null {
   const state = useUiStore((s) => s.textDialog);
@@ -93,7 +77,8 @@ function DialogForm(props: {
   return (
     <Dialog onClose={close} ariaLabel="Add or edit text" as="form" onSubmit={onSubmit} size="sm">
       <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
-      <FormFields fields={fields} />
+      <ContentField value={fields.values.content} onChange={fields.setContent} />
+      <TextFormattingFields fields={fields} />
       <FormActions
         mode={state.mode}
         canSubmit={
@@ -120,148 +105,24 @@ async function commitText(
     readonly isCurrent: () => boolean;
   },
 ): Promise<void> {
-  const normalizedContent = normalizeTextContent(v.content);
-  if (normalizedContent.trim() === '') {
-    ctx.pushToast('Type some text first.', 'warning');
-    return;
-  }
-  const safeValues = sanitizeTextDialogNumericValues(v);
-  const variable = fieldsVariableTemplate(v);
-  if (!variable.ok) {
-    ctx.pushToast(variable.message, 'error');
-    return;
-  }
   ctx.setSubmitting(true);
   try {
-    const rawRendered = await renderTextGeometry({
-      fontKey: v.fontKey,
-      embeddedFonts: v.embeddedFonts,
-      content: normalizedContent,
-      sizeMm: safeValues.sizeMm,
-      alignment: v.alignment,
-      lineHeight: safeValues.lineHeight,
-      letterSpacing: safeValues.letterSpacing,
-      color: v.color,
-    });
+    const obj = await buildTextObject(state, v);
     if (!ctx.isCurrent()) return;
-    const placed = placeRenderedText(rawRendered, safeValues, v);
-    const obj: TextObject = {
-      kind: 'text',
-      id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
-      content: normalizedContent,
-      fontKey: v.fontKey,
-      sizeMm: safeValues.sizeMm,
-      alignment: v.alignment,
-      lineHeight: safeValues.lineHeight,
-      letterSpacing: safeValues.letterSpacing,
-      bendDeg: v.pathText === undefined ? safeValues.bendDeg : 0,
-      color: v.color,
-      ...(v.pathText === undefined ? {} : { pathText: v.pathText }),
-      ...(variable.template === undefined ? {} : { variableTemplate: variable.template }),
-      bounds: placed.rendered.bounds,
-      transform: placed.transform,
-      paths: placed.rendered.paths,
-    };
     ctx.upsert(obj, v.importedFont);
     ctx.close();
   } catch (err) {
     if (!ctx.isCurrent()) return;
-    ctx.pushToast(
-      `Could not render text: ${err instanceof Error ? err.message : String(err)}`,
-      'error',
-    );
+    if (err instanceof TextObjectValidationError) ctx.pushToast(err.message, err.severity);
+    else {
+      ctx.pushToast(
+        `Could not render text: ${err instanceof Error ? err.message : String(err)}`,
+        'error',
+      );
+    }
   } finally {
     if (ctx.isCurrent()) ctx.setSubmitting(false);
   }
-}
-
-function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
-  const {
-    values,
-    setContent,
-    setFontKey,
-    setSizeMm,
-    setAlignment,
-    setLineHeight,
-    setLetterSpacing,
-    setBendDeg,
-  } = props.fields;
-  return (
-    <>
-      <ContentField value={values.content} onChange={setContent} />
-      <VariableTextFields
-        enabled={props.fields.variableEnabled}
-        onEnabledChange={props.fields.setVariableEnabled}
-        onInsert={(source) => setContent(`${values.content}${source}`)}
-      />
-      <Field label="Font">
-        <FontPicker
-          value={values.fontKey}
-          embeddedFonts={values.embeddedFonts}
-          onChange={setFontKey}
-        />
-        <FontImportButton importFont={props.fields.importFont} />
-        <FontUsageHint fontKey={values.fontKey} />
-      </Field>
-      <Field label="Alignment">
-        <AlignmentRadio value={values.alignment} onChange={setAlignment} />
-      </Field>
-      <TextDialogNumericFields
-        values={values}
-        setSizeMm={setSizeMm}
-        setLineHeight={setLineHeight}
-        setLetterSpacing={setLetterSpacing}
-        setBendDeg={setBendDeg}
-      />
-      <PathTextFields
-        enabled={props.fields.pathEnabled}
-        guides={props.fields.guides}
-        settings={
-          values.pathText ?? {
-            guideObjectId: props.fields.guides[0]?.id ?? '',
-            offsetMm: 0,
-            reverse: false,
-          }
-        }
-        setEnabled={props.fields.setPathEnabled}
-        setGuideId={props.fields.setPathGuideId}
-        setOffsetMm={props.fields.setPathOffsetMm}
-        setReverse={props.fields.setPathReverse}
-      />
-    </>
-  );
-}
-
-function fieldsVariableTemplate(
-  values: DialogValues,
-):
-  | { readonly ok: true; readonly template?: NonNullable<TextObject['variableTemplate']> }
-  | { readonly ok: false; readonly message: string } {
-  if (values.variableTemplate === undefined) return { ok: true };
-  return parseVariableTemplateSource(values.content);
-}
-
-function placeRenderedText(
-  rendered: Awaited<ReturnType<typeof renderTextGeometry>>,
-  safeValues: TextDialogNumericValues,
-  values: DialogValues,
-): {
-  readonly rendered: Awaited<ReturnType<typeof renderTextGeometry>>;
-  readonly transform: typeof IDENTITY_TRANSFORM;
-} {
-  if (values.pathText === undefined) {
-    return {
-      rendered: bendTextRender(rendered, safeValues.bendDeg),
-      transform: IDENTITY_TRANSFORM,
-    };
-  }
-  if (values.pathGuide === undefined) throw new Error('Select a guide path for this text.');
-  const result = placeTextOnPath(rendered, values.pathGuide, values.pathText);
-  if (result.kind !== 'ok') throw new Error(result.message);
-  return {
-    rendered: result.rendered,
-    transform: { ...IDENTITY_TRANSFORM, x: result.origin.x, y: result.origin.y },
-  };
 }
 
 function ContentField(props: {
@@ -335,10 +196,6 @@ function FormActions(props: {
   );
 }
 
-function normalizeTextContent(text: string): string {
-  return text.normalize('NFC');
-}
-
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
     <label className="lf-field" style={fieldAlignStyle}>
@@ -347,29 +204,6 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
       </span>
       <span style={fieldControlStyle}>{props.children}</span>
     </label>
-  );
-}
-
-function AlignmentRadio(props: {
-  readonly value: TextAlignment;
-  readonly onChange: (next: TextAlignment) => void;
-}): JSX.Element {
-  return (
-    <span style={alignmentStyle}>
-      {(['left', 'center', 'right'] as const).map((a) => (
-        <label key={a} style={alignmentLabelStyle}>
-          <input
-            type="radio"
-            name="text-alignment"
-            value={a}
-            checked={props.value === a}
-            title={`Align text ${a}.`}
-            onChange={() => props.onChange(a)}
-          />
-          {a}
-        </label>
-      ))}
-    </span>
   );
 }
 
@@ -389,13 +223,6 @@ const textareaStyle: React.CSSProperties = {
   fontFamily: 'inherit',
   fontSize: 13,
   resize: 'vertical',
-};
-const alignmentStyle: React.CSSProperties = { display: 'flex', gap: 12 };
-const alignmentLabelStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  textTransform: 'capitalize',
 };
 const DIACRITIC_INSERTS = [
   'é',

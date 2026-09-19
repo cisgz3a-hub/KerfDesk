@@ -57,7 +57,9 @@ function OpenJobReview(props: {
       <span ref={topAnchorRef} aria-hidden="true" />
       <JobReviewHeader machineKind={model.machineKind} />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
-      {blocker !== null ? <BlockerBanner blocker={blocker} purpose={purpose} /> : null}
+      {blocker !== null ? (
+        <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />
+      ) : null}
       <JobReviewWarnings warnings={model.warnings} />
       {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
       <JobReviewStockCard />
@@ -127,6 +129,7 @@ function useReviewInitialFocus(anchor: RefObject<HTMLElement>): void {
 function BlockerBanner(props: {
   readonly blocker: ReadonlyArray<string>;
   readonly purpose: JobReviewPurpose;
+  readonly onRetry: () => void;
 }): JSX.Element {
   return (
     <div role="alert" className="lf-banner lf-banner--danger" style={bannerStyle}>
@@ -140,6 +143,7 @@ function BlockerBanner(props: {
           <li key={message}>{message}</li>
         ))}
       </ul>
+      <Button onClick={props.onRetry}>Retry preparation</Button>
     </div>
   );
 }

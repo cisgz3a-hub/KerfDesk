@@ -65,6 +65,7 @@ import {
   reliefOffsetDiagnosticsForStatus,
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
+import { restAwareVCarveGroup } from './vcarve-rest-finishing';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
@@ -172,8 +173,8 @@ function compileCncSnapshot(
     }
   }
   // Multi-tool release ordering: all clearing phases finish before any
-  // profile can free material. Tools remain contiguous within each phase and
-  // may recur in the profile phase when physical ordering requires it.
+  // profile can free material. Group ready work by tool while preserving each
+  // operation's secondary-clearing-before-finish dependency.
   const groups = orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]);
   const cncCompilation = buildCncCompilationSidecar(
     vcarveLayers,
@@ -313,7 +314,10 @@ function compileVectorOperationGroups(
       stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
     };
   }
-  const tagged = tagArtworkGroup(compiledGroup.group, priorityObjectId);
+  const tagged = tagArtworkGroup(
+    restAwareVCarveGroup(compiledGroup.group, secondary.groups, polylines),
+    priorityObjectId,
+  );
   return isProfileCutType(settings.cutType)
     ? {
         clearingGroups,

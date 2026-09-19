@@ -12,6 +12,7 @@ export type TilePlanResult =
 
 /** CNC job tiling result, including empty and pre-allocation budget outcomes. */
 export type TiledJobsResult =
+  | { readonly kind: 'registration-invalid'; readonly message: string }
   | {
       readonly kind: 'ready';
       readonly grid: EffectiveCncTileGrid;

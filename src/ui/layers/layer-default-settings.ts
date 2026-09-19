@@ -1,4 +1,7 @@
-import type { Layer } from '../../core/scene';
+import { LAYER_DEFAULTS, type Layer } from '../../core/scene';
+import { normalizeLayer } from '../../io/project/normalize-layer';
+import { validateProjectLayer } from '../../io/project/project-layer-shape-validator';
+import { cncSettingsForArtworkPaste } from '../state/cnc-settings-clipboard';
 import type { LayerDefaultsState } from '../state/layer-default-actions';
 
 export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color'>>;
@@ -6,12 +9,22 @@ export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color'>>;
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export function captureLayerDefaultSettings(layer: Layer): LayerDefaultSettings {
-  const { id: _id, color: _color, ...settings } = layer;
-  return settings;
+  const { id: _id, color: _color, cnc, ...settings } = layer;
+  return {
+    ...settings,
+    ...(cnc === undefined ? {} : { cnc: cncSettingsForArtworkPaste(cnc, undefined) }),
+  };
 }
 
 export function applyLayerDefaultSettings(layer: Layer, settings: LayerDefaultSettings): Layer {
-  return { ...layer, ...settings, id: layer.id, color: layer.color };
+  const { cnc, ...artwork } = settings;
+  return {
+    ...layer,
+    ...artwork,
+    ...(cnc === undefined ? {} : { cnc: cncSettingsForArtworkPaste(cnc, layer.cnc) }),
+    id: layer.id,
+    color: layer.color,
+  };
 }
 
 export function layerDefaultsStorageKey(deviceProfileName: string): string {
@@ -85,7 +98,31 @@ function isLayerDefaultRecord(value: unknown): value is Record<string, LayerDefa
 
 function isLayerDefaultSettings(value: unknown): value is LayerDefaultSettings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  return !('id' in value) && !('color' in value);
+  if ('id' in value || 'color' in value) return false;
+  // Defaults are partial layer records. Supply only the missing required fields
+  // for validation, retaining every persisted value and the project's ranges.
+  const layer = { ...LAYER_DEFAULTS, id: '', name: '', color: '', ...value };
+  if (validateProjectLayer(layer, 'defaults') !== null) return false;
+  // Project import normalizes CNC settings instead of validating that block.
+  // A saved default must already satisfy those rules; do not silently repair a
+  // corrupted recipe that would otherwise be applied to every new operation.
+  const normalized = normalizeLayer(layer) as Record<string, unknown>;
+  return sameJsonValue((value as Record<string, unknown>)['cnc'], normalized['cnc']);
+}
+
+function sameJsonValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
+    return false;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  return (
+    Object.keys(leftRecord).length === Object.keys(rightRecord).length &&
+    Object.entries(leftRecord).every(
+      ([key, value]) => Object.hasOwn(rightRecord, key) && sameJsonValue(value, rightRecord[key]),
+    )
+  );
 }
 
 function clearSlot(storage: StorageLike, key: string): void {

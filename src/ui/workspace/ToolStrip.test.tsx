@@ -41,6 +41,15 @@ afterEach(async () => {
 });
 
 describe('ToolStrip', () => {
+  it('arms text placement directly and shows the active text tool', async () => {
+    const h = await render(<ToolStrip />);
+    const text = h.querySelector('button[data-help-id="tool:text"]');
+    await act(async () => text?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'text' });
+    expect(text?.getAttribute('aria-pressed')).toBe('true');
+    expect(useUiStore.getState().textDialog).toBeNull();
+  });
+
   it('uses help topics for drawing tool hover explanations', async () => {
     const h = await render(<ToolStrip />);
     const pen = h.querySelector('button[data-help-id="tool:polyline"]');

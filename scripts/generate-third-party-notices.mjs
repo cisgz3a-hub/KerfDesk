@@ -15,6 +15,7 @@ import {
   REPO_ROOT,
   collectElectronPackage,
   collectProductionPackages,
+  sha256File,
   verifyOpenClipartAssets,
 } from './third-party-closure.mjs';
 
@@ -39,9 +40,12 @@ function fontNameEntry(font, key) {
 }
 
 function outlineFontSections(rootDir) {
-  return OUTLINE_FONTS.map(({ file, name, spdx }) => {
+  return OUTLINE_FONTS.map(({ file, name, spdx, source, sha256, licenseFile }) => {
     const abs = path.join(rootDir, file);
     if (!fs.existsSync(abs)) throw new Error(`font file missing: ${file}`);
+    if (sha256 !== undefined && sha256File(abs) !== sha256) {
+      throw new Error(`pinned font hash changed: ${file}`);
+    }
     const data = fs.readFileSync(abs);
     const font = opentype.parse(
       data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
@@ -53,10 +57,18 @@ function outlineFontSections(rootDir) {
     return [
       `--- Font: ${name} (${spdx}) ---`,
       `Bundled file: ${file}`,
+      ...(source === undefined ? [] : [`Pinned source snapshot: ${source}`]),
+      ...(sha256 === undefined ? [] : [`Unmodified font SHA-256: ${sha256}`]),
       copyright,
       ...(license === null ? [] : [license]),
       ...(licenseUrl === null ? [] : [`License URL: ${licenseUrl}`]),
       `Full license text: see the ${spdx} section at the end of this file.`,
+      ...(licenseFile === undefined
+        ? []
+        : [
+            `Original distribution license (${licenseFile}):`,
+            fs.readFileSync(path.join(rootDir, licenseFile), 'utf8').trim(),
+          ]),
     ].join('\n');
   });
 }
@@ -143,6 +155,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     standardTexts,
   ]
     .join('\n\n')
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+$/gm, '');
 }
 

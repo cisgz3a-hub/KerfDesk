@@ -13,6 +13,10 @@ import {
   prepareTiledOutputOffThread,
 } from '../laser/output-preparation-worker-client';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
+import {
+  isOutputPreparationAbort,
+  outputPreparationFailure,
+} from '../laser/output-preparation-errors';
 import type { ToastVariant } from '../state/toast-store';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
@@ -118,8 +122,9 @@ async function prepareTiledOutput(
     if (background === null) return null;
     try {
       return await background;
-    } catch {
-      return null;
+    } catch (error) {
+      if (isOutputPreparationAbort(error)) throw error;
+      return { kind: 'preparation-failed', messages: [outputPreparationFailure(error).message] };
     }
   }
   const hydrated = await hydratePagedRasterProject(ctx.project);

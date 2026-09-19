@@ -2,7 +2,8 @@
 // the same bounded output-worker scheduler as Save. The hook owns request
 // identity so an edit can cancel stale work and can never publish old bytes.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { resolveMarlinDialect } from '../../core/devices';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import { usePlatform } from '../app/platform-context';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
@@ -10,16 +11,55 @@ import { saveGcodeContext } from '../commands/gcode-command-actions';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import type { CanvasMotionPlan, LiveCanvasLifecycle } from '../state/canvas-motion-plan';
+import { canvasProgramMatchesRunQueue, canvasProgramSource } from '../state/canvas-program-source';
+import { projectInspectionContext, type GcodeInspectionContext } from './gcode-inspection-source';
 
 export type CurrentGcode =
   | { readonly kind: 'idle' }
   | { readonly kind: 'compiling'; readonly progress?: OutputCompilationProgress }
-  | { readonly kind: 'ready'; readonly programName: string; readonly text: string }
+  | {
+      readonly kind: 'ready';
+      readonly programName: string;
+      readonly text: string;
+      readonly context: GcodeInspectionContext;
+      readonly liveLifecycle?: LiveCanvasLifecycle;
+    }
   | { readonly kind: 'empty' }
   | { readonly kind: 'stale'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
 export function useCurrentGcode(active: boolean): {
+  readonly state: CurrentGcode;
+  readonly stale: boolean;
+  readonly refresh: () => void;
+  readonly followingRun: boolean;
+} {
+  const liveProgram = useCurrentRunProgram();
+  const [dismissedPlan, setDismissedPlan] = useState<CanvasMotionPlan | null>(null);
+  const followingRun = liveProgram !== null && liveProgram.plan !== dismissedPlan;
+  const compilation = useCurrentGcodeCompilation(active, followingRun);
+  const compile = compilation.refresh;
+  const refresh = useCallback(() => {
+    if (followingRun && liveProgram !== null) {
+      // Refresh cannot replace immutable running bytes with a new compilation.
+      if (['running', 'paused', 'tool-change'].includes(liveProgram.lifecycle)) return;
+      setDismissedPlan(liveProgram.plan);
+    }
+    compile();
+  }, [compile, followingRun, liveProgram]);
+  return {
+    state: followingRun && liveProgram !== null ? currentRunState(liveProgram) : compilation.state,
+    stale: !followingRun && compilation.stale,
+    refresh,
+    followingRun,
+  };
+}
+
+function useCurrentGcodeCompilation(
+  active: boolean,
+  suspended: boolean,
+): {
   readonly state: CurrentGcode;
   readonly stale: boolean;
   readonly refresh: () => void;
@@ -55,7 +95,7 @@ export function useCurrentGcode(active: boolean): {
   }, [project]);
 
   useEffect(() => {
-    if (!active) {
+    if (!active || suspended) {
       const controller = activeController.current;
       if (controller !== null) {
         runSequence.current += 1;
@@ -66,8 +106,9 @@ export function useCurrentGcode(active: boolean): {
       return;
     }
     if (compiledFor.current === useStore.getState().project) return;
+    if (activeController.current !== null) return;
     refresh();
-  }, [active, refresh]);
+  }, [active, suspended, refresh]);
 
   useEffect(
     () => () => {
@@ -82,6 +123,65 @@ export function useCurrentGcode(active: boolean): {
     stale: state.kind === 'stale' || (state.kind === 'ready' && compiledFor.current !== project),
     refresh,
   };
+}
+
+type CurrentRunProgram = {
+  readonly plan: CanvasMotionPlan;
+  readonly text: string;
+  readonly lifecycle: LiveCanvasLifecycle;
+  readonly context: GcodeInspectionContext;
+};
+
+function useCurrentRunProgram(): CurrentRunProgram | null {
+  const plan = useLaserStore((store) => store.liveCanvasRun?.plan ?? null);
+  const lifecycle = useLaserStore((store) => store.liveCanvasRun?.lifecycle ?? null);
+  const startedAtMs = useLaserStore((store) => store.liveCanvasRun?.startedAtMs ?? 0);
+  const queued = useLaserStore((store) => store.streamer?.queued ?? null);
+  const context = useMemo(() => (plan === null ? null : runInspectionContext(plan)), [plan]);
+  return useMemo(() => {
+    if (plan === null || lifecycle === null || context === null) return null;
+    const text = canvasProgramSource(plan);
+    if (text === null || !canvasProgramMatchesRunQueue({ plan, startedAtMs, lifecycle }, queued))
+      return null;
+    return { plan, text, lifecycle, context };
+  }, [plan, lifecycle, queued, startedAtMs, context]);
+}
+
+function currentRunState(run: CurrentRunProgram): Extract<CurrentGcode, { kind: 'ready' }> {
+  return {
+    kind: 'ready',
+    programName: runProgramName(run.lifecycle),
+    text: run.text,
+    liveLifecycle: run.lifecycle,
+    context: run.context,
+  };
+}
+
+function runInspectionContext(plan: CanvasMotionPlan): GcodeInspectionContext {
+  if (plan.machineKind === 'cnc') return { machineKind: 'cnc' };
+  const fan =
+    plan.device.controllerKind === 'marlin' &&
+    resolveMarlinDialect(plan.device).powerMode === 'fan';
+  return { machineKind: 'laser', laserPowerControl: fan ? 'fan' : 'spindle' };
+}
+
+function runProgramName(lifecycle: LiveCanvasLifecycle): string {
+  switch (lifecycle) {
+    case 'running':
+      return 'Running program';
+    case 'paused':
+      return 'Paused program';
+    case 'tool-change':
+      return 'Running program · Tool change';
+    case 'finished':
+      return 'Finished program';
+    case 'stopped':
+      return 'Stopped program';
+    case 'disconnected':
+      return 'Disconnected program';
+    case 'errored':
+      return 'Interrupted program';
+  }
 }
 
 function useCurrentGcodeRefresh(args: {
@@ -110,7 +210,7 @@ function useCurrentGcodeRefresh(args: {
       (programName, text) => {
         if (runSequence.current !== runId || controller.signal.aborted) return;
         compiledFor.current = snapshot;
-        setState({ kind: 'ready', programName, text });
+        setState({ kind: 'ready', programName, text, context: projectInspectionContext(snapshot) });
       },
       {
         signal: controller.signal,

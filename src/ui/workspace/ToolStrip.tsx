@@ -20,6 +20,7 @@ type Tool = {
 
 const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'select' }, helpKey: 'select', icon: 'cursor' },
+  { mode: { kind: 'text' }, helpKey: 'text', icon: 'text' },
   { mode: { kind: 'node' }, helpKey: 'node', icon: 'nodes' },
   { mode: { kind: 'measure' }, helpKey: 'measure', icon: 'ruler' },
   { mode: { kind: 'draw', shape: 'rect' }, helpKey: 'rect', icon: 'square' },
@@ -165,6 +166,7 @@ function NodeAction(props: {
 
 function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'select') return tool.kind === 'select';
+  if (current.kind === 'text') return tool.kind === 'text';
   if (current.kind === 'node') return tool.kind === 'node';
   if (current.kind === 'measure') return tool.kind === 'measure';
   if (current.kind === 'position-laser') return tool.kind === 'position-laser';

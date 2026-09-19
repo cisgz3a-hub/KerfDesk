@@ -1,6 +1,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import { applyTransform, type Polyline, type SceneObject, type Vec2 } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
+import { drawCachedClosedFill } from './filled-path-cache';
 
 // Batched-stroke helper used by line mode and fill preview paths. Display
 // simplification of enormous traces happens upstream (display-polylines.ts
@@ -31,6 +32,7 @@ export function fillClosedPolylinesBatched(
   view: ViewTransform,
   fillRule: CanvasFillRule = 'evenodd',
 ): void {
+  if (drawCachedClosedFill(ctx, polylines, obj.transform, view, fillRule)) return;
   ctx.beginPath();
   for (const polyline of polylines) {
     if (!polyline.closed) continue;

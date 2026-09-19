@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DEFAULT_TEXT_COLOR,
   DEFAULT_FONT_KEY,
@@ -31,6 +31,7 @@ export type DialogValues = TextDialogNumericValues & {
   readonly content: string;
   readonly fontKey: string;
   readonly alignment: TextAlignment;
+  readonly weldOverlaps?: boolean;
   readonly color: string;
   readonly embeddedFonts: ReadonlyArray<EmbeddedFont>;
   readonly importedFont?: EmbeddedFont;
@@ -48,6 +49,7 @@ export type DialogFields = {
   readonly setLineHeight: (value: number) => void;
   readonly setLetterSpacing: (value: number) => void;
   readonly setBendDeg: (value: number) => void;
+  readonly setWeldOverlaps: (value: boolean) => void;
   readonly importFont: (file: File) => Promise<void>;
   readonly fontAvailable: boolean;
   readonly pathAvailable: boolean;
@@ -72,7 +74,10 @@ export function useTextDialogFields(
   const [variableEnabled, setVariableEnabled] = useState(
     state.mode === 'edit' && state.variableTemplate !== undefined,
   );
-  const embeddedFonts = availableEmbeddedFonts(project, font.importedFont);
+  const embeddedFonts = useMemo(
+    () => availableEmbeddedFonts(project.embeddedFonts, font.importedFont),
+    [project.embeddedFonts, font.importedFont],
+  );
   const variableTemplate = variableTemplateValue(state, variableEnabled);
   const color = state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR;
   return {
@@ -93,12 +98,10 @@ export function useTextDialogFields(
 }
 
 function availableEmbeddedFonts(
-  project: Project,
+  fonts: Project['embeddedFonts'],
   importedFont: EmbeddedFont | undefined,
 ): ReadonlyArray<EmbeddedFont> {
-  return importedFont === undefined
-    ? (project.embeddedFonts ?? [])
-    : [...(project.embeddedFonts ?? []), importedFont];
+  return importedFont === undefined ? (fonts ?? []) : [...(fonts ?? []), importedFont];
 }
 
 function dialogValues(
@@ -153,9 +156,18 @@ function useBasicFields(state: TextDialogState) {
     initialTextLetterSpacing(editing ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING),
   );
   const [bendDeg, setBendDeg] = useState(initialTextBend(editing ? (state.bendDeg ?? 0) : 0));
+  const [weldOverlaps, setWeldOverlaps] = useState(editing ? (state.weldOverlaps ?? false) : true);
   return {
-    values: { content, sizeMm, alignment, lineHeight, letterSpacing, bendDeg },
-    setters: { setContent, setSizeMm, setAlignment, setLineHeight, setLetterSpacing, setBendDeg },
+    values: { content, sizeMm, alignment, lineHeight, letterSpacing, bendDeg, weldOverlaps },
+    setters: {
+      setContent,
+      setSizeMm,
+      setAlignment,
+      setLineHeight,
+      setLetterSpacing,
+      setBendDeg,
+      setWeldOverlaps,
+    },
   };
 }
 

@@ -19,15 +19,22 @@ export type DisplayPolylines = {
 export type DisplayPolylineCache = {
   readonly get: (polylines: ReadonlyArray<Polyline>, budget?: number) => DisplayPolylines;
   readonly getPath: (path: ColoredPath, toleranceMm: number, budget?: number) => DisplayPolylines;
+  readonly getFillPath: (
+    path: ColoredPath,
+    toleranceMm: number,
+    budget?: number,
+  ) => DisplayPolylines;
 };
 
 type CacheEntry = DisplayPolylines & { readonly budget: number };
 type CurveCacheEntry = CacheEntry & { readonly toleranceMm: number };
+type FillCacheEntry = CurveCacheEntry & { readonly compatibility: ReadonlyArray<Polyline> };
 
 export function createDisplayPolylineCache(): DisplayPolylineCache {
   const bySource = new WeakMap<ReadonlyArray<Polyline>, CacheEntry>();
   const byCurves = new WeakMap<ReadonlyArray<CurveSubpath>, CurveCacheEntry>();
   return {
+    getFillPath: createFillDisplayCache(),
     get(polylines, budget = LARGE_SCENE_SEGMENT_THRESHOLD) {
       const cached = bySource.get(polylines);
       if (cached !== undefined && cached.budget === budget) return cached;
@@ -110,4 +117,77 @@ function decimatePolylines(
     kept.push({ closed: polyline.closed, points: keptPoints });
   }
   return kept;
+}
+
+/** Closed boundaries determine filled topology. Only open strokes may be sampled. */
+export function buildFillDisplayPolylines(
+  polylines: ReadonlyArray<Polyline>,
+  budget = LARGE_SCENE_SEGMENT_THRESHOLD,
+): DisplayPolylines {
+  const open = polylines.filter((polyline) => !polyline.closed);
+  const display = buildDisplayPolylines(open, budget);
+  return {
+    polylines: display.isSimplified
+      ? [...polylines.filter((polyline) => polyline.closed), ...display.polylines]
+      : polylines,
+    isSimplified: display.isSimplified,
+    segmentCount: countPolylineSegments(polylines),
+  };
+}
+
+function createFillDisplayCache() {
+  const entries = new WeakMap<
+    ReadonlyArray<Polyline> | ReadonlyArray<CurveSubpath>,
+    FillCacheEntry
+  >();
+  const linear = new WeakMap<ReadonlyArray<CurveSubpath>, ReadonlyArray<Polyline> | null>();
+  return (path: ColoredPath, toleranceMm: number, budget = LARGE_SCENE_SEGMENT_THRESHOLD) => {
+    const key = path.curves ?? path.polylines;
+    let lineGeometry = path.curves === undefined ? path.polylines : linear.get(path.curves);
+    if (lineGeometry === undefined && path.curves !== undefined) {
+      lineGeometry = linearCurvePolylines(path.curves);
+      linear.set(path.curves, lineGeometry);
+    }
+    const zoomInvariant = lineGeometry !== null;
+    const cached = entries.get(key);
+    if (
+      cached !== undefined &&
+      cached.budget === budget &&
+      cached.compatibility === path.polylines &&
+      (zoomInvariant || cached.toleranceMm === toleranceMm)
+    )
+      return cached;
+    const flattened = lineGeometry ?? flattenForFill(path, toleranceMm, budget);
+    const display = buildFillDisplayPolylines(flattened, budget);
+    const entry: FillCacheEntry = {
+      ...display,
+      budget,
+      toleranceMm,
+      compatibility: path.polylines,
+    };
+    entries.set(key, entry);
+    return entry;
+  };
+}
+
+function linearCurvePolylines(curves: ReadonlyArray<CurveSubpath>): ReadonlyArray<Polyline> | null {
+  if (curves.some((curve) => curve.segments.some((segment) => segment.kind !== 'line')))
+    return null;
+  return curves.map((curve) => {
+    const points = [curve.start];
+    for (const segment of curve.segments) points.push(segment.to);
+    return { points, closed: curve.closed };
+  });
+}
+
+function flattenForFill(
+  path: ColoredPath,
+  toleranceMm: number,
+  budget: number,
+): ReadonlyArray<Polyline> {
+  const flattened = flattenColoredPathCurves(path, {
+    toleranceMm,
+    segmentBudget: Math.max(budget, LARGE_SCENE_SEGMENT_THRESHOLD),
+  });
+  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
 }

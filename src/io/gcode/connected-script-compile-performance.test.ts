@@ -120,9 +120,12 @@ function recordBoundaryArraySource(source: Parameters<AsBoundaryIndex>[0]): void
 }
 
 const EXPECTED_REGION_COUNT = 12;
-const EXPECTED_GCODE_CODE_UNITS = 1_024_912;
-const EXPECTED_GCODE_SHA256 = 'dde64575fd5da13a6a62a3505eaee98e318d7165ffe65decd227a4c4ffe9d53e';
-const EXPECTED_GCODE_UTF8_BYTES = 1_024_924;
+// Final-grid containment and retained cutting/surface transitions add necessary
+// detail. Mapped-first capsule searches preserve compaction within the existing
+// certificate budget; ownership, region count and index reuse stay unchanged.
+const EXPECTED_GCODE_CODE_UNITS = 1_083_328;
+const EXPECTED_GCODE_SHA256 = '7094c5de65e6f44a9b85fbf19155f5c3da9320038afb1fb10fa2ade63ce467d1';
+const EXPECTED_GCODE_UTF8_BYTES = 1_083_340;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;

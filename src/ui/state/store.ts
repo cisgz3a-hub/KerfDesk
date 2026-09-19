@@ -117,7 +117,8 @@ import {
   pathNodeCurveCommandActions,
   type PathNodeCurveCommandActions,
 } from './path-node-curve-command-actions';
-import { type ImportOutcome, type TraceExistingImageOptions } from './scene-mutations';
+import type { ImportOutcome, TraceExistingImageOptions } from './scene-mutations';
+import type { TextInsertOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
 import {
@@ -279,7 +280,8 @@ export type AppState = ObjectPropertiesActions &
     // originals; a multi-selection merges into a single bitmap).
     readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
     // Insert/update text by id; edits preserve position and transform.
-    readonly upsertTextObject: (text: TextObject, embeddedFont?: EmbeddedFont) => void;
+    // prettier-ignore
+    readonly upsertTextObject: (text: TextObject, embeddedFont?: EmbeddedFont, options?: TextInsertOptions) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
     // Phase K (ADR-106): insert a generated box panel sheet — one polyline

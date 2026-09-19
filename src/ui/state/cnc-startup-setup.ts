@@ -1,4 +1,7 @@
-import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
+import {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
+  type CncMachineStarterLiveCaps,
+} from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -99,7 +102,7 @@ function settingsAfterPrimaryToolChange(
     profile: context.profile,
     machineSpindleMaxRpm: context.machine.params.spindleMaxRpm,
     liveCaps: context.liveCaps,
-    fluteCount: tool.fluteCount ?? source.fluteCount,
+    fluteCount: tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
   });
   return patch === null ? withoutCncFeedSource(settings) : { ...settings, ...patch };
 }

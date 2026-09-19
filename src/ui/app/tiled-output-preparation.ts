@@ -44,7 +44,12 @@ export function finalizeTiledOutput(
   if (machine?.kind !== 'cnc' || machine.tiling === undefined) {
     return { kind: 'preparation-failed', messages: ['CNC tiling is not configured.'] };
   }
-  const tiled = tileJobs(prepared.job, machine.tiling);
+  const tiled = tileJobs(prepared.job, machine.tiling, {
+    machine,
+    device: prepared.project.device,
+  });
+  if (tiled.kind === 'registration-invalid')
+    return { kind: 'preparation-failed', messages: [tiled.message] };
   if (tiled.kind === 'empty') return tiled;
   if (tiled.kind === 'work-budget-exceeded') return tiled;
   const emitted = emitTileFiles(prepared.project, machine, tiled.tiles, savedName, prepared.job);

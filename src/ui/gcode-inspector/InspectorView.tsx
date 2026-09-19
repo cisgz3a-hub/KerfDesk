@@ -1,40 +1,21 @@
-// InspectorView — the Inspector's working surface: 3D viewport, transport,
-// source pane and readouts (ADR-255 stage 9b extraction).
-//
-// Extracted from the dialog so the SAME view can render inline as a canvas
-// mode, not only inside a modal. The dialog is now just a frame around it.
-
-import { useMemo, useRef, useState } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
+// Shared read-only working surface for the canvas and the full Inspector.
+import { useRef, useState } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
-import {
-  directionArrows,
-  resolveViewer3dTheme,
-  type CameraPreset,
-  type Viewer3dSceneHandle,
-} from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
-import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
-import { InspectorViewControls } from './InspectorViewControls';
-import { DEFAULT_LENS_ID, lensColorFn, type LensId } from './lenses';
-import { playheadAtTime, secondsAtLine } from './playhead';
-import { useInspectorPlayback } from './use-inspector-playback';
-import { useLiveMachine, type LiveMachine } from './use-live-machine';
+import { InspectorViewport } from './InspectorViewport';
+import { secondsAtLine } from './playhead';
+import { useInspectorCamera } from './use-inspector-camera';
+import { useInspectorSession } from './use-inspector-session';
 import { useSceneSync } from './use-scene-sync';
-import { useViewer3dScene, type Viewer3dSceneState } from './use-viewer3d-scene';
+import { useViewer3dScene } from './use-viewer3d-scene';
 
-/**
- * 'full' is the in-depth screen: 3D + source pane + readouts + health.
- * 'preview' is the canvas mode: the 3D toolpath and its transport only —
- * a look at the program, not a workbench.
- */
 export type InspectorVariant = 'full' | 'preview';
-
 type InspectorViewProps =
   | {
       readonly model: GcodeRenderModel;
@@ -46,83 +27,68 @@ type InspectorViewProps =
   | {
       readonly model: GcodeRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
+      readonly source?: GcodeInspectionSource;
       readonly variant: 'preview';
     };
+type Session = ReturnType<typeof useInspectorSession>;
 
 export function InspectorView(props: InspectorViewProps): JSX.Element {
-  const full = (props.variant ?? 'full') === 'full';
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [travelVisible, setTravelVisible] = useState(true);
-  const [lens, setLens] = useState<LensId>(DEFAULT_LENS_ID);
-  const [arrowsVisible, setArrowsVisible] = useState(false);
   const [sourceVisible, setSourceVisible] = useState(true);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
-  const theme = useMemo(() => resolveViewer3dTheme(canvasRef.current), []);
-  const { model } = props;
-  const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
-  const { time, playback, playhead, findings, atEnd, colorOf, arrows, activeLine } =
-    useInspectorDerived(model, props.analysis, lens, theme, arrowsVisible);
-  const live = useLiveMachine();
-
-  useSceneSync({
-    handleRef,
-    state,
-    playhead: atEnd ? null : playhead,
-    colorOf,
-    live: live.point,
-    arrows,
-    travelVisible,
-  });
-
-  // source -> 3D: select the line, and move the playhead to its first move.
-  // Modal/event lines emit no motion, so the playhead stays put rather than
-  // jumping somewhere arbitrary — the selection still updates.
+  const session = useInspectorSession(props.model, props.analysis, props.source);
+  const { canvasRef, handleRef, state, reason, camera } = useInspectorScene(props.model, session);
+  const { playhead, liveMode, live } = session;
   const locateLine = (line: number): void => {
     setSelectedLine(line);
-    const target = secondsAtLine(model, time.segTimeEndSec, line);
-    if (target !== null) playback.setRouteMm(target);
+    if (liveMode) return;
+    const target = secondsAtLine(props.model, session.time.segTimeEndSec, line);
+    if (target !== null) session.playback.setRouteMm(target);
   };
-
+  const travelChange = session.setTravelVisible;
   return (
-    <div style={bodyRowStyle}>
-      <div style={viewColumnStyle}>
-        {full ? <SourceToggle visible={sourceVisible} onToggle={setSourceVisible} /> : null}
-        <Viewport
+    <div className="gcode-viewer-body">
+      <div className="gcode-viewer-column">
+        <ViewerHeader
+          session={session}
+          full={props.variant !== 'preview'}
+          sourceVisible={sourceVisible}
+          onSourceToggle={() => setSourceVisible((value) => !value)}
+        />
+        <InspectorViewport
           canvasRef={canvasRef}
-          live={live}
           handleRef={handleRef}
           state={state}
           reason={reason}
+          cameraMode={camera.cameraMode}
+          onCameraModeChange={camera.setCameraMode}
+          live={liveMode ? live : null}
+          playhead={playhead}
+          activeLine={session.activeLine}
+          playing={session.playback.playing}
+          travelVisible={session.travelVisible}
+          onTravelChange={travelChange}
         >
-          {full ? null : (
-            <PreviewLens model={model} time={time} theme={theme} lens={lens} onChange={setLens} />
-          )}
-        </Viewport>
-        <InspectorTimeline playback={playback} totalRouteMm={time.motionSeconds} />
+          {props.variant === 'preview' ? (
+            <PreviewLens model={props.model} session={session} />
+          ) : null}
+        </InspectorViewport>
+        <SessionTimeline session={session} />
       </div>
       {props.variant !== 'preview' && sourceVisible ? (
         <InspectorSourcePane
           source={props.source}
           sourceIndex={props.sourceIndex}
-          categories={model.lineCategories}
-          activeLine={activeLine}
+          categories={props.model.lineCategories}
+          activeLine={session.activeLine}
           selectedLine={selectedLine}
           onSelectLine={locateLine}
         />
       ) : null}
-      {full ? (
-        <InspectorSidebar
-          model={model}
-          theme={theme}
-          playhead={playhead}
-          time={time}
-          findings={findings}
-          lens={lens}
-          onLensChange={setLens}
-          arrowsVisible={arrowsVisible}
-          onArrowsVisibleChange={setArrowsVisible}
-          travelVisible={travelVisible}
-          onTravelVisibleChange={setTravelVisible}
+      {props.variant !== 'preview' ? (
+        <Readouts
+          model={props.model}
+          session={session}
+          onTravelChange={travelChange}
           onLocateLine={locateLine}
         />
       ) : null}
@@ -132,219 +98,141 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
 
 function PreviewLens(props: {
   readonly model: GcodeRenderModel;
-  readonly time: ProgramTimeModel;
-  readonly theme: ReturnType<typeof resolveViewer3dTheme>;
-  readonly lens: LensId;
-  readonly onChange: (lens: LensId) => void;
+  readonly session: Session;
 }): JSX.Element {
+  const s = props.session;
   return (
-    <InspectorLensControl
-      model={props.model}
-      time={props.time}
-      theme={props.theme}
-      lens={props.lens}
-      onLensChange={props.onChange}
-      variant="overlay"
+    <div style={previewLensStyle}>
+      <InspectorLensControl
+        model={props.model}
+        time={s.time}
+        theme={s.theme}
+        lens={s.lens}
+        onLensChange={s.setLens}
+        variant="overlay"
+      />
+    </div>
+  );
+}
+
+function SessionTimeline({ session }: { readonly session: Session }): JSX.Element {
+  const { live, liveMode } = session;
+  return (
+    <InspectorTimeline
+      playback={session.playback}
+      totalRouteMm={session.time.motionSeconds}
+      live={
+        liveMode
+          ? {
+              progress: live.progress,
+              active: live.active,
+              label: live.reason ?? `${live.lifecycle ?? 'Waiting'} / confirmed route`,
+            }
+          : null
+      }
     />
   );
 }
 
-/** Everything derived from the program: planner time, playhead, findings,
- * lens colours and the arrow overlay. Extracted to keep InspectorView inside
- * the function-size cap. */
-function useInspectorDerived(
-  model: GcodeRenderModel,
-  analysis: GcodeInspectorAnalysis,
-  lens: LensId,
-  theme: ReturnType<typeof resolveViewer3dTheme>,
-  arrowsVisible: boolean,
-): {
-  readonly time: ProgramTimeModel;
-  readonly playback: ReturnType<typeof useInspectorPlayback>;
-  readonly playhead: ReturnType<typeof playheadAtTime>;
-  readonly findings: GcodeInspectorAnalysis['findings'];
-  readonly atEnd: boolean;
-  readonly colorOf: ReturnType<typeof lensColorFn>;
-  readonly arrows: ReturnType<typeof directionArrows> | null;
-  /** 3D -> source: the line whose move the playhead is executing. */
-  readonly activeLine: number | null;
-} {
-  const { time, findings } = analysis;
-  const playback = useInspectorPlayback(time.motionSeconds);
-  const playhead = useMemo(
-    () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
-    [model, time, playback.routeMm],
-  );
-  const colorOf = useMemo(() => lensColorFn(model, time, lens, theme), [model, time, lens, theme]);
-  // Cut direction is invisible without these: climb vs conventional.
-  const arrows = useMemo(
-    () => (arrowsVisible ? directionArrows(model) : null),
-    [model, arrowsVisible],
-  );
-  return {
-    time,
-    playback,
-    playhead,
-    findings,
-    // Fully-drawn playhead = show everything, so the scene never hides the
-    // tail segment to floating-point rounding.
-    atEnd: playback.routeMm >= time.motionSeconds,
-    colorOf,
-    arrows,
-    activeLine: playhead.segmentIndex < 0 ? null : (model.segLine[playhead.segmentIndex] ?? null),
-  };
-}
-
-function Viewport(props: {
-  readonly canvasRef: React.RefObject<HTMLCanvasElement>;
-  readonly live: LiveMachine;
-  readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
-  readonly state: Viewer3dSceneState;
-  readonly reason: string;
-  readonly children?: React.ReactNode;
+function ViewerHeader(props: {
+  readonly session: Session;
+  readonly full: boolean;
+  readonly sourceVisible: boolean;
+  readonly onSourceToggle: () => void;
 }): JSX.Element {
+  const { session } = props;
   return (
-    <div style={viewportStyle} data-viewer-state={props.state}>
-      <canvas ref={props.canvasRef} style={canvasStyle} />
-      {props.live.streaming ? <LiveBadge live={props.live} /> : null}
-      <InspectorViewControls
-        onSelectView={(preset: CameraPreset) => props.handleRef.current?.setView(preset)}
-        onCapture={() => {
-          const url = props.handleRef.current?.captureImage();
-          if (url !== undefined) downloadPng(url);
-        }}
-      />
-      {props.children}
-      {props.state === 'no-webgl' ? (
-        <p style={messageStyle}>
-          3D view unavailable: {props.reason} The program parsed — readouts are live.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-// Shown only while a job is actually streaming. Reports what the controller
-// said — never an inference — so the operator can trust it against the
-// machine in front of them.
-function LiveBadge(props: { readonly live: LiveMachine }): JSX.Element {
-  const { live } = props;
-  const percent =
-    live.progress === null || live.progress.total <= 0
-      ? null
-      : Math.round((live.progress.completed / live.progress.total) * 100);
-  return (
-    <div style={liveBadgeStyle} role="status" aria-label="Live machine">
-      <span style={liveDotStyle} aria-hidden="true" />
-      <strong>LIVE</strong>
-      {live.state === null ? null : <span>{live.state}</span>}
-      {percent === null ? null : <span>{percent}%</span>}
-      {live.point === null ? (
-        <span style={liveMutedStyle}>position not reported</span>
-      ) : (
-        <span style={liveMonoStyle}>
-          X{live.point.x.toFixed(1)} Y{live.point.y.toFixed(1)} Z{live.point.z.toFixed(1)}
+    <div className="gcode-viewer-header">
+      <div className="gcode-viewer-heading">
+        <span className="gcode-viewer-eyebrow">G-CODE / 3D</span>
+        <span className="gcode-viewer-subtitle">
+          {session.liveMode ? 'Watching the started program' : 'Explore the toolpath'}
         </span>
-      )}
+      </div>
+      <div className="gcode-viewer-header-actions">
+        {session.live.matched ? (
+          <button
+            type="button"
+            className="lf-btn"
+            aria-pressed={session.liveMode}
+            title="Switch between reported machine progress and local preview playback"
+            onClick={() => session.setFollowLive(!session.followLive)}
+          >
+            {session.liveMode ? 'Preview playback' : 'Watch live run'}
+          </button>
+        ) : null}
+        {props.full ? (
+          <button
+            type="button"
+            className="lf-btn"
+            aria-pressed={props.sourceVisible}
+            title="Show or hide the G-code source beside the 3D view"
+            onClick={props.onSourceToggle}
+          >
+            {props.sourceVisible ? 'Hide source' : 'Show source'}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-// The operator asked for this frame, so handing back a file is the whole
-// point; nothing leaves the machine.
-function downloadPng(dataUrl: string): void {
-  const link = document.createElement('a');
-  link.href = dataUrl;
-  link.download = 'gcode-view.png';
-  link.click();
-}
-
-function SourceToggle(props: {
-  readonly visible: boolean;
-  readonly onToggle: (update: (visible: boolean) => boolean) => void;
+function Readouts(props: {
+  readonly model: GcodeRenderModel;
+  readonly session: Session;
+  readonly onTravelChange: (visible: boolean) => void;
+  readonly onLocateLine: (line: number) => void;
 }): JSX.Element {
+  const s = props.session;
   return (
-    <div style={sourceToggleRowStyle}>
-      <button
-        type="button"
-        className="lf-btn"
-        title="Show or hide the program source"
-        aria-pressed={props.visible}
-        style={sourceToggleStyle}
-        onClick={() => props.onToggle((visible) => !visible)}
-      >
-        {props.visible ? 'Hide source' : 'Show source'}
-      </button>
-    </div>
+    <InspectorSidebar
+      model={props.model}
+      theme={s.theme}
+      playhead={s.playhead}
+      time={s.time}
+      findings={s.findings}
+      lens={s.lens}
+      onLensChange={s.setLens}
+      arrowsVisible={s.arrowsVisible}
+      onArrowsVisibleChange={s.setArrowsVisible}
+      travelVisible={s.travelVisible}
+      onTravelVisibleChange={props.onTravelChange}
+      onLocateLine={props.onLocateLine}
+    />
   );
 }
 
-const bodyRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flex: 1,
-  minHeight: 0,
-};
+function useInspectorScene(model: GcodeRenderModel, session: Session) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
+  const { playhead, liveMode, live } = session;
+  useSceneSync({
+    handleRef,
+    state,
+    model: model,
+    playhead: liveMode ? playhead : session.atEnd ? null : playhead,
+    colorOf: session.colorOf,
+    live: liveMode ? live.point : null,
+    arrows: session.arrows,
+    hidePlaybackMarker: liveMode,
+    travelVisible: session.travelVisible,
+  });
+  const camera = useInspectorCamera(
+    handleRef,
+    state,
+    {
+      point: liveMode ? live.point : session.atEnd ? null : playhead.point,
+      progress: session.progress,
+    },
+    model,
+  );
+  return { canvasRef, handleRef, state, reason, camera };
+}
 
-const viewColumnStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  flex: 1,
-  minWidth: 0,
-};
-
-const viewportStyle: React.CSSProperties = {
-  position: 'relative',
-  flex: 1,
-  minHeight: 0,
-};
-
-const canvasStyle: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
-  display: 'block',
-};
-
-const messageStyle: React.CSSProperties = {
-  margin: 12,
-};
-
-const liveBadgeStyle: React.CSSProperties = {
+const previewLensStyle: React.CSSProperties = {
   position: 'absolute',
-  top: 10,
-  left: 10,
-  zIndex: 2,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '4px 10px',
-  borderRadius: 'var(--lf-radius-lg)',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-1)',
-  boxShadow: 'var(--lf-shadow)',
-  fontSize: 'var(--lf-text-sm)',
-};
-
-const liveDotStyle: React.CSSProperties = {
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  background: 'var(--lf-success)',
-};
-
-const liveMonoStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, monospace',
-  fontVariantNumeric: 'tabular-nums',
-};
-
-const liveMutedStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
-
-const sourceToggleRowStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  padding: '4px 8px 0',
-};
-
-const sourceToggleStyle: React.CSSProperties = {
-  padding: '1px 8px',
-  fontSize: 'var(--lf-text-xs)',
+  left: 0,
+  bottom: 44,
+  width: 250,
+  maxWidth: '100%',
 };

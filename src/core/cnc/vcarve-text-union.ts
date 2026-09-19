@@ -1,4 +1,5 @@
-// mergeTextObjectContours — resolve each text object's own glyphs with
+// mergeTextObjectContours — resolve each text object's own glyphs, including
+// explicitly nonzero paths retained by Convert to Path, with
 // non-zero fill before a V-carve layer's contours are pooled even-odd
 // (ADR-286).
 //
@@ -78,7 +79,9 @@ function groupByTextObject(contours: ReadonlyArray<CollectedCncContour>): Contou
 }
 
 function mergeKey(contour: CollectedCncContour): string | null {
-  if (contour.sourceKind !== 'text') return null;
+  if ((contour.fillRule ?? (contour.sourceKind === 'text' ? 'nonzero' : 'evenodd')) !== 'nonzero') {
+    return null;
+  }
   if (!contour.polyline.closed) return null;
   return contour.objectId ?? null;
 }

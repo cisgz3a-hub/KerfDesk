@@ -88,7 +88,7 @@ describe('vector path tools', () => {
     }
   });
 
-  it('drops round-stroke provenance that a baked non-uniform transform cannot represent', () => {
+  it('preserves a non-uniform stroke pen while baking only its centreline', () => {
     const artwork: ImportedSvg = {
       kind: 'imported-svg',
       id: 'stretched-stroke',
@@ -100,7 +100,10 @@ describe('vector path tools', () => {
 
     const materialized = materializeVectorObject(artwork);
 
-    expect(materialized.paths[0]?.strokeWidthMm).toBeUndefined();
+    expect(materialized.paths[0]).toMatchObject({
+      strokeWidthMm: 0.5,
+      strokeTransform: { a: 2, b: 0, c: 0, d: 3 },
+    });
   });
 
   it('welds selected closed vector contours by color into one baked path object', () => {

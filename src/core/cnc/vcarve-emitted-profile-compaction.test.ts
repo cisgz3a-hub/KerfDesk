@@ -3,6 +3,7 @@ import type { Vec3 } from '../geometry/vec3';
 import type { BoundarySegment } from './vcarve-detail-geometry';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
+import { coneRemovedDepth, type RemovalChord } from './vcarve-removal.test-support';
 
 const TAN_HALF = 1;
 const POINT_ENVELOPE = {
@@ -47,5 +48,26 @@ describe('compactVCarveEmittedProfile', () => {
     );
 
     expect(compact).toEqual(points);
+  });
+
+  it('retains cutting at a surface corner despite a larger footprint allowance', () => {
+    const approach = [
+      { x: 0.2, y: 0, z: -0.183 },
+      { x: 0.039, y: 0, z: -0.035 },
+      { x: 0.02, y: 0, z: -0.017 },
+      { x: 0.01, y: 0, z: -0.008 },
+      { x: 0.005, y: 0, z: -0.003 },
+      { x: 0.002, y: 0, z: -0.001 },
+      { x: 0.001, y: 0, z: 0 },
+    ];
+    const points = [...approach, { x: 0, y: 0, z: 0 }, ...approach.toReversed()];
+    const compact = compactVCarveEmittedProfile(points, DISTANT_BOUNDARY, POINT_ENVELOPE, 0.005);
+    const chords: RemovalChord[] = compact.flatMap((b, index) => {
+      const a = compact[index - 1];
+      return a === undefined ? [] : [[a, b]];
+    });
+    // Dropping the whole shallow turn keeps its swept footprint within
+    // 0.005 mm, but leaves this inward corner witness completely uncut.
+    expect(coneRemovedDepth({ x: 0.003, y: 0 }, chords, 90)).toBeGreaterThan(0.001);
   });
 });

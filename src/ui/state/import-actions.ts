@@ -10,6 +10,7 @@
 // store.ts -> import-actions.ts -> store.ts cycle ESLint forbids.
 
 import type { RasterImage, SceneObject, TracedImage } from '../../core/scene';
+import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { applyConvertToBitmap } from './convert-to-bitmap';
 import { applyRasterizedTraceToExisting } from './rasterized-trace-mutation';
 import {
@@ -110,7 +111,7 @@ function withFreshCncLayers(state: ImportState, result: MutationResult): Mutatio
     savedDefaultLayerIds.add(layer.id);
     // Image and trace mutations own structural settings such as mode and
     // density. Only the operator's saved CNC block participates here.
-    return { ...layer, cnc: savedCnc };
+    return applyLayerDefaultSettings(layer, { cnc: savedCnc });
   });
   const project = layers.some((layer, index) => layer !== result.project.scene.layers[index])
     ? { ...result.project, scene: { ...result.project.scene, layers } }

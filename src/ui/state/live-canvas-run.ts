@@ -7,6 +7,7 @@ import type { GcodeTimingPlanResult } from '../../core/gcode-time';
 import { normalizeReportedFeedRateToMm } from '../../core/controllers/grbl/machine-envelope';
 import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
+import { registerCanvasProgramRun } from './canvas-program-source';
 import {
   completeLiveCanvasRun,
   endStampFor,
@@ -157,8 +158,11 @@ export function liveCanvasStartPatch(
   now: number = Date.now(),
   jobTimingPlan?: GcodeTimingPlanResult,
   initialLifecycle: 'running' | 'tool-change' = 'running',
+  queued?: ReadonlyArray<string>,
+  gcode?: string,
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   if (plan === undefined) return {};
+  if (queued !== undefined) registerCanvasProgramRun(plan, queued, now, gcode);
   return {
     liveCanvasRun: {
       ...startLiveCanvasRun(plan, now),

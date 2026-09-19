@@ -51,7 +51,7 @@ export async function handleInspectCurrentGcode(
     ctx.pushToast(`Could not compile G-code: ${message}`, 'error');
     return { kind: 'failed', message };
   }
-  if (emission.kind === 'preparation-unavailable') {
+  if ('message' in emission) {
     ctx.pushToast(`Could not compile G-code: ${emission.message}`, 'error');
     return { kind: 'unavailable', message: emission.message };
   }

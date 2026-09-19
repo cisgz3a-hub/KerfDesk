@@ -32,6 +32,7 @@ import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeLayer } from './normalize-layer';
+import { normalizeTileRegistration } from './normalize-tile-registration';
 import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
 import { validateProjectShape } from './project-shape-validator';
 import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
@@ -200,6 +201,7 @@ function normalizeCncTiling(raw: unknown): { tiling: CncTiling } | Record<string
       tileHeightMm,
       overlapMm,
       registrationHoles: raw['registrationHoles'] === true,
+      ...normalizeTileRegistration(raw['registration']),
     },
   };
 }

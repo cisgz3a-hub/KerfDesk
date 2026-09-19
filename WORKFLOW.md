@@ -712,7 +712,7 @@ the completed physical Frame is the spatial source of truth.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
 3. Project saved-as does not auto-trigger; user can save to persist migration.
 
-> **Current note:** project schema v5 stores canonical curve subpaths, explicit artwork-to-operation bindings, canonical relief heightfields, and operation-owned artwork overrides. The registered v1→v2 migrator promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes to canonical heightfields where exact conversion is available; v4→v5 preserves existing settings and bindings unchanged (ADR-159, ADR-211, ADR-292, ADR-317). Readers supporting only v4 report a newer schema instead of silently ignoring operation ownership.
+> **Current note:** project schema v7 stores canonical curves, artwork-to-operation bindings, canonical relief heightfields, operation-owned overrides, tile registration plans, and converted text/stroke semantics. The registered v1→v2 migration promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes where exact conversion is available. The v4→v5→v6→v7 migrations preserve existing settings, bindings and geometry (ADR-159, ADR-211, ADR-292, ADR-317, ADR-318, ADR-319). Earlier readers report a newer schema instead of silently discarding cutting semantics.
 
 #### Error — schema newer than supported
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
@@ -798,6 +798,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `V` — Flip vertical
 
 #### Tools
+- `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
 - `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
 - `Cmd/Ctrl+L` - Line/pen
@@ -1803,14 +1804,61 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 
 ## Phase D flows
 
-- F-D1. Add text object
-- F-D2. Edit text content
+### F-D1. Add text on the canvas (ADR-320)
+
+1. Choose **Text...** in the toolbar or Tools menu, choose **Text** in the drawing rail, or press
+   **T** outside an editable field. Click blank canvas space to place the text at that scene
+   position. Clicking visible, unlocked text with this tool edits it instead.
+2. Type directly in the canvas text box. **Enter** starts another line. The **Text formatting**
+   panel provides the font picker and font import, alignment, size, line height, spacing, bend,
+   path text, variable text, and character insertion controls beside the live vector preview.
+3. **Done**, **Cmd/Ctrl+Enter**, or a primary click on empty canvas space finishes the edit.
+   **Escape** or **Cancel** discards it. A blank draft creates no object and does not delete an
+   existing object. Text created on the canvas retains the clicked placement and requested size.
+4. Text, any imported font, and the session's staged variable data/settings commit together in
+   one undoable project change. CSV imports, serial values, sequence settings, and Previous/Next/Reset
+   adjustments in this panel remain drafts until finishing; Cancel leaves their saved values alone.
+   An unchanged edit adds no undo entry.
+
+### F-D2. Edit existing text on the canvas (ADR-320)
+
+1. With **Select**, double-click the visible, unlocked text to edit; with **Text**, click it once.
+   Editing targets the text under the pointer, including when another object was the primary
+   selection. The text box follows workspace zoom and pan.
+2. Select characters, move the caret, cut/copy/paste, and undo typing with native text shortcuts.
+   These keys do not delete, select, move, or undo scene objects while the editor owns input.
+   IME composition stays in the text box; composition keystrokes do not finish or cancel the edit.
+3. Ordinary text edits preserve translation, scale, rotation, mirrors, operation bindings, and
+   artwork overrides. Path text continues to use its selected guide's placement. Bent text, text
+   on a path, and native stroke fonts use a readable content box beside their live geometry.
+   Reopening and finishing text after moving or reshaping its guide saves the updated placement.
+   If the guide changes while saving, review the updated preview and choose **Done** again.
+4. Finish or cancel using the same controls as F-D1. One project Undo restores the whole committed
+   edit. Draft geometry is excluded from project saves, autosave, and executable output. Replacing
+   the document or edited source retires its draft; delayed font/geometry results cannot update a
+   replacement document. A render error stays beside the editor so the content can be corrected.
+
+### Other text controls
+
+- The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
+  Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
+  serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
+  and work with **Weld overlaps**; no system-font installation or font-service connection is needed.
 - F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
   Pocket, and Fill require an outline font with closed regions. Fresh CNC
   stroke-text operations default to Engrave even when a V-bit is mounted.
 - F-D4. Adjust character spacing / line height
+- **Weld overlaps** joins overlapping outline letters without converting text to a separate shape.
+  It is enabled for new text. For existing text, double-click it, enable **Weld overlaps**, then
+  choose **Done**; the whole edit can be undone. Saved files remember the choice, including when
+  variable text is regenerated. Openings inside letters remain holes. Single-line engraving fonts
+  keep their native strokes and do not use this option. Welding happens after bend/path placement;
+  turning it off regenerates the original glyph outlines. A failed weld leaves the saved text
+  unchanged and shows an error in the editor. Welded boundaries are finely sampled polygons;
+  increasing **Size** regenerates them, while scaling an already welded object also scales the
+  approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
 ### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
@@ -1873,6 +1921,19 @@ ADR-279.*
 **Success**:
 1. Choose a raster image and open the trace dialog. The image is decoded at the
    preview budget and the selected preset starts tracing in a worker.
+   The large preview and scrollable settings panel sit side by side on wide screens and stack
+   on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
+   or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
+   Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
+   source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
+   only to Overlay. A centred loading indicator distinguishes image preparation from tracing,
+   remains visible while zoomed or panned, and disappears on completion or error.
+   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
+   **Show Points** displays vector vertices. These viewing controls do not
+   restart tracing or change the committed geometry. Source, trace and boundary overlays share
+   the original image's aspect ratio even when their working grids round to different sizes.
+   Escape closes the dialog and returns focus
+   to its opener without deselecting the source image.
 2. Choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
@@ -1880,9 +1941,11 @@ ADR-279.*
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. **Smoothness** and **Optimize**
-   stay visible and editable for filled outlines and Edge Detection, including values carried from
-   another preset; Reset restores the selected preset's defaults. Automatic Line Art detail
+   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
+   for alpha-mask tracing. Sliders and numeric fields stay in sync. Manual adjustments persist
+   when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
+   restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
    Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
    Changes are debounced; the
@@ -1915,6 +1978,9 @@ ADR-279.*
 4. Click **Trace** after the preview is ready. When the file, options, and
    boundary still match, the ready preview geometry is reused instead of traced
    a second time. The result is imported as a Scene object.
+   **Delete Image After trace** starts selected and removes the source bitmap only after a
+   successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
+   and abandoned requests retain the source; Undo reverses the import and source deletion together.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. Selection bounds follow the conditioned
    geometry while the trace remains registered over its full source image.
@@ -2457,8 +2523,10 @@ including mixed selections with a raster among the vectors,
 mirroring LightBurn's greyed menu item. A multi-selection merges
 into **one** bitmap spanning the selection's combined bounds
 (LightBurn-faithful, ADR-029 amendment ii): Fill All renders
-even-odd across the whole selection — a shape nested inside another
-object's shape becomes a hole, exactly like our Fill layer mode —
+each path's fill rule first, then even-odd across objects — a shape nested inside another
+object's shape becomes a hole. Use Cut Settings combines independent operation fills
+without cancelling their overlap. Text retains its nonzero fill and SVG import retains
+explicit fill rules. In all modes,
 every source vector is deleted, and the whole swap is one undo
 entry. The result is labeled `N objects (bitmap)`.
 
@@ -2472,7 +2540,16 @@ ADR-029 amendment), and **Default Brightness** (percent, default
 below the Threshold cutoff so converted ink always burns — M7). The
 dialog shows the estimated bitmap pixel size for the current DPI —
 computed from the selection's full transform including rotation —
-and disables Convert when it exceeds the raster budget.
+and disables Convert when the pixel and geometry estimate exceeds the conversion budget.
+The 64 MiB allowance includes conservative encoding and geometry costs. Very large or
+complex artwork can require lower DPI or simplification; accepted artwork keeps its detail.
+
+After Convert, the dialog stays open with **Converting to bitmap…** progress and
+**Cancel**. Settings are disabled until completion. Cancel or Escape stops work without
+changing the artwork. If the artwork or relevant cut settings change during conversion,
+the result is discarded and the dialog asks you to review and retry. Errors retain your
+settings for retry. Conversion requires a working browser worker; failures are never
+retried as blocking work on the main UI thread.
 
 **What it does.** Rasterizes the selected vector into a
 `RasterImage` at the chosen DPI (default 254 = 10 lines/mm, a
@@ -2483,6 +2560,8 @@ carries the transformed axis-aligned bounds with an IDENTITY
 transform, so it lands exactly where the vector was. Later object rotation is
 also supported by the raster compiler's transformed machine-grid sampler;
 baking simply leaves the conversion result with no residual transform.
+A horizontal or vertical line gets one centred pixel of physical thickness on its zero
+axis, so its bitmap remains visible and correctly positioned.
 **The source vector is deleted** (LightBurn discards the original);
 the swap is one undo entry, so Ctrl+Z restores the vector — replacing
 LightBurn's manual "duplicate first" guidance.
@@ -2505,10 +2584,9 @@ LightBurn's manual "duplicate first" guidance.
    fills closed shapes only, LightBurn's same closed-shape rule. The
    convert still succeeds; the operator sees a blank engrave source
    and can undo. (Outlines mode in A3 will render open paths.)
-4. **Encode failure (edge).** If the browser cannot create a 2D
-   canvas context (`toDataURL` unavailable), the build throws and is
-   caught → error toast "Could not convert to bitmap: `<message>`";
-   the scene is left unchanged (the swap never dispatched).
+4. **Failure or cancellation.** A missing worker, encoding error, timeout, or resource
+   refusal leaves the scene unchanged. Failures show an error and keep the dialog open
+   for retry. Cancel and Escape close the dialog and terminate conversion work.
 
 **Verification status.** Fill + PNG-encode + luma fidelity verified
 in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
@@ -2519,10 +2597,11 @@ re-verification (isolated, no live scene): the production rasterizer
 matches the perceptual-harness reference pixel-for-pixel (IoU 1.0000
 on a star + annulus), and rendered PNGs of Fill All / Outlines / a
 rotated + scaled bake were eyeballed correct, bounds matching the
-transform math exactly. **Not yet verified:** the live in-app
-render/placement of the swapped bitmap on the workspace canvas, and
-a side-by-side pixel comparison against LightBurn's own Convert
-output — both deferred (need a live import or a LightBurn session).
+transform math exactly. The 2026-09-13 browser regression checks additionally cover
+native worker conversion, explicit SVG nonzero overlap, independent operation coverage,
+visible zero-extent line placement, byte-matched PNG/luma, Undo/Redo, and cancellation
+followed by retry. A side-by-side comparison against LightBurn, packaged desktop runtime,
+and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
@@ -2978,7 +3057,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    **Flat depth** is off, and groove depth follows artwork width plus the
    selected bit's included angle and cutting diameter. **Detail** controls the
    vector boundary-sampling target (0 = automatic) and any necessary
-   flat-core clearing pitch.
+   flat-core clearing pitch. It is not a whole-artwork accuracy tolerance;
+   pointed cutters can leave between-pass floor scallops.
 2. Compile normalizes each closed filled region, builds sampled Delaunay
    medial-topology candidates, and accepts only finite nodes and complete XY
    chords certified inside that exact normalized region. Delaunay is not an
@@ -2998,8 +3078,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    needs floor-clearing motion even in flowing-depth mode.
 5. A selected flat clearing end mill is active only when **Flat depth** is on.
    Its floor boundary and Z passes use the same effective depth and cannot cut
-   below the V walls.
-6. Each connected medial graph is emitted as one deterministic tool-down edge
+   below the V walls. **Stepover** directly edits its clearing spacing; inlay
+   likewise exposes Stepover for the female pocket. The V-bit finish omits
+   only spans whose complete modeled cutter volume is already removed by
+   the emitted clearing paths. Residual floor, walls and corners remain in
+   the finish. This can split a route into more entries, so shorter cutting
+   distance is not a promise of a shorter cycle.
+6. Before optional rest finishing, each connected medial graph is emitted as one deterministic tool-down edge
    walk per depth level. Branches can be retraced and disconnected regions
    need separate entries, but the compiler no longer machines the whole
    V-shaped surface as a stack of global offset rings.
@@ -3521,6 +3606,12 @@ and lifts the command's CNC-only gate.)*
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
    diameter that cannot fit are blocked before output.
    Depth ladders ramp each step from the previous level.
+5. **Profile leads** on inside/outside profiles offers Arc, Line and None.
+   None persists the explicit opt-out; the other choices expose their radius
+   or length and arc sweep. An absent radius follows the cutter radius.
+   Ramp entry owns entry motion when requested, while the lead settings stay
+   stored. Tabbed profile ramps retain the raised tab windows and intentional
+   vertical tab walls, then finish the original complete contour.
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
@@ -3552,9 +3643,23 @@ and lifts the command's CNC-only gate.)*
    (clipped at boundaries, Z interpolated), translated so the tile's
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
-3. With registration holes on, adjacent tiles drill 3 mm dowel holes at
-   IDENTICAL stock positions inside the overlap strip — pins re-index
-   the stock physically between tiles.
+3. With registration holes on, **Configure registration** starts a separate
+   saved plan from the current default cutter and operation cutting values.
+   Review its cutter, hole diameter, depth, depth per pass, feed, plunge and
+   RPM. Later artwork/tool-plan edits do not rewrite this plan. Legacy
+   checkbox-only projects must configure it before a multi-tile export can
+   produce the requested holes. A missing/unsupported cutter or a cutter
+   wider than the requested hole cannot produce that cylindrical bore.
+   The registration plan was introduced in schema v6 so earlier builds reject the file instead of
+   silently discarding this cutter/depth plan. Existing v1-v5 projects still
+   load; migration does not invent a registration recipe.
+4. Matching flat end mills peck to the requested depth; smaller flat end mills
+   clear concentric circles at each depth step. Adjacent tiles use identical
+   stock-space centers in the overlap strip. Registration joins clearing work
+   before profiles **within each tile file**. This does not establish global
+   order across separately run indexed files: earlier files may already have
+   completed profiles. Cutter suitability and workholding remain operator
+   choices; no physical cutting recipe is inferred from these defaults.
 
 #### Error — a tile fails preflight
 1. Every tile preflights BEFORE any file is written; a failure names
@@ -6044,6 +6149,27 @@ validation must be supervised without cutting load.
    is the point. The view only reads — it never writes, streams, or advances
    variable text.
 4. Choosing **Design** returns to the canvas with the artwork untouched.
+
+#### Success — follow playback or a running program
+
+1. **Auto views** follows the current tool position and eases between elevated
+   viewpoints as progress advances. **Follow** keeps a steady viewing angle;
+   **Manual** leaves orbit, pan, and zoom to the operator. Dragging or zooming
+   immediately selects Manual. **Fit** restores the whole program. Reduced-motion
+   preferences keep a steady angle and remove animated camera transitions.
+2. Playback shows completed motion, a partial active move, and a faint outline
+   of the program for context. Its timeline is labelled **Playback estimate**.
+3. During a run, the canvas displays the exact retained started program. The
+   Inspector follows live progress only when its source matches that program and
+   its stream identity. Progress comes from the reconciled confirmed route, not
+   acknowledged-line counts; the camera uses the reported work-coordinate head.
+4. A paused or draining controller keeps its run view. Uncertain position,
+   disconnection, or a changed position reference removes the live camera target
+   and explains the missing report. Finished or interrupted runs retain their
+   confirmed trail as **Recorded run progress**. Unknown progress has no percentage.
+5. **Preview playback** temporarily explores the program independently; **Watch
+   live run** restores reported progress. These controls never command the machine.
+   After a terminal run, **Current design** recompiles the design for inspection.
 
 #### Empty — nothing to compile
 

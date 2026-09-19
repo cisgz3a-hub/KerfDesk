@@ -4,9 +4,9 @@ import type { VCarveBoundarySegmentSource } from './vcarve-boundary-segment-inde
 import { zPassDepths } from './depth-passes';
 import { compactVCarveEmittedProfile } from './vcarve-emitted-profile-compaction';
 import { vcarveEmittedProfileCovers } from './vcarve-emitted-profile';
-import type { RadialEnvelope } from './radial-envelope';
+import { vcarveConservativeZ, type VCarveCertifiedEnvelope } from './vcarve-cutting-constraints';
 
-type DepthSteppedOptions = RadialEnvelope & {
+type DepthSteppedOptions = VCarveCertifiedEnvelope & {
   readonly depthPerPassMm: number;
   readonly compactionToleranceMm: number;
   readonly sweepToleranceMm: number;
@@ -72,5 +72,6 @@ function covers(
 }
 
 function pointsAtLevel(points: ReadonlyArray<Vec3>, levelZ: number): ReadonlyArray<Vec3> {
-  return points.map((point) => ({ ...point, z: Math.max(point.z, levelZ) }));
+  const representedLevelZ = vcarveConservativeZ(levelZ);
+  return points.map((point) => ({ ...point, z: Math.max(point.z, representedLevelZ) }));
 }

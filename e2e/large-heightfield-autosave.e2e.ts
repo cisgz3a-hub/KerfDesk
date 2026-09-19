@@ -119,12 +119,16 @@ test('real IndexedDB autosave restores a 2048x2048 canonical field after reload'
   expect(written.base64Length).toBe(Math.ceil(SAMPLE_BYTE_COUNT / 3) * 4);
   expect(written.localAutosaveKeys).toEqual([]);
 
-  let recoveryPrompt = '';
-  page.once('dialog', async (dialog) => {
-    recoveryPrompt = dialog.message();
-    await dialog.accept();
+  const nativeDialogs: string[] = [];
+  page.on('dialog', async (dialog) => {
+    nativeDialogs.push(dialog.message());
+    await dialog.dismiss();
   });
   await page.reload();
+  const recoveryBar = page.getByRole('region', { name: 'Autosaved project' });
+  await expect(recoveryBar).toBeVisible();
+  await recoveryBar.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expect(recoveryBar).toBeHidden();
 
   await expect
     .poll(
@@ -206,7 +210,7 @@ test('real IndexedDB autosave restores a 2048x2048 canonical field after reload'
     };
   });
 
-  expect(recoveryPrompt).toContain('CurveDesk found an auto-saved project');
+  expect(nativeDialogs).toEqual([]);
   expect(recovered).toEqual({
     dirty: true,
     kind: 'heightfield-v1',

@@ -26,6 +26,11 @@ export function appendCncGroupComments(lines: string[], group: CncGroup): void {
   }
   const depth = depthComment(group);
   if (depth !== null) lines.push(depth);
+  if (group.registrationHoleDiameterMm !== undefined) {
+    lines.push(
+      `; cnc registration-hole-diameter-mm: ${requestedCncCoordinateText(group.registrationHoleDiameterMm)}`,
+    );
+  }
   if (group.vResolutionMm !== undefined) {
     const resolution = group.vResolutionMm === 0 ? 'auto' : fmt(group.vResolutionMm);
     lines.push(`; cnc v-resolution-mm: ${resolution}`);

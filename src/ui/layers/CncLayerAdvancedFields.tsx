@@ -11,6 +11,7 @@ import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
+import { CncProfileLeadFields } from './CncProfileLeadFields';
 import { HelicalEntryRows, MotionPolishRows, ReliefLayerRows } from './CncLayerToolFields';
 import { CncFeedPresetRows } from './CncFeedPresetRows';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
@@ -149,14 +150,25 @@ function FeedHelperRows(props: {
   );
 }
 
-// Pocket/relief ring spacing — advanced, shown only when it applies.
+// Clearing spacing is editable on every operation that consumes it.
 export function StepoverField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly hasReliefObjects: boolean;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element | null {
-  if (props.settings.cutType !== 'pocket' && !props.hasReliefObjects) return null;
+  const vCarveClearing =
+    props.settings.cutType === 'v-carve' &&
+    (props.settings.vCarveFlatDepthEnabled ?? true) &&
+    props.settings.vClearToolId !== undefined;
+  if (
+    props.settings.cutType !== 'pocket' &&
+    props.settings.cutType !== 'inlay-pair' &&
+    !vCarveClearing &&
+    !props.hasReliefObjects
+  ) {
+    return null;
+  }
   if (
     props.settings.cutType === 'pocket' &&
     props.settings.pocketStrategy === 'adaptive' &&
@@ -172,14 +184,19 @@ export function StepoverField(props: {
       value={props.settings.stepoverPercent}
       positiveOnly
       step={5}
-      title={
-        props.hasReliefObjects
-          ? 'Relief roughing and pocket ring spacing as a percentage of the bit diameter.'
-          : 'Pocket ring spacing as a percentage of the bit diameter.'
-      }
+      title={stepoverDescription(props.hasReliefObjects, vCarveClearing)}
       onCommit={(stepoverPercent) => props.onCommit({ stepoverPercent })}
     />
   );
+}
+
+function stepoverDescription(hasReliefObjects: boolean, vCarveClearing: boolean): string {
+  if (hasReliefObjects) {
+    return 'Relief roughing and pocket ring spacing as a percentage of the bit diameter.';
+  }
+  return vCarveClearing
+    ? 'Flat-floor clearing spacing as a percentage of the clearing bit diameter. Detail controls the V-bit finishing pitch separately.'
+    : 'Pocket clearing spacing as a percentage of the bit diameter.';
 }
 
 // The cut-type-specific tails (relief rows, v-carve options, H.9 polish,
@@ -201,6 +218,7 @@ export function CutTypeSections(props: {
   return (
     <>
       <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
+      <CncProfileLeadFields layer={layer} settings={settings} onCommit={onCommit} />
       {props.hasReliefObjects ? (
         <ReliefLayerRows layer={layer} settings={settings} onCommit={onCommit} />
       ) : null}
@@ -255,7 +273,7 @@ function VCarveFields(props: {
         min={0}
         max={5}
         step={0.05}
-        title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller = finer geometry and longer compile/job time."
+        title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller values refine sampling and can increase compile/job time; this is not an exact whole-artwork tolerance. Pointed cutters can leave scallops between floor passes."
         onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
       />
       {!activeToolIsCompatible ? (

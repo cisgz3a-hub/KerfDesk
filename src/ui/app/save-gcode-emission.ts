@@ -11,6 +11,7 @@ import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import {
   emitSavePreparedOutput,
   unavailableSaveOutput,
+  failedBackgroundSaveOutput,
   type SaveOutputEmission,
 } from '../laser/save-output-emission';
 import { renderVariableText } from '../text/render-variable-text';
@@ -94,7 +95,7 @@ async function prepareSaveInBackground(
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error;
     console.warn('Background Save preparation failed.', error);
-    return unavailableSaveOutput(BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE);
+    return failedBackgroundSaveOutput(error);
   }
 }
 

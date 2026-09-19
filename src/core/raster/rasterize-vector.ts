@@ -23,7 +23,8 @@
 // binary mask (not luma) and the fixture is test-only; extracting a shared
 // scanline primitive across all three is a candidate refactor, not done here.
 
-import { isClosedEnough, type Bounds, type Polyline, type Vec2 } from '../scene';
+import { type Bounds, type Polyline, type Vec2 } from '../scene';
+import { fillVectorGroups, type VectorFillGroup } from './rasterize-vector-fill';
 
 // LightBurn sets every converted pixel to 50% gray by default; white is
 // unburned material. 127, not 128: ditherThreshold burns strictly BELOW its
@@ -42,7 +43,6 @@ const MM_PER_INCH = 25.4;
 const SCANLINE_EPS = 1e-9;
 const OUTLINE_RADIUS_PX = 0.5;
 const OUTLINE_RADIUS_SQ = OUTLINE_RADIUS_PX * OUTLINE_RADIUS_PX;
-const MIN_CONTOUR_POINTS = 3;
 const MIN_STROKE_POINTS = 2;
 const MIN_PIXEL_DIM = 1;
 
@@ -56,6 +56,7 @@ export type VectorRasterInput = {
   // Explicit groups used by Convert to Bitmap's "Use Cut Settings" mode. When
   // omitted, `renderType` determines whether `polylines` are filled or stroked.
   readonly fillPolylines?: ReadonlyArray<Polyline>;
+  readonly fillGroups?: ReadonlyArray<VectorFillGroup>;
   readonly outlinePolylines?: ReadonlyArray<Polyline>;
   // The mm-space axis-aligned footprint the output bitmap spans.
   readonly bounds: Bounds;
@@ -95,14 +96,14 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
   const fillPolylines = input.fillPolylines ?? (input.renderType === 'outlines' ? [] : polylines);
   const outlinePolylines =
     input.outlinePolylines ?? (input.renderType === 'outlines' ? polylines : []);
-  fillEvenOdd(
+  fillVectorGroups(
     grid,
-    toPixelContours(
-      fillPolylines,
-      bounds,
-      scaleForExtent(width, widthMm),
-      scaleForExtent(height, heightMm),
-    ),
+    input.fillGroups ?? [
+      { objects: [{ paths: [{ polylines: fillPolylines, fillRule: 'evenodd' }] }] },
+    ],
+    bounds,
+    scaleForExtent(width, widthMm),
+    scaleForExtent(height, heightMm),
   );
   strokePolylines(
     grid,
@@ -165,29 +166,6 @@ function scaleForExtent(pixelExtentPx: number, mm: number): number {
   return mm > 0 ? pixelExtentPx / mm : 0;
 }
 
-// Map closed mm-space contours into pixel space; drop open / degenerate
-// ones. isClosedEnough (shared with fill-hatching, M4) accepts contours
-// whose endpoints coincide without the closed flag — the same data-at-rest
-// shape Fill was patched for, so Fill and Convert to Bitmap agree.
-function toPixelContours(
-  polylines: ReadonlyArray<Polyline>,
-  bounds: Bounds,
-  pxPerMmX: number,
-  pxPerMmY: number,
-): Vec2[][] {
-  const out: Vec2[][] = [];
-  for (const pl of polylines) {
-    if (!isClosedEnough(pl) || pl.points.length < MIN_CONTOUR_POINTS) continue;
-    out.push(
-      pl.points.map((p) => ({
-        x: (p.x - bounds.minX) * pxPerMmX,
-        y: (p.y - bounds.minY) * pxPerMmY,
-      })),
-    );
-  }
-  return out;
-}
-
 type PixelStroke = {
   readonly closed: boolean;
   readonly points: ReadonlyArray<Vec2>;
@@ -211,51 +189,6 @@ function toPixelStrokes(
     });
   }
   return out;
-}
-
-// One half-open scanline per pixel row, sampled at the row centre (y + 0.5).
-function fillEvenOdd(grid: LumaGrid, contours: ReadonlyArray<ReadonlyArray<Vec2>>): void {
-  if (contours.length === 0) return;
-  for (let y = 0; y < grid.height; y += 1) {
-    const xs = crossingsAtY(contours, y + 0.5);
-    if (xs.length < 2) continue;
-    xs.sort((a, b) => a - b);
-    for (let i = 0; i + 1 < xs.length; i += 2) {
-      const xa = xs[i];
-      const xb = xs[i + 1];
-      if (xa === undefined || xb === undefined) continue;
-      fillSpan(grid, y, xa, xb);
-    }
-  }
-}
-
-// Every edge crossing the scanline contributes its X. Half-open rule
-// [yLo, yHi) counts a vertex shared by two edges exactly once.
-function crossingsAtY(contours: ReadonlyArray<ReadonlyArray<Vec2>>, y: number): number[] {
-  const out: number[] = [];
-  for (const pts of contours) {
-    const n = pts.length;
-    for (let i = 0; i < n; i += 1) {
-      const a = pts[i];
-      const b = pts[(i + 1) % n];
-      if (a === undefined || b === undefined) continue;
-      if (y < Math.min(a.y, b.y) || y >= Math.max(a.y, b.y)) continue;
-      const dy = b.y - a.y;
-      if (Math.abs(dy) < SCANLINE_EPS) continue;
-      out.push(a.x + ((y - a.y) / dy) * (b.x - a.x));
-    }
-  }
-  return out;
-}
-
-// Ink every pixel in row y whose centre (x + 0.5) lies in [xa, xb).
-function fillSpan(grid: LumaGrid, y: number, xa: number, xb: number): void {
-  const xStart = Math.max(0, Math.ceil(xa - 0.5));
-  const xEnd = Math.min(grid.width - 1, Math.ceil(xb - 0.5) - 1);
-  const rowBase = y * grid.width;
-  for (let x = xStart; x <= xEnd; x += 1) {
-    grid.luma[rowBase + x] = grid.ink;
-  }
 }
 
 function strokePolylines(grid: LumaGrid, strokes: ReadonlyArray<PixelStroke>): void {

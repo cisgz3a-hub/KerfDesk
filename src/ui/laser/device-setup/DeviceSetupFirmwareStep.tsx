@@ -13,7 +13,11 @@ import {
   type MachineSettingsPresentationContext,
 } from '../machine-settings-presentation';
 import type { DeviceSetupStepProps } from './device-setup-flow';
-import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
+import {
+  computeFirmwareComparison,
+  type FirmwareComparison,
+  type FirmwareDiff,
+} from './device-setup-firmware-diff';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 export function DeviceSetupFirmwareStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
@@ -70,10 +74,11 @@ function ComparedFirmware(props: {
 }): JSX.Element {
   const { state, dispatch, rows } = props;
   const settingsContext = machineSettingsContext(state);
-  const diffs = computeFirmwareDiffs(state.draft, rows, {
+  const comparison = computeFirmwareComparison(state.draft, rows, {
     machine: state.draftMachine,
     machineKinds: state.machineKinds,
   });
+  const { diffs } = comparison;
   const writable = diffs.filter((diff) => diff.differs && diff.writable);
   const infoOnly = diffs.filter((diff) => diff.differs && !diff.writable);
   const firmwareNotice = machineSettingsFirmwareNotice(settingsContext);
@@ -105,9 +110,7 @@ function ComparedFirmware(props: {
         />
         I exported and stored the current controller settings backup.
       </label>
-      {writable.length === 0 && infoOnly.length === 0 ? (
-        <p style={okStyle}>The compared controller values match this software profile.</p>
-      ) : null}
+      <ComparisonSummary comparison={comparison} />
       {writable.map((diff) => (
         <FirmwareSyncRow
           key={diff.id}
@@ -132,6 +135,40 @@ function ComparedFirmware(props: {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ComparisonSummary({
+  comparison,
+}: {
+  readonly comparison: FirmwareComparison;
+}): JSX.Element {
+  const { comparedCount, expectedCount, missingCodes, invalidCodes, diffs } = comparison;
+  const complete = comparedCount === expectedCount;
+  const matches = comparedCount > 0 && !diffs.some((diff) => diff.differs);
+  return (
+    <div style={infoStyle}>
+      <p style={hintStyle}>
+        Compared {comparedCount} of {expectedCount} profile settings.
+      </p>
+      {missingCodes.length > 0 ? (
+        <p style={warningStyle}>Not reported: {missingCodes.join(', ')}.</p>
+      ) : null}
+      {invalidCodes.length > 0 ? (
+        <p style={warningStyle}>Invalid readback: {invalidCodes.join(', ')}.</p>
+      ) : null}
+      {comparedCount === 0 ? (
+        <p style={warningStyle}>
+          Firmware agreement could not be verified: no supported numeric values were reported.
+        </p>
+      ) : matches ? (
+        <p style={complete ? okStyle : warningStyle}>
+          {complete
+            ? 'The compared controller values match this software profile.'
+            : 'Reported numeric values match where compared. Firmware comparison is incomplete.'}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
