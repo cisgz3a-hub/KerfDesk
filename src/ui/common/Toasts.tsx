@@ -21,18 +21,23 @@ export function Toasts(): JSX.Element {
     >
       {toasts.map((toast) => {
         const variantLabel = toastVariantLabel(toast.variant);
+        const dismissLabel = `Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`;
         return (
-          <button
-            key={toast.id}
-            type="button"
-            onClick={() => dismiss(toast.id)}
-            style={{ ...toastStyle, ...variantStyle(toast.variant) }}
-            aria-label={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
-            title={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
-          >
-            <strong>{variantLabel}: </strong>
-            {toast.message}
-          </button>
+          <div key={toast.id} style={{ ...toastStyle, ...variantStyle(toast.variant) }}>
+            <span style={messageStyle}>
+              <strong>{variantLabel}: </strong>
+              {toast.message}
+            </span>
+            <button
+              type="button"
+              onClick={() => dismiss(toast.id)}
+              style={dismissStyle}
+              aria-label={dismissLabel}
+              title={dismissLabel}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         );
       })}
     </div>
@@ -103,8 +108,16 @@ const containerStyle: React.CSSProperties = {
   zIndex: 'var(--lf-z-toast)' as React.CSSProperties['zIndex'],
   pointerEvents: 'none',
 };
+// The toast body ignores pointer input: it sits over the drawing surface, and
+// a notification that appeared where the operator was about to click or start
+// a drag must not swallow that gesture (a project-open "parsing in worker"
+// advisory did exactly that to a rectangle drag). Only the dismiss control is
+// interactive.
 const toastStyle: React.CSSProperties = {
-  pointerEvents: 'auto',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 10,
   padding: '7px 12px',
   borderRadius: 4,
   border: '1px solid var(--lf-border)',
@@ -113,7 +126,22 @@ const toastStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
   boxShadow: 'var(--lf-shadow)',
-  cursor: 'pointer',
   textAlign: 'left',
   maxWidth: 420,
+};
+const messageStyle: React.CSSProperties = { flex: '1 1 auto', minWidth: 0, padding: '2px 0' };
+const dismissStyle: React.CSSProperties = {
+  pointerEvents: 'auto',
+  flex: '0 0 auto',
+  width: 24,
+  height: 24,
+  padding: 0,
+  border: 'none',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  fontSize: 16,
+  lineHeight: '24px',
+  cursor: 'pointer',
 };

@@ -9324,7 +9324,9 @@ lower edge.
   order, and still directs the operator to the physical E-stop or power isolation.
 - Toasts leave the rails for the same reason: they overlay the top-centre of the canvas under the
   view switch, use a tinted surface with a coloured edge instead of a solid fill, and a success
-  confirmation auto-dismisses in 4 s (advisories and failures keep 8 s).
+  confirmation auto-dismisses in 4 s (advisories and failures keep 8 s). A toast body ignores
+  pointer input, so a notification that appears over the drawing never swallows a click or a drag
+  meant for the canvas; only its dismiss control is interactive.
 
 **Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the overlay
 anchoring. The zoom buttons at the canvas's bottom-right are covered only while motion is active
