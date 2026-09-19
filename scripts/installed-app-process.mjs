@@ -96,16 +96,17 @@ export async function runNativeHelper(args, action, label, pid = 0, filePath) {
   return result;
 }
 
-export async function launchInstalledApp(args) {
+export async function launchInstalledApp(args, observe = observeChild) {
   const launchArgs = ['--remote-debugging-port=0'];
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_OPTIONS;
-  const observed = observeChild(args.executable, launchArgs, {
+  const observed = observe(args.executable, launchArgs, {
     env,
     cwd: dirname(args.executable),
+    // The GUI's real visibility is being qualified; only helper processes stay hidden.
+    windowsHide: false,
   });
-  // The window itself must be visible; windowsHide only suppresses a helper console.
   observed.launchArgs = launchArgs;
   return observed;
 }

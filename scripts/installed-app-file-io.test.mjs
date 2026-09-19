@@ -17,7 +17,7 @@ import {
   prepareProfile,
   validateProject,
 } from './installed-app-evidence.mjs';
-import { bounded } from './installed-app-process.mjs';
+import { bounded, launchInstalledApp } from './installed-app-process.mjs';
 
 const ENV = {
   GITHUB_ACTIONS: 'true',
@@ -44,6 +44,43 @@ const PROBE = {
   userInteractive: true,
   sessionId: 1,
 };
+
+test('installed GUI launch stays visible and strips Node-only environment flags without launching', async () => {
+  const calls = [];
+  const observed = {};
+  const args = parseArgs(ARGV);
+  const original = {
+    NODE_OPTIONS: process.env.NODE_OPTIONS,
+    ELECTRON_RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE,
+    KERFDESK_QUALIFICATION_LAUNCH_TEST: process.env.KERFDESK_QUALIFICATION_LAUNCH_TEST,
+  };
+  try {
+    process.env.NODE_OPTIONS = '--inspect=12345';
+    process.env.ELECTRON_RUN_AS_NODE = '1';
+    process.env.KERFDESK_QUALIFICATION_LAUNCH_TEST = 'preserved';
+    const result = await launchInstalledApp(args, (...input) => {
+      calls.push(input);
+      return observed;
+    });
+    assert.equal(result, observed);
+    assert.equal(calls.length, 1);
+    const [executable, flags, options] = calls[0];
+    assert.equal(executable, args.executable);
+    assert.deepEqual(flags, ['--remote-debugging-port=0']);
+    assert.deepEqual(result.launchArgs, flags);
+    assert.equal(options.cwd, dirname(args.executable));
+    assert.equal(options.windowsHide, false);
+    assert.notEqual(options.env, process.env);
+    assert.equal(options.env.KERFDESK_QUALIFICATION_LAUNCH_TEST, 'preserved');
+    assert.equal(Object.hasOwn(options.env, 'NODE_OPTIONS'), false);
+    assert.equal(Object.hasOwn(options.env, 'ELECTRON_RUN_AS_NODE'), false);
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) Reflect.deleteProperty(process.env, key);
+      else process.env[key] = value;
+    }
+  }
+});
 
 test('unresponsive protocol calls have a bounded failure', async () => {
   await assert.rejects(
