@@ -8,63 +8,255 @@
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <!-- Fetch the splash art at top priority during HTML parse so it fills the
-         card's dark placeholder as early as possible. -->
-    <link rel="preload" as="image" href="/splash.jpg" />
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/startup-craft.webp"
+      fetchpriority="high"
+    />
     <title>KerfDesk</title>
-    <!-- Startup splash. Static in the HTML so it paints on first parse (the
-         real "loading" moment, before the JS bundle runs); main.tsx fades it
-         out once React has mounted, with a minimum on-screen time so it never
-         just flashes. It is a loading indicator only — pointer-events:none,
-         auto-dismissed — so it never blocks the workspace (WORKFLOW.md F-A1).
-         Inline <style> is permitted by the CSP (style-src 'unsafe-inline');
-         the removal cannot be an inline <script> (script-src 'self'). -->
+    <!-- The wordmark, credit and activity indicator paint before JS or artwork.
+         main.tsx dismisses the screen when the workspace is ready (F-A1).
+         Activity is indeterminate: no simulated percentage or branding hold.
+         Inline CSS is allowed by the CSP; startup code stays in the bundle. -->
     <style>
-      /* Startup splash: a full black loading screen with the KerfDesk banner
-         centered on it. It paints immediately from static HTML (before the JS
-         bundle) so it covers the page — no flash of blank content. The banner
-         art is near-black, so it sits seamlessly on the black screen. main.tsx
-         fades the whole screen out once the workspace has painted, revealing
-         the app. */
       #app-splash {
         position: fixed;
         inset: 0;
         z-index: 2147483000;
         display: flex;
         align-items: center;
-        justify-content: center;
-        background: #000000;
+        box-sizing: border-box;
+        padding: 56px clamp(28px, 7.5vw, 144px) 110px;
+        overflow: hidden;
+        isolation: isolate;
+        background: #101113;
+        color: #f6f1e9;
+        color-scheme: dark;
+        font-family: 'Segoe UI', system-ui, sans-serif;
         pointer-events: none;
-        transition: opacity 450ms ease;
+        transition: opacity 180ms ease-out;
+      }
+      #app-splash .app-splash__art {
+        position: absolute;
+        inset: 0;
+        z-index: -3;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 64% center;
+      }
+      #app-splash::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          linear-gradient(90deg, rgb(13 15 18 / 92%) 0%, rgb(13 15 18 / 66%) 34%, transparent 72%),
+          linear-gradient(0deg, rgb(13 15 18 / 90%), transparent 30%);
       }
       #app-splash.app-splash--hidden {
         opacity: 0;
       }
-      #app-splash .app-splash__banner {
-        max-width: 60vw;
-        max-height: 62vh;
+      #app-splash .app-splash__content {
+        width: min(660px, 100%);
+      }
+      #app-splash .app-splash__eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 0 0 24px;
+        color: #d0b390;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 2.4px;
+        line-height: 1.6;
+      }
+      #app-splash .app-splash__eyebrow::before {
+        content: '';
+        width: 30px;
+        height: 1px;
+        flex: 0 0 auto;
+        background: #c99a63;
+      }
+      #app-splash .app-splash__name {
+        margin: 0;
+        color: #f6f1e9;
+        font-size: clamp(58px, 8.2vw, 126px);
+        font-weight: 500;
+        letter-spacing: -0.065em;
+        line-height: 1.08;
+      }
+      #app-splash .app-splash__name span {
+        color: #d6b48a;
+        font-weight: 300;
+      }
+      #app-splash .app-splash__tagline {
+        margin: 24px 0 0;
+        color: #c7c1b8;
+        font-size: clamp(15px, 1.5vw, 19px);
+        font-weight: 400;
+        letter-spacing: 0.2px;
+        line-height: 1.6;
+      }
+      #app-splash .app-splash__loading {
+        width: min(244px, 100%);
+        margin-top: 54px;
+      }
+      #app-splash .app-splash__track {
+        height: 2px;
+        overflow: hidden;
+        background: #4b4540;
+      }
+      #app-splash .app-splash__beam {
+        display: block;
+        width: 32%;
+        height: 100%;
+        background: #d6ad7b;
+        transform: translateX(106%);
+        animation: app-splash-loading 1500ms ease-in-out infinite;
+      }
+      #app-splash .app-splash__status {
+        margin: 16px 0 0;
+        color: #bfb8ae;
+        font-size: 12px;
+        letter-spacing: 0.4px;
+        line-height: 1.6;
+      }
+      #app-splash .app-splash__footer {
+        position: absolute;
+        right: clamp(28px, 7.5vw, 144px);
+        bottom: max(32px, env(safe-area-inset-bottom));
+        left: clamp(28px, 7.5vw, 144px);
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      #app-splash .app-splash__credit {
+        margin: 0;
+        color: #bfb8ae;
+        font-size: 11px;
+        line-height: 1.6;
+      }
+      #app-splash .app-splash__credit span {
+        display: block;
+        margin-top: 5px;
+        color: #e6d2b8;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 20px;
+        font-style: italic;
+        letter-spacing: 0.1px;
+      }
+      #app-splash .app-splash__signature {
+        margin: 0 0 3px;
+        color: #bfb8ae;
+        font-size: 10px;
+        letter-spacing: 2px;
+        line-height: 1.6;
+      }
+      @keyframes app-splash-loading {
+        from {
+          transform: translateX(-110%);
+        }
+        to {
+          transform: translateX(320%);
+        }
+      }
+      @media (max-width: 600px) {
+        #app-splash {
+          padding-bottom: 130px;
+        }
+        #app-splash .app-splash__art {
+          object-position: 58% center;
+        }
+        #app-splash::before {
+          background: linear-gradient(90deg, rgb(13 15 18 / 88%), rgb(13 15 18 / 38%));
+        }
+        #app-splash .app-splash__name {
+          font-size: clamp(54px, 12vw, 72px);
+        }
+        #app-splash .app-splash__signature {
+          display: none;
+        }
+      }
+      @media (max-height: 480px) {
+        #app-splash {
+          padding-top: 24px;
+          padding-bottom: 88px;
+        }
+        #app-splash .app-splash__eyebrow {
+          margin-bottom: 12px;
+        }
+        #app-splash .app-splash__name {
+          font-size: 54px;
+        }
+        #app-splash .app-splash__tagline {
+          margin-top: 12px;
+        }
+        #app-splash .app-splash__loading {
+          margin-top: 24px;
+        }
+        #app-splash .app-splash__footer {
+          bottom: 20px;
+        }
+        #app-splash .app-splash__credit span {
+          font-size: 17px;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         #app-splash {
           transition: none;
         }
+        #app-splash .app-splash__beam {
+          animation: none;
+        }
+      }
+      @media (forced-colors: active) {
+        #app-splash {
+          background: Canvas;
+        }
+        #app-splash::before,
+        #app-splash .app-splash__art {
+          display: none;
+        }
+        #app-splash .app-splash__track {
+          background: GrayText;
+        }
+        #app-splash .app-splash__beam {
+          background: Highlight;
+        }
       }
     </style>
-    <!-- CSP is intentionally NOT set via a meta tag here.
-         * Web deploy: set CSP via HTTP response headers at the hosting
-           platform (Cloudflare Pages / Netlify / Vercel rule file). The meta
-           form has known limitations and can't gate things like form-action
-           or frame-ancestors.
-         * Electron: contextIsolation + sandbox + no nodeIntegration is the
-           security boundary; CSP would be set via session.webRequest if we
-           wanted defense-in-depth (file:// origin makes meta CSP unreliable).
-         Phase B will land both — the Electron session-based CSP and the web
-         deploy header file. -->
+    <!-- Web CSP is supplied by public/_headers; Electron supplies its own.
+         Neither surface permits inline scripts. -->
   </head>
   <body>
     <div id="app-root"></div>
     <div id="app-splash" role="status" aria-label="Loading KerfDesk workspace">
-      <img class="app-splash__banner" src="/splash.jpg" alt="KerfDesk — Laser &amp; CNC Software" />
+      <img
+        class="app-splash__art"
+        src="/startup-craft.webp"
+        alt=""
+        fetchpriority="high"
+        decoding="async"
+      />
+      <div class="app-splash__content">
+        <p class="app-splash__eyebrow">LASER &amp; CNC SOFTWARE</p>
+        <h1 class="app-splash__name">Kerf<span>Desk</span></h1>
+        <p class="app-splash__tagline">Your ideas. Beautifully made.</p>
+        <div class="app-splash__loading">
+          <div class="app-splash__track" aria-hidden="true">
+            <span class="app-splash__beam"></span>
+          </div>
+          <p class="app-splash__status">Opening your workspace…</p>
+        </div>
+      </div>
+      <div class="app-splash__footer">
+        <p class="app-splash__credit">Created by <span>Ons Houtkombuis</span></p>
+        <p class="app-splash__signature" aria-hidden="true">DESIGN / ENGRAVE / CARVE</p>
+      </div>
     </div>
     <script type="module" src="/src/ui/app/main.tsx"></script>
   </body>
