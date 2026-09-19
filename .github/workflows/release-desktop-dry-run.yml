@@ -45,7 +45,7 @@ jobs:
 
       - name: Verify installer qualification guards and evidence checks
         if: inputs.qualify_installer
-        run: node --test scripts/qualify-windows-installer.test.mjs scripts/installed-app-file-io.test.mjs
+        run: node --test scripts/qualify-windows-installer.test.mjs scripts/installed-app-file-io.test.mjs scripts/installed-app-ownership.test.mjs
 
       - name: Verify disposable Windows desktop availability
         if: inputs.qualify_installer

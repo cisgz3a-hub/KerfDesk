@@ -51,13 +51,19 @@ completed transition. Review those artifacts before claiming a result.
 The harness also records both native-helper and renderer-click outcomes, trusted
 click/user-activation evidence and transient notification text. A dialog timeout
 must not hide an independently failed click or an already-dismissed app error.
+Windows common dialogs may run in a Chromium utility child. The helper admits
+only the launched app and descendants with the same installed executable,
+desktop session and valid creation-time ancestry. It rechecks process and
+owner-window ancestry before changing a filename or confirming a dialog, and
+refuses multiple matching dialogs. The [shipped Windows chooser factory](https://github.com/chromium/chromium/blob/148.0.7778.280/chrome/browser/win/chrome_select_file_dialog_factory.cc)
+passes the app's owner window to a separate utility service.
 
 Electron 42 checks existing File System Access grants with a null frame and
 WebContents. The permission policy therefore accepts the exact `fileSystem`
 check for a trusted requesting/embedding origin when no window is supplied.
 An existing empty or untrusted window URL still fails, as do all other
 permissions without a window. Main-frame request rules remain unchanged.
-This matches the [shipped Electron implementation](https://github.com/electron/electron/blob/v42.11.5/shell/browser/file_system_access/file_system_access_permission_context.cc#L251-L254)
+This matches the [shipped Electron implementation](https://github.com/electron/electron/blob/v42.11.5/shell/browser/file_system_access/file_system_access_permission_context.cc)
 and preserves the origin checks without rejecting legitimate file grants.
 
 This is an unsigned **manual installer** upgrade between versions of the same

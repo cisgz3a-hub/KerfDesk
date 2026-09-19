@@ -24,6 +24,7 @@ if (-not @($allowedRoots | Where-Object { $evidencePath.StartsWith($_, [StringCo
 [IO.Directory]::CreateDirectory($evidencePath) | Out-Null
 $result = [ordered]@{ ok = $false; action = $Action; appProcessId = $AppProcessId; startedAt = [DateTime]::UtcNow.ToString('o') }
 $exitCode = 0
+$rootProcessStartedAt = $null
 
 function Write-JsonFile([string]$Name, $Value) {
   $json = ConvertTo-Json -InputObject $Value -Depth 12
@@ -35,7 +36,39 @@ function Assert-OwnedProcess {
   if (-not [string]::Equals($appProcess.Path, [IO.Path]::GetFullPath($ExpectedExecutable), [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Native automation PID no longer belongs to the expected installed executable.'
   }
+  $started = $appProcess.StartTime.ToUniversalTime()
+  if ($null -ne $script:rootProcessStartedAt -and $started -ne $script:rootProcessStartedAt) {
+    throw 'Native automation root PID was reused.'
+  }
+  $script:rootProcessStartedAt = $started
   return $appProcess
+}
+
+function Get-EligibleAppProcesses($Processes, [int]$RootProcessId, [string]$Executable, [int]$SessionId, [datetime]$RootStartedAt) {
+  if (@($Processes | Group-Object ProcessId | Where-Object Count -GT 1).Count) { throw 'Ambiguous process snapshot.' }
+  $matching = @($Processes | Where-Object {
+    [string]::Equals($_.ExecutablePath, $Executable, [StringComparison]::OrdinalIgnoreCase) -and
+    $_.SessionId -eq $SessionId -and $null -ne $_.CreationDate
+  })
+  $rootRows = @($matching | Where-Object ProcessId -EQ $RootProcessId)
+  if ($rootRows.Count -ne 1 -or [Math]::Abs(($rootRows[0].CreationDate.ToUniversalTime() - $RootStartedAt.ToUniversalTime()).TotalSeconds) -gt 1) {
+    throw 'Process snapshot does not match the verified app root.'
+  }
+  $eligible = @{}
+  $eligible[$RootProcessId] = $rootRows[0]
+  do {
+    $added = $false
+    foreach ($row in $matching) {
+      $rowId = [int]$row.ProcessId
+      $parentId = [int]$row.ParentProcessId
+      if (-not $eligible.ContainsKey($rowId) -and $eligible.ContainsKey($parentId) -and
+          $row.CreationDate.ToUniversalTime() -ge $eligible[$parentId].CreationDate.ToUniversalTime()) {
+        $eligible[$rowId] = $row
+        $added = $true
+      }
+    }
+  } while ($added)
+  return @($eligible.Values | Sort-Object ProcessId)
 }
 
 function Initialize-WindowTools {
@@ -55,6 +88,7 @@ public static class QualificationWindows {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+  [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
@@ -69,17 +103,53 @@ public static class QualificationWindows {
 '@
 }
 
-function Get-WindowInventory {
-  return @([QualificationWindows]::ForProcess($AppProcessId) | ForEach-Object {
+function Get-WindowInventory([int[]]$ProcessIds = @($AppProcessId)) {
+  return @($ProcessIds | ForEach-Object { [QualificationWindows]::ForProcess($_) } | ForEach-Object {
     $rect = [QualificationWindows+Rect]::new()
     [QualificationWindows]::GetWindowRect($_, [ref]$rect) | Out-Null
+    $windowProcessId = [uint32]0
+    [QualificationWindows]::GetWindowThreadProcessId($_, [ref]$windowProcessId) | Out-Null
     [pscustomobject]@{
+      processId = $windowProcessId; ownerHandle = [QualificationWindows]::GetWindow($_, 4).ToInt64()
       handle = $_.ToInt64(); className = [QualificationWindows]::ClassName($_)
       title = [QualificationWindows]::Title($_); visible = [QualificationWindows]::IsWindowVisible($_)
       minimized = [QualificationWindows]::IsIconic($_)
       bounds = @{ left = $rect.Left; top = $rect.Top; width = $rect.Right - $rect.Left; height = $rect.Bottom - $rect.Top }
     }
   })
+}
+
+function Get-OwnedWindowInventory {
+  $root = Assert-OwnedProcess
+  $snapshot = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, ExecutablePath, SessionId, CreationDate)
+  $ownedProcesses = @(Get-EligibleAppProcesses $snapshot $AppProcessId $root.Path $root.SessionId $root.StartTime)
+  $result.ownedProcesses = $ownedProcesses
+  foreach ($window in @(Get-WindowInventory @($ownedProcesses | ForEach-Object { [int]$_.ProcessId }))) {
+    $processRow = @($ownedProcesses | Where-Object ProcessId -EQ $window.processId)
+    if ($processRow.Count -ne 1) { continue }
+    $window | Add-Member -NotePropertyName processCreatedAtUtc -NotePropertyValue $processRow[0].CreationDate.ToUniversalTime().ToString('o')
+    $window
+  }
+}
+
+function Assert-OwnedDialog($Dialog) {
+  # Chromium's Windows chooser runs in a utility child. Refresh the complete
+  # verified ancestry before each UI mutation; never target arbitrary dialogs.
+  $current = @(Get-OwnedWindowInventory | Where-Object {
+    $_.visible -and $_.className -eq '#32770'
+  })
+  if ($current.Count -ne 1 -or $current[0].handle -ne $Dialog.handle -or
+      $current[0].processId -ne $Dialog.processId -or
+      $current[0].processCreatedAtUtc -ne $Dialog.processCreatedAtUtc) { throw 'Native dialog ownership changed or became ambiguous.' }
+  $ownerHandle = [IntPtr]$current[0].ownerHandle
+  for ($depth = 0; $depth -lt 16 -and $ownerHandle -ne [IntPtr]::Zero; $depth++) {
+    $ownerProcessId = [uint32]0
+    [QualificationWindows]::GetWindowThreadProcessId($ownerHandle, [ref]$ownerProcessId) | Out-Null
+    if ($ownerProcessId -eq $AppProcessId) { return }
+    if (-not @($result.ownedProcesses | Where-Object ProcessId -EQ $ownerProcessId).Count) { break }
+    $ownerHandle = [QualificationWindows]::GetWindow($ownerHandle, 4)
+  }
+  throw 'Native dialog has no verified owner-window chain to the app root.'
 }
 
 function Save-WindowScreenshot([IntPtr]$WindowHandle, [string]$Name) {
@@ -117,11 +187,10 @@ function Get-Controls($Element) {
 function Wait-NativeDialog {
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
-    Assert-OwnedProcess | Out-Null
-    $windows = @(Get-WindowInventory)
+    $windows = @(Get-OwnedWindowInventory)
     $dialogs = @($windows | Where-Object { $_.visible -and $_.className -eq '#32770' })
     if ($dialogs.Count -gt 1) { throw 'More than one native dialog belongs to this app; refusing an ambiguous target.' }
-    if ($dialogs.Count -eq 1) { return $dialogs[0] }
+    if ($dialogs.Count -eq 1) { Assert-OwnedDialog $dialogs[0]; return $dialogs[0] }
     Start-Sleep -Milliseconds 150
   } while ([DateTime]::UtcNow -lt $deadline)
   Write-JsonFile 'windows.json' $windows
@@ -142,6 +211,7 @@ function Complete-FileDialog {
   })
   if ($edits.Count -ne 1) { throw "Expected one File name edit, found $($edits.Count)." }
   $value = $edits[0].GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+  Assert-OwnedDialog $dialog
   $value.SetValue($FilePath)
   $result.enteredPath = $value.Current.Value
   if ($result.enteredPath -ne $FilePath) { throw 'Native filename edit did not retain the requested path.' }
@@ -152,10 +222,11 @@ function Complete-FileDialog {
   $result.acceptButton = $buttons[0].Current.Name
   Save-WindowScreenshot ([IntPtr]$dialog.handle) 'dialog-filled.png'
   $invoke = $buttons[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
+  Assert-OwnedDialog $dialog
   $invoke.Invoke()
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
-    $remaining = @(Get-WindowInventory | Where-Object { $_.visible -and $_.className -eq '#32770' })
+    $remaining = @(Get-OwnedWindowInventory | Where-Object { $_.visible -and $_.className -eq '#32770' })
     if ($remaining.Count -eq 0) { $result.dialogDismissed = $true; return }
     Start-Sleep -Milliseconds 150
   } while ([DateTime]::UtcNow -lt $deadline)
