@@ -1,4 +1,4 @@
-import type { DeviceProfile } from '../devices';
+import { jogAxisSignsForOrigin, type DeviceProfile, type Origin } from '../devices';
 import { assertNever, type Vec2 } from '../scene';
 import type {
   CncGroup,
@@ -101,14 +101,18 @@ export function jobOriginOffset(
   if (target === null) return { x: 0, y: 0 };
   const bounds = computeJobBounds(job, device);
   if (bounds === null) return { x: 0, y: 0 };
-  const anchor = anchorPoint(bounds, placement.anchor);
+  const anchor = anchorPointForOrigin(bounds, placement.anchor, device?.origin);
   return { x: target.x - anchor.x, y: target.y - anchor.y };
 }
 
-export function jobOriginOffsetFromBounds(bounds: JobBounds, placement: JobOriginPlacement): Vec2 {
+export function jobOriginOffsetFromBounds(
+  bounds: JobBounds,
+  placement: JobOriginPlacement,
+  device?: Pick<DeviceProfile, 'origin'>,
+): Vec2 {
   const target = targetPoint(placement);
   if (target === null) return { x: 0, y: 0 };
-  const anchor = anchorPoint(bounds, placement.anchor);
+  const anchor = anchorPointForOrigin(bounds, placement.anchor, device?.origin);
   return { x: target.x - anchor.x, y: target.y - anchor.y };
 }
 
@@ -124,31 +128,69 @@ export function offsetJobBounds(
   };
 }
 
-function anchorPoint(bounds: JobBounds, anchor: JobOriginAnchor): Vec2 {
-  const midX = (bounds.minX + bounds.maxX) / 2;
-  const midY = (bounds.minY + bounds.maxY) / 2;
+// The nine anchors name PHYSICAL corners of the artwork as the operator sees it
+// on the canvas (front = toward the operator, left = the operator's left), the
+// same way the 3x3 picker they come from reads. `bounds` is in MACHINE
+// coordinates, whose axes are mirrored on front-right / rear-* device origins
+// (origin-transform.ts), so the corner is chosen through jogAxisSignsForOrigin —
+// the one table that already keeps the jog pad physically honest. For
+// front-left and center origins the signs are +1/+1 and this reduces to the
+// machine-frame corners the earlier implementation used, so their output is
+// byte-identical (ADR-323). Callers without a device keep the front-left mapping.
+export function anchorPointForOrigin(
+  bounds: JobBounds,
+  anchor: JobOriginAnchor,
+  origin: Origin = 'front-left',
+): Vec2 {
+  const signs = jogAxisSignsForOrigin(origin);
+  const [row, column] = anchorRowColumn(anchor);
+  return { x: anchorX(bounds, column, signs.x), y: anchorY(bounds, row, signs.y) };
+}
+
+type AnchorRow = 'front' | 'center' | 'back';
+type AnchorColumn = 'left' | 'center' | 'right';
+
+function anchorRowColumn(anchor: JobOriginAnchor): readonly [AnchorRow, AnchorColumn] {
   switch (anchor) {
     case 'front-left':
-      return { x: bounds.minX, y: bounds.minY };
+      return ['front', 'left'];
     case 'front-center':
-      return { x: midX, y: bounds.minY };
+      return ['front', 'center'];
     case 'front-right':
-      return { x: bounds.maxX, y: bounds.minY };
+      return ['front', 'right'];
     case 'center-left':
-      return { x: bounds.minX, y: midY };
+      return ['center', 'left'];
     case 'center':
-      return { x: midX, y: midY };
+      return ['center', 'center'];
     case 'center-right':
-      return { x: bounds.maxX, y: midY };
+      return ['center', 'right'];
     case 'back-left':
-      return { x: bounds.minX, y: bounds.maxY };
+      return ['back', 'left'];
     case 'back-center':
-      return { x: midX, y: bounds.maxY };
+      return ['back', 'center'];
     case 'back-right':
-      return { x: bounds.maxX, y: bounds.maxY };
+      return ['back', 'right'];
     default:
       return assertNever(anchor, 'JobOriginAnchor');
   }
+}
+
+// sign = +1 when machine +X is the operator's right (front-*/center origins):
+// the physical left edge is then minX; *-right origins mirror X, so it is maxX.
+function anchorX(bounds: JobBounds, column: AnchorColumn, sign: 1 | -1): number {
+  if (column === 'center') return (bounds.minX + bounds.maxX) / 2;
+  const left = sign === 1 ? bounds.minX : bounds.maxX;
+  const right = sign === 1 ? bounds.maxX : bounds.minX;
+  return column === 'left' ? left : right;
+}
+
+// sign = +1 when machine +Y points away from the operator (front-*/center
+// origins): the physical front edge is then minY; rear-* origins mirror Y.
+function anchorY(bounds: JobBounds, row: AnchorRow, sign: 1 | -1): number {
+  if (row === 'center') return (bounds.minY + bounds.maxY) / 2;
+  const front = sign === 1 ? bounds.minY : bounds.maxY;
+  const back = sign === 1 ? bounds.maxY : bounds.minY;
+  return row === 'front' ? front : back;
 }
 
 function targetPoint(placement: JobOriginPlacement): Vec2 | null {

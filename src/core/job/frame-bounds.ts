@@ -18,9 +18,8 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
-import type { JobOriginPlacement } from './job-origin';
 import type { JobBounds } from './job-bounds';
-import { offsetJobBounds } from './job-origin';
+import { jobOriginOffsetFromBounds, offsetJobBounds, type JobOriginPlacement } from './job-origin';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 
 export type ComputeFrameBoundsOptions = {
@@ -52,7 +51,7 @@ export function computeFrameBounds(
   };
   return options.jobOrigin === undefined
     ? unplaced
-    : offsetJobBounds(unplaced, jobOriginOffsetForBounds(unplaced, options.jobOrigin));
+    : offsetJobBounds(unplaced, jobOriginOffsetFromBounds(unplaced, options.jobOrigin, device));
 }
 
 function extendBoundsForObject(
@@ -127,52 +126,4 @@ function extendPoint(bounds: MutableBounds, point: Vec2): void {
   if (point.x > bounds.maxX) bounds.maxX = point.x;
   if (point.y < bounds.minY) bounds.minY = point.y;
   if (point.y > bounds.maxY) bounds.maxY = point.y;
-}
-
-function jobOriginOffsetForBounds(bounds: JobBounds, placement: JobOriginPlacement): Vec2 {
-  const target = targetPoint(placement);
-  if (target === null) return { x: 0, y: 0 };
-  const anchor = anchorPoint(bounds, placement.anchor);
-  return { x: target.x - anchor.x, y: target.y - anchor.y };
-}
-
-function targetPoint(placement: JobOriginPlacement): Vec2 | null {
-  switch (placement.startFrom) {
-    case 'absolute':
-      return null;
-    case 'user-origin':
-    case 'verified-origin':
-      return { x: 0, y: 0 };
-    case 'current-position':
-      return placement.currentPosition;
-    default:
-      return assertNever(placement, 'JobOriginPlacement');
-  }
-}
-
-function anchorPoint(bounds: JobBounds, anchor: JobOriginPlacement['anchor']): Vec2 {
-  const midX = (bounds.minX + bounds.maxX) / 2;
-  const midY = (bounds.minY + bounds.maxY) / 2;
-  switch (anchor) {
-    case 'front-left':
-      return { x: bounds.minX, y: bounds.minY };
-    case 'front-center':
-      return { x: midX, y: bounds.minY };
-    case 'front-right':
-      return { x: bounds.maxX, y: bounds.minY };
-    case 'center-left':
-      return { x: bounds.minX, y: midY };
-    case 'center':
-      return { x: midX, y: midY };
-    case 'center-right':
-      return { x: bounds.maxX, y: midY };
-    case 'back-left':
-      return { x: bounds.minX, y: bounds.maxY };
-    case 'back-center':
-      return { x: midX, y: bounds.maxY };
-    case 'back-right':
-      return { x: bounds.maxX, y: bounds.maxY };
-    default:
-      return assertNever(anchor, 'JobOriginAnchor');
-  }
 }
