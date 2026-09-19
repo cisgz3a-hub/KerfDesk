@@ -242,7 +242,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   expect(fileSavedCount(await kerfdesk.events())).toBe(savedBefore);
   const failedSave = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(failedSave).toContainText('No final file was selected or modified');
-  await failedSave.getByRole('button', { name: 'Cancel' }).click();
+  await failedSave.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await (await toolbarCommand(page, 'Save As...')).click();
 

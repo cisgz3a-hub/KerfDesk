@@ -74,7 +74,7 @@ test.describe('workspace shell acceptance', () => {
     await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
     await expectNoPageOverflow(page);
     await expectInsideViewport(page, page.getByRole('contentinfo', { name: 'Status bar' }));
-    await expectOneToolbarRow(page);
+    await expectUsableToolbarRows(page);
 
     const canvas = page.locator('canvas[aria-label="KerfDesk workspace"]');
     const compactBox = await canvas.boundingBox();
@@ -159,9 +159,26 @@ test.describe('workspace shell acceptance', () => {
     await page.getByText('Window', { exact: true }).click();
     await page.getByRole('menuitem', { name: 'Reset Workspace Layout', exact: true }).click();
 
-    await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
-    await page.getByRole('tab', { name: 'Artwork', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Artwork', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await expect(page.getByLabel('Artwork / Operations panel', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Workspace side panels' })).toHaveAttribute(
+      'data-layout',
+      'compact',
+    );
+    await expect(page.getByRole('button', { name: 'Workspace layout', exact: true })).toHaveText(
+      'Auto layout',
+    );
+    await expect(page.getByRole('region', { name: 'Job actions' })).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
+    for (const name of ['Cuts / Layers Panel', 'Machine Controls Panel']) {
+      await expect(page.getByRole('menuitemcheckbox', { name, exact: true })).toBeChecked();
+    }
+    await page.keyboard.press('Escape');
+    await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+    await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
   });
 
   test('renders a nonblank workspace in Chromium canvas', async ({ page }) => {
@@ -213,19 +230,43 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
   expect(widths.body).toBeLessThanOrEqual(widths.viewport);
 }
 
-async function expectOneToolbarRow(page: Page): Promise<void> {
-  const rows = await page
-    .getByLabel('Toolbar', { exact: true })
-    .locator('button')
-    .evaluateAll(
-      (buttons) =>
-        new Set(
-          buttons
-            .filter((button) => button.getClientRects().length > 0)
-            .map((button) => Math.round(button.getBoundingClientRect().top)),
-        ).size,
-    );
-  expect(rows).toBe(1);
+async function expectUsableToolbarRows(page: Page): Promise<void> {
+  // Below 700px utilities have their own row; neither group may wrap or clip.
+  for (const selector of ['.lf-toolbar-command-groups', '.lf-toolbar-utilities']) {
+    const row = page.getByLabel('Toolbar', { exact: true }).locator(selector);
+    const geometry = await row.evaluate((node) => ({
+      bounds: node.getBoundingClientRect().toJSON() as {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+      },
+      buttons: Array.from(node.querySelectorAll('button'))
+        .filter((button) => button.getClientRects().length > 0)
+        .map((button) => {
+          const rect = button.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            centre: rect.top + rect.height / 2,
+          };
+        }),
+    }));
+    expect(geometry.buttons.length).toBeGreaterThan(0);
+    const centres = geometry.buttons.map((button) => button.centre);
+    expect(Math.max(...centres) - Math.min(...centres)).toBeLessThanOrEqual(1);
+    expect(geometry.bounds.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.bounds.right).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
+    await expectInsideViewport(page, row);
+    for (const button of geometry.buttons) {
+      expect(button.left).toBeGreaterThanOrEqual(geometry.bounds.left - 1);
+      expect(button.right).toBeLessThanOrEqual(geometry.bounds.right + 1);
+      expect(button.top).toBeGreaterThanOrEqual(geometry.bounds.top - 1);
+      expect(button.bottom).toBeLessThanOrEqual(geometry.bounds.bottom + 1);
+    }
+  }
 }
 
 function countSampledCanvasColors(canvas: HTMLCanvasElement): number {
