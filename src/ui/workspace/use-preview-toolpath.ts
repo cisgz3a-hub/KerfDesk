@@ -21,7 +21,7 @@ import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-sc
 import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import { useSettledHeadPosition } from '../laser/settled-head-position';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -52,6 +52,13 @@ export function usePreviewToolpath(
   // placement object itself need not be an effect dependency.
   const placementRef = useRef(placement);
   placementRef.current = placement;
+  // The settled head keys the background preparation exactly as the estimate
+  // hook does, so Preview and ETA still share one worker compute. Read through
+  // a ref: preview geometry does not depend on it, so a settled head move must
+  // not rebuild the route.
+  const head = useSettledHeadPosition();
+  const headRef = useRef(head);
+  headRef.current = head;
 
   useEffect(() => {
     if (!previewMode) {
@@ -67,6 +74,7 @@ export function usePreviewToolpath(
         externalGcodePreview,
         placement: placementRef.current,
         outputScope,
+        initialPosition: headRef.current,
         isCancelled: () => cancelled,
         setToolpath,
       });
@@ -95,6 +103,7 @@ function runScheduledPreviewBuild(args: {
   readonly externalGcodePreview: ReturnType<typeof useStore.getState>['externalGcodePreview'];
   readonly placement: ReturnType<typeof usePreviewPlacement>;
   readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
+  readonly initialPosition: LargeJobPreparationOptions['initialPosition'];
   readonly isCancelled: () => boolean;
   readonly setToolpath: (toolpath: PreviewToolpath | null) => void;
 }): void {
@@ -117,7 +126,11 @@ function runScheduledPreviewBuild(args: {
     });
     return;
   }
-  const options = previewPreparationOptions(resolved.jobOrigin, args.outputScope);
+  const options = previewPreparationOptions(
+    resolved.jobOrigin,
+    args.outputScope,
+    args.initialPosition,
+  );
   const registration = currentPrintCutOutputRegistration(args.project);
   const needsSnapshot = hasVariableText(args.project) || registration !== undefined;
   const backgroundOptions: LargeJobPreparationOptions = {
@@ -146,18 +159,11 @@ function runScheduledPreviewBuild(args: {
 function previewPreparationOptions(
   jobOrigin: JobOriginPlacement | undefined,
   outputScope: OutputScope,
+  initialPosition: LargeJobPreparationOptions['initialPosition'],
 ): LargeJobPreparationOptions {
-  // Preview geometry does not depend on the physical head in fixed-origin
-  // modes. Read it only when building so Preview and ETA share the same
-  // worker cache entry without rebuilding geometry on every head move.
-  const machine = useLaserStore.getState();
-  const initialPosition = reportedWorkPositionMm(
-    machine,
-    machine.controllerSettings?.reportInches === true,
-  );
   return {
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
-    ...(initialPosition === null ? {} : { initialPosition }),
+    ...(initialPosition === undefined ? {} : { initialPosition }),
     outputScope,
   };
 }

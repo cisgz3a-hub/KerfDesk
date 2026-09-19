@@ -32,7 +32,7 @@ import {
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
-import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import { useSettledHeadPosition } from './settled-head-position';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -84,23 +84,13 @@ export function useJobEstimate(): LiveJobEstimate {
   });
 }
 
+// The physical head reaches the estimate only once it is settled; while a
+// Frame, jog, probe or job moves it, the previous sample holds. Sampling every
+// status report keyed a fresh background preparation per head move, and each
+// one retains a complete prepared route — enough to exhaust the renderer
+// during the Frame of a large traced fill.
 function useEstimateInitialPosition(): LiveJobEstimateOptions['initialPosition'] {
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const workOriginActive = useLaserStore((state) => state.workOriginActive);
-  const wcoCache = useLaserStore((state) => state.wcoCache);
-  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  const position = reportedWorkPositionMm(
-    { statusReport, workOriginActive, wcoCache },
-    reportInches,
-  );
-  const x = position?.x;
-  const y = position?.y;
-  const z = position?.z;
-  // Identical controller polls must not re-arm the estimate debounce.
-  return useMemo(
-    () => (x === undefined || y === undefined || z === undefined ? undefined : { x, y, z }),
-    [x, y, z],
-  );
+  return useSettledHeadPosition();
 }
 
 function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement']) {

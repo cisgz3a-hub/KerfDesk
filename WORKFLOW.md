@@ -1209,7 +1209,10 @@ reconciliation; it is not presented as elapsed-time or remaining-time progress.
 
 Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
 and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
-head position contributes approach time in every placement mode. Job Review reuses the prepared
+head position contributes approach time in every placement mode. That position is sampled only
+while the head is settled — an Idle report with no Frame, jog, probe, autofocus, streamed job or
+MPG motion — and the last settled sample holds while it moves, so Frame and jog motion never
+re-prepare the estimate. Job Review reuses the prepared
 program's timing baseline when available, and Start retains the same cut/travel calibration.
 The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
 and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and

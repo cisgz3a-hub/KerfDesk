@@ -5,6 +5,7 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { startMotionOperation } from '../state/laser-motion-operation';
 import { resetStore } from '../state/test-helpers';
 import type * as PreparationWorkerClient from './preparation-worker-client';
 import { PreparationSupersededError } from './preparation-worker-client';
@@ -80,6 +81,7 @@ beforeEach(() => {
 afterEach(async () => {
   if (root !== null) await act(async () => root?.unmount());
   host.remove();
+  useLaserStore.setState({ statusReport: null, motionOperation: null });
 });
 
 describe('usePreviewToolpath', () => {
@@ -203,6 +205,34 @@ describe('usePreviewToolpath', () => {
       resolveWorker({ toolpath: builtToolpath, estimate: { kind: 'estimated' } });
     });
     expect(probe.current).toBe(builtToolpath);
+  });
+
+  it('leaves a moving head out of the background preparation key, matching the estimate', async () => {
+    // While a Frame owns the head the reported position is transient, so the
+    // preparation is keyed without it — the same sample the estimate hook
+    // uses, so both still share one worker compute.
+    useLaserStore.setState({
+      statusReport: idleReport(300, 0),
+      motionOperation: startMotionOperation('frame'),
+    });
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    previewMocks.buildPreviewToolpath.mockReturnValue({
+      totalLength: 0,
+      steps: [],
+      previewIssue: { kind: 'too-complex' as const },
+    });
+    workerMocks.prepareLargeJobOffThread.mockReturnValue(new Promise(() => undefined));
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+
+    expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledOnce();
+    const [, options] = workerMocks.prepareLargeJobOffThread.mock.calls[0] ?? [];
+    expect(options).not.toHaveProperty('initialPosition');
   });
 
   it('keeps the paused banner when workers are unavailable', async () => {
