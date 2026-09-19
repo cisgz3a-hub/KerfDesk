@@ -69,9 +69,19 @@ jobs:
         run: pnpm guard:repo
 
       - name: Release verification gate
+        if: ${{ !inputs.qualify_installer }}
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm release:check
+
+      - name: Compile qualification candidate
+        if: inputs.qualify_installer
+        shell: bash
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pnpm build:web
+          pnpm build:electron-main
 
       - name: Build unsigned installer
         shell: bash
@@ -126,6 +136,14 @@ jobs:
             -Version $env:VERSION -UpgradeVersion $env:UPGRADE_VERSION `
             -SourceCommit $env:GITHUB_SHA `
             -EvidenceRoot "$env:GITHUB_WORKSPACE/artifacts/installed-qualification"
+
+      # Probe the installed app early so native failures do not wait behind the
+      # full suite. This required gate still has to pass for qualification success.
+      - name: Release verification gate after installed qualification
+        if: inputs.qualify_installer
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.upgrade_version }}
+        run: pnpm release:check
 
       - name: Upload installed application qualification evidence
         if: always() && inputs.qualify_installer

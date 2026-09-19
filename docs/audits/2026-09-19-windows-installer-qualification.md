@@ -4,6 +4,14 @@ The credential-free **Desktop Packaging Dry Run** workflow accepts an optional
 `qualify_installer` input. It builds two unsigned versions from the same source
 commit, then exercises the actual per-user NSIS installer on a disposable
 GitHub-hosted Windows VM. It does not publish a desktop release or update feed.
+The installer exercise runs before the full release check for earlier native
+failure feedback; both must pass for the workflow to succeed. Ordinary packaging
+dry runs retain their existing verification-before-packaging order.
+
+Candidates use the existing `electron-builder.yml` Windows NSIS configuration
+with signing disabled, preview channel metadata and updater trust disabled.
+They are separate test binaries from the `electron-builder.preview.yml` output;
+results apply to the recorded candidate hashes, not a different preview build.
 
 The runner must have no existing KerfDesk/LaserForge registration, profile,
 shortcuts or processes. Installers and evidence stay in the checkout; installed

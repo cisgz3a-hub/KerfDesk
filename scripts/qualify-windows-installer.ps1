@@ -58,6 +58,7 @@ $receipt = [ordered]@{
   elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   installRoot = $installRoot; profile = $profile; project = $project
   versions = @($Version, $UpgradeVersion); steps = $steps
+  packaging = 'electron-builder.yml Windows NSIS, unsigned with preview metadata and trusted updater disabled'
   limitations = @(
     'Unsigned manual installer upgrade; production signed automatic updates remain unqualified.',
     'Both candidates use this same source commit; historical release/profile migrations remain separate checks.',
