@@ -303,6 +303,10 @@ function canvasMachineSnapshot(
     workOriginActive: state.workOriginActive,
     wcoCache: state.wcoCache,
     trustedPositionEpoch: state.trustedPositionEpoch ?? 0,
+    // canvasCoordinateFrame draws origin-anchored starts in the machine frame
+    // only on a homed machine; without this field the idle markers were always
+    // artwork-relative and jumped to the bed position at Start (ADR-323).
+    homingState: state.homingState,
     statusQuery: state.capabilities.statusQuery,
     ...(canvasRevision === '' ? {} : { canvasRevision }),
   };

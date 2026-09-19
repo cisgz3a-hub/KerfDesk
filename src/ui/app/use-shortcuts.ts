@@ -82,7 +82,12 @@ function useFileEditShortcuts(): void {
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsCapability = useLaserStore((s) => s.capabilities.settings);
   const pushToast = useToastStore((s) => s.pushToast);
-  const machine = { statusReport, workOriginActive, wcoCache };
+  const machine = {
+    statusReport,
+    workOriginActive,
+    wcoCache,
+    reportInches: controllerSettings?.reportInches === true,
+  };
   const confirmDiscard = (action: string): Promise<boolean> =>
     confirmDiscardAsync(platform, action);
   // prettier-ignore

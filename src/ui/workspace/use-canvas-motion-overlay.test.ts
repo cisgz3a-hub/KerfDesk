@@ -51,6 +51,7 @@ describe('idle canvas motion plan', () => {
       workOriginActive: false,
       wcoCache: null,
       trustedPositionEpoch: 0,
+      homingState: 'unknown' as const,
       statusQuery: 'realtime-report' as const,
     };
     const placementSettings = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
