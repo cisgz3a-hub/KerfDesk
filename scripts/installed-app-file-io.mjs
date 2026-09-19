@@ -14,6 +14,7 @@ import {
   parseArgs,
   prepareProfile,
   sha256,
+  summarizeDialogResults,
   validateProject,
 } from './installed-app-evidence.mjs';
 import {
@@ -58,6 +59,8 @@ async function createContext(args) {
       workflowRunId: process.env.GITHUB_RUN_ID,
       stages: [],
       rendererErrors: [],
+      uiEvents: [],
+      dialogAttempts: [],
       failure: null,
     },
   };
@@ -150,6 +153,36 @@ async function attach(context) {
   await context.page
     .getByRole('button', { name: 'Import...', exact: true })
     .waitFor({ state: 'visible' });
+  // Observe transient errors and actual clicks without replacing any app or picker API.
+  await context.page.exposeFunction('recordInstalledUiEvidence', (event) => {
+    if (manifest.uiEvents.length < 100) manifest.uiEvents.push(event);
+  });
+  await context.page.evaluate(() => {
+    const record = (event) =>
+      void globalThis.recordInstalledUiEvidence({ ...event, at: new Date().toISOString() });
+    const notifications = globalThis.document.querySelector(
+      '[role="region"][aria-label="Notifications"]',
+    );
+    if (notifications) {
+      new globalThis.MutationObserver(() => {
+        record({ kind: 'notifications', text: notifications.textContent });
+      }).observe(notifications, { childList: true, subtree: true, characterData: true });
+    }
+    globalThis.document.addEventListener(
+      'click',
+      (event) => {
+        const button = event.target.closest?.('button');
+        if (button)
+          record({
+            kind: 'click',
+            button: button.getAttribute('aria-label') ?? button.textContent,
+            trusted: event.isTrusted,
+            activeUserGesture: globalThis.navigator.userActivation.isActive,
+          });
+      },
+      { capture: true },
+    );
+  });
   const badge = await context.page
     .getByLabel('Build version', { exact: true })
     .getAttribute('title');
@@ -195,8 +228,9 @@ async function useFileDialog(context, button, action, target, label) {
   const helper = runNativeHelper(context.args, action, label, context.app.child.pid, target);
   const click = context.page.getByRole('button', { name: button, exact: true }).click();
   const settled = await Promise.allSettled([helper, click]);
-  const failure = settled.find((result) => result.status === 'rejected');
-  if (failure) throw failure.reason;
+  const attempt = summarizeDialogResults(label, button, settled);
+  context.manifest.dialogAttempts.push(attempt);
+  if (attempt.failure) throw new Error(attempt.failure);
   return settled[0].value;
 }
 

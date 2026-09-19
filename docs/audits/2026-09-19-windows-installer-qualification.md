@@ -48,6 +48,18 @@ project evidence are uploaded even when a test fails. The receipt identifies
 the source SHA, actual candidate hashes, versions, runner OS, elevation and each
 completed transition. Review those artifacts before claiming a result.
 
+The harness also records both native-helper and renderer-click outcomes, trusted
+click/user-activation evidence and transient notification text. A dialog timeout
+must not hide an independently failed click or an already-dismissed app error.
+
+Electron 42 checks existing File System Access grants with a null frame and
+WebContents. The permission policy therefore accepts the exact `fileSystem`
+check for a trusted requesting/embedding origin when no window is supplied.
+An existing empty or untrusted window URL still fails, as do all other
+permissions without a window. Main-frame request rules remain unchanged.
+This matches the [shipped Electron implementation](https://github.com/electron/electron/blob/v42.11.5/shell/browser/file_system_access/file_system_access_permission_context.cc#L251-L254)
+and preserves the origin checks without rejecting legitimate file grants.
+
 This is an unsigned **manual installer** upgrade between versions of the same
 source. Signed automatic updates, historical schema/profile migration, standard
 user UAC, SmartScreen, consumer Windows versions, accessibility, macOS and

@@ -134,6 +134,25 @@ export function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+export function summarizeDialogResults(label, button, settled) {
+  const outcomes = settled.map((result, index) => ({
+    operation: index === 0 ? 'native-helper' : 'renderer-click',
+    status: result.status,
+    ...(result.status === 'rejected'
+      ? { error: result.reason?.stack ?? result.reason?.message ?? String(result.reason) }
+      : {}),
+  }));
+  const failures = outcomes.filter((result) => result.status === 'rejected');
+  return {
+    label,
+    button,
+    outcomes,
+    failure: failures.length
+      ? failures.map((result) => `${result.operation}: ${result.error}`).join('\n')
+      : null,
+  };
+}
+
 export function assertBuildMetadata(title, args) {
   const version = /^Version (.+)$/m.exec(title)?.[1];
   const commit = /^Commit (.+)$/m.exec(title)?.[1];

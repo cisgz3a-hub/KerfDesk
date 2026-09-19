@@ -15,6 +15,7 @@ import {
   FIXTURE_NAME,
   parseArgs,
   prepareProfile,
+  summarizeDialogResults,
   validateProject,
 } from './installed-app-evidence.mjs';
 import { bounded, launchInstalledApp } from './installed-app-process.mjs';
@@ -44,6 +45,24 @@ const PROBE = {
   userInteractive: true,
   sessionId: 1,
 };
+
+test('native dialog failure evidence retains both the helper and triggering click outcomes', () => {
+  const result = summarizeDialogResults('import', 'Import...', [
+    { status: 'rejected', reason: new Error('No native dialog') },
+    { status: 'rejected', reason: new Error('Click intercepted by an overlay') },
+  ]);
+  assert.match(result.failure, /native-helper: Error: No native dialog/);
+  assert.match(result.failure, /renderer-click: Error: Click intercepted by an overlay/);
+  const passed = summarizeDialogResults('save', 'Save As...', [
+    { status: 'fulfilled', value: { ok: true } },
+    { status: 'fulfilled', value: undefined },
+  ]);
+  assert.equal(passed.failure, null);
+  assert.deepEqual(
+    passed.outcomes.map((result) => result.status),
+    ['fulfilled', 'fulfilled'],
+  );
+});
 
 test('installed GUI launch stays visible and strips Node-only environment flags without launching', async () => {
   const calls = [];
