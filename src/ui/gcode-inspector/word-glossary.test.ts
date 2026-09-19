@@ -50,4 +50,15 @@ describe('explainLine', () => {
     expect(explainLine('/G1 X10').map((word) => word.text)).toEqual(['G1', 'X10']);
     expect(explainLine('N2 G1 X20*23').map((word) => word.text)).toEqual(['N2', 'G1', 'X20']);
   });
+
+  it('explains native Smoothie percent override without labelling it motion power', () => {
+    const context = { machineKind: 'laser', laserPowerControl: 'smoothieware' } as const;
+    const words = explainLine('M221 S100 P0', context);
+    expect(words.map((word) => word.text)).toEqual(['M221', 'S100', 'P0']);
+    expect(words[1]?.meaning).toContain('override percent');
+    expect(words[2]?.meaning).toContain('0 enables');
+    expect(explainLine('fire off', context)[0]?.meaning).toContain('Clear manual laser fire');
+    expect(explainLine('M221 S100')[0]?.meaning).toContain('not interpreted');
+    expect(explainLine('fire off')).toEqual([]);
+  });
 });

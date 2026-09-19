@@ -223,29 +223,27 @@ Verified end-to-end against scripted firmware simulators
   transcripts); per-profile `baudRate`; controller detection from welcome banners
   (advisory).
 - **I.2 — grblHAL + FluidNC**: capability deltas on the GRBL driver (FluidNC:
-  settings read-only); extended grblHAL alarm codes 11–13. **grblHAL confirmed
-  working on the Falcon A1 Pro (GrblHAL 1.1f) by the maintainer, 2026-07-02.**
-  FluidNC still simulator-only.
+  settings read-only); extended grblHAL alarm codes 11–13. The Falcon A1 Pro
+  uses an explicit researched vendor command set; its GRBL-LPC device-file label
+  does not establish a grblHAL firmware build. Hardware qualification is unverified.
 - **I.3 — Marlin** (ADR-095): queued M114 status, stream-side pause, G28 X Y,
-  M400 settle, marlin-inline / marlin-fan dialects (M106/M107 transform).
+  M400 settle, explicit M3 I / M5 I inline mode, and M106/M107 fan dialect.
   Simulator-verified only.
-- **I.4 — Smoothieware** (ADR-096): realtime ?/!/~ kept, M999 halt recovery,
-  fractional S power (S0.500 at the 0–1.0 default scale). Simulator-verified only.
+- **I.4 — Smoothieware** (ADR-096, amended by ADR-322): realtime ? status,
+  M999 halt recovery, native M221 power mode, fractional vector/raster S power,
+  and queued host pause. Generic realtime hold/resume is unavailable. Simulator-verified only.
 - **I.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
   proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
   link; pure UDP session state machine as groundwork.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
-  streaming mode, receive window, output dialect, active driver, and Start
-  readiness are reconciled by one fail-closed policy. Cross-family profile
-  selection is refused after detection; simulator-verified families remain
-  hardware CLAIMED.
+  streaming mode, receive window, output dialect and active driver are reconciled.
+  Policy findings are advisory in Job Review; completed Frame for the exact job
+  remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
 
-**Hardware truth table:** GRBL v1.1 + grblHAL = **hardware-verified on the Falcon
-A1 Pro (GrblHAL 1.1f), maintainer, 2026-07-02** — this also proves the S1/H.1
-driver refactor is byte-identical on real hardware, since the Falcon's normal
-`grbl-v1.1` profile drives it through the rewritten path unchanged. FluidNC /
-Marlin / Smoothieware / Ruida = simulator-verified only, labeled `unverified` in
-catalog evidence and (for .rd) warned on every export.
+**Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
+the former Falcon hardware-verification claim. The catalogue now separates researched,
+simulator and unverified evidence. No controller or machine gains physical qualification
+from software tests. See ADR-322 and the [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md).
 
 ### Phase K — v0.10 "Box generator" [Built (S0–S6); hardware fit CLAIMED]
 

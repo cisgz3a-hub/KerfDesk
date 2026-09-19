@@ -1,4 +1,5 @@
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
+import { laserPowerControlForDevice } from '../../core/gcode-view';
 import {
   buildGcodeTimingPlan,
   type GcodeTimingPlanResult,
@@ -76,6 +77,7 @@ export function canvasJobTimingPlan(
     {
       maxSegments: MAX_LIVE_COUNTDOWN_SEGMENTS,
       machineKind,
+      laserPowerControl: machineKind === 'laser' ? laserPowerControlForDevice(device) : undefined,
       timeCalibration: profileTimeCalibration(device),
     },
   );

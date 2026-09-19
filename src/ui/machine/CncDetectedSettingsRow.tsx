@@ -1,15 +1,16 @@
 // CncDetectedSettingsRow — an opt-in banner that fills the CNC machine from the
 // connected controller's detected `$$` settings (ADR-111). It renders only when
-// the controller reported values that differ from the current setup; Apply
-// writes spindle max to the CNC params and bed size to the shared device, then
-// the row disappears because nothing differs any more. Never silent — nothing
+// the controller reported values that differ from the current setup. Apply copies
+// configured travel; spindle RPM requires an explicitly selected S mapping. Nothing
 // changes until the operator clicks Apply. Cross-store read of the laser store
 // mirrors ProbePanel (both are top-level Zustand stores).
 
 import type { CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { computeCncDetectedApply } from './cnc-detected-apply';
+import { cncDetectedSpindleScale, computeCncDetectedApply } from './cnc-detected-apply';
+import { SpindleScaleChoice } from './SpindleScaleChoice';
+import { useSpindleScaleChoice } from './use-spindle-scale-choice';
 
 export function CncDetectedSettingsRow(props: {
   readonly machine: CncMachineConfig;
@@ -17,18 +18,34 @@ export function CncDetectedSettingsRow(props: {
   const detected = useLaserStore((s) => s.controllerSettings);
   const device = useStore((s) => s.project.device);
   const applyCncMachineSetup = useStore((s) => s.applyCncMachineSetup);
-  const apply = detected === null ? null : computeCncDetectedApply(detected, props.machine, device);
-  if (apply === null) return null;
+  const scale = cncDetectedSpindleScale(detected);
+  const rpmChoice = useSpindleScaleChoice(scale);
+  const offerRpm = scale !== undefined && scale !== props.machine.params.spindleMaxRpm;
+  const apply =
+    detected === null
+      ? null
+      : computeCncDetectedApply(detected, props.machine, device, offerRpm && rpmChoice.checked);
+  if (apply === null && !offerRpm) return null;
   const handleApply = (): void => {
-    applyCncMachineSetup(apply);
+    if (apply !== null) applyCncMachineSetup(apply);
   };
   return (
     <div style={bannerStyle} role="status" aria-label="Detected machine settings">
-      <span style={textStyle}>Machine reports {apply.summary}.</span>
+      <span style={textStyle}>
+        {apply === null ? 'No RPM mapping selected.' : `Apply ${apply.summary}.`}
+        {offerRpm && scale !== undefined ? (
+          <SpindleScaleChoice
+            value={scale}
+            checked={rpmChoice.checked}
+            onChange={rpmChoice.onChange}
+          />
+        ) : null}
+      </span>
       <button
         type="button"
         onClick={handleApply}
-        title="Fill spindle max and bed size from the connected controller's reported settings."
+        disabled={apply === null}
+        title="Copy configured travel and any explicitly selected spindle RPM mapping."
         style={buttonStyle}
       >
         Apply

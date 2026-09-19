@@ -11,9 +11,10 @@ export const MARLIN_CMD_HOME_XY = 'G28 X Y';
  *  semantics the settle-marker pattern needs (GRBL uses a G4 dwell). */
 export const MARLIN_CMD_SETTLE = 'M400';
 
-/** Beam-off cleanup after stop: M5 covers LASER_FEATURE (inline) builds,
- *  M107 covers fan-mosfet wiring. Harmless where unsupported. */
-export const MARLIN_STOP_LASER_LINES: ReadonlyArray<string> = ['M5', 'M107'];
+/** M5 I drains queued movement and exits modern LASER_FEATURE inline mode;
+ * plain M5 would leave that mode selected. M107 covers fan-mosfet wiring.
+ * Both are queued commands, not an emergency stop. */
+export const MARLIN_STOP_LASER_LINES: ReadonlyArray<string> = ['M5 I', 'M107'];
 
 /** Queued position query; replies `X:.. Y:.. Z:.. E:.. Count ..` then ok. */
 export const MARLIN_CMD_POSITION = 'M114';

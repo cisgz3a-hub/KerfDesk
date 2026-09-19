@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { findLaserOnTravelIssues } from '../invariants';
 import type { Job } from '../job';
-import { grblStrategy } from './grbl-strategy';
 import { marlinStrategy } from './marlin-strategy';
 import { selectOutputStrategy } from './select-output-strategy';
 import { toMarlinFanGcode } from './marlin-fan-transform';
@@ -44,10 +43,12 @@ const MARLIN_FAN_DEVICE: DeviceProfile = {
 };
 
 describe('marlinStrategy', () => {
-  it('inline dialect emits the GRBL wire shape (M3/M4/M5 + per-move S)', () => {
-    expect(marlinStrategy.emit(JOB, MARLIN_INLINE_DEVICE)).toBe(
-      grblStrategy.emit(JOB, MARLIN_INLINE_DEVICE),
-    );
+  it('selects S-controlled inline mode and explicitly leaves it before parking', () => {
+    const out = marlinStrategy.emit(JOB, MARLIN_INLINE_DEVICE);
+    expect(out).toMatch(/^M5 I\nG21\nG90\nM3 I S0\n/);
+    expect(out).toContain('G1 X30.000 Y40.000 F1500 S128');
+    expect(out).toContain('M5 I\nG0 X0.000 Y0.000 S0');
+    expect(out).not.toMatch(/^M4\b|^G(?:54|94)\b/m);
   });
 
   it('fan dialect converts power to M106/M107 and strips S from motion lines', () => {
@@ -73,7 +74,7 @@ describe('marlinStrategy', () => {
       ...MARLIN_INLINE_DEVICE,
       gcodeDialect: { dialectId: 'neotronics-4040-safe' },
     });
-    expect(out).toContain('M4 S0');
+    expect(out).toContain('M3 I S0');
     expect(out).toContain('G0 X0.000 Y0.000 S0');
   });
 
@@ -91,6 +92,15 @@ describe('marlinStrategy', () => {
       expect(lastPower === undefined || lastPower === 'M107').toBe(true);
     });
   });
+
+  it.each([MARLIN_INLINE_DEVICE, MARLIN_FAN_DEVICE])(
+    'uses only the common Marlin units/position preamble for $gcodeDialect.dialectId',
+    (device) => {
+      const out = marlinStrategy.emit(JOB, device);
+      expect(out).toContain('G21\nG90\n');
+      expect(out).not.toMatch(/^G(?:54|94)\b/m);
+    },
+  );
 
   it('is deterministic (non-negotiable #5)', () => {
     expect(marlinStrategy.emit(JOB, MARLIN_FAN_DEVICE)).toBe(

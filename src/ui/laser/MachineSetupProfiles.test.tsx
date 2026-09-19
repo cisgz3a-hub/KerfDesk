@@ -57,7 +57,10 @@ describe('Machine Setup profile choice', () => {
       const falconCard = [...view.host.querySelectorAll('article')].find((card) =>
         card.textContent?.includes('Creality Falcon A1 Pro'),
       );
-      const apply = button(falconCard as HTMLElement, 'Use Creality Falcon A1 Pro (grblHAL)');
+      const apply = button(
+        falconCard as HTMLElement,
+        'Use Creality Falcon A1 Pro (vendor command set)',
+      );
       expect(apply.disabled).toBe(false);
       expect(falconCard?.textContent).not.toContain('Will set controllerKind');
       await act(async () => apply.click());

@@ -10,7 +10,10 @@ import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
-  const guide = machineSetupControllerGuide(state.draft.controllerKind ?? 'grbl-v1.1');
+  const guide = machineSetupControllerGuide(
+    state.draft.controllerKind ?? 'grbl-v1.1',
+    state.draft.controllerCommandSet,
+  );
   const sourceText = state.controllerRead
     ? 'Controller observations remain separate until you explicitly choose Use detected values.'
     : 'No controller values were imported, so confirm each value from the machine manual.';

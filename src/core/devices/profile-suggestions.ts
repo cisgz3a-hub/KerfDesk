@@ -81,7 +81,9 @@ function profileReasons(
     reasons.push(`Detected ${controllerKindLabel(detectedControllerKind)} firmware.`);
   }
   if (typeof facts.bedWidth === 'number' && typeof facts.bedHeight === 'number') {
-    reasons.push(`Controller reports a ${facts.bedWidth} x ${facts.bedHeight} mm work area.`);
+    reasons.push(
+      `Controller reports configured travel of ${facts.bedWidth} x ${facts.bedHeight} mm; usable work area is not measured.`,
+    );
   }
   if (typeof facts.minPowerS === 'number' && typeof facts.maxPowerS === 'number') {
     reasons.push(`Controller reports S range ${facts.minPowerS}-${facts.maxPowerS}.`);

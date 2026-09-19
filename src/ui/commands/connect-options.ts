@@ -9,5 +9,11 @@ import type { ConnectControllerOptions } from '../state/laser-store';
 // the connect options from the configured device profile so both Connect
 // surfaces agree.
 export function connectOptionsForDevice(device: DeviceProfile): ConnectControllerOptions {
-  return { controllerKind: device.controllerKind, baudRate: device.baudRate };
+  return {
+    controllerKind: device.controllerKind,
+    baudRate: device.baudRate,
+    ...(device.controllerCommandSet === undefined
+      ? {}
+      : { controllerCommandSet: device.controllerCommandSet }),
+  };
 }

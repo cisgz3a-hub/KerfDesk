@@ -7,6 +7,7 @@ import { blockElapsedTimeAtDistance } from '../motion-planner';
 import type { MotionLimits } from './motion-limits';
 import type { ProgramTimeCalibration } from './program-time';
 import type { MachineKind } from '../scene/machine';
+import type { BuildRenderModelOptions } from '../gcode-view';
 
 export type GcodeTimingPlan = ProgramTimeline;
 
@@ -26,6 +27,7 @@ export type GcodeTimingPlanOptions = {
   readonly maxSegments?: number;
   readonly timeCalibration?: ProgramTimeCalibration;
   readonly machineKind?: MachineKind;
+  readonly laserPowerControl?: BuildRenderModelOptions['laserPowerControl'];
 };
 
 const EMPTY_PROGRESS: PlannedProgramProgress = {

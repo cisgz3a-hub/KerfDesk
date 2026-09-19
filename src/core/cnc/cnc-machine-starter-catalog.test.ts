@@ -21,9 +21,9 @@ describe('CNC_MACHINE_STARTER_CATALOG', () => {
       matchedBy: 'profile-id',
       matchedValue: 'neotronics-4040-max-lt4lds-v2-20w',
       starter: {
-        confidence: 'maintainer-verified',
+        confidence: 'unverified-starter',
         operatorNotice:
-          'Maintainer-verified starter (ADR-256) — feed and plunge come from cutting experience on this machine with a 3.175 mm 2-flute cutter; confirm on scrap for a new bit or stock.',
+          'Unverified cutting starter: retained legacy values for a 3.175 mm 2-flute cutter and assumed 500 W spindle. Public specifications do not provide this recipe, and no attributable physical cutting record is attached. Confirm the fitted spindle, bit, stock and cut before production.',
         tool: { toolId: 'em-3175', diameterMm: 3.175, fluteCount: 2 },
         material: { key: 'plywood-mdf', label: 'Wood / MDF' },
         values: {

@@ -10,7 +10,6 @@ import {
   ijArcCenter,
   PROGRAM_PARSE_REASON,
   rArcGeometry,
-  scanCompleteGcodeWords,
   stripInlineComments,
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
@@ -25,6 +24,11 @@ import { expandCannedCycle } from './canned-cycle';
 import { resolveCycleParameters } from './cycle-parameters';
 import { createLineCategoryBuilder } from './line-category-builder';
 import { applyLineWords, freshRenderModal, type RenderModal } from './render-model-words';
+import {
+  isNativeLaserConsoleLine,
+  nativeLaserMotionWords,
+  scanControllerRenderWords,
+} from './native-laser-render-words';
 import { computeProgramStats } from './program-stats';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
@@ -143,16 +147,34 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   if (stripped === '') return LINE_CATEGORY.comment;
   if (stripped === '%') return LINE_CATEGORY.marker;
   if (context.modal.ended) return LINE_CATEGORY.afterEnd;
-  const words = scanCompleteGcodeWords(stripped);
+  if (isNativeLaserConsoleLine(context.laser, stripped)) {
+    context.recognizedWords += 1;
+    return LINE_CATEGORY.modalOnly;
+  }
+  const words = scanControllerRenderWords(stripped);
   if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
   updateLaserRenderState(context.laser, words, raw);
-  const outcome = applyLineWords(context.modal, words, line, {
-    countUnsupported: (word, atLine) => countUnsupported(context.unsupported, word, atLine),
-    pushEvent: (event) => context.events.push(event),
+  const accounting = {
+    countUnsupported: (word: string, atLine: number) =>
+      countUnsupported(context.unsupported, word, atLine),
+    pushEvent: (event: ProgramEvent) => context.events.push(event),
+  };
+  const motionWords = nativeLaserMotionWords(context.laser, words, {
+    modal: context.modal,
+    line,
+    accounting,
   });
+  const outcome = applyLineWords(context.modal, motionWords, line, accounting);
   if (emitLineMotion(context, outcome, line)) return LINE_CATEGORY.motion;
-  if (outcome.sawEvent) return LINE_CATEGORY.event;
+  return nonMotionCategory(outcome, motionWords !== words);
+}
+
+function nonMotionCategory(
+  outcome: ReturnType<typeof applyLineWords>,
+  hasNativeEvent: boolean,
+): number {
+  if (outcome.sawEvent || hasNativeEvent) return LINE_CATEGORY.event;
   if (outcome.sawModal) return LINE_CATEGORY.modalOnly;
   if (outcome.sawUnsupported) return LINE_CATEGORY.unsupported;
   return LINE_CATEGORY.modalOnly;

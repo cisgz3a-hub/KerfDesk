@@ -18,6 +18,7 @@ export type CreateSmoothieSimulatorOptions = {
   readonly homingMs?: number;
   readonly rejectLines?: ReadonlyArray<SmoothieSimRejectRule>;
   readonly emitBannerOnOpen?: boolean;
+  readonly initialManualFire?: boolean;
 };
 
 export type SmoothieSimState = {
@@ -26,6 +27,10 @@ export type SmoothieSimState = {
   readonly isHalted: boolean;
   readonly isHomed: boolean;
   readonly pendingMotions: number;
+  readonly manualFire: boolean;
+  readonly laserScale: number;
+  readonly proportionalPower: boolean;
+  readonly burnPowers: ReadonlyArray<number>;
 };
 
 export type SmoothieSimulator = {
@@ -50,6 +55,12 @@ export function createSmoothieSimulator(
   let isHalted = false;
   let isHomed = false;
   let pendingMotions = 0;
+  let pendingSettles = 0;
+  let manualFire = options.initialManualFire ?? false;
+  let laserScale = 1;
+  let proportionalPower = true;
+  let motionPower = 0;
+  const burnPowers: number[] = [];
   let rxBuffer = '';
 
   const emit = (line: string): void => {
@@ -68,6 +79,10 @@ export function createSmoothieSimulator(
   const finishMotion = (): void => {
     pendingMotions = Math.max(0, pendingMotions - 1);
     if (pendingMotions === 0 && (machine === 'Run' || machine === 'Home')) machine = 'Idle';
+    if (pendingMotions === 0) {
+      for (let i = 0; i < pendingSettles; i += 1) emit('ok');
+      pendingSettles = 0;
+    }
   };
 
   const handleRealtime = (byte: string): void => {
@@ -84,6 +99,7 @@ export function createSmoothieSimulator(
       return;
     }
     if (byte === '\x18') {
+      manualFire = false; // Laser::on_halt clears manual fire and output.
       // Ctrl-X abort: flush motion; Smoothie halts if it was moving.
       if (machine === 'Run' || machine === 'Hold' || pendingMotions > 0) isHalted = true;
       pendingMotions = 0;
@@ -110,8 +126,19 @@ export function createSmoothieSimulator(
     return false;
   };
 
+  const handleLaserPower = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
+    if (/^M221\b/.test(line)) {
+      if (words.spindle !== null) laserScale = words.spindle / 100;
+      const proportional = /\bP(\d+)/.exec(line)?.[1];
+      if (proportional !== undefined) proportionalPower = Number(proportional) === 0;
+    }
+    if (/^G[01]\b/.test(line) && words.spindle !== null) motionPower = words.spindle;
+    if (/^G1\b/.test(line) && motionPower > 0) burnPowers.push(motionPower * laserScale);
+  };
+
   const handleMotion = (line: string): void => {
     const words = parseMotionWords(line);
+    handleLaserPower(line, words);
     if (words.setsAbsolute !== null) isAbsolute = words.setsAbsolute;
     if (words.hasMotion) {
       pos = {
@@ -142,6 +169,11 @@ export function createSmoothieSimulator(
       emit('ok');
       return;
     }
+    if (line === 'fire off') {
+      manualFire = false;
+      emit('turning laser off and returning to auto mode'); // native completion, no ok
+      return;
+    }
     if (/^G28\.2\b/i.test(line)) {
       machine = 'Home';
       pendingMotions = 0;
@@ -154,6 +186,11 @@ export function createSmoothieSimulator(
       return;
     }
     if (handleQuery(line)) return;
+    if (/^M400\b/i.test(line)) {
+      if (pendingMotions === 0) emit('ok');
+      else pendingSettles += 1;
+      return;
+    }
     handleMotion(line);
   };
 
@@ -182,7 +219,17 @@ export function createSmoothieSimulator(
   return {
     adapter: port.adapter,
     port,
-    state: () => ({ pos, machine, isHalted, isHomed, pendingMotions }),
+    state: () => ({
+      pos,
+      machine,
+      isHalted,
+      isHomed,
+      pendingMotions,
+      manualFire,
+      laserScale,
+      proportionalPower,
+      burnPowers: [...burnPowers],
+    }),
     outbound: () => port.outbound(),
     triggerHalt: () => {
       isHalted = true;

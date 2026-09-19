@@ -14,6 +14,7 @@ export function WorkZRecoveryControl(): JSX.Element | null {
   const controllerState = useLaserStore((state) => state.statusReport?.state ?? null);
   const controllerOperation = useLaserStore((state) => state.controllerOperation);
   const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
+  const activeControllerCommandSet = useLaserStore((state) => state.activeControllerCommandSet);
   const evidence = useLaserStore((state) => state.workZZeroEvidence);
   const workZReferenceEpoch = useLaserStore((state) => state.workZReferenceEpoch);
   const controllerSessionEpoch = useLaserStore((state) => state.controllerSessionEpoch);
@@ -21,7 +22,10 @@ export function WorkZRecoveryControl(): JSX.Element | null {
   if (machine?.kind !== 'cnc') return null;
 
   const tool = activeCncTool(machine);
-  const commands = selectControllerDriver(activeControllerKind).commands;
+  const commands = selectControllerDriver(
+    activeControllerKind,
+    activeControllerCommandSet ?? undefined,
+  ).commands;
   const supported = commands.modalStateQuery !== null && commands.offsetsQuery !== null;
   const currentEvidence = currentWorkZEvidenceForTool(
     evidence,

@@ -27,8 +27,8 @@ import {
 
 export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
-  const guide = machineSetupControllerGuide(controllerKind);
-  const driver = selectControllerDriver(controllerKind);
+  const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
+  const driver = selectControllerDriver(controllerKind, state.draft.controllerCommandSet);
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
     <section style={sectionStyle}>
@@ -75,8 +75,14 @@ function ControllerContract(props: {
   readonly dispatch: DeviceSetupStepProps['dispatch'];
   readonly update: (patch: Partial<DeviceProfile>) => void;
 }): JSX.Element {
-  const guide = machineSetupControllerGuide(props.controllerKind);
-  const driver = selectControllerDriver(props.controllerKind);
+  const guide = machineSetupControllerGuide(
+    props.controllerKind,
+    props.state.draft.controllerCommandSet,
+  );
+  const driver = selectControllerDriver(
+    props.controllerKind,
+    props.state.draft.controllerCommandSet,
+  );
   const dialects = props.controllerKind === 'marlin' ? MARLIN_GCODE_DIALECTS : GRBL_GCODE_DIALECTS;
   return (
     <div style={settingsStyle}>
@@ -159,7 +165,10 @@ function AdvancedConnection(props: {
   readonly controllerKind: ControllerKind;
   readonly update: (patch: Partial<DeviceProfile>) => void;
 }): JSX.Element {
-  const guide = machineSetupControllerGuide(props.controllerKind);
+  const guide = machineSetupControllerGuide(
+    props.controllerKind,
+    props.state.draft.controllerCommandSet,
+  );
   const pingPongOnly = props.controllerKind === 'marlin' || props.controllerKind === 'smoothieware';
   return (
     <details style={detailsStyle}>

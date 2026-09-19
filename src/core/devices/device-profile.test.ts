@@ -21,11 +21,8 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
   });
 
   it('ships an empty autofocus command — no portable default exists', () => {
-    // Field finding: every "reasonable default" we tried broke at least one
-    // common machine (G38.2 → error:20 on GrblHAL diode lasers; vendor
-    // M-codes are mutually exclusive). The Auto-focus button stays disabled
-    // until the user pastes their machine's actual command — see the
-    // DeviceProfile docs and the UI hint in DeviceSettings for context.
+    // The generic template has no documented model-specific autofocus macro.
+    // Named vendor profiles can provide their own command independently.
     expect(DEFAULT_DEVICE_PROFILE.autofocusCommand).toBe('');
   });
 
@@ -73,7 +70,7 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
   it('bed dimensions sit in the millimetre range, not centimetre or inch', () => {
     // Audit guard: catches a future regression where someone types 40
     // (cm) or 16 (in) thinking it'll be auto-converted. A 400 mm bed is
-    // canonical for the Falcon A1 Pro and other common 40-cm-class
+    // the generic starter for common 40-cm-class
     // machines — anything below 100 mm is almost certainly a unit
     // confusion, not a real machine. Real laser CAM beds run roughly
     // 100 mm (xTool M1) to 1500 mm (Lightburn-class CO₂).

@@ -8,9 +8,9 @@ import {
   startCollecting,
 } from './parse-settings';
 
-// Realistic settings dump from a Creality Falcon A1 Pro (GrblHAL 1.1f).
-// Trimmed to the lines our collector actually reads, plus a stray $32 to
-// confirm we ignore unknown settings cleanly.
+// Historical synthetic GRBL-family settings fixture, not a verified Falcon
+// readback. Its legacy name does not qualify the machine dimensions or firmware.
+// Trimmed to the lines our collector reads, including the laser-mode setting.
 const FALCON_DUMP = [
   '$11=0.010',
   '$22=0',

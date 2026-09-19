@@ -15,7 +15,10 @@ import {
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
-import { isBidirectionalScanPolicy } from '../../core/devices/device-profile';
+import {
+  isBidirectionalScanPolicy,
+  isControllerCommandSet,
+} from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import {
@@ -109,8 +112,18 @@ function validateProfileIdentity(value: Record<string, unknown>): string | null 
   if (value['profileSource'] !== undefined && !isProfileSource(value['profileSource'])) {
     return 'profile.profileSource is invalid';
   }
+  return validateProfileControllerIdentity(value);
+}
+
+function validateProfileControllerIdentity(value: Record<string, unknown>): string | null {
   if (value['controllerKind'] !== undefined && !isKnownControllerKind(value['controllerKind'])) {
     return 'profile.controllerKind is invalid';
+  }
+  if (
+    value['controllerCommandSet'] !== undefined &&
+    !isControllerCommandSet(value['controllerCommandSet'])
+  ) {
+    return 'profile.controllerCommandSet is invalid';
   }
   return null;
 }

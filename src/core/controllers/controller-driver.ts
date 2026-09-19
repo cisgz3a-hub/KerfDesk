@@ -4,7 +4,7 @@
 // React. `null` command/realtime entries mean "this firmware has no such
 // operation" — callers gate on capabilities before reaching for them.
 
-import type { ControllerKind } from '../devices/device-profile';
+import type { ControllerCommandSet, ControllerKind } from '../devices/device-profile';
 import type { ControllerCapabilities } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
@@ -84,6 +84,7 @@ export type ConsoleQuickCommand = {
 
 export type ControllerDriver = {
   readonly kind: ControllerKind;
+  readonly commandSet?: ControllerCommandSet;
   readonly label: string;
   readonly defaultBaudRate: number;
   readonly capabilities: ControllerCapabilities;

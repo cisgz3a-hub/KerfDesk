@@ -1,9 +1,6 @@
-// Marlin output strategy (ADR-095). The 'marlin-inline' dialect (LASER_FEATURE
-// builds) shares GRBL's wire shape — M3/M4/M5 with per-move S — so the body is
-// the GRBL emitter's output with the profile's S scale (Marlin convention:
-// maxPowerS = 255). The 'marlin-fan' dialect post-transforms that body into
-// M106/M107 fan-PWM control. Determinism (non-negotiable #5) is preserved:
-// both paths are pure functions of (job, device).
+// Reuse geometric emission, then apply Marlin's native power/mode contract.
+// Inline power needs explicit M3 I entry and M5 I exit on modern LASER_FEATURE
+// builds; fan-mosfet wiring instead uses M106/M107 in fixed 0..255 units.
 
 import type { DeviceProfile } from '../devices';
 import { resolveMarlinDialect } from '../devices';
@@ -11,6 +8,7 @@ import type { Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 import { toMarlinFanGcode } from './marlin-fan-transform';
 import { MARLIN_FAN_MAX_POWER, marlinFanRasterJob } from './marlin-fan-raster';
+import { toMarlinInlineGcode, withoutGrblWorkspacePreamble } from './marlin-inline-transform';
 import type { OutputEmitOptions } from './output-strategy';
 
 export const marlinStrategy = {
@@ -24,7 +22,11 @@ export const marlinStrategy = {
     };
     const intermediateJob =
       dialect.powerMode === 'fan' ? marlinFanRasterJob(job, device.maxPowerS) : job;
-    const body = grblStrategy.emit(intermediateJob, intermediateDevice, options);
-    return dialect.powerMode === 'fan' ? toMarlinFanGcode(body, MARLIN_FAN_MAX_POWER) : body;
+    const body = withoutGrblWorkspacePreamble(
+      grblStrategy.emit(intermediateJob, intermediateDevice, options),
+    );
+    return dialect.powerMode === 'fan'
+      ? toMarlinFanGcode(body, MARLIN_FAN_MAX_POWER)
+      : toMarlinInlineGcode(body);
   },
 };

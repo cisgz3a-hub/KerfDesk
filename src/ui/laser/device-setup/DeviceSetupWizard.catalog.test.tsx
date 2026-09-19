@@ -43,7 +43,7 @@ describe('DeviceSetupWizard catalog', () => {
       await act(async () => button(view.host, 'Next').click());
       expect(view.host.textContent).toContain('Step 2 of 6 — Choose your machine');
       // The catalog is always visible — no collapsed section hides it (ADR-240).
-      expect(view.host.textContent).toContain('Use Creality Falcon A1 Pro (grblHAL)');
+      expect(view.host.textContent).toContain('Use Creality Falcon A1 Pro (vendor command set)');
       expect(view.host.querySelector('input[aria-label="Search machine profiles"]')).toBeInstanceOf(
         HTMLInputElement,
       );
@@ -88,7 +88,8 @@ describe('DeviceSetupWizard catalog', () => {
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
       await act(async () => button(view.host, 'Next').click()); // connect & detect
       await act(async () => button(view.host, 'Next').click()); // confirm settings
-      expect(input(view.host, 'Bed width (mm)').value).toBe('400');
+      expect(input(view.host, 'Bed width (mm)').value).toBe('358');
+      expect(input(view.host, 'Bed height (mm)').value).toBe('268');
       expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
     } finally {
       await view.unmount();

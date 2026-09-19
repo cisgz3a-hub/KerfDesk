@@ -1,8 +1,8 @@
 // Autofocus protocol orchestration (F-B / WORKFLOW.md autofocus stub).
 //
 // Per-machine autofocus is vendor-specific — the Creality Falcon A1 Pro
-// implements `$HZ1` as a single-line GrblHAL macro that runs the internal
-// probe; other machines may expose one proprietary macro or M-code (and some
+// supplies `$HZ1` as its vendor autofocus command in the official LightBurn
+// device file; other machines may expose one proprietary macro or M-code (and some
 // don't support it at all). This module owns the wire
 // protocol regardless of which command body the user pasted:
 //   1. Pre-flight: connection open, controller idle, single-line command.
@@ -12,9 +12,8 @@
 //      an active -> Idle cycle (Falcon firmwares do not all expose activity).
 //   5. Reject on `error:`, on `<Alarm|...>`, or on 15s timeout.
 //
-// The 15s default mirrors the firmware behavior observed on Falcon A1
-// Pro — the probe cycle takes ~5-8s, anything longer is a hang and
-// continuing would risk crashing the head into the workpiece.
+// The 15s timeout is a host response budget, not a researched maximum physical
+// focus duration or proof that an unresponsive machine has stopped moving.
 
 import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
@@ -132,7 +131,7 @@ export function describeAutofocusResult(result: AutofocusResult): {
     case 'rejected':
       if (result.errorCode === 20) {
         return {
-          message: `Auto-focus rejected (error:20 — unsupported on this firmware). Update GrblHAL or check the command for your machine.`,
+          message: `Auto-focus rejected (error:20 — unsupported on this firmware). Check the vendor autofocus command and firmware instructions for your machine.`,
           variant: 'error',
         };
       }

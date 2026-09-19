@@ -105,6 +105,27 @@ describe('unified machine setup flow', () => {
     });
   });
 
+  it('clears vendor-specific commands when explicitly selecting a firmware family', () => {
+    const state = initDeviceSetup(
+      {
+        ...DEFAULT_DEVICE_PROFILE,
+        controllerCommandSet: 'creality-falcon-a1-pro',
+      },
+      null,
+      { machine: LASER_MACHINE_CONFIG },
+    );
+    const selected = deviceSetupReducer(state, {
+      kind: 'select-controller',
+      controllerKind: 'marlin',
+    });
+    expect(selected.draft.controllerCommandSet).toBeUndefined();
+    const correctedGrblLabel = deviceSetupReducer(state, {
+      kind: 'select-controller',
+      controllerKind: 'grbl-v1.1',
+    });
+    expect(correctedGrblLabel.draft.controllerCommandSet).toBe('creality-falcon-a1-pro');
+  });
+
   it('blocks unsupported CNC/controller combinations', () => {
     let state = deviceSetupReducer(open(), {
       kind: 'set-machine-kinds',
@@ -217,7 +238,8 @@ describe('unified machine setup flow', () => {
     );
     state = deviceSetupReducer(state, {
       kind: 'accept-detected',
-      // $32=0: laser mode off, so $30 really is the spindle ceiling.
+      useSpindleScaleAsRpm: true,
+      // Explicitly chosen numerical RPM mapping; $32=0 alone cannot establish it.
       patch: { maxPowerS: 24000, minPowerS: 80, laserModeEnabled: false, bedWidth: 610 },
     });
     expect(state.draft.maxPowerS).toBe(DEFAULT_DEVICE_PROFILE.maxPowerS);
@@ -226,6 +248,28 @@ describe('unified machine setup flow', () => {
     expect(state.draft.bedWidth).toBe(610);
     if (state.draftMachine.kind !== 'cnc') throw new Error('expected CNC draft');
     expect(state.draftMachine.params.spindleMaxRpm).toBe(24000);
+  });
+
+  it('keeps a CNC PWM S1000 scale out of spindle RPM unless explicitly selected', () => {
+    const before = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null, {
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+    });
+    const state = deviceSetupReducer(before, {
+      kind: 'accept-detected',
+      patch: { maxPowerS: 1000, laserModeEnabled: false, bedWidth: 610 },
+    });
+    expect(state.cncDraft.params.spindleMaxRpm).toBe(before.cncDraft.params.spindleMaxRpm);
+    expect(state.draft.bedWidth).toBe(610);
+  });
+
+  it('uses the researched FluidNC laser default only after explicit controller selection', () => {
+    const before = initDeviceSetup({ ...DEFAULT_DEVICE_PROFILE, maxPowerS: 8191 }, null);
+    expect(before.draft.maxPowerS).toBe(8191);
+    const selected = deviceSetupReducer(before, {
+      kind: 'select-controller',
+      controllerKind: 'fluidnc',
+    });
+    expect(selected.draft.maxPowerS).toBe(255);
   });
 
   it('leaves the spindle ceiling alone when the controller is in laser mode ($32=1)', () => {

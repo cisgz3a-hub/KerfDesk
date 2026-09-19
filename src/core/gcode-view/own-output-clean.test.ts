@@ -3,14 +3,15 @@
 // notes, zero junk lines, and zero skipped motions. (Test files may import
 // across modules — the CLAUDE.md boundary exemption.)
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { Job } from '../job';
 import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import { grblStrategy } from '../output/grbl-strategy';
 import { marlinStrategy } from '../output/marlin-strategy';
 import { smoothiewareStrategy } from '../output/smoothieware-strategy';
 import { buildGcodeRenderModel } from './gcode-render-model';
-import { LINE_CATEGORY } from './render-model-types';
+import { laserPowerControlForDevice } from './laser-power-control';
+import { LINE_CATEGORY, type BuildRenderModelOptions } from './render-model-types';
 
 const laserJob: Job = {
   groups: [
@@ -75,17 +76,51 @@ const cncJob: Job = {
   ],
 };
 
-const CASES: ReadonlyArray<{ readonly name: string; readonly gcode: string }> = [
-  { name: 'grbl laser', gcode: grblStrategy.emit(laserJob, DEFAULT_DEVICE_PROFILE) },
-  { name: 'grbl cnc', gcode: cncGrblStrategy.emit(cncJob, DEFAULT_DEVICE_PROFILE) },
-  { name: 'marlin', gcode: marlinStrategy.emit(laserJob, DEFAULT_DEVICE_PROFILE) },
-  { name: 'smoothieware', gcode: smoothiewareStrategy.emit(laserJob, DEFAULT_DEVICE_PROFILE) },
+const MARLIN_DEVICE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  controllerKind: 'marlin',
+  maxPowerS: 255,
+};
+const SMOOTHIE_DEVICE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  controllerKind: 'smoothieware',
+  maxPowerS: 1,
+};
+
+const CASES: ReadonlyArray<{
+  readonly name: string;
+  readonly gcode: string;
+  readonly options: BuildRenderModelOptions;
+}> = [
+  {
+    name: 'grbl laser',
+    gcode: grblStrategy.emit(laserJob, DEFAULT_DEVICE_PROFILE),
+    options: { machineKind: 'laser' },
+  },
+  {
+    name: 'grbl cnc',
+    gcode: cncGrblStrategy.emit(cncJob, DEFAULT_DEVICE_PROFILE),
+    options: { machineKind: 'cnc' },
+  },
+  {
+    name: 'marlin',
+    gcode: marlinStrategy.emit(laserJob, MARLIN_DEVICE),
+    options: { machineKind: 'laser', laserPowerControl: laserPowerControlForDevice(MARLIN_DEVICE) },
+  },
+  {
+    name: 'smoothieware',
+    gcode: smoothiewareStrategy.emit(laserJob, SMOOTHIE_DEVICE),
+    options: {
+      machineKind: 'laser',
+      laserPowerControl: laserPowerControlForDevice(SMOOTHIE_DEVICE),
+    },
+  },
 ];
 
 describe('own-output-clean (ADR-255 acceptance)', () => {
   for (const strategyCase of CASES) {
     it(`${strategyCase.name} output parses with zero notes, junk, or skips`, () => {
-      const result = buildGcodeRenderModel(strategyCase.gcode);
+      const result = buildGcodeRenderModel(strategyCase.gcode, strategyCase.options);
       expect(result.kind).toBe('ok');
       if (result.kind !== 'ok') return;
       expect(result.model.unsupportedWords).toEqual([]);

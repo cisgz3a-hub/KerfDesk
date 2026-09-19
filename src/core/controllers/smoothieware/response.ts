@@ -8,6 +8,7 @@
 import type { ControllerEvent } from '../controller-event';
 import { parseStatusReport } from '../grbl/status-parser';
 import { parseCommaStatusReport } from './comma-status-report';
+import { SMOOTHIE_FIRE_OFF_COMPLETE } from './commands';
 
 const OK_RE = /^ok\b/i;
 const ERROR_RE = /^error:/i;
@@ -19,6 +20,9 @@ const FIRMWARE_RE = /FIRMWARE_NAME:\s*Smoothie/i;
 export function classifySmoothieResponse(line: string): ControllerEvent {
   const trimmed = line.trim();
   if (OK_RE.test(trimmed)) return { kind: 'ok' };
+  // Qualified Smoothieware V1 Laser.cpp prints this once for `fire off` and
+  // does not emit a subsequent `ok`. This is its native command completion.
+  if (trimmed === SMOOTHIE_FIRE_OFF_COMPLETE) return { kind: 'ok' };
   if (HALT_RE.test(trimmed) || ALARM_TEXT_RE.test(trimmed) || ERROR_RE.test(trimmed)) {
     return { kind: 'error', code: null, raw: trimmed };
   }

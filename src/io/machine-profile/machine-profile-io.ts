@@ -378,6 +378,9 @@ function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile
   return {
     ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
     ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
+    ...(profile.controllerCommandSet !== undefined
+      ? { controllerCommandSet: profile.controllerCommandSet }
+      : {}),
     ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
     ...(profile.laserSubProfile !== undefined
       ? { laserSubProfile: { ...profile.laserSubProfile } }

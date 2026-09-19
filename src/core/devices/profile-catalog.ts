@@ -12,8 +12,14 @@ import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falc
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
+import {
+  XTOOL_D1_PRO_PROFILES,
+  SCULPFUN_S30_PROFILE,
+  SCULPFUN_S30_MANUAL_AIR_PROFILE,
+  ORTUR_LASER_MASTER_3_PROFILES,
+} from './brand-laser-profiles';
 
-export const PROFILE_CATALOG_VERSION = '2026-06-17';
+export const PROFILE_CATALOG_VERSION = '2026-09-19';
 
 const LASER_TECHNOLOGIES: ReadonlyArray<NonNullable<LaserSubProfile['technology']>> = [
   'diode',
@@ -31,76 +37,12 @@ export type MachineProfileCatalogEntry = {
   readonly reviewNotes: ReadonlyArray<string>;
 };
 
-// Brand starter profiles. Bed dimensions are commonly-published figures, NOT
-// hardware-verified here, so each carries public-spec starter evidence. The Device
-// Setup wizard reads the true travel/power from the controller's $$ dump on
-// connect (core/controllers/grbl/parse-settings.ts), so these are named
-// starting points and an offline fallback; the operator confirms first.
-const XTOOL_D1_PRO_PROFILE: DeviceProfile = {
-  ...DEFAULT_DEVICE_PROFILE,
-  profileId: 'xtool-d1-pro',
-  vendor: 'xTool',
-  model: 'D1 Pro',
-  name: 'xTool D1 Pro',
-  machineFamily: 'xtool-d1-pro',
-  controllerKind: 'grbl-v1.1',
-  bedWidth: 430,
-  bedHeight: 390,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
-  evidence: [
-    {
-      label: 'xTool D1 Pro public specs',
-      status: 'public-spec-starter',
-      note: 'Work area ~430×390 mm from published specs (xTool lists up to 432×406). Confirm bed size, S range, and homing — KerfDesk reads the real values from $$ on connect.',
-    },
-  ],
-};
-
-const SCULPFUN_S30_PROFILE: DeviceProfile = {
-  ...DEFAULT_DEVICE_PROFILE,
-  profileId: 'sculpfun-s30',
-  vendor: 'Sculpfun',
-  model: 'S30',
-  name: 'Sculpfun S30',
-  machineFamily: 'sculpfun-s30',
-  controllerKind: 'grbl-v1.1',
-  bedWidth: 410,
-  bedHeight: 400,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
-  evidence: [
-    {
-      label: 'Sculpfun S30 public specs',
-      status: 'public-spec-starter',
-      note: 'Work area ~410×400 mm from published specs (Pro/Max variants differ). Confirm bed size and S range before the first job; KerfDesk reads the real values from $$ on connect.',
-    },
-  ],
-};
-
-const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
-  ...DEFAULT_DEVICE_PROFILE,
-  profileId: 'ortur-laser-master-3',
-  vendor: 'Ortur',
-  model: 'Laser Master 3',
-  name: 'Ortur Laser Master 3',
-  machineFamily: 'ortur-laser-master-3',
-  controllerKind: 'grbl-v1.1',
-  bedWidth: 400,
-  bedHeight: 400,
-  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
-  evidence: [
-    {
-      label: 'Ortur Laser Master 3 public specs',
-      status: 'public-spec-starter',
-      note: 'Work area ~400×400 mm from published specs. Confirm bed size, homing, and S range before the first job; KerfDesk reads the real values from $$ on connect.',
-    },
-  ],
-};
-
 // Phase H controller-family starters. Wire-compatible with the GRBL driver
 // path; the controllerKind selects the matching ControllerDriver at connect.
 const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-grblhal',
+  catalogVersion: PROFILE_CATALOG_VERSION,
   vendor: 'Generic',
   model: 'grblHAL controller',
   name: 'Generic grblHAL 400×400',
@@ -111,7 +53,7 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
     {
       label: 'grblHAL protocol compatibility',
       status: 'simulator-tested',
-      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes. Use a specific hardware profile when one matches; confirm bed size and S range from $$ on connect.',
+      note: 'Firmware template with unspecified machine output kind. GRBL-compatible serial commands have simulator coverage; board plugins and spindle/laser configuration vary. Match the controller-reported configured travel and S range, then confirm usable work area. Source checked 2026-09-19: https://github.com/grblHAL/core . No hardware qualification.',
     },
   ],
 };
@@ -119,17 +61,21 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
 const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-fluidnc',
+  catalogVersion: PROFILE_CATALOG_VERSION,
   vendor: 'Generic',
   model: 'FluidNC (ESP32)',
   name: 'Generic FluidNC 400×400',
   machineFamily: 'generic-fluidnc',
   controllerKind: 'fluidnc',
+  // FluidNC v4.0.3 LaserSpindle.cpp default speed_map. Saved profiles and live
+  // reports retain their configured scale; a YAML speed_map can override it.
+  maxPowerS: 255,
   capabilities: ['grbl', 'wcs', 'verified-origin', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'FluidNC GRBL-compatible reporting',
       status: 'simulator-tested',
-      note: 'FluidNC reports as "Grbl 3.x [FluidNC vX]" and streams like GRBL, but real configuration lives in its YAML config — numeric $ writes are disabled in-app. Simulator-verified only; not hardware-verified.',
+      note: 'Firmware template with unspecified machine output kind. Serial GRBL-compatible reporting and streaming have simulator coverage; Wi-Fi is not implemented by this profile. Match the YAML laser speed_map: 255 is the FluidNC v4.0.3 laser default, not a universal S maximum. Numeric $ writes are disabled in-app. Source checked 2026-09-19: https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Spindles/LaserSpindle.cpp. No hardware qualification.',
     },
   ],
 };
@@ -137,6 +83,7 @@ const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
 const GENERIC_MARLIN_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-marlin-laser',
+  catalogVersion: PROFILE_CATALOG_VERSION,
   vendor: 'Generic',
   model: 'Marlin laser (LASER_FEATURE)',
   name: 'Generic Marlin laser 300×200',
@@ -152,12 +99,12 @@ const GENERIC_MARLIN_PROFILE: DeviceProfile = {
   // Marlin laser convention: S range 0-255.
   maxPowerS: 255,
   minPowerS: 0,
-  capabilities: ['no-go-zones'],
+  capabilities: ['laser-output', 'no-go-zones'],
   evidence: [
     {
       label: 'Marlin LASER_FEATURE conventions',
       status: 'simulator-tested',
-      note: 'Marlin builds vary widely (LASER_FEATURE inline vs fan-mosfet wiring, S 0-255 vs 0-100). Simulator-verified only; NOT hardware-verified. Confirm the dialect and S range against your firmware configuration before burning.',
+      note: 'Inline output targets Marlin 2.1.2.6 LASER_FEATURE with PWM and M3 I continuous inline power; CUTTER_POWER_UNIT must match the selected S range (this starter uses 255). LASER_POWER_TRAP is a firmware build choice. Origin reset requires CNC_COORDINATE_SYSTEMS and a non-SCARA build. Fan-MOSFET wiring requires the separate fan dialect. Match baud and firmware configuration. Source: https://marlinfw.org/docs/gcode/M003.html. Simulator coverage only; no hardware qualification.',
     },
   ],
 };
@@ -165,6 +112,7 @@ const GENERIC_MARLIN_PROFILE: DeviceProfile = {
 const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-smoothieware',
+  catalogVersion: PROFILE_CATALOG_VERSION,
   vendor: 'Generic',
   model: 'Smoothieware laser',
   name: 'Generic Smoothieware 300×200',
@@ -177,12 +125,12 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
   // default 1.0 — power words are fractions (S0.500 = 50%).
   maxPowerS: 1,
   minPowerS: 0,
-  capabilities: ['wcs', 'no-go-zones'],
+  capabilities: ['laser-output', 'wcs', 'no-go-zones'],
   evidence: [
     {
       label: 'Smoothieware laser module conventions',
       status: 'simulator-tested',
-      note: 'Fractional S scale (0-1.0) from the Smoothieware laser docs; realtime ?/!/~ supported, halt recovery via M999. Simulator-verified only; NOT hardware-verified. Confirm laser_module_maximum_s_value against your config.',
+      note: 'Smoothieware V1 laser module: match laser_module_maximum_s_value (default 1.0) and set laser_module_minimum_power to 0 so S0 feed moves remain dark. Power mode uses M221 P, not GRBL M3/M4. Status uses ?, halt recovery uses M999; realtime pause/resume is not offered because transport/configuration support varies. Source checked 2026-09-19: https://smoothieware.org/laser.html. Simulator coverage only; no hardware qualification.',
     },
   ],
 };
@@ -190,6 +138,7 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
 const GENERIC_RUIDA_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-ruida-rd-export',
+  catalogVersion: PROFILE_CATALOG_VERSION,
   vendor: 'Generic',
   model: 'Ruida RDC644x-class CO2 (.rd export)',
   name: 'Generic Ruida CO2 900×600 (.rd export)',
@@ -198,7 +147,7 @@ const GENERIC_RUIDA_PROFILE: DeviceProfile = {
   bedWidth: 900,
   bedHeight: 600,
   origin: 'rear-right',
-  capabilities: ['no-go-zones'],
+  capabilities: ['laser-output', 'no-go-zones'],
   evidence: [
     {
       label: 'Ruida protocol (public reverse-engineering)',
@@ -210,26 +159,33 @@ const GENERIC_RUIDA_PROFILE: DeviceProfile = {
 
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
-    'Starter profile. Confirm work area, homing, and laser S range before first job.',
+    'Generic firmware template; the machine and laser/CNC output kind are unspecified. Confirm usable work area, homing and S scale.',
   ]),
   entry(FALCON_A1_PRO_GRBLHAL_PROFILE, [
-    'Hardware-verified Falcon A1 Pro grblHAL identity. Confirm your controller $$ before cutting.',
+    'Manufacturer configuration starter; controller build and physical operation are not qualified. Use the researched model-specific dimensions and commands.',
   ]),
   entry(FALCON_COMPATIBLE_PROFILE, [
-    'Broad Falcon-compatible GRBL fallback; use the grblHAL Falcon profile when detected.',
+    'Broad Falcon-compatible GRBL fallback. Choose the A1 Pro profile only for that model; a firmware banner does not identify the machine.',
   ]),
   entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',
   ]),
-  entry(XTOOL_D1_PRO_PROFILE, [
-    'Work area from public specs; KerfDesk confirms the real bed size from $$ on connect.',
-  ]),
+  ...XTOOL_D1_PRO_PROFILES.map((profile) =>
+    entry(profile, [
+      'Choose the fitted laser head. Controller-reported configured travel does not verify head clearance or usable work area.',
+    ]),
+  ),
   entry(SCULPFUN_S30_PROFILE, [
-    'Work area from public specs; confirm bed size and S range before the first job.',
+    'Stock S30 5 W pump uses M8/M9. Confirm the installed pump, usable work area, S range and homing configuration.',
   ]),
-  entry(ORTUR_LASER_MASTER_3_PROFILE, [
-    'Work area from public specs; confirm bed size, homing, and S range before the first job.',
+  entry(SCULPFUN_S30_MANUAL_AIR_PROFILE, [
+    'Manual pump variant; no software air command is sent. Stock automatic pumps use the separate M8 profile.',
   ]),
+  ...ORTUR_LASER_MASTER_3_PROFILES.map((profile) =>
+    entry(profile, [
+      'Match the LU2/LU3 head. Controller-reported configured travel is not a physical measurement.',
+    ]),
+  ),
   entry(GENERIC_GRBLHAL_PROFILE, [
     'grblHAL is wire-compatible with the GRBL driver; extended alarm codes 11-13 are decoded.',
   ]),
@@ -240,7 +196,7 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
     'Marlin: ping-pong streaming, no realtime pause/stop bytes, S 0-255, dialect must match the firmware build (inline vs fan).',
   ]),
   entry(GENERIC_SMOOTHIEWARE_PROFILE, [
-    'Smoothieware: fractional S power (0-1.0), realtime ?/!/~, M999 halt recovery, no $$/$J.',
+    'Smoothieware V1: fractional S, M221 P power mode, ? status and M999 halt recovery. No realtime pause/resume, $$ or $J in this integration.',
   ]),
   entry(GENERIC_RUIDA_PROFILE, [
     'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
@@ -320,7 +276,7 @@ function entry(
     ...profile,
     profileSource: 'built-in' as const,
     // A profile revised after the catalog baseline keeps its own version date
-    // (e.g. the 4040's 2026-07-19); the catalog constant is the fallback so
+    // instead of losing its provenance; the catalog constant is the fallback so
     // unrevised profiles still carry a provenance date.
     catalogVersion: profile.catalogVersion ?? PROFILE_CATALOG_VERSION,
   };
