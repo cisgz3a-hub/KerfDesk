@@ -72,6 +72,7 @@ export default defineConfig({
         'app-icon-192x192.png',
         'app-icon-512x512.png',
         'app-icon-maskable-512x512.png',
+        'startup-craft.webp',
       ],
       manifest: {
         name: 'KerfDesk',

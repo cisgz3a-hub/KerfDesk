@@ -33,6 +33,13 @@
 ### F-A1. App launch
 
 #### Success — first run (no prior project)
+
+The startup loading screen uses a charcoal-and-copper KerfDesk wordmark over sculpted timber
+artwork, with **Created by Ons Houtkombuis** visible below. Its text and indeterminate activity
+bar paint before the artwork loads, and remain readable if the image is unavailable. Reduced
+motion uses a static indicator. The screen fades away once the workspace canvas has had a paint
+opportunity, without an extra branding delay. It introduces no startup interaction or modal.
+
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
