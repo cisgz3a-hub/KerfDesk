@@ -61,7 +61,10 @@ afterEach(() => {
     streamer: null,
     motionOperation: null,
   });
-  useStore.setState({ project: createProject() });
+  useStore.setState({
+    project: createProject(),
+    jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' },
+  });
   useJogControlPreferences.setState({
     stepMm: DEFAULT_JOG_STEP_MM,
     requestedFeedMmPerMin: DEFAULT_JOG_FEED_MM_PER_MIN,
@@ -209,5 +212,38 @@ describe('OriginRow persistent origin controls', () => {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
     }
+  });
+});
+
+describe('OriginRow Set origin and the Start-from mode (ADR-323)', () => {
+  async function startFromAfterSetOrigin(
+    startFrom: 'absolute' | 'verified-origin' | 'current-position',
+  ): Promise<string> {
+    useLaserStore.setState({ setOriginHere: async () => undefined });
+    useStore.setState({ jobPlacement: { startFrom, anchor: 'back-center' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      await act(async () => buttonByText(host, 'Set origin here').click());
+      return useStore.getState().jobPlacement.startFrom;
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  }
+
+  it('upgrades Absolute Coordinates to User Origin once an origin exists', async () => {
+    expect(await startFromAfterSetOrigin('absolute')).toBe('user-origin');
+    expect(useStore.getState().jobPlacement.anchor).toBe('back-center');
+  });
+
+  it('keeps an explicit Verified Origin selection', async () => {
+    expect(await startFromAfterSetOrigin('verified-origin')).toBe('verified-origin');
+  });
+
+  it('keeps an explicit Current Position selection', async () => {
+    expect(await startFromAfterSetOrigin('current-position')).toBe('current-position');
   });
 });

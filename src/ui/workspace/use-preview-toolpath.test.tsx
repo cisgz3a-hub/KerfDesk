@@ -152,6 +152,28 @@ describe('usePreviewToolpath', () => {
     expect(probe.current).toBe(builtToolpath);
   });
 
+  it('builds a Verified Origin preview before the machine origin is set (ADR-323)', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+    act(() =>
+      useStore.setState({ jobPlacement: { startFrom: 'verified-origin', anchor: 'center' } }),
+    );
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+
+    expect(previewMocks.buildPreviewToolpath).toHaveBeenCalledWith(
+      project,
+      expect.objectContaining({
+        jobOrigin: { startFrom: 'verified-origin', anchor: 'center' },
+      }),
+    );
+    expect(probe.current).toBe(builtToolpath);
+  });
+
   it('cancels stale scheduled preparation when preview exits', async () => {
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {

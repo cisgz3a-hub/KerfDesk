@@ -8,6 +8,7 @@ import {
   resolveExportJobPlacement,
   resolveJobPlacement,
   trustedMotionOffsetForPreflight,
+  resolvePreviewJobPlacement,
 } from './job-placement';
 
 const idleAtMachinePosition = (x: number, y: number): StatusReport => ({
@@ -372,5 +373,28 @@ describe('trustedMotionOffsetForPreflight', () => {
     if (resolved.ok) {
       expect(trustedMotionOffsetForPreflight(DEFAULT_DEVICE_PROFILE, resolved)).toBeUndefined();
     }
+  });
+});
+
+describe('resolvePreviewJobPlacement (ADR-323)', () => {
+  const disconnected = { statusReport: null, workOriginActive: false, wcoCache: null };
+
+  it('falls back to the export placement for User and Verified Origin with no machine', () => {
+    expect(
+      resolvePreviewJobPlacement({ startFrom: 'user-origin', anchor: 'center' }, disconnected),
+    ).toEqual({ ok: true, jobOrigin: { startFrom: 'user-origin', anchor: 'center' } });
+    expect(
+      resolvePreviewJobPlacement({ startFrom: 'verified-origin', anchor: 'center' }, disconnected),
+    ).toEqual({ ok: true, jobOrigin: { startFrom: 'verified-origin', anchor: 'center' } });
+  });
+
+  it('keeps the live resolution for Current Position and Absolute', () => {
+    expect(
+      resolvePreviewJobPlacement({ startFrom: 'current-position', anchor: 'center' }, disconnected)
+        .ok,
+    ).toBe(false);
+    expect(
+      resolvePreviewJobPlacement({ startFrom: 'absolute', anchor: 'center' }, disconnected),
+    ).toEqual({ ok: true });
   });
 });

@@ -172,6 +172,23 @@ describe('NoHomingPositionGuide', () => {
     }
   });
 
+  it('keeps coaching after a Z-only touch-off, which is not an XY origin (ADR-323)', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true },
+      workOriginActive: false,
+      wcoCache: { x: 0, y: 0, z: 5 },
+    });
+    const host = document.createElement('div');
+    const root = await renderGuide(host);
+    try {
+      expect(host.textContent).toContain('Position job');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('dismisses a stale released-motors step when origin is set outside the guide', async () => {
     const releaseMotors = vi.fn(async () => undefined);
     vi.spyOn(window, 'confirm').mockReturnValue(true);

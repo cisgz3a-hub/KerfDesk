@@ -5,12 +5,14 @@ import { useToastStore } from '../state/toast-store';
 import {
   ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE,
   USER_ORIGIN_REQUIRED_MESSAGE,
+  VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import {
   offerSetupFixForBlockedStart,
   RESET_ORIGIN_OFFER_PROMPT,
   SET_ORIGIN_OFFER_PROMPT,
+  VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT,
 } from './start-blocked-setup-offers';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -105,5 +107,29 @@ describe('refusals without a one-click remedy', () => {
       offerFixForBlockedStart([USER_ORIGIN_REQUIRED_MESSAGE, 'A job is already active.']),
     ).resolves.toBe('unrepaired');
     expect(jobAwareConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('verified-origin set-origin offer (ADR-323)', () => {
+  it('offers the same one-click Set origin remedy as User Origin', async () => {
+    await expect(offerSetupFixForBlockedStart(VERIFIED_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe(
+      'retry',
+    );
+    expect(jobAwareConfirm).toHaveBeenCalledWith(VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT);
+    expect(useLaserStore.getState().setOriginHere).toHaveBeenCalledTimes(1);
+  });
+
+  it('reaches the offer through the blocked-Start dispatcher', async () => {
+    await expect(offerFixForBlockedStart([VERIFIED_ORIGIN_REQUIRED_MESSAGE])).resolves.toBe(
+      'retry',
+    );
+  });
+
+  it('keeps the block when the operator declines', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    await expect(offerSetupFixForBlockedStart(VERIFIED_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe(
+      'unrepaired',
+    );
+    expect(useLaserStore.getState().setOriginHere).not.toHaveBeenCalled();
   });
 });
