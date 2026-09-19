@@ -2911,6 +2911,20 @@ change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
   the maintainer's authored change; this ADR records the decision, it does not
   re-design it.
 
+### Startup branding amendment — 2026-09-19
+
+The transient startup surface uses a separate charcoal/copper palette and a typographic
+KerfDesk wordmark over sculpted timber artwork, with **Created by Ons Houtkombuis** as live text.
+This is the maintainer-requested loading-screen identity; the workspace keeps ADR-049's light
+chrome. The static HTML provides readable branding before either JavaScript or the artwork is
+available. A compressed local WebP is explicitly precached for offline launches, with a plain
+charcoal background as fallback. No remote font or image service is used at runtime.
+
+The activity bar is indeterminate, reduced motion disables animation, and the screen reveals
+the workspace after the canvas has a paint opportunity without a minimum branding hold.
+A mounted root crash screen is revealed promptly; the existing bounded wait after main-module
+execution remains for a missing canvas. The loading screen adds no modal or operator action.
+
 ---
 
 ## ADR-050 — Module-level memoization caches in core/job (narrow exception to "no module-level mutable")
