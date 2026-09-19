@@ -5,6 +5,7 @@ import {
   SEG_MOTION,
   type GcodeRenderModel,
   type ProgramEvent,
+  type BuildRenderModelOptions,
 } from '../gcode-view';
 import {
   buildProgramTime,
@@ -66,6 +67,7 @@ export type ProgramTimelineOptions = {
   readonly timeCalibration?: ProgramTimeCalibration;
   /** Known job kind distinguishes laser-off S0 feeds from CNC process feeds. */
   readonly machineKind?: MachineKind;
+  readonly laserPowerControl?: BuildRenderModelOptions['laserPowerControl'];
 };
 
 type LineTiming = Pick<

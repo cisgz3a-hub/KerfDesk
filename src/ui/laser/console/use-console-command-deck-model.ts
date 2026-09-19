@@ -41,8 +41,12 @@ export function useConsoleCommandDeckModel(
 ): ConsoleCommandDeckModel {
   const connection = useLaserStore((state) => state.connection);
   const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
+  const activeControllerCommandSet = useLaserStore((state) => state.activeControllerCommandSet);
   const sendConsoleCommand = useLaserStore((state) => state.sendConsoleCommand);
-  const driver = selectControllerDriver(activeControllerKind);
+  const driver = selectControllerDriver(
+    activeControllerKind,
+    activeControllerCommandSet ?? undefined,
+  );
   const availabilityState: ConsoleCommandAvailabilityState = {
     connection,
     statusReport: useLaserStore((state) => state.statusReport),

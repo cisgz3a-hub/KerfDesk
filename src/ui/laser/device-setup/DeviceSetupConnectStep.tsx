@@ -12,6 +12,7 @@ import { useToastStore } from '../../state/toast-store';
 import { describePatch } from '../DetectedSettingsBanner';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
+import { DeviceSetupDetectedApply } from './DeviceSetupDetectedApply';
 
 export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const model = useConnectionStepModel(state);
@@ -31,6 +32,7 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
+  const activeControllerCommandSet = useLaserStore((s) => s.activeControllerCommandSet);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const detected = useLaserStore((s) => s.detectedSettings);
@@ -40,19 +42,21 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   const sendConsoleCommand = useLaserStore((s) => s.sendConsoleCommand);
   const pushToast = useToastStore((s) => s.pushToast);
   const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
-  const driver = selectControllerDriver(controllerKind);
-  const guide = machineSetupControllerGuide(controllerKind);
+  const driver = selectControllerDriver(controllerKind, state.draft.controllerCommandSet);
+  const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
   const connected = connection.kind === 'connected';
   const supportsSerial = platform.serial.isSupported();
   const rows = detected === null ? [] : describePatch(detected, state.baseline);
   const mismatch =
     connected &&
     (activeControllerKind !== controllerKind ||
+      (activeControllerCommandSet ?? null) !== (driver.commandSet ?? null) ||
       (detectedControllerKind !== null && detectedControllerKind !== controllerKind));
 
   const openConnection = (): Promise<void> =>
     connect(platform, {
       controllerKind,
+      controllerCommandSet: state.draft.controllerCommandSet,
       baudRate: state.draft.baudRate ?? guide.defaultBaudRate,
     });
   const reconnect = async (): Promise<void> => {
@@ -107,6 +111,9 @@ function SerialConnectStep(props: {
         {model.state.draft.baudRate ?? model.guide.defaultBaudRate} baud. Reading identity and
         settings is non-motion and does not change controller configuration.
       </p>
+      {model.guide.writePolicy === 'external-config' ? (
+        <p style={hintStyle}>{model.guide.writeExplanation}</p>
+      ) : null}
       {model.mismatch ? <ConnectionMismatch model={model} dispatch={props.dispatch} /> : null}
       <ConnectionActions model={model} dispatch={props.dispatch} />
       {!model.supportsSerial ? (
@@ -164,11 +171,6 @@ function ConnectionActions(props: {
   readonly dispatch: DeviceSetupStepProps['dispatch'];
 }): JSX.Element {
   const { model } = props;
-  const acceptDetected = (): void => {
-    const detected = model.detected;
-    if (detected === null) return;
-    props.dispatch({ kind: 'accept-detected', patch: detected });
-  };
   if (model.connection.kind !== 'connected') {
     return (
       <div style={actionsStyle}>
@@ -188,19 +190,21 @@ function ConnectionActions(props: {
       <div style={actionsStyle}>
         <Button
           onClick={() => void model.readController()}
-          disabled={model.mismatch || model.controllerOperation !== null}
+          disabled={
+            model.mismatch ||
+            model.controllerOperation !== null ||
+            (model.guide.identityCommands.length === 0 && model.guide.settingsCommands.length === 0)
+          }
           {...helpProps('control:laser.device-setup.reread')}
         >
           Run read-only checks
         </Button>
         {model.detected !== null && model.rows.length > 0 ? (
-          <Button
-            variant="primary"
-            onClick={acceptDetected}
-            {...helpProps('control:laser.device-setup.apply-detected')}
-          >
-            Use detected values
-          </Button>
+          <DeviceSetupDetectedApply
+            state={model.state}
+            detected={model.detected}
+            dispatch={props.dispatch}
+          />
         ) : null}
       </div>
       {model.state.detectedApplied ? (

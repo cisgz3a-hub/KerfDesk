@@ -38,6 +38,15 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
 export function isKnownControllerKind(value: unknown): value is ControllerKind {
   return (KNOWN_CONTROLLER_KINDS as ReadonlyArray<unknown>).includes(value);
 }
+
+// Vendor command contracts are independent of a firmware-family label. The
+// Falcon LightBurn device file disables $J jogging and settings fetch and
+// supplies axis-specific Home commands; it does not identify a firmware build.
+export type ControllerCommandSet = 'creality-falcon-a1-pro';
+
+export function isControllerCommandSet(value: unknown): value is ControllerCommandSet {
+  return value === 'creality-falcon-a1-pro';
+}
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
 export type LaserTechnology = 'diode' | 'co2' | 'fiber' | 'unknown';
@@ -166,6 +175,7 @@ export type DeviceProfile = {
   readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  readonly controllerCommandSet?: ControllerCommandSet;
   // Serial baud rate override. Absent = the controller driver's default
   // (GRBL family 115200; Marlin profiles typically 250000).
   readonly baudRate?: number;
@@ -181,10 +191,10 @@ export type DeviceProfile = {
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
   // treats these as mm. G-code output is `G21` (mm). Reference work
-  // areas: Creality Falcon A1 Pro = 400×400 mm; Creality Falcon 2 =
+  // areas: Creality Falcon A1 Pro = 358×268 mm (X×Y); Creality Falcon 2 =
   // 400×415 mm; xTool D1 Pro 20W = 430×390 mm. If you mistype this as
   // cm (40 instead of 400), nothing crashes — it just renders a tiny
-  // bed and the framer/bounds checks will reject most jobs.
+  // bed and distort placement and bounds warnings.
   readonly bedWidth: number; // mm
   readonly bedHeight: number; // mm
   readonly maxFeed: number; // mm/min
@@ -293,21 +303,11 @@ export function isEstimateTimeScale(value: unknown): value is number {
 
 // Autofocus is intentionally blank by default.
 //
-// Field reality check: there is no portable autofocus G-code. Real-world
-// behavior we've seen:
-//   * GRBL with Z + probe pin  → a full probe/offset/retract routine needs
-//     several acknowledged commands, so it is not a valid value for this field.
-//   * GrblHAL on diode lasers   → rejects G38.2 with `error:20` (unsupported)
-//     and on some boards (Creality Falcon "A1 Pro Laser Master", xTool) the
-//     firmware beeps loudly and aborts the line — actively bad UX.
-//   * Creality Falcon stock     → focus is mechanical (head height ring); no
-//     command exists. CrealityPrint doesn't send one.
-//   * xTool                     → vendor-specific M-codes that vary by model.
-//
-// Shipping any "default" we picked would break someone's machine, so the
-// default is empty and the UI accepts only one documented firmware command or
-// macro. The Auto-focus button is disabled while this is empty (see the
-// laser store's `autofocus` action).
+// There is no portable autofocus G-code. Generic profiles leave this empty;
+// model-specific profiles may supply a manufacturer-documented single command
+// (the Falcon A1 Pro configuration supplies $HZ1). A multi-step probe routine
+// is not a single autofocus macro. The UI accepts one documented command and
+// disables Auto-focus while it is empty.
 const DEFAULT_AUTOFOCUS_COMMAND = '';
 
 // First-run default per WORKFLOW.md F-A1.
@@ -316,13 +316,13 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   vendor: 'Generic',
   model: 'GRBL 400x400',
   profileSource: 'built-in',
-  catalogVersion: '2026-06-17',
+  catalogVersion: '2026-09-19',
   capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {
       label: 'KerfDesk default',
       status: 'default-starter',
-      note: 'Starter GRBL profile. Confirm bed size, homing, and S range before first job.',
+      note: 'Generic GRBL firmware template with unspecified machine and output kind. The 400 x 400 mm work area, S1000 scale and feed values are starter assumptions. Controller-reported configured travel does not measure usable work area. Confirm the fitted tool, firmware, homing and S range.',
     },
   ],
   name: 'Default 400×400',
@@ -355,7 +355,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   vendor: 'Neotronics',
   model: '4040 Max / LT-4LDS-V2 20W',
   name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
-  catalogVersion: '2026-07-19',
+  catalogVersion: '2026-09-19',
   machineFamily: 'neotronics-4040-max',
   controllerKind: 'grbl-v1.1',
   bedWidth: 400,
@@ -384,7 +384,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
     {
       label: 'Neotronics and LASER TREE public specifications',
       status: 'public-spec-starter',
-      note: 'Public sources confirm the 400x400x75 mm machine envelope, default 500 W / 12,000 RPM spindle, and LT-4LDS-V2 optical metadata. GRBL version, $ settings, homing corner, feed limits, selector wiring, and air-relay wiring still require live-machine confirmation.',
+      note: 'Public specifications checked 2026-09-19: 400 x 400 x 75 mm geometry; this combination assumes the separately specified 500 W / 12,000 RPM spindle, not the 710 W alternative. LT-4LDS-V2 optical data comes from LASER TREE. Sources: https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct and https://lasertree.com/products/20w-optical-power-laser-cutting-module . Neither source establishes the combined controller revision or wiring. Confirm GRBL build, configured travel, usable work area, S scale, homing, feed limits, selector and air wiring.',
     },
   ],
   zTravelMm: 75,

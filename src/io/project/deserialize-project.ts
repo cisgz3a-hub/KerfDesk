@@ -38,6 +38,7 @@ import { validateProjectShape } from './project-shape-validator';
 import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
+import { normalizeControllerPatch } from './project-controller-normalization';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -355,22 +356,6 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ...normalizeControllerPatch(dev),
   };
   return normalized;
-}
-
-// ADR-094: a corrupt/unknown controllerKind must never reach
-// selectControllerDriver (its switch is exhaustive over the union, so junk
-// would return undefined at runtime). Drop invalid values back to the GRBL
-// default; same for a non-positive baud rate.
-function normalizeControllerPatch(dev: Record<string, unknown>): Record<string, unknown> {
-  const patch: Record<string, unknown> = {};
-  if (dev['controllerKind'] !== undefined && !isKnownControllerKind(dev['controllerKind'])) {
-    patch['controllerKind'] = undefined;
-  }
-  const baud = dev['baudRate'];
-  if (baud !== undefined && !(typeof baud === 'number' && Number.isFinite(baud) && baud > 0)) {
-    patch['baudRate'] = undefined;
-  }
-  return patch;
 }
 
 function normalizeZTravelPatch(dev: Record<string, unknown>): Record<string, unknown> {

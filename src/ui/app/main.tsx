@@ -64,15 +64,11 @@ createRoot(rootElement).render(
   </StrictMode>,
 );
 
-// The startup splash (index.html) is a full black loading screen with the
-// KerfDesk banner. It paints immediately from static HTML, covering the page
-// while the bundle loads. Here we hold it until the workspace CANVAS has
-// painted, a short beat, then fade the whole screen OUT — background and
-// banner together — to reveal the app. A hard max-wait dismisses it even if
-// the canvas never appears. (Timing this from an inline <script> would be
-// blocked by the CSP anyway.)
-const SPLASH_HOLD_MS = 700;
-const SPLASH_FADE_MS = 700;
+// Static HTML supplies the wordmark and indeterminate loader before JS arrives.
+// Give the mounted canvas one paint opportunity, then reveal the workspace
+// without an artificial hold. Keep the fallback for startup render failures.
+// The fade duration matches index.html; reduced motion removes it immediately.
+const SPLASH_FADE_MS = 180;
 const SPLASH_MAX_WAIT_MS = 5000;
 const SPLASH_HIDDEN_CLASS = 'app-splash--hidden';
 const splashStartedAt = performance.now();
@@ -80,6 +76,10 @@ const splashStartedAt = performance.now();
 function fadeOutSplash(): void {
   const splash = document.getElementById('app-splash');
   if (splash === null) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    splash.remove();
+    return;
+  }
   splash.classList.add(SPLASH_HIDDEN_CLASS);
   const remove = (): void => splash.remove();
   splash.addEventListener('transitionend', remove, { once: true });
@@ -88,10 +88,11 @@ function fadeOutSplash(): void {
 }
 
 function dismissWhenBoardReady(): void {
-  const boardPainted = document.querySelector('#app-root canvas') !== null;
+  const boardMounted = document.querySelector('#app-root canvas') !== null;
+  const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
-  if (boardPainted || timedOut) {
-    window.setTimeout(fadeOutSplash, SPLASH_HOLD_MS);
+  if (boardMounted || startupCrashed || timedOut) {
+    requestAnimationFrame(fadeOutSplash);
     return;
   }
   requestAnimationFrame(dismissWhenBoardReady);

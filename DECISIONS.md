@@ -2911,6 +2911,20 @@ change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
   the maintainer's authored change; this ADR records the decision, it does not
   re-design it.
 
+### Startup branding amendment — 2026-09-19
+
+The transient startup surface uses a separate charcoal/copper palette and a typographic
+KerfDesk wordmark over sculpted timber artwork, with **Created by Ons Houtkombuis** as live text.
+This is the maintainer-requested loading-screen identity; the workspace keeps ADR-049's light
+chrome. The static HTML provides readable branding before either JavaScript or the artwork is
+available. A compressed local WebP is explicitly precached for offline launches, with a plain
+charcoal background as fallback. No remote font or image service is used at runtime.
+
+The activity bar is indeterminate, reduced motion disables animation, and the screen reveals
+the workspace after the canvas has a paint opportunity without a minimum branding hold.
+A mounted root crash screen is revealed promptly; the existing bounded wait after main-module
+execution remains for a missing canvas. The loading screen adds no modal or operator action.
+
 ---
 
 ## ADR-050 — Module-level memoization caches in core/job (narrow exception to "no module-level mutable")
@@ -19906,7 +19920,61 @@ interaction without requiring destructive conversion.
   tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
   this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.
 
-## ADR-322 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
+## ADR-322 - Machine presets carry researched command and configuration contracts (2026-09-19)
+
+**Status:** Accepted; amends ADR-095 and ADR-096 controller/output assumptions.
+
+### Context
+
+The machine compatibility audit found fractional raster power lost before Smoothieware output,
+missing Marlin inline-mode entry, brand presets conflating different laser heads, and generic
+GRBL commands applied to a vendor configuration that explicitly disables them. A configured
+S maximum was also being presented as a measured spindle RPM. Historical hardware claims did
+not have reproducible qualification evidence. The [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)
+maps all eleven findings to primary sources and scoped verification.
+
+### Decision
+
+1. Raster compilation preserves sufficient PWM resolution and returns power in the profile's
+   original S units. Controller exporters convert stored and streamed rows once without consuming
+   or mutating their providers. Vectors retain percentage-based power.
+2. Marlin inline output clears stale mode with `M5 I`, enters `M3 I S0` and exits `M5 I`, and
+   omits G54/G94 from the inherited GRBL preamble. Re-entry first settles and disables power with
+   `M5 I`, preserving an explicit timing boundary with either `LASER_POWER_SYNC` build choice
+   without assuming idle laser blanking. Compensation depends on the firmware build. Fan output retains its
+   separate M106/M107 contract. Supported build prerequisites are disclosed during setup.
+3. Smoothieware V1 uses settled M221 native power modes and the exact `fire off` shell completion
+   for acknowledgement. Jobs, Frame, jog and Home clear native manual firing. The profile must
+   match `laser_module_maximum_s_value` and use `laser_module_minimum_power=0` for dark S0 feed
+   moves. Generic realtime hold/resume is not offered; host pause drains buffered motion.
+   Inspection and countdown derive the native power context from the emitted or retained device
+   profile, keeping M221 percentage overrides separate from motion S and recognizing Marlin's
+   bare inline flag only on its laser mode commands. Export provenance identifies the new emitter.
+4. An optional persisted controller command set identifies the Falcon A1 Pro vendor contract,
+   independently of the legacy controller-family label. Its source disables settings fetch and
+   native $J jogging, specifies X358/Y268 travel, and uses $HX followed by $HY for Home. Each Home
+   line owns its acknowledgement before the next line or settlement marker is sent. The live
+   connection retains its selected command set until reconnection.
+5. Named laser presets declare their supported output kind and head-specific travel. CNC size
+   presets disclose their controller limits and preserve the selected driver. Onefinity templates
+   remain geometry-only; they do not add Buildbotics, MASSO or Redline integration. Confidence
+   labels distinguish research, simulator evidence and unknown physical qualification.
+6. Detected travel is configured travel. Copying a detected CNC S maximum into spindle RPM
+   requires an explicit numerical S-to-RPM mapping. New FluidNC laser selections use the researched
+   S255 default; saved/custom values and profiles are not silently migrated.
+7. These changes preserve the completed-Frame contract in ADRs 228/230/232/237. Compatibility and
+   configuration findings remain Job Review warnings. No new ordinary Start policy gate is added.
+
+### Verification and limits
+
+Public export and streamed raster tests cover fractional power and native mode transitions.
+Controller lifecycle tests cover acknowledgements, cleanup, Home settlement and repeated jobs.
+Persistence, setup, bounds, air commands, head variants and settings adoption have regression
+coverage. Integrated release checks and browser evidence are recorded in the correction record.
+No physical machine, firmware runtime, material process or packaged hardware transport is
+qualified by these software checks. Ruida remains experimental vector-only file export.
+
+## ADR-323 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
 
 **Status:** Accepted
 
@@ -19918,7 +19986,7 @@ Short hover descriptions name controls but do not teach unfamiliar drawing, imag
 
 Provide explicit Tutorial buttons in feature dialogs, rails, active tool controls and command menus. Add Learn to the toolbar and Visual tutorials to Help. All entry points open one lazy-loaded, accessible learning surface with a searchable, machine-filtered catalog. Never open a tutorial automatically at startup.
 
-Lessons contain source-verified instructions, expected results and bundled SVG examples with manually selectable Before/Action/Result stages and optional finite playback. Illustrations are separate sample artwork, not a controller simulation. Retain static stage controls under reduced motion. Persist only local lesson position/completion, tolerating unavailable or malformed storage.
+Lessons contain source-verified instructions, expected results and bundled SVG examples with manually selectable Before/Action/Result stages and optional finite playback. Researched, compressed WebP pictures illustrate physical processes and CNC cutter geometry. Mount tutorial images only when their lesson opens, and cutter images only when explicitly expanded or the selected cutter changes. Keep responsive images out of the service-worker precache and cache successful same-origin WebP responses on use in a bounded runtime cache. Illustrations are separate sample artwork, not a controller simulation. Retain static stage controls under reduced motion. Persist only local lesson position/completion, tolerating unavailable or malformed storage.
 
 Keep tutorial UI state separate from project data, undo and machine actions. Opening, browsing, replaying and closing help must preserve the working project and any underlying dialog draft. Reuse modal registration, focus trapping and focus restoration, portal above editor dialogs, and preserve the existing live-motion bar's highest stacking order. Opening help must never submit a tool form. Contextual menu help remains usable for a disabled command without invoking it.
 
@@ -19926,4 +19994,4 @@ Use explicit stable lesson IDs, an exhaustive command mapping, source entry-poin
 
 ### Consequences
 
-The catalog and visuals work from the bundled app, including its precached offline assets, without new dependencies or video hosting. Schematic illustrations are inexpensive to maintain but do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.
+The catalog and SVG illustrations are bundled and precached for offline use without new dependencies or video hosting. Optional photographs are cached after viewing; unvisited images or responsive sizes retain readable instructions and a diagram fallback offline. Packaged desktop builds include the local image files. Pictures and diagrams do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.

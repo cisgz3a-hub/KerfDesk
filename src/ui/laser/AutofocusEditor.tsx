@@ -6,10 +6,9 @@
 // controller line the runtime can execute; users on something else either
 // paste a known command from their controller docs or leave blank to disable.
 //
-// Falcon: GrblHAL on the Creality "A1 Pro Laser Master" mainboard
-// implements `$HZ1` as a single-line firmware macro that runs the
-// internal autofocus probe. Requires firmware ≥ 1.0.38; older firmware
-// rejects with error:20 (unsupported G-code).
+// Creality's A1 Pro LightBurn device configuration supplies `$HZ1` as its
+// autofocus macro. The file does not establish a firmware family or minimum
+// version. See the sourced device fields in the 2026-09-19 correction record.
 
 import { inlineCodeStyle } from './device-settings-shared';
 
@@ -21,7 +20,7 @@ const AUTOFOCUS_PRESETS: ReadonlyArray<{
   {
     label: 'Creality Falcon A1 Pro',
     command: '$HZ1',
-    hint: 'Firmware ≥ 1.0.38. Older firmware rejects with error:20.',
+    hint: 'Uses the $HZ1 macro from Creality’s A1 Pro device configuration. Confirm support for your firmware.',
   },
 ];
 

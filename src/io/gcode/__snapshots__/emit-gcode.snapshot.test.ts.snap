@@ -463,8 +463,6 @@ G0 X0.000 Y0.000 S0
 exports[`emitGcode production composition — fixture snapshots > marlin-fan-vector produces stable G-code through the shipped pipeline 1`] = `
 "G21
 G90
-G54
-G94
 M107
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
@@ -1111,11 +1109,13 @@ G0 X0.000 Y0.000 S0
 `;
 
 exports[`emitGcode production composition — fixture snapshots > smoothieware-vector produces stable G-code through the shipped pipeline 1`] = `
-"G21
+"fire off
+G21
 G90
 G54
 G94
-M4 S0
+M400
+M221 S100 P0
 ; layer line-red color #ff0000 power 30% speed 1500 mm/min passes 1
 ; pass 1 of 1
 G0 X10.000 Y390.000 S0
@@ -1243,7 +1243,8 @@ G0 X95.000 Y348.000 S0
 G1 X90.000 Y348.000 F1500 S0 ; kerfdesk:laser-off-motion
 G1 X50.000 Y348.000 F1500 S0.300
 G1 X45.000 Y348.000 F1500 S0 ; kerfdesk:laser-off-motion
-M5
+M400
+M221 S0
 G0 X0.000 Y0.000 S0
 "
 `;

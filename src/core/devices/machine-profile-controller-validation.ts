@@ -3,6 +3,7 @@ import { controllerSupportsGcodeDialect } from './controller-profile-compatibili
 import { isStreamingModeCompatible } from './controller-streaming-mode';
 import {
   isBidirectionalScanPolicy,
+  isControllerCommandSet,
   isKnownControllerKind,
   type DeviceProfile,
 } from './device-profile';
@@ -11,6 +12,10 @@ import { isGcodeDialectSelection } from './gcode-dialects';
 export function machineProfileControllerIssues(profile: DeviceProfile): ReadonlyArray<string> {
   return [
     ...controllerKindIssues(profile),
+    ...(profile.controllerCommandSet === undefined ||
+    isControllerCommandSet(profile.controllerCommandSet)
+      ? []
+      : ['controllerCommandSet is invalid']),
     ...dialectIssues(profile),
     ...scanPolicyIssues(profile),
     ...streamingIssues(profile),

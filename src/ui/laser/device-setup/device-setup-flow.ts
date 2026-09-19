@@ -4,6 +4,7 @@
 
 import type { Dispatch } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
+import { controllerProfileForSelection } from './device-setup-controller-selection';
 import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
 import { deviceProfileWithInteractivePatch } from '../../../core/devices/device-profile-patch';
 import {
@@ -79,7 +80,11 @@ export type DeviceSetupAction =
   | { readonly kind: 'select-machine-kind'; readonly machineKind: MachineKind }
   | { readonly kind: 'select-controller'; readonly controllerKind: ControllerKind }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
-  | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
+  | {
+      readonly kind: 'accept-detected';
+      readonly patch: Partial<DeviceProfile>;
+      readonly useSpindleScaleAsRpm?: boolean;
+    }
   | { readonly kind: 'set-firmware-backup-confirmed'; readonly confirmed: boolean }
   | { readonly kind: 'toggle-firmware-write'; readonly id: number }
   | {
@@ -200,7 +205,7 @@ function reduceDraftAction(
     case 'select-controller':
       return selectController(state, action.controllerKind);
     case 'accept-detected':
-      return acceptDetected(state, action.patch);
+      return acceptDetected(state, action.patch, action.useSpindleScaleAsRpm === true);
     case 'apply-preset':
       return applyPreset(state, action.profile);
     case 'set-firmware-backup-confirmed':
@@ -255,16 +260,8 @@ function selectController(
   state: DeviceSetupState,
   controllerKind: ControllerKind,
 ): DeviceSetupState {
-  const compatible = controllerCompatibleProfile(state.draft, controllerKind).profile;
-  const driver = selectControllerDriver(controllerKind);
   return invalidateFirmwarePlan(state, {
-    draft: {
-      ...compatible,
-      controllerKind,
-      baudRate: driver.defaultBaudRate,
-      minPowerS: 0,
-      maxPowerS: defaultPowerScale(controllerKind),
-    },
+    draft: controllerProfileForSelection(state.draft, controllerKind),
   });
 }
 
@@ -279,18 +276,21 @@ function toggleFirmwareWrite(state: DeviceSetupState, id: number): DeviceSetupSt
   };
 }
 
-function acceptDetected(state: DeviceSetupState, patch: Partial<DeviceProfile>): DeviceSetupState {
+function acceptDetected(
+  state: DeviceSetupState,
+  patch: Partial<DeviceProfile>,
+  useSpindleScaleAsRpm: boolean,
+): DeviceSetupState {
   const profilePatch = profilePatchForMachineKind(patch, state.machineKind);
   const draft = controllerCompatibleProfile(
     deviceProfileWithInteractivePatch(state.draft, profilePatch),
     state.draft.controllerKind,
   ).profile;
-  // $30 only means spindle RPM when laser mode is off. On a hybrid running
-  // $32=1 it is the laser PWM scale, so adopting it as spindleMaxRpm turns a
-  // 12000 RPM router into S1000 while the feeds still assume 12000 - a 12x
-  // chipload error. Same term as cnc-detected-apply.ts and cnc-controller-caps.
+  // $32=0 alone does not make a configured PWM scale into physical RPM.
+  // Copy $30 only when the operator explicitly chooses that mapping.
   if (
     state.machineKind !== 'cnc' ||
+    !useSpindleScaleAsRpm ||
     !positive(patch.maxPowerS ?? 0) ||
     patch.laserModeEnabled !== false
   ) {
@@ -386,7 +386,10 @@ function invalidateFirmwarePlan(
 
 export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyArray<string> {
   const issues = [...validateMachineProfile(machineSetupProfile(state))];
-  const driver = selectControllerDriver(state.draft.controllerKind);
+  const driver = selectControllerDriver(
+    state.draft.controllerKind,
+    state.draft.controllerCommandSet,
+  );
   if (state.machineKind === 'cnc' && !driver.capabilities.cncJobs) {
     issues.push(`${driver.label} cannot run KerfDesk CNC jobs. Choose a GRBL-family controller.`);
   }
@@ -443,10 +446,4 @@ function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
 
 function positive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
-}
-
-function defaultPowerScale(controllerKind: ControllerKind): number {
-  if (controllerKind === 'marlin') return 255;
-  if (controllerKind === 'smoothieware') return 1;
-  return 1000;
 }

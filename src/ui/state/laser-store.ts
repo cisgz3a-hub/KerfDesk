@@ -252,6 +252,7 @@ export type LaserState = LaserStoreActions &
      *  pure driver-data lookups (console quick commands); guards still gate on
      *  `capabilities`, never on the kind. */
     readonly activeControllerKind: ControllerKind;
+    readonly activeControllerCommandSet: ControllerDriver['commandSet'] | null;
     /** Firmware family detected from the welcome banner, null until seen. May
      *  disagree with the profile-selected driver (advisory — see line handler). */
     readonly detectedControllerKind: ControllerKind | null;

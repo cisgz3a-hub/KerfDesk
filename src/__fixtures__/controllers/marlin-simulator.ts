@@ -28,6 +28,8 @@ export type MarlinSimState = {
   readonly isHalted: boolean;
   readonly isHomed: boolean;
   readonly fanPower: number;
+  readonly laserMode: 'standard' | 'continuous' | 'dynamic';
+  readonly inlineBurnPowers: ReadonlyArray<number>;
 };
 
 export type MarlinSimulator = {
@@ -52,7 +54,10 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
   let isHalted = false;
   let isHomed = false;
   let fanPower = 0;
-  let pendingM400 = 0;
+  let laserMode: MarlinSimState['laserMode'] = 'standard';
+  let laserPower = 0;
+  const inlineBurnPowers: number[] = [];
+  const pendingSettles: Array<() => void> = [];
   let rxBuffer = '';
 
   const emit = (line: string): void => {
@@ -63,14 +68,29 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
 
   const finishMotion = (): void => {
     pendingMotions = Math.max(0, pendingMotions - 1);
-    if (pendingMotions === 0 && pendingM400 > 0) {
-      for (let i = 0; i < pendingM400; i += 1) emit('ok');
-      pendingM400 = 0;
+    if (pendingMotions === 0) pendingSettles.splice(0).forEach((complete) => complete());
+  };
+
+  const handleLaserPower = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
+    // Model the modern native mode distinction, not GRBL's M3/M4 equivalence.
+    if (/^M[34]\b/i.test(line)) {
+      if (/\bI\b/i.test(line)) laserMode = /^M3\b/i.test(line) ? 'continuous' : 'dynamic';
+      if (words.spindle !== null) laserPower = words.spindle;
+    }
+    if (/^M5\b/i.test(line)) {
+      laserPower = 0;
+      if (/\bI\b/i.test(line)) laserMode = 'standard';
+    }
+    if (/^G0\b/i.test(line)) laserPower = 0;
+    if (/^G1\b/i.test(line) && laserMode === 'continuous') {
+      if (words.spindle !== null) laserPower = words.spindle;
+      if (laserPower > 0) inlineBurnPowers.push(laserPower);
     }
   };
 
   const handleMotion = (line: string): void => {
     const words = parseMotionWords(line);
+    handleLaserPower(line, words);
     if (words.setsAbsolute !== null) isAbsolute = words.setsAbsolute;
     if (words.hasMotion) {
       pos = {
@@ -111,9 +131,11 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       }, homingMs);
       return;
     }
-    if (/^M400\b/i.test(line)) {
-      if (pendingMotions === 0) emit('ok');
-      else pendingM400 += 1;
+    if (/^M(?:400|5)\b/i.test(line)) {
+      // M5 (including M5 I) synchronizes the planner in native Marlin.
+      const complete = (): void => (/^M5\b/i.test(line) ? handleMotion(line) : emit('ok'));
+      if (pendingMotions === 0) complete();
+      else pendingSettles.push(complete);
       return;
     }
     if (/^M114\b/i.test(line)) {
@@ -154,7 +176,16 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
   return {
     adapter: port.adapter,
     port,
-    state: () => ({ pos, isAbsolute, pendingMotions, isHalted, isHomed, fanPower }),
+    state: () => ({
+      pos,
+      isAbsolute,
+      pendingMotions,
+      isHalted,
+      isHomed,
+      fanPower,
+      laserMode,
+      inlineBurnPowers: [...inlineBurnPowers],
+    }),
     outbound: () => port.outbound(),
   };
 }

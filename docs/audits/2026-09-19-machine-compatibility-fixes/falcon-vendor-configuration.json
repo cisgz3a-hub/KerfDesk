@@ -1,0 +1,42 @@
+{
+  "researchedAt": "2026-09-19",
+  "guideUrl": "https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide",
+  "bundleUrl": "https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip",
+  "bundleSha256": "11b13328ace21461c7cba2e6350999813fb60a670b3cff77930f0a44f988405b",
+  "device": {
+    "Name": "GRBL-LPC",
+    "DisplayName": "Falcon A1 Pro",
+    "Width": 358,
+    "Height": 268,
+    "HomeOnStartup": false,
+    "settings": {
+      "BaudRate": 115200,
+      "S_Scale": 1000,
+      "AirAssistM7": false,
+      "EnableGrblJCommand": false,
+      "AllowSettingsFetch": false,
+      "TransferMode": 0,
+      "SwapXYOutput": false
+    },
+    "macros": [
+      {
+        "Content": "$HZ1\n",
+        "Label": "Aotu Focus"
+      },
+      {
+        "Content": "$HX\n$HY\n",
+        "Label": "Home"
+      },
+      {
+        "Content": "$Hz\n",
+        "Label": "Z Home"
+      }
+    ]
+  },
+  "limitations": [
+    "Selected source fields only. No hardware was connected or operated.",
+    "LightBurn GRBL-LPC label does not establish exact controller firmware family or build.",
+    "Width/Height explicitly determine X358/Y268; product dimension order alone was ambiguous.",
+    "Vendor configuration is research evidence, not proof of physical behaviour."
+  ]
+}

@@ -33,6 +33,13 @@
 ### F-A1. App launch
 
 #### Success — first run (no prior project)
+
+The startup loading screen uses a charcoal-and-copper KerfDesk wordmark over sculpted timber
+artwork, with **Created by Ons Houtkombuis** visible below. Its text and indeterminate activity
+bar paint before the artwork loads, and remain readable if the image is unavailable. Reduced
+motion uses a static indicator. The screen fades away once the workspace canvas has had a paint
+opportunity, without an extra branding delay. It introduces no startup interaction or modal.
+
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
@@ -1685,22 +1692,17 @@ a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `Machi
 current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
 undoable project change.
 
-Machine capability is an enforced physical-output contract (ADR-210), not descriptive metadata:
+Machine output-kind metadata describes the researched configuration and supplies advisory warnings:
 
-- **Laser only** keeps Laser active and makes CNC unavailable. **CNC only** keeps CNC active and
-  makes Laser unavailable. **Laser + CNC** allows either active mode.
-- The unavailable Laser/CNC segment stays visible and keyboard-focusable, but is visibly muted and
-  carries `aria-disabled="true"`. Activating it shows the capability-specific explanation and the
-  **Machine Setup** recovery path; it does not change the project, history, or dirty state.
-- **New Project** starts in the sole supported mode for a single-output profile. A hybrid or legacy
-  profile keeps the operator's active mode while resetting job-specific configuration.
-- Opening or restoring a contradictory project switches it to the sole supported mode before any
-  mode-specific UI or output path can use it. Displaced CNC setup is retained for recovery, the
-  project remains dirty until explicitly saved, and a warning explains the repair.
-- Profiles with neither output capability are legacy-compatible and continue to allow both modes
-  until their next Machine Setup save records an explicit choice.
-- The final atomic setup action independently refuses a profile/machine mismatch, so another caller
-  cannot persist a single-output capability beside the opposite active mode.
+- Named stock laser profiles declare **Laser only**; the hybrid 4040 profile declares both kinds.
+  Generic firmware templates and legacy profiles can leave the installed tool unspecified.
+- The Laser/CNC switch remains available. Choosing a mode outside the profile's declared output
+  kinds changes mode and shows the existing Machine Setup warning; it adds no Start policy gate.
+- Loading a project retains its selected mode and saved settings, with a warning for a contradictory
+  capability label. The atomic setup action likewise reports a capability warning rather than
+  silently rewriting the requested machine mode.
+- Catalogue updates apply when the operator loads a researched preset. Existing imported/custom
+  dimensions, wiring and controller settings are not silently replaced with new catalogue defaults.
 
 The six machine pages remain ordered as ADR-240 defined. A draft whose active output is CNC inserts
 one **Startup Setup** (`cnc-setup`) page between Confirm settings and Options, so CNC has seven visible pages and
@@ -1715,9 +1717,16 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
    Below it: CNC preset, controller family, baud, output dialect, advanced streaming, and
    import/export. Controller selection precedes serial connection; picking a card applies the
    whole profile to the draft and nothing else.
+   CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
+   controller choice unchanged. Their controller notes and sources stay visible beside the
+   selected preset. Onefinity entries explicitly require an external controller/postprocessor
+   integration and do not claim compatible KerfDesk output.
 3. **Connect & detect** — connect with the reviewed driver/baud, run that controller family's
    read-only identity/settings commands, and optionally **Use detected values** (Ruida correctly
    presents file-only behavior). This page only observes and copies; it edits no field directly.
+   CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
+   the separate **Use S maximum as spindle RPM** option and a reported CNC mode; otherwise the
+   spindle ceiling stays unchanged. Configured travel is not measured usable travel.
 4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the laser
    output contract (S range/air/Fire) on one flat page. CNC machine-output and current-job settings
    live together on the next page instead of being split across this page and Material & Bit.
@@ -5071,8 +5080,16 @@ and lifts the command's CNC-only gate.)*
 3. **Pause** stops sending — buffered moves finish (the button title and
    safety copy say so). **Resume** continues the stream. **ABORT** requests the
    controller-specific reset/de-energize path; it is not a physical E-stop. The
-   host stops sending and requests `M5` + `M107` cleanup.
+   host stops sending and requests `M5 I` + `M107` cleanup.
 4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+5. Inline export targets modern Marlin `LASER_FEATURE` with PWM, researched against 2.1.2.6:
+   `M5 I` settles and disables power before inline entry or re-entry with `M3 I S0`, each move
+   carries its requested S power, and `M5 I` exits the mode. This explicit boundary applies with
+   either `LASER_POWER_SYNC` build choice. `CUTTER_POWER_UNIT` determines S units;
+   `LASER_POWER_TRAP` determines
+   acceleration compensation. The per-layer GRBL Constant/Dynamic selector is replaced by a
+   firmware explanation. Origin reset requires `CNC_COORDINATE_SYSTEMS` and a non-SCARA build.
+   The emitted preamble does not assume `G54` or `G94` support.
 
 #### Error — firmware answers `Error:` or `Resend:`
 1. Terminal for the stream (no replay); beam-off lines are written; with no
@@ -5081,12 +5098,18 @@ and lifts the command's CNC-only gate.)*
 ### F-H3. Smoothieware halt and recovery
 
 #### Success
-1. Realtime `?` / `!` / `~` work as on GRBL; pause is allowed WITHOUT the $32
-   proof (Smoothie cannot report $-settings; its laser module ties beam to
-   motion). Power words are fractional (S0.500 = 50% at the 0–1.0 scale).
-2. Abort sends the controller-specific reset/de-energize sequence (Ctrl-X +
-   `M5`/`M9` for GRBL); a halted controller answers `!!` to normal
-   lines; the alarm banner's unlock sends `M999` and the machine returns Idle.
+1. The generic serial driver does not promise realtime `!`/`~`: support depends on transport
+   and firmware configuration. Host pause stops new lines while buffered motion drains.
+   Power words preserve fractional values for vectors and images (S0.500 = 50% at S maximum 1).
+2. Constant/proportional intentions use the native Laser module's `M221 P` setting, with
+   settled mode changes. A GRBL `M3` or `M4` is not a native Smoothieware power-mode selector.
+   Native override changes settle the queue; completed output de-energizes the module and a
+   new job explicitly re-establishes its override.
+   Match `laser_module_maximum_s_value` to the profile and set `laser_module_minimum_power`
+   to `0` for dark S0 feed moves. The pinned V1 `fire off` shell command clears manual firing
+   before output, Frame, jog and Home; its exact textual completion is the acknowledgement.
+3. Abort uses the controller's Ctrl-X halt path; a halted controller answers `!!` to normal
+   lines. Unlock sends `M999`. This is not the GRBL soft-reset lifecycle or a physical E-stop.
 
 ### F-H4. Export a Ruida job (.rd, EXPERIMENTAL)
 

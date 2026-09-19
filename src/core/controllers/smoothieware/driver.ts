@@ -16,6 +16,7 @@ import {
   SMOOTHIE_CMD_UNLOCK,
   SMOOTHIE_CMD_VERSION,
   SMOOTHIE_STOP_LASER_LINES,
+  SMOOTHIE_FRAME_TOOL_OFF_LINES,
 } from './commands';
 import { prepareSmoothieConsoleCommand } from './console-command';
 import { classifySmoothieResponse } from './response';
@@ -59,7 +60,9 @@ export const smoothiewareDriver: ControllerDriver = {
     jogCancel: null,
   },
   commands: {
-    home: SMOOTHIE_CMD_HOME,
+    // M400 first also gives a terminal rejection while halted; the shell's
+    // fire-off command itself is silently ignored in that state.
+    home: ['M400', ...SMOOTHIE_FRAME_TOOL_OFF_LINES, SMOOTHIE_CMD_HOME].join('\n'),
     unlock: SMOOTHIE_CMD_UNLOCK,
     sleep: null,
     settingsQuery: null,
@@ -68,7 +71,7 @@ export const smoothiewareDriver: ControllerDriver = {
     offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: SMOOTHIE_STOP_LASER_LINES,
-    frameToolOffLines: SMOOTHIE_STOP_LASER_LINES,
+    frameToolOffLines: SMOOTHIE_FRAME_TOOL_OFF_LINES,
     settleDwell: SMOOTHIE_CMD_SETTLE,
     setOriginHere: 'G92 X0 Y0',
     clearOrigin: 'G92.1',

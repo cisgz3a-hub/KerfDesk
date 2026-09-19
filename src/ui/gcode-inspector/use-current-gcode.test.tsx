@@ -154,35 +154,41 @@ describe('useCurrentGcode', () => {
     expect(latest?.state).toMatchObject({ text: 'G21 G90\nG1 X10 F600\n' });
   });
 
-  it('uses the started machine and fan-power context even after the project changes', async () => {
-    const state = liveInspectorState();
-    const plan = {
-      ...state.liveCanvasRun.plan,
-      device: {
-        ...state.liveCanvasRun.plan.device,
-        controllerKind: 'marlin' as const,
-        gcodeDialect: { dialectId: 'marlin-fan' as const },
-      },
-    };
-    registerCanvasProgramSource(plan, LIVE_PROGRAM);
-    registerCanvasProgramRun(
-      plan,
-      state.streamer.queued,
-      state.liveCanvasRun.startedAtMs,
-      LIVE_PROGRAM,
-    );
-    useLaserStore.setState({ ...state, liveCanvasRun: { ...state.liveCanvasRun, plan } });
-    useStore.setState({
-      project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
-    });
-    await mount(true);
-    expect(latest?.state).toMatchObject({
-      kind: 'ready',
-      text: LIVE_PROGRAM,
-      context: { machineKind: 'laser', laserPowerControl: 'fan' },
-    });
-    expect(compileCount()).toBe(0);
-  });
+  it.each(['marlin', 'smoothieware'] as const)(
+    'uses the started %s power context even after the project changes',
+    async (controllerKind) => {
+      const state = liveInspectorState();
+      const plan = {
+        ...state.liveCanvasRun.plan,
+        device: {
+          ...state.liveCanvasRun.plan.device,
+          controllerKind,
+          gcodeDialect: { dialectId: 'marlin-fan' as const },
+        },
+      };
+      registerCanvasProgramSource(plan, LIVE_PROGRAM);
+      registerCanvasProgramRun(
+        plan,
+        state.streamer.queued,
+        state.liveCanvasRun.startedAtMs,
+        LIVE_PROGRAM,
+      );
+      useLaserStore.setState({ ...state, liveCanvasRun: { ...state.liveCanvasRun, plan } });
+      useStore.setState({
+        project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+      });
+      await mount(true);
+      expect(latest?.state).toMatchObject({
+        kind: 'ready',
+        text: LIVE_PROGRAM,
+        context: {
+          machineKind: 'laser',
+          laserPowerControl: controllerKind === 'marlin' ? 'fan' : 'smoothieware',
+        },
+      });
+      expect(compileCount()).toBe(0);
+    },
+  );
 
   it('cancels a design compilation when a live run takes over and ignores its late output', async () => {
     let lateOutput: ((name: string, text: string) => void) | undefined;

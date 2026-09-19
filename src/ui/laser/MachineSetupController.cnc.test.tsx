@@ -43,7 +43,7 @@ describe('router controller settings', () => {
     });
     const view = await renderPanel();
     try {
-      expect(view.host.textContent).toContain('spindle max 24000 RPM');
+      expect(view.host.textContent).toContain('configured S maximum 24000');
       expect(view.host.textContent).not.toContain('Your laser');
       expect(view.host.textContent).not.toContain('Max power (S)');
     } finally {

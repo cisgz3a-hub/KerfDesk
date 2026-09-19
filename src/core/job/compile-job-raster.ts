@@ -10,6 +10,7 @@ import {
 } from '../raster';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
+import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import {
   captureLayerOperationSettings,
@@ -104,8 +105,9 @@ function compileRasterGroup(
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
   const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
-  const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
-  const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
+  const compilationMaxS = rasterCompilationPowerScale(device);
+  const sMax = Math.round((powerPercent / 100) * compilationMaxS);
+  const sMin = Math.round((minPowerPercent / 100) * compilationMaxS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
   const passThroughDimensions = rasterPassThroughDimensions(obj);
   const pixelWidth = layer.passThrough
@@ -169,27 +171,33 @@ function rasterPassThroughDimensions(obj: RasterImage): {
 function rasterValuesFor(
   input: MaterializedRasterInput,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
+  const compilationMaxS = rasterCompilationPowerScale(input.device);
+  const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
+    compilationMaxS === input.device.maxPowerS
+      ? values
+      : rescaleRasterValues(values, compilationMaxS, input.device.maxPowerS);
   // Streaming works for every dither algorithm and mask (ADR-243); only size
   // chooses between one-shot materialization and an O(width) row provider.
   if (input.pixelWidth * input.pixelHeight <= STREAMED_RASTER_PIXEL_THRESHOLD) {
-    return { sValues: materializedRasterValues(input) };
+    return { sValues: toDeviceUnits(materializedRasterValues(input)) };
   }
+  const rowProvider = streamedRasterRowProvider({
+    sourceLuma: input.preparedLuma,
+    sourceWidth: input.obj.pixelWidth,
+    sourceHeight: input.obj.pixelHeight,
+    pixelWidth: input.pixelWidth,
+    pixelHeight: input.pixelHeight,
+    obj: input.obj,
+    maskObject: input.maskObject,
+    device: input.device,
+    bounds: input.bounds,
+    algorithm: input.layer.ditherAlgorithm,
+    sMax: input.sMax,
+    sMin: input.sMin,
+  });
   return {
     sValues: new Float64Array(0),
-    rowProvider: streamedRasterRowProvider({
-      sourceLuma: input.preparedLuma,
-      sourceWidth: input.obj.pixelWidth,
-      sourceHeight: input.obj.pixelHeight,
-      pixelWidth: input.pixelWidth,
-      pixelHeight: input.pixelHeight,
-      obj: input.obj,
-      maskObject: input.maskObject,
-      device: input.device,
-      bounds: input.bounds,
-      algorithm: input.layer.ditherAlgorithm,
-      sMax: input.sMax,
-      sMin: input.sMin,
-    }),
+    rowProvider: (y) => toDeviceUnits(rowProvider(y)),
   };
 }
 
