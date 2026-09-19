@@ -281,6 +281,6 @@ const failureStyle: React.CSSProperties = {
   borderLeft: '3px solid var(--lf-danger)',
   marginTop: 10,
   padding: '7px 9px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };

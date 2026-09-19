@@ -4,12 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
+import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
+import { SINGLE_PANEL_QUERY } from './use-workspace-layout';
+import { resetWorkspaceLayout } from './workspace-panel-actions';
 
-const media = vi.hoisted(() => ({ compact: false, listener: null as (() => void) | null }));
+const media = vi.hoisted(() => ({
+  compact: false,
+  narrow: false,
+  listeners: new Set<() => void>(),
+}));
 const COLLAPSED_PANEL_WIDTH_CSS = '48px';
 
 vi.mock('../layers', () => ({ CutsLayersPanel: () => <div>Layer rail</div> }));
 vi.mock('../laser', () => ({ LaserWindow: () => <div>Machine rail</div> }));
+vi.mock('../laser/WorkspaceJobActions', () => ({
+  WorkspaceJobActions: () => (
+    <div aria-label="Job actions">
+      <button>Frame job</button>
+    </div>
+  ),
+}));
 
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 
@@ -31,16 +45,21 @@ async function renderPanels(): Promise<{ host: HTMLDivElement; root: Root }> {
 
 beforeEach(() => {
   media.compact = false;
-  media.listener = null;
+  media.narrow = false;
+  media.listeners.clear();
+  useWorkspaceLayoutStore.setState({ preference: 'auto', resetRevision: 0 });
   useLaserStore.setState({ streamer: null });
   useUiStore.getState().setRailPanelVisible('layers', true);
   useUiStore.getState().setRailPanelVisible('machine', true);
-  vi.stubGlobal('matchMedia', () => ({
-    matches: media.compact,
-    addEventListener: (_event: string, listener: () => void) => {
-      media.listener = listener;
+  useUiStore.setState({ railPanelFocusRequest: null });
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    get matches() {
+      return query === SINGLE_PANEL_QUERY ? media.narrow : media.compact;
     },
-    removeEventListener: vi.fn(),
+    addEventListener: (_event: string, listener: () => void) => {
+      media.listeners.add(listener);
+    },
+    removeEventListener: (_event: string, listener: () => void) => media.listeners.delete(listener),
   }));
 });
 
@@ -141,6 +160,61 @@ describe('WorkspaceSidePanels', () => {
 
       await act(async () => useUiStore.getState().focusRailPanel('layers'));
       expect(host.textContent).toContain('Layer rail');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps one job dock while switching tabs and opens the selected collapsed rail', async () => {
+    media.compact = true;
+    useUiStore.getState().setRailPanelVisible('machine', false);
+    const { host, root } = await renderPanels();
+    try {
+      const dock = host.querySelector('[aria-label="Job actions"]');
+      const artwork = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+      artwork?.focus();
+      await act(async () =>
+        artwork?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
+      );
+      expect(useUiStore.getState().railPanelVisibility.machine).toBe(true);
+      expect(host.querySelectorAll('[aria-label="Job actions"]')).toHaveLength(1);
+      expect(host.querySelector('[aria-label="Job actions"]')).toBe(dock);
+      expect(document.activeElement?.textContent).toBe('Machine');
+      expect(host.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(
+        document.activeElement?.id,
+      );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('preserves the manual spacious preference through a temporarily narrow window', async () => {
+    media.compact = true;
+    media.narrow = true;
+    useWorkspaceLayoutStore.getState().setPreference('spacious');
+    const { host, root } = await renderPanels();
+    try {
+      expect(host.querySelector('[data-layout="compact"]')).not.toBeNull();
+      await act(async () => {
+        media.narrow = false;
+        media.listeners.forEach((listener) => listener());
+      });
+      expect(host.querySelector('[data-layout="spacious"]')).not.toBeNull();
+      expect(useWorkspaceLayoutStore.getState().preference).toBe('spacious');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('reset layout reopens hidden desktop panels and restores automatic sizing', async () => {
+    const { host, root } = await renderPanels();
+    try {
+      const layers = host.querySelector<HTMLButtonElement>('[title="Hide Layers panel"]');
+      await act(async () => layers?.click());
+      expect(host.textContent).not.toContain('Layer rail');
+      await act(async () => resetWorkspaceLayout(useUiStore.getState()));
+      expect(host.textContent).toContain('Layer rail');
+      expect(useWorkspaceLayoutStore.getState().preference).toBe('auto');
     } finally {
       await act(async () => root.unmount());
     }

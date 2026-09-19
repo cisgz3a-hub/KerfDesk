@@ -1,0 +1,113 @@
+.lf-numeric-edits {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 5px 12px;
+  background: var(--lf-bg-1);
+  border-bottom: 1px solid var(--lf-border);
+  font-size: 13px;
+}
+.lf-numeric-edits-fields {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 6px 10px;
+}
+.lf-transform-anchor-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--lf-bg-1);
+  white-space: nowrap;
+}
+.lf-transform-anchor-trigger > svg {
+  flex-shrink: 0;
+}
+.lf-transform-anchor-popover {
+  width: 140px;
+}
+.lf-transform-anchor-heading {
+  margin: 2px 2px 7px;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+.lf-transform-anchor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.lf-transform-anchor-grid button {
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+}
+.lf-numeric-edit-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.lf-numeric-field-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lf-numeric-edit-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--lf-border);
+}
+.lf-numeric-edit-caption {
+  color: var(--lf-text-muted);
+  font-weight: 500;
+}
+.lf-numeric-edit-field .lf-input {
+  width: 70px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+.lf-numeric-edit-unit {
+  color: var(--lf-text-faint);
+  font-size: 12px;
+}
+.lf-numeric-aspect-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+.lf-numeric-aspect-lock svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+@media (max-width: 900px) {
+  .lf-numeric-edits-fields {
+    gap: 6px 8px;
+  }
+  .lf-numeric-edit-field .lf-input {
+    width: 64px;
+  }
+}
+@media (max-width: 700px) {
+  .lf-numeric-edit-divider {
+    display: none;
+  }
+}

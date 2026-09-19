@@ -1,0 +1,103 @@
+.lf-app-shell {
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lf-text);
+  background: var(--lf-bg-0);
+  font-size: var(--lf-text-md);
+  line-height: 1.4;
+}
+
+.lf-workspace-panels {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: calc(100% - 60px);
+  border-left: 1px solid var(--lf-border);
+  background: var(--lf-bg-1);
+}
+
+.lf-workspace-panels--compact {
+  width: clamp(320px, 34vw, 400px);
+  max-width: min(430px, calc(100% - 100px));
+}
+
+.lf-workspace-panels--run-order {
+  width: clamp(320px, 34vw, 430px);
+}
+
+.lf-workspace-panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 5px;
+  flex-shrink: 0;
+  background: var(--lf-bg-0);
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-workspace-panel-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 38px;
+  font-size: var(--lf-text-md);
+  font-weight: 600;
+}
+
+.lf-workspace-panel-tabs > button > svg {
+  width: 19px;
+  height: 19px;
+}
+
+.lf-workspace-panel-body,
+.lf-workspace-machine-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lf-workspace-desktop-panels {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.lf-workspace-resizable-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+}
+
+.lf-workspace-resizable-panel + .lf-workspace-resizable-panel {
+  border-left: 1px solid var(--lf-border);
+}
+
+.lf-workspace-panel-toggles {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px;
+  border-bottom: 1px solid var(--lf-border);
+  background: var(--lf-bg-0);
+}
+
+.lf-workspace-panel-toggles > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 700px) {
+  .lf-workspace-panels--compact {
+    width: 260px;
+    max-width: calc(100% - 70px);
+  }
+}

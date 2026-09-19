@@ -267,8 +267,12 @@ const hintStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   lineHeight: 1.45,
 };
-const okStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-success)', fontWeight: 600 };
-const warningStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-warning)', fontSize: 12 };
+const okStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-success-fg)', fontWeight: 600 };
+const warningStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-warning-fg)',
+  fontSize: 12,
+};
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',

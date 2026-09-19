@@ -9,13 +9,13 @@ import {
 } from './view-transform';
 
 describe('computeView', () => {
-  it('fits the bed centered with PADDING_PX margin at zoomFactor=1', () => {
+  it('fits the bed centered clear of its ruler strips at zoomFactor=1', () => {
     const v = computeView(800, 600, 400, 400);
-    // Square bed in landscape canvas → limited by height (552 usable / 400 = 1.38).
-    expect(v.scale).toBeCloseTo(552 / 400);
-    // Centered: (800 - 400*scale)/2 = (800 - 552)/2 = 124
-    expect(v.offsetX).toBeCloseTo(124);
-    expect(v.offsetY).toBeCloseTo(24);
+    // Square bed in landscape canvas → limited by height (540 usable / 400 = 1.35).
+    expect(v.scale).toBeCloseTo(540 / 400);
+    // Centered: (800 - 400*scale)/2 = (800 - 540)/2 = 130
+    expect(v.offsetX).toBeCloseTo(130);
+    expect(v.offsetY).toBeCloseTo(30);
   });
 
   it('applies zoomFactor multiplicatively over the fit-to-bed baseline', () => {

@@ -11,6 +11,7 @@ import {
 import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 import { handleMenuKeyDown } from './menu-keyboard';
 import { useMenuBarState } from './use-menu-bar-state';
+import { AppMenuChrome } from './AppMenuChrome';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -19,41 +20,43 @@ export function AppMenuBar(props: {
   const menu = useMenuBarState();
 
   return (
-    <nav
-      ref={menu.menuBarRef}
-      role="menubar"
-      aria-label="Application menu"
-      style={menuBarStyle}
-      onKeyDown={(event) =>
-        handleMenuKeyDown(event, {
-          root: menu.menuBarRef.current,
-          openFamily: menu.openFamily,
-          setOpenFamily: menu.setOpenFamily,
-          setFocusedFamily: menu.setFocusedFamily,
-          pendingMenuFocus: menu.pendingMenuFocus,
-          pendingFamilyReturn: menu.pendingFamilyReturn,
-        })
-      }
-    >
-      {COMMAND_FAMILY_ORDER.map((family) => (
-        <MenuFamily
-          key={family}
-          family={family}
-          machineKind={props.machineKind}
-          commands={props.commands}
-          open={menu.openFamily === family}
-          tabIndex={menu.focusedFamily === family ? 0 : -1}
-          onFocus={() => menu.setFocusedFamily(family)}
-          onOpenChange={(open) =>
-            menu.setOpenFamily((current) => {
-              if (open) return family;
-              return current === family ? null : current;
-            })
-          }
-          onCommandRun={() => menu.setOpenFamily(null)}
-        />
-      ))}
-    </nav>
+    <AppMenuChrome>
+      <nav
+        ref={menu.menuBarRef}
+        role="menubar"
+        aria-label="Application menu"
+        style={menuBarStyle}
+        onKeyDown={(event) =>
+          handleMenuKeyDown(event, {
+            root: menu.menuBarRef.current,
+            openFamily: menu.openFamily,
+            setOpenFamily: menu.setOpenFamily,
+            setFocusedFamily: menu.setFocusedFamily,
+            pendingMenuFocus: menu.pendingMenuFocus,
+            pendingFamilyReturn: menu.pendingFamilyReturn,
+          })
+        }
+      >
+        {COMMAND_FAMILY_ORDER.map((family) => (
+          <MenuFamily
+            key={family}
+            family={family}
+            machineKind={props.machineKind}
+            commands={props.commands}
+            open={menu.openFamily === family}
+            tabIndex={menu.focusedFamily === family ? 0 : -1}
+            onFocus={() => menu.setFocusedFamily(family)}
+            onOpenChange={(open) =>
+              menu.setOpenFamily((current) => {
+                if (open) return family;
+                return current === family ? null : current;
+              })
+            }
+            onCommandRun={() => menu.setOpenFamily(null)}
+          />
+        ))}
+      </nav>
+    </AppMenuChrome>
   );
 }
 
@@ -257,12 +260,11 @@ const menuBarStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'stretch',
   gap: 2,
-  padding: '2px 8px',
+  padding: '2px 0',
   background: 'var(--lf-bg-0)',
   color: 'var(--lf-text)',
-  borderBottom: '1px solid var(--lf-border)',
   fontFamily: 'system-ui, sans-serif',
-  fontSize: 13,
+  fontSize: 'var(--lf-text-md)',
   position: 'relative',
   zIndex: 20,
 };

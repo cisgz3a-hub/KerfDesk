@@ -35,10 +35,24 @@ export type IconName =
   | 'ruler'
   | 'pen'
   | 'crosshair'
+  | 'layers'
+  | 'sliders'
   | 'panel-left'
   | 'panel-right';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
+  sliders: (
+    <>
+      <path d="M2 4h3m4 0h5M2 12h6m4 0h2M2 8h8m4 0h0" />
+      <path d="M6 2v4M11 6v4M9 10v4" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m1.5 5 6.5-3.5L14.5 5 8 8.5 1.5 5Z" />
+      <path d="m1.5 8 6.5 3.5L14.5 8M1.5 11 8 14.5 14.5 11" />
+    </>
+  ),
   crosshair: (
     <>
       <circle cx="8" cy="8" r="3" />
@@ -82,11 +96,9 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   text: <path d="M3 5V3h10v2M8 3v10M5 13h6" />,
   nodes: (
     <>
-      <path d="M4.5 4.5h7v7h-7Z" />
-      <circle cx="4.5" cy="4.5" r="1.2" />
-      <circle cx="11.5" cy="4.5" r="1.2" />
-      <circle cx="11.5" cy="11.5" r="1.2" />
-      <circle cx="4.5" cy="11.5" r="1.2" />
+      <path d="M3 12C3 5 13 11 13 4" />
+      <rect x="1.5" y="11.5" width="3" height="3" rx="0.7" />
+      <rect x="11.5" y="1.5" width="3" height="3" rx="0.7" />
     </>
   ),
   square: <rect x="3" y="3" width="10" height="10" rx="1" />,

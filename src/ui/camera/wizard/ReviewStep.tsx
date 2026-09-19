@@ -167,4 +167,4 @@ const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap
 const noteStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-faint)' };
 const statusStyle: React.CSSProperties = { margin: 0 };
 const warnStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-warning-fg)' };
-const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)' };
+const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)' };

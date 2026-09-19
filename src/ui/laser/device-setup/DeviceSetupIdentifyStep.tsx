@@ -251,7 +251,7 @@ const settingsStyle: React.CSSProperties = { display: 'flex', flexDirection: 'co
 const mutedInlineStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 11 };
 const warningStyle: React.CSSProperties = {
   margin: 0,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
   fontWeight: 600,
 };

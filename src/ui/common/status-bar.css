@@ -2,10 +2,25 @@
    move the fixed update-action rail or change the footer height. */
 .lf-status-bar__telemetry {
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  font-variant-numeric: tabular-nums;
 }
 
 .lf-status-bar__telemetry::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
+}
+
+.lf-status-bar__segment {
+  flex: 0 0 auto;
+}
+
+.lf-status-bar__segment + .lf-status-bar__segment {
+  border-left: 1px solid var(--lf-border);
+  padding-left: 12px;
+}
+
+.lf-status-bar__telemetry:focus-visible {
+  outline-offset: -2px;
 }

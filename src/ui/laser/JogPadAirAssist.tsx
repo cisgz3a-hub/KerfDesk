@@ -165,17 +165,17 @@ const airAssistButtonBaseStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 const airAssistTitleStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 'var(--lf-text-sm)',
+  fontWeight: 600,
   lineHeight: 1.15,
 };
 const airAssistStateStyle: React.CSSProperties = {
   fontSize: 20,
-  fontWeight: 800,
+  fontWeight: 600,
   lineHeight: 1,
 };
 const airAssistCommandStyle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
   lineHeight: 1.2,
 };
 const airSetupWarningStyle: React.CSSProperties = {

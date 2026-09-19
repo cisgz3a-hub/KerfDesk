@@ -15,9 +15,10 @@ import {
 } from '../../core/scene';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeMouseDownDrag, nextTransformForDrag, type DragState } from './drag-state';
+import { CANVAS_PADDING_PX } from './canvas-layout';
 
 const VIEW_STATE = { zoomFactor: 1, panX: 0, panY: 0 };
-const CANVAS_SIZE = 448;
+const CANVAS_SIZE = 400 + CANVAS_PADDING_PX * 2;
 
 function canvasRef(): React.RefObject<HTMLCanvasElement> {
   return {
@@ -35,8 +36,8 @@ function mouseEventAtScenePoint(point: {
 }): React.MouseEvent<HTMLCanvasElement> {
   return {
     button: 0,
-    clientX: 24 + point.x,
-    clientY: 24 + point.y,
+    clientX: CANVAS_PADDING_PX + point.x,
+    clientY: CANVAS_PADDING_PX + point.y,
     shiftKey: false,
     altKey: false,
   } as React.MouseEvent<HTMLCanvasElement>;

@@ -301,7 +301,11 @@ const hintStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   lineHeight: 1.45,
 };
-const warningStyle: React.CSSProperties = { margin: 0, fontSize: 12, color: 'var(--lf-warning)' };
+const warningStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-warning-fg)',
+};
 const confirmationStyle: React.CSSProperties = {
   margin: 0,
   color: 'var(--lf-success-fg)',

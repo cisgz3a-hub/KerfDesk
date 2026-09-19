@@ -17,6 +17,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
@@ -231,7 +232,7 @@ function drawDraftShape(
 ): void {
   if (draft.kind !== 'shape') return;
   ctx.save();
-  ctx.strokeStyle = draft.color;
+  ctx.strokeStyle = canvasVectorDisplayColor(draft.color);
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   for (const path of draft.paths) strokePolylinesBatched(ctx, draft, path.polylines, view);
@@ -363,7 +364,7 @@ function drawObjectPolylines(
     if (!resolution.visible) continue;
     const layer = resolution.operation;
     if (layer === undefined) {
-      ctx.strokeStyle = path.color;
+      ctx.strokeStyle = canvasVectorDisplayColor(path.color);
       ctx.lineWidth = 1.5;
       const display = displayPathFor(path, obj, view, displayPolylineCache);
       simplified = includesSimplifiedDisplay(simplified, display);
@@ -380,12 +381,12 @@ function drawObjectPolylines(
         display.polylines,
         effectiveLayer,
         view,
-        layer.color,
+        canvasVectorDisplayColor(layer.color),
         path.fillRule,
       );
       continue;
     }
-    ctx.strokeStyle = layer.color;
+    ctx.strokeStyle = canvasVectorDisplayColor(layer.color);
     ctx.lineWidth = effectiveLayer.output ? 1.5 : 0.75;
     // Single beginPath/stroke per color. Per-polyline stroke() was the cause
     // of the post-import freeze: each stroke is a GPU sync, so a

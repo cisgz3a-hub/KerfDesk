@@ -18,9 +18,14 @@ export function CollapsibleRailSection({ label, title, children }: Props): JSX.E
 }
 
 const sectionStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 4,
-  padding: '6px 8px',
+  borderTop: '1px solid var(--lf-border)',
+  padding: '9px 0',
+  fontSize: 'var(--lf-text-sm)',
 };
-const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontWeight: 600 };
+const summaryStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  fontWeight: 500,
+  color: 'var(--lf-text-muted)',
+  lineHeight: 1.4,
+};
 const contentStyle: React.CSSProperties = { marginTop: 8 };

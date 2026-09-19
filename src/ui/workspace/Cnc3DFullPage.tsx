@@ -147,7 +147,7 @@ const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const toolbarRowStyle: React.CSSProperties = { padding: '0 12px 8px', flexShrink: 0 };
 const resolutionNoticeStyle: React.CSSProperties = {
   padding: '0 12px 8px',
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   flexShrink: 0,
 };
 const readoutRowStyle: React.CSSProperties = { padding: '6px 12px', flexShrink: 0 };

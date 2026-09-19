@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createProject, type Project } from '../../core/scene';
+import { canvasTheme } from '../theme/canvas-theme';
 import { drawScene } from './draw-scene';
 
 function recordingContext(): {
@@ -61,6 +62,6 @@ describe('drawScene no-go zone overlay', () => {
       view: { zoomFactor: 1, panX: 0, panY: 0 },
     });
 
-    expect(fillRectStyles).toContain('rgba(198, 40, 40, 0.12)');
+    expect(fillRectStyles).toContain(canvasTheme.noGoZoneFill);
   });
 });

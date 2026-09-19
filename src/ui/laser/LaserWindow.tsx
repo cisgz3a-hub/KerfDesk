@@ -29,8 +29,13 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
+import './LaserWindow.css';
 
-export function LaserWindow(): JSX.Element {
+export function LaserWindow({
+  dockedJobActions = false,
+}: {
+  readonly dockedJobActions?: boolean;
+} = {}): JSX.Element {
   const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -56,7 +61,11 @@ export function LaserWindow(): JSX.Element {
   }
 
   return (
-    <aside aria-label={machineControlsLabel(machineKind)} className="lf-rail" style={panelStyle}>
+    <aside
+      aria-label={machineControlsLabel(machineKind)}
+      className="lf-rail lf-machine-rail"
+      style={panelStyle}
+    >
       <DetectedSettingsToast />
       <MachineRailHeading machineKind={machineKind} onCollapse={machinePanel.toggle} />
       <ControllerConnectionControls
@@ -92,6 +101,7 @@ export function LaserWindow(): JSX.Element {
       <ProbePanel />
       <CncUtilitiesPanel />
       <JobControls
+        dockedJobActions={dockedJobActions}
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onConfigureAutofocus={() =>
           openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })
@@ -339,18 +349,15 @@ const panelStyle: React.CSSProperties = {
   // collectively grow. overflowY scrolls the column internally instead of
   // forcing the parent flexbox to stretch — without this, on a narrower
   // window the canvas (flex:1, minWidth:0) collapses to zero.
-  // Surface chrome comes from .lf-rail; layout only here.
-  padding: '8px 12px',
+  // Surface chrome and spacing come from .lf-machine-rail; layout only here.
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
   overflowY: 'auto',
   overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',
-  fontSize: 13,
   display: 'flex',
   flexDirection: 'column',
-  gap: 10,
 };
 const alarmStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',

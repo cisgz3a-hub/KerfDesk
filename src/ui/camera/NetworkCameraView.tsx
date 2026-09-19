@@ -312,4 +312,4 @@ const feedStyle: CSSProperties = {
   objectFit: 'contain',
 };
 const hintStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
-const errStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-danger)' };
+const errStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-danger-fg)' };

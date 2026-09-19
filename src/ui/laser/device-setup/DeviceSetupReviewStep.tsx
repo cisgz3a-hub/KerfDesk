@@ -345,19 +345,19 @@ const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'col
 const readyStyle: React.CSSProperties = {
   margin: 0,
   fontWeight: 600,
-  color: 'var(--lf-success)',
+  color: 'var(--lf-success-fg)',
   fontSize: 12,
 };
 const pendingStyle: React.CSSProperties = {
   margin: 0,
   fontWeight: 600,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };
 const issueListStyle: React.CSSProperties = {
   margin: 0,
   paddingLeft: 18,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };
 const cardStyle: React.CSSProperties = {
