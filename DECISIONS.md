@@ -9304,33 +9304,45 @@ the operator's pointer. Removing a panel or changing selection tools cannot remo
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
 
-### Amendment (2026-09-19) — overlaid on the canvas, never in normal flow
+### Amendment (2026-09-19, revised 2026-09-20) — a floating popup, never in normal flow
 
 **Context.** In normal flow between the workspace and the status bar, the bar's arrival and
 departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
 maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
 decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
-lower edge.
+lower edge. A first revision absolutely positioned it on the canvas's lower edge; the maintainer
+then asked for it to be "above screen like a pop up that doesnt affect the rest and wont cause any
+jumping", which an absolute full-bleed strip inside the canvas is not.
 
 **Decision.**
 
-- The bar is absolutely positioned on the lower edge of the canvas area (`App.tsx` `CanvasArea`),
-  so mounting or unmounting it never changes the size or position of the workspace, the tool strip,
-  or either rail. Living inside the canvas area it can only cover drawing surface (and the canvas
-  zoom controls while motion is active) — never a rail control — which preserves the intent of
-  "cannot cover unrelated controls" without reserving permanent space.
-- It is a single wrapping line (state · progress · safety note) beside the unchanged ≥48 px
+- The control is a **window-level floating popup**: `position: fixed`, bottom-centre, above the
+  status bar, rendered as an App-shell sibling rather than inside `<main>` (`App.tsx`). Being
+  fixed it occupies no layout box anywhere, so mounting or unmounting it cannot change the size or
+  position of the workspace, the tool strip, or either rail — and no ancestor's `overflow` can clip
+  it. Measured live at 1400×900: the `main`, canvas, rails and status-bar rects are identical
+  before and after it mounts.
+- It is sized by its content (`width: max-content`, capped at `min(720px, 100vw - 24px)`) with a
+  rounded radius, border, danger top edge and shadow, so it reads as a popup over a small patch
+  above the status bar rather than a full-bleed strip across the workspace.
+- It keeps a wrapping status line (state · progress · safety note) beside the unchanged ≥48 px
   controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
   order, and still directs the operator to the physical E-stop or power isolation.
-- Toasts leave the rails for the same reason: they overlay the top-centre of the canvas under the
-  view switch, use a tinted surface with a coloured edge instead of a solid fill, and a success
-  confirmation auto-dismisses in 4 s (advisories and failures keep 8 s). A toast body ignores
-  pointer input, so a notification that appears over the drawing never swallows a click or a drag
-  meant for the canvas; only its dismiss control is interactive.
+- Toasts leave the rails for the same reason: they are fixed at the top-centre of the window over
+  the menu bar / toolbar chrome, use a tinted surface with a coloured edge instead of a solid fill,
+  and a success confirmation auto-dismisses in 4 s (advisories and failures keep 8 s). Only the
+  newest three render, so a burst cannot bury the toolbar. Two independent guards keep a toast from
+  eating an operator gesture: it is never over the canvas, and the toast body ignores pointer input
+  with only its dismiss control interactive. Both were earned — a draft that overlaid the drawing
+  with click-to-dismiss toasts had the import worker's "parsing in worker" advisory swallow the
+  mousedown starting a rectangle drag, which the `shape-properties` browser smoke caught.
 
-**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the overlay
-anchoring. The zoom buttons at the canvas's bottom-right are covered only while motion is active
-(wheel and keyboard zoom keep working). The Machine rail is unchanged.
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the fixed
+positioning, the content sizing and the placement outside `<main>`. While motion is active the
+popup covers a band above the status bar — at a typical width that includes the canvas zoom
+cluster (wheel and keyboard zoom keep working) and can reach the rails' lowest rows; it is
+transient and the canonical run controls are the ones inside it. A stack of several toasts briefly
+covers the toolbar under the menu bar. The Machine rail is unchanged.
 
 ---
 

@@ -185,21 +185,35 @@ function jobProgress(streamer: Streamer): string {
 // or job starting and settling resized the canvas — the whole screen jumped.
 // Absolutely positioned inside the canvas area it takes no layout space and
 // can only ever cover drawing surface, never a rail or tool-strip control.
+// A floating popup, not a bar (maintainer, 2026-09-20: "above screen like a
+// pop up that doesnt affect the rest and wont cause any jumping").
+// `position: fixed` takes it out of flow entirely and out of every ancestor's
+// box, so nothing it does can resize the workspace, move the rails, or be
+// clipped by the canvas's overflow — mounting and unmounting it on each jog,
+// auto-focus and job cannot shift a single pixel of the app. It is sized by
+// its content rather than the window, so it covers a small patch above the
+// status bar instead of a full-bleed strip across the workspace.
 const barStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  bottom: 0,
+  position: 'fixed',
+  bottom: 34,
+  left: '50%',
+  transform: 'translateX(-50%)',
   zIndex: MAXIMUM_STACKING_ORDER,
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'center',
   gap: '6px 16px',
-  minWidth: 0,
+  width: 'max-content',
+  // Capped so a wide window gets a popup rather than a 75%-width strip: the
+  // safety note wraps under the heading and the card keeps its 48 px-control
+  // height either way.
+  maxWidth: 'min(720px, calc(100vw - 24px))',
   boxSizing: 'border-box',
-  padding: '6px 14px',
+  padding: '8px 14px',
   background: 'var(--lf-bg-1)',
+  border: '1px solid var(--lf-border)',
   borderTop: '3px solid var(--lf-danger)',
+  borderRadius: 'var(--lf-radius-lg)',
   boxShadow: 'var(--lf-shadow)',
 };
 // One wrapping line — heading · detail · safety note — so the bar is no taller

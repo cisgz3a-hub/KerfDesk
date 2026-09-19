@@ -110,7 +110,7 @@ describe('App mount', () => {
     },
   );
 
-  it('overlays the live motion bar inside the canvas so mounting it never reflows the workspace', async () => {
+  it('floats the live motion popup outside the workspace so mounting it never reflows anything', async () => {
     useLaserStore.setState({ motionOperation: startMotionOperation('jog') });
 
     await act(async () => {
@@ -127,12 +127,16 @@ describe('App mount', () => {
     const liveMotionBar = host.querySelector<HTMLElement>('[aria-label="Live Motion"]');
     expect(liveMotionBar).not.toBeNull();
     // In flow between <main> and the status bar, the bar resized the canvas
-    // every time a jog or auto-focus started and settled. Absolutely
-    // positioned inside the canvas area it takes no layout space, so the
-    // rails and the drawing stay exactly where they were (ADR-207 amendment).
-    expect(workspace?.contains(liveMotionBar)).toBe(true);
-    expect(liveMotionBar?.style.position).toBe('absolute');
-    expect(liveMotionBar?.style.bottom).toBe('0px');
+    // every time a jog or auto-focus started and settled. As a `fixed` popup
+    // outside <main> it takes no layout space anywhere and sits in no
+    // ancestor's box, so the rails and the drawing stay exactly where they
+    // were and no overflow can clip it (ADR-207 amendment).
+    expect(workspace?.contains(liveMotionBar)).toBe(false);
+    expect(liveMotionBar?.style.position).toBe('fixed');
+    // Content-sized, not full-bleed: it must not claim the window's width.
+    expect(liveMotionBar?.style.width).toBe('max-content');
+    // Topmost, so no dialog can cover the software Abort path.
+    expect(liveMotionBar?.style.zIndex).toBe('2147483647');
   });
 });
 

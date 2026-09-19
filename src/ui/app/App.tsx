@@ -81,6 +81,13 @@ export function App(): JSX.Element {
         <WorkspaceSidePanels />
       </main>
       <StatusBar />
+      {/* Window-level popups (ADR-207 amendment). Both are `position: fixed`,
+          so they take no layout space anywhere: mounting either one cannot
+          resize the workspace or shift the rails. Neither may overlay the
+          drawing surface at rest — a click-to-dismiss toast under the pointer
+          swallows the mousedown that starts a drag. */}
+      <Toasts />
+      <LiveMotionBar />
       <PwaUpdateWatcherGate />
       <AddTextDialog />
       <DesignLibraryDialog />
@@ -117,12 +124,6 @@ function CanvasArea(): JSX.Element {
       <div style={canvasSwitchStyle}>
         <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
       </div>
-      {/* Layout-stable overlays (ADR-207 amendment, 2026-09-19): both are
-          absolutely positioned inside the canvas, so mounting them never
-          resizes the workspace or shifts the rails. Toasts sit top-centre
-          under the view switch; the Live Motion bar owns the lower edge. */}
-      <Toasts />
-      <LiveMotionBar />
     </div>
   );
 }
