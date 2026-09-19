@@ -13,6 +13,8 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { nativeLaserProject } from '../../__fixtures__/controllers/native-laser-project';
+import { emitGcode } from '../../io/gcode/emit-gcode';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -157,7 +159,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
   it('streams ping-pong: one line per ok, completes, and settles', async () => {
     const sim = await connectMarlinIdle();
-    const gcode = 'G21\nG90\nM3 S0\nG1 X10 Y0 F600 S100\nG1 X10 Y5 F600 S100\nM5\n';
+    const gcode = 'G21\nG90\nM3 I S0\nG1 X10 Y0 F600 S100\nG1 X10 Y5 F600 S100\nM5 I\n';
     await startTestLaserJob(gcode, { streamingMode: 'ping-pong' });
     expect(useLaserStore.getState().streamer?.streamingMode).toBe('ping-pong');
     await pump(4000);
@@ -168,6 +170,21 @@ describe('Marlin lifecycle against the simulator', () => {
     for (const write of jobWrites) {
       expect(write.trim().split('\n')).toHaveLength(1);
     }
+  });
+
+  it('streams the public inline image through native entry, power and teardown', async () => {
+    const sim = await connectMarlinIdle({ motionMs: 1000 });
+    const output = emitGcode(nativeLaserProject('marlin'));
+    expect(output.preflight.issues).toEqual([]);
+    await startTestLaserJob(output.gcode, { streamingMode: 'ping-pong' });
+    await pump(100);
+    expect(sim.state().laserMode).toBe('continuous');
+    expect(useLaserStore.getState().streamer).not.toBeNull();
+    await pump(4000);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(sim.state().inlineBurnPowers).toEqual([64]);
+    expect(sim.state().laserMode).toBe('standard');
+    expect(sim.outbound()).not.toContain('M4 I S0\n');
   });
 
   it('pauses stream-side (no ! byte) and resumes to completion', async () => {
@@ -195,7 +212,7 @@ describe('Marlin lifecycle against the simulator', () => {
     await useLaserStore.getState().stopJob();
     await pump(50);
     expect(sim.outbound()).not.toContain('\x18');
-    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
@@ -206,7 +223,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
     await useLaserStore.getState().forgetDevice?.();
 
-    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },
@@ -229,7 +246,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
     await useLaserStore.getState().disconnect();
 
-    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },
@@ -250,7 +267,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
     await useLaserStore.getState().forgetDevice?.();
 
-    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },
@@ -270,7 +287,7 @@ describe('Marlin lifecycle against the simulator', () => {
 
     await useLaserStore.getState().forgetDevice?.();
 
-    expect(sim.outbound()).toContain('M5\n');
+    expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },

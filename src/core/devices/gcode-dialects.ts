@@ -4,8 +4,10 @@ export type GrblGcodeDialectId =
   | 'grbl-raster'
   | 'neotronics-4040-safe';
 
-// Marlin output dialects (ADR-095): 'marlin-inline' assumes LASER_FEATURE
-// (M3/M4/M5 + per-move S, same wire shape as GRBL with maxPowerS=255);
+// Marlin output dialects: 'marlin-inline' targets modern LASER_FEATURE
+// (researched against 2.1.2.6): M3 I continuous mode with per-move S.
+// CUTTER_POWER_UNIT sets S units; LASER_POWER_TRAP controls velocity compensation.
+// Marlin's M4 I derives power from feedrate and is not GRBL dynamic power.
 // 'marlin-fan' drives a fan-mosfet laser with M106 Sn / M107 power changes
 // between moves (no per-move S support at all).
 export type MarlinGcodeDialectId = 'marlin-inline' | 'marlin-fan';
@@ -28,8 +30,9 @@ export type MarlinGcodeDialect = {
 export const MARLIN_GCODE_DIALECTS: ReadonlyArray<MarlinGcodeDialect> = [
   {
     id: 'marlin-inline',
-    label: 'Marlin Inline (LASER_FEATURE)',
-    description: 'Marlin builds with LASER_FEATURE: M3/M4/M5 with per-move S power, S range 0-255.',
+    label: 'Marlin Inline (modern LASER_FEATURE)',
+    description:
+      'Marlin 2.1.2.6 LASER_FEATURE with PWM: M3 I and per-move S, M5 I teardown. Match S range to CUTTER_POWER_UNIT; acceleration compensation depends on LASER_POWER_TRAP. Origin reset requires CNC_COORDINATE_SYSTEMS on a non-SCARA build.',
     powerMode: 'inline',
   },
   {

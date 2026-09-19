@@ -138,16 +138,22 @@ async function executeHomeSequence(
   homeCommand: string,
   epochs: HomeEpochs,
 ): Promise<void> {
-  await startControllerCommand(refs, safeWrite, {
-    kind: 'home',
-    label: 'home',
-    command: `${homeCommand}\n`,
-    action: 'home',
-    source: 'motion',
-    timeoutMs: HOME_COMMAND_TIMEOUT_MS,
-    timeoutMode: 'non-idle-status-activity',
-  });
-  assertHomeCurrent(get(), refs, epochs);
+  // Vendor Home sequences can contain one command per axis. Each line must
+  // earn its own terminal acknowledgement before the next line is dispatched;
+  // the first axis's ok must never authorize the final settlement marker.
+  for (const command of homeCommand.split(/\r?\n/).filter((line) => line.trim() !== '')) {
+    assertHomeCurrent(get(), refs, epochs);
+    await startControllerCommand(refs, safeWrite, {
+      kind: 'home',
+      label: 'home',
+      command: `${command}\n`,
+      action: 'home',
+      source: 'motion',
+      timeoutMs: HOME_COMMAND_TIMEOUT_MS,
+      timeoutMode: 'non-idle-status-activity',
+    });
+    assertHomeCurrent(get(), refs, epochs);
+  }
   set({ controllerOperation: homeOperation(epochs.operationId, 'settling') });
   await startControllerCommand(refs, safeWrite, {
     kind: 'home',

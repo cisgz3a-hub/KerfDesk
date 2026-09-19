@@ -52,7 +52,11 @@ describe('raster luma validation without a decoded or cleaned copy', () => {
     const compare = (text: string): void => {
       const oldLength = legacyLength(text);
       for (let length = 0; length <= Math.floor((text.length * 3) / 4) + 1; length++) {
-        expect(accepted(text, length), JSON.stringify(text)).toBe(oldLength === length);
+        const actual = accepted(text, length);
+        const expected = oldLength === length;
+        // Preserve every oracle comparison without building assertion diagnostics
+        // hundreds of thousands of times on the successful compatibility path.
+        if (actual !== expected) expect(actual, JSON.stringify({ text, length })).toBe(expected);
       }
     };
     const enumerate = (prefix: string, depth: number): void => {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildSmoothieFrameLines, buildSmoothieJogCommand } from './commands';
+import {
+  buildSmoothieFrameLines,
+  buildSmoothieJogCommand,
+  SMOOTHIE_FRAME_TOOL_OFF_LINES,
+} from './commands';
 import { prepareSmoothieConsoleCommand } from './console-command';
 import { smoothiewareDriver } from './driver';
 import { classifySmoothieResponse } from './response';
@@ -7,6 +11,10 @@ import { classifySmoothieResponse } from './response';
 describe('classifySmoothieResponse', () => {
   it('classifies the Smoothie vocabulary', () => {
     expect(classifySmoothieResponse('ok')).toEqual({ kind: 'ok' });
+    expect(classifySmoothieResponse('turning laser off and returning to auto mode')).toEqual({
+      kind: 'ok',
+    });
+    expect(classifySmoothieResponse('laser manual state: off')).toMatchObject({ kind: 'unknown' });
     expect(classifySmoothieResponse('!!')).toMatchObject({ kind: 'error', code: null });
     expect(classifySmoothieResponse('error:Alarm lock')).toMatchObject({
       kind: 'error',
@@ -39,7 +47,9 @@ describe('classifySmoothieResponse', () => {
 
 describe('Smoothie command builders', () => {
   it('builds relative jogs and absolute frame legs', () => {
-    expect(buildSmoothieJogCommand({ dx: 10, feed: 1000 })).toBe('G21\nG91\nG0 X10.000 F1000\nG90');
+    expect(buildSmoothieJogCommand({ dx: 10, feed: 1000 })).toBe(
+      'fire off\nM400\nM221 S0\nM5\nM9\nG21\nG91\nG0 X10.000 F1000\nG90',
+    );
     const lines = buildSmoothieFrameLines({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 6000);
     expect(lines[0]).toBe('G21\n');
     expect(lines[1]).toBe('G90\n');
@@ -48,7 +58,7 @@ describe('Smoothie command builders', () => {
 
   it('keeps zero-valued axis words in absolute mode (X0 is a real destination)', () => {
     expect(buildSmoothieJogCommand({ dx: 0, dy: 50, feed: 1000, relative: false })).toBe(
-      'G21\nG90\nG0 X0.000 Y50.000 F1000',
+      'fire off\nM400\nM221 S0\nM5\nM9\nG21\nG90\nG0 X0.000 Y50.000 F1000',
     );
   });
 });
@@ -108,11 +118,18 @@ describe('smoothiewareDriver', () => {
       sleep: false,
       wcs: 'g92-only',
     });
-    expect(smoothiewareDriver.commands.home).toBe('G28.2');
+    expect(smoothiewareDriver.commands.home).toBe('M400\nfire off\nM400\nM221 S0\nM5\nM9\nG28.2');
     expect(smoothiewareDriver.commands.unlock).toBe('M999');
     expect(smoothiewareDriver.commands.settingsQuery).toBeNull();
     expect(smoothiewareDriver.commands.stopLaserLines).toEqual(['M5', 'M9']);
-    expect(smoothiewareDriver.commands.frameToolOffLines).toEqual(['M5', 'M9']);
+    expect(smoothiewareDriver.commands.frameToolOffLines).toEqual(SMOOTHIE_FRAME_TOOL_OFF_LINES);
+    expect(smoothiewareDriver.commands.frameToolOffLines).toEqual([
+      'fire off',
+      'M400',
+      'M221 S0',
+      'M5',
+      'M9',
+    ]);
   });
 
   it('settles with M400, not G4 P0.01 — G4 P is milliseconds on Smoothieware', () => {

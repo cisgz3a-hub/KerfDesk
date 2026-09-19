@@ -3,7 +3,9 @@
 // scanner, so the glossary can never disagree with the parser about what a
 // word IS — only about how to describe it.
 
-import { scanCompleteGcodeWords, stripInlineComments } from '../../core/gcode';
+import { stripInlineComments, type GcodeWordMatch } from '../../core/gcode';
+import { scanControllerRenderWords } from '../../core/gcode-view/native-laser-render-words';
+import type { GcodeInspectionContext } from './gcode-inspection-source';
 
 export type WordExplanation = {
   /** The word as written, e.g. "G1" or "X12.5". */
@@ -75,15 +77,42 @@ const LETTERS: Readonly<Record<string, string>> = {
   N: 'Line number (ignored by the controller)',
 };
 
-export function explainLine(rawLine: string): ReadonlyArray<WordExplanation> {
+export function explainLine(
+  rawLine: string,
+  context: GcodeInspectionContext = {},
+): ReadonlyArray<WordExplanation> {
   const stripped = stripInlineComments(rawLine);
   if (stripped === '' || stripped === '%') return [];
-  const words = scanCompleteGcodeWords(stripped);
+  const isSmoothie =
+    context.machineKind === 'laser' && context.laserPowerControl === 'smoothieware';
+  if (isSmoothie && stripped === 'fire off') {
+    return [
+      { text: 'fire off', meaning: 'Clear manual laser fire and return to automatic motion power' },
+    ];
+  }
+  const words = scanControllerRenderWords(stripped);
   if (words === null) return [];
+  if (isSmoothie && words.some((word) => word.letter === 'M' && word.value === 221)) {
+    return words.map(explainSmoothieOverrideWord);
+  }
   return words.map((word) => ({
     text: `${word.letter}${word.value}`,
     meaning: explainWord(word.letter, word.value),
   }));
+}
+
+function explainSmoothieOverrideWord(word: GcodeWordMatch): WordExplanation {
+  const meaning =
+    word.letter === 'S'
+      ? 'Laser power override percent, separate from motion S'
+      : word.letter === 'P'
+        ? 'Proportional laser power: 0 enables, positive values disable'
+        : word.letter === 'R'
+          ? 'Laser PWM frequency in Hz'
+          : word.letter === 'M' && word.value === 221
+            ? 'Set Smoothieware native laser power override'
+            : explainWord(word.letter, word.value);
+  return { text: `${word.letter}${word.value}`, meaning };
 }
 
 function explainWord(letter: string, value: number): string {

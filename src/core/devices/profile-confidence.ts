@@ -6,6 +6,8 @@ export type ProfileConfidenceLabel =
   | 'Public-spec starter'
   | 'Experimental'
   | 'Default starter'
+  | 'Researched / untested'
+  | 'Unverified'
   | 'Imported / custom';
 
 const PROFILE_CONFIDENCE_LABELS: Record<ProfileEvidenceStatus, ProfileConfidenceLabel> = {
@@ -16,8 +18,8 @@ const PROFILE_CONFIDENCE_LABELS: Record<ProfileEvidenceStatus, ProfileConfidence
   experimental: 'Experimental',
   'user-imported': 'Imported / custom',
   default: 'Default starter',
-  researched: 'Simulator tested',
-  unverified: 'Public-spec starter',
+  researched: 'Researched / untested',
+  unverified: 'Unverified',
 };
 
 export function profileConfidenceLabel(profile: DeviceProfile): ProfileConfidenceLabel {

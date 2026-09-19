@@ -1,5 +1,4 @@
-import { resolveMarlinDialect } from '../../core/devices';
-import type { BuildRenderModelOptions } from '../../core/gcode-view';
+import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../../core/gcode-view';
 import type { Project } from '../../core/scene';
 
 export type GcodeInspectionContext = Pick<
@@ -17,8 +16,5 @@ export type GcodeInspectionSource = (
  * no inferred machine kind because CNC and laser share M3/M4/S words. */
 export function projectInspectionContext(project: Project): GcodeInspectionContext {
   if (project.machine?.kind === 'cnc') return { machineKind: 'cnc' };
-  const fan =
-    project.device.controllerKind === 'marlin' &&
-    resolveMarlinDialect(project.device).powerMode === 'fan';
-  return { machineKind: 'laser', laserPowerControl: fan ? 'fan' : 'spindle' };
+  return { machineKind: 'laser', laserPowerControl: laserPowerControlForDevice(project.device) };
 }

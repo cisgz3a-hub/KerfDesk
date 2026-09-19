@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LINE_CATEGORY } from '../../core/gcode-view';
-import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeInspectionContext, GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { useGcodeSourceLines } from './use-gcode-source-lines';
 import { explainLine } from './word-glossary';
@@ -110,7 +110,7 @@ export function InspectorSourcePane(props: {
         </div>
       </div>
       <SourceError error={sourceError} />
-      <WordDetail line={props.selectedLine} text={selectedText} />
+      <WordDetail line={props.selectedLine} text={selectedText} context={props.source} />
     </div>
   );
 }
@@ -158,8 +158,12 @@ function rowBackground(isActive: boolean, isSelected: boolean): string {
 function WordDetail(props: {
   readonly line: number | null;
   readonly text: string | null;
+  readonly context: GcodeInspectionContext;
 }): JSX.Element {
-  const words = useMemo(() => (props.text === null ? [] : explainLine(props.text)), [props.text]);
+  const words = useMemo(
+    () => (props.text === null ? [] : explainLine(props.text, props.context)),
+    [props.text, props.context],
+  );
   if (props.line === null) {
     return <p style={detailEmptyStyle}>Select a line to see what each word does.</p>;
   }

@@ -3,7 +3,8 @@
 // reviewed later on the Confirm settings step.
 
 import { useState } from 'react';
-import { CNC_MACHINE_CATALOG } from '../../../core/cnc';
+import { CNC_MACHINE_CATALOG, type CncMachinePreset } from '../../../core/cnc';
+import { selectControllerDriver } from '../../../core/controllers';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupCncPreset({
@@ -65,11 +66,46 @@ export function DeviceSetupCncPreset({
         </button>
       </div>
       {preset === null ? null : (
-        <p style={noteStyle}>
-          Sets work area and {preset.spindleMaxRpm} RPM spindle maximum. {preset.note}
-        </p>
+        <PresetDisclosure
+          preset={preset}
+          controllerLabel={
+            selectControllerDriver(state.draft.controllerKind, state.draft.controllerCommandSet)
+              .label
+          }
+        />
       )}
     </details>
+  );
+}
+
+function PresetDisclosure({
+  preset,
+  controllerLabel,
+}: {
+  readonly preset: CncMachinePreset;
+  readonly controllerLabel: string;
+}): JSX.Element {
+  return (
+    <div style={noteStyle}>
+      <p>
+        Geometry and spindle ceiling only: {preset.spindleMaxRpm} RPM. {preset.note}
+      </p>
+      <p role={preset.controllerSupport === 'unqualified' ? 'alert' : 'note'}>
+        {preset.controllerNote} Loading this preset leaves the selected controller unchanged:{' '}
+        {controllerLabel}.
+      </p>
+      <p>
+        Sources checked {preset.researchedAt}:{' '}
+        {preset.sources.map((source, index) => (
+          <span key={source.url}>
+            {index > 0 ? '; ' : ''}
+            <a href={source.url} target="_blank" rel="noreferrer" title={source.supports}>
+              {source.label}
+            </a>
+          </span>
+        ))}
+      </p>
+    </div>
   );
 }
 

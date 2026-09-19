@@ -16,6 +16,20 @@ function withDevicePatch(patch: Record<string, unknown>): string {
 }
 
 describe('.lf2 controllerKind + baudRate round-trip', () => {
+  it('preserves a known vendor command contract and drops unknown command sets', () => {
+    const loaded = deserializeProject(
+      withDevicePatch({ controllerCommandSet: 'creality-falcon-a1-pro' }),
+    );
+    if (loaded.kind !== 'ok') throw new Error('expected project');
+    const reloaded = deserializeProject(serializeProject(loaded.project));
+    expect(reloaded.kind).toBe('ok');
+    if (reloaded.kind === 'ok') {
+      expect(reloaded.project.device.controllerCommandSet).toBe('creality-falcon-a1-pro');
+    }
+    const invalid = deserializeProject(withDevicePatch({ controllerCommandSet: 'unknown-device' }));
+    expect(invalid.kind).toBe('ok');
+    if (invalid.kind === 'ok') expect(invalid.project.device.controllerCommandSet).toBeUndefined();
+  });
   it('preserves every non-default controller kind and a custom baud rate', () => {
     for (const kind of ['grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const) {
       const result = deserializeProject(

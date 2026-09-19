@@ -34,7 +34,7 @@ describe('suggestMachineProfiles', () => {
     expect(suggestions[0]?.reasons).toEqual(
       expect.arrayContaining([
         'Detected grblHAL firmware.',
-        'Controller reports a 400 x 400 mm work area.',
+        'Controller reports configured travel of 400 x 400 mm; usable work area is not measured.',
         'Controller reports S range 0-1000.',
       ]),
     );

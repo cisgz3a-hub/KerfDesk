@@ -56,7 +56,7 @@ export async function runConnectAction(
   }
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   refs.nextTranscriptId = 1;
-  refs.driver = selectControllerDriver(options.controllerKind);
+  refs.driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
   set((state) => connectingPatch(state, refs));
   try {
     const portRef = await adapter.serial.requestPort();

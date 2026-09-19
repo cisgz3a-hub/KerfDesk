@@ -1,4 +1,6 @@
 import type { Layer, LayerMode } from '../../core/scene';
+import { useStore } from '../state';
+import { CutPowerModeField } from './CutPowerModeField';
 
 export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
@@ -8,6 +10,7 @@ export function CutSettingsCommonFields(props: {
   readonly onModeChange: (mode: LayerMode) => void;
   readonly onPowerChange?: (power: number) => void;
 }): JSX.Element {
+  const controllerKind = useStore((state) => state.project.device.controllerKind);
   const speedValue =
     props.maxFeed === undefined ? props.layer.speed : Math.min(props.layer.speed, props.maxFeed);
   const speedMax = props.maxFeed === undefined ? {} : { max: props.maxFeed };
@@ -33,19 +36,7 @@ export function CutSettingsCommonFields(props: {
         <span className="lf-field-unit">%</span>
       </Field>
       {props.mode !== 'image' ? (
-        <Field label="Power mode">
-          <select
-            name="powerMode"
-            className="lf-select"
-            defaultValue={props.layer.powerMode ?? 'auto'}
-            aria-label="Cut settings power mode"
-            title="Auto uses the active controller profile. Constant emits M3; Dynamic emits M4 and scales power with speed on compatible laser firmware."
-          >
-            <option value="auto">Auto (device default)</option>
-            <option value="constant">Constant (M3)</option>
-            <option value="dynamic">Dynamic (M4)</option>
-          </select>
-        </Field>
+        <CutPowerModeField controllerKind={controllerKind} layer={props.layer} />
       ) : null}
       <Field label="Speed">
         <NumberInput name="speed" value={speedValue} min={1} label="speed" {...speedMax} />

@@ -8,6 +8,8 @@ export type LaserRenderState = {
   readonly powerControl: BuildRenderModelOptions['laserPowerControl'];
   intentionalOffLine: boolean;
   fanPower: number;
+  smoothiePowerScale: number;
+  smoothieMode: 'constant' | 'dynamic';
 };
 
 export function createLaserRenderState(options: BuildRenderModelOptions): LaserRenderState {
@@ -16,6 +18,8 @@ export function createLaserRenderState(options: BuildRenderModelOptions): LaserR
     powerControl: options.laserPowerControl,
     intentionalOffLine: false,
     fanPower: 0,
+    smoothiePowerScale: 1,
+    smoothieMode: 'dynamic',
   };
 }
 
@@ -37,6 +41,7 @@ export function updateLaserRenderState(
 
 export function isLaserOffFeed(state: LaserRenderState, modal: RenderModal): boolean {
   if (state.machineKind === 'laser') {
+    if (state.powerControl === 'smoothieware') return renderedPower(state, modal) <= 0;
     return state.powerControl === 'fan'
       ? state.fanPower <= 0
       : modal.power <= 0 || modal.spindleMode === 'off';
@@ -47,6 +52,11 @@ export function isLaserOffFeed(state: LaserRenderState, modal: RenderModal): boo
 }
 
 export function renderedPower(state: LaserRenderState, modal: RenderModal): number {
+  if (state.machineKind === 'laser' && state.powerControl === 'smoothieware') {
+    // M221 is a percent override, not the motion S register. This is nominal
+    // motion power; firmware acceleration/minimum-PWM effects are not simulated.
+    return modal.power * state.smoothiePowerScale;
+  }
   return state.machineKind === 'laser' && state.powerControl === 'fan'
     ? state.fanPower
     : modal.power;

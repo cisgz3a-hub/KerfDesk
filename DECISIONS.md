@@ -19919,3 +19919,55 @@ interaction without requiring destructive conversion.
   the text's **Size** regenerates the outline at the requested size. Independent dense-reference
   tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
   this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.
+
+## ADR-322 - Machine presets carry researched command and configuration contracts (2026-09-19)
+
+**Status:** Accepted; amends ADR-095 and ADR-096 controller/output assumptions.
+
+### Context
+
+The machine compatibility audit found fractional raster power lost before Smoothieware output,
+missing Marlin inline-mode entry, brand presets conflating different laser heads, and generic
+GRBL commands applied to a vendor configuration that explicitly disables them. A configured
+S maximum was also being presented as a measured spindle RPM. Historical hardware claims did
+not have reproducible qualification evidence. The [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)
+maps all eleven findings to primary sources and scoped verification.
+
+### Decision
+
+1. Raster compilation preserves sufficient PWM resolution and returns power in the profile's
+   original S units. Controller exporters convert stored and streamed rows once without consuming
+   or mutating their providers. Vectors retain percentage-based power.
+2. Marlin inline output explicitly enters `M3 I S0` and exits `M5 I`, and omits G54/G94 from the
+   inherited GRBL preamble. Compensation depends on the firmware build. Fan output retains its
+   separate M106/M107 contract. Supported build prerequisites are disclosed during setup.
+3. Smoothieware V1 uses settled M221 native power modes and the exact `fire off` shell completion
+   for acknowledgement. Jobs, Frame, jog and Home clear native manual firing. The profile must
+   match `laser_module_maximum_s_value` and use `laser_module_minimum_power=0` for dark S0 feed
+   moves. Generic realtime hold/resume is not offered; host pause drains buffered motion.
+   Inspection and countdown derive the native power context from the emitted or retained device
+   profile, keeping M221 percentage overrides separate from motion S and recognizing Marlin's
+   bare inline flag only on its laser mode commands. Export provenance identifies the new emitter.
+4. An optional persisted controller command set identifies the Falcon A1 Pro vendor contract,
+   independently of the legacy controller-family label. Its source disables settings fetch and
+   native $J jogging, specifies X358/Y268 travel, and uses $HX followed by $HY for Home. Each Home
+   line owns its acknowledgement before the next line or settlement marker is sent. The live
+   connection retains its selected command set until reconnection.
+5. Named laser presets declare their supported output kind and head-specific travel. CNC size
+   presets disclose their controller limits and preserve the selected driver. Onefinity templates
+   remain geometry-only; they do not add Buildbotics, MASSO or Redline integration. Confidence
+   labels distinguish research, simulator evidence and unknown physical qualification.
+6. Detected travel is configured travel. Copying a detected CNC S maximum into spindle RPM
+   requires an explicit numerical S-to-RPM mapping. New FluidNC laser selections use the researched
+   S255 default; saved/custom values and profiles are not silently migrated.
+7. These changes preserve the completed-Frame contract in ADRs 228/230/232/237. Compatibility and
+   configuration findings remain Job Review warnings. No new ordinary Start policy gate is added.
+
+### Verification and limits
+
+Public export and streamed raster tests cover fractional power and native mode transitions.
+Controller lifecycle tests cover acknowledgements, cleanup, Home settlement and repeated jobs.
+Persistence, setup, bounds, air commands, head variants and settings adoption have regression
+coverage. Integrated release checks and browser evidence are recorded in the correction record.
+No physical machine, firmware runtime, material process or packaged hardware transport is
+qualified by these software checks. Ruida remains experimental vector-only file export.

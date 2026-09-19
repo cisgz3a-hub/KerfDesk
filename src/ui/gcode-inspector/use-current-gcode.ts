@@ -3,7 +3,7 @@
 // identity so an edit can cancel stale work and can never publish old bytes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { resolveMarlinDialect } from '../../core/devices';
+import { laserPowerControlForDevice } from '../../core/gcode-view';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import { usePlatform } from '../app/platform-context';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
@@ -159,10 +159,7 @@ function currentRunState(run: CurrentRunProgram): Extract<CurrentGcode, { kind: 
 
 function runInspectionContext(plan: CanvasMotionPlan): GcodeInspectionContext {
   if (plan.machineKind === 'cnc') return { machineKind: 'cnc' };
-  const fan =
-    plan.device.controllerKind === 'marlin' &&
-    resolveMarlinDialect(plan.device).powerMode === 'fan';
-  return { machineKind: 'laser', laserPowerControl: fan ? 'fan' : 'spindle' };
+  return { machineKind: 'laser', laserPowerControl: laserPowerControlForDevice(plan.device) };
 }
 
 function runProgramName(lifecycle: LiveCanvasLifecycle): string {

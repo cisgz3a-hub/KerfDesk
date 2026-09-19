@@ -25,14 +25,23 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
   const profileBaudRate = useStore((state) => state.project.device.baudRate);
+  const controllerCommandSet = useStore((state) => state.project.device.controllerCommandSet);
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
   const connect = (): void => {
-    void connectController(platform, { controllerKind, baudRate: profileBaudRate });
+    void connectController(platform, {
+      controllerKind,
+      controllerCommandSet,
+      baudRate: profileBaudRate,
+    });
   };
   const reconnect = async (): Promise<void> => {
     await disconnectController();
-    await connectController(platform, { controllerKind, baudRate: profileBaudRate });
+    await connectController(platform, {
+      controllerKind,
+      controllerCommandSet,
+      baudRate: profileBaudRate,
+    });
   };
   return (
     <>

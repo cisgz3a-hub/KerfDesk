@@ -46,9 +46,10 @@ export type GcodeMetadata = {
  * ADR-314's requested-versus-parser-represented CNC Z disclosure, and the
  * 2026-09-12 drill, tabbed-entry, registration and rest-aware V-carve repair,
  * plus preserved converted artwork, clearing dependencies and final-grid
- * containment in the V-carve audit repair.
+ * containment in the V-carve audit repair, plus ADR-322's native Marlin and
+ * Smoothieware laser contracts and fractional raster power correction.
  */
-export const EMITTER_REVISION = 'vcarve-audit-repair-20260912-v1';
+export const EMITTER_REVISION = 'machine-compatibility-20260919-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
@@ -140,15 +141,20 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
       : [
           `; output-dialect: ${dialect.id}`,
           `; assumes: Marlin LASER_FEATURE inline power, max S=${assumed.maxPowerS}`,
-          laserPowerSafetyLine(assumed.effectivePowerModes),
+          '; power-control: M3 I enters S-controlled inline mode; M5 I exits; compensation follows the firmware build',
+          '; safety: laser-off travel is explicit S0; ordinary Scan Line runway <=5mm per side',
         ];
   }
   const dialect = resolveGrblDialect(dialectSelection);
   if (assumed.controllerKind === 'smoothieware') {
     return [
-      `; output-dialect: ${dialect.id}`,
+      '; output-controller: Smoothieware V1 native laser module',
+      `; base-dialect: ${dialect.id}`,
       `; assumes: Smoothieware laser power scale max S=${assumed.maxPowerS}`,
-      laserPowerSafetyLine(assumed.effectivePowerModes),
+      '; assumes: laser_module_minimum_power=0 for dark S0 feed moves',
+      laserPowerSafetyLine(assumed.effectivePowerModes)
+        .replace(/\bM3\b/g, 'M221 P1')
+        .replace(/\bM4\b/g, 'M221 P0'),
     ];
   }
   return [

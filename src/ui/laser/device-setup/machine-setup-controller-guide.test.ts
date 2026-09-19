@@ -6,6 +6,14 @@ import {
 } from './machine-setup-controller-guide';
 
 describe('machineSetupControllerGuide', () => {
+  it('matches Falcon vendor commands without advertising settings reads or writes', () => {
+    const guide = machineSetupControllerGuide('grblhal', 'creality-falcon-a1-pro');
+    expect(guide.identityCommands).toEqual([]);
+    expect(guide.settingsCommands).toEqual([]);
+    expect(guide.homeCommand).toBe('$HX\n$HY');
+    expect(guide.writePolicy).toBe('external-config');
+    expect(guide.writeExplanation).toContain('native jog cancellation is unavailable');
+  });
   it('covers every supported controller and matches driver transport/commands', () => {
     const guides = machineSetupControllerGuides();
     expect(guides.map((guide) => guide.kind)).toEqual([
