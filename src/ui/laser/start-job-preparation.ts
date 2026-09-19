@@ -16,6 +16,7 @@ import {
   type CanvasMotionPlan,
 } from '../state/canvas-motion-plan';
 import { canvasExecutablePlan } from '../state/canvas-preview-motion';
+import { canvasExecutableSidecarWithinBudget } from '../state/canvas-program-analysis-budget';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
@@ -115,6 +116,9 @@ function executablePlanForCalculatedBounds(args: {
 }): ExecutablePlanV1 | undefined {
   const associated = canvasExecutablePlan(args.canvasPlan);
   if (associated !== undefined) return associated;
+  // The canvas may have omitted this redundant sidecar for a dense program.
+  // Do not immediately rebuild it solely for optional calculated bounds.
+  if (!canvasExecutableSidecarWithinBudget(args.gcode, args.canvasPlan.manifest)) return undefined;
   // Avoid constructing a plan that the bounds selector must reject for a
   // coordinate-basis mismatch. Realtime previews may already have associated
   // one; that exact object is reused above and the selector still rolls back.

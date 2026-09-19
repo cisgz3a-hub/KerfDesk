@@ -11061,6 +11061,31 @@ warning refresh loop changes. The partially adopted historical proposal and its 
 no-go/timing portions are recorded in
 [the preservation note](docs/audits/2026-09-06-frame-advisory-retention-preservation.md).
 
+### 2026-09-19 amendment: extended position reports and bounded optional analysis
+
+A live Falcon report contained `MPos:191.500,106.500,-21.100,0.000`. Requiring exactly
+three axis values discarded its valid XYZ coordinates while retaining Idle, making both
+ordinary Frame and work-origin placement fail. `MPos`, `WPos`, and `WCO` now accept
+additional finite numeric axes after XYZ and retain the first three coordinates used by
+KerfDesk. Incomplete or malformed vectors remain unavailable; override reports still
+require exactly three values. This follows the variable-axis reports in the
+[grblHAL report implementation](https://github.com/grblHAL/core/blob/master/report.c)
+and does not add motion support for those extra axes.
+
+Frame preparation also built an optional executable-plan sidecar through a render model,
+another motion manifest, and a parity toolpath, amplifying memory use for dense traces.
+Both sidecar entry points now check the existing 25,000-line/segment analysis budgets
+before construction, counting expanded arc segments from the already-built manifest.
+Above that budget, the complete emitted program and manifest remain available, and the
+existing manifest preview and Job-based calculated-bounds paths remain in use. Nothing
+is truncated and this budget does not refuse Frame or Start. Physical Frame bounds,
+one-use permits, exact bytes, and controller completion requirements are unchanged.
+
+Regression tests reproduce the captured position loss and the redundant sidecar entry.
+They verify placement/return coordinates and unchanged large-job bytes, route, and Frame
+bounds. These are software checks; the original out-of-memory browser crash and physical
+Falcon framing have not been reproduced by the tests.
+
 ---
 
 ## ADR-238 - Laser trace output defaults to editable vectors; raster scan remains selectable
