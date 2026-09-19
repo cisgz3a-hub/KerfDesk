@@ -321,7 +321,7 @@ function installPermissionHandlers(ses: Session): void {
       permission: String(permission),
       requestingOrigin,
       isMainFrame: details.isMainFrame,
-      currentUrl: wc?.getURL() ?? '',
+      currentUrl: wc === null ? null : wc.getURL(),
     };
     return shouldGrantPermissionCheck(
       {
