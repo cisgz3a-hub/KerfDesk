@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { projectWithLine } from '../../__fixtures__/file-actions';
+import type { StatusReport } from '../../core/controllers/grbl';
+import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -87,3 +89,46 @@ async function mount(adapter: PlatformAdapter): Promise<{
     },
   };
 }
+
+describe('G-code save placement units (ADR-323)', () => {
+  it('places a Current Position export with the controller report units', async () => {
+    // The line fixture spans scene X 0..10 at Y 0 (machine Y 400 on the default
+    // 400 mm front-left bed). With the head at WPos (1, 2) INCHES the anchor must
+    // land at 25.4 / 50.8 mm — exactly what Preview and Start compile — not at
+    // the raw 1 / 2 the dialog's context used to hand the export resolver.
+    useStore.setState({
+      project: projectWithLine(),
+      jobPlacement: { startFrom: 'current-position', anchor: 'front-left' },
+    });
+    useLaserStore.setState({
+      statusReport: {
+        state: 'Idle',
+        mPos: null,
+        wPos: { x: 1, y: 2, z: 0 },
+        wco: null,
+      } as unknown as StatusReport,
+      controllerSettings: { reportInches: true } as ControllerSettingsSnapshot,
+    });
+    const written: string[] = [];
+    const write = vi.fn(async (data: string | Blob) => {
+      written.push(typeof data === 'string' ? data : await data.text());
+    });
+    const mounted = await mount(platform('web', async () => ({ displayName: 'job.gcode', write })));
+    try {
+      const button = destinationButton(mounted.host);
+      await act(async () => {
+        await vi.waitFor(() => expect(button.disabled).toBe(false));
+      });
+      await act(async () => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
+      });
+      const text = written.join('');
+      expect(text).toContain('X25.400');
+      expect(text).toContain('Y50.800');
+      expect(text).not.toMatch(/X1\.000 Y2\.000/);
+    } finally {
+      await mounted.unmount();
+    }
+  });
+});

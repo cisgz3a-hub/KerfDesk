@@ -116,7 +116,6 @@ export function OriginRow(props: {
     resetOrigin,
     releaseMotors,
     setJobPlacement,
-    startFrom,
     pushToast,
   });
   return (
@@ -171,18 +170,17 @@ type OriginHandlerDeps = {
   readonly resetOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
   readonly setJobPlacement: (placement: { readonly startFrom: 'user-origin' }) => void;
-  readonly startFrom: JobStartMode;
   readonly pushToast: (message: string, variant: 'success') => void;
 };
 
 // A fresh origin makes only Absolute unusable (it refuses while a custom origin
 // is active), so that is the one mode Set origin upgrades to User Origin. An
 // explicit User, Verified, or Current Position choice is the operator's and is
-// never rewritten under them (ADR-193; ADR-323).
-function placementAfterSetOrigin(
-  startFrom: JobStartMode,
-  setJobPlacement: OriginHandlerDeps['setJobPlacement'],
-): void {
+// never rewritten under them (ADR-193; ADR-323). The mode is read when the
+// controller acknowledges, not when the button rendered: Set origin waits up to
+// a few seconds for the work-offset frame and the dropdown may change meanwhile.
+function placementAfterSetOrigin(setJobPlacement: OriginHandlerDeps['setJobPlacement']): void {
+  const startFrom: JobStartMode = useStore.getState().jobPlacement.startFrom;
   if (startFrom === 'absolute') setJobPlacement({ startFrom: 'user-origin' });
 }
 
@@ -200,7 +198,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(deps.startFrom, deps.setJobPlacement);
+          placementAfterSetOrigin(deps.setJobPlacement);
           deps.pushToast('Origin set to current head position (G92).', 'success');
         })
         .catch(reportOriginActionFailure);
@@ -284,13 +282,12 @@ function AdvancedOriginControls(props: {
   const setPersistentOrigin = useLaserStore((s) => s.setPersistentOriginHere);
   const clearPersistentOrigin = useLaserStore((s) => s.clearPersistentOrigin);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
-  const startFrom = useStore((s) => s.jobPlacement.startFrom);
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(startFrom, setJobPlacement);
+        placementAfterSetOrigin(setJobPlacement);
         pushToast('Persistent G54 origin set to current head position.', 'success');
       })
       .catch(reportOriginActionFailure);

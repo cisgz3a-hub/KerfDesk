@@ -20147,7 +20147,7 @@ coupon (Frame, then Start with Air on; pump audible at the first burn line) rema
 check.
 ## ADR-323 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
 
-**Status:** Accepted; amends ADR-021 (Set origin and the Start-from mode), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
+**Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
 
 ### Context
 
@@ -20185,12 +20185,15 @@ compile path (ADR-047 numbers, not names):
    resolves the named row/column through `jogAxisSignsForOrigin` — the one table that already keeps the
    jog pad physically honest (PROJECT.md non-negotiable #2, origin honesty). front-left and center
    origins reduce to the previous machine-frame corners, so their output is byte-identical; mirrored
-   origins now place the corner the button names. `computeFrameBounds` reuses the same function
-   (its private duplicate is deleted) and the bounds-based placements (registration jig box, full-scene
-   bounds for "Selected artwork only") receive the device.
+   origins now place the corner the button names. `computeFrameBounds` (a test-only helper today —
+   the live Frame consumes the already-placed prepared job, so Frame/Start agreement is structural)
+   reuses the same function, loses its private duplicate, and the bounds-based placements
+   (registration jig box, full-scene bounds for "Selected artwork only") receive the device.
 2. **Selection-stable permits.** The retention key / execution signature drops `selectedObjectIds`
-   while `cutSelectedGraphics` is off. The Frame permit and the ADR-244 worker cache therefore survive
-   canvas clicks; with the scope on, the selection still keys both exactly as before.
+   while `cutSelectedGraphics` is off. The Frame permit therefore survives canvas clicks; with the
+   scope on, the selection still keys the signature exactly as before. The preview/estimate
+   preparation caches still key on the raw scope, so a click may still trigger a (harmless)
+   re-preparation — a follow-up, not a permit concern.
 3. **Verified Origin parity.** `resolvePreviewJobPlacement` is the single preview/estimate rule:
    User Origin and Verified Origin fall back to the export placement while the live resolution fails
    (both are work-zero relative); Absolute and Current Position keep the live resolution. The
@@ -20199,21 +20202,34 @@ compile path (ADR-047 numbers, not names):
 4. **Set origin upgrades only Absolute.** After the controller acknowledges Set origin / Set persistent
    origin, Start from changes to User Origin only when it was Absolute Coordinates (the one mode a
    custom origin makes unusable). An explicit User, Verified, or Current Position choice is kept.
-5. **Export snapshots carry report units.** `saveGcodeContext` and the keyboard shortcut context pass
-   `reportInches`, so Save/Inspect/canvas view place a Current Position job exactly as Preview and
-   Start do.
+5. **Export snapshots carry report units.** The Save dialog's context (`GcodeSaveDialog`, the one live
+   Save surface, also reached by Ctrl+Shift+E) and `saveGcodeContext` (Inspect and the canvas G-code
+   view) pass `reportInches`, so every export surface places a Current Position job exactly as
+   Preview and Start do.
 6. **Coaching keys on XY.** The Set-origin pulse and the Position job card use `hasCustomXyOrigin`;
-   Reset origin and Go to work zero keep the XYZ predicate because they act on the whole offset.
+   Reset origin, Go to work zero and the status-bar Origin readout keep the XYZ predicate because
+   they act on, or report, the controller's whole offset — they are not placement coaching.
 7. **Idle canvas carries homing state.** `canvasMachineSnapshot` forwards `homingState`, so
    `canvasCoordinateFrame` picks the same frame before and after Start.
 
 ### Consequences and verification
 
 - Regression tests: five-origin anchor tables and a full anchor-by-origin sweep
-  (`job-origin.test.ts`), Frame/compiled parity on a rear-left origin (`frame-bounds.test.ts`),
-  retention-key selection independence (`canvas-motion-plan-output-scope.test.ts`), the Verified
-  Origin offer, preview and estimate fallbacks, the shared preview rule, Set origin keeping explicit
-  modes (`OriginRow.test.tsx`), and the Z-only touch-off keeping the guide.
+  (`job-origin.test.ts`); `computeFrameBounds` parity with the compiled placement on a rear-left
+  origin (`frame-bounds.test.ts`); retention-key selection independence
+  (`canvas-motion-plan-output-scope.test.ts`); the Verified Origin offer
+  (`start-blocked-setup-offers.test.ts`); preview and estimate fallbacks
+  (`use-preview-toolpath.test.tsx`, `use-job-estimate.test.tsx`); the shared preview rule
+  (`job-placement.test.ts`); Set origin keeping explicit modes and the attention pulse
+  (`OriginRow.test.tsx`); the Z-only touch-off keeping the guide (`NoHomingPositionGuide.test.tsx`);
+  the Save dialog carrying report units (`GcodeSaveDialog.test.tsx`).
+- Behaviour change on front-right / rear-* devices: a project saved with a non-default anchor
+  (possibly chosen to compensate for the old mirror) now places at the corner the anchor names, and
+  a pre-ADR-323 recovery slot on such a device recompiles to different bytes and is refused as
+  edited. Re-Frame before the next run; the completed Frame still gates Start.
+- Preview/estimate preparation caches and the Job Review rebuild trigger still key on the raw
+  selection while the scope is off (wasted re-preparation on a click, never a wrong program) —
+  follow-up.
 - Software evidence only: no rear-*/right-origin machine was available, so the physical direction of
   the mirrored anchors rests on `origin-transform.ts` / `jog-direction.ts` conventions that the jog
   pad already relies on. Verify on scrap with a Frame before the first production job on such a machine.

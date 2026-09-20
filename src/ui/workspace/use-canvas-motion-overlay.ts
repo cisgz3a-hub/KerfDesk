@@ -327,6 +327,9 @@ function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>)
     state.workOriginActive ? 'origin' : 'machine',
     String(state.trustedPositionEpoch ?? 0),
     axisKey(state.wcoCache),
+    // The snapshot forwards homingState (ADR-323); confirmHome flips it without
+    // touching any other keyed field, so it must key the revision too.
+    state.homingState,
     position,
   ].join('|');
 }
