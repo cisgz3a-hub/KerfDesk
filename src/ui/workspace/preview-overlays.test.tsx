@@ -58,6 +58,18 @@ afterEach(async () => {
 });
 
 describe('PreviewStatsPanel', () => {
+  it('discloses dwell, streaming overhead and unpriced operator waits', async () => {
+    const host = await renderPanel({
+      ...estimate,
+      totalSeconds: 57,
+      label: '57s',
+      manualPauseCount: 1,
+      breakdown: { ...estimate.breakdown, dwellSeconds: 3, transportSeconds: 7 },
+    });
+    expect(host.textContent).toContain('Dwell time3s');
+    expect(host.textContent).toContain('Streaming time7s');
+    expect(host.textContent).toContain('Operator time excluded');
+  });
   it('shows the total estimated time when the live estimate is available', async () => {
     const host = await renderPanel(estimate);
 
@@ -76,18 +88,31 @@ describe('PreviewStatsPanel', () => {
     expect(host.textContent).toContain('ETA skipped');
   });
 
-  it('discloses spindle dwell separately from the animated motion time', async () => {
-    const host = await renderPanel({
-      ...estimate,
-      label: '50s',
-      totalSeconds: 50,
-      breakdown: { ...estimate.breakdown, dwellSeconds: 3 },
-    });
+  it('discloses CNC plunge and spindle dwell in the playback total', async () => {
+    const host = await renderPanel(
+      {
+        ...estimate,
+        label: '50s',
+        totalSeconds: 50,
+        breakdown: { ...estimate.breakdown, dwellSeconds: 3 },
+      },
+      'Whole project',
+      {
+        totalLength: 31,
+        steps: [
+          { kind: 'plunge', at: { x: 0, y: 0 }, fromZ: 0, toZ: -1, length: 1 },
+          ...toolpath.steps,
+        ],
+      },
+    );
 
     expect(host.textContent).toContain('50s');
+    expect(host.textContent).toContain('Cut + plunge time');
     expect(host.textContent).toContain('Spindle dwell3s');
     expect(
-      host.querySelector('[title="Included in total time. Route playback shows motion only."]'),
+      host.querySelector(
+        '[title="Included in total time. Route playback spreads waits across the displayed path."]',
+      ),
     ).not.toBeNull();
   });
 
@@ -269,6 +294,7 @@ describe('PreviewControlsPanel', () => {
 async function renderPanel(
   estimate: React.ComponentProps<typeof PreviewStatsPanel>['estimate'],
   routeLabel = 'Whole project',
+  toolpathValue = toolpath,
 ): Promise<HTMLDivElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -276,7 +302,7 @@ async function renderPanel(
   await act(async () => {
     root = createRoot(host);
     root.render(
-      <PreviewStatsPanel toolpath={toolpath} estimate={estimate} routeLabel={routeLabel} />,
+      <PreviewStatsPanel toolpath={toolpathValue} estimate={estimate} routeLabel={routeLabel} />,
     );
   });
   cleanup = async () => {

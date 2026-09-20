@@ -1,6 +1,6 @@
 // Planner-true time for a parsed G-code program (ADR-255 stage 8b).
-// Plans over core/motion-planner with caller-selected machine assumptions
-// and optional motion-time calibration.
+// Plans over core/motion-planner — the same kinematics as the job duration
+// estimator. Consumers supply their own limits and timing context.
 
 export {
   buildProgramTime,

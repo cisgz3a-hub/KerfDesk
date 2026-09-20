@@ -3,19 +3,23 @@ import { createProject } from '../../core/scene';
 import {
   isPreparationSuperseded,
   PreparationSupersededError,
+  prepareJobEstimateOffThread,
   prepareLargeJobOffThread,
   resetPreparationWorkerForTests,
   SUPERSEDE_QUIET_WINDOW_MS,
   type LargeJobPreparation,
 } from './preparation-worker-client';
-import type { PreparationWorkerResponse } from './preparation-worker-protocol';
+import type {
+  PreparationWorkerRequest,
+  PreparationWorkerResponse,
+} from './preparation-worker-protocol';
 import { isCanvasCompilationBridgeConnection } from './canvas-compilation-worker-protocol';
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
   onmessage: ((e: MessageEvent<PreparationWorkerResponse>) => void) | null = null;
   onerror: (() => void) | null = null;
-  posted: Array<{ id: number }> = [];
+  posted: Array<PreparationWorkerRequest> = [];
   terminated = false;
   bridgeConnected = false;
 
@@ -28,7 +32,7 @@ class FakeWorker {
       this.bridgeConnected = true;
       return;
     }
-    this.posted.push(data as { id: number });
+    this.posted.push(data as PreparationWorkerRequest);
   }
 
   terminate(): void {
@@ -87,6 +91,49 @@ describe('prepareLargeJobOffThread', () => {
     expect(second).toBe(first);
     expect(lastWorker().posted).toHaveLength(1);
   });
+
+  it.each(['preview', 'estimate'] as const)(
+    'shares semantic head coordinates and invalidates every axis for %s requests',
+    async (projection) => {
+      const project = createProject();
+      const prepare =
+        projection === 'preview' ? prepareLargeJobOffThread : prepareJobEstimateOffThread;
+      const responseKind = projection === 'preview' ? 'ok' : 'estimate';
+      const first = prepare(project, { initialPosition: { x: 300, y: 0, z: 4 } });
+      const samePosition = prepare(project, { initialPosition: { z: 4, y: 0, x: 300 } });
+      expect(samePosition).toBe(first);
+      const firstWorker = lastWorker();
+      expect(firstWorker.posted[0]?.initialPosition).toEqual({ x: 300, y: 0, z: 4 });
+      firstWorker.respond({
+        id: firstWorker.posted[0]?.id ?? -1,
+        kind: responseKind,
+        ...okResult,
+      } as PreparationWorkerResponse);
+      await expect(first).resolves.toBeDefined();
+
+      const positions = [
+        { x: 100, y: 0, z: 4 },
+        { x: 100, y: 20, z: 4 },
+        { x: 100, y: 20, z: 7 },
+      ];
+      for (const initialPosition of positions) {
+        const next = prepare(project, { initialPosition });
+        expect(next).not.toBe(first);
+        const worker = lastWorker();
+        expect(worker).not.toBe(firstWorker);
+        expect(worker.posted).toHaveLength(1);
+        const posted = worker.posted[0];
+        expect(posted?.initialPosition).toEqual(initialPosition);
+        expect(posted?.projection).toBe(projection === 'estimate' ? 'estimate' : undefined);
+        worker.respond({
+          id: posted?.id ?? -1,
+          kind: responseKind,
+          ...okResult,
+        } as PreparationWorkerResponse);
+        await expect(next).resolves.toBeDefined();
+      }
+    },
+  );
 
   it('keeps only the latest settled full Preview reusable', async () => {
     const project = createProject();

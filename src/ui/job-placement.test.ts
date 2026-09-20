@@ -376,7 +376,7 @@ describe('trustedMotionOffsetForPreflight', () => {
   });
 });
 
-describe('resolvePreviewJobPlacement (ADR-324)', () => {
+describe('resolvePreviewJobPlacement (ADR-327)', () => {
   const disconnected = { statusReport: null, workOriginActive: false, wcoCache: null };
 
   it('falls back to the export placement for User and Verified Origin with no machine', () => {

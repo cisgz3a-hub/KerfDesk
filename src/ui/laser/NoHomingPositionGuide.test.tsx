@@ -172,7 +172,7 @@ describe('NoHomingPositionGuide', () => {
     }
   });
 
-  it('keeps coaching after a Z-only touch-off, which is not an XY origin (ADR-324)', async () => {
+  it('keeps coaching after a Z-only touch-off, which is not an XY origin (ADR-327)', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: status('Idle'),

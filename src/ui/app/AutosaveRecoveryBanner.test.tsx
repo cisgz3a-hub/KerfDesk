@@ -39,7 +39,7 @@ function recoverySnapshot(): AutosaveDurableSnapshot {
 function mockRecovery(snapshot = recoverySnapshot()) {
   const readLatest = vi
     .spyOn(projectAutosaveService, 'readLatest')
-    .mockResolvedValue({ snapshot, warnings: [] });
+    .mockResolvedValue({ snapshot, warnings: [], unreadable: [] });
   const write = vi.spyOn(projectAutosaveService, 'write').mockResolvedValue({
     kind: 'ok',
     savedAt: Date.now(),
@@ -183,7 +183,7 @@ describe('AutosaveRecoveryBanner', () => {
 
     await act(async () => {
       useStore.getState().newProject();
-      resolveRead({ snapshot: service.snapshot, warnings: [] });
+      resolveRead({ snapshot: service.snapshot, warnings: [], unreadable: [] });
     });
 
     expect(banners()).toHaveLength(0);

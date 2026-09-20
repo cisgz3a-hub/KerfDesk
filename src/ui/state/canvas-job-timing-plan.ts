@@ -1,10 +1,6 @@
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
-import { laserPowerControlForDevice } from '../../core/gcode-view';
-import {
-  buildGcodeTimingPlan,
-  type GcodeTimingPlanResult,
-  type ProgramTimeCalibration,
-} from '../../core/gcode-time';
+import { buildGcodeTimingPlan, type GcodeTimingPlanResult } from '../../core/gcode-time';
+import { deviceProgramTimingOptions } from '../../core/gcode-time/program-timing-options';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { MachineKind } from '../../core/scene/machine';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
@@ -14,6 +10,12 @@ import {
 } from './canvas-program-analysis-budget';
 
 const INITIAL_POSITION_TOLERANCE_MM = 0.05;
+
+/** The one live-plan refusal that also voids the pre-job estimate: a program
+ * that dwells on a connected controller which has not proven whether G4 P is
+ * seconds or milliseconds cannot be estimated without a thousandfold guess. */
+export const DWELL_EVIDENCE_UNAVAILABLE_REASON =
+  'current-session controller evidence cannot prove G4 P dwell uses seconds';
 
 export type CanvasJobTimingEvidence = {
   readonly fingerprint: GcodeFingerprint;
@@ -29,6 +31,7 @@ export type CanvasJobTimingPlanResult = GcodeTimingPlanResult & {
 };
 
 export type CanvasJobTimingContext = {
+  readonly machineKind?: MachineKind;
   readonly controllerSessionEpoch: number | undefined;
   readonly positionEpoch: number | undefined;
   readonly activeControllerKind: ControllerKind | null | undefined;
@@ -77,10 +80,12 @@ export function canvasJobTimingPlan(
     },
     initialPosition,
     {
+      ...deviceProgramTimingOptions(
+        device,
+        context.machineKind ?? machineKind,
+        context.activeControllerKind,
+      ),
       maxSegments: CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
-      machineKind,
-      laserPowerControl: machineKind === 'laser' ? laserPowerControlForDevice(device) : undefined,
-      timeCalibration: profileTimeCalibration(device),
     },
   );
   if (
@@ -92,18 +97,11 @@ export function canvasJobTimingPlan(
   ) {
     return {
       kind: 'unavailable',
-      reason: 'current-session controller evidence cannot prove G4 P dwell uses seconds',
+      reason: DWELL_EVIDENCE_UNAVAILABLE_REASON,
       evidence,
     };
   }
   return { ...result, evidence };
-}
-
-function profileTimeCalibration(device: DeviceProfile): ProgramTimeCalibration {
-  return {
-    cutTimeScale: device.estimateCutTimeScale ?? 1,
-    travelTimeScale: device.estimateTravelTimeScale ?? 1,
-  };
 }
 
 export function validatedCanvasJobTimingPlan(

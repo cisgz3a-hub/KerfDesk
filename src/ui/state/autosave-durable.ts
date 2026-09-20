@@ -5,6 +5,7 @@ import type { AutosaveWriteResult } from './autosave-record';
 import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
 import {
   autosaveStorageKeyForSession,
+  clearLocalAutosave,
   currentAutosaveSessionId,
   replaceAutosaveSessionId,
   type LocalAutosaveClearResult,
@@ -15,6 +16,7 @@ import {
   readLatestDurableAutosave,
   type AutosaveDurableReadResult,
   type AutosaveDurableSnapshot,
+  type AutosaveUnreadableSlot,
 } from './autosave-durable-read';
 import type { AutosaveDurableRepository } from './autosave-durable-repository';
 import { AutosaveSessionLocks, type AutosaveSessionGuard } from './autosave-session-lock';
@@ -24,6 +26,7 @@ export type {
   AutosaveDurableReadResult,
   AutosaveDurableSnapshot,
   AutosaveDurableWarning,
+  AutosaveUnreadableSlot,
 } from './autosave-durable-read';
 
 export type AutosaveDurableWriteResult =
@@ -115,7 +118,50 @@ export class AutosaveDurableService {
   async readLatest(): Promise<AutosaveDurableReadResult> {
     await this.tail;
     const session = await this.session();
-    return readLatestDurableAutosave(this.repository, this.locks, session.sessionId);
+    const result = await readLatestDurableAutosave(this.repository, this.locks, session.sessionId);
+    await this.retireUnreadable(result.unreadable, session.sessionId);
+    return result;
+  }
+
+  // A record this build cannot turn back into a project is not a backup — no
+  // version can restore it — so leaving it in place only guarantees that the
+  // "recovery storage could not be fully read" warning returns on every launch
+  // and that its dead bytes keep consuming the quota the working autosave
+  // needs. Retire it once the read has reported it. M15 still holds: a slot a
+  // live window owns is left alone, because that window's beforeunload write
+  // is a real backup even when this build cannot read its current contents.
+  private async retireUnreadable(
+    slots: ReadonlyArray<AutosaveUnreadableSlot>,
+    currentSessionId: string,
+  ): Promise<void> {
+    for (const slot of slots) {
+      try {
+        if (slot.sessionId === undefined || slot.sessionId === currentSessionId) {
+          await this.enqueue(async () => this.retireNow(slot));
+          continue;
+        }
+        await this.locks.runIfAbandoned(slot.sessionId, async () =>
+          this.enqueue(async () => this.retireNow(slot)),
+        );
+      } catch {
+        // Cleanup is best effort: a slot that resists retirement is reported
+        // again next launch, which is strictly better than failing recovery.
+      }
+    }
+  }
+
+  private async retireNow(slot: AutosaveUnreadableSlot): Promise<void> {
+    if (slot.backend === 'local') {
+      clearLocalAutosave({ storageKey: slot.storageKey });
+      return;
+    }
+    if (slot.sessionId === undefined) return;
+    const result = await this.repository.clear({
+      storageKey: slot.storageKey,
+      sessionId: slot.sessionId,
+      expectedEpoch: await this.repository.readEpoch(slot.storageKey),
+    });
+    if (result.kind === 'committed') this.epochs.set(slot.storageKey, result.epoch);
   }
 
   async stop(): Promise<void> {

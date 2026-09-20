@@ -47,8 +47,9 @@ function compareProgram(job: Job, finishX: number, profile = device): number {
     maxFeedMmPerMin: profile.maxFeed,
   });
   const estimate = estimateJobDuration(job, profile, options);
-  expect(estimate.totalSeconds).toBeCloseTo(clock.totalSeconds, 6);
-  return estimate.totalSeconds;
+  const executionSeconds = estimate.totalSeconds - (estimate.breakdown.transportSeconds ?? 0);
+  expect(executionSeconds).toBeCloseTo(clock.totalSeconds, 6);
+  return executionSeconds;
 }
 
 describe('controlled laser seeks preserve emitted motion and synchronization', () => {
@@ -164,7 +165,11 @@ describe('controlled laser seeks preserve emitted motion and synchronization', (
       { finishPosition: { x: 2, y: 0 } },
     );
     expect(baseline.breakdown.cutSeconds).toBe(0);
-    expect(calibrated.totalSeconds).toBeCloseTo(baseline.totalSeconds * 2, 8);
+    expect(calibrated.breakdown.travelSeconds).toBeCloseTo(baseline.breakdown.travelSeconds * 2, 8);
+    expect(calibrated.totalSeconds).toBeCloseTo(
+      calibrated.breakdown.travelSeconds + (calibrated.breakdown.transportSeconds ?? 0),
+      8,
+    );
   });
 
   it('retains G0 motion for an ordinary profile without controlled seeks', () => {

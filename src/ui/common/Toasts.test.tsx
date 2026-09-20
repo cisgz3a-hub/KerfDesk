@@ -113,4 +113,26 @@ describe('Toasts', () => {
   it('renders nothing when no toast has been raised', () => {
     expect(renderToasts().textContent).toBe('');
   });
+
+  // The stack is fixed over the toolbar; a burst (the import worker pushes
+  // four on every Open) must not grow down into the canvas, where a
+  // click-to-dismiss toast under the pointer swallows a drawing drag.
+  it('renders only the newest three toasts of a burst', () => {
+    for (const step of ['queued', 'reading', 'parsing', 'opened', 'migrated']) {
+      useToastStore.getState().pushToast(`project.lf2: ${step}`, 'info');
+    }
+    const container = renderToasts();
+    // The message lives in the non-interactive body; the only button per toast
+    // is its dismiss control, so read the bodies by their dismiss labels.
+    const shown = [...container.querySelectorAll('button')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(shown).toEqual([
+      'Dismiss info notification: project.lf2: parsing',
+      'Dismiss info notification: project.lf2: opened',
+      'Dismiss info notification: project.lf2: migrated',
+    ]);
+    // The older ones are still queued in the store, not lost.
+    expect(useToastStore.getState().toasts).toHaveLength(5);
+  });
 });

@@ -247,7 +247,7 @@ function retainedDeviceFields(device: DeviceProfile): Readonly<Record<string, un
 // off, validateOutputScope returns the scene untouched for any selection, so the
 // ids must not perturb the retention key. That key is also the Frame permit's
 // execution signature, and a bare canvas click after Frame was expiring the
-// permit with "output selection changed" (ADR-324).
+// permit with "output selection changed" (ADR-327).
 function executionOutputScope(scope: OutputScope): OutputScope {
   return scope.cutSelectedGraphics || scope.selectedObjectIds.length === 0
     ? scope

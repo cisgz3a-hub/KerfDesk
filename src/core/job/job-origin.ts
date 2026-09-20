@@ -136,7 +136,7 @@ export function offsetJobBounds(
 // the one table that already keeps the jog pad physically honest. For
 // front-left and center origins the signs are +1/+1 and this reduces to the
 // machine-frame corners the earlier implementation used, so their output is
-// byte-identical (ADR-324). Callers without a device keep the front-left mapping.
+// byte-identical (ADR-327). Callers without a device keep the front-left mapping.
 export function anchorPointForOrigin(
   bounds: JobBounds,
   anchor: JobOriginAnchor,

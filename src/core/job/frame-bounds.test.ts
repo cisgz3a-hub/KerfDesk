@@ -170,7 +170,7 @@ describe('computeFrameBounds', () => {
     );
   });
 
-  it('keeps Frame and compiled placement in step on a rear-left origin (ADR-324)', () => {
+  it('keeps Frame and compiled placement in step on a rear-left origin (ADR-327)', () => {
     const scene = {
       ...EMPTY_SCENE,
       layers: [createLayer({ id: 'red', color: '#ff0000', mode: 'line' })],

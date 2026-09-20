@@ -9348,7 +9348,7 @@ ordinary Start guard.
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17, 2026-09-19
 
 ### Context
 
@@ -9384,6 +9384,46 @@ longer stack competing Abort buttons, and transient jog state no longer moves th
 the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
+
+### Amendment (2026-09-19, revised 2026-09-20) — a floating popup, never in normal flow
+
+**Context.** In normal flow between the workspace and the status bar, the bar's arrival and
+departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
+maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
+decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
+lower edge. A first revision absolutely positioned it on the canvas's lower edge; the maintainer
+then asked for it to be "above screen like a pop up that doesnt affect the rest and wont cause any
+jumping", which an absolute full-bleed strip inside the canvas is not.
+
+**Decision.**
+
+- The control is a **window-level floating popup**: `position: fixed`, bottom-centre, above the
+  status bar, rendered as an App-shell sibling rather than inside `<main>` (`App.tsx`). Being
+  fixed it occupies no layout box anywhere, so mounting or unmounting it cannot change the size or
+  position of the workspace, the tool strip, or either rail — and no ancestor's `overflow` can clip
+  it. Measured live at 1400×900: the `main`, canvas, rails and status-bar rects are identical
+  before and after it mounts.
+- It is sized by its content (`width: max-content`, capped at `min(720px, 100vw - 24px)`) with a
+  rounded radius, border, danger top edge and shadow, so it reads as a popup over a small patch
+  above the status bar rather than a full-bleed strip across the workspace.
+- It keeps a wrapping status line (state · progress · safety note) beside the unchanged ≥48 px
+  controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
+  order, and still directs the operator to the physical E-stop or power isolation.
+- Toasts leave the rails for the same reason: they share the canvas's available space (lower left
+  of the workspace, above the live controls) or a reserved row inside the open modal, as decided by
+  the placement hook the laptop-layout work introduced; they use a tinted surface with a coloured
+  edge instead of a solid fill, and a success confirmation auto-dismisses in 4 s (advisories and
+  failures keep 8 s). Only the newest three render, so a burst cannot bury the drawing. The toast
+  body ignores pointer input with only its dismiss control interactive — a draft that overlaid the
+  drawing with click-to-dismiss toasts had the import worker's "parsing in worker" advisory swallow
+  the mousedown starting a rectangle drag, which the `shape-properties` browser smoke caught.
+
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the fixed
+positioning, the content sizing and the placement outside `<main>`. While motion is active the
+popup covers a band above the status bar — at a typical width that includes the canvas zoom
+cluster (wheel and keyboard zoom keep working) and can reach the rails' lowest rows; it is
+transient and the canonical run controls are the ones inside it. A stack of up to three toasts briefly
+covers the lower left of the drawing or a row of the open dialog. The Machine rail is unchanged.
 
 ---
 
@@ -10053,6 +10093,42 @@ controller buffering, live override response, spindle-at-speed behavior, and rea
 pacing still require physical calibration; controller reports and simulator evidence do not prove
 them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
 Frame authorization, controller command, settle contract, or other safety boundary.
+
+### Amendment 2026-09-19 — one emitted baseline for estimates and remaining time
+
+Pre-job estimates, prepared Job Review and the live countdown share the emitted-program timing
+model and device cut/travel calibration. CNC pecks, helical entry, XYZ motion, represented feeds,
+retracts, dwell and parking are timed from native output. Junction planning retains XYZ direction;
+arc timing uses the circular or helical route length rather than the shorter display chords.
+
+Serial delivery contributes only delay that cannot overlap earlier modeled execution. It counts
+the sender's trimmed UTF-8 lines, newline and 8N1 framing at the configured or driver-default baud.
+Host-managed tool changes restart the delivery window; their operator wait is excluded and
+disclosed. Motion calibration and observed route pacing do not scale dwell or serial delay.
+Ruida binary output does not use the G-code serial model.
+
+Known physical XYZ is an estimate input for every placement mode. It is separate from any final
+Current Position parking target and participates in background cache identity by coordinate
+values. A preloaded large job requests background estimation on initial mount. Superseded replies
+cannot replace the current result. The existing bounded Start timing sidecar keeps an unavailable
+result without retrying an unbounded parse or introducing a new Start gate. An unavailable live plan
+(no trusted position, unknown controller family, program over the countdown budget) never voids the
+pre-job estimate: Job Review and the time tile still estimate the emitted program with the estimator's
+own assumptions, as they did before the two shared one baseline. The one exception is a dwelling
+program on a connected controller that has not proven its G4 P units; that estimate stays unavailable
+rather than guess by a factor of a thousand.
+
+Freezing the sender is not proof of a physical hold. Run/deceleration continues consuming the
+estimate until fresh controller evidence establishes a settled hold or the existing host-tool-change
+boundary. Marlin position-only reports do not prove drain. Rounding is applied to total seconds
+before formatting units; an exhausted estimate continues to show that execution is awaiting
+controller completion. Only the established completion contract selects Complete.
+
+Geometric Preview playback incorporates the same total but distributes non-motion time over its
+route; it does not represent exact command-event placement. The estimator remains a model of
+configured motion limits and earliest serial arrival. RX/ACK behavior, host scheduling, overrides,
+spindle behavior and actual material/machine pacing require separate physical qualification. The
+Frame-first authorization contract and the emitted machine commands are unchanged by timing.
 
 ---
 
@@ -20146,7 +20222,124 @@ pump-timing cause is inferred from the emitted bytes and public firmware reports
 coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
 check.
 
-## ADR-324 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
+## ADR-325 - The plan-backed preview authority stops at the advisory program size (2026-09-20)
+
+**Status:** Accepted; amends the ADR-244 large-job preparation path and the second consumer
+migration slice in `docs/architecture/10-executable-plan-mathematical-contract.md` §13.
+Preserves ADR-241/ADR-243 (no size refusals) and rule 7: nothing here refuses a job.
+
+### Context
+
+Tracing a dense line drawing — a detailed coloring-page dragon — and leaving the traced artwork
+on its default Fill operation crashed the renderer with Chrome's "Aw, Snap! Out of Memory". The
+same symptom on Frame was addressed in ADR-323's sibling timing work (PR #799), which stopped a
+moving head from keying a fresh background preparation per status report. That removed the
+repetition; it did not change what ONE preparation costs, and the crash survived it.
+
+The cost is the preview's second authority. `buildPreviewToolpathFromPrepared` builds the legacy
+machine route, maps a scene copy of it, then — for every job that is not a streamed raster —
+emits the whole G-code program and the v1 plan to verify a plan-backed route at emit precision
+and retains that verified route beside the legacy one for as long as the preview lives. Four
+complete routes plus the program exist at the peak.
+
+Measured on a synthetic fill inside a 4 GB heap, the size of Chrome's renderer budget:
+
+| fill segments | route steps | with the plan authority | without |
+| --- | --- | --- | --- |
+| 1,000,000 | 2,100,001 | 2,925 MB | 991 MB |
+| 2,000,000 | 4,200,001 | heap OOM | 1,584 MB |
+| 3,000,000 | 6,300,001 | heap OOM | 1,990 MB |
+
+A dense trace reaches those counts easily: every thin stroke outline becomes its own filled
+region, so the span count scales with contour crossings times hatch rows. The compiled job is
+not the problem — it is roughly 207 bytes per segment. The copies are.
+
+### Decision
+
+1. `planPreviewRouteEligible` holds every rule that decides whether a prepared job may carry the
+   plan-backed preview authority: the existing current-position and ADR-243 streamed-raster
+   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_STEPS` keeps
+   the legacy route. That constant is `MAX_COMPILED_MOTION_SEGMENTS`, the same 250,000 the
+   operator is already shown as "Large program: … preparation, preview, and streaming may be
+   slow". Route steps never undercount the motion segments that raise that advisory.
+2. `buildPreviewToolpathFromPrepared` asks the gate BEFORE mapping. Only the plan comparison
+   keeps the freshly built machine route alive past that point, so when the gate declines, the
+   machine array is consumed in place by `mapOwnedToolpathToScene` — the treatment streamed
+   rasters already had — instead of retaining two complete routes. Callers that never ask for a
+   plan keep the pure mapper unchanged.
+3. Nothing about the drawn geometry changes. The plan route is adopted only after
+   `comparePreviewRoutesAtEmitPrecision` proves it equal to the legacy route at the emitter's
+   own precision, and every consumer already falls back to the legacy route when it is absent.
+   Bytes, bounds, timing, Frame and Start are untouched: none of them read this route.
+
+### Verification and limits
+
+`draw-preview-plan-route-budget.test.ts` pins the boundary (admitted at the budget, declined one
+step past it), the current-position and streamed-raster refusals, that an ordinary job still
+reports `executable-plan`, and that an over-budget fill reports `legacy-toolpath` AND hands back
+the same steps array it was built into. The 2,000,000-segment case above, which exited 134 on a
+4 GB heap before, now completes in 1,584 MB; in the running app a 577,048-segment traced fill
+prepares in 549 MB of renderer heap where a 330,976-segment one previously reached 1,446 MB.
+
+The preparation worker still holds the compiled Job alive for the length of the acknowledged
+chunk transfer, and a preview still costs one full route on each side of that boundary. Both
+remain open; neither is what exhausted the renderer here. No hardware was operated.
+
+## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
+
+**Status:** Accepted; closes the worker-retention limit ADR-325 recorded as open. Amends the
+ADR-244 worker message contract. No change to bytes, preflight, Frame, Start or any response.
+
+### Context
+
+ADR-244's worker hands a prepared route to the UI in acknowledged chunks: it posts one chunk,
+waits for the main thread to accept it, then posts the next. On a large traced fill that handover
+is thousands of round trips, and for its whole length the worker had, in one suspended `async`
+message handler:
+
+- the structured clone of the Project the request arrived with,
+- the compiled `Job` the route was derived from, and
+- the route itself, which the transfer releases slot by slot as chunks are acknowledged.
+
+Only the third has a consumer. The first two are each the same order of size as the route, and
+they sat at the worker's peak for the entire handover.
+
+Measured by driving the real handler over a 1.6M-step fill with a 46 MB scene, acknowledging each
+chunk on its own task, as a real port delivery does:
+
+| | first chunk | transfer-complete | request released during transfer |
+| --- | --- | --- | --- |
+| before | 701 MB | 379 MB | no |
+| after | 434 MB | 112 MB | yes |
+
+On a small scene the same probe measured 345 MB → 247 MB at the first chunk. The earlier reading
+in ADR-325 ("~400 MB of dead weight") was taken with microtask-paced acknowledgements, where the
+collector never runs between chunks; it understated both the cost and the fix.
+
+### Decision
+
+1. `self.onmessage` is a synchronous dispatcher, not an `async` handler. It builds the promise
+   chain and returns, so its frame — and the request in it — is gone before the transfer runs.
+   Only the request id and the route reach the transfer.
+2. The prepare and the derivation of the payload live in their own frames (`previewPayload`,
+   `estimateResponse`). Returning the payload ends that frame, so the hydrated project and the
+   compiled Job are unreachable before the first chunk is posted.
+3. Error handling is unchanged in effect: a rejection anywhere in the chain still posts
+   `{ kind: 'error', message }` for the same id, and acknowledgement and bridge messages are
+   still answered before anything else.
+
+### Verification and limits
+
+`preparation-worker-retention.test.ts` drives the real handler over a chunked fill, acknowledging
+each chunk on its own task, and pins both halves: the dispatcher is not an async function, and —
+where `--expose-gc` is available — the request is collected before the final chunk. Both
+assertions fail against the previous handler. `src/ui/workspace` is otherwise unchanged and green.
+
+A preview still costs one full route on each side of the worker boundary; that is inherent to
+showing one and stays open. The acknowledged transfer still releases route slots only as chunks
+are accepted, so the worker's peak remains proportional to the route. No hardware was operated.
+
+## ADR-327 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
 
 **Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
 
@@ -20226,7 +20419,7 @@ compile path (ADR-047 numbers, not names):
   the Save dialog carrying report units (`GcodeSaveDialog.test.tsx`).
 - Behaviour change on front-right / rear-* devices: a project saved with a non-default anchor
   (possibly chosen to compensate for the old mirror) now places at the corner the anchor names, and
-  a pre-ADR-324 recovery slot on such a device recompiles to different bytes and is refused as
+  a pre-ADR-327 recovery slot on such a device recompiles to different bytes and is refused as
   edited. Re-Frame before the next run; the completed Frame still gates Start.
 - Preview/estimate preparation caches and the Job Review rebuild trigger still key on the raw
   selection while the scope is off (wasted re-preparation on a click, never a wrong program) —

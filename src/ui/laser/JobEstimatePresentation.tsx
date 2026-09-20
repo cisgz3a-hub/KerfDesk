@@ -17,7 +17,13 @@ export function EstimateBadge({
 }: {
   readonly estimate: LiveJobEstimate;
 }): JSX.Element | null {
-  if (estimate.kind === 'estimated') return <span style={estimateStyle}>≈ {estimate.label}</span>;
+  if (estimate.kind === 'estimated')
+    return (
+      <span style={estimateStyle}>
+        ≈ {estimate.label}
+        {(estimate.manualPauseCount ?? 0) > 0 ? ' + tool changes' : ''}
+      </span>
+    );
   if (estimate.kind === 'too-large') {
     return (
       <span style={estimateStyle} title="Live estimate paused so large traces stay responsive.">

@@ -36,6 +36,10 @@ function buttonByText(host: HTMLElement, text: string): HTMLButtonElement {
   return button;
 }
 
+function queryButtonByText(host: HTMLElement, text: string): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+}
+
 async function renderOriginRow(
   host: HTMLElement,
   props: { readonly disabled?: boolean; readonly streaming?: boolean } = {},
@@ -216,7 +220,74 @@ describe('OriginRow persistent origin controls', () => {
   });
 });
 
-describe('OriginRow Set origin and the Start-from mode (ADR-324)', () => {
+describe('OriginRow release motors reachability', () => {
+  // A finished job always leaves a settled origin behind, and the Position job
+  // card hides itself once one exists — so before this, a no-homing machine had
+  // no way to free the gantry after a burn (maintainer report: "After the laser
+  // is done burning I cannot move the laser by hand as if its locked in one spot").
+  it('offers Release motors on a no-homing machine once an origin is settled', async () => {
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 40, y: 25, z: 0 },
+    });
+    expect(useStore.getState().project.device.homing.enabled).toBe(false);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      expect(buttonByText(host, 'Release motors').disabled).toBe(false);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  // Complementary, not duplicated: while the Position job card is on the rail it
+  // still owns the release, so the row must stay quiet.
+  it('leaves Release motors to the Position job card when no origin is settled', async () => {
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      workOriginActive: false,
+      workOriginSource: 'none',
+      wcoCache: null,
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      expect(queryButtonByText(host, 'Release motors')).toBeUndefined();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps Release motors on the row for a homing-enabled machine with no origin', async () => {
+    useLaserStore.setState({
+      statusReport: statusReport('Idle'),
+      workOriginActive: false,
+      workOriginSource: 'none',
+      wcoCache: null,
+    });
+    useStore.getState().updateDeviceProfile({ homing: { enabled: true, direction: 'front-left' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      expect(buttonByText(host, 'Release motors').disabled).toBe(false);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('OriginRow Set origin and the Start-from mode (ADR-327)', () => {
   async function startFromAfterSetOrigin(
     startFrom: 'absolute' | 'verified-origin' | 'current-position',
   ): Promise<string> {
@@ -249,7 +320,7 @@ describe('OriginRow Set origin and the Start-from mode (ADR-324)', () => {
   });
 });
 
-describe('OriginRow Set-origin attention pulse (ADR-324)', () => {
+describe('OriginRow Set-origin attention pulse (ADR-327)', () => {
   async function setOriginClassName(state: {
     readonly startFrom: JobStartMode;
     readonly wcoCache: WorkCoordinateOffset | null;

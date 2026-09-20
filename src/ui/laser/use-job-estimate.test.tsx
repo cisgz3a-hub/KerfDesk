@@ -265,7 +265,7 @@ describe('useJobEstimate debounce (H16)', () => {
     await unmount();
   });
 
-  it('resolves Verified Origin placement with the export fallback like User Origin (ADR-324)', async () => {
+  it('resolves Verified Origin placement with the export fallback like User Origin (ADR-327)', async () => {
     workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
     useStore.setState({ jobPlacement: { startFrom: 'verified-origin', anchor: 'front-left' } });
     const unmount = await renderProbe();
@@ -301,14 +301,14 @@ describe('useJobEstimate debounce (H16)', () => {
       useStore.setState({ project: lineProject() });
     });
 
-    // Ten polls spanning four debounce windows. Each stores a FRESH report
-    // object, but the resolved User Origin placement is byte-identical across
-    // all of them, so the debounce must not re-arm: tracking the placement's
+    // Ten stationary polls spanning four debounce windows. Each stores a FRESH
+    // report object, but the placement and physical head are byte-identical,
+    // so the debounce must not re-arm: tracking the placement's
     // per-call jobOrigin object by reference starved the estimate forever on
     // any connected machine.
     for (let poll = 1; poll <= STATUS_POLLS_PER_SETTLE; poll += 1) {
       await act(async () => {
-        useLaserStore.setState({ statusReport: idleReportAtX(poll) });
+        useLaserStore.setState({ statusReport: idleReportAtX(0) });
         vi.advanceTimersByTime(STATUS_POLL_INTERVAL_MS);
       });
     }

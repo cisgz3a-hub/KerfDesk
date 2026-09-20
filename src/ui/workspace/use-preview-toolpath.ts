@@ -2,8 +2,8 @@
 // entering Preview can paint first and cancel stale builds before they start.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildToolpath, EMPTY_JOB } from '../../core/job';
-import type { Project } from '../../core/scene';
+import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
+import type { OutputScope, Project } from '../../core/scene';
 import { resolvePreviewJobPlacement, type JobPlacementSettings } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -17,6 +17,7 @@ import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-sc
 import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { useSettledHeadPosition } from '../laser/settled-head-position';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -47,6 +48,13 @@ export function usePreviewToolpath(
   // placement object itself need not be an effect dependency.
   const placementRef = useRef(placement);
   placementRef.current = placement;
+  // The settled head keys the background preparation exactly as the estimate
+  // hook does, so Preview and ETA still share one worker compute. Read through
+  // a ref: preview geometry does not depend on it, so a settled head move must
+  // not rebuild the route.
+  const head = useSettledHeadPosition();
+  const headRef = useRef(head);
+  headRef.current = head;
 
   useEffect(() => {
     if (!previewMode) {
@@ -62,6 +70,7 @@ export function usePreviewToolpath(
         externalGcodePreview,
         placement: placementRef.current,
         outputScope,
+        initialPosition: headRef.current,
         isCancelled: () => cancelled,
         setToolpath,
       });
@@ -90,6 +99,7 @@ function runScheduledPreviewBuild(args: {
   readonly externalGcodePreview: ReturnType<typeof useStore.getState>['externalGcodePreview'];
   readonly placement: ReturnType<typeof usePreviewPlacement>;
   readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
+  readonly initialPosition: LargeJobPreparationOptions['initialPosition'];
   readonly isCancelled: () => boolean;
   readonly setToolpath: (toolpath: PreviewToolpath | null) => void;
 }): void {
@@ -112,10 +122,11 @@ function runScheduledPreviewBuild(args: {
     });
     return;
   }
-  const options: LargeJobPreparationOptions = {
-    ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
-    outputScope: args.outputScope,
-  };
+  const options = previewPreparationOptions(
+    resolved.jobOrigin,
+    args.outputScope,
+    args.initialPosition,
+  );
   const registration = currentPrintCutOutputRegistration(args.project);
   const needsSnapshot = hasVariableText(args.project) || registration !== undefined;
   const backgroundOptions: LargeJobPreparationOptions = {
@@ -139,6 +150,18 @@ function runScheduledPreviewBuild(args: {
       setToolpath: args.setToolpath,
     });
   });
+}
+
+function previewPreparationOptions(
+  jobOrigin: JobOriginPlacement | undefined,
+  outputScope: OutputScope,
+  initialPosition: LargeJobPreparationOptions['initialPosition'],
+): LargeJobPreparationOptions {
+  return {
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
+    ...(initialPosition === undefined ? {} : { initialPosition }),
+    outputScope,
+  };
 }
 
 function usePreviewPlacement(jobPlacement: JobPlacementSettings) {

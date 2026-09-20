@@ -110,7 +110,7 @@ describe('refusals without a one-click remedy', () => {
   });
 });
 
-describe('verified-origin set-origin offer (ADR-324)', () => {
+describe('verified-origin set-origin offer (ADR-327)', () => {
   it('offers the same one-click Set origin remedy as User Origin', async () => {
     await expect(offerSetupFixForBlockedStart(VERIFIED_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe(
       'retry',

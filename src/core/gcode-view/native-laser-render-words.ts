@@ -4,10 +4,13 @@ import type { RenderModal, WordAccounting } from './render-model-words';
 
 /** Marlin's standalone I flag is valid only on laser mode commands. Keep
  * arbitrary trailing text subject to the shared scanner's strict validation. */
-export function scanControllerRenderWords(line: string): ReadonlyArray<GcodeWordMatch> | null {
-  const words = scanCompleteGcodeWords(line);
+export function scanControllerRenderWords(
+  line: string,
+  parseValue?: (letter: string, text: string) => number,
+): ReadonlyArray<GcodeWordMatch> | null {
+  const words = scanCompleteGcodeWords(line, parseValue);
   if (words !== null || !/^M[345]\s/i.test(line)) return words;
-  return scanCompleteGcodeWords(line.replace(/\bI(?=\s|$)/gi, ''));
+  return scanCompleteGcodeWords(line.replace(/\bI(?=\s|$)/gi, ''), parseValue);
 }
 
 export function isNativeLaserConsoleLine(state: LaserRenderState, line: string): boolean {

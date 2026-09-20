@@ -2,8 +2,7 @@
 // (ADR-244). Full requests prepare both consumer views from one compile.
 // Estimate-only requests omit the unused, potentially enormous preview route.
 
-import type { JobOriginPlacement } from '../../core/job';
-import type { OutputScope, Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
   LargeJobEstimate,
@@ -14,12 +13,9 @@ import type { PreparationTransferResponse } from './preparation-transfer-protoco
 
 export type PreparationProjection = 'preview' | 'estimate';
 
-export type PreparationWorkerRequest = {
+export type PreparationWorkerRequest = LargeJobPreparationOptions & {
   readonly id: number;
   readonly project: Project;
-  readonly jobOrigin?: JobOriginPlacement;
-  readonly outputScope?: OutputScope;
-  readonly snapshot?: LargeJobPreparationOptions['snapshot'];
   /** Omitted preserves the full Preview API. */
   readonly projection?: PreparationProjection;
 };
