@@ -176,7 +176,7 @@ type OriginHandlerDeps = {
 // A fresh origin makes only Absolute unusable (it refuses while a custom origin
 // is active), so that is the one mode Set origin upgrades to User Origin. An
 // explicit User, Verified, or Current Position choice is the operator's and is
-// never rewritten under them (ADR-193; ADR-323). The mode is read when the
+// never rewritten under them (ADR-193; ADR-324). The mode is read when the
 // controller acknowledges, not when the button rendered: Set origin waits up to
 // a few seconds for the work-offset frame and the dropdown may change meanwhile.
 function placementAfterSetOrigin(setJobPlacement: OriginHandlerDeps['setJobPlacement']): void {

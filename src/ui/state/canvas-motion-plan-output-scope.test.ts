@@ -4,8 +4,8 @@ import { canvasPlanRetentionKey } from './canvas-motion-plan';
 
 // The retention key doubles as the Frame permit's execution signature
 // (currentReplayExecutionSignature), so a bare canvas click must not change it
-// while "Selected artwork only" is off (ADR-323).
-describe('canvasPlanRetentionKey output scope (ADR-323)', () => {
+// while "Selected artwork only" is off (ADR-324).
+describe('canvasPlanRetentionKey output scope (ADR-324)', () => {
   const placement = { startFrom: 'user-origin' as const, anchor: 'front-left' as const };
 
   it('ignores the canvas selection while "Selected artwork only" is off', () => {

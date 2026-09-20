@@ -20145,7 +20145,8 @@ advisory texts and that they never change the acknowledgement. No hardware was o
 pump-timing cause is inferred from the emitted bytes and public firmware reports, and a Falcon
 coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
 check.
-## ADR-323 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
+
+## ADR-324 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
 
 **Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
 
@@ -20225,7 +20226,7 @@ compile path (ADR-047 numbers, not names):
   the Save dialog carrying report units (`GcodeSaveDialog.test.tsx`).
 - Behaviour change on front-right / rear-* devices: a project saved with a non-default anchor
   (possibly chosen to compensate for the old mirror) now places at the corner the anchor names, and
-  a pre-ADR-323 recovery slot on such a device recompiles to different bytes and is refused as
+  a pre-ADR-324 recovery slot on such a device recompiles to different bytes and is refused as
   edited. Re-Frame before the next run; the completed Frame still gates Start.
 - Preview/estimate preparation caches and the Job Review rebuild trigger still key on the raw
   selection while the scope is off (wasted re-preparation on a click, never a wrong program) —

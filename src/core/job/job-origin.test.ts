@@ -87,12 +87,12 @@ describe('offsetJobBounds', () => {
   });
 });
 
-// ADR-323: an anchor names a PHYSICAL corner of the artwork (front = toward the
+// ADR-324: an anchor names a PHYSICAL corner of the artwork (front = toward the
 // operator, left = the operator's left) on every device origin. centeredJob spans
 // machine X 175..225 / Y 185..215; front-right, rear-left and rear-right origins
 // mirror an axis (origin-transform.ts), so the same physical corner is a
 // different machine-frame corner on each.
-describe('anchorPointForOrigin: anchors are physical corners on every device origin (ADR-323)', () => {
+describe('anchorPointForOrigin: anchors are physical corners on every device origin (ADR-324)', () => {
   const ORIGINS: ReadonlyArray<Origin> = [
     'front-left',
     'front-right',

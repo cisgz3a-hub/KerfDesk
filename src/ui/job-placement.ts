@@ -142,7 +142,7 @@ export function resolveExportJobPlacement(
 // Position keep the live resolution: their bytes depend on live machine state or
 // on no custom origin being active. Start still uses resolveJobPlacement and the
 // completed Frame (ADR-228); the worker cache keys on the resolved jobOrigin, so
-// preview and estimate must share this exact rule (ADR-323).
+// preview and estimate must share this exact rule (ADR-324).
 export function resolvePreviewJobPlacement(
   settings: JobPlacementSettings,
   machine: MachinePlacementSnapshot,

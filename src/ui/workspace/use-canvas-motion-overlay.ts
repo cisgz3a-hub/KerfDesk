@@ -305,7 +305,7 @@ function canvasMachineSnapshot(
     trustedPositionEpoch: state.trustedPositionEpoch ?? 0,
     // canvasCoordinateFrame draws origin-anchored starts in the machine frame
     // only on a homed machine; without this field the idle markers were always
-    // artwork-relative and jumped to the bed position at Start (ADR-323).
+    // artwork-relative and jumped to the bed position at Start (ADR-324).
     homingState: state.homingState,
     statusQuery: state.capabilities.statusQuery,
     ...(canvasRevision === '' ? {} : { canvasRevision }),
@@ -327,7 +327,7 @@ function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>)
     state.workOriginActive ? 'origin' : 'machine',
     String(state.trustedPositionEpoch ?? 0),
     axisKey(state.wcoCache),
-    // The snapshot forwards homingState (ADR-323); confirmHome flips it without
+    // The snapshot forwards homingState (ADR-324); confirmHome flips it without
     // touching any other keyed field, so it must key the revision too.
     state.homingState,
     position,

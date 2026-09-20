@@ -265,7 +265,7 @@ describe('useJobEstimate debounce (H16)', () => {
     await unmount();
   });
 
-  it('resolves Verified Origin placement with the export fallback like User Origin (ADR-323)', async () => {
+  it('resolves Verified Origin placement with the export fallback like User Origin (ADR-324)', async () => {
     workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
     useStore.setState({ jobPlacement: { startFrom: 'verified-origin', anchor: 'front-left' } });
     const unmount = await renderProbe();

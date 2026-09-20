@@ -216,7 +216,7 @@ describe('OriginRow persistent origin controls', () => {
   });
 });
 
-describe('OriginRow Set origin and the Start-from mode (ADR-323)', () => {
+describe('OriginRow Set origin and the Start-from mode (ADR-324)', () => {
   async function startFromAfterSetOrigin(
     startFrom: 'absolute' | 'verified-origin' | 'current-position',
   ): Promise<string> {
@@ -249,7 +249,7 @@ describe('OriginRow Set origin and the Start-from mode (ADR-323)', () => {
   });
 });
 
-describe('OriginRow Set-origin attention pulse (ADR-323)', () => {
+describe('OriginRow Set-origin attention pulse (ADR-324)', () => {
   async function setOriginClassName(state: {
     readonly startFrom: JobStartMode;
     readonly wcoCache: WorkCoordinateOffset | null;

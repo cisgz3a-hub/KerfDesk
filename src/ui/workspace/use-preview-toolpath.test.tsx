@@ -152,7 +152,7 @@ describe('usePreviewToolpath', () => {
     expect(probe.current).toBe(builtToolpath);
   });
 
-  it('builds a Verified Origin preview before the machine origin is set (ADR-323)', async () => {
+  it('builds a Verified Origin preview before the machine origin is set (ADR-324)', async () => {
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {
       scheduled = work;

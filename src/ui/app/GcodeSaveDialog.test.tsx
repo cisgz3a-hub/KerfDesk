@@ -90,7 +90,7 @@ async function mount(adapter: PlatformAdapter): Promise<{
   };
 }
 
-describe('G-code save placement units (ADR-323)', () => {
+describe('G-code save placement units (ADR-324)', () => {
   it('places a Current Position export with the controller report units', async () => {
     // The line fixture spans scene X 0..10 at Y 0 (machine Y 400 on the default
     // 400 mm front-left bed). With the head at WPos (1, 2) INCHES the anchor must
