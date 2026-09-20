@@ -1,10 +1,10 @@
 import {
-  estimateExecutionArtifactBytes,
   isCurrentExecutionArtifact,
   isExecutionArtifact,
   isRecoveryArtifact,
   type RecoveryArtifactV1,
 } from './execution-artifact';
+import { memoizedExecutionArtifactBytes } from './execution-artifact-size';
 import { storedExecutionArtifactIntegrityIsValid } from './execution-artifact-integrity';
 import { boundExecutionHistory } from './execution-history';
 import type { RecoveryStorageBackend } from './recovery-backend';
@@ -123,7 +123,11 @@ function hydratedExecutionHistory(
     if (!isExecutionArtifact(artifact) || !progressMatchesArtifact(record, artifact)) continue;
     newestUnique.push({
       ...record,
-      estimatedArtifactBytes: estimateExecutionArtifactBytes(artifact),
+      // Same measurement as before, cached on the artifact's identity: the
+      // persisted record's byte count is mutable, so retention must still be
+      // decided from the artifact itself, but the artifact is immutable and
+      // the coordinator hands the same references back on every refresh.
+      estimatedArtifactBytes: memoizedExecutionArtifactBytes(artifact),
     });
   }
   newestUnique.reverse();
