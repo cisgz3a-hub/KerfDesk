@@ -20361,7 +20361,7 @@ A preview still costs one full route on each side of the worker boundary; that i
 showing one and stays open. The acknowledged transfer still releases route slots only as chunks
 are accepted, so the worker's peak remains proportional to the route. No hardware was operated.
 
-## ADR-327 - A preview route is columnar, and crosses the worker boundary as buffers (2026-09-20)
+## ADR-328 - A preview route is columnar, and crosses the worker boundary as buffers (2026-09-20)
 
 **Status:** Accepted; extends ADR-244's large-job preparation and the ADR-254 packed transfer.
 Builds on ADR-325 (one preview authority) and ADR-326 (the worker owns only the route it sends).
