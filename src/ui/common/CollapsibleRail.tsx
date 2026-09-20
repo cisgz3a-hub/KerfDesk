@@ -56,7 +56,11 @@ const headingRowStyle: React.CSSProperties = {
   gap: 8,
   marginBottom: 8,
 };
-const headingStyle: React.CSSProperties = { margin: 0 };
+const headingStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 'var(--lf-text-lg)',
+  fontWeight: 600,
+};
 const collapsedRailStyle: React.CSSProperties = {
   width: COLLAPSED_RAIL_WIDTH_PX,
   flexShrink: 0,

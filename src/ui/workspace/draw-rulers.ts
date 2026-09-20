@@ -4,9 +4,9 @@
 // visible at the top-left corner where the rulers meet).
 
 import { canvasTheme } from '../theme/canvas-theme';
+import { RULER_THICKNESS_PX } from './canvas-layout';
 import type { ViewTransform } from './view-transform';
 
-const RULER_THICKNESS_PX = 18;
 const RULER_TICK_MM = 10;
 const RULER_LABEL_EVERY_MM = 50;
 
@@ -29,7 +29,7 @@ export function drawRulers(
   ctx.lineTo(RULER_THICKNESS_PX + 0.5, canvasH);
   ctx.stroke();
   ctx.fillStyle = canvasTheme.rulerText;
-  ctx.font = '10px ui-monospace, Menlo, monospace';
+  ctx.font = '12px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'top';
   drawHorizontalRuler(ctx, canvasW, view);
   drawVerticalRuler(ctx, canvasH, view);
@@ -72,6 +72,6 @@ function drawVerticalRuler(
     ctx.moveTo(RULER_THICKNESS_PX - (major ? 8 : 4), py + 0.5);
     ctx.lineTo(RULER_THICKNESS_PX, py + 0.5);
     ctx.stroke();
-    if (major) ctx.fillText(String(mm), 2, py + 2);
+    if (major) ctx.fillText(String(mm), 2, py + 2, RULER_THICKNESS_PX - 4);
   }
 }

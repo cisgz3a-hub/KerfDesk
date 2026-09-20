@@ -113,13 +113,6 @@ function SelectedOperationEditor(props: {
           onChange={props.onSelect}
         />
       ) : null}
-      <OperationContextActions
-        affected={affected}
-        selectedUsingActive={activeObjects.length}
-        onMakeUnique={() => makeUnique(objectIds, props.active.id)}
-        onAdd={() => addOperation(objectIds)}
-      />
-      <OperationToggles operation={props.active} />
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
@@ -134,6 +127,13 @@ function SelectedOperationEditor(props: {
           reconcileKey={reconcileKey}
         />
       )}
+      <OperationContextActions
+        affected={affected}
+        selectedUsingActive={activeObjects.length}
+        onMakeUnique={() => makeUnique(objectIds, props.active.id)}
+        onAdd={() => addOperation(objectIds)}
+      />
+      <OperationToggles operation={props.active} />
       {overrideEditing && !hasMixedFields(mixedFields) ? (
         <p style={advisoryStyle}>
           Effective artwork override — these values drive the editor, preview, Job Review, and
@@ -329,13 +329,10 @@ function selectionOperationContext(
 }
 
 const inspectorStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-accent)',
-  borderRadius: 6,
-  padding: 10,
   marginBottom: 10,
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
+  gap: 10,
 };
 const headingStyle: React.CSSProperties = { margin: 0, fontSize: 14 };
 const hintStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-muted)' };
@@ -362,4 +359,8 @@ const fieldRowStyle: React.CSSProperties = {
   gap: 8,
   alignItems: 'center',
 };
-const advisoryStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-warning)', fontSize: 12 };
+const advisoryStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-warning-fg)',
+  fontSize: 12,
+};

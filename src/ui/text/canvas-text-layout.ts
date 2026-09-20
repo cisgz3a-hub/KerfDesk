@@ -6,6 +6,7 @@ import {
   type Transform,
 } from '../../core/scene';
 import { findFontEntry } from '../../core/text';
+import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import type { ViewTransform } from '../workspace/view-transform';
 import type { CanvasTextSession } from './canvas-text-store';
 import { cssFamilyForFont } from './font-loader';
@@ -54,7 +55,7 @@ function straightInputStyle(
     letterSpacing: `${values.letterSpacing * values.sizeMm}px`,
     textAlign: values.alignment,
     fontFamily: `"${family}", sans-serif`,
-    color: object === null ? values.color : 'transparent',
+    color: object === null ? canvasVectorDisplayColor(values.color) : 'transparent',
   };
 }
 

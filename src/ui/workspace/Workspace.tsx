@@ -16,6 +16,7 @@ import { type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import {
@@ -261,9 +262,10 @@ function useWorkspaceDraw(args: {
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
+  const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
-    () => [args.project, args.cncRemovalGrid, rasterRedrawTick],
-    [args.project, args.cncRemovalGrid, rasterRedrawTick],
+    () => [args.project, args.cncRemovalGrid, rasterRedrawTick, colorScheme],
+    [args.project, args.cncRemovalGrid, rasterRedrawTick, colorScheme],
   );
   const displayPolylineCache = useDisplayPolylineCache();
   const requestRasterRedraw = useCallback(() => {

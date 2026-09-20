@@ -2,7 +2,11 @@ import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project, Vec2 } from '../../core/scene';
 import type { SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../../io/gcode';
-import { estimateLiveJobFromPrepared, type LiveJobEstimate } from '../laser/live-job-estimate';
+import {
+  estimateLiveJobFromPrepared,
+  type LiveJobEstimate,
+  type LiveJobEstimateOptions,
+} from '../laser/live-job-estimate';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
 import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-route';
 import type { PreviewToolpath } from './preview-status';
@@ -18,7 +22,7 @@ export type LargeJobPreparation = LargeJobEstimate & {
   readonly jobOriginOffset?: Vec2;
 };
 
-export type LargeJobPreparationOptions = {
+export type LargeJobPreparationOptions = LiveJobEstimateOptions & {
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
   readonly snapshot?: { readonly registration?: SimilarityTransform | null };
@@ -59,7 +63,10 @@ export function largeJobPreparationFromPrepared(
 ): LargeJobPreparation {
   // Finish the planner's temporary allocations before retaining a complete
   // multi-million-step preview route. Both use this exact prepared output.
-  const estimate = estimateLiveJobFromPrepared(prepared, options.jobOrigin, { unbounded: true });
+  const estimate = estimateLiveJobFromPrepared(prepared, options.jobOrigin, {
+    ...(options.initialPosition === undefined ? {} : { initialPosition: options.initialPosition }),
+    unbounded: true,
+  });
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
   });

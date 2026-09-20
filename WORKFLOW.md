@@ -88,15 +88,22 @@ opportunity, without an extra branding delay. It introduces no startup interacti
   hides or disables a ready update action, and applying an update still requires an explicit click.
   Rapid repeated clicks share one update/reload attempt. If that attempt fails, a nonblocking error
   toast is shown and the still-visible action owns the next retry.
-- **Top command toolbar**: one non-wrapping row. Familiar file, import, export, Preview, and Shortcuts actions use icon-only buttons with accessible names and hover help. Specialist tools keep icon-plus-label at wide widths and become icon-only at 1280 px and below. Below 700 px the redundant brand wordmark hides; if the window is still narrower than the command set, the command group scrolls horizontally instead of creating a second row.
+- **Top command toolbar**: the command row measures its available width and moves commands into **More** as space runs out. Familiar commands retain accessible icon buttons; specialist commands keep their labels in the row or in More. Command names, shortcuts, tooltips, disabled reasons, and pressed states remain available. The command row does not need horizontal scrolling. At narrow widths, the utility controls may occupy a separate row.
+- **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order widens the same docked rail while the canvas remains on the left; it is not a modal or a third sidebar. Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
-- **Machine controls panel**: docked at the far right with the same collapse/expand pattern. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
-- **Live Motion bar**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears directly below the workspace and above the status bar, so its arrival shortens the workspace from the bottom without moving the top-aligned jog controls. It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs without covering workspace content.
-- **Laptop workspace**: at 1100 px wide or below, the machine rail starts collapsed while Cuts/Layers remains visible, preserving editing space without hiding the layer workflow.
+- **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
+- **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
+- **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
+- **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
+- **Job actions dock**: Frame and the primary **Set up & Frame** / **Start framed job** action sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
+- **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
+- **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
+- **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
-- **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering either responsive range again reapplies only its collapsed default.
-- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button and a "Design" button that opens the Design Studio (ADR-272, flows F-DS1..F-DS4). Preview lives in the top toolbar and the Window menu, not here.
-- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores both panels. Panel visibility does not affect the Live Motion bar.
+- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. It retains Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions retain readable labels and may widen the strip. Preview lives in More and the Window menu.
+- **Workspace colours**: panels, drawing bed, grid, rulers and controls follow the operating system's light/dark preference. Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
+- **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
+- **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
 - **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
 
 #### Disabled controls
@@ -906,6 +913,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
    Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
    non-Frame-validity policy findings remain warnings.
+   Dense programs above the optional analysis budget keep their complete G-code and motion route
+   while omitting duplicate executable-plan analysis. Frame bounds and Start authorization are
+   unchanged. GRBL-compatible position reports with extra axes retain their reported XYZ values;
+   additional axes do not make an otherwise valid position disappear.
 5. **Job Review runs at Start (ADR-237).** Frame dispatches dialog-free; the warnings, exact
    artifact, and — when preparation changed G55-G59 to G54 — the durable WCS disclosure ride the
    review-pending permit. Pressing Start opens the one Job Review; the operator confirms with
@@ -1103,9 +1114,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B7. Pause / resume
 
-Pause, Resume, and tool-change Continue appear only in the Live Motion bar. The bar remains in normal
-layout below the workspace, keeping the top-aligned machine controls stationary, and wraps its status
-and action groups instead of shrinking the controls below their minimum target size.
+Pause, Resume, and tool-change Continue appear only in the Live Motion popup. It floats above the
+status bar as a fixed, content-sized card (ADR-207 amendment) so it never reflows the workspace or
+the rails, and wraps its status and action groups instead of shrinking the controls below their
+minimum target size.
 
 #### Success — pause (GRBL-family laser)
 1. User clicks **Pause**. The app freezes host refill before writing any controller byte.
@@ -1203,10 +1215,20 @@ and the Machine rail may retain its detailed progress bar. Both update whenever 
 advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
 reconciliation; it is not presented as elapsed-time or remaining-time progress.
 
-Before Start, the existing project estimate remains visible. Once the exact output artifact exists,
-the in-job remaining-time baseline comes from the exact emitted G-code timeline: modeled motion and
-every deterministic timing command, including CNC `G4` spindle spin-up dwells. A deterministic dwell
-keeps its emitted duration and is never multiplied by an observed motion-pacing correction. Motion
+Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
+and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
+head position contributes approach time in every placement mode. That position is sampled only
+while the head is settled — an Idle report with no Frame, jog, probe, autofocus, streamed job or
+MPG motion — and the last settled sample holds while it moves, so Frame and jog motion never
+re-prepare the estimate. Job Review reuses the prepared
+program's timing baseline when available, and Start retains the same cut/travel calibration.
+The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
+and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and
+dwell; only delivery delays extend the estimate. This is an earliest-arrival serial model, not a
+simulation of controller RX buffers, acknowledgement latency or host scheduling. Ruida binary job
+execution does not use the serial G-code delivery model. Manual tool-change time is disclosed but
+cannot be predicted. Deterministic dwell and serial delivery are never multiplied by motion
+calibration or an observed motion-pacing correction. Motion
 lookahead also restarts where the emitted program makes the controller drain its planner: dwell/
 pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `M3`/`M4`/`M7`/`M8`/
 `M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
@@ -1233,6 +1255,10 @@ model:
   `Run` report proves execution while the first write is settling. The baseline pace applies until
   fresh route samples calibrate it, while deterministic dwell always retains its emitted duration.
 - **Paused:** the last estimate freezes; hold time does not silently consume the remaining estimate.
+  Pausing the sender alone does not stop the execution clock. Fresh `Run` and `Hold:1` reports
+  continue it through queued motion or deceleration; confirmed `Hold:0` and settled `Door:0/1`
+  freeze it. Smoothie `Hold` without a substate remains supported. Marlin's position-only `M114`
+  response does not prove execution drained, even when represented as `Idle` by the adapter.
   A host-side CNC `M0` alone is not physical pause proof: the clock keeps running through the
   buffered pre-`M0` tail and freezes only after the existing fresh `Idle` tool-change proof.
 - **Disconnected:** remaining time is unavailable rather than counting down or carrying a stale
@@ -1242,6 +1268,9 @@ model:
   line acknowledgement alone does not select this state or remove the numeric countdown.
 - **Complete:** the active-driver settle marker has completed and the required stable `Idle` reports
   have released the job. An acknowledged final line alone cannot select this state.
+
+Positive subsecond estimates display `<1s`. An exhausted estimate while the job remains active
+displays that it is waiting for the controller; numerical rounding never implies completion.
 
 The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
 session, position epoch, active driver, and current-session detected-family evidence. If any of that
@@ -2306,6 +2335,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 10. **$10 unusual config.** Set `$10=1` (WPos-only) and repeat steps
     2–3. The cache should still update — WCO is reported on a
     separate bit from MPos/WPos.
+11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+    then Start: the pump must be running at the first burn line. Frame
+    no longer sends `M9` on the Falcon command set, so a pump the
+    operator left on stays on. With the first operation's Air off, Job
+    Review shows the air-off opening-operation advisory; Start is not
+    blocked.
 
 When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
@@ -2344,6 +2379,18 @@ Position may omit Set origin; Current Position, User Origin, and Absolute
 Coordinates all require an exact completed Frame before ordinary Start.
 The raw placement dropdown and advanced origin controls remain available for
 fixtures and deliberately manually-homed Absolute Coordinates workflows.
+
+**Releasing the motors after a job.** GRBL holds the steppers energized when
+motion stops — `$1` (step idle delay) decides for how long, and 255 holds them
+indefinitely — so a finished burn normally leaves the gantry immovable by hand.
+The Position job card leaves the rail once an origin is settled, which every
+completed job guarantees, so the Origin row carries **Release motors** whenever
+the card is not showing it (either homing is enabled, or an origin is settled).
+Release is refused until the controller reports Idle, so it stays blocked
+through the "Machine finishing" window while the postamble park rapid is still
+running. `$SLP` clears the work origin and invalidates any Verified Frame; the
+top-level **Controller is asleep** banner offers Wake (Ctrl-X), and on a
+no-homing profile the Position job card returns to guide the re-set.
 
 ---
 

@@ -209,7 +209,7 @@ const resultStyle: React.CSSProperties = {
 };
 const errorStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   margin: '4px 0 6px 0',
 };
 const advisoryStyle: React.CSSProperties = {

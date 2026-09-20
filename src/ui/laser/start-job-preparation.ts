@@ -1,4 +1,5 @@
 import { rotaryAppliesTo, type JobOriginPlacement } from '../../core/job';
+import { machineKindOf } from '../../core/scene';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import type { ControllerSettingsSnapshot, PreflightOptions } from '../../core/preflight';
 import type { PreparedOutput } from '../../io/gcode';
@@ -8,13 +9,17 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
+import {
+  canvasJobTimingPlan,
+  DWELL_EVIDENCE_UNAVAILABLE_REASON,
+} from '../state/canvas-job-timing-plan';
 import {
   buildCanvasMotionPlan,
   reportedWorkPositionMm,
   type CanvasMotionPlan,
 } from '../state/canvas-motion-plan';
 import { canvasExecutablePlan } from '../state/canvas-preview-motion';
+import { canvasExecutableSidecarWithinBudget } from '../state/canvas-program-analysis-budget';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
@@ -70,6 +75,7 @@ export function okPreparation(
     prepared.project.device,
     reportedWorkPositionMm(machine, reportInches),
     {
+      machineKind: machineKindOf(prepared.project.machine),
       controllerSessionEpoch: machine.controllerSessionEpoch,
       positionEpoch: machine.trustedPositionEpoch,
       activeControllerKind: machine.activeControllerKind,
@@ -88,7 +94,23 @@ export function okPreparation(
     gcode,
     warnings,
     prepared,
-    metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan),
+    // The live countdown needs proof (a trusted position, the controller
+    // family, a bounded program); the pre-job estimate does not. When the
+    // exact plan is unavailable the estimate is still built from the emitted
+    // program with the estimator's own assumptions, as it was before the two
+    // shared one baseline - an offline or dense job keeps its time. The one
+    // exception is unproven dwell units on a connected controller.
+    metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
+      gcode,
+      ...(jobTimingPlan.kind === 'ok'
+        ? { timeline: jobTimingPlan.plan }
+        : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
+          ? { unavailableReason: jobTimingPlan.reason }
+          : {}),
+      ...(jobTimingPlan.evidence.initialPosition === null
+        ? {}
+        : { initialPosition: jobTimingPlan.evidence.initialPosition }),
+    }),
     ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
     canvasPlan,
     jobTimingPlan,
@@ -105,6 +127,9 @@ function executablePlanForCalculatedBounds(args: {
 }): ExecutablePlanV1 | undefined {
   const associated = canvasExecutablePlan(args.canvasPlan);
   if (associated !== undefined) return associated;
+  // The canvas may have omitted this redundant sidecar for a dense program.
+  // Do not immediately rebuild it solely for optional calculated bounds.
+  if (!canvasExecutableSidecarWithinBudget(args.gcode, args.canvasPlan.manifest)) return undefined;
   // Avoid constructing a plan that the bounds selector must reject for a
   // coordinate-basis mismatch. Realtime previews may already have associated
   // one; that exact object is reused above and the selector still rolls back.

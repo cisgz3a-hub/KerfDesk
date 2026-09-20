@@ -41,6 +41,17 @@ describe('useToastStore', () => {
     expect(useToastStore.getState().toasts.length).toBe(0);
   });
 
+  it('dismisses a success confirmation sooner than an advisory', () => {
+    useToastStore.getState().pushToast('saved', 'success');
+    useToastStore.getState().pushToast('careful', 'warning');
+    vi.advanceTimersByTime(3999);
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['saved', 'careful']);
+    vi.advanceTimersByTime(1);
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['careful']);
+    vi.advanceTimersByTime(4000);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
   it('two toasts dismiss independently', () => {
     useToastStore.getState().pushToast('first');
     vi.advanceTimersByTime(1000);

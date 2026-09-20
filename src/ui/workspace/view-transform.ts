@@ -3,14 +3,14 @@
 // mouse-event handling) and by handles.ts (px-to-mm for hit-test).
 //
 // Layered model: there's a baseline "fit-to-bed" scale (the bed maximises
-// in the canvas with PADDING_PX margin), and on top the user-controlled
+// in the canvas clear of its ruler strips), and on top the user-controlled
 // zoomFactor + pan offsets. zoomFactor of 1 = fit-to-bed; pan is in
 // scene-mm, applied to the camera (positive panX shifts content left).
 
 import type { Project, Vec2 } from '../../core/scene';
 import { MAX_ZOOM, MIN_ZOOM } from '../state/ui-store';
+import { CANVAS_PADDING_PX } from './canvas-layout';
 
-const PADDING_PX = 24;
 const MIN_USABLE_PX = 1;
 
 export type ViewTransform = {
@@ -42,8 +42,8 @@ export function computeView(
   const zoomFactor = positiveFiniteOr(view.zoomFactor, DEFAULT_VIEW_STATE.zoomFactor);
   const panX = finiteOr(view.panX, DEFAULT_VIEW_STATE.panX);
   const panY = finiteOr(view.panY, DEFAULT_VIEW_STATE.panY);
-  const usableW = Math.max(MIN_USABLE_PX, canvasWidth - PADDING_PX * 2);
-  const usableH = Math.max(MIN_USABLE_PX, canvasHeight - PADDING_PX * 2);
+  const usableW = Math.max(MIN_USABLE_PX, canvasWidth - CANVAS_PADDING_PX * 2);
+  const usableH = Math.max(MIN_USABLE_PX, canvasHeight - CANVAS_PADDING_PX * 2);
   const baseScale = Math.min(usableW / bedWidth, usableH / bedHeight);
   const scale = Math.max(Number.EPSILON, baseScale * zoomFactor);
   // Center the bed in the canvas at the new scale, then apply the user pan.

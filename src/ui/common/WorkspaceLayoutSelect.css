@@ -1,0 +1,44 @@
+.lf-workspace-layout-select {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+  min-height: 40px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.lf-workspace-layout-menu {
+  width: 176px;
+}
+.lf-workspace-layout-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  color: var(--lf-text);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lf-workspace-layout-option[aria-checked='true'],
+.lf-workspace-layout-option:hover,
+.lf-workspace-layout-option:focus-visible {
+  background: var(--lf-tint-accent);
+}
+.lf-workspace-layout-option:focus-visible {
+  outline: 1px solid var(--lf-accent);
+  outline-offset: -1px;
+}
+.lf-workspace-layout-check {
+  color: var(--lf-accent);
+  visibility: hidden;
+}
+.lf-workspace-layout-option[aria-checked='true'] .lf-workspace-layout-check {
+  visibility: visible;
+}

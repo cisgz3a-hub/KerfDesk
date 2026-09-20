@@ -66,7 +66,8 @@ describe('CNC Resume refill ownership', () => {
     expect(harness.writes).not.toContain(RT_SOFT_RESET);
     expect(useLaserStore.getState().pauseResumeTransition).toMatchObject({ action: 'resume' });
     expect(useLaserStore.getState().streamer?.status).toBe('paused');
-    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('paused');
+    // Fresh Run proved physical execution despite the failed sender refill.
+    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('running');
 
     const writesBeforeBlockedRetry = harness.writes.length;
     await expect(useLaserStore.getState().resumeJob()).rejects.toThrow(PENDING_TRANSPORT_MESSAGE);

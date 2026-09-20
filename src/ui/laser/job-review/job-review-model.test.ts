@@ -308,6 +308,23 @@ describe('buildJobReviewModel', () => {
     expect(model.warnings).toContainEqual(expect.stringContaining('manual air pump'));
   });
 
+  it('discloses that a job never sends M8 when every operation runs with air off (ADR-323)', async () => {
+    // The fixture layer keeps the Air default (off) while the device is wired
+    // for job-controlled air — the Falcon A1 Pro "shadows at the start" setup.
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...state.project.device, airAssistCommand: 'M8' },
+      },
+    }));
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.warnings).toContainEqual(expect.stringContaining('never sends M8'));
+    // rule 7 / ADR-228: disclosure only — it never forces acknowledgement.
+    expect(model.acknowledgement).toEqual({ kind: 'laser-verified' });
+  });
+
   it('discloses the park rapid that exits the framed outline (laser)', async () => {
     // The line object spans X/Y 1..9 while the default GRBL dialect parks at
     // work 0,0 — the job's final rapid leaves the framed motion envelope.
@@ -325,6 +342,8 @@ describe('buildJobReviewModel', () => {
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     }));
     useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
       ovCache: { feed: 100, rapid: 100, spindle: 100 },
       accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
@@ -348,5 +367,22 @@ describe('buildJobReviewModel', () => {
       kind: 'cnc',
       prompt: CNC_SETUP_ATTESTATION_PROMPT,
     });
+  });
+
+  it('keeps CNC Review available when current-session dwell timing evidence is missing', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({ detectedControllerKind: null });
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.stats[0]).toMatchObject({
+      label: 'Estimated time',
+      value: 'Unavailable',
+      detail: 'current-session controller evidence cannot prove G4 P dwell uses seconds',
+    });
+    expect(model.stats[2]?.label).toBe('Cutters');
+    expect(model.acknowledgement.kind).toBe('cnc');
   });
 });

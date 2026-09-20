@@ -2840,6 +2840,10 @@ that is a separate LightBurn convention for vector user units and is unaffected.
 
 **Status:** Accepted. | **Date:** 2026-06-13
 
+> **Amendment note (2026-09-19).** The light-only choice below is amended by the
+> theme-aware workspace palette at the end of this entry. The shared token
+> architecture remains in force; the workspace bed now follows the theme too.
+
 ### Context
 
 ADR-047 built the design-token system with a **unified dark chrome** over a
@@ -2915,8 +2919,8 @@ change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
 
 The transient startup surface uses a separate charcoal/copper palette and a typographic
 KerfDesk wordmark over sculpted timber artwork, with **Created by Ons Houtkombuis** as live text.
-This is the maintainer-requested loading-screen identity; the workspace keeps ADR-049's light
-chrome. The static HTML provides readable branding before either JavaScript or the artwork is
+This is the maintainer-requested loading-screen identity; the workspace follows the theme-aware
+palette amendment below. The static HTML provides readable branding before either JavaScript or the artwork is
 available. A compressed local WebP is explicitly precached for offline launches, with a plain
 charcoal background as fallback. No remote font or image service is used at runtime.
 
@@ -2924,6 +2928,35 @@ The activity bar is indeterminate, reduced motion disables animation, and the sc
 the workspace after the canvas has a paint opportunity without a minimum branding hold.
 A mounted root crash screen is revealed promptly; the existing bounded wait after main-module
 execution remains for a missing canvas. The loading screen adds no modal or operator action.
+
+### Amendment (2026-09-19): theme-aware workspace palette
+
+The maintainer accepted the responsive workspace preview and its blue and soft
+grey palette. The application now uses light tokens by default and overrides
+chrome surfaces, text, tints, and native-control `color-scheme` through
+`prefers-color-scheme: dark`. This supersedes the light-only restriction above;
+it does not add a separate in-app theme preference.
+
+Light chrome uses white panels, `#f5f7fa` bars, `#dce2ea` borders, and `#253248`
+text. The shared blue fill is `#3175d0`, minimally deeper than the preview blue
+so small white labels meet AA contrast. Dark chrome uses `#20242b` panels,
+`#272c34` bars, and `#e0e7f2` text. Semantic text uses the `--lf-*-fg` tokens;
+semantic fills retain white `--lf-on-fill` text in either theme.
+
+The maintainer's approved dark preview supersedes the always-light workspace bed.
+The canvas surround, bed, grid, rulers and Design Studio drawing surface now
+follow the chrome theme: dark mode uses a `#242930` bed, `#343b46` grid and
+`#272c34` rulers. Black and other low-contrast vector paints are adapted only at
+display time, with neutral artwork using `#e0e7f2` ink on the dark bed. Chromatic
+paints retain their relative channel order when lightened for visibility. Light
+mode retains the white bed and original artwork paints. OS theme changes redraw
+the canvas and invalidate its preview-background cache immediately.
+
+Canvas selection and out-of-bounds chrome still share the corresponding accent
+and danger values pinned by `theme-sync.test.ts`. Stored artwork colours, raster
+pixels, exports, toolpath semantics and machine behaviour are unchanged. Material
+and image-specific previews keep their own rendering semantics. The static error
+page remains its existing light presentation.
 
 ---
 
@@ -7245,6 +7278,25 @@ desktop widths gain vertical space while specialist labels remain available
 where room permits. Operators on narrow windows may need to horizontally scroll
 the command group, but every command also remains available from the menus.
 
+### Amendment (2026-09-19): measured overflow and compact transform controls
+
+The command lane now measures the available space and moves commands into a
+labelled **More** popover instead of requiring horizontal scrolling or hiding
+specialist labels at a fixed breakpoint. Commands in the row and popover share
+the command registry, including their handlers, accessible names, tooltips,
+shortcuts, disabled reasons, and pressed states. Overflow adapts to the actual
+window width and the space occupied by the toolbar's utilities. The command lane
+does not wrap; at 700 px and below, utilities and commands may occupy separate rows.
+This replaces the earlier fixed 1280 px label rule and horizontal-scroll fallback.
+
+The toolbar also exposes the saved Auto / Compact / Spacious workspace preference
+defined in ADR-139's amendment. The numeric toolbar retains X/Y, width/height,
+rotation, and the aspect-ratio control; the nine-point transform anchor moves into
+a keyboard-accessible **Anchor** popover without changing transform semantics.
+The drawing strip uses a 44 px default width, scrolls when necessary, and keeps
+all tools, design-library access, and Design Studio access. Curve actions may
+widen it to retain readable labels. No capability is removed to fit the window.
+
 ## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
 
 **Status:** Superseded in part by ADR-207 | **Date:** 2026-07-13
@@ -7290,6 +7342,35 @@ preference, so a panel that was collapsed before Start collapses again after the
 stream fully settles. Panel visibility remains session-only; persistence across
 launches can be added later if user testing shows that preference is valuable.
 At 700 px and below, the initial canvas no longer collapses to zero width.
+
+### Amendment (2026-09-19): saved responsive workspace layout
+
+The earlier width-triggered collapse defaults are replaced by an explicit
+**Auto / Compact / Spacious** preference. It is local application UI state,
+persisted across reloads, never project or undo data. If browser storage is
+unavailable, changing the layout still works for the current session.
+
+- **Auto** chooses Compact at viewport width <=1439 CSS px or height <=719 CSS
+  px, and Spacious otherwise. Width and height both matter because short laptop
+  windows lose usable canvas area even when their horizontal resolution is high.
+- **Compact** presents one sidebar with keyboard-accessible Artwork and Machine
+  tabs, a scrolling settings body, and the shared job-actions dock beneath it.
+  Selecting a tab makes its existing panel available; commands that request a
+  particular panel focus the corresponding tab.
+- **Spacious** presents the two panels side by side, preserving independent
+  horizontal resize, hide/show, and collapse/expand controls. Run order continues
+  to widen the Artwork / Operations panel.
+- Below 960 CSS px wide, the workspace always uses a single Compact sidebar,
+  even with Spacious selected. The saved preference is retained and takes effect
+  again once the window can accommodate it.
+- **Reset Workspace Layout** restores Auto and opens both panels. Compact still
+  displays one tab at a time. Panel visibility and manual panel sizing remain
+  distinct from the persisted layout preference.
+
+ADR-207 remains unchanged: Pause, Resume, Continue, and software Abort belong to
+the independent Live Motion bar, and panel visibility never changes those active
+operation controls. The job dock is a presentation change under ADR-225's
+amendment; switching layouts does not Frame, Start, connect, or send machine work.
 
 ## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
 
@@ -9267,7 +9348,7 @@ ordinary Start guard.
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17, 2026-09-19
 
 ### Context
 
@@ -9303,6 +9384,46 @@ longer stack competing Abort buttons, and transient jog state no longer moves th
 the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
+
+### Amendment (2026-09-19, revised 2026-09-20) — a floating popup, never in normal flow
+
+**Context.** In normal flow between the workspace and the status bar, the bar's arrival and
+departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
+maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
+decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
+lower edge. A first revision absolutely positioned it on the canvas's lower edge; the maintainer
+then asked for it to be "above screen like a pop up that doesnt affect the rest and wont cause any
+jumping", which an absolute full-bleed strip inside the canvas is not.
+
+**Decision.**
+
+- The control is a **window-level floating popup**: `position: fixed`, bottom-centre, above the
+  status bar, rendered as an App-shell sibling rather than inside `<main>` (`App.tsx`). Being
+  fixed it occupies no layout box anywhere, so mounting or unmounting it cannot change the size or
+  position of the workspace, the tool strip, or either rail — and no ancestor's `overflow` can clip
+  it. Measured live at 1400×900: the `main`, canvas, rails and status-bar rects are identical
+  before and after it mounts.
+- It is sized by its content (`width: max-content`, capped at `min(720px, 100vw - 24px)`) with a
+  rounded radius, border, danger top edge and shadow, so it reads as a popup over a small patch
+  above the status bar rather than a full-bleed strip across the workspace.
+- It keeps a wrapping status line (state · progress · safety note) beside the unchanged ≥48 px
+  controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
+  order, and still directs the operator to the physical E-stop or power isolation.
+- Toasts leave the rails for the same reason: they share the canvas's available space (lower left
+  of the workspace, above the live controls) or a reserved row inside the open modal, as decided by
+  the placement hook the laptop-layout work introduced; they use a tinted surface with a coloured
+  edge instead of a solid fill, and a success confirmation auto-dismisses in 4 s (advisories and
+  failures keep 8 s). Only the newest three render, so a burst cannot bury the drawing. The toast
+  body ignores pointer input with only its dismiss control interactive — a draft that overlaid the
+  drawing with click-to-dismiss toasts had the import worker's "parsing in worker" advisory swallow
+  the mousedown starting a rectangle drag, which the `shape-properties` browser smoke caught.
+
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the fixed
+positioning, the content sizing and the placement outside `<main>`. While motion is active the
+popup covers a band above the status bar — at a typical width that includes the canvas zoom
+cluster (wheel and keyboard zoom keep working) and can reach the rails' lowest rows; it is
+transient and the canonical run controls are the ones inside it. A stack of up to three toasts briefly
+covers the lower left of the drawing or a row of the open dialog. The Machine rail is unchanged.
 
 ---
 
@@ -9973,6 +10094,42 @@ pacing still require physical calibration; controller reports and simulator evid
 them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
 Frame authorization, controller command, settle contract, or other safety boundary.
 
+### Amendment 2026-09-19 — one emitted baseline for estimates and remaining time
+
+Pre-job estimates, prepared Job Review and the live countdown share the emitted-program timing
+model and device cut/travel calibration. CNC pecks, helical entry, XYZ motion, represented feeds,
+retracts, dwell and parking are timed from native output. Junction planning retains XYZ direction;
+arc timing uses the circular or helical route length rather than the shorter display chords.
+
+Serial delivery contributes only delay that cannot overlap earlier modeled execution. It counts
+the sender's trimmed UTF-8 lines, newline and 8N1 framing at the configured or driver-default baud.
+Host-managed tool changes restart the delivery window; their operator wait is excluded and
+disclosed. Motion calibration and observed route pacing do not scale dwell or serial delay.
+Ruida binary output does not use the G-code serial model.
+
+Known physical XYZ is an estimate input for every placement mode. It is separate from any final
+Current Position parking target and participates in background cache identity by coordinate
+values. A preloaded large job requests background estimation on initial mount. Superseded replies
+cannot replace the current result. The existing bounded Start timing sidecar keeps an unavailable
+result without retrying an unbounded parse or introducing a new Start gate. An unavailable live plan
+(no trusted position, unknown controller family, program over the countdown budget) never voids the
+pre-job estimate: Job Review and the time tile still estimate the emitted program with the estimator's
+own assumptions, as they did before the two shared one baseline. The one exception is a dwelling
+program on a connected controller that has not proven its G4 P units; that estimate stays unavailable
+rather than guess by a factor of a thousand.
+
+Freezing the sender is not proof of a physical hold. Run/deceleration continues consuming the
+estimate until fresh controller evidence establishes a settled hold or the existing host-tool-change
+boundary. Marlin position-only reports do not prove drain. Rounding is applied to total seconds
+before formatting units; an exhausted estimate continues to show that execution is awaiting
+controller completion. Only the established completion contract selects Complete.
+
+Geometric Preview playback incorporates the same total but distributes non-motion time over its
+route; it does not represent exact command-event placement. The estimator remains a model of
+configured motion limits and earliest serial arrival. RX/ACK behavior, host scheduling, overrides,
+spindle behavior and actual material/machine pacing require separate physical qualification. The
+Frame-first authorization contract and the emitted machine commands are unchanged by timing.
+
 ---
 
 ## ADR-222 - Single-artwork scenes select the artwork by default
@@ -10217,6 +10374,30 @@ re-landed after a merge race via #261).
    the release -> wake -> unlock -> set-origin wizard behind it is unchanged.
 
 **Amendment (2026-07-17, same day).** Placement moves below the job actions: the placement block above the cluster pushed Start/Frame under the 720p fold, and the maintainer requires the go-actions visible without scrolling. Final rail order: origin -> job actions -> placement -> hand-positioning guide. Placement stays a set-once compile setting and is re-presented in the pre-start Job Review dialog (ADR-224), so nothing is lost at Start time. The ux-shell e2e restores the hard above-the-fold assertion for Start job and Frame at laptop height.
+
+### Amendment (2026-09-19): job actions outside the settings scroller
+
+Frame and the primary Set up & Frame / Start framed job action now share a job
+dock outside the scrolling settings body. Compact keeps this dock below both the
+Artwork and Machine tabs. Spacious places it below the expanded Machine panel;
+the operator's explicit hide/collapse controls still apply. The dock includes the
+existing frame-readiness explanation, job estimate, and Start blocker notice.
+Origin, placement, homing, focus, and other setup controls remain available in the
+Machine panel.
+
+The dock uses the existing Frame and Start handlers and the same readiness and
+busy-state inputs as the inline controls. The primary action still prepares and
+Frames when the exact job is not framed, then opens the existing Start-time
+review when its Frame evidence is current. It does not add a second permission
+model or change the sole ordinary Start policy gate: completed Frame for the
+exact reviewed job, as governed by ADRs 228, 230, 232, and 237. Policy findings
+remain review warnings, and the existing factual transport/output/handoff
+boundaries remain unchanged.
+
+The workspace dock presents Frame as a neutral button and the primary action as
+the shared blue filled button, replacing the earlier go-green presentation there.
+The shared inline go-action variant remains available to existing callers. The
+Live Motion bar and its Pause, Resume, Continue, and Abort behaviour are unchanged.
 
 ---
 
@@ -11029,6 +11210,31 @@ timing plan remain owned by the permit; neither cached-plan replacement nor Job 
 warning refresh loop changes. The partially adopted historical proposal and its pending
 no-go/timing portions are recorded in
 [the preservation note](docs/audits/2026-09-06-frame-advisory-retention-preservation.md).
+
+### 2026-09-19 amendment: extended position reports and bounded optional analysis
+
+A live Falcon report contained `MPos:191.500,106.500,-21.100,0.000`. Requiring exactly
+three axis values discarded its valid XYZ coordinates while retaining Idle, making both
+ordinary Frame and work-origin placement fail. `MPos`, `WPos`, and `WCO` now accept
+additional finite numeric axes after XYZ and retain the first three coordinates used by
+KerfDesk. Incomplete or malformed vectors remain unavailable; override reports still
+require exactly three values. This follows the variable-axis reports in the
+[grblHAL report implementation](https://github.com/grblHAL/core/blob/master/report.c)
+and does not add motion support for those extra axes.
+
+Frame preparation also built an optional executable-plan sidecar through a render model,
+another motion manifest, and a parity toolpath, amplifying memory use for dense traces.
+Both sidecar entry points now check the existing 25,000-line/segment analysis budgets
+before construction, counting expanded arc segments from the already-built manifest.
+Above that budget, the complete emitted program and manifest remain available, and the
+existing manifest preview and Job-based calculated-bounds paths remain in use. Nothing
+is truncated and this budget does not refuse Frame or Start. Physical Frame bounds,
+one-use permits, exact bytes, and controller completion requirements are unchanged.
+
+Regression tests reproduce the captured position loss and the redundant sidecar entry.
+They verify placement/return coordinates and unchanged large-job bytes, route, and Frame
+bounds. These are software checks; the original out-of-memory browser crash and physical
+Falcon framing have not been reproduced by the tests.
 
 ---
 
@@ -19973,3 +20179,45 @@ Persistence, setup, bounds, air commands, head variants and settings adoption ha
 coverage. Integrated release checks and browser evidence are recorded in the correction record.
 No physical machine, firmware runtime, material process or packaged hardware transport is
 qualified by these software checks. Ruida remains experimental vector-only file export.
+
+## ADR-323 - Falcon Frame leaves the air pump alone and Job Review discloses an air-off opening operation (2026-09-19)
+
+**Status:** Accepted; amends the ADR-322 §4 Falcon A1 Pro command contract. Preserves the
+completed-Frame contract in ADRs 228, 230, 232 and 237.
+
+### Context
+
+The maintainer's Falcon A1 Pro burned dark smoke marks around the opening part of every job on
+wood, fading as the job progressed. The emitted program is time-invariant (`M4 S0` preamble,
+`S0` on every travel, dynamic power throughout), so the only start-specific behaviour was air:
+Frame sent the generic GRBL tool-off pair `M5`/`M9` plus a settle dwell immediately before Start,
+and the job writes the device's air command only right before the first operation whose Air
+setting is on. New operations default to Air off. Creality's A1 firmware treats `M9` as a
+stateful low/standby request with a `$152` delay, dropped the pump seconds after `M8` on firmware
+1.0.6, and fails the pump around dwell pauses (LightBurn forum threads 181704, 186138 and 175296;
+Creality forum thread 41420). The pump was therefore commanded off immediately before the burn
+and turned on late or never.
+
+### Decision
+
+1. The Falcon A1 Pro command contract overrides `frameToolOffLines` to `M5` alone. Frame still
+   asserts laser-off and every perimeter line carries `S0`; the pump keeps whatever state the
+   operator or the previous job left. The generic GRBL driver keeps `M5`/`M9` because CNC
+   projects trace with coolant off, and Stop, Abort and disconnect cleanup still send `M9`.
+2. Job Review adds an advisory when the device has a job-controlled air command and the first
+   laser operation runs with Air off. It names the opening operation and the operation before
+   which the command first appears, or states that the job never sends the command when every
+   operation has Air off. The Air column in the same review is the fix. This is a warning only;
+   no Start gate is added.
+3. The emitter is unchanged. Pre-arming `M8` at job start was rejected: an operation with Air
+   off is a legitimate choice (the A1's `M9` state is its documented gentle engraving flow), and
+   forcing air would silently change that operation's result.
+
+### Verification and limits
+
+`falcon-command-contract.test.ts` pins `['M5']` for the Falcon contract and `['M5', 'M9']` for
+the generic driver. `air-assist-start-warnings.test.ts` and `job-review-model.test.ts` pin the
+advisory texts and that they never change the acknowledgement. No hardware was operated; the
+pump-timing cause is inferred from the emitted bytes and public firmware reports, and a Falcon
+coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
+check.

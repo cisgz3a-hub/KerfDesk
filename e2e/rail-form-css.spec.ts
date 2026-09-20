@@ -132,7 +132,7 @@ test('keeps CNC job setup out of Artwork and opens it through Startup Setup', as
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
 
-  const artworkPanel = page.getByLabel('Cuts / Layers resizable panel');
+  const artworkPanel = page.getByRole('complementary', { name: 'Artwork / Operations panel' });
   await expect(artworkPanel.locator('section[aria-label="Material and bit setup"]')).toHaveCount(0);
   await expect(artworkPanel.getByLabel('Stock origin X', { exact: true })).toHaveCount(0);
   await expect(artworkPanel.getByLabel('Stock origin Y', { exact: true })).toHaveCount(0);
@@ -162,7 +162,7 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
 
-  const panel = page.getByLabel('Cuts / Layers resizable panel');
+  const panel = page.getByRole('complementary', { name: 'Artwork / Operations panel' });
   const machineMaximum = panel.getByRole('button', { name: /^Machine maximum:/ });
   const artworkSpindle = panel.getByRole('spinbutton', { name: /^Artwork spindle speed for/ });
   await expect(machineMaximum).toBeVisible();

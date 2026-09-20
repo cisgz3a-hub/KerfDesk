@@ -103,6 +103,16 @@ function preparedWith(job: Job, rotary?: RotarySetup): Extract<PreparedOutput, {
 }
 
 describe('buildPreparedJobMetrics rotary duration (ADR-127)', () => {
+  it('retains bounded or untrusted timing evidence without an unbounded fallback', () => {
+    const reason = 'Exact emitted program exceeds the live countdown line budget.';
+    const metrics = buildPreparedJobMetrics(preparedWith(yLineJob()), undefined, undefined, {
+      gcode: 'G21\nG90\nG1 X100 F600\n'.repeat(10_000),
+      unavailableReason: reason,
+    });
+    expect(metrics.duration.unavailableReason).toBe(reason);
+    expect(metrics.duration.totalSeconds).toBe(0);
+    expect(metrics.jobBounds).not.toBeNull();
+  });
   it('measures the machine-space job, not the design surface', () => {
     const job = yLineJob();
     const device = deviceWith(CHUCK);

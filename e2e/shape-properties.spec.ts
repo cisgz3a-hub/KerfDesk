@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -17,7 +18,7 @@ test('edits a drawn rectangle as canonical geometry and undoes the edit', async 
   await cornerRadius.press('Tab');
   await expect(cornerRadius).toHaveValue('6');
 
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = await savedProject(kerfdesk);
   const rectangle = saved.scene.objects.find(
     (object) => object.kind === 'shape' && object.spec?.kind === 'rect',

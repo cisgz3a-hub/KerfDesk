@@ -34,6 +34,16 @@ const job: Job = {
 };
 
 describe('job duration calibration', () => {
+  it('caps the per-group cut feed at device.maxFeed', () => {
+    // Requested F12000 is capped at 6000 mm/min = 100 mm/s. The 100 mm
+    // cut takes 1 s cruise plus 0.1 s acceleration/deceleration at 1000 mm/s².
+    const fastJob: Job = {
+      groups: job.groups.map((group) => ({ ...group, speed: 12000 })),
+    };
+    const estimate = estimateJobDuration(fastJob, device);
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(1.1, 2);
+  });
+
   it('applies independent cut and travel factors after motion planning', () => {
     const baseline = estimateJobDuration(job, device);
     const calibrated = estimateJobDuration(job, {
@@ -47,8 +57,16 @@ describe('job duration calibration', () => {
       baseline.breakdown.travelSeconds * 1.5,
       8,
     );
+    expect(calibrated.breakdown.dwellSeconds).toBe(baseline.breakdown.dwellSeconds);
+    expect(calibrated.breakdown.transportSeconds).toBeCloseTo(
+      baseline.breakdown.transportSeconds ?? 0,
+      8,
+    );
     expect(calibrated.totalSeconds).toBeCloseTo(
-      calibrated.breakdown.cutSeconds + calibrated.breakdown.travelSeconds,
+      calibrated.breakdown.cutSeconds +
+        calibrated.breakdown.travelSeconds +
+        (calibrated.breakdown.dwellSeconds ?? 0) +
+        (calibrated.breakdown.transportSeconds ?? 0),
       8,
     );
   });

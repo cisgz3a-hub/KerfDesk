@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { Buffer } from 'node:buffer';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
@@ -6,7 +7,7 @@ test('RTSP bridge failure requires explicit reconnect even when the image never 
 }) => {
   const bridge = await installControlledRtspBridge(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await (await toolbarCommand(page, 'Camera')).click();
   await page.getByText(/^RTSP camera/).click();
   await page.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
   await page.getByRole('button', { name: 'Connect', exact: true }).click();

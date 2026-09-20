@@ -122,7 +122,7 @@ const radioStyle: React.CSSProperties = {
   lineHeight: 1.4,
 };
 const retainedIssueStyle: React.CSSProperties = {
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 11,
   margin: '0 0 0 24px',
 };

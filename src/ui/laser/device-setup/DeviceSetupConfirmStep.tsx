@@ -82,6 +82,6 @@ const inlineStyle: React.CSSProperties = {
 const warningStyle: React.CSSProperties = {
   margin: '4px 0 0',
   fontSize: 12,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   lineHeight: 1.45,
 };

@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import type { Project } from '../src/core/scene';
 import { expect, test } from './fixtures/kerfdesk-test';
 import { checkWorkspaceHover } from './fixtures/workspace-responsiveness';
@@ -50,7 +51,7 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
   await kerfdesk.setOpenFiles([
     { name: 'canvas-raster.png', kind: 'png-fixture', width: 600, height: 2400 },
   ]);
-  await page.getByRole('button', { name: 'Import...', exact: true }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
   await expect.poll(() => workers.some((url) => url.includes('preparation-worker'))).toBe(true);
   await expect
@@ -88,7 +89,7 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
   expect(preparationReplies.map((reply) => reply.kind)).toEqual(
     expect.arrayContaining(['estimate', 'transfer-start', 'transfer-chunk', 'transfer-complete']),
   );
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect.poll(async () => Object.keys(await kerfdesk.savedFiles()).length).toBeGreaterThan(0);
   const entry = Object.entries(await kerfdesk.savedFiles()).find(([name]) => name.endsWith('.lf2'));
   if (entry === undefined) throw Error('Saved raster project is missing');

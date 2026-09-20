@@ -1,17 +1,21 @@
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
-import { laserPowerControlForDevice } from '../../core/gcode-view';
-import {
-  buildGcodeTimingPlan,
-  type GcodeTimingPlanResult,
-  type ProgramTimeCalibration,
-} from '../../core/gcode-time';
+import { buildGcodeTimingPlan, type GcodeTimingPlanResult } from '../../core/gcode-time';
+import { deviceProgramTimingOptions } from '../../core/gcode-time/program-timing-options';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { MachineKind } from '../../core/scene/machine';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
+import {
+  CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
+  canvasProgramExceedsLineBudget,
+} from './canvas-program-analysis-budget';
 
-const MAX_LIVE_COUNTDOWN_LINES = 25_000;
-const MAX_LIVE_COUNTDOWN_SEGMENTS = 25_000;
 const INITIAL_POSITION_TOLERANCE_MM = 0.05;
+
+/** The one live-plan refusal that also voids the pre-job estimate: a program
+ * that dwells on a connected controller which has not proven whether G4 P is
+ * seconds or milliseconds cannot be estimated without a thousandfold guess. */
+export const DWELL_EVIDENCE_UNAVAILABLE_REASON =
+  'current-session controller evidence cannot prove G4 P dwell uses seconds';
 
 export type CanvasJobTimingEvidence = {
   readonly fingerprint: GcodeFingerprint;
@@ -27,6 +31,7 @@ export type CanvasJobTimingPlanResult = GcodeTimingPlanResult & {
 };
 
 export type CanvasJobTimingContext = {
+  readonly machineKind?: MachineKind;
   readonly controllerSessionEpoch: number | undefined;
   readonly positionEpoch: number | undefined;
   readonly activeControllerKind: ControllerKind | null | undefined;
@@ -45,7 +50,7 @@ export function canvasJobTimingPlan(
     initialPosition,
     ...context,
   };
-  if (exceedsLineBudget(gcode, MAX_LIVE_COUNTDOWN_LINES)) {
+  if (canvasProgramExceedsLineBudget(gcode)) {
     return {
       kind: 'unavailable',
       reason: 'Exact emitted program exceeds the live countdown line budget.',
@@ -75,10 +80,12 @@ export function canvasJobTimingPlan(
     },
     initialPosition,
     {
-      maxSegments: MAX_LIVE_COUNTDOWN_SEGMENTS,
-      machineKind,
-      laserPowerControl: machineKind === 'laser' ? laserPowerControlForDevice(device) : undefined,
-      timeCalibration: profileTimeCalibration(device),
+      ...deviceProgramTimingOptions(
+        device,
+        context.machineKind ?? machineKind,
+        context.activeControllerKind,
+      ),
+      maxSegments: CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
     },
   );
   if (
@@ -90,18 +97,11 @@ export function canvasJobTimingPlan(
   ) {
     return {
       kind: 'unavailable',
-      reason: 'current-session controller evidence cannot prove G4 P dwell uses seconds',
+      reason: DWELL_EVIDENCE_UNAVAILABLE_REASON,
       evidence,
     };
   }
   return { ...result, evidence };
-}
-
-function profileTimeCalibration(device: DeviceProfile): ProgramTimeCalibration {
-  return {
-    cutTimeScale: device.estimateCutTimeScale ?? 1,
-    travelTimeScale: device.estimateTravelTimeScale ?? 1,
-  };
 }
 
 export function validatedCanvasJobTimingPlan(
@@ -141,14 +141,4 @@ function positionsMatch(left: MotionPoint | null, right: MotionPoint | null): bo
 
 function usesMillisecondDwellP(controllerKind: ControllerKind): boolean {
   return controllerKind === 'marlin' || controllerKind === 'smoothieware';
-}
-
-function exceedsLineBudget(gcode: string, maximumLines: number): boolean {
-  let lines = 1;
-  for (let index = 0; index < gcode.length; index += 1) {
-    if (gcode.charCodeAt(index) !== 10) continue;
-    lines += 1;
-    if (lines > maximumLines) return true;
-  }
-  return false;
 }

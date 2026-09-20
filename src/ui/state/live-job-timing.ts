@@ -30,7 +30,7 @@ type PlannedTimingState = {
   readonly plan: GcodeTimingPlan;
   /** Prediction frozen at `updatedAtMs`. Only confirmed running consumes wall time. */
   readonly remainingSecondsAtUpdate: number;
-  /** Observed wall time per planned motion second. Deterministic dwells stay unscaled. */
+  /** Observed wall time per planned motion second. Dwells and transport stay unscaled. */
   readonly motionPace: number;
   readonly updatedAtMs: number;
   readonly lastTrustedSample: TrustedTimingSample | null;
@@ -189,8 +189,12 @@ function calibratedMotionPace(current: number, sample: MotionPaceSample): number
   const plannedMotion = progress.motionSeconds - previous.progress.motionSeconds;
   if (plannedMotion < MINIMUM_PLANNED_MOTION_SAMPLE_SECONDS) return current;
   const plannedDwell = Math.max(0, progress.dwellSeconds - previous.progress.dwellSeconds);
+  const plannedTransport = Math.max(
+    0,
+    (progress.transportSeconds ?? 0) - (previous.progress.transportSeconds ?? 0),
+  );
   const observedWall = Math.max(0, atMs - previous.atMs) / 1000;
-  const observedMotion = observedWall - plannedDwell;
+  const observedMotion = observedWall - plannedDwell - plannedTransport;
   if (!Number.isFinite(observedMotion) || observedMotion <= 0) return current;
   const observedPace = clamp(
     observedMotion / plannedMotion,
@@ -207,7 +211,8 @@ function predictedRemaining(
 ): number {
   const remainingMotion = Math.max(0, plan.motionSeconds - progress.motionSeconds);
   const remainingDwell = Math.max(0, plan.dwellSeconds - progress.dwellSeconds);
-  return remainingMotion * motionPace + remainingDwell;
+  const remainingTransport = Math.max(0, plan.transportSeconds - (progress.transportSeconds ?? 0));
+  return remainingMotion * motionPace + remainingDwell + remainingTransport;
 }
 
 function remainingSecondsAt(timing: PlannedTimingState & { readonly kind: string }, now: number) {

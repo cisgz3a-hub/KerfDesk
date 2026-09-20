@@ -55,8 +55,16 @@ describe('canvas job timing plan', () => {
     if (baseline.kind !== 'ok' || laser.kind !== 'ok' || cnc.kind !== 'ok') {
       throw new Error('Expected calibrated timing plans.');
     }
-    expect(laser.plan.totalSeconds).toBeCloseTo(baseline.plan.totalSeconds * 3, 5);
-    expect(cnc.plan.totalSeconds).toBeCloseTo(baseline.plan.totalSeconds * 2, 5);
+    expect(laser.plan.motionSeconds).toBeCloseTo(baseline.plan.motionSeconds * 3, 5);
+    expect(cnc.plan.motionSeconds).toBeCloseTo(baseline.plan.motionSeconds * 2, 5);
+    expect(laser.plan.totalSeconds - laser.plan.motionSeconds).toBeCloseTo(
+      baseline.plan.transportSeconds,
+      5,
+    );
+    expect(cnc.plan.totalSeconds - cnc.plan.motionSeconds).toBeCloseTo(
+      baseline.plan.transportSeconds,
+      5,
+    );
     expect(laser.plan.totalRouteMm).toBe(cnc.plan.totalRouteMm);
   });
 

@@ -220,13 +220,19 @@ describe('useShortcuts modal gate', () => {
       </>,
     );
     try {
-      const openButton = [...host.querySelectorAll('button')].find((button) =>
-        button.textContent?.includes('Convert to Bitmap'),
+      const moreButton = host.querySelector<HTMLButtonElement>(
+        'button[aria-label="More commands"]',
+      );
+      if (moreButton === null) throw new Error('More commands missing');
+      await act(async () => moreButton.click());
+      const openButton = document.querySelector(
+        '[role="menu"][aria-label="More commands"] button[data-help-id="command:tools.convert-to-bitmap"]',
       );
       if (!(openButton instanceof HTMLButtonElement)) throw new Error('Convert button missing');
       await act(async () => {
         openButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
+      expect(document.querySelector('[role="menu"][aria-label="More commands"]')).toBeNull();
       expect(host.querySelector('[role="dialog"][aria-modal="true"]')).not.toBeNull();
 
       await pressKey({ key: 'Backspace' });

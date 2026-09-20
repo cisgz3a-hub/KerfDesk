@@ -69,7 +69,7 @@ const buttonStyle: React.CSSProperties = {
   fontSize: 12,
   padding: '2px 10px',
   cursor: 'pointer',
-  color: 'var(--lf-accent)',
+  color: 'var(--lf-accent-fg)',
   border: '1px solid var(--lf-accent)',
   borderRadius: 4,
   background: 'transparent',

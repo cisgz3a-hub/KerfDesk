@@ -94,8 +94,20 @@ describe('live countdown calibration handoff', () => {
     });
     if (timing.kind !== 'ok') throw new Error(timing.reason);
     // 10.01 seconds cutting and 1.4 seconds rapid travel become 20.02 + 4.2.
-    expect(estimate.totalSeconds).toBeCloseTo(24.22, 6);
-    expect(timing.plan.totalSeconds).toBeCloseTo(24.22, 5);
+    // The ADR-221 amendment of 2026-09-19 adds the serial delivery delay that
+    // cannot overlap modeled execution to the total, and calibration never
+    // scales it: the two calibrated buckets stay exact and the total carries
+    // the unscaled delay on top. The estimate and the live plan must be the
+    // same computation, not merely close.
+    const { transportSeconds = 0 } = estimate.breakdown;
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(20.02, 6);
+    expect(estimate.breakdown.rapidTravelSeconds ?? 0).toBeCloseTo(4.2, 6);
+    expect(estimate.breakdown.feedTravelSeconds ?? 0).toBe(0);
+    expect(estimate.breakdown.dwellSeconds ?? 0).toBe(0);
+    expect(transportSeconds).toBeGreaterThan(0);
+    expect(estimate.totalSeconds).toBeCloseTo(24.22 + transportSeconds, 6);
+    expect(timing.plan.transportSeconds).toBe(transportSeconds);
+    expect(timing.plan.totalSeconds).toBe(estimate.totalSeconds);
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);

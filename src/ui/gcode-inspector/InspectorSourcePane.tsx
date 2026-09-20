@@ -293,7 +293,7 @@ const detailEmptyStyle: React.CSSProperties = {
 const sourceErrorStyle: React.CSSProperties = {
   margin: 0,
   padding: '6px 8px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 'var(--lf-text-xs)',
   borderTop: '1px solid var(--lf-border)',
 };

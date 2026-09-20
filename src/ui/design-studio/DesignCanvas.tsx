@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { findEntity, type SketchEntity } from '../../core/design';
 import { useStore } from '../state';
+import { subscribeCanvasColorScheme } from '../theme/canvas-color-scheme';
 import { entityFields, type EntityField } from './design-entity-fields';
 import type { DesignSession as DesignStudioSession } from './design-session';
 import { paintDesignCanvas } from './design-canvas-draw';
@@ -184,6 +185,7 @@ function useLayerPaint(
       frameSchedulerHostFor(host.ownerDocument.defaultView),
     );
     const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
+    const unsubscribeTheme = subscribeCanvasColorScheme(scheduler.request);
     const observer = new ResizeObserver(scheduler.request);
     observer.observe(host);
     // The FIRST paint runs immediately rather than on a frame: a hidden or
@@ -198,6 +200,7 @@ function useLayerPaint(
     host.ownerDocument.addEventListener('visibilitychange', onVisible);
     return () => {
       unsubscribe();
+      unsubscribeTheme();
       observer.disconnect();
       host.ownerDocument.removeEventListener('visibilitychange', onVisible);
       scheduler.cancel();

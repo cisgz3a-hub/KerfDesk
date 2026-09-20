@@ -1,4 +1,5 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
+import { selectWorkspacePanel } from './fixtures/workspace-ui';
 
 test('CNC review separates configured spindle values from live controller scale', async ({
   page,
@@ -10,6 +11,7 @@ test('CNC review separates configured spindle values from live controller scale'
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('/');
+  await selectWorkspacePanel(page, 'Machine');
   await expect(page.getByRole('button', { name: 'Machine Setup', exact: true })).toBeVisible();
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
 

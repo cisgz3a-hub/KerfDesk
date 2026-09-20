@@ -20,7 +20,7 @@ export const cncStockCanvasHudStyles = {
   collapsedPanel: {
     width: 176,
     padding: 4,
-    background: 'color-mix(in srgb, var(--lf-bg-1) 68%, transparent)',
+    background: 'var(--lf-bg-overlay)',
     borderColor: 'color-mix(in srgb, var(--lf-border-strong) 38%, transparent)',
     boxShadow: '0 3px 10px color-mix(in srgb, var(--lf-text) 10%, transparent)',
     backdropFilter: 'blur(6px)',

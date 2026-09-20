@@ -80,7 +80,6 @@ function ArtworkPropertiesInspector(props: {
       aria-label={context.selectionActive ? 'Selected object properties' : 'Artwork properties'}
       style={sectionStyle}
     >
-      <h3 style={headingStyle}>{artworkInspectorHeading(context)}</h3>
       {context.selectionActive ? null : (
         <ArtworkTargetChooser
           artwork={props.artwork}
@@ -89,6 +88,11 @@ function ArtworkPropertiesInspector(props: {
           onChange={props.onChooseArtwork}
         />
       )}
+      <SelectedOperationInspector
+        objects={context.objects}
+        selectionActive={context.selectionActive}
+      />
+      <h3 style={headingStyle}>{artworkInspectorHeading(context)}</h3>
       {parametricShape === null ? null : (
         <SelectedShapeGeometryFields
           object={parametricShape}
@@ -102,10 +106,6 @@ function ArtworkPropertiesInspector(props: {
         object={
           context.selectionActive && context.objects.length === 1 ? context.primaryObject : null
         }
-      />
-      <SelectedOperationInspector
-        objects={context.objects}
-        selectionActive={context.selectionActive}
       />
       {props.isCncMachine ? null : <SelectedImageAdjustments image={rasterImage} />}
     </section>
@@ -305,7 +305,13 @@ const sectionStyle: React.CSSProperties = {
   marginTop: 12,
   paddingTop: 10,
 };
-const headingStyle: React.CSSProperties = { fontSize: 13, margin: '0 0 8px 0' };
+const headingStyle: React.CSSProperties = {
+  fontSize: 'var(--lf-text-sm)',
+  fontWeight: 500,
+  textTransform: 'uppercase',
+  color: 'var(--lf-text-muted)',
+  margin: '0 0 12px 0',
+};
 const targetChooserStyle: React.CSSProperties = { marginBottom: 8 };
 const targetHintStyle: React.CSSProperties = {
   margin: '0 0 8px 0',

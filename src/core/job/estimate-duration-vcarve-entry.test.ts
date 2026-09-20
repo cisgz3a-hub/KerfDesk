@@ -4,13 +4,12 @@ import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { cncGrblStrategy } from '../output';
 import type { CncGroup } from './job';
 import { estimateJobDuration } from './estimate-duration';
-import { blockTime, planVelocities, type Block } from './planner';
+import { expectedVcarveMotion } from './estimate-duration-vcarve-kinematics.test-support';
 
 type PathPoint = { readonly x: number; readonly y: number; readonly z: number };
 
 const SAFE_Z_MM = 3;
 const PLUNGE_FEED_MM_PER_MIN = 300;
-const SECONDS_PER_MINUTE = 60;
 
 function rampGroup(
   lateralFeed?: 'plunge' | 'z-rate-capped',
@@ -65,10 +64,7 @@ describe('V-carve ramp duration', () => {
       DEFAULT_DEVICE_PROFILE,
     );
 
-    expect(zRateCapped.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(points, [1000, 1000, 1000]),
-      9,
-    );
+    expectMotion(zRateCapped, points, [1000, 1000, 1000]);
   });
 
   it('prices a steep descent at the same plunge-component-capped feed as emission', () => {
@@ -87,10 +83,7 @@ describe('V-carve ramp duration', () => {
       DEFAULT_DEVICE_PROFILE,
     );
 
-    expect(zRateCapped.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(points, [expectedFeed]),
-      9,
-    );
+    expectMotion(zRateCapped, points, [expectedFeed]);
     expect(zRateCapped.totalSeconds).toBeGreaterThan(cuttingFeed.totalSeconds);
   });
 
@@ -108,10 +101,7 @@ describe('V-carve ramp duration', () => {
     const emitted = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
 
     expect(emitted).toContain('X0.100Y0.000Z-0.051F658');
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(representedPoints, [658], SAFE_Z_MM, 299),
-      9,
-    );
+    expectMotion(estimate, representedPoints, [658], SAFE_Z_MM, 299);
   });
 
   it('prices a GRBL float-boundary segment at the exact emitted feed', () => {
@@ -128,10 +118,7 @@ describe('V-carve ramp duration', () => {
     const emitted = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
 
     expect(emitted).toContain('X6553.606Y0.000Z-3000.001F2650');
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(representedPoints, [2650], SAFE_Z_MM, 1103),
-      9,
-    );
+    expectMotion(estimate, representedPoints, [2650], SAFE_Z_MM, 1103);
   });
 
   it('retains the emitter feed across opposite signed-zero XY words on a rise', () => {
@@ -145,10 +132,10 @@ describe('V-carve ramp duration', () => {
     const emitted = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
 
     expect(emitted).toContain('X0.000Y0.000Z0.000F1000');
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(representedPoints, [1000]),
-      9,
-    );
+    expectMotion(estimate, representedPoints, [1000]);
+    // The rise is priced, not dropped for its zero XY projection; it is cut
+    // time because the tool is still in the material at working feed.
+    expect(estimate.breakdown.cutSeconds).toBeGreaterThan(0);
   });
 
   it('prices entry and retract travel from represented safe Z and entry Z', () => {
@@ -163,10 +150,7 @@ describe('V-carve ramp duration', () => {
 
     expect(emitted).toContain('G0 Z3.001');
     expect(emitted).toContain('G1 Z-0.051');
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(representedPoints, [1000], representedCncCoordinateMm(group.safeZMm)),
-      9,
-    );
+    expectMotion(estimate, representedPoints, [1000], representedCncCoordinateMm(group.safeZMm));
   });
 
   it('prices a pure vertical in-cut descent instead of losing it in XY projection', () => {
@@ -179,10 +163,9 @@ describe('V-carve ramp duration', () => {
       DEFAULT_DEVICE_PROFILE,
     );
 
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(points, [PLUNGE_FEED_MM_PER_MIN]),
-      9,
-    );
+    expectMotion(estimate, points, [PLUNGE_FEED_MM_PER_MIN]);
+    // The two collinear downward G1 moves share their 5 mm/s junction.
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(5 / 5 + 5 / 500, 9);
   });
 
   it('prices a pure vertical in-cut rise at plunge feed like the emitter', () => {
@@ -195,37 +178,43 @@ describe('V-carve ramp duration', () => {
       DEFAULT_DEVICE_PROFILE,
     );
 
-    expect(estimate.breakdown.cutSeconds).toBeCloseTo(
-      expectedCutSeconds(points, [PLUNGE_FEED_MM_PER_MIN]),
-      9,
-    );
+    expectMotion(estimate, points, [PLUNGE_FEED_MM_PER_MIN]);
+    // Reversal stops the entry plunge, and the preserved rapid/feed boundary
+    // stops again before the G0 retract. The rise is cut time: the tool is
+    // still 1-2 mm into the material at working feed, exactly as the mirror
+    // descent above is. drilling.test.ts pins the same rule for a peck's chip
+    // clear, so a feed-rate +Z move is never priced as travel.
+    expect(estimate.breakdown.cutSeconds).toBeCloseTo(5 / 5 + 5 / 500 + 1 / 5 + 5 / 500, 9);
+    expect(estimate.breakdown.feedTravelSeconds ?? 0).toBe(0);
   });
 });
 
-function expectedCutSeconds(
+function expectMotion(
+  estimate: ReturnType<typeof estimateJobDuration>,
   points: ReadonlyArray<PathPoint>,
   feeds: ReadonlyArray<number>,
   safeZMm = SAFE_Z_MM,
   plungeFeedMmPerMin = PLUNGE_FEED_MM_PER_MIN,
-): number {
-  const blocks = profileBlocks(points, feeds);
-  const plan = planVelocities(
-    blocks,
-    DEFAULT_DEVICE_PROFILE.accelMmPerSec2,
-    DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
-  );
-  const motionSeconds = blocks.reduce((sum, block, index) => {
-    const velocity = plan[index];
-    return velocity === undefined
-      ? sum
-      : sum +
-          blockTime(block, velocity.entryV, velocity.exitV, DEFAULT_DEVICE_PROFILE.accelMmPerSec2);
-  }, 0);
-  const entryTravelMm = safeZMm + Math.abs(points[0]?.z ?? 0);
-  const plungeSeconds = (entryTravelMm / plungeFeedMmPerMin) * SECONDS_PER_MINUTE;
-  // G0 retract now belongs to rapid travel; Cut retains the feed-motion
-  // profile and the analytic entry plunge only.
-  return motionSeconds + plungeSeconds;
+): void {
+  const expected = expectedVcarveMotion(points, feeds, safeZMm, plungeFeedMmPerMin);
+  for (const [actual, analytic, roundOff] of [
+    [estimate.breakdown.cutSeconds, expected.cut, expected.roundOffSeconds.cut],
+    [
+      estimate.breakdown.feedTravelSeconds ?? 0,
+      expected.feedTravel,
+      expected.roundOffSeconds.feedTravel,
+    ],
+    [estimate.breakdown.rapidTravelSeconds ?? 0, expected.rapid, expected.roundOffSeconds.rapid],
+    [
+      estimate.totalSeconds - (estimate.breakdown.transportSeconds ?? 0),
+      expected.cut + expected.feedTravel + expected.rapid,
+      expected.roundOffSeconds.cut +
+        expected.roundOffSeconds.feedTravel +
+        expected.roundOffSeconds.rapid,
+    ],
+  ] as const) {
+    expect(Math.abs(actual - analytic)).toBeLessThanOrEqual(roundOff);
+  }
 }
 
 function representedPoint(point: PathPoint): PathPoint {
@@ -234,27 +223,4 @@ function representedPoint(point: PathPoint): PathPoint {
     y: representedCncCoordinateMm(point.y),
     z: representedCncCoordinateMm(point.z),
   };
-}
-
-function profileBlocks(points: ReadonlyArray<PathPoint>, feeds: ReadonlyArray<number>): Block[] {
-  const blocks: Block[] = [];
-  for (let index = 1; index < points.length; index += 1) {
-    const from = points[index - 1];
-    const to = points[index];
-    const feed = feeds[index - 1];
-    if (from === undefined || to === undefined || feed === undefined) continue;
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const dz = to.z - from.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (!(distance > 0)) continue;
-    blocks.push({
-      kind: 'cut',
-      motion: 'feed',
-      distance,
-      targetVelocity: feed / SECONDS_PER_MINUTE,
-      direction: { x: dx / distance, y: dy / distance, z: dz / distance },
-    });
-  }
-  return blocks;
 }

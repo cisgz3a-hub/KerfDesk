@@ -71,6 +71,7 @@ export async function streamResumeFromRawLine(
       project.device,
       initialPosition,
       {
+        machineKind: machineKindOf(project.machine),
         controllerSessionEpoch: laser.controllerSessionEpoch,
         positionEpoch: laser.trustedPositionEpoch,
         activeControllerKind: laser.activeControllerKind,

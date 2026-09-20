@@ -141,7 +141,7 @@ const captureStyle: React.CSSProperties = {
   fontSize: 12,
 };
 const warningStyle: React.CSSProperties = {
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
   margin: '8px 0 0',
 };

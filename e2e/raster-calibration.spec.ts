@@ -1,3 +1,4 @@
+import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
 test('Machine Setup retains measurement drafts and Cancel leaves the saved profile unchanged', async ({
@@ -10,6 +11,7 @@ test('Machine Setup retains measurement drafts and Cancel leaves the saved profi
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('/');
+  await selectWorkspacePanel(page, 'Machine');
   await expect(page.getByRole('button', { name: 'Machine Setup', exact: true })).toBeVisible();
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   await openDiagnostics(page);
@@ -33,7 +35,7 @@ test('Machine Setup retains measurement drafts and Cancel leaves the saved profi
   await openDiagnostics(page);
   await expect(page.getByLabel('Measured offset 1', { exact: true })).toHaveValue('');
   await page.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = Object.values(await kerfdesk.savedFiles());
   expect(saved.length).toBeGreaterThan(0);
   expect(JSON.parse(saved.at(-1) ?? '{}').device.scanningOffsets).toEqual([]);
@@ -63,7 +65,7 @@ test('Machine Setup commits converted calibration once and restores it on reopen
     .getByRole('dialog', { name: 'Machine Setup', exact: true })
     .screenshot({ path: testInfo.outputPath('calibration-saved.png') });
   await page.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = Object.values(await kerfdesk.savedFiles());
   expect(saved.length).toBeGreaterThan(0);
   const project = JSON.parse(saved.at(-1) ?? '{}');
@@ -73,6 +75,7 @@ test('Machine Setup commits converted calibration once and restores it on reopen
 });
 
 async function openDiagnostics(page: Page): Promise<void> {
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   await page
     .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })

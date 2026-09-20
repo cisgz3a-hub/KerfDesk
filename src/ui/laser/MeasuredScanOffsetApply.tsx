@@ -307,7 +307,7 @@ const unitStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', fontSize
 const errorListStyle: React.CSSProperties = {
   margin: 0,
   paddingLeft: 18,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };
 const verificationStyle: React.CSSProperties = {
@@ -315,7 +315,7 @@ const verificationStyle: React.CSSProperties = {
   padding: 8,
   border: '1px solid var(--lf-warning)',
   borderRadius: 6,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
   lineHeight: 1.4,
 };
@@ -324,7 +324,7 @@ const verifiedStyle: React.CSSProperties = {
   padding: 8,
   border: '1px solid var(--lf-success)',
   borderRadius: 6,
-  color: 'var(--lf-success)',
+  color: 'var(--lf-success-fg)',
   fontSize: 12,
   lineHeight: 1.4,
 };
