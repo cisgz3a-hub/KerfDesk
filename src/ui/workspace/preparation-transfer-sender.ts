@@ -1,3 +1,5 @@
+import { packedToolpathTransferables } from '../../core/job/packed-toolpath';
+import { packedToolpathOf } from '../../core/job/packed-toolpath-steps';
 import type { LargeJobPreparation } from './large-job-preparation';
 import type { ToolpathStep } from '../../core/job';
 import type { PreparationWorkerResponse } from './preparation-worker-protocol';
@@ -14,7 +16,12 @@ export class PreparationTransferSender {
     readonly resolve: () => void;
   } | null = null;
 
-  constructor(private readonly post: (response: PreparationWorkerResponse) => void) {}
+  constructor(
+    private readonly post: (
+      response: PreparationWorkerResponse,
+      transfer?: ReadonlyArray<ArrayBuffer>,
+    ) => void,
+  ) {}
 
   acceptAcknowledgement(data: unknown): boolean {
     if (
@@ -58,6 +65,10 @@ export class PreparationTransferSender {
     preparation: LargeJobPreparation,
     consume: boolean,
   ): Promise<void> {
+    // A packed route needs neither chunking nor acknowledgement: its buffers
+    // move to the UI instead of being cloned, so the worker is not holding a
+    // copy while the other side builds one.
+    if (this.postPackedPreparation(id, preparation)) return;
     const steps = preparation.toolpath.steps.length;
     const planSteps = preparation.toolpath.executablePlanPreview?.toolpath.steps.length ?? 0;
     if (steps + planSteps <= PREPARATION_TRANSFER_STEP_CHUNK) {
@@ -77,6 +88,18 @@ export class PreparationTransferSender {
       });
       if (consume) releaseAcknowledgedSteps(preparation, packet);
     }
+  }
+
+  private postPackedPreparation(id: number, preparation: LargeJobPreparation): boolean {
+    const packed = packedToolpathOf(preparation.toolpath.steps);
+    if (packed === null || preparation.toolpath.executablePlanPreview !== undefined) return false;
+    const { toolpath, ...preparedHeader } = preparation;
+    const { steps: _steps, executablePlanPreview: _plan, ...toolpathHeader } = toolpath;
+    this.post(
+      { ...preparedHeader, id, kind: 'packed', toolpath: toolpathHeader, packed },
+      packedToolpathTransferables(packed),
+    );
+    return true;
   }
 }
 

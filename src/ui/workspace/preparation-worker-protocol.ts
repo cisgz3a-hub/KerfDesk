@@ -2,6 +2,8 @@
 // (ADR-244). Full requests prepare both consumer views from one compile.
 // Estimate-only requests omit the unused, potentially enormous preview route.
 
+import type { PackedToolpath } from '../../core/job/packed-toolpath';
+import type { PreviewToolpath } from './preview-status';
 import type { Project } from '../../core/scene';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
@@ -20,8 +22,21 @@ export type PreparationWorkerRequest = LargeJobPreparationOptions & {
   readonly projection?: PreparationProjection;
 };
 
+/**
+ * A route already in columnar buffers. One message, and the buffers are
+ * transferred rather than cloned, so the acknowledged chunk protocol below is
+ * needed only for routes that could not be packed.
+ */
+export type PreparationPackedResponse = Omit<LargeJobPreparation, 'toolpath'> & {
+  readonly id: number;
+  readonly kind: 'packed';
+  readonly toolpath: Omit<PreviewToolpath, 'steps' | 'executablePlanPreview'>;
+  readonly packed: PackedToolpath;
+};
+
 export type PreparationWorkerResponse =
   | PreparationTransferResponse
+  | PreparationPackedResponse
   | { readonly id: number; readonly kind: 'progress'; readonly progress: OutputCompilationProgress }
   | ({
       readonly id: number;

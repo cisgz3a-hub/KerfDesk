@@ -39,7 +39,7 @@ describe('preview timeline', () => {
     const detailed: Toolpath = {
       totalLength: 300,
       steps: [
-        mixed.steps[0]!,
+        mixed.steps.at(0)!,
         {
           kind: 'travel',
           motion: 'rapid',

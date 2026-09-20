@@ -3,6 +3,7 @@
 // toolpath.ts so the raster/slice/build modules can share them without
 // import cycles.
 
+import type { ToolpathStepList } from './toolpath-steps';
 import type { Vec2 } from '../scene';
 import type { ScanOffsetPoint } from './scan-offset';
 
@@ -71,7 +72,7 @@ export type RasterToolpathSource = {
 };
 
 export type Toolpath = {
-  readonly steps: ReadonlyArray<ToolpathStep>;
+  readonly steps: ToolpathStepList;
   readonly totalLength: number;
 };
 
@@ -95,7 +96,7 @@ export type ToolpathDistanceSummary = {
 // Slice result: steps to render whole, the partial step (if the cut lands
 // mid-segment) with truncated geometry, and the head position.
 export type SlicedToolpath = {
-  readonly whole: ReadonlyArray<ToolpathStep>;
+  readonly whole: ToolpathStepList;
   readonly partial: ToolpathStep | null;
   readonly head: Vec2 | null;
 };

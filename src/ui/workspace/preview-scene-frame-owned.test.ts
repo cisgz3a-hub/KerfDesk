@@ -32,7 +32,7 @@ describe('owned scene mapping', () => {
       mapped.steps.forEach((step, index) => {
         expect(step).not.toBe(originalSteps[index]);
       });
-      const mappedCut = mapped.steps[1];
+      const mappedCut = mapped.steps.at(1);
       const originalCut = originalSteps[1];
       if (mappedCut?.kind !== 'cut' || originalCut?.kind !== 'cut') throw new Error('missing cut');
       expect(mappedCut.polyline).not.toBe(originalCut.polyline);
@@ -40,7 +40,7 @@ describe('owned scene mapping', () => {
       expect(mappedCut.source).toBe(originalCut.source);
       expect(mappedCut.zs).toBe(originalCut.zs);
       expect(mappedCut.z).toBe(originalCut.z);
-      expect(mapped.steps[1]).not.toBe(mapped.steps[3]);
+      expect(mapped.steps.at(1)).not.toBe(mapped.steps.at(3));
     }
   });
 
@@ -50,7 +50,7 @@ describe('owned scene mapping', () => {
       { kind: 'travel', from: { x: -0, y: -0 }, to: { x: 0, y: 0 }, length: -0 },
     ];
     const result = mapOwnedToolpathToScene({ steps, totalLength: -0 }, { x: 0, y: 0 }, device);
-    const first = result.steps[0];
+    const first = result.steps.at(0);
     if (first?.kind !== 'travel') throw new Error('missing travel');
     expect(Object.is(first.from.x, -0)).toBe(true);
     expect(Object.is(first.from.y, -0)).toBe(true);

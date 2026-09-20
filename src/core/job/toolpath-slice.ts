@@ -2,6 +2,7 @@
 // preview scrubber can render a partial job with the head position. Split
 // from toolpath.ts (Phase H.2 refactor).
 
+import type { ToolpathStepList } from './toolpath-steps';
 import type { Vec2 } from '../scene';
 import { stepIndexAtLength, toolpathCumulativeLengths } from './toolpath-cumulative-lengths';
 import { dist, lerp } from './toolpath-math';
@@ -19,7 +20,7 @@ export function sliceToolpath(toolpath: Toolpath, cut: number): SlicedToolpath {
   const cumulative = toolpathCumulativeLengths(toolpath.steps);
   const index = stepIndexAtLength(cumulative, cut);
   const whole = toolpath.steps.slice(0, index);
-  const step = toolpath.steps[index];
+  const step = toolpath.steps.at(index);
   // Exact match on the last step — equivalent to "render all".
   if (step === undefined) return { whole, partial: null, head: lastHead(toolpath.steps) };
   const consumed = index === 0 ? 0 : (cumulative[index - 1] ?? 0);
@@ -76,17 +77,17 @@ function headOf(step: ToolpathStep): Vec2 | null {
   return step.polyline[step.polyline.length - 1] ?? null;
 }
 
-function firstHead(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
-  const first = steps[0];
+function firstHead(steps: ToolpathStepList): Vec2 | null {
+  const first = steps.at(0);
   if (first === undefined) return null;
   if (first.kind === 'travel') return first.from;
   if (first.kind === 'plunge') return first.at;
   return first.polyline[0] ?? null;
 }
 
-function lastHead(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
+function lastHead(steps: ToolpathStepList): Vec2 | null {
   for (let i = steps.length - 1; i >= 0; i -= 1) {
-    const step = steps[i];
+    const step = steps.at(i);
     if (step === undefined) continue;
     const head = headOf(step);
     if (head !== null) return head;

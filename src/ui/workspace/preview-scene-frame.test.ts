@@ -89,13 +89,13 @@ describe('mapToolpathToScene', () => {
 
     const scene = mapToolpathToScene(machineToolpath, { x: 0, y: 0 }, dev);
 
-    expect(scene.steps[0]).toEqual({
+    expect(scene.steps.at(0)).toEqual({
       kind: 'travel',
       from: { x: 0, y: 0 },
       to: { x: 10, y: 10 },
       length: 5,
     });
-    expect(scene.steps[1]).toEqual({
+    expect(scene.steps.at(1)).toEqual({
       kind: 'cut',
       color: '#000000',
       source: {
@@ -182,7 +182,7 @@ describe('buildPreviewToolpath frame registration (H3)', () => {
 
     // The front-left artwork anchor is placed exactly under the head, so there
     // is no phantom travel from work zero before the first cut.
-    expect(currentPosition.steps[0]?.kind).toBe('cut');
+    expect(currentPosition.steps.at(0)?.kind).toBe('cut');
     expect(currentPosition.steps.at(-1)).toEqual({
       kind: 'travel',
       from: { x: 50, y: 10 },

@@ -58,8 +58,8 @@ describe('toolpath preview with ADR-239 contour entries', () => {
       { startPoint: { x: 0, y: 0 } },
     );
 
-    expect(toolpath.steps[0]).toMatchObject({ to: { x: 8, y: 10 } });
-    expect(toolpath.steps[1]).toMatchObject({ from: { x: 8, y: 10 }, to: { x: 10, y: 10 } });
-    expect(toolpath.steps[1]?.length).toBeCloseTo(2, 9);
+    expect(toolpath.steps.at(0)).toMatchObject({ to: { x: 8, y: 10 } });
+    expect(toolpath.steps.at(1)).toMatchObject({ from: { x: 8, y: 10 }, to: { x: 10, y: 10 } });
+    expect(toolpath.steps.at(1)?.length).toBeCloseTo(2, 9);
   });
 });

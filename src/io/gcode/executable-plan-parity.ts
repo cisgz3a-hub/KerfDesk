@@ -1,3 +1,4 @@
+import type { ToolpathStepList } from '../../core/job/toolpath-steps';
 import {
   buildExecutablePlan,
   serializeExecutablePlan,
@@ -101,7 +102,7 @@ function byteParity(plan: ExecutablePlanV1, gcode: string): ExecutablePlanParity
 
 function endpointParity(
   plan: ExecutablePlanV1,
-  steps: ReadonlyArray<ToolpathStep>,
+  steps: ToolpathStepList,
 ): ExecutablePlanParityCheck {
   const simulator = simulatorEndpoints(steps);
   if (simulator.length !== plan.motions.length) {
@@ -137,7 +138,7 @@ function endpointParity(
   };
 }
 
-function simulatorEndpoints(steps: ReadonlyArray<ToolpathStep>): ReadonlyArray<EndpointPair> {
+function simulatorEndpoints(steps: ToolpathStepList): ReadonlyArray<EndpointPair> {
   const endpoints: EndpointPair[] = [];
   let z = 0;
   for (const step of steps) {

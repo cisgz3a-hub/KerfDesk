@@ -20452,3 +20452,65 @@ compile path (ADR-047 numbers, not names):
 - Not changed here (audit follow-ups): recovering a frozen Current Position run after the head moved
   still cannot mint a matching Frame; the time badge still times a refused Current Position placement
   as Absolute while disconnected; the `verified-origin` device capability is still unread.
+
+## ADR-328 - A preview route is columnar, and crosses the worker boundary as buffers (2026-09-20)
+
+**Status:** Accepted; extends ADR-244's large-job preparation and the ADR-254 packed transfer.
+Builds on ADR-325 (one preview authority) and ADR-326 (the worker owns only the route it sends).
+No change to emitted bytes, bounds, timing, Frame or Start.
+
+### Context
+
+A scanline fill over a dense trace compiles to millions of route steps, and a step as a plain
+object costs about 230 bytes measured live: the record, its nested points, and a polyline array
+for every two-point span. On a 2,000,000-segment fill — 4,200,001 steps — that is 923 MB of
+**V8 heap**, the heap whose 4 GB ceiling is what Chrome reports as "Aw, Snap! Out of Memory".
+The same route crossed the ADR-244 boundary as thousands of acknowledged chunks, each a
+structured clone of 2,048 step objects.
+
+The layout to store it in already existed: the imported-G-code transfer has packed a route into
+columnar typed arrays since ADR-254. What was missing was a way to READ a route without
+materializing it, so nothing could keep one packed.
+
+### Decision
+
+1. `Toolpath.steps` is a `ToolpathStepList`, not a `ReadonlyArray<ToolpathStep>`.
+   `ReadonlyArray` still satisfies it, so every caller that builds a route from an array is
+   unchanged; what the interface drops is the numeric index signature, so `steps[i]` became
+   `steps.at(i)` at each of its call sites and a packed route can answer without holding an
+   object per step. `filter` and `find` keep Array's type-predicate overloads so narrowing still
+   works.
+2. `core/job/packed-toolpath.ts` holds the codec — extracted from the importer's, which is now a
+   thin wrapper over it — and `PackedToolpathSteps` reads a route straight out of those buffers,
+   one fresh step at a time. Per-vertex Z (`zs`) and the multi-tool `toolId` have no column, so
+   `packToolpath` REFUSES such a route rather than dropping the fields, and it stays an array.
+3. Past `MAX_PLAN_PREVIEW_ROUTE_STEPS` — the same budget ADR-325 uses — a preview route that no
+   longer has a plan authority to compare against is mapped into scene space directly as buffers,
+   consuming the machine array slot by slot as it goes. Below the budget nothing changes.
+4. A packed route crosses the ADR-244 boundary as one `packed` response whose buffers are
+   **transferred**, not cloned; the chunk protocol remains for routes that could not be packed.
+5. The scrubber's cumulative-length walk reads lengths out of the value column instead of
+   building a step to read one number.
+
+### Verification and limits
+
+Measured on a 2,000,000-segment fill (4,200,001 steps), live after collection:
+
+| | V8 heap | buffers | total retained | peak while building | length walk |
+| --- | --- | --- | --- | --- | --- |
+| step objects | 923 MB | 0 | 923 MB | 1,340 MB | 113 ms |
+| columnar | 59 MB | 342 MB | 401 MB | 817 MB | 92 ms |
+
+Total retained falls 2.3x, the peak 1.6x, and the JS heap — the one with the ceiling — 15.6x.
+Both routes report the same total arc length and the same first and last step.
+
+`packed-toolpath.test.ts` pins the round trip for every field with a column, negative zero
+included, every list method against the array it replaces, and the refusal for `zs`/`toolId`.
+`preparation-packed-transfer.test.ts` pins the single transferred message and the chunk fallback.
+In the running app a 797,193-step traced fill previews, decimates and scrubs from a packed route.
+
+Reading the same index twice returns equal but distinct records: identity comparison between two
+reads is meaningless, as it already was across the worker boundary. `stepValues` keeps eight
+Float64 slots per step for layout compatibility with the importer, so the packed cost is about
+85 bytes a step rather than the ~60 a tighter layout would give. Routes below the budget, and any
+route carrying per-vertex Z or a tool id, keep step objects.

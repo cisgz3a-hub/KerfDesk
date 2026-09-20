@@ -27,12 +27,14 @@ import { buildDisplayPolylines } from './display-polylines';
 import { strokePolylinesBatched } from './draw-vector-strokes';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import {
+  MAX_PLAN_PREVIEW_ROUTE_STEPS,
   planPreviewRouteEligible,
   previewRouteForDrawing,
   registerExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
 import {
+  mapOwnedToolpathToPackedScene,
   mapOwnedToolpathToScene,
   mapToolpathToScene,
   registerPreviewJobOriginOffset,
@@ -220,10 +222,17 @@ export function buildPreviewToolpathFromPrepared(
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
       routeStepCount: machineToolpath.steps.length,
     });
-  const mapPreview =
-    streamedRaster || (options.executablePlan === true && !planPreview)
-      ? mapOwnedToolpathToScene
-      : mapToolpathToScene;
+  // Past the same budget, the mapped route lands in columnar buffers instead
+  // of a step object per span: nothing compares against it any more, and a
+  // multi-million-step fill is the case where roughly 217 bytes a step is what
+  // the renderer cannot afford. Smaller routes keep the object mapping, whose
+  // identity the owned-mapping contract still rests on.
+  const ownsMachineRoute = streamedRaster || (options.executablePlan === true && !planPreview);
+  const mapPreview = !ownsMachineRoute
+    ? mapToolpathToScene
+    : machineToolpath.steps.length > MAX_PLAN_PREVIEW_ROUTE_STEPS
+      ? mapOwnedToolpathToPackedScene
+      : mapOwnedToolpathToScene;
   const previewToolpath = mapPreview(machineToolpath, prepared.jobOriginOffset, project.device);
   registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
   if (planPreview) {

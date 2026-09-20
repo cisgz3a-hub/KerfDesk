@@ -1,3 +1,4 @@
+import type { ToolpathStepList } from '../../core/job/toolpath-steps';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
 
@@ -168,10 +169,7 @@ export function scrubberAtElapsedSeconds(
   return 1;
 }
 
-function sumStepLengths(
-  steps: ReadonlyArray<ToolpathStep>,
-  include: (step: ToolpathStep) => boolean,
-): number {
+function sumStepLengths(steps: ToolpathStepList, include: (step: ToolpathStep) => boolean): number {
   return steps.reduce(
     (total, step) => total + (include(step) ? finiteNonNegative(step.length) : 0),
     0,

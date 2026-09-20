@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ToolpathStepList } from './toolpath-steps';
 import type { RasterGroup } from './job';
-import { buildToolpath, type ToolpathStep } from './toolpath';
+import { buildToolpath } from './toolpath';
 
 const SPARSE_ROW = [500, 0, 0, 0, 0, 0, 0, 500];
 
@@ -23,7 +24,7 @@ function sparseRaster(): RasterGroup {
   };
 }
 
-function horizontalDeltasAtY(steps: ReadonlyArray<ToolpathStep>, y: number): number[] {
+function horizontalDeltasAtY(steps: ToolpathStepList, y: number): number[] {
   return steps.flatMap((step) => {
     if (step.kind === 'travel') {
       return step.from.y === y && step.to.y === y ? [step.to.x - step.from.x] : [];

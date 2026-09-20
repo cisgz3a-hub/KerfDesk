@@ -118,7 +118,7 @@ function cutStepAllocationIssue(toolpath: Toolpath): {
   readonly geometry: string;
 } | null {
   for (let stepIndex = 0; stepIndex < toolpath.steps.length; stepIndex += 1) {
-    const step = toolpath.steps[stepIndex];
+    const step = toolpath.steps.at(stepIndex);
     if (step === undefined || step.kind !== 'cut') continue;
     const declared = formatGcodeCoordinateMm(step.length);
     const geometry = formatGcodeCoordinateMm(polylineLength(step.polyline));

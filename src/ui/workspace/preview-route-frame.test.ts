@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ToolpathStepList } from '../../core/job/toolpath-steps';
 import { sliceToolpath, type Toolpath, type ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
 import { displayPolylinePointIndices, displayStepIndices } from './preview-display-decimation';
@@ -91,7 +92,7 @@ describe('prepared Preview display frames', () => {
   });
 
   it('does not allocate the full whole-step prefix when preparing a partial display', () => {
-    const source = Array.from({ length: 100 }, () => steps[0]!);
+    const source = Array.from({ length: 100 }, () => steps.at(0)!);
     Object.defineProperty(source, 'slice', {
       value: () => {
         throw new Error('whole prefix allocated');
@@ -162,16 +163,17 @@ function referenceFrame(
   };
   if (input.totalLength === 0) return empty;
   const sliced = sliceToolpath(input, t * input.totalLength);
-  const select = (source: ReadonlyArray<ToolpathStep>) =>
-    [...displayStepIndices(source.length)].flatMap((index) =>
-      source[index] === undefined ? [] : selectedStep(source[index], options),
-    );
+  const select = (source: ToolpathStepList) =>
+    [...displayStepIndices(source.length)].flatMap((index) => {
+      const step = source.at(index);
+      return step === undefined ? [] : selectedStep(step, options);
+    });
   const last =
     [...input.steps]
       .reverse()
       .map(endPoint)
       .find((point) => point !== null) ?? null;
-  const first = input.steps[0];
+  const first = input.steps.at(0);
   return {
     futureSteps: options.showFuture !== false && t < 1 ? select(input.steps) : [],
     wholeSteps: select(sliced.whole),
