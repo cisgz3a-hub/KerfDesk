@@ -1,4 +1,4 @@
-import { expect, test as baseTest, type Page } from '@playwright/test';
+import { expect, test as baseTest, type Locator, type Page } from '@playwright/test';
 import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -77,12 +77,13 @@ baseTest(
       await route.continue();
     });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Import...' }).click();
+    await (await toolbarCommand(page, 'Import...')).click();
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
     await expect(page.getByText('Layers: 1 (1 output)', { exact: true })).toBeVisible();
     expect(workerUrls.length).toBeGreaterThan(0);
 
     await page.keyboard.press('Escape');
+    await page.getByLabel('More controls for fixture', { exact: true }).click();
     await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();
     await expect(page.getByRole('region', { name: 'Selected artwork operation' })).toBeVisible();
 
@@ -90,23 +91,23 @@ baseTest(
     await layerMode.selectOption('fill');
     await expect(layerMode).toHaveValue('fill');
 
-    const preview = page.getByRole('button', { name: 'Preview', exact: true });
+    const preview = await toolbarCommand(page, 'Preview');
     await expect(preview).toBeEnabled();
     await preview.click();
     await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
-    await preview.click();
+    await (await toolbarCommand(page, 'Preview')).click();
 
     // A fresh no-homing project intentionally defaults to User Origin, which
     // needs a set origin (with a known work offset) before it can export. This
     // fixture is file-only, so deliberately choose Absolute before Save.
     await page.getByRole('tab', { name: 'Machine' }).click();
-    await page.getByRole('button', { name: 'Expand Laser panel' }).click();
+    await page.locator('summary').filter({ hasText: 'Placement & output' }).click();
     const startFrom = page.getByLabel('Start from');
     await expect(startFrom).toHaveValue('user-origin');
     await startFrom.selectOption('absolute');
-    await page.getByRole('tab', { name: 'Cuts / Layers' }).click();
+    await page.getByRole('tab', { name: 'Artwork' }).click();
 
-    await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await (await toolbarCommand(page, 'Save G-code...')).click();
     await choosePreparedGcodeDestination(page);
     await expect
       .poll(() =>
@@ -129,6 +130,7 @@ baseTest(
   async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
+    await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
@@ -168,6 +170,7 @@ baseTest(
   async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
+    await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toHaveAccessibleName('Machine Setup');
@@ -207,6 +210,7 @@ baseTest(
 baseTest('unconfigured auto-focus opens its setup section directly', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
+  await page.getByRole('tab', { name: 'Machine' }).click();
 
   await page.getByRole('button', { name: 'Set up auto-focus', exact: true }).click();
 
@@ -220,7 +224,6 @@ baseTest('Machine Setup stays navigable at the narrow breakpoint', async ({ page
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto('/');
   await page.getByRole('tab', { name: 'Machine' }).click();
-  await page.getByRole('button', { name: 'Expand Laser panel' }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
@@ -248,6 +251,7 @@ kerfDeskTest(
   async ({ page, kerfdesk }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
+    await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
@@ -394,7 +398,7 @@ async function runPageBackedImport(
   await page.goto('/');
   {
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: 'Import...' }).click();
+    await (await toolbarCommand(page, 'Import...')).click();
     await (await chooser).setFiles(fixturePath);
     await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible({ timeout: 60_000 });
     expect(workerUrls.some((url) => url.includes('png-import-worker'))).toBe(true);
@@ -454,12 +458,12 @@ async function runPageBackedImport(
       retained.imageSources.some((source) => source.startsWith('data:image/bmp;base64,')),
     ).toBe(true);
 
-    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await (await toolbarCommand(page, 'Preview')).click();
     await expect(page.getByRole('group', { name: 'Preview options' })).toBeVisible();
     await expect
       .poll(() => workerUrls.some((url) => url.includes('preparation-worker')))
       .toBe(true);
-    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await (await toolbarCommand(page, 'Preview')).click();
 
     await page.evaluate(async () => {
       const statePath = '/src/ui/state/index.ts';
@@ -475,7 +479,7 @@ async function runPageBackedImport(
         jobPlacement: { ...store.getState().jobPlacement, startFrom: 'absolute' },
       });
     });
-    await page.getByRole('button', { name: 'Save G-code...' }).click();
+    await (await toolbarCommand(page, 'Save G-code...')).click();
     await choosePreparedGcodeDestination(page);
     await expect
       .poll(() =>
@@ -489,8 +493,8 @@ async function runPageBackedImport(
 baseTest('unqualified bitmap legacy fallback still reaches Trace and commits', async ({ page }) => {
   await installFileSystemMocks(page, UNQUALIFIED_PNG_BASE64, 'image');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Import...' }).click();
-  const trace = page.getByRole('button', { name: 'Trace Image...' });
+  await (await toolbarCommand(page, 'Import...')).click();
+  const trace = await toolbarCommand(page, 'Trace Image...');
   await expect(trace).toBeEnabled();
   await trace.click();
   await expect(page.getByRole('dialog', { name: 'Trace image' })).toBeVisible();
@@ -520,6 +524,18 @@ kerfDeskTest(
       .toContain('$J=G90 G21');
     const startButton = page.getByRole('button', { name: 'Start framed job', exact: true });
     await expect(startButton).toBeEnabled();
+    const frameNotice = page.getByRole('button', {
+      name: 'Dismiss success notification: Frame complete — press Start to review and run this exact job.',
+      exact: true,
+    });
+    await expect(frameNotice).toBeInViewport({ ratio: 1 });
+    const noticeBounds = await frameNotice.boundingBox();
+    const dockBounds = await page.getByRole('region', { name: 'Job actions' }).boundingBox();
+    expect(noticeBounds).not.toBeNull();
+    expect(dockBounds).not.toBeNull();
+    expect((noticeBounds?.x ?? 0) + (noticeBounds?.width ?? 0)).toBeLessThanOrEqual(
+      dockBounds?.x ?? 0,
+    );
 
     await kerfdesk.setAutoAcknowledge(false);
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
@@ -565,8 +581,18 @@ kerfDeskTest(
     await expect(probe).toHaveAttribute('data-reported-head-y', trustedHeadY ?? '');
     expect((await canvasPixels(page)).motion).toBe(pixelsAfterStatus.motion);
 
+    await page.getByRole('tab', { name: 'Artwork' }).click();
+    await expect(page.getByLabel('Laser controls', { exact: true })).toHaveCount(0);
+    const liveMotion = page.getByRole('region', { name: 'Live Motion', exact: true });
+    const pause = liveMotion.getByRole('button', { name: 'Pause', exact: true });
+    const abort = liveMotion.getByRole('button', { name: 'ABORT JOB', exact: true });
+    await expect(pause).toBeEnabled();
+    await expect(pause).toBeInViewport({ ratio: 1 });
+    await expect(abort).toBeEnabled();
+    await expect(abort).toBeInViewport({ ratio: 1 });
+
     const pauseBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
-    await page.getByRole('button', { name: 'Pause', exact: true }).first().click();
+    await pause.click();
     await expect
       .poll(async () =>
         hasSerialByteSequence(serialWriteBytes(await kerfdesk.events()).slice(pauseBytesBefore), [
@@ -583,7 +609,7 @@ kerfDeskTest(
     await expect(page.getByTestId('canvas-motion-status')).toContainText('Hold');
     expect(Number(await probe.getAttribute('data-confirmed-route-mm'))).toBe(atPause);
     const resumeBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
-    await page.getByRole('button', { name: 'Resume', exact: true }).first().click();
+    await liveMotion.getByRole('button', { name: 'Resume', exact: true }).click();
     await expect
       .poll(async () =>
         hasSerialByteSequence(serialWriteBytes(await kerfdesk.events()).slice(resumeBytesBefore), [
@@ -628,6 +654,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
     );
   });
   await page.goto('/');
+  await page.getByRole('tab', { name: 'Machine' }).click();
   const savedRecovery = page.getByText('Interrupted job saved', { exact: true });
   await expect(savedRecovery).toBeVisible();
   await expect(page.getByText('Last Start attempt blocked', { exact: true })).toHaveCount(0);
@@ -665,6 +692,20 @@ async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const filenamePanel = page.getByRole('dialog', { name: 'Choose G-code filename' });
   await expect(filenamePanel).toBeVisible();
   await filenamePanel.getByRole('button', { name: 'Save', exact: true }).click();
+}
+
+async function toolbarCommand(page: Page, name: string): Promise<Locator> {
+  const button = page
+    .getByLabel('Toolbar', { exact: true })
+    .getByRole('button', { name, exact: true });
+  if (await button.isVisible()) return button;
+  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
+  if (!(await menu.isVisible())) {
+    await page.getByRole('button', { name: 'More commands', exact: true }).click();
+  }
+  return menu
+    .getByRole('menuitem', { name, exact: true })
+    .or(menu.getByRole('menuitemcheckbox', { name, exact: true }));
 }
 
 async function installFileSystemMocks(
@@ -733,6 +774,7 @@ async function installFileSystemMocks(
 }
 
 async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+  await page.getByRole('tab', { name: 'Machine' }).click();
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();

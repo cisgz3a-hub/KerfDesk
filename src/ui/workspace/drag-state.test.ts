@@ -8,6 +8,7 @@ import {
   type Transform,
 } from '../../core/scene';
 import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
+import { CANVAS_PADDING_PX } from './canvas-layout';
 import {
   computeMouseDownDrag,
   nextTransformForDrag,
@@ -332,7 +333,7 @@ function centerOf(bbox: {
 }
 
 const VIEW_STATE = { zoomFactor: 1, panX: 0, panY: 0 };
-const CANVAS_SIZE = 448;
+const CANVAS_SIZE = 400 + CANVAS_PADDING_PX * 2;
 const CANVAS_RECT = {
   left: 0,
   top: 0,
@@ -401,8 +402,8 @@ function mouseEventAtScenePoint(
 ): React.MouseEvent<HTMLCanvasElement> {
   return {
     button: 0,
-    clientX: 24 + point.x,
-    clientY: 24 + point.y,
+    clientX: CANVAS_PADDING_PX + point.x,
+    clientY: CANVAS_PADDING_PX + point.y,
     shiftKey: modifiers.shiftKey ?? false,
     altKey: modifiers.altKey ?? false,
   } as React.MouseEvent<HTMLCanvasElement>;

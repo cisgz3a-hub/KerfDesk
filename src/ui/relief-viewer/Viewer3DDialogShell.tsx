@@ -108,5 +108,5 @@ function ViewerStateHint(props: {
   );
 }
 const noticeStyle: React.CSSProperties = {
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
 };

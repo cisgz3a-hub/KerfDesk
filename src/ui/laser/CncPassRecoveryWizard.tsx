@@ -225,7 +225,7 @@ const guidanceStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',
   borderRadius: 6,
   padding: '9px 11px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
   lineHeight: 1.5,
 };
@@ -243,14 +243,14 @@ const fieldStyle: React.CSSProperties = {
   marginTop: 10,
 };
 const hintWarningStyle: React.CSSProperties = {
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 11,
   fontWeight: 600,
 };
 const refusalStyle: React.CSSProperties = {
   borderLeft: '3px solid var(--lf-danger)',
   padding: '7px 9px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
   marginTop: 10,
 };

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import lock from 'lucide-static/icons/lock-keyhole.svg?raw';
+import unlock from 'lucide-static/icons/lock-keyhole-open.svg?raw';
 import {
   buildSelectionTransformEdit,
   selectionAnchorPoint,
@@ -10,31 +12,19 @@ import {
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { TransformAnchorPicker } from './TransformAnchorPicker';
+import './NumericEditsBar.css';
 
 const FIELD_STEP_MM = 0.1;
 const ROTATION_STEP_DEG = 1;
 const DISPLAY_DECIMALS = 3;
 
-const ANCHORS: ReadonlyArray<SelectionAnchor> = ['nw', 'n', 'ne', 'w', 'c', 'e', 'sw', 's', 'se'];
-
-const ANCHOR_NAMES: Readonly<Record<SelectionAnchor, string>> = {
-  nw: 'top left',
-  n: 'top center',
-  ne: 'top right',
-  w: 'middle left',
-  c: 'center',
-  e: 'middle right',
-  sw: 'bottom left',
-  s: 'bottom center',
-  se: 'bottom right',
-};
-
 export function NumericEditsBar(): JSX.Element {
   const model = useNumericEditModel();
   return (
-    <section aria-label="Numeric Edits Toolbar" style={barStyle}>
-      <div style={editsGroupStyle}>
-        <AnchorGrid
+    <section aria-label="Numeric Edits Toolbar" className="lf-numeric-edits">
+      <div className="lf-numeric-edits-fields">
+        <TransformAnchorPicker
           active={model.anchor}
           disabled={!model.hasSelection}
           onChange={model.setAnchor}
@@ -104,28 +94,51 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
   const { model } = props;
   return (
     <>
+      <div className="lf-numeric-field-group">
+        <NumberField
+          label="Selection X position"
+          caption="X"
+          value={model.xValue}
+          disabled={!model.hasSelection}
+          unit="mm"
+          hideUnit
+          onCommit={(x) => model.commit({ kind: 'position', anchor: model.anchor, x })}
+        />
+        <NumberField
+          label="Selection Y position"
+          caption="Y"
+          value={model.yValue}
+          disabled={!model.hasSelection}
+          unit="mm"
+          onCommit={(y) => model.commit({ kind: 'position', anchor: model.anchor, y })}
+        />
+      </div>
+      <span className="lf-numeric-edit-divider" aria-hidden="true" />
+      <SizeFields model={model} />
+      <span className="lf-numeric-edit-divider" aria-hidden="true" />
       <NumberField
-        label="Selection X position"
-        caption="X"
-        value={model.xValue}
-        disabled={!model.hasSelection}
-        unit="mm"
-        onCommit={(x) => model.commit({ kind: 'position', anchor: model.anchor, x })}
+        label="Selection rotation"
+        caption="R"
+        value={model.rotationValue}
+        disabled={model.rotationValue === null}
+        unit="°"
+        step={ROTATION_STEP_DEG}
+        onCommit={(rotationDeg) => model.commit({ kind: 'rotate', rotationDeg })}
       />
-      <NumberField
-        label="Selection Y position"
-        caption="Y"
-        value={model.yValue}
-        disabled={!model.hasSelection}
-        unit="mm"
-        onCommit={(y) => model.commit({ kind: 'position', anchor: model.anchor, y })}
-      />
+    </>
+  );
+}
+
+function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Element {
+  return (
+    <div className="lf-numeric-field-group">
       <NumberField
         label="Selection width"
         caption="W"
         value={model.widthValue}
         disabled={!model.hasSelection}
         unit="mm"
+        hideUnit
         onCommit={(width) =>
           model.commit({
             kind: 'resize',
@@ -137,14 +150,17 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
       />
       <button
         type="button"
-        className="lf-btn lf-iconbtn lf-iconbtn--sm"
+        className="lf-btn lf-numeric-aspect-lock"
         aria-label="Lock aspect ratio"
         title="Keep width and height proportional when resizing the selection."
         aria-pressed={model.preserveAspect}
         disabled={!model.hasSelection}
         onClick={() => model.setPreserveAspect((value) => !value)}
       >
-        AR
+        <span
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: model.preserveAspect ? lock : unlock }}
+        />
       </button>
       <NumberField
         label="Selection height"
@@ -161,69 +177,8 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
           })
         }
       />
-      <NumberField
-        label="Selection rotation"
-        caption="R"
-        value={model.rotationValue}
-        disabled={model.rotationValue === null}
-        unit="deg"
-        step={ROTATION_STEP_DEG}
-        onCommit={(rotationDeg) => model.commit({ kind: 'rotate', rotationDeg })}
-      />
-    </>
-  );
-}
-
-function AnchorGrid(props: {
-  readonly active: SelectionAnchor;
-  readonly disabled: boolean;
-  readonly onChange: (anchor: SelectionAnchor) => void;
-}): JSX.Element {
-  return (
-    <div aria-label="Transform anchor" style={anchorGridStyle}>
-      {ANCHORS.map((anchor) => (
-        <button
-          key={anchor}
-          type="button"
-          className="lf-btn lf-iconbtn lf-iconbtn--sm"
-          aria-label={`Transform anchor: ${ANCHOR_NAMES[anchor]}`}
-          title={anchorTitle(anchor)}
-          aria-pressed={props.active === anchor}
-          disabled={props.disabled}
-          onClick={() => props.onChange(anchor)}
-        >
-          <span aria-hidden="true" style={anchorMarkerStyle} />
-        </button>
-      ))}
     </div>
   );
-}
-
-function anchorTitle(anchor: SelectionAnchor): string {
-  return `Use the selection ${anchorPointName(anchor)} point as the X/Y reference and resize anchor. Rotation always pivots about the centre.`;
-}
-
-function anchorPointName(anchor: SelectionAnchor): string {
-  switch (anchor) {
-    case 'nw':
-      return 'top-left';
-    case 'n':
-      return 'top';
-    case 'ne':
-      return 'top-right';
-    case 'w':
-      return 'left';
-    case 'c':
-      return 'center';
-    case 'e':
-      return 'right';
-    case 'sw':
-      return 'bottom-left';
-    case 's':
-      return 'bottom';
-    case 'se':
-      return 'bottom-right';
-  }
 }
 
 function NumberField(props: {
@@ -232,6 +187,7 @@ function NumberField(props: {
   readonly value: number | null;
   readonly disabled: boolean;
   readonly unit: string;
+  readonly hideUnit?: boolean;
   readonly step?: number;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
@@ -259,8 +215,8 @@ function NumberField(props: {
     props.onCommit(next);
   };
   return (
-    <label style={fieldStyle}>
-      <span style={captionStyle}>{props.caption}</span>
+    <label className="lf-numeric-edit-field">
+      <span className="lf-numeric-edit-caption">{props.caption}</span>
       <input
         className="lf-input"
         aria-label={props.label}
@@ -276,9 +232,8 @@ function NumberField(props: {
         onKeyDown={(event) => {
           if (event.key === 'Enter') commit(event.currentTarget);
         }}
-        style={inputStyle}
       />
-      <span style={unitStyle}>{props.unit}</span>
+      {!props.hideUnit && <span className="lf-numeric-edit-unit">{props.unit}</span>}
     </label>
   );
 }
@@ -318,51 +273,3 @@ function messageForError(reason: string): string {
   if (reason === 'invalid-number') return 'Numeric values must be finite.';
   return 'Numeric edit could not be applied.';
 }
-
-const barStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  minWidth: 0,
-  maxWidth: '100%',
-  boxSizing: 'border-box',
-  gap: 8,
-  padding: '4px 12px',
-  background: 'var(--lf-bg-1)',
-  borderBottom: '1px solid var(--lf-border)',
-  fontSize: 12,
-};
-// Transform controls scroll within their own bar. Live machine actions are a
-// separate full-width App-shell sibling (ADR-207), never selection-toolbar content.
-const editsGroupStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  minWidth: 0,
-  flex: '1 1 auto',
-  overflowX: 'auto',
-  overflowY: 'hidden',
-  gap: 8,
-};
-const anchorGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, 22px)',
-  gap: 2,
-};
-const anchorMarkerStyle: React.CSSProperties = {
-  display: 'block',
-  width: 7,
-  height: 7,
-  borderRadius: 2,
-  background: 'currentColor',
-};
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-};
-const captionStyle: React.CSSProperties = {
-  width: 12,
-  color: 'var(--lf-text-muted)',
-  fontWeight: 600,
-};
-const inputStyle: React.CSSProperties = { width: 74 };
-const unitStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', fontSize: 11 };

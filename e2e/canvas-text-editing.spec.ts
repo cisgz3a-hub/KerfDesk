@@ -1,3 +1,5 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
+import { CANVAS_PADDING_PX } from '../src/ui/workspace/canvas-layout';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { Page } from '@playwright/test';
 import type { AppState } from '../src/ui/state/store';
@@ -37,9 +39,13 @@ test('places and formats multiline text directly on the canvas in one saved undo
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+  await expect(canvas).toBeVisible();
   const rect = await canvas.boundingBox();
   if (rect === null) throw new Error('Canvas missing');
-  const scale = Math.min((rect.width - 48) / 400, (rect.height - 48) / 400);
+  const scale = Math.min(
+    (rect.width - CANVAS_PADDING_PX * 2) / 400,
+    (rect.height - CANVAS_PADDING_PX * 2) / 400,
+  );
   const input = await addText(page, 'Made with care\nCafé & Studio');
   await page.getByRole('spinbutton', { name: 'Text size', exact: true }).fill('16');
   await input.click();
@@ -65,7 +71,7 @@ test('places and formats multiline text directly on the canvas in one saved undo
     0,
   );
   expect(saved.undo).toBe(1);
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect
     .poll(async () =>
       Object.values(await kerfdesk.savedFiles()).some((file) => file.includes('Made with care')),

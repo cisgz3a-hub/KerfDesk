@@ -119,4 +119,4 @@ function rtspButtonLabel(control: RtspControlState): string {
 
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
 const urlStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-const errorStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)' };
+const errorStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)' };

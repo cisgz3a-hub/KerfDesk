@@ -13,8 +13,8 @@ const SEVERITY_LABEL: Readonly<Record<FindingSeverity, string>> = {
 };
 
 const SEVERITY_COLOR: Readonly<Record<FindingSeverity, string>> = {
-  warning: 'var(--lf-warning)',
-  notice: 'var(--lf-accent)',
+  warning: 'var(--lf-warning-fg)',
+  notice: 'var(--lf-accent-fg)',
   info: 'var(--lf-text-muted)',
 };
 

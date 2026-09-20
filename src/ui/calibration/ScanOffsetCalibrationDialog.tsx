@@ -308,7 +308,7 @@ const errorStyle: React.CSSProperties = {
   padding: 10,
   border: '1px solid color-mix(in srgb, var(--lf-danger) 55%, transparent)',
   borderRadius: 6,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };
 const warningStyle: React.CSSProperties = {
@@ -316,7 +316,7 @@ const warningStyle: React.CSSProperties = {
   padding: 10,
   border: '1px solid color-mix(in srgb, var(--lf-warning) 65%, transparent)',
   borderRadius: 6,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };
 const feedbackListStyle: React.CSSProperties = { margin: '4px 0 0', paddingLeft: 18 };

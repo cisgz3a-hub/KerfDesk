@@ -159,6 +159,6 @@ const surfaceStyle: CSSProperties = {
 };
 const sourceErrorStyle: CSSProperties = {
   margin: '4px 0 0',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };

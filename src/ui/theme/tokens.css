@@ -9,7 +9,8 @@
  * tokens; DYNAMIC styling (drag readout position, layer color swatches,
  * progress width, preview opacity) stays inline by policy.
  *
- * Theme: unified light chrome. The canvas viewport keeps its light bed —
+ * Theme: quiet blue chrome follows the operating system's light/dark mode.
+ * The canvas viewport follows the same theme with display-only artwork ink —
  * its palette lives in canvas-theme.ts; the two shared values
  * (--lf-accent ↔ selection, --lf-danger ↔ out-of-bounds) are pinned by
  * theme-sync.test.ts. Keep component code on tokens so theme changes stay
@@ -21,57 +22,69 @@
  */
 
 :root {
+  color-scheme: var(--lf-color-scheme);
   /* Surfaces */
-  --lf-bg-0: #f8fafc; /* bars: menubar, toolbar, statusbar */
+  --lf-color-scheme: light;
+  --lf-bg-0: #f5f7fa; /* bars: menubar, toolbar, statusbar */
   --lf-bg-1: #ffffff; /* rails + dialog panels */
-  --lf-bg-2: #f1f5f9; /* cards, dropdown menus, hover wells */
+  --lf-bg-2: #f5f7fa; /* cards, dropdown menus, hover wells */
   --lf-bg-input: #ffffff; /* inputs, log scrollback */
-  --lf-border: #d0d7de;
-  --lf-border-strong: #9aa4af;
+  --lf-bg-canvas: #f4f5f7;
+  --lf-bg-overlay: rgba(255, 255, 255, 0.96);
+  /* Fixed light artwork/material previews keep their text legible in either theme. */
+  --lf-material-surface-text: #5f6f85;
+  --lf-border: #dce2ea;
+  --lf-border-strong: #a2afbf;
 
   /* Text */
-  --lf-text: #111827;
-  --lf-text-muted: #4b5563;
-  --lf-text-faint: #6b7280;
+  --lf-text: #253248;
+  --lf-text-muted: #5f6f85;
+  --lf-text-faint: #64748b;
 
-  /* Semantic fills (white text on these passes AA) */
-  --lf-accent: #1976d2;
-  --lf-accent-hover: #1565c0;
-  --lf-danger: #c62828;
-  --lf-danger-hover: #d73b3b;
-  --lf-success: #2e7d32;
-  --lf-warning: #ed6c02;
+  /* Slightly deeper than the preview's #3478d4 so small white labels pass AA. */
+  --lf-accent: #3175d0;
+  --lf-accent-hover: #2967bb;
+  --lf-accent-active: #235aa5;
+  /* Semantic fills (white text on these passes AA). */
+  --lf-danger: #b43337;
+  --lf-danger-hover: #9d2b30;
+  --lf-danger-active: #87242a;
+  --lf-success: #2d845d;
+  --lf-warning: #94621f;
   /* Text/icons sitting ON one of the semantic fills above */
   --lf-on-fill: #ffffff;
 
   /* Semantic text on light surfaces */
-  --lf-accent-fg: #0d47a1;
-  --lf-danger-fg: #9f1d1d;
-  --lf-success-fg: #1b5e20;
-  --lf-warning-fg: #7a3f00;
+  --lf-accent-fg: #2967bb;
+  --lf-danger-fg: #a02c31;
+  --lf-success-fg: #246b4b;
+  --lf-warning-fg: #805117;
   --lf-trace-fg: #6a1b9a;
 
   /* Tinted panel backgrounds behind semantic banners/wells */
-  --lf-tint-danger: #fff1f1;
-  --lf-tint-warning: #fff7e6;
-  --lf-tint-info: #eef6ff;
-  --lf-tint-success: #e9f7ec;
+  --lf-tint-danger: #fff0f1;
+  --lf-tint-warning: #fff9ec;
+  --lf-tint-info: #eaf2ff;
+  --lf-tint-accent: var(--lf-tint-info);
+  --lf-tint-success: #edf7f1;
+  --lf-tint-success-hover: #dcefe4;
+  --lf-tint-success-active: #cee8d9;
   /* Faint accent wash (drag-import overlay fill) */
-  --lf-accent-wash: rgba(25, 118, 210, 0.08);
+  --lf-accent-wash: rgba(49, 117, 208, 0.08);
 
-  --lf-focus: #1976d2;
-  --lf-backdrop: rgba(17, 24, 39, 0.35);
+  --lf-focus: #3175d0;
+  --lf-backdrop: rgba(37, 50, 72, 0.35);
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
   --lf-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
 
   /* Type scale */
-  --lf-font: system-ui, sans-serif;
+  --lf-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --lf-font-mono: ui-monospace, Menlo, monospace;
-  --lf-text-xs: 11px;
-  --lf-text-sm: 12px;
-  --lf-text-md: 13px;
-  --lf-text-lg: 14px;
-  --lf-text-xl: 16px;
+  --lf-text-xs: 12px;
+  --lf-text-sm: 14px;
+  --lf-text-md: 15px;
+  --lf-text-lg: 16px;
+  --lf-text-xl: 18px;
 
   /* Space + radius */
   --lf-space-1: 2px;
@@ -90,6 +103,38 @@
   --lf-z-toast: 1100;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lf-color-scheme: dark;
+    --lf-bg-0: #272c34;
+    --lf-bg-1: #20242b;
+    --lf-bg-2: #272c34;
+    --lf-bg-input: #20242b;
+    --lf-bg-canvas: #191d23;
+    --lf-bg-overlay: rgba(32, 36, 43, 0.96);
+    --lf-border: #3d4653;
+    --lf-border-strong: #65758b;
+    --lf-text: #e0e7f2;
+    --lf-text-muted: #a0afc3;
+    --lf-text-faint: #a0afc3;
+    --lf-accent-fg: #79b3ff;
+    --lf-danger-fg: #ff9da2;
+    --lf-success-fg: #80caa4;
+    --lf-warning-fg: #e9c183;
+    --lf-trace-fg: #d6a5f5;
+    --lf-tint-danger: #3f282e;
+    --lf-tint-warning: #3d3323;
+    --lf-tint-info: #243e61;
+    --lf-tint-success: #233b31;
+    --lf-tint-success-hover: #2c4b3c;
+    --lf-tint-success-active: #345b48;
+    --lf-accent-wash: rgba(121, 179, 255, 0.12);
+    --lf-focus: #79b3ff;
+    --lf-backdrop: rgba(10, 14, 21, 0.6);
+    --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+}
+
 html,
 body,
 #app-root {
@@ -100,6 +145,9 @@ body,
 
 body {
   overflow: hidden;
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  color-scheme: var(--lf-color-scheme);
 }
 
 /* Keyboard-only focus ring, everywhere. */
@@ -114,7 +162,7 @@ body {
   font: inherit;
   font-size: var(--lf-text-md);
   color: var(--lf-text);
-  background: var(--lf-bg-2);
+  background: var(--lf-bg-1);
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-md);
   padding: 3px 10px;
@@ -124,8 +172,8 @@ body {
     border-color 80ms;
 }
 .lf-btn:hover:not(:disabled) {
-  background: #e5eaf0;
-  border-color: var(--lf-border-strong);
+  background: var(--lf-tint-info);
+  border-color: var(--lf-accent);
 }
 .lf-btn:active:not(:disabled) {
   background: var(--lf-bg-1);
@@ -147,7 +195,7 @@ body {
   border-color: var(--lf-accent-hover);
 }
 .lf-btn--primary:active:not(:disabled) {
-  background: #0d47a1;
+  background: var(--lf-accent-active);
 }
 
 .lf-btn--danger {
@@ -160,7 +208,7 @@ body {
   border-color: var(--lf-danger-hover);
 }
 .lf-btn--danger:active:not(:disabled) {
-  background: #b22222;
+  background: var(--lf-danger-active);
 }
 
 .lf-btn--ghost {
@@ -168,7 +216,7 @@ body {
   border-color: transparent;
 }
 .lf-btn--ghost:hover:not(:disabled) {
-  background: var(--lf-bg-2);
+  background: var(--lf-tint-info);
 }
 
 /* Light-green "go" actions (LightBurn's green-means-run): Frame and Start.
@@ -179,11 +227,11 @@ body {
   color: var(--lf-success-fg);
 }
 .lf-btn--go:hover:not(:disabled) {
-  background: #d9efe0;
+  background: var(--lf-tint-success-hover);
   border-color: var(--lf-success);
 }
 .lf-btn--go:active:not(:disabled) {
-  background: #c9e7d2;
+  background: var(--lf-tint-success-active);
 }
 
 .lf-btn--pressed,
@@ -191,6 +239,15 @@ body {
   background: var(--lf-accent);
   border-color: var(--lf-accent);
   color: #fff;
+}
+.lf-btn--pressed:hover:not(:disabled),
+.lf-btn[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--lf-accent-hover);
+  border-color: var(--lf-accent-hover);
+}
+.lf-btn--pressed:active:not(:disabled),
+.lf-btn[aria-pressed='true']:active:not(:disabled) {
+  background: var(--lf-accent-active);
 }
 
 /* Attention pulse — coaches the one next required step (e.g. "Set origin
@@ -247,60 +304,13 @@ body {
   height: 36px;
 }
 
-/* ---------- Responsive command toolbar ---------- */
-
-.lf-toolbar-command-groups {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-.lf-toolbar-command-groups::-webkit-scrollbar {
-  display: none;
-}
-.lf-toolbar-separator {
-  display: inline-block;
-}
-.lf-toolbar-command {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 28px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.lf-toolbar-command--icon-only {
-  width: 30px;
-  padding: 0;
-}
+/* Toolbar icons are also used in the keyboard shortcut reference. */
 .lf-toolbar-icon,
 .lf-toolbar-icon > svg {
   display: block;
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
-}
-
-@media (max-width: 1280px) {
-  .lf-toolbar-build,
-  .lf-toolbar-command-label {
-    display: none;
-  }
-  .lf-toolbar-command {
-    width: 30px;
-    padding: 0;
-  }
-}
-
-@media (max-width: 700px) {
-  .lf-toolbar-brand,
-  .lf-toolbar-identity-separator {
-    display: none;
-  }
 }
 
 /* ---------- Inputs ---------- */
@@ -314,7 +324,7 @@ body {
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-sm);
   padding: 2px 6px;
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 .lf-input:hover:not(:disabled),
 .lf-select:hover:not(:disabled) {
@@ -330,7 +340,7 @@ body {
 }
 
 .lf-checkbox {
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
   accent-color: var(--lf-accent);
 }
 
@@ -396,8 +406,8 @@ body {
     border-color 80ms;
 }
 .lf-pane-form button:not([class]):not(:where(.lf-dialog *)):hover:not(:disabled) {
-  background: #e5eaf0;
-  border-color: var(--lf-border-strong);
+  background: var(--lf-tint-info);
+  border-color: var(--lf-accent);
 }
 .lf-pane-form button:not([class]):not(:where(.lf-dialog *)):active:not(:disabled) {
   background: var(--lf-bg-2);
@@ -419,7 +429,7 @@ body {
   padding: 3px 6px;
   min-height: 24px;
   box-sizing: border-box;
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 /* Closed selects ellipsize long options instead of running under the arrow. */
 .lf-pane-form select:not(:where(.lf-dialog *)) {
@@ -456,7 +466,7 @@ body {
 }
 .lf-pane-form input[type='checkbox']:not(:where(.lf-dialog *)) {
   accent-color: var(--lf-accent);
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 
 /* One disclosure chrome for every collapsible rail section: hairline
@@ -563,7 +573,7 @@ body {
   font-size: var(--lf-text-md);
   max-height: 90vh;
   overflow-y: auto;
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 .lf-dialog--sm {
   min-width: min(320px, calc(100vw - 20px));
@@ -692,7 +702,7 @@ body {
   font-size: var(--lf-text-md);
   overflow-y: auto;
   overflow-x: hidden;
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 
 .lf-card {
@@ -748,13 +758,13 @@ body {
 /* ---------- Menus (AppMenuBar dropdowns) ---------- */
 
 .lf-menu {
-  background: var(--lf-bg-2);
+  background: var(--lf-bg-1);
   color: var(--lf-text);
   border: 1px solid var(--lf-border-strong);
   border-radius: var(--lf-radius-md);
   padding: var(--lf-space-2);
   z-index: var(--lf-z-menu);
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 
 .lf-menu-item {
@@ -773,8 +783,8 @@ body {
   text-align: left;
 }
 .lf-menu-item:hover:not(:disabled) {
-  background: var(--lf-accent);
-  color: #fff;
+  background: var(--lf-tint-info);
+  color: var(--lf-accent-fg);
 }
 .lf-menu-item:disabled {
   color: var(--lf-text-faint);
@@ -799,14 +809,14 @@ body {
 /* ---------- Workspace overlay chips ---------- */
 
 .lf-chip {
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--lf-bg-overlay);
   color: var(--lf-text);
-  border: 1px solid var(--lf-border-strong);
+  border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-md);
-  color-scheme: light;
+  color-scheme: var(--lf-color-scheme);
 }
 
-/* ---------- Scrollbars (light surfaces) ---------- */
+/* ---------- Scrollbars ---------- */
 
 .lf-rail,
 .lf-dialog,

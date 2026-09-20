@@ -222,4 +222,4 @@ const previewStyle: React.CSSProperties = {
   borderRadius: 4,
   fontSize: 12,
 };
-const errorStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)', fontSize: 12 };
+const errorStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)', fontSize: 12 };

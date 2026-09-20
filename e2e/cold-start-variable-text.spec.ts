@@ -1,3 +1,4 @@
+import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
 
 test('cold Vite start renders variable outline text without optimization reloads or 504s', async ({
@@ -14,7 +15,7 @@ test('cold Vite start renders variable outline text without optimization reloads
   });
 
   await page.goto('/');
-  await expect(page.getByRole('banner', { name: 'Toolbar' })).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk');
   await page.getByRole('button', { name: 'Text...' }).click();
   await page
     .getByLabel('KerfDesk workspace', { exact: true })

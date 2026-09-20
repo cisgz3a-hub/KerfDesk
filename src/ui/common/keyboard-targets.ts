@@ -10,7 +10,8 @@ export function isEditableShortcutTarget(target: EventTarget | null): boolean {
 export function isKeyboardActivationTarget(target: EventTarget | null): boolean {
   if (isEditableShortcutTarget(target)) return true;
   if (!(target instanceof HTMLElement)) return false;
-  if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return true;
+  if (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'SUMMARY')
+    return true;
   const role = target.getAttribute('role');
   return (
     role === 'button' ||

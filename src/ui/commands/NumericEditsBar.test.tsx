@@ -28,17 +28,16 @@ afterEach(async () => {
 });
 
 describe('NumericEditsBar', () => {
-  it('owns only horizontally scrollable transform fields', async () => {
+  it('keeps all transform fields available with the anchor grid collapsed', async () => {
     const container = await render(<NumericEditsBar />);
     const toolbar = container.querySelector('section[aria-label="Numeric Edits Toolbar"]');
     expect(toolbar).toBeInstanceOf(HTMLElement);
-    expect((toolbar as HTMLElement).style.minWidth).toBe('0');
-    expect((toolbar as HTMLElement).style.maxWidth).toBe('100%');
     // Live machine actions are an App-shell sibling, not mixed into selection edits.
     const editsGroup = toolbar?.querySelector(':scope > div');
     expect(editsGroup).toBeInstanceOf(HTMLElement);
-    expect((editsGroup as HTMLElement).style.overflowX).toBe('auto');
-    expect((editsGroup as HTMLElement).style.minWidth).toBe('0');
+    expect(editsGroup?.querySelectorAll('input')).toHaveLength(5);
+    expect(toolbar?.querySelector('button[aria-label="Choose transform anchor"]')).not.toBeNull();
+    expect(document.querySelector('[role="dialog"][aria-label="Transform anchor"]')).toBeNull();
     expect(toolbar?.querySelector('[aria-label="Live machine controls"]')).toBeNull();
   });
 
@@ -70,12 +69,14 @@ describe('NumericEditsBar', () => {
 
     expect(input(container, 'Selection X position').disabled).toBe(true);
     expect(input(container, 'Selection width').disabled).toBe(true);
+    expect(button(container, 'Choose transform anchor').disabled).toBe(true);
   });
 
   it('explains the 9-point anchor buttons on hover', async () => {
     installProject();
     const container = await render(<NumericEditsBar />);
-    const anchor = button(container, 'Transform anchor: top right');
+    await act(async () => button(container, 'Choose transform anchor').click());
+    const anchor = button(document.body, 'Transform anchor: top right');
 
     expect(anchor.title).toContain('top-right point');
     expect(anchor.textContent).not.toBe('.');
@@ -84,13 +85,62 @@ describe('NumericEditsBar', () => {
   it('stores the selected anchor for numeric fields and canvas transforms', async () => {
     installProject();
     const container = await render(<NumericEditsBar />);
-    const anchor = button(container, 'Transform anchor: middle right');
+    await act(async () => button(container, 'Choose transform anchor').click());
+    const anchor = button(document.body, 'Transform anchor: middle right');
 
     await act(async () => {
       anchor.click();
     });
 
     expect(useUiStore.getState().selectionAnchor).toBe('e');
+    expect(button(container, 'Choose transform anchor').getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+    expect(document.activeElement).toBe(button(container, 'Choose transform anchor'));
+    expect(input(container, 'Selection X position').value).toBe('20');
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('opens the selected anchor with the keyboard and navigates all nine positions', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const trigger = button(container, 'Choose transform anchor');
+    await act(async () =>
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })),
+    );
+    expect(document.querySelectorAll('[role="dialog"] button')).toHaveLength(9);
+    expect(document.activeElement).toBe(button(document.body, 'Transform anchor: top left'));
+    await act(async () =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      ),
+    );
+    expect(document.activeElement).toBe(button(document.body, 'Transform anchor: middle left'));
+    await act(async () =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+      ),
+    );
+    expect(document.activeElement).toBe(button(document.body, 'Transform anchor: bottom right'));
+    await act(async () => (document.activeElement as HTMLButtonElement).click());
+    expect(useUiStore.getState().selectionAnchor).toBe('se');
+    expect(document.activeElement).toBe(trigger);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('dismisses the anchor picker with Escape without changing the anchor', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const trigger = button(container, 'Choose transform anchor');
+    await act(async () => trigger.click());
+    await act(async () =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      ),
+    );
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(useUiStore.getState().selectionAnchor).toBe('nw');
   });
 
   it('commits an exact X position edit through the selection transform path', async () => {
@@ -188,7 +238,7 @@ function input(container: HTMLDivElement, label: string): HTMLInputElement {
   return found;
 }
 
-function button(container: HTMLDivElement, label: string): HTMLButtonElement {
+function button(container: HTMLElement, label: string): HTMLButtonElement {
   const found = container.querySelector(`button[aria-label="${label}"]`);
   if (!(found instanceof HTMLButtonElement)) throw new Error(`${label} missing`);
   return found;

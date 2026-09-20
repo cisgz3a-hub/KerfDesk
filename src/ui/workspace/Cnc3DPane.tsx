@@ -201,5 +201,5 @@ const hintStyle: React.CSSProperties = {
 };
 const resolutionNoticeStyle: React.CSSProperties = {
   ...hintStyle,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
 };

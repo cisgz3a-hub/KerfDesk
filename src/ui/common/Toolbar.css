@@ -1,0 +1,157 @@
+.lf-toolbar-shell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 54px;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  background: var(--lf-bg-0);
+  color: var(--lf-text);
+  border-bottom: 1px solid var(--lf-border);
+  font:
+    15px system-ui,
+    sans-serif;
+}
+.lf-toolbar-project-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 240px;
+  margin-right: 10px;
+  overflow: hidden;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lf-toolbar-shell .lf-toolbar-command-groups {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+  overflow: hidden;
+}
+.lf-toolbar-shell .lf-toolbar-separator {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  flex: 0 0 1px;
+  background: var(--lf-border);
+}
+.lf-toolbar-shell .lf-toolbar-command {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  width: auto;
+  min-height: 40px;
+  padding: 5px 10px;
+  background: var(--lf-bg-1);
+  border-radius: 5px;
+  font: inherit;
+  white-space: nowrap;
+}
+.lf-toolbar-shell .lf-toolbar-command--icon-only {
+  width: 40px;
+  padding: 4px;
+}
+.lf-toolbar-shell .lf-toolbar-command-label,
+.lf-toolbar-overflow .lf-toolbar-command-label {
+  display: inline;
+}
+.lf-toolbar-utilities {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.lf-toolbar-shell .lf-toolbar-more {
+  min-width: 76px;
+}
+.lf-toolbar-shell .lf-toolbar-icon,
+.lf-toolbar-shell .lf-toolbar-icon > svg {
+  width: 20px;
+  height: 20px;
+}
+.lf-toolbar-shell .lf-workspace-layout-select {
+  gap: 6px;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: var(--lf-text-muted);
+}
+.lf-toolbar-shell .lf-workspace-layout-select:hover {
+  background: var(--lf-tint-accent);
+}
+.lf-toolbar-measure {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: flex;
+  width: max-content;
+  gap: 4px;
+  visibility: hidden;
+  pointer-events: none;
+}
+.lf-toolbar-overflow {
+  width: 292px;
+}
+.lf-toolbar-overflow-command {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lf-toolbar-overflow-command:hover:not(:disabled),
+.lf-toolbar-overflow-command:focus-visible {
+  background: var(--lf-tint-accent);
+  outline: 1px solid var(--lf-accent);
+  outline-offset: -1px;
+}
+.lf-toolbar-overflow-command:disabled {
+  color: var(--lf-text-faint);
+  cursor: default;
+}
+.lf-toolbar-overflow-command kbd {
+  margin-left: auto;
+  color: var(--lf-text-muted);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.lf-toolbar-overflow-separator {
+  height: 1px;
+  margin: 5px 7px;
+  background: var(--lf-border);
+}
+@media (max-width: 1000px) {
+  .lf-toolbar-project-name {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .lf-toolbar-shell {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 5px 7px;
+  }
+  .lf-toolbar-shell .lf-toolbar-command-groups {
+    order: 2;
+    flex-basis: 100%;
+  }
+  .lf-toolbar-utilities {
+    margin-left: auto;
+  }
+}

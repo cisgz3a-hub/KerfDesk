@@ -1,0 +1,49 @@
+.lf-toasts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-height: min(180px, 28vh);
+  overflow-y: auto;
+  pointer-events: none;
+  scrollbar-width: thin;
+}
+
+.lf-toasts--workspace {
+  position: fixed;
+  left: 12px;
+  bottom: 140px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: var(--lf-z-toast);
+}
+
+.lf-toast-dialog-host {
+  order: -1;
+  flex: 0 0 auto;
+  align-self: stretch;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.lf-toast-dialog-host > .lf-toasts {
+  margin: 0 0 8px;
+}
+
+.lf-toast {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+  padding: 8px 14px;
+  border-radius: var(--lf-radius-md);
+  border: none;
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  line-height: 1.4;
+  box-shadow: var(--lf-shadow);
+  cursor: pointer;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

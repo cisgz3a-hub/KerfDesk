@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Sketch } from '../../core/design';
 import { canvasTheme } from '../theme/canvas-theme';
 import { gridStepMm, paintDesignCanvas, type DesignCanvasPaint } from './design-canvas-draw';
@@ -43,6 +43,8 @@ function recordingContext(): {
 }
 
 const emptySketch: Sketch = { entities: [] };
+
+afterEach(() => vi.unstubAllGlobals());
 
 const basePaint: DesignCanvasPaint = {
   view: { pxPerMm: 2, panXmm: 0, panYmm: 0 },
@@ -157,6 +159,16 @@ describe('paintDesignCanvas — entities', () => {
       },
     ],
   };
+
+  it('keeps default sketch geometry visible on a dark bed without changing layer data', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const drawing: Sketch = { entities: [sketch.entities[0]!] };
+    const before = JSON.stringify(drawing);
+    const { ctx } = recordingContext();
+    paintDesignCanvas(ctx, { ...basePaint, sketch: drawing });
+    expect(ctx.strokeStyle).toBe(canvasTheme.artworkInk);
+    expect(JSON.stringify(drawing)).toBe(before);
+  });
 
   it('strokes each entity once', () => {
     const { ctx, calls } = recordingContext();

@@ -1,0 +1,99 @@
+.lf-workspace-job-actions {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--lf-border);
+  background: var(--lf-bg-1);
+  box-shadow: 0 -4px 12px #00000004;
+  color: var(--lf-text);
+  font-size: var(--lf-text-md);
+}
+
+.lf-job-dock__status {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.4;
+}
+
+.lf-job-dock__status > svg {
+  margin-top: 1px;
+}
+
+.lf-job-dock__readiness {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.lf-job-dock__status[data-ready='true'] {
+  color: var(--lf-success-fg);
+}
+
+.lf-job-dock__estimate {
+  max-width: 128px;
+  margin-left: auto;
+  color: var(--lf-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: break-word;
+}
+
+.lf-job-dock__estimate:empty {
+  display: none;
+}
+
+.lf-job-dock__buttons > .lf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: var(--lf-text-md);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.lf-job-dock__buttons > .lf-btn > svg {
+  flex-shrink: 0;
+}
+
+.lf-job-dock__buttons > .lf-job-dock__start {
+  background: var(--lf-accent-fill, var(--lf-accent));
+  border-color: var(--lf-accent-fill, var(--lf-accent));
+  color: var(--lf-on-fill);
+}
+
+.lf-job-dock__buttons > .lf-job-dock__start:disabled {
+  opacity: 0.48;
+}
+
+.lf-job-dock__buttons > .lf-job-dock__start:hover:not(:disabled) {
+  background: var(--lf-accent-hover);
+  border-color: var(--lf-accent-hover);
+}
+
+.lf-job-dock__notices {
+  max-height: min(22dvh, 160px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.lf-job-dock__notices:empty {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .lf-job-dock__buttons > .lf-btn {
+    min-height: 44px;
+  }
+}

@@ -45,9 +45,12 @@ describe('Toolbar Box Generator', () => {
         );
       });
 
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('button[aria-label="More commands"]')?.click(),
+      );
       const toolbarButtons = [
-        ...host.querySelectorAll('header[aria-label="Toolbar"] button'),
-      ].filter((button) => button.textContent !== 'Shortcuts');
+        ...document.querySelectorAll('[role="menu"][aria-label="More commands"] button'),
+      ];
       const labels = toolbarButtons.map((button) => button.textContent?.trim() ?? '');
       // Camera (ADR-116) and Place Board (ADR-124) sit between Registration Jig
       // and Box Generator.

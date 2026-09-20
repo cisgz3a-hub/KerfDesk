@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../src/core/devices';
 import { unrepresentableStrokeProject } from '../src/__fixtures__/vcarve-stroke-geometry';
@@ -110,7 +111,7 @@ for (const scenario of cases) {
     const before = await exportGcode(page, kerfdesk);
     await command(page, 'Edit', 'Select All');
     await command(page, 'Tools', 'Convert to Path');
-    await page.getByRole('button', { name: 'Save As...' }).click();
+    await (await toolbarCommand(page, 'Save As...')).click();
     await expect
       .poll(async () =>
         Object.keys(await kerfdesk.savedFiles()).some((name) => name.endsWith('.lf2')),
@@ -144,7 +145,7 @@ for (const scenario of cases) {
       expect(afterDepth).toBe(0);
       expect(emittedFeedChords(after).some(([a, b]) => a.z < -0.2 || b.z < -0.2)).toBe(true);
     }
-    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await (await toolbarCommand(page, 'Preview')).click();
     await expect(
       page.getByRole('group', { name: 'Preview route controls and statistics' }),
     ).toBeVisible();

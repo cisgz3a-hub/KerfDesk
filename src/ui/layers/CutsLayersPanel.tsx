@@ -22,6 +22,7 @@ import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 import { SelectedReliefProperties } from './SelectedReliefProperties';
+import './cuts-layers-panel.css';
 
 export function CutsLayersPanel(): JSX.Element {
   const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
@@ -47,7 +48,7 @@ export function CutsLayersPanel(): JSX.Element {
   return (
     <aside
       aria-label="Artwork / Operations panel"
-      className="lf-rail lf-pane-form"
+      className="lf-rail lf-pane-form lf-artwork-panel"
       style={panelStyle}
     >
       <RailPanelHeading
@@ -127,8 +128,7 @@ function ViewTab(props: {
       aria-controls={`cuts-layers-${props.view}-panel`}
       aria-selected={props.selected}
       title={`Show ${props.label.toLowerCase()}`}
-      className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn lf-btn--ghost'}
-      style={viewTabStyle}
+      className="lf-btn lf-btn--ghost lf-artwork-view-tab"
       onClick={() => props.onSelect(props.view)}
     >
       {props.label}
@@ -141,11 +141,11 @@ function LayersView(props: {
 }): JSX.Element {
   return (
     <>
+      <LayerList layers={props.layers} />
       <SelectedObjectProperties />
       <OffsetPathsRow />
       <DogboneRow />
       <SelectedReliefProperties />
-      <LayerList layers={props.layers} />
     </>
   );
 }
@@ -173,7 +173,7 @@ function LayerList(props: {
 // Surface chrome (background, border, scrollbars, text color) comes from
 // .lf-rail; this constant keeps only the rail's layout.
 const panelStyle: React.CSSProperties = {
-  padding: '10px 12px',
+  padding: '12px',
   // Card layout means we don't need 500 px of horizontal room any more.
   // 320 px holds a clean two-column field-row layout (label + control)
   // and leaves plenty of width for the Laser panel on 1280-class monitors.
@@ -186,18 +186,19 @@ const panelStyle: React.CSSProperties = {
 };
 // Layers remains the default working page; reusable preset management is a
 // sibling page so an empty library cannot push the active job controls down.
-const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
-const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
+const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', lineHeight: 1.5 };
+const listStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  flexShrink: 0,
+  marginBottom: 12,
+};
 const viewTabsStyle: React.CSSProperties = {
   display: 'grid',
   gap: 4,
-  margin: '10px 0',
-  paddingBottom: 10,
+  margin: '10px 0 14px',
+  paddingBottom: 0,
   borderBottom: '1px solid var(--lf-border)',
-};
-const viewTabStyle: React.CSSProperties = {
-  minWidth: 0,
-  minHeight: 32,
 };
 const viewContentStyle: React.CSSProperties = {
   minHeight: 0,

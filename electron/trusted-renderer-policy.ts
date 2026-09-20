@@ -17,7 +17,7 @@ export interface PermissionCheckPolicyInput {
   readonly embeddingOrigin?: string;
   readonly isMainFrame?: boolean;
   readonly mediaType?: 'video' | 'audio' | 'unknown';
-  readonly currentUrl: string;
+  readonly currentUrl: string | null;
 }
 
 export interface PermissionRequestPolicyInput {
@@ -67,9 +67,22 @@ export function shouldGrantPermissionCheck(
   return (
     isAllowedPermissionCheck(input) &&
     isTrustedRendererUrl(input.requestingOrigin, trustedOrigins) &&
-    isTrustedRendererUrl(input.currentUrl, trustedOrigins) &&
+    isTrustedPermissionCheckContext(input, trustedOrigins) &&
     isTrustedOptionalEmbeddingOrigin(input.embeddingOrigin, trustedOrigins)
   );
+}
+
+function isTrustedPermissionCheckContext(
+  input: PermissionCheckPolicyInput,
+  trustedOrigins: ReadonlySet<string>,
+): boolean {
+  // Electron 42's FileSystemAccessPermissionContext::PermissionGrantImpl::GetStatus
+  // checks existing grants with a null frame/WebContents and the grant's origin.
+  // Permit only that exact origin-scoped API when no window is supplied. An
+  // existing empty/untrusted window URL and every other permission still fail.
+  return input.currentUrl === null
+    ? input.permission === 'fileSystem'
+    : isTrustedRendererUrl(input.currentUrl, trustedOrigins);
 }
 
 export function shouldGrantPermissionRequest(

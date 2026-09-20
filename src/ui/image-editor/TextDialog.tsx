@@ -197,6 +197,6 @@ const actionsStyle: React.CSSProperties = {
 
 const errorStyle: React.CSSProperties = {
   margin: 0,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };

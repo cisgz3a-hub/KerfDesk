@@ -61,7 +61,14 @@ const headingRowStyle: React.CSSProperties = {
   gap: 8,
   marginBottom: 8,
 };
-const headingStyle: React.CSSProperties = { margin: 0, flex: 1 };
+// flex: 1 keeps the title claiming the free space so the tutorial button and
+// the collapse chevron stay pinned together at the rail's trailing edge.
+const headingStyle: React.CSSProperties = {
+  margin: 0,
+  flex: 1,
+  fontSize: 'var(--lf-text-lg)',
+  fontWeight: 600,
+};
 const collapsedRailStyle: React.CSSProperties = {
   width: COLLAPSED_RAIL_WIDTH_PX,
   flexShrink: 0,

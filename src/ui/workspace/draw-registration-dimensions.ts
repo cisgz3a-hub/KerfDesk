@@ -54,7 +54,7 @@ function drawLabel(
   // Light chip behind the text so it stays readable over the grid lines.
   ctx.fillStyle = canvasTheme.noticeFill;
   ctx.fillRect(centerX - width / 2, top, width, LABEL_HEIGHT_PX);
-  ctx.fillStyle = canvasTheme.measureStroke;
+  ctx.fillStyle = canvasTheme.noticeText;
   ctx.fillText(text, centerX, top + LABEL_PAD_Y_PX);
 }
 

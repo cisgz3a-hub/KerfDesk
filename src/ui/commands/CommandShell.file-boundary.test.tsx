@@ -53,7 +53,11 @@ describe('CommandShell file boundaries', () => {
     try {
       expect(host.querySelector('input[type="file"]')).toBeNull();
 
-      await clickButton(host, 'Import...');
+      // Import lives in the toolbar's "More" overflow (use-toolbar-overflow:
+      // only the six primary commands render inline); the popover portals to
+      // document.body, so the command is looked up there.
+      await clickButton(host, 'More commands');
+      await clickButton(document.body, 'Import...');
       expect(platform.pickFilesForOpen).toHaveBeenLastCalledWith({
         accept: ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'],
         multiple: true,

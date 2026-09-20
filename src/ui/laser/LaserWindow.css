@@ -1,0 +1,49 @@
+.lf-machine-rail {
+  padding: 12px 14px;
+  gap: 12px;
+  min-height: 0;
+  font-size: var(--lf-text-md);
+  line-height: 1.4;
+  scrollbar-width: thin;
+}
+
+.lf-machine-rail > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.lf-machine-rail .lf-btn {
+  min-width: 0;
+  white-space: normal;
+}
+
+.lf-machine-rail [data-help-id='control:laser.machine-setup.launch'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.lf-machine-rail [data-help-id='control:laser.machine-setup.launch']:not(.lf-btn--primary) {
+  background: var(--lf-bg-0);
+}
+
+.lf-machine-rail [data-help-id='control:laser.machine-setup.launch']::after {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-right: 3px;
+  border-right: 1.5px solid currentColor;
+  border-top: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+@media (max-height: 800px) {
+  .lf-machine-rail {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+}

@@ -320,7 +320,7 @@ function statusLabel(status: CncRecoveryEvidenceCheck['status']): string {
 function statusStyle(status: CncRecoveryEvidenceCheck['status']): React.CSSProperties {
   return {
     minWidth: 78,
-    color: status === 'matched' ? 'var(--lf-success)' : 'var(--lf-warning)',
+    color: status === 'matched' ? 'var(--lf-success-fg)' : 'var(--lf-warning-fg)',
     fontSize: 10,
     fontWeight: 800,
     letterSpacing: '0.04em',
@@ -335,7 +335,7 @@ const warningStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',
   borderRadius: 6,
   padding: '9px 11px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontWeight: 650,
   fontSize: 12,
 };
@@ -358,7 +358,7 @@ const assumptionStyle: React.CSSProperties = { ...bodyStyle, fontSize: 11 };
 const refusalStyle: React.CSSProperties = {
   borderLeft: '3px solid var(--lf-danger)',
   padding: '7px 9px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 12,
 };
 const metricsStyle: React.CSSProperties = { ...bodyStyle, fontFamily: 'monospace', fontSize: 11 };

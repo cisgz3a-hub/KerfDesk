@@ -19,6 +19,7 @@ import { entityToPolylines, type Sketch } from '../../core/design';
 import { entityDesignLayer, sketchLayers } from '../../core/design/layers';
 import type { Polyline, Vec2 } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
+import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { mmToPx } from './design-view';
 import type { DesignView } from './design-session';
 
@@ -150,7 +151,7 @@ function paintEntities(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint):
       ? canvasTheme.selection
       : isGuide
         ? canvasTheme.designConstruction
-        : entityDesignLayer(entity, layers).color;
+        : canvasVectorDisplayColor(entityDesignLayer(entity, layers).color);
     ctx.lineWidth = isSelected ? SELECTED_LINE_WIDTH_PX : NORMAL_LINE_WIDTH_PX;
     ctx.setLineDash(isGuide ? [...CONSTRUCTION_DASH_PX] : []);
     for (const polyline of entityToPolylines(entity)) strokePolyline(ctx, paint.view, polyline);

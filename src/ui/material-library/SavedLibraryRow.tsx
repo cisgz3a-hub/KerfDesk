@@ -170,6 +170,6 @@ const metaStyle: React.CSSProperties = {
   minWidth: 0,
 };
 const nameStyle: React.CSSProperties = { fontWeight: 600 };
-const activeStyle: React.CSSProperties = { color: 'var(--lf-accent)', fontWeight: 400 };
+const activeStyle: React.CSSProperties = { color: 'var(--lf-accent-fg)', fontWeight: 400 };
 const subStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
 const actionsStyle: React.CSSProperties = { display: 'flex', gap: 6, flexShrink: 0 };

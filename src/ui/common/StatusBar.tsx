@@ -28,7 +28,14 @@ export function StatusBar(): JSX.Element {
   const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
   return (
     <footer aria-label="Status bar" className="lf-status-bar" style={barStyle}>
-      <div className="lf-status-bar__telemetry" style={telemetryStyle}>
+      <div
+        className="lf-status-bar__telemetry"
+        style={telemetryStyle}
+        role="group"
+        tabIndex={0}
+        aria-label="Workspace status details"
+        onKeyDown={retainStatusScrollKeys}
+      >
         <Segment>
           {cursorMm === null
             ? 'Cursor: —'
@@ -61,6 +68,24 @@ export function StatusBar(): JSX.Element {
   );
 }
 
+function retainStatusScrollKeys(event: React.KeyboardEvent<HTMLDivElement>): void {
+  // Let the browser scroll this focused group without invoking canvas nudge
+  // or machine Z-focus shortcuts at the window level.
+  if (STATUS_SCROLL_KEYS.has(event.key)) event.stopPropagation();
+}
+
+const STATUS_SCROLL_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  ' ',
+]);
+
 function describeSelection(
   project: ReturnType<typeof useStore.getState>['project'],
   selectedId: string | null,
@@ -89,7 +114,11 @@ function fillWarning(
 }
 
 function Segment({ children }: { readonly children: React.ReactNode }): JSX.Element {
-  return <span style={segStyle}>{children}</span>;
+  return (
+    <span className="lf-status-bar__segment" style={segStyle}>
+      {children}
+    </span>
+  );
 }
 
 const barStyle: React.CSSProperties = {
@@ -101,11 +130,13 @@ const barStyle: React.CSSProperties = {
   overflowY: 'hidden',
   gap: 8,
   alignItems: 'center',
-  padding: '4px 12px',
+  padding: '4px 10px',
   background: 'var(--lf-bg-0)',
-  color: 'var(--lf-text)',
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+  fontFamily: 'var(--lf-font)',
+  fontSize: 'var(--lf-text-xs)',
+  lineHeight: 1.4,
+  flexShrink: 0,
   borderTop: '1px solid var(--lf-border)',
 };
 const telemetryStyle: React.CSSProperties = {
@@ -114,7 +145,7 @@ const telemetryStyle: React.CSSProperties = {
   minWidth: 0,
   overflowX: 'auto',
   overflowY: 'hidden',
-  gap: 16,
+  gap: 12,
   alignItems: 'center',
 };
 const actionsStyle: React.CSSProperties = {

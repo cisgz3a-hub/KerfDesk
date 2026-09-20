@@ -198,7 +198,7 @@ function drawChip(ctx: CanvasRenderingContext2D, at: Vec2, label: string): void 
   ctx.strokeStyle = canvasTheme.measureStroke;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, width, LABEL_HEIGHT_PX);
-  ctx.fillStyle = canvasTheme.designGeometry;
+  ctx.fillStyle = canvasTheme.noticeText;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, at.x, y + LABEL_HEIGHT_PX / 2);

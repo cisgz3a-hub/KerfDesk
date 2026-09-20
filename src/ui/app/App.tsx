@@ -23,7 +23,6 @@ import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
-import { useCompactRailDefaults } from './use-compact-rail-defaults';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
@@ -36,6 +35,7 @@ import { useUnloadStop } from './use-unload-stop';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
+import './workspace-layout.css';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
@@ -49,7 +49,6 @@ export function App(): JSX.Element {
   useAutosave();
   useMaterialLibraryPersistence();
   useCncLibraryPersistence();
-  useCompactRailDefaults();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
   useJobShortcuts();
@@ -61,7 +60,7 @@ export function App(): JSX.Element {
   useUnsavedChangesGuard();
   useWindowTitle();
   return (
-    <div style={shellStyle}>
+    <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
       <DesktopCloseNotice />
       <AutosaveRecoveryBanner />
@@ -108,7 +107,7 @@ function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
   return (
-    <div style={canvasAreaStyle}>
+    <div style={canvasAreaStyle} data-toast-workspace>
       {/* G-code owns the canvas, so Workspace is unmounted rather than merely
           covered. Its cleanup cancels idle motion/preview workers and makes a
           late heavy result incapable of committing or drawing underneath. */}
@@ -131,7 +130,7 @@ function CanvasArea(): JSX.Element {
 // control rather than part of the drawing.
 const canvasSwitchStyle: React.CSSProperties = {
   position: 'absolute',
-  top: 10,
+  top: 30,
   left: '50%',
   transform: 'translateX(-50%)',
   zIndex: 4,
@@ -142,7 +141,6 @@ const canvasSwitchStyle: React.CSSProperties = {
 const shellStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  height: '100vh',
   margin: 0,
   fontFamily: 'system-ui, sans-serif',
 };
