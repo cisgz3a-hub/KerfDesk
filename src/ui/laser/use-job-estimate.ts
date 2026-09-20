@@ -12,7 +12,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
 import { useOutputScope, useStore } from '../state';
-import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
+import {
+  estimateLiveJob,
+  type LiveJobEstimate,
+  type LiveJobEstimateOptions,
+} from './live-job-estimate';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -28,6 +32,7 @@ import {
 import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import { useSettledHeadPosition } from './settled-head-position';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -36,6 +41,7 @@ type Settled = {
   readonly outputScopeKey: string;
   readonly registrationKey: string;
   readonly placementKey: string;
+  readonly initialPosition: LiveJobEstimateOptions['initialPosition'];
   readonly estimate: LiveJobEstimate;
 };
 
@@ -54,6 +60,7 @@ export function useJobEstimate(): LiveJobEstimate {
   const resolvedPlacement = useEstimatePlacement(jobPlacement);
   const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
   const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
+  const initialPosition = useEstimateInitialPosition();
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -72,8 +79,18 @@ export function useJobEstimate(): LiveJobEstimate {
     placementKey,
     jobOrigin,
     initialRegistration,
+    initialPosition,
     initiallyAsync,
   });
+}
+
+// The physical head reaches the estimate only once it is settled; while a
+// Frame, jog, probe or job moves it, the previous sample holds. Sampling every
+// status report keyed a fresh background preparation per head move, and each
+// one retains a complete prepared route — enough to exhaust the renderer
+// during the Frame of a large traced fill.
+function useEstimateInitialPosition(): LiveJobEstimateOptions['initialPosition'] {
+  return useSettledHeadPosition();
 }
 
 function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement']) {
@@ -125,61 +142,62 @@ function jobOriginOf(placement: ResolvedJobPlacement): JobOriginPlacement | unde
   return placement.ok ? placement.jobOrigin : undefined;
 }
 
-function useSettledEstimate({
-  project,
-  outputScope,
-  outputScopeKey,
-  registrationKey,
-  placementKey,
-  jobOrigin,
-  initialRegistration,
-  initiallyAsync,
-}: {
+type EstimateInputs = Omit<Settled, 'project' | 'estimate'> & {
   readonly project: Project;
   readonly outputScope: OutputScope;
-  readonly outputScopeKey: string;
-  readonly registrationKey: string;
-  readonly placementKey: string;
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly initialRegistration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly initiallyAsync: boolean;
-}): LiveJobEstimate {
-  // Compute only cheap jobs on mount. Snapshot-backed jobs need variable-text,
-  // paged-asset, or Print-and-Cut materialization and therefore begin paused
-  // (or with the already-known registration failure) until the background
-  // preparation settles.
-  const [settled, setSettled] = useState<Settled>(() => {
-    // A saved plain raster can need background work on mount too. Leaving it
-    // marked as settled would suppress the worker follow-up until another edit.
-    // Classify inside this initializer so hover renders do not repeat the scan.
-    const deferInitial = initiallyAsync || costlyCanvasPreparation(project, outputScope);
-    return {
-      project: deferInitial ? null : project,
-      outputScopeKey,
-      registrationKey,
-      placementKey,
-      estimate: initialEstimate(project, outputScope, jobOrigin, initialRegistration, deferInitial),
-    };
-  });
+};
+
+function initialSettledEstimate(inputs: EstimateInputs): Settled {
+  // Classify once on mount so unrelated renders do not repeat costly scans.
+  const deferInitial =
+    inputs.initiallyAsync || costlyCanvasPreparation(inputs.project, inputs.outputScope);
+  const estimate = initialEstimate(inputs, deferInitial);
+  return {
+    // A synchronous size limit still needs a background request, even if
+    // the project was already loaded when this panel mounted.
+    project: deferInitial || estimate.kind === 'too-large' ? null : inputs.project,
+    outputScopeKey: inputs.outputScopeKey,
+    registrationKey: inputs.registrationKey,
+    placementKey: inputs.placementKey,
+    initialPosition: inputs.initialPosition,
+    estimate,
+  };
+}
+
+function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
+  const {
+    project,
+    outputScope,
+    outputScopeKey,
+    registrationKey,
+    placementKey,
+    jobOrigin,
+    initialPosition,
+  } = inputs;
+  // Compute cheap jobs synchronously; background jobs begin pending.
+  const [settled, setSettled] = useState<Settled>(() => initialSettledEstimate(inputs));
   // The ADR-244 worker follow-up must survive the settle-triggered effect
   // cleanup (settling changes the deps and re-runs the effect), so it is
-  // cancelled by GENERATION — a newer recompute or unmount — not by the
-  // effect's own cancelled flag.
+  // cancelled by GENERATION — newer inputs or unmount — not by the effect's
+  // own cancelled flag. Invalidate on input change before the next debounce
+  // fires, and on cleanup so StrictMode's replay starts a fresh generation.
   const workerGeneration = useRef(0);
-  const mounted = useRef(true);
-  useEffect(() => {
-    // StrictMode replays effect setup after cleanup on the mounted instance.
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  useEffect(
+    () => () => {
+      workerGeneration.current += 1;
+    },
+    [project, outputScopeKey, registrationKey, placementKey, initialPosition],
+  );
   useEffect(() => {
     if (
       settled.project === project &&
       settled.outputScopeKey === outputScopeKey &&
       settled.registrationKey === registrationKey &&
-      settled.placementKey === placementKey
+      settled.placementKey === placementKey &&
+      settled.initialPosition === initialPosition
     ) {
       return undefined;
     }
@@ -188,13 +206,21 @@ function useSettledEstimate({
       workerGeneration.current += 1;
       const generation = workerGeneration.current;
       const settleAt = (value: LiveJobEstimate): void =>
-        setSettled({ project, outputScopeKey, registrationKey, placementKey, estimate: value });
+        setSettled({
+          project,
+          outputScopeKey,
+          registrationKey,
+          placementKey,
+          initialPosition,
+          estimate: value,
+        });
       recomputeEstimate({
         project,
         outputScope,
         jobOrigin,
+        initialPosition,
         isCancelled: () => cancelled,
-        isFollowUpStale: () => !mounted.current || workerGeneration.current !== generation,
+        isFollowUpStale: () => workerGeneration.current !== generation,
         settleAt,
       });
     }, JOB_ESTIMATE_DEBOUNCE_MS);
@@ -210,23 +236,24 @@ function useSettledEstimate({
     settled.outputScopeKey,
     settled.registrationKey,
     settled.placementKey,
+    settled.initialPosition,
     registrationKey,
     placementKey,
     jobOrigin,
+    initialPosition,
   ]);
   return settled.estimate;
 }
 
-function initialEstimate(
-  project: Project,
-  outputScope: OutputScope,
-  jobOrigin: JobOriginPlacement | undefined,
-  registration: ReturnType<typeof currentPrintCutOutputRegistration>,
-  asyncSnapshot: boolean,
-): LiveJobEstimate {
-  if (registration === null) return invalidPrintCutEstimate();
+function initialEstimate(inputs: EstimateInputs, asyncSnapshot: boolean): LiveJobEstimate {
+  if (inputs.initialRegistration === null) return invalidPrintCutEstimate();
   if (asyncSnapshot) return { kind: 'too-large' };
-  return estimateLiveJob(project, outputScope, jobOrigin);
+  return estimateLiveJob(
+    inputs.project,
+    inputs.outputScope,
+    inputs.jobOrigin,
+    inputs.initialPosition === undefined ? {} : { initialPosition: inputs.initialPosition },
+  );
 }
 
 function hasVariableText(project: Project): boolean {
@@ -239,13 +266,15 @@ type RecomputeEstimateArgs = {
   readonly project: Project;
   readonly outputScope: OutputScope;
   readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly initialPosition: LiveJobEstimateOptions['initialPosition'];
   readonly isCancelled: () => boolean;
   readonly isFollowUpStale: () => boolean;
   readonly settleAt: (value: LiveJobEstimate) => void;
 };
 
 function recomputeEstimate(args: RecomputeEstimateArgs): void {
-  const { project, outputScope, jobOrigin } = args;
+  const { project, outputScope, jobOrigin, initialPosition } = args;
+  const options = initialPosition === undefined ? {} : { initialPosition };
   const registration = currentPrintCutOutputRegistration(project);
   const usesSnapshot =
     hasVariableText(project) || registration !== undefined || projectHasPagedRasterAssets(project);
@@ -254,7 +283,7 @@ function recomputeEstimate(args: RecomputeEstimateArgs): void {
       ? invalidPrintCutEstimate()
       : usesSnapshot
         ? { kind: 'too-large' }
-        : estimateLiveJob(project, outputScope, jobOrigin),
+        : estimateLiveJob(project, outputScope, jobOrigin, options),
   );
   void estimate.then((value) => {
     if (args.isCancelled()) return;
@@ -290,6 +319,7 @@ function followUpWithWorkerEstimate(
           },
         }
       : {}),
+    ...(args.initialPosition === undefined ? {} : { initialPosition: args.initialPosition }),
   });
   if (offThread === null) return;
   offThread.then(
@@ -299,10 +329,9 @@ function followUpWithWorkerEstimate(
     (error: unknown) => {
       // A supersede means the client replaced this request with a newer one —
       // its own coalescing decision, not a failure. Keep the badge as it was:
-      // isFollowUpStale() only advances when the debounce FIRES, so during a
-      // jog (current-position placement re-keys per head move) this rejection
-      // lands inside the debounce window and used to pin a false
-      // "Background estimate failed" for as long as the head kept moving.
+      // during a jog (current-position placement re-keys per head move) this
+      // rejection used to pin a false "Background estimate failed" for as
+      // long as the head kept moving.
       if (isPreparationSuperseded(error) || args.isFollowUpStale()) return;
       args.settleAt({
         kind: 'preparation-failed',

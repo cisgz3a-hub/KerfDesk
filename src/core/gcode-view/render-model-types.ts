@@ -132,6 +132,8 @@ export type GcodeRenderModel = {
   readonly segPower: Float32Array;
   /** Cumulative route mm at each segment's end (arc-true, not chord-sum). */
   readonly segRouteEndMm: Float32Array;
+  /** Optional non-cumulative true lengths retained for execution timing. */
+  readonly segLengthMm?: Float64Array;
   readonly totalRouteMm: number;
   readonly lineCount: number;
   /** LINE_CATEGORY value per raw line — the accountability array. */
@@ -148,10 +150,16 @@ export type BuildRenderModelOptions = {
   readonly machineKind?: 'laser' | 'cnc' | undefined;
   /** Native power semantics apply only to a known laser output profile. */
   readonly laserPowerControl?: 'spindle' | 'fan' | 'smoothieware' | undefined;
+  /** Known GRBL CNC output uses its eight-digit float32 coordinate parser.
+   * Omitted for generic imports and native non-GRBL controller programs. */
+  readonly coordinateRepresentation?: 'grbl' | undefined;
   /** Line cap for the synchronous path; the Stage-11 worker path raises it. */
   /** Optional segment cap for bounded synchronous consumers. The parser
    * checks after each source line, so one expanded line may cross the cap. */
   readonly maxSegments?: number;
+  /** Timing can retain true segment lengths without quantizing a long route.
+   * Rendering-only callers keep the smaller default model. */
+  readonly retainPreciseSegmentLengths?: boolean;
   /** Advisory threshold only. Every parsed segment remains in the render model. */
   readonly renderPressureThreshold?: number;
   /** Work-coordinate position before the first program line. */

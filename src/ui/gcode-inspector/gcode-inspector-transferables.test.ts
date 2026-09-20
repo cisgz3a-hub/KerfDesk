@@ -10,12 +10,14 @@ describe('gcodeInspectorTransferables', () => {
     if (!hasGcodeInspectorAnalysis(result)) return;
 
     const transfers = gcodeInspectorTransferables(result);
-    expect(transfers).toHaveLength(16);
+    expect(transfers).toHaveLength(18);
     expect(new Set(transfers).size).toBe(transfers.length);
     expect(transfers).toContain(result.sourceIndex.starts.buffer);
     expect(transfers).toContain(result.parsed.model.positions.buffer);
     expect(transfers).toContain(result.parsed.model.lineCategories.buffer);
+    expect(transfers).toContain(result.parsed.model.segLengthMm?.buffer);
     expect(transfers).toContain(result.analysis.time.segSeconds.buffer);
+    expect(transfers).toContain(result.analysis.time.segTimeScale.buffer);
     expect(transfers).toContain(result.analysis.time.segFeedLimited.buffer);
   });
 

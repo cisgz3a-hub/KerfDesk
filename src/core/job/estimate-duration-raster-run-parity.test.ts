@@ -50,7 +50,12 @@ describe('raster duration run parity', () => {
     });
 
     expect(estimate.breakdown.cutSeconds).toBe(0);
-    expect(estimate.totalSeconds).toBe(estimate.breakdown.travelSeconds);
+    expect(estimate.breakdown.dwellSeconds).toBe(0);
+    expect(estimate.breakdown.transportSeconds).toBeGreaterThan(0);
+    expect(estimate.totalSeconds).toBeCloseTo(
+      estimate.breakdown.travelSeconds + (estimate.breakdown.transportSeconds ?? 0),
+      8,
+    );
   });
 });
 
@@ -111,5 +116,19 @@ function expectEstimateParity(raster: RasterGroup, emittedMotion: FillGroup): vo
     expected.breakdown.rapidTravelSeconds ?? 0,
     8,
   );
-  expect(actual.totalSeconds).toBeCloseTo(expected.totalSeconds, 8);
+  // Raster and fill emit different command bytes for the same motion. Keep
+  // parity strict for the route, with each program's serial overhead separate.
+  expect(actual.breakdown.cutSeconds + actual.breakdown.travelSeconds).toBeCloseTo(
+    expected.breakdown.cutSeconds + expected.breakdown.travelSeconds,
+    8,
+  );
+  for (const estimate of [actual, expected]) {
+    expect(estimate.totalSeconds).toBeCloseTo(
+      estimate.breakdown.cutSeconds +
+        estimate.breakdown.travelSeconds +
+        (estimate.breakdown.dwellSeconds ?? 0) +
+        (estimate.breakdown.transportSeconds ?? 0),
+      8,
+    );
+  }
 }

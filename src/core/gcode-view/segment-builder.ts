@@ -28,6 +28,7 @@ export type FinishedSegments = {
   readonly segFeed: Float32Array;
   readonly segPower: Float32Array;
   readonly segRouteEndMm: Float32Array;
+  readonly segLengthMm?: Float64Array;
   readonly totalRouteMm: number;
 };
 
@@ -37,7 +38,10 @@ export type SegmentBuilder = {
   readonly finish: () => FinishedSegments;
 };
 
-export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
+export function createSegmentBuilder(
+  initialCapacity = 1024,
+  retainPreciseLengths = false,
+): SegmentBuilder {
   let capacity = Math.max(1, initialCapacity);
   let count = 0;
   let routeMm = 0;
@@ -50,6 +54,9 @@ export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
   let segFeed: Float32Array = new Float32Array(capacity);
   let segPower: Float32Array = new Float32Array(capacity);
   let segRouteEndMm: Float32Array = new Float32Array(capacity);
+  let segLengthMm: Float64Array | undefined = retainPreciseLengths
+    ? new Float64Array(capacity)
+    : undefined;
 
   const grow = (): void => {
     capacity *= 2;
@@ -77,6 +84,7 @@ export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
     segFeed = growF32(segFeed);
     segPower = growF32(segPower);
     segRouteEndMm = growF32(segRouteEndMm);
+    if (segLengthMm !== undefined) segLengthMm = growFloat64(segLengthMm, capacity);
   };
 
   const push = (segment: SegmentRecord): void => {
@@ -93,6 +101,7 @@ export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
     segLine[count] = segment.line;
     segFeed[count] = segment.feed;
     segPower[count] = segment.power;
+    if (segLengthMm !== undefined) segLengthMm[count] = segment.lengthMm;
     routeMm += segment.lengthMm;
     segRouteEndMm[count] = routeMm;
     count += 1;
@@ -107,8 +116,15 @@ export function createSegmentBuilder(initialCapacity = 1024): SegmentBuilder {
     segFeed: segFeed.slice(0, count),
     segPower: segPower.slice(0, count),
     segRouteEndMm: segRouteEndMm.slice(0, count),
+    ...(segLengthMm === undefined ? {} : { segLengthMm: segLengthMm.slice(0, count) }),
     totalRouteMm: routeMm,
   });
 
   return { push, count: () => count, finish };
+}
+
+function growFloat64(source: Float64Array, capacity: number): Float64Array {
+  const next = new Float64Array(capacity);
+  next.set(source);
+  return next;
 }

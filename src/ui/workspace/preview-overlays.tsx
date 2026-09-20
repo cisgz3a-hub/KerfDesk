@@ -5,13 +5,14 @@
 // outline is a trust leak.
 
 import { useMemo } from 'react';
-import { formatDuration, summarizeToolpathDistances, type Toolpath } from '../../core/job';
+import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
 // its index contract, so this display-resolution type remains on a leaf path.
 import type { RemovalGridResolution } from '../../core/sim/removal-grid';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
+import { PreviewEstimateBreakdown } from './preview-estimate-breakdown';
 import { PreviewResolutionBanner } from './preview-resolution';
 import type { PreviewIssue } from './preview-status';
 import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
@@ -131,22 +132,7 @@ export function PreviewStatsPanel(props: {
         <strong>{formatMm(stats.totalMm)}</strong>
         <span>Time</span>
         <strong>{formatEstimate(props.estimate)}</strong>
-        {props.estimate.kind === 'estimated' ? (
-          <>
-            <span>{stats.plungeMm > 0 ? 'Cut + plunge time' : 'Cut time'}</span>
-            <strong>{formatDuration(props.estimate.breakdown.cutSeconds)}</strong>
-            <span>Travel time</span>
-            <strong>{formatDuration(props.estimate.breakdown.travelSeconds)}</strong>
-            {(props.estimate.breakdown.dwellSeconds ?? 0) > 0 ? (
-              <>
-                <span title="Included in total time. Route playback shows motion only.">
-                  Spindle dwell
-                </span>
-                <strong>{formatDuration(props.estimate.breakdown.dwellSeconds ?? 0)}</strong>
-              </>
-            ) : null}
-          </>
-        ) : null}
+        <PreviewEstimateBreakdown estimate={props.estimate} includesPlunge={stats.plungeMm > 0} />
       </div>
     </div>
   );

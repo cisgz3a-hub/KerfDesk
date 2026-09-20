@@ -9,8 +9,9 @@ import type { Vec2 } from '../scene';
 
 export type OutputEmitOptions = {
   /** Explicit beam-off position for the final move. When absent, the selected
-   * device dialect keeps its normal finish policy. */
-  readonly finishPosition?: Vec2;
+   * device dialect keeps its normal finish policy. Null omits a laser park;
+   * CNC retains its safe finishing policy. */
+  readonly finishPosition?: Vec2 | null;
 };
 
 /** The emit options a job's origin placement implies. A current-position job

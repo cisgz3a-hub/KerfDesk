@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cncContourEmissionPoints } from '../cnc/cnc-contour-emission';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { estimateJobDuration } from './estimate-duration';
+import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import type { CncContourPass, CncGroup, Job } from './job';
 
 function cncJob(pass: CncContourPass): Job {
@@ -26,14 +27,28 @@ function contour(polyline: CncContourPass['polyline']): CncContourPass {
 }
 
 describe('CNC contour duration parity', () => {
-  it('does not price motion or entry travel when the emitter cannot represent the contour', () => {
+  it('omits the collapsed contour while retaining emitted safe-Z and delivery time', () => {
     const pass = contour([
       { x: 247.01767, y: 20 },
       { x: 247.01768, y: 20 },
     ]);
 
     expect(cncContourEmissionPoints(pass)).toEqual([]);
-    expect(estimateJobDuration(cncJob(pass), DEFAULT_DEVICE_PROFILE).totalSeconds).toBe(0);
+    const job = cncJob(pass);
+    const program = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+    const estimate = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
+    expect(program).not.toContain('X247.');
+    expect(program).not.toContain('\nG1 ');
+    expect(estimate.breakdown.cutSeconds).toBe(0);
+    expect(estimate.breakdown.feedTravelSeconds).toBe(0);
+    expect(estimate.breakdown.rapidTravelSeconds).toBeCloseTo(
+      2 * Math.sqrt(5 / DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
+      8,
+    );
+    expect(estimate.totalSeconds).toBeCloseTo(
+      estimate.breakdown.travelSeconds + (estimate.breakdown.transportSeconds ?? 0),
+      8,
+    );
   });
 
   it('prices only the parser-represented portion of a partially collapsed contour', () => {

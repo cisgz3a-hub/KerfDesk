@@ -342,6 +342,8 @@ describe('buildJobReviewModel', () => {
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     }));
     useLaserStore.setState({
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
       controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
       ovCache: { feed: 100, rapid: 100, spindle: 100 },
       accessoryCache: { spindleCw: false, spindleCcw: false, flood: false, mist: false },
@@ -365,5 +367,22 @@ describe('buildJobReviewModel', () => {
       kind: 'cnc',
       prompt: CNC_SETUP_ATTESTATION_PROMPT,
     });
+  });
+
+  it('keeps CNC Review available when current-session dwell timing evidence is missing', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({ detectedControllerKind: null });
+
+    const model = await buildModelFromCurrentStores();
+
+    expect(model.stats[0]).toMatchObject({
+      label: 'Estimated time',
+      value: 'Unavailable',
+      detail: 'current-session controller evidence cannot prove G4 P dwell uses seconds',
+    });
+    expect(model.stats[2]?.label).toBe('Cutters');
+    expect(model.acknowledgement.kind).toBe('cnc');
   });
 });

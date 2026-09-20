@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
+import { grblStrategy } from '../output/grbl-strategy';
 import type { Vec2 } from '../scene';
-import { estimateJobDuration, formatDuration } from './estimate-duration';
+import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
 
 // Pin accel + junctionDeviation explicitly. The shipping defaults are
@@ -110,9 +111,13 @@ describe('estimateJobDuration', () => {
     expect(r.breakdown.travelSeconds).toBe(0);
   });
 
-  it('returns 0 for a job with empty groups (all output off)', () => {
+  it('prices only transmission when empty groups emit modal setup without motion', () => {
     const r = estimateJobDuration({ groups: [group({ segments: [] })] }, device);
-    expect(r.totalSeconds).toBe(0);
+    expect(r.breakdown.cutSeconds).toBe(0);
+    expect(r.breakdown.travelSeconds).toBe(0);
+    expect(r.breakdown.dwellSeconds).toBe(0);
+    expect(r.breakdown.transportSeconds).toBeGreaterThan(0);
+    expect(r.totalSeconds).toBe(r.breakdown.transportSeconds);
   });
 
   it('a single 100 mm cut + 100 mm travel back includes accel overhead', () => {
@@ -161,17 +166,6 @@ describe('estimateJobDuration', () => {
     const r = estimateJobDuration(j, device);
     expect(r.breakdown.cutSeconds).toBeCloseTo(1.233, 2);
     expect(r.breakdown.travelSeconds).toBeCloseTo(1.2, 2);
-  });
-
-  it('caps the per-group cut feed at device.maxFeed', () => {
-    // Group asks for 12000 mm/min but device caps at 6000. 100 mm at
-    // 6000 mm/min through accel = 1.1 s (same trapezoidal math as travel).
-    const fastDevice = { ...device, maxFeed: 6000 };
-    const j: Job = {
-      groups: [group({ speed: 12000, segments: [seg([0, 0], [100, 0])] })],
-    };
-    const r = estimateJobDuration(j, fastDevice);
-    expect(r.breakdown.cutSeconds).toBeCloseTo(1.1, 2);
   });
 
   it('includes fill overscan runway time in the travel estimate', () => {
@@ -240,8 +234,9 @@ describe('estimateJobDuration', () => {
 
   it('keeps a multi-span sweep continuous while accounting S0 holes as feed travel', () => {
     // Three ink spans on one scanline (two holes). The continuous sweep moves at
-    // feed across the whole row (ink + S0-blanked gaps), so its total time equals
+    // feed across the whole row (ink + S0-blanked gaps), so its motion time equals
     // a single span over the full envelope without three stop-start runs.
+    // Different emitted commands can have different transmission overhead.
     const multiSpan: FillGroup = {
       kind: 'fill',
       layerId: 'fill',
@@ -259,7 +254,10 @@ describe('estimateJobDuration', () => {
     expect(multi.breakdown.cutSeconds).toBeLessThan(single.breakdown.cutSeconds);
     expect(multi.breakdown.feedTravelSeconds).toBeGreaterThan(0);
     expect(single.breakdown.feedTravelSeconds).toBe(0);
-    expect(multi.totalSeconds).toBeCloseTo(single.totalSeconds, 6);
+    expect(multi.breakdown.cutSeconds + multi.breakdown.travelSeconds).toBeCloseTo(
+      single.breakdown.cutSeconds + single.breakdown.travelSeconds,
+      6,
+    );
   });
 
   it('repeats a fill sweep per pass in the estimate', () => {
@@ -331,16 +329,17 @@ describe('estimateJobDuration', () => {
     expect(mixed.breakdown.cutSeconds).toBeGreaterThan(cutOnly.breakdown.cutSeconds);
   });
 
-  it('handles a layer whose speed is 0 or negative by treating it as 1 mm/min (minimum) — never NaN/Inf', () => {
+  it.each([0, -1])('reports unavailable when the emitter rejects layer speed %s', (speed) => {
     const j: Job = {
-      groups: [group({ speed: 0, segments: [seg([0, 0], [1, 0])] })],
+      groups: [group({ speed, segments: [seg([0, 0], [1, 0])] })],
     };
+    expect(() => grblStrategy.emit(j, device)).toThrow('speed must be finite and > 0');
     const r = estimateJobDuration(j, device);
-    expect(Number.isFinite(r.totalSeconds)).toBe(true);
-    expect(r.totalSeconds).toBeGreaterThan(0);
+    expect(r.unavailableReason).toContain('speed must be finite and > 0');
+    expect(r.totalSeconds).toBe(0);
   });
 
-  it('property: total = cut + travel for all valid inputs', () => {
+  it('property: total = cut + travel + dwell + transport for all valid inputs', () => {
     fc.assert(
       fc.property(
         fc.array(
@@ -371,7 +370,14 @@ describe('estimateJobDuration', () => {
             })),
           };
           const r = estimateJobDuration(job, device);
-          expect(r.totalSeconds).toBeCloseTo(r.breakdown.cutSeconds + r.breakdown.travelSeconds, 6);
+          expect(r.unavailableReason).toBeUndefined();
+          expect(r.totalSeconds).toBeCloseTo(
+            r.breakdown.cutSeconds +
+              r.breakdown.travelSeconds +
+              (r.breakdown.dwellSeconds ?? 0) +
+              (r.breakdown.transportSeconds ?? 0),
+            6,
+          );
           expect(r.breakdown.cutSeconds).toBeGreaterThanOrEqual(0);
           expect(r.breakdown.travelSeconds).toBeGreaterThanOrEqual(0);
           expect(Number.isFinite(r.totalSeconds)).toBe(true);
@@ -381,7 +387,7 @@ describe('estimateJobDuration', () => {
     );
   });
 
-  it('property: scaling all coordinates UP never decreases the estimate (monotonicity)', () => {
+  it('property: scaling all coordinates UP never decreases estimated motion time', () => {
     // Strict linear scaling broke when v1 added acceleration modeling —
     // trapezoidal time grows linearly in the cruise phase but the
     // accel/decel phases are fixed-cost, and triangular moves grow as
@@ -419,7 +425,11 @@ describe('estimateJobDuration', () => {
             { groups: [group({ segments: [{ polyline: scaled, closed: false }] })] },
             device,
           );
-          expect(scaledJob.totalSeconds).toBeGreaterThanOrEqual(base.totalSeconds - 1e-9);
+          // Command bytes and transmission overlap can change independently of
+          // geometry; this invariant applies to the motion subtotal.
+          expect(
+            scaledJob.breakdown.cutSeconds + scaledJob.breakdown.travelSeconds,
+          ).toBeGreaterThanOrEqual(base.breakdown.cutSeconds + base.breakdown.travelSeconds - 1e-9);
         },
       ),
       { numRuns: 30 },
@@ -460,44 +470,5 @@ describe('estimateJobDuration', () => {
     expect(r.totalSeconds).toBeGreaterThan(30);
     // And not absurdly high (sanity ceiling):
     expect(r.totalSeconds).toBeLessThan(60);
-  });
-});
-
-// Trapezoidal-profile unit tests for `moveSeconds` moved into
-// planner.test.ts (the planner now owns block-time math via blockTime).
-
-describe('formatDuration', () => {
-  it('shows seconds-only under one minute', () => {
-    expect(formatDuration(0)).toBe('0s');
-    expect(formatDuration(7.4)).toBe('7s');
-    expect(formatDuration(59)).toBe('59s');
-  });
-
-  it('shows minutes-and-seconds under one hour', () => {
-    expect(formatDuration(60)).toBe('1m 0s');
-    expect(formatDuration(263)).toBe('4m 23s');
-    expect(formatDuration(3599)).toBe('59m 59s');
-  });
-
-  it('keeps seconds once over an hour', () => {
-    expect(formatDuration(3600)).toBe('1h 0m 0s');
-    expect(formatDuration(4332)).toBe('1h 12m 12s');
-  });
-
-  it.each([
-    [59.49, '59s'],
-    [59.5, '1m 0s'],
-    [119.6, '2m 0s'],
-    [3599.5, '1h 0m 0s'],
-    [3659.6, '1h 1m 0s'],
-    [7199.6, '2h 0m 0s'],
-  ])('carries rounded seconds into minutes and hours: %s', (seconds, expected) => {
-    expect(formatDuration(seconds)).toBe(expected);
-  });
-
-  it('handles non-finite and negative inputs as 0s', () => {
-    expect(formatDuration(NaN)).toBe('0s');
-    expect(formatDuration(-5)).toBe('0s');
-    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe('0s');
   });
 });

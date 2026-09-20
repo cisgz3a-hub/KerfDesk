@@ -4,11 +4,8 @@
 // it decomposes polylines per edge, and the render model is already per-edge
 // (each G-code move, each sampled arc chord).
 //
-// Known limit, stated rather than hidden: the planner's junction rule is
-// planar (it dots XY directions), so a Z-only plunge or retract carries a
-// zero direction and corners against its neighbours neutrally rather than as
-// a full stop. Feed-vs-rapid transitions still force a stop, which is the
-// dominant effect on real programs.
+// Distance and direction both use XYZ: pure-Z reversals must stop, while
+// collinear 3D moves retain their continuous junction velocity.
 
 import { SEG_KIND, SEG_MOTION, type GcodeRenderModel } from '../gcode-view';
 import type { Block } from '../motion-planner';
@@ -29,22 +26,43 @@ function segmentBlock(model: GcodeRenderModel, index: number, limits: MotionLimi
   const dx = (model.positions[base + 3] ?? 0) - (model.positions[base] ?? 0);
   const dy = (model.positions[base + 4] ?? 0) - (model.positions[base + 1] ?? 0);
   const dz = (model.positions[base + 5] ?? 0) - (model.positions[base + 2] ?? 0);
-  const xyLength = Math.hypot(dx, dy);
+  const length = Math.hypot(dx, dy, dz);
   const isRapid = model.segMotion[index] === SEG_MOTION.rapid;
   return {
     kind: isCutting(model, index) ? 'cut' : 'travel',
     motion: isRapid ? 'rapid' : 'feed',
-    distance: Math.hypot(xyLength, dz),
+    distance: segmentDistance(model, index, length),
     targetVelocity: isRapid
       ? limits.maxFeedMmPerMin / SECONDS_PER_MINUTE
       : feedMmPerSec(model.segFeed[index] ?? 0, limits.maxFeedMmPerMin),
-    direction: xyLength > 0 ? { x: dx / xyLength, y: dy / xyLength } : { x: 0, y: 0 },
+    direction:
+      length > 0 ? { x: dx / length, y: dy / length, z: dz / length } : { x: 0, y: 0, z: 0 },
   };
+}
+
+function segmentDistance(model: GcodeRenderModel, index: number, chordLength: number): number {
+  const preciseLength = model.segLengthMm?.[index];
+  if (preciseLength !== undefined && Number.isFinite(preciseLength) && preciseLength > 0) {
+    return preciseLength;
+  }
+  const motion = model.segMotion[index];
+  if (motion !== SEG_MOTION.cw && motion !== SEG_MOTION.ccw) return chordLength;
+  // Compatibility for render-only models that did not retain precise lengths.
+  // Execution timelines use the non-cumulative lengths above, since display
+  // route differences can round to zero after a long prior route.
+  const start = index === 0 ? 0 : model.segRouteEndMm[index - 1];
+  const end = model.segRouteEndMm[index];
+  const routeLength = start === undefined || end === undefined ? 0 : end - start;
+  return Number.isFinite(routeLength) && routeLength > 0 ? routeLength : chordLength;
 }
 
 function isCutting(model: GcodeRenderModel, index: number): boolean {
   const kind = model.segKind[index];
-  return kind === SEG_KIND.cut || kind === SEG_KIND.plunge;
+  if (kind === SEG_KIND.cut || kind === SEG_KIND.plunge) return true;
+  // A Z-only retract commanded at feed rate is the chip clear inside a peck
+  // cycle, not a seek: the tool is still in the hole at working feed and the
+  // preview counts it in the cut step. Only a rapid retract is travel.
+  return kind === SEG_KIND.retract && model.segMotion[index] !== SEG_MOTION.rapid;
 }
 
 // A feed move with no F word is a program defect (Program Health reports it);

@@ -34,11 +34,12 @@ self.onmessage = async (
   if (acceptCanvasCompilationBridgeConnection(e.data)) return;
   if (transferSender.acceptAcknowledgement(e.data)) return;
   if ('kind' in e.data) return;
-  const { id, project, jobOrigin, outputScope, snapshot, projection } = e.data;
+  const { id, project, jobOrigin, outputScope, initialPosition, snapshot, projection } = e.data;
   try {
     const options = {
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
       ...(outputScope === undefined ? {} : { outputScope }),
+      ...(initialPosition === undefined ? {} : { initialPosition }),
     };
     const hydrated = await hydratePagedRasterProject(project);
     const prepare = (nextProject: typeof hydrated, nextOptions: typeof options) =>
@@ -66,7 +67,10 @@ self.onmessage = async (
       const response: PreparationWorkerResponse = {
         id,
         kind: 'estimate',
-        estimate: estimateLiveJobFromPrepared(prepared, jobOrigin, { unbounded: true }),
+        estimate: estimateLiveJobFromPrepared(prepared, jobOrigin, {
+          ...(initialPosition === undefined ? {} : { initialPosition }),
+          unbounded: true,
+        }),
       };
       self.postMessage(response);
     } else {

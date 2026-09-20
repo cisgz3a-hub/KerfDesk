@@ -1,20 +1,27 @@
 // buildProgramTime — planner-true seconds for a parsed program (ADR-255
 // stage 8b).
 //
-// Runs the same lookahead + trapezoidal kinematics the job duration
-// estimator uses (core/motion-planner). Callers may calibrate the resulting
-// motion times without changing the planned velocities or deterministic dwells.
+// Shares lookahead + trapezoidal kinematics with job duration estimation.
+// Inspector supplies its own assumed limits; job timing additionally supplies
+// device calibration and layers serial delivery onto this motion clock.
 //
 // Beyond an honest ETA this yields the planner lens: which moves never
 // sustained their programmed feed because acceleration or cornering got in
 // the way first — "why is my job slow", answered from the program itself.
 
-import type { GcodeRenderModel } from '../gcode-view';
-import { isEstimateTimeScale } from '../devices';
-import type { MachineKind } from '../scene/machine';
+import { SEG_MOTION, type GcodeRenderModel } from '../gcode-view';
 import { blockTime, planVelocities, type Block } from '../motion-planner';
 import { sanitizeLimits, type MotionLimits } from './motion-limits';
 import { segmentBlocks } from './segment-blocks';
+import { validTimeScale, type ProgramTimingOptions } from './program-timing-options';
+
+export type { ProgramTimeCalibration } from './program-timing-options';
+
+export type ProgramMotionBreakdown = {
+  readonly cutSeconds: number;
+  readonly rapidTravelSeconds: number;
+  readonly feedTravelSeconds: number;
+};
 
 // "Feed-limited" asks whether the move ever REACHED its programmed feed —
 // not whether it took longer than a pure cruise. Every first and last move
@@ -23,9 +30,9 @@ import { segmentBlocks } from './segment-blocks';
 
 export type ProgramTimeModel = {
   /** Seconds for each segment. */
-  readonly segSeconds: Float32Array;
-  /** Calibration applied to time only; segment kinematics remain unscaled. */
-  readonly segTimeScale: Float32Array;
+  readonly segSeconds: Float64Array;
+  /** Per-segment motion calibration, also used for partial-route time. */
+  readonly segTimeScale: Float64Array;
   readonly segDistanceMm: Float32Array;
   readonly segTargetVelocityMmPerSec: Float32Array;
   readonly segEntryVelocityMmPerSec: Float32Array;
@@ -41,28 +48,21 @@ export type ProgramTimeModel = {
   /** motionSeconds + dwellSeconds — the ETA. */
   readonly totalSeconds: number;
   readonly accelMmPerSec2: number;
-};
-
-export type ProgramTimeCalibration = {
-  readonly cutTimeScale: number;
-  readonly travelTimeScale: number;
-};
-
-const DEFAULT_TIME_CALIBRATION: ProgramTimeCalibration = {
-  cutTimeScale: 1,
-  travelTimeScale: 1,
+  readonly breakdown: ProgramMotionBreakdown;
 };
 
 export function buildProgramTime(
   model: GcodeRenderModel,
   rawLimits: MotionLimits,
-  calibration: ProgramTimeCalibration = DEFAULT_TIME_CALIBRATION,
-  machineKind?: MachineKind,
+  options: ProgramTimingOptions = {},
+  machineKind?: ProgramTimingOptions['machineKind'],
 ): ProgramTimeModel {
   const limits = sanitizeLimits(rawLimits);
+  const context = motionContext(options, machineKind);
   const blocks = segmentBlocks(model, limits);
-  const segSeconds = new Float32Array(blocks.length);
-  const segTimeScale = new Float32Array(blocks.length);
+  const power = model.segPower;
+  const segSeconds = new Float64Array(blocks.length);
+  const segTimeScale = new Float64Array(blocks.length);
   const segDistanceMm = new Float32Array(blocks.length);
   const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
   const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
@@ -70,6 +70,9 @@ export function buildProgramTime(
   const segTimeEndSec = new Float32Array(blocks.length);
   const segFeedLimited = new Uint8Array(blocks.length);
   let elapsed = 0;
+  let cutSeconds = 0;
+  let rapidTravelSeconds = 0;
+  let feedTravelSeconds = 0;
   for (const span of motionSpans(model, blocks.length)) {
     const spanBlocks = blocks.slice(span.startIndex, span.endIndex);
     const plan = planVelocities(spanBlocks, limits.accelMmPerSec2, limits.junctionDeviationMm);
@@ -78,11 +81,15 @@ export function buildProgramTime(
       const block = spanBlocks[localIndex];
       const entry = plan[localIndex];
       if (block === undefined || entry === undefined) continue;
-      const timeScale = motionTimeScale(block, model.segPower[index], calibration, machineKind);
-      const seconds =
-        blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2) * timeScale;
+      const rapid = model.segMotion[index] === SEG_MOTION.rapid;
+      const cutting = isCutting(model, index, block, context.machineKind, power);
+      const scale = cutting ? context.cutTimeScale : context.travelTimeScale;
+      const seconds = blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2) * scale;
+      if (cutting) cutSeconds += seconds;
+      else if (rapid) rapidTravelSeconds += seconds;
+      else feedTravelSeconds += seconds;
       segSeconds[index] = seconds;
-      segTimeScale[index] = timeScale;
+      segTimeScale[index] = scale;
       segDistanceMm[index] = block.distance;
       segTargetVelocityMmPerSec[index] = block.targetVelocity;
       segEntryVelocityMmPerSec[index] = entry.entryV;
@@ -108,25 +115,35 @@ export function buildProgramTime(
     dwellSeconds,
     totalSeconds: elapsed + dwellSeconds,
     accelMmPerSec2: limits.accelMmPerSec2,
+    breakdown: { cutSeconds, rapidTravelSeconds, feedTravelSeconds },
   };
 }
 
-function motionTimeScale(
-  block: Block,
-  power: number | undefined,
-  calibration: ProgramTimeCalibration,
-  machineKind: MachineKind | undefined,
-): number {
-  // Render kinds describe geometry: an XY G1 is "cut" even when its laser S
-  // word is zero. Keep those runways/seeks on the travel clock, while CNC
-  // plunge remains cutting and every G0 (including downward Z) remains travel.
-  const laserOff = machineKind === 'laser' && power === 0;
-  const isTravel = block.motion === 'rapid' || block.kind === 'travel' || laserOff;
-  const value = isTravel ? calibration.travelTimeScale : calibration.cutTimeScale;
-  return isEstimateTimeScale(value) ? value : 1;
+type MotionSpan = { readonly startIndex: number; readonly endIndex: number };
+
+function motionContext(
+  options: ProgramTimingOptions,
+  machineKind: ProgramTimingOptions['machineKind'],
+) {
+  return {
+    machineKind: options.machineKind ?? machineKind,
+    cutTimeScale: validTimeScale(options.cutTimeScale ?? options.timeCalibration?.cutTimeScale),
+    travelTimeScale: validTimeScale(
+      options.travelTimeScale ?? options.timeCalibration?.travelTimeScale,
+    ),
+  };
 }
 
-type MotionSpan = { readonly startIndex: number; readonly endIndex: number };
+function isCutting(
+  model: GcodeRenderModel,
+  index: number,
+  block: Block,
+  machineKind: ProgramTimingOptions['machineKind'],
+  power: Float32Array,
+): boolean {
+  if (model.segMotion[index] === SEG_MOTION.rapid) return false;
+  return block.kind === 'cut' && (machineKind !== 'laser' || (power[index] ?? 0) > 0);
+}
 type SynchronizationBoundary = { readonly line: number; readonly isBeforeMotion: boolean };
 
 function motionSpans(model: GcodeRenderModel, segmentCount: number): ReadonlyArray<MotionSpan> {

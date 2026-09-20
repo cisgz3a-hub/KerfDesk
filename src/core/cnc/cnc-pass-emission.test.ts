@@ -62,10 +62,23 @@ describe('CNC pass emission eligibility parity', () => {
       const job: Job = { groups: [cncGroup] };
 
       expect(cncPassCanEmit(pass)).toBe(false);
-      expect(emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE).spans).toEqual([]);
+      const emitted = emitCncJobWithPassSpans(job, DEFAULT_DEVICE_PROFILE);
+      expect(emitted.spans).toEqual([]);
       expect(buildToolpath(job).steps).toEqual([]);
       expect(cncGroupMaximumDepthMm(cncGroup)).toBe(0);
-      expect(estimateJobDuration(job, DEFAULT_DEVICE_PROFILE).totalSeconds).toBe(0);
+      const duration = estimateJobDuration(job, DEFAULT_DEVICE_PROFILE);
+      expect(duration.unavailableReason).toBeUndefined();
+      expect(duration.breakdown.cutSeconds).toBe(0);
+      expect(duration.breakdown.feedTravelSeconds).toBe(0);
+      // The group emits no pass, but its preamble still raises Z and its
+      // header/footer still have to reach the controller.
+      expect(emitted.gcode).toContain('G0 Z5');
+      expect(duration.breakdown.rapidTravelSeconds).toBeGreaterThan(0);
+      expect(duration.breakdown.transportSeconds).toBeGreaterThan(0);
+      expect(duration.totalSeconds).toBeCloseTo(
+        (duration.breakdown.rapidTravelSeconds ?? 0) + (duration.breakdown.transportSeconds ?? 0),
+        8,
+      );
     },
   );
 });

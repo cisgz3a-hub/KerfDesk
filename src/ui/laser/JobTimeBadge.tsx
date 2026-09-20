@@ -3,13 +3,19 @@ import { assertNever } from '../../core/scene';
 import { estimateStyle } from './JobControls.styles';
 
 const TIME_MESSAGES = {
-  estimating: (duration: string): string => `Estimating · ~${duration} remaining`,
-  running: (duration: string): string => `~${duration} remaining`,
-  paused: (duration: string): string => `Paused · ~${duration} remaining`,
+  estimating: (duration: string): string => `Estimating · ${duration} remaining`,
+  running: (duration: string): string => `${duration} remaining`,
+  paused: (duration: string): string => `Paused · ${duration} remaining`,
   disconnected: 'Time remaining unavailable · disconnected',
   finishing: 'Machine finishing · waiting for controller',
   complete: 'Complete',
   unavailable: (reason: string): string => `Time remaining unavailable · ${reason}`,
+};
+
+const ELAPSED_ESTIMATE_MESSAGES = {
+  estimating: 'Estimating · waiting for controller',
+  running: 'Estimate elapsed · waiting for controller',
+  paused: 'Paused · estimate elapsed',
 };
 
 /** Display-only states for the exact-program job countdown badge. */
@@ -34,11 +40,9 @@ export function JobTimeBadge({ state }: { readonly state: JobTimeBadgeState }): 
 function jobTimeText(state: JobTimeBadgeState): string {
   switch (state.kind) {
     case 'estimating':
-      return TIME_MESSAGES.estimating(formatDuration(state.remainingSeconds));
     case 'running':
-      return TIME_MESSAGES.running(formatDuration(state.remainingSeconds));
     case 'paused':
-      return TIME_MESSAGES.paused(formatDuration(state.remainingSeconds));
+      return countdownText(state);
     case 'disconnected':
       return TIME_MESSAGES.disconnected;
     case 'finishing':
@@ -50,4 +54,14 @@ function jobTimeText(state: JobTimeBadgeState): string {
     default:
       return assertNever(state);
   }
+}
+
+function countdownText(
+  state: Extract<JobTimeBadgeState, { readonly remainingSeconds: number }>,
+): string {
+  const seconds = state.remainingSeconds;
+  if (!Number.isFinite(seconds)) return TIME_MESSAGES.unavailable('waiting for timing data');
+  if (seconds <= 0) return ELAPSED_ESTIMATE_MESSAGES[state.kind];
+  const duration = seconds < 1 ? '<1s' : `~${formatDuration(seconds)}`;
+  return TIME_MESSAGES[state.kind](duration);
 }

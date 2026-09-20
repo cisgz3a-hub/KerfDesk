@@ -148,7 +148,7 @@ function emitCncProgram(
     currentRpm: firstGroup.spindleRpm,
     currentToolKey: firstGroup.toolId ?? '',
     maxSafeZ: 0,
-    finish: options.finishPosition,
+    finish: options.finishPosition ?? undefined,
     coolant: firstGroup.coolant,
   };
   for (const { group, jobGroupIndex } of cncGroups) {

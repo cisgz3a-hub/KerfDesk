@@ -5,15 +5,15 @@ import {
   SEG_MOTION,
   type GcodeRenderModel,
   type ProgramEvent,
-  type BuildRenderModelOptions,
 } from '../gcode-view';
 import {
   buildProgramTime,
-  type ProgramTimeCalibration,
+  type ProgramMotionBreakdown,
   type ProgramTimeModel,
 } from './program-time';
 import type { MotionLimits } from './motion-limits';
-import type { MachineKind } from '../scene/machine';
+import type { ProgramTimingOptions } from './program-timing-options';
+import { programTransportTime } from './program-transport-time';
 
 /** An emitted M0/M1 boundary mapped to both raw and controller-sendable lines. */
 export type ProgramPauseBarrier = {
@@ -30,6 +30,9 @@ export type ProgramTimeline = {
   readonly totalSeconds: number;
   readonly motionSeconds: number;
   readonly dwellSeconds: number;
+  readonly transportSeconds: number;
+  readonly wireSeconds: number;
+  readonly breakdown: ProgramMotionBreakdown;
   readonly totalRouteMm: number;
   readonly segmentRawLine: Uint32Array;
   readonly routeStartMm: Float64Array;
@@ -37,10 +40,10 @@ export type ProgramTimeline = {
   readonly plannedMotionStartSeconds: Float64Array;
   readonly plannedMotionEndSeconds: Float64Array;
   readonly segmentDistanceMm: Float32Array;
-  readonly segmentTimeScale: Float32Array;
   readonly segmentTargetVelocityMmPerSec: Float32Array;
   readonly segmentEntryVelocityMmPerSec: Float32Array;
   readonly segmentExitVelocityMmPerSec: Float32Array;
+  readonly segmentTimeScale: Float64Array;
   readonly accelMmPerSec2: number;
   readonly plannedStartSeconds: Float64Array;
   readonly plannedEndSeconds: Float64Array;
@@ -48,9 +51,11 @@ export type ProgramTimeline = {
   readonly rawLineEndSeconds: Float64Array;
   readonly rawLineMotionEndSeconds: Float64Array;
   readonly rawLineDwellEndSeconds: Float64Array;
+  readonly rawLineTransportEndSeconds: Float64Array;
   readonly sendableLineEndSeconds: Float64Array;
   readonly sendableLineMotionEndSeconds: Float64Array;
   readonly sendableLineDwellEndSeconds: Float64Array;
+  readonly sendableLineTransportEndSeconds: Float64Array;
   readonly pauseBarriers: ReadonlyArray<ProgramPauseBarrier>;
 };
 
@@ -61,13 +66,9 @@ export type ProgramTimelineResult =
   | { readonly kind: 'unavailable'; readonly reason: string };
 
 /** Parser evidence and allocation limits required by bounded timing consumers. */
-export type ProgramTimelineOptions = {
+export type ProgramTimelineOptions = ProgramTimingOptions & {
   readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
   readonly maxSegments?: number;
-  readonly timeCalibration?: ProgramTimeCalibration;
-  /** Known job kind distinguishes laser-off S0 feeds from CNC process feeds. */
-  readonly machineKind?: MachineKind;
-  readonly laserPowerControl?: BuildRenderModelOptions['laserPowerControl'];
 };
 
 type LineTiming = Pick<
@@ -76,9 +77,11 @@ type LineTiming = Pick<
   | 'rawLineEndSeconds'
   | 'rawLineMotionEndSeconds'
   | 'rawLineDwellEndSeconds'
+  | 'rawLineTransportEndSeconds'
   | 'sendableLineEndSeconds'
   | 'sendableLineMotionEndSeconds'
   | 'sendableLineDwellEndSeconds'
+  | 'sendableLineTransportEndSeconds'
   | 'pauseBarriers'
 >;
 
@@ -88,7 +91,16 @@ export function buildProgramTimeline(
   limits: MotionLimits,
   options: ProgramTimelineOptions = {},
 ): ProgramTimelineResult {
-  const parsed = buildGcodeRenderModel(gcode, options);
+  const timingOptions = {
+    ...options,
+    ...(options.laserPowerControl === undefined && options.fanPower === true
+      ? { laserPowerControl: 'fan' as const }
+      : {}),
+  };
+  const parsed = buildGcodeRenderModel(gcode, {
+    ...timingOptions,
+    retainPreciseSegmentLengths: true,
+  });
   if (parsed.kind === 'error') {
     return parsed.segmentLimit === undefined
       ? parsed
@@ -99,23 +111,26 @@ export function buildProgramTimeline(
   }
   const unavailableReason = timingUnavailableReason(parsed.model);
   if (unavailableReason !== null) return { kind: 'unavailable', reason: unavailableReason };
-  const time = buildProgramTime(parsed.model, limits, options.timeCalibration, options.machineKind);
-  const lineTiming = buildLineTiming(gcode, parsed.model, time);
+  const time = buildProgramTime(parsed.model, limits, timingOptions);
+  const lineTiming = buildLineTiming(gcode, parsed.model, time, timingOptions);
   const segmentTiming = buildSegmentTiming(parsed.model, time, lineTiming);
   const motionSeconds = last(lineTiming.rawLineMotionEndSeconds);
   const dwellSeconds = last(lineTiming.rawLineDwellEndSeconds);
+  const transportSeconds = last(lineTiming.rawLineTransportEndSeconds);
   return {
     kind: 'ok',
     timeline: {
-      totalSeconds: motionSeconds + dwellSeconds,
+      totalSeconds: motionSeconds + dwellSeconds + transportSeconds,
       motionSeconds,
       dwellSeconds,
+      transportSeconds,
+      breakdown: time.breakdown,
       totalRouteMm: parsed.model.totalRouteMm,
       segmentDistanceMm: time.segDistanceMm,
-      segmentTimeScale: time.segTimeScale,
       segmentTargetVelocityMmPerSec: time.segTargetVelocityMmPerSec,
       segmentEntryVelocityMmPerSec: time.segEntryVelocityMmPerSec,
       segmentExitVelocityMmPerSec: time.segExitVelocityMmPerSec,
+      segmentTimeScale: time.segTimeScale,
       accelMmPerSec2: time.accelMmPerSec2,
       ...segmentTiming,
       ...lineTiming,
@@ -164,18 +179,9 @@ function buildLineTiming(
   gcode: string,
   model: GcodeRenderModel,
   time: ProgramTimeModel,
-): LineTiming {
-  const lineMotion = new Float64Array(model.lineCount);
-  const lineDwell = new Float64Array(model.lineCount);
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    const line = model.segLine[index];
-    if (line !== undefined)
-      lineMotion[line] = (lineMotion[line] ?? 0) + (time.segSeconds[index] ?? 0);
-  }
-  for (const event of model.events) {
-    if (event.kind === 'dwell')
-      lineDwell[event.line] = (lineDwell[event.line] ?? 0) + event.seconds;
-  }
+  options: ProgramTimingOptions,
+): LineTiming & { readonly wireSeconds: number } {
+  const { lineMotion, lineDwell } = perLineDurations(model, time);
   const rawLineStartSeconds = new Float64Array(model.lineCount);
   const rawLineEndSeconds = new Float64Array(model.lineCount);
   const rawLineMotionEndSeconds = new Float64Array(model.lineCount);
@@ -190,14 +196,50 @@ function buildLineTiming(
     rawLineDwellEndSeconds[line] = dwell;
     rawLineEndSeconds[line] = motion + dwell;
   }
+  const transport = programTransportTime(
+    gcode,
+    rawLineStartSeconds,
+    options.baudRate,
+    options.hostToolChangePauses,
+  );
+  const rawLineTransportEndSeconds = transport.rawLineTransportSeconds;
+  for (let line = 0; line < model.lineCount; line += 1) {
+    rawLineStartSeconds[line] =
+      (rawLineStartSeconds[line] ?? 0) + (rawLineTransportEndSeconds[line] ?? 0);
+    rawLineEndSeconds[line] =
+      (rawLineEndSeconds[line] ?? 0) + (rawLineTransportEndSeconds[line] ?? 0);
+  }
   return {
     rawLineStartSeconds,
     rawLineEndSeconds,
     rawLineMotionEndSeconds,
     rawLineDwellEndSeconds,
-    ...sendableTiming(gcode, rawLineEndSeconds, rawLineMotionEndSeconds, rawLineDwellEndSeconds),
+    rawLineTransportEndSeconds,
+    wireSeconds: transport.wireSeconds,
+    ...sendableTiming(
+      gcode,
+      rawLineEndSeconds,
+      rawLineMotionEndSeconds,
+      rawLineDwellEndSeconds,
+      rawLineTransportEndSeconds,
+    ),
     pauseBarriers: pauseBarriers(gcode, model.events),
   };
+}
+
+function perLineDurations(model: GcodeRenderModel, time: ProgramTimeModel) {
+  const lineMotion = new Float64Array(model.lineCount);
+  const lineDwell = new Float64Array(model.lineCount);
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    const line = model.segLine[index];
+    if (line !== undefined)
+      lineMotion[line] = (lineMotion[line] ?? 0) + (time.segSeconds[index] ?? 0);
+  }
+  for (const event of model.events) {
+    if (event.kind === 'dwell')
+      lineDwell[event.line] = (lineDwell[event.line] ?? 0) + event.seconds;
+  }
+  return { lineMotion, lineDwell };
 }
 
 function sendableTiming(
@@ -205,27 +247,34 @@ function sendableTiming(
   rawTotal: Float64Array,
   rawMotion: Float64Array,
   rawDwell: Float64Array,
+  rawTransport: Float64Array,
 ): Pick<
   LineTiming,
-  'sendableLineEndSeconds' | 'sendableLineMotionEndSeconds' | 'sendableLineDwellEndSeconds'
+  | 'sendableLineEndSeconds'
+  | 'sendableLineMotionEndSeconds'
+  | 'sendableLineDwellEndSeconds'
+  | 'sendableLineTransportEndSeconds'
 > {
   const rawLines = gcode.split(/\r\n|\n|\r/);
   const sendableCount = rawLines.filter(isSendableGcodeLine).length;
   const total = new Float64Array(sendableCount);
   const motion = new Float64Array(sendableCount);
   const dwell = new Float64Array(sendableCount);
+  const transport = new Float64Array(sendableCount);
   let sendableIndex = 0;
   rawLines.forEach((line, rawLineIndex) => {
     if (!isSendableGcodeLine(line)) return;
     total[sendableIndex] = rawTotal[rawLineIndex] ?? 0;
     motion[sendableIndex] = rawMotion[rawLineIndex] ?? 0;
     dwell[sendableIndex] = rawDwell[rawLineIndex] ?? 0;
+    transport[sendableIndex] = rawTransport[rawLineIndex] ?? 0;
     sendableIndex += 1;
   });
   return {
     sendableLineEndSeconds: total,
     sendableLineMotionEndSeconds: motion,
     sendableLineDwellEndSeconds: dwell,
+    sendableLineTransportEndSeconds: transport,
   };
 }
 
@@ -273,18 +322,24 @@ function buildSegmentTiming(
   const plannedStartSeconds = new Float64Array(model.segmentCount);
   const plannedEndSeconds = new Float64Array(model.segmentCount);
   let motionElapsed = 0;
+  let routeMm = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
     const line = model.segLine[index] ?? 0;
     const motionStart = motionElapsed;
     motionElapsed += time.segSeconds[index] ?? 0;
     const motionEnd = motionElapsed;
     const dwellBefore = line === 0 ? 0 : (lines.rawLineDwellEndSeconds[line - 1] ?? 0);
-    routeStartMm[index] = index === 0 ? 0 : (model.segRouteEndMm[index - 1] ?? 0);
-    routeEndMm[index] = model.segRouteEndMm[index] ?? routeStartMm[index] ?? 0;
+    const transportBefore = lines.rawLineTransportEndSeconds[line] ?? 0;
+    routeStartMm[index] = routeMm;
+    routeMm =
+      model.segLengthMm === undefined
+        ? (model.segRouteEndMm[index] ?? routeMm)
+        : routeMm + (model.segLengthMm[index] ?? 0);
+    routeEndMm[index] = routeMm;
     plannedMotionStartSeconds[index] = motionStart;
     plannedMotionEndSeconds[index] = motionEnd;
-    plannedStartSeconds[index] = motionStart + dwellBefore;
-    plannedEndSeconds[index] = motionEnd + dwellBefore;
+    plannedStartSeconds[index] = motionStart + dwellBefore + transportBefore;
+    plannedEndSeconds[index] = motionEnd + dwellBefore + transportBefore;
   }
   return {
     segmentRawLine,

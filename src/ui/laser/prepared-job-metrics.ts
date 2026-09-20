@@ -13,6 +13,7 @@ import {
   computeFrameJobMotionBounds,
 } from '../../core/job/job-bounds';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
+import type { JobDurationEstimateOptions } from '../../core/job/estimate-duration';
 import { resolveJobParkTarget } from '../../core/output';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
@@ -36,6 +37,7 @@ export function buildPreparedJobMetrics(
   prepared: SuccessfulPreparedOutput,
   jobOrigin?: JobOriginPlacement,
   executablePlan?: ExecutablePlanV1,
+  timingOptions: JobDurationEstimateOptions & { readonly unavailableReason?: string } = {},
 ): PreparedJobMetrics {
   const device = prepared.project.device;
   const machineKind = machineKindOf(prepared.project.machine);
@@ -48,11 +50,19 @@ export function buildPreparedJobMetrics(
   // the rotary scale (~1.91x on the shipped chuck defaults, i.e. the Time tile
   // showed roughly half the real duration). machineSpaceJob is the identity
   // when no rotary is active, so flat jobs are unchanged.
-  const duration = estimateJobDuration(
-    framedJob,
-    device,
-    finishPosition === undefined ? {} : { initialPosition: finishPosition, finishPosition },
-  );
+  const duration: JobDurationEstimate =
+    timingOptions.unavailableReason === undefined
+      ? estimateJobDuration(framedJob, device, {
+          ...(finishPosition === undefined
+            ? {}
+            : { initialPosition: finishPosition, finishPosition }),
+          ...timingOptions,
+        })
+      : {
+          totalSeconds: 0,
+          breakdown: { cutSeconds: 0, travelSeconds: 0 },
+          unavailableReason: timingOptions.unavailableReason,
+        };
   const calculatedBounds = selectExecutablePlanCalculatedBounds({
     legacyJobBounds: computeEmittedJobBounds(prepared.job, device),
     legacyMotionBounds: computeEmittedJobMotionBounds(prepared.job, device),

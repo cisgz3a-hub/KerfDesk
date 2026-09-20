@@ -173,8 +173,9 @@ describe('Marlin countdown settlement against the simulator', () => {
     await pump(20);
     expect(useLaserStore.getState()).toMatchObject({
       streamer: { status: 'paused', completed: 1, inFlight: [] },
-      liveCanvasRun: { timing: { kind: 'paused' } },
+      liveCanvasRun: { timing: { kind: 'running' } },
     });
+    expect(sim.state().pendingMotions).toBeGreaterThan(0);
 
     await useLaserStore.getState().resumeJob();
     expect(useLaserStore.getState()).toMatchObject({

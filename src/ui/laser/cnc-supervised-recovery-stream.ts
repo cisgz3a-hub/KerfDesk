@@ -70,6 +70,7 @@ export async function streamCncRecoveryProgram(
     planned.source.project.device,
     initialPosition,
     {
+      machineKind: 'cnc',
       controllerSessionEpoch: laser.controllerSessionEpoch,
       positionEpoch: laser.trustedPositionEpoch,
       activeControllerKind: laser.activeControllerKind,
