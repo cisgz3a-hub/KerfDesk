@@ -31,9 +31,15 @@ export type LocalAutosaveReadResult = {
   readonly snapshots: AutosaveSnapshot[];
   readonly corrupt: boolean;
   readonly failed: boolean;
+  // The keys that held a record this build cannot turn back into a project.
+  // The caller retires them; see AutosaveDurableService.retireUnreadable.
+  readonly unreadableKeys: readonly string[];
 };
 
-type LocalReadDiagnostics = { corrupt: boolean; failed: boolean };
+// Any addressable autosave slot: a snapshot, or a bare key a scan turned up.
+export type AutosaveStorageTarget = { readonly storageKey: string };
+
+type LocalReadDiagnostics = { corrupt: boolean; failed: boolean; unreadableKeys: string[] };
 
 export function writeLocalAutosave(
   project: Project,
@@ -76,8 +82,10 @@ export function readLocalAutosaveSnapshots(): AutosaveSnapshot[] {
 }
 
 export function readLocalAutosaveState(): LocalAutosaveReadResult {
-  if (!localAutosaveAvailable()) return { snapshots: [], corrupt: false, failed: true };
-  const diagnostics: LocalReadDiagnostics = { corrupt: false, failed: false };
+  if (!localAutosaveAvailable()) {
+    return { snapshots: [], corrupt: false, failed: true, unreadableKeys: [] };
+  }
+  const diagnostics: LocalReadDiagnostics = { corrupt: false, failed: false, unreadableKeys: [] };
   const snapshots = localAutosaveCandidateKeys(diagnostics)
     .map((storageKey) => readAutosaveAtKey(storageKey, diagnostics))
     .filter((snapshot): snapshot is AutosaveSnapshot => snapshot !== null);
@@ -85,7 +93,7 @@ export function readLocalAutosaveState(): LocalAutosaveReadResult {
 }
 
 export function clearLocalAutosave(
-  target: AutosaveScope | AutosaveSnapshot = {},
+  target: AutosaveScope | AutosaveStorageTarget = {},
 ): LocalAutosaveClearResult {
   if (!localAutosaveAvailable()) return { kind: 'unavailable', keys: [] };
   const keys = 'storageKey' in target ? [target.storageKey] : keysForClearScope(target);
@@ -174,15 +182,31 @@ function readAutosaveAtKey(
   try {
     record = JSON.parse(raw);
   } catch {
-    state.corrupt = true;
-    return null;
+    return markUnreadable(state, storageKey);
   }
   const snapshot =
     isAutosaveRecord(record) && recordMatchesStorageKey(record, storageKey)
       ? autosaveSnapshotFromRecord(record, storageKey)
       : null;
-  if (snapshot === null) state.corrupt = true;
-  return snapshot;
+  return snapshot === null ? markUnreadable(state, storageKey) : snapshot;
+}
+
+function markUnreadable(state: LocalReadDiagnostics, storageKey: string): null {
+  state.corrupt = true;
+  state.unreadableKeys.push(storageKey);
+  return null;
+}
+
+// The session that owns a slot is encoded in its key, so an unreadable record
+// can still be attributed to a window and ownership-checked before retirement.
+export function autosaveSessionIdForStorageKey(storageKey: string): string | undefined {
+  if (!storageKey.startsWith(AUTOSAVE_KEY_PREFIX)) return undefined;
+  try {
+    const sessionId = decodeURIComponent(storageKey.slice(AUTOSAVE_KEY_PREFIX.length));
+    return sessionId === '' ? undefined : sessionId;
+  } catch {
+    return undefined;
+  }
 }
 
 function localAutosaveCandidateKeys(diagnostics: LocalReadDiagnostics): ReadonlyArray<string> {

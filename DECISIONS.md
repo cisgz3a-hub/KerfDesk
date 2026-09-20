@@ -20243,3 +20243,120 @@ Use explicit stable lesson IDs, an exhaustive command mapping, source entry-poin
 ### Consequences
 
 The catalog and SVG illustrations are bundled and precached for offline use without new dependencies or video hosting. Optional photographs are cached after viewing; unvisited images or responsive sizes retain readable instructions and a diagram fallback offline. Packaged desktop builds include the local image files. Pictures and diagrams do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.
+
+## ADR-325 - The plan-backed preview authority stops at the advisory program size (2026-09-20)
+
+**Status:** Accepted; amends the ADR-244 large-job preparation path and the second consumer
+migration slice in `docs/architecture/10-executable-plan-mathematical-contract.md` §13.
+Preserves ADR-241/ADR-243 (no size refusals) and rule 7: nothing here refuses a job.
+
+### Context
+
+Tracing a dense line drawing — a detailed coloring-page dragon — and leaving the traced artwork
+on its default Fill operation crashed the renderer with Chrome's "Aw, Snap! Out of Memory". The
+same symptom on Frame was addressed in ADR-323's sibling timing work (PR #799), which stopped a
+moving head from keying a fresh background preparation per status report. That removed the
+repetition; it did not change what ONE preparation costs, and the crash survived it.
+
+The cost is the preview's second authority. `buildPreviewToolpathFromPrepared` builds the legacy
+machine route, maps a scene copy of it, then — for every job that is not a streamed raster —
+emits the whole G-code program and the v1 plan to verify a plan-backed route at emit precision
+and retains that verified route beside the legacy one for as long as the preview lives. Four
+complete routes plus the program exist at the peak.
+
+Measured on a synthetic fill inside a 4 GB heap, the size of Chrome's renderer budget:
+
+| fill segments | route steps | with the plan authority | without |
+| --- | --- | --- | --- |
+| 1,000,000 | 2,100,001 | 2,925 MB | 991 MB |
+| 2,000,000 | 4,200,001 | heap OOM | 1,584 MB |
+| 3,000,000 | 6,300,001 | heap OOM | 1,990 MB |
+
+A dense trace reaches those counts easily: every thin stroke outline becomes its own filled
+region, so the span count scales with contour crossings times hatch rows. The compiled job is
+not the problem — it is roughly 207 bytes per segment. The copies are.
+
+### Decision
+
+1. `planPreviewRouteEligible` holds every rule that decides whether a prepared job may carry the
+   plan-backed preview authority: the existing current-position and ADR-243 streamed-raster
+   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_STEPS` keeps
+   the legacy route. That constant is `MAX_COMPILED_MOTION_SEGMENTS`, the same 250,000 the
+   operator is already shown as "Large program: … preparation, preview, and streaming may be
+   slow". Route steps never undercount the motion segments that raise that advisory.
+2. `buildPreviewToolpathFromPrepared` asks the gate BEFORE mapping. Only the plan comparison
+   keeps the freshly built machine route alive past that point, so when the gate declines, the
+   machine array is consumed in place by `mapOwnedToolpathToScene` — the treatment streamed
+   rasters already had — instead of retaining two complete routes. Callers that never ask for a
+   plan keep the pure mapper unchanged.
+3. Nothing about the drawn geometry changes. The plan route is adopted only after
+   `comparePreviewRoutesAtEmitPrecision` proves it equal to the legacy route at the emitter's
+   own precision, and every consumer already falls back to the legacy route when it is absent.
+   Bytes, bounds, timing, Frame and Start are untouched: none of them read this route.
+
+### Verification and limits
+
+`draw-preview-plan-route-budget.test.ts` pins the boundary (admitted at the budget, declined one
+step past it), the current-position and streamed-raster refusals, that an ordinary job still
+reports `executable-plan`, and that an over-budget fill reports `legacy-toolpath` AND hands back
+the same steps array it was built into. The 2,000,000-segment case above, which exited 134 on a
+4 GB heap before, now completes in 1,584 MB; in the running app a 577,048-segment traced fill
+prepares in 549 MB of renderer heap where a 330,976-segment one previously reached 1,446 MB.
+
+The preparation worker still holds the compiled Job alive for the length of the acknowledged
+chunk transfer, and a preview still costs one full route on each side of that boundary. Both
+remain open; neither is what exhausted the renderer here. No hardware was operated.
+
+## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
+
+**Status:** Accepted; closes the worker-retention limit ADR-325 recorded as open. Amends the
+ADR-244 worker message contract. No change to bytes, preflight, Frame, Start or any response.
+
+### Context
+
+ADR-244's worker hands a prepared route to the UI in acknowledged chunks: it posts one chunk,
+waits for the main thread to accept it, then posts the next. On a large traced fill that handover
+is thousands of round trips, and for its whole length the worker had, in one suspended `async`
+message handler:
+
+- the structured clone of the Project the request arrived with,
+- the compiled `Job` the route was derived from, and
+- the route itself, which the transfer releases slot by slot as chunks are acknowledged.
+
+Only the third has a consumer. The first two are each the same order of size as the route, and
+they sat at the worker's peak for the entire handover.
+
+Measured by driving the real handler over a 1.6M-step fill with a 46 MB scene, acknowledging each
+chunk on its own task, as a real port delivery does:
+
+| | first chunk | transfer-complete | request released during transfer |
+| --- | --- | --- | --- |
+| before | 701 MB | 379 MB | no |
+| after | 434 MB | 112 MB | yes |
+
+On a small scene the same probe measured 345 MB → 247 MB at the first chunk. The earlier reading
+in ADR-325 ("~400 MB of dead weight") was taken with microtask-paced acknowledgements, where the
+collector never runs between chunks; it understated both the cost and the fix.
+
+### Decision
+
+1. `self.onmessage` is a synchronous dispatcher, not an `async` handler. It builds the promise
+   chain and returns, so its frame — and the request in it — is gone before the transfer runs.
+   Only the request id and the route reach the transfer.
+2. The prepare and the derivation of the payload live in their own frames (`previewPayload`,
+   `estimateResponse`). Returning the payload ends that frame, so the hydrated project and the
+   compiled Job are unreachable before the first chunk is posted.
+3. Error handling is unchanged in effect: a rejection anywhere in the chain still posts
+   `{ kind: 'error', message }` for the same id, and acknowledgement and bridge messages are
+   still answered before anything else.
+
+### Verification and limits
+
+`preparation-worker-retention.test.ts` drives the real handler over a chunked fill, acknowledging
+each chunk on its own task, and pins both halves: the dispatcher is not an async function, and —
+where `--expose-gc` is available — the request is collected before the final chunk. Both
+assertions fail against the previous handler. `src/ui/workspace` is otherwise unchanged and green.
+
+A preview still costs one full route on each side of the worker boundary; that is inherent to
+showing one and stays open. The acknowledged transfer still releases route slots only as chunks
+are accepted, so the worker's peak remains proportional to the route. No hardware was operated.

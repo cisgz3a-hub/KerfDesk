@@ -47,6 +47,7 @@ describe('runAutosaveRecovery warnings', () => {
         readLatest: async () => ({
           snapshot: null,
           warnings: ['corrupt-slot', 'ownership-probe-failed'],
+          unreadable: [],
         }),
         write: async () => ({ kind: 'superseded' }),
         clearRecovered: async () => ({ kind: 'ok' }),
@@ -147,6 +148,7 @@ describe('runAutosaveRecovery (M15)', () => {
         ownership: 'abandoned';
       };
       warnings: [];
+      unreadable: [];
     };
     let resolveRead: (value: DeferredRead) => void = () => undefined;
     const readLatest = vi.fn(
@@ -174,6 +176,7 @@ describe('runAutosaveRecovery (M15)', () => {
         ownership: 'abandoned',
       },
       warnings: [],
+      unreadable: [],
     });
 
     await recovery;

@@ -1,6 +1,6 @@
 import type { AutosaveSnapshot } from './autosave-record';
 import { autosaveSnapshotFromRecord } from './autosave-record';
-import { readLocalAutosaveState } from './autosave-local-storage';
+import { autosaveSessionIdForStorageKey, readLocalAutosaveState } from './autosave-local-storage';
 import type { AutosaveIndexedDbSlot } from './autosave-indexeddb';
 import type { AutosaveDurableRepository } from './autosave-durable-repository';
 import type { AutosaveSessionLocks, AutosaveSessionProbe } from './autosave-session-lock';
@@ -18,9 +18,19 @@ export type AutosaveDurableWarning =
   | 'corrupt-slot'
   | 'ownership-probe-failed';
 
+// A slot that held something but yielded no restorable project. No build can
+// turn these bytes back into a project, so the reader names them and the
+// service retires them instead of re-warning about them on every launch.
+export type AutosaveUnreadableSlot = {
+  readonly storageKey: string;
+  readonly sessionId: string | undefined;
+  readonly backend: 'indexeddb' | 'local';
+};
+
 export type AutosaveDurableReadResult = {
   readonly snapshot: AutosaveDurableSnapshot | null;
   readonly warnings: ReadonlyArray<AutosaveDurableWarning>;
+  readonly unreadable: ReadonlyArray<AutosaveUnreadableSlot>;
 };
 
 export async function readLatestDurableAutosave(
@@ -29,24 +39,45 @@ export async function readLatestDurableAutosave(
   currentSessionId: string,
 ): Promise<AutosaveDurableReadResult> {
   const warnings: AutosaveDurableWarning[] = [];
-  const candidates = await readCandidates(repository, warnings);
+  const unreadable: AutosaveUnreadableSlot[] = [];
+  const candidates = await readCandidates(repository, warnings, unreadable);
   const eligible = await eligibleCandidates(locks, candidates, currentSessionId, warnings);
   eligible.sort((a, b) => b.savedAt - a.savedAt);
-  return { snapshot: eligible[0] ?? null, warnings: [...new Set(warnings)] };
+  return { snapshot: eligible[0] ?? null, warnings: [...new Set(warnings)], unreadable };
 }
 
 async function readCandidates(
   repository: AutosaveDurableRepository,
   warnings: AutosaveDurableWarning[],
+  unreadable: AutosaveUnreadableSlot[],
 ): Promise<AutosaveDurableSnapshot[]> {
   const local = readLocalAutosaveState();
   if (local.corrupt) warnings.push('corrupt-slot');
   if (local.failed) warnings.push('local-read-failed');
+  for (const storageKey of local.unreadableKeys) {
+    unreadable.push({
+      storageKey,
+      sessionId: autosaveSessionIdForStorageKey(storageKey),
+      backend: 'local',
+    });
+  }
   const candidates = local.snapshots.map(localCandidate);
   try {
     for (const slot of await repository.readAllSlots()) {
       const candidate = indexedDbCandidate(slot, warnings);
-      if (candidate !== null) candidates.push(candidate);
+      if (candidate !== null) {
+        candidates.push(candidate);
+        continue;
+      }
+      // An empty manifest is a cleared slot, not a loss; only a manifest that
+      // still points at snapshots it can no longer resolve is unreadable.
+      if (slot.currentExpected || slot.previousExpected) {
+        unreadable.push({
+          storageKey: slot.storageKey,
+          sessionId: slot.sessionId,
+          backend: 'indexeddb',
+        });
+      }
     }
   } catch {
     warnings.push('indexeddb-read-failed');
