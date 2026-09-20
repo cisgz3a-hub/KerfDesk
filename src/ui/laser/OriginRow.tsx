@@ -133,6 +133,26 @@ export function OriginRow(props: {
   // ADR-094: firmwares without work-coordinate-system support (Marlin v1)
   // have no origin vocabulary at all — the whole row disappears.
   if (wcs === 'none') return null;
+  // Two origin predicates, and every consumer below picks one DELIBERATELY.
+  // hasCustom counts a Z-only touch-off (hasCustomOrigin tests |x|,|y|,|z|);
+  // hasCustomXy does not (|x|,|y| only). Choosing the wrong one is invisible
+  // until an operator zeroes Z against stock without setting an XY origin.
+  //
+  //   hasCustom   — Reset origin and Clear persistent origin: both clear the
+  //                 offset on ALL axes (G92.1 / G10 L2), so a Z-only offset is
+  //                 a real thing to clear and must keep them enabled.
+  //   hasCustomXy — the Set-origin attention pulse, and the Release motors
+  //                 gate. The gate is a CROSS-COMPONENT invariant: it must use
+  //                 whatever predicate NoHomingPositionGuide keys originSettled
+  //                 on, or both surfaces render a release control at once. The
+  //                 pair is pinned by release-motors-complementarity.test.tsx —
+  //                 neither component’s own tests can see the invariant, which is
+  //                 how a Z-only double-Release shipped once already.
+  //
+  // GoToWorkZeroButton still takes hasCustom; it jogs to work X0 Y0, so the
+  // Z-inclusive predicate enables a move that a Z-only offset says nothing
+  // about. Left as-is here deliberately (out of scope for the gate fix) —
+  // considered, not overlooked.
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
   const hasCustomXy = workOriginActive || hasCustomXyOrigin(wcoCache);
   const persistentOrUnknown =
@@ -174,7 +194,7 @@ export function OriginRow(props: {
         </button>
         <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
         <ReleaseMotorsButton
-          show={canSleep && (homingEnabled || hasCustom)}
+          show={canSleep && (homingEnabled || hasCustomXy)}
           busy={busy}
           onRelease={onRelease}
         />
