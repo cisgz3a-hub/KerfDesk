@@ -276,14 +276,14 @@ describe('useJobEstimate debounce (H16)', () => {
       useStore.setState({ project: lineProject() });
     });
 
-    // Ten polls spanning four debounce windows. Each stores a FRESH report
-    // object, but the resolved User Origin placement is byte-identical across
-    // all of them, so the debounce must not re-arm: tracking the placement's
+    // Ten stationary polls spanning four debounce windows. Each stores a FRESH
+    // report object, but the placement and physical head are byte-identical,
+    // so the debounce must not re-arm: tracking the placement's
     // per-call jobOrigin object by reference starved the estimate forever on
     // any connected machine.
     for (let poll = 1; poll <= STATUS_POLLS_PER_SETTLE; poll += 1) {
       await act(async () => {
-        useLaserStore.setState({ statusReport: idleReportAtX(poll) });
+        useLaserStore.setState({ statusReport: idleReportAtX(0) });
         vi.advanceTimersByTime(STATUS_POLL_INTERVAL_MS);
       });
     }

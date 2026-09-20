@@ -5,9 +5,7 @@ import {
 } from './program-timeline';
 import { blockElapsedTimeAtDistance } from '../motion-planner';
 import type { MotionLimits } from './motion-limits';
-import type { ProgramTimeCalibration } from './program-time';
-import type { MachineKind } from '../scene/machine';
-import type { BuildRenderModelOptions } from '../gcode-view';
+import type { ProgramTimingOptions } from './program-timing-options';
 
 export type GcodeTimingPlan = ProgramTimeline;
 
@@ -19,15 +17,13 @@ export type PlannedProgramProgress = {
   readonly motionSeconds: number;
   readonly dwellSeconds: number;
   readonly totalSeconds: number;
+  readonly transportSeconds?: number;
 };
 
 type InitialPosition = { readonly x: number; readonly y: number; readonly z: number };
 
-export type GcodeTimingPlanOptions = {
+export type GcodeTimingPlanOptions = ProgramTimingOptions & {
   readonly maxSegments?: number;
-  readonly timeCalibration?: ProgramTimeCalibration;
-  readonly machineKind?: MachineKind;
-  readonly laserPowerControl?: BuildRenderModelOptions['laserPowerControl'];
 };
 
 const EMPTY_PROGRESS: PlannedProgramProgress = {
@@ -62,9 +58,22 @@ export function plannedProgressAtRoute(
   const fraction = routeFraction(routeMm, routeStart, routeEnd);
   const motionStart = plan.plannedMotionStartSeconds[index] ?? 0;
   const motionEnd = plan.plannedMotionEndSeconds[index] ?? motionStart;
-  const totalStart = plan.plannedStartSeconds[index] ?? motionStart;
-  const dwellSeconds = Math.max(0, totalStart - motionStart);
-  const segmentDistance = plan.segmentDistanceMm[index] ?? Math.max(0, routeEnd - routeStart);
+  const line = plan.segmentRawLine[index] ?? 0;
+  const dwellSeconds = line === 0 ? 0 : (plan.rawLineDwellEndSeconds[line - 1] ?? 0);
+  const transportSeconds = plan.rawLineTransportEndSeconds[line] ?? 0;
+  const elapsedInSegment = segmentElapsedTime(plan, index, fraction);
+  const motionSeconds =
+    motionStart + Math.min(Math.max(0, motionEnd - motionStart), elapsedInSegment);
+  return {
+    motionSeconds,
+    dwellSeconds,
+    ...(transportSeconds > 0 ? { transportSeconds } : {}),
+    totalSeconds: motionSeconds + dwellSeconds + transportSeconds,
+  };
+}
+
+function segmentElapsedTime(plan: GcodeTimingPlan, index: number, fraction: number): number {
+  const segmentDistance = plan.segmentDistanceMm[index] ?? 0;
   const elapsedInSegment = blockElapsedTimeAtDistance({
     block: {
       distance: segmentDistance,
@@ -75,10 +84,7 @@ export function plannedProgressAtRoute(
     acceleration: plan.accelMmPerSec2,
     distance: segmentDistance * fraction,
   });
-  const calibratedElapsed = elapsedInSegment * (plan.segmentTimeScale[index] ?? 1);
-  const motionSeconds =
-    motionStart + Math.min(Math.max(0, motionEnd - motionStart), calibratedElapsed);
-  return { motionSeconds, dwellSeconds, totalSeconds: motionSeconds + dwellSeconds };
+  return elapsedInSegment * (plan.segmentTimeScale[index] ?? 1);
 }
 
 /** Maps an acknowledged-line count to a projection ceiling, not physical progress. */
@@ -95,6 +101,9 @@ export function plannedProgressAtSendableLine(
     motionSeconds: plan.sendableLineMotionEndSeconds[index] ?? 0,
     dwellSeconds: plan.sendableLineDwellEndSeconds[index] ?? 0,
     totalSeconds: plan.sendableLineEndSeconds[index] ?? 0,
+    ...(plan.transportSeconds > 0
+      ? { transportSeconds: plan.sendableLineTransportEndSeconds[index] ?? 0 }
+      : {}),
   };
 }
 

@@ -80,9 +80,14 @@ export function App(): JSX.Element {
         */}
         <WorkspaceSidePanels />
       </main>
-      <LiveMotionBar />
       <StatusBar />
+      {/* Window-level popups (ADR-207 amendment). Both are `position: fixed`,
+          so they take no layout space anywhere: mounting either one cannot
+          resize the workspace or shift the rails. Neither may overlay the
+          drawing surface at rest — a click-to-dismiss toast under the pointer
+          swallows the mousedown that starts a drag. */}
       <Toasts />
+      <LiveMotionBar />
       <PwaUpdateWatcherGate />
       <AddTextDialog />
       <DesignLibraryDialog />

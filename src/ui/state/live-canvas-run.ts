@@ -38,6 +38,7 @@ export function liveCanvasStatusPatch(
   const run = state.liveCanvasRun ?? null;
   if (run === null) return {};
   const lifecycle = lifecycleFor(
+    state,
     streamer,
     report,
     run.lifecycle,
@@ -60,7 +61,7 @@ export function liveCanvasStatusPatch(
   const updated = updatedRun(state, run, report, streamer, lifecycle, reportedHead);
   const statusFrame: LiveCanvasStatusFrame = { report, streamer, reportedHead };
   const isControllerExecutionConfirmed =
-    report.state === 'Run' && mayReconcile(run, streamer, report, state);
+    isExecutingJobMotion(report) && mayReconcile(run, streamer, report, state);
   const timing = liveCanvasTimingForStatus(
     run,
     updated,
@@ -245,9 +246,6 @@ function mayTrustTimingProgress(
   return (
     updated.lifecycle === 'running' &&
     frame.report.state === 'Run' &&
-    (frame.streamer?.status === 'streaming' ||
-      frame.streamer?.status === 'tool-change' ||
-      frame.streamer?.status === 'done') &&
     frame.reportedHead !== null &&
     mayReconcile(previous, frame.streamer, frame.report, state) &&
     !updated.route.uncertain
@@ -265,7 +263,11 @@ function mayReconcile(
   if (report.mpgActive === true || state.mpgActive === true) return false;
   if (!streamerMayReconcile(streamer, state.toolChangeIdleSeen)) return false;
   if (state.probeBusy || state.motionOperation !== null) return false;
-  return report.state === 'Run' || report.state === 'Idle';
+  return isExecutingJobMotion(report) || report.state === 'Idle';
+}
+
+function isExecutingJobMotion(report: StatusReport): boolean {
+  return report.state === 'Run' || (report.state === 'Hold' && report.subState === 1);
 }
 
 function streamerMayReconcile(
@@ -273,31 +275,53 @@ function streamerMayReconcile(
   toolChangeIdleSeen: boolean,
 ): boolean {
   if (streamer === null) return false;
-  if (!['streaming', 'tool-change', 'done'].includes(streamer.status)) return false;
+  if (!['streaming', 'paused', 'tool-change', 'done'].includes(streamer.status)) return false;
   return streamer.status !== 'tool-change' || !toolChangeIdleSeen;
 }
 
 function lifecycleFor(
+  state: LaserState,
   streamer: StreamerState | null,
   report: StatusReport,
   current: LiveCanvasLifecycle,
   toolChangeIsHeld: boolean,
 ): LiveCanvasLifecycle {
   return (
-    controllerLifecycle(report, streamer) ??
+    controllerLifecycle(state, report, streamer) ??
     streamerLifecycle(streamer, toolChangeIsHeld) ??
     resumedLifecycle(current, streamer, report)
   );
 }
 
 function controllerLifecycle(
+  state: LaserState,
   report: StatusReport,
   streamer: StreamerState | null,
 ): LiveCanvasLifecycle | null {
   if (report.state === 'Alarm') return 'errored';
-  if (report.state === 'Hold' || report.state === 'Door') return 'paused';
+  if (isSettledControllerHold(state, report)) return 'paused';
   if (report.state === 'Tool') return 'tool-change';
+  // Marlin's M114 is Idle-shaped but may describe a queued destination. Only
+  // realtime Idle can prove a paused sender's accepted tail has drained.
+  if (report.state === 'Idle' && isDrainedPausedSender(state, streamer)) return 'paused';
   return report.state === 'Idle' && streamer?.status === 'done' ? 'finished' : null;
+}
+
+function isDrainedPausedSender(state: LaserState, streamer: StreamerState | null): boolean {
+  return (
+    streamer?.status === 'paused' &&
+    streamer.inFlight.length === 0 &&
+    state.capabilities?.statusQuery === 'realtime-report'
+  );
+}
+
+function isSettledControllerHold(state: LaserState, report: StatusReport): boolean {
+  if (report.state === 'Door') return report.subState === 0 || report.subState === 1;
+  if (report.state !== 'Hold') return false;
+  return (
+    report.subState === 0 ||
+    (report.subState === null && state.capabilities?.startProtocol === 'smoothie-live')
+  );
 }
 
 function streamerLifecycle(
@@ -306,8 +330,6 @@ function streamerLifecycle(
 ): LiveCanvasLifecycle | null {
   const status = streamer?.status;
   switch (status) {
-    case 'paused':
-      return 'paused';
     case 'tool-change':
       return toolChangeIsHeld ? 'tool-change' : 'running';
     case 'cancelled':
@@ -320,6 +342,7 @@ function streamerLifecycle(
     case 'idle':
     case 'done':
     case 'streaming':
+    case 'paused':
       return null;
     default:
       return assertNever(status, 'StreamerState status');
@@ -341,8 +364,10 @@ function resumedLifecycle(
   report: StatusReport,
 ): LiveCanvasLifecycle {
   return current === 'paused' &&
-    report.state === 'Run' &&
-    (streamer?.status === 'streaming' || streamer?.status === 'done')
+    isExecutingJobMotion(report) &&
+    (streamer?.status === 'streaming' ||
+      streamer?.status === 'paused' ||
+      streamer?.status === 'done')
     ? 'running'
     : current;
 }

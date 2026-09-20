@@ -25,8 +25,8 @@ export type Block = {
   /** A non-motion command drains the planner after this move, such as M5 or
    * a coolant/power-mode transition before the following motion. */
   readonly stopAfter?: boolean;
-  // Unit direction vector. Travels with zero length are filtered out
-  // before block creation so this is always defined for real blocks.
+  // Unit direction vector in the same dimensions as distance. Planar callers
+  // can omit Z; the junction calculation treats it as zero.
   readonly direction: BlockDirection;
 };
 

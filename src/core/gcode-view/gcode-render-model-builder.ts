@@ -24,6 +24,7 @@ import { expandCannedCycle } from './canned-cycle';
 import { resolveCycleParameters } from './cycle-parameters';
 import { createLineCategoryBuilder } from './line-category-builder';
 import { applyLineWords, freshRenderModal, type RenderModal } from './render-model-words';
+import { grblCoordinateWord, resolveTarget } from './render-model-coordinates';
 import {
   isNativeLaserConsoleLine,
   nativeLaserMotionWords,
@@ -52,6 +53,7 @@ const ARC_RADIUS_TOLERANCE_MM = 0.127;
 const XY_PLANE = 17;
 
 type BuildContext = {
+  readonly coordinateRepresentation: BuildRenderModelOptions['coordinateRepresentation'];
   readonly laser: LaserRenderState;
   readonly modal: RenderModal;
   readonly segments: SegmentBuilder;
@@ -73,9 +75,10 @@ export function createGcodeRenderModelBuilder(
   // it is opt-in: only the live countdown passes it as a responsiveness budget
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
+    coordinateRepresentation: options.coordinateRepresentation,
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
-    segments: createSegmentBuilder(1024),
+    segments: createSegmentBuilder(1024, options.retainPreciseSegmentLengths),
     events: [],
     skipped: [],
     unsupported: new Map(),
@@ -151,7 +154,10 @@ function processLine(context: BuildContext, raw: string, line: number): number {
     context.recognizedWords += 1;
     return LINE_CATEGORY.modalOnly;
   }
-  const words = scanControllerRenderWords(stripped);
+  const words = scanControllerRenderWords(
+    stripped,
+    context.coordinateRepresentation === 'grbl' ? grblCoordinateWord : undefined,
+  );
   if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
   updateLaserRenderState(context.laser, words, raw);
@@ -280,19 +286,6 @@ function emitCannedCycle(
   if (parameters.dwellSeconds !== null) {
     context.events.push({ kind: 'dwell', line, seconds: Math.max(0, parameters.dwellSeconds) });
   }
-}
-
-function resolveTarget(
-  modal: RenderModal,
-  words: ReadonlyMap<string, number>,
-): { x: number; y: number; z: number } {
-  const axis = (name: string, current: number): number => {
-    const raw = words.get(name);
-    if (raw === undefined) return current;
-    const scaled = raw * modal.unitScale;
-    return modal.absolute ? scaled : current + scaled;
-  };
-  return { x: axis('X', modal.x), y: axis('Y', modal.y), z: axis('Z', modal.z) };
 }
 
 function emitLinear(

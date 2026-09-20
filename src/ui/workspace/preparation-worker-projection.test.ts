@@ -99,6 +99,33 @@ describe('preparation worker result projection', () => {
     },
   );
 
+  it.each([
+    { projection: 'estimate' as const },
+    { projection: 'estimate' as const, snapshot: {} },
+    { projection: 'preview' as const },
+  ])('uses the physical head for the $projection projection (%j)', async (options) => {
+    const initialPosition = { x: 300, y: 0, z: 4 };
+    const jobOrigin = { startFrom: 'user-origin' as const, anchor: 'front-left' as const };
+    const expected = estimateLiveJobFromPrepared(prepared, jobOrigin, {
+      initialPosition,
+      unbounded: true,
+    });
+    expect(expected).not.toEqual(expectedEstimate);
+    if (options.projection === 'preview')
+      mocks.preview.mockReturnValue({ steps: [], totalLength: 42 });
+    const request: PreparationWorkerRequest = {
+      id: 8,
+      project,
+      jobOrigin,
+      initialPosition,
+      ...options,
+    };
+    await workerScope.onmessage?.(new MessageEvent('message', { data: request }));
+    expect(workerScope.postMessage).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 8, estimate: expected }),
+    );
+  });
+
   it('preserves the default full Preview response and builds its route', async () => {
     const toolpath = { steps: [], totalLength: 42 };
     mocks.preview.mockReturnValue(toolpath);

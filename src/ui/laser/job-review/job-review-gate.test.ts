@@ -373,6 +373,13 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     });
     const blocked = reviewState();
     expect(blocked.kind === 'open' ? blocked.blocker?.join(' ') : '').toMatch(/frame/i);
+    // The blocker explains the re-Frame, but the numbers under it must be the
+    // EDITED job's compile, not the last framed one (maintainer, 2026-09-19):
+    // the compiled summary carries the new feed while Confirm stays refused.
+    const shown = blocked.kind === 'open' ? blocked.model.effectiveOperations : [];
+    expect(shown.flatMap((operation) => operation.summaries).join(' ')).toContain('777');
+    useJobReviewStore.getState().confirm();
+    expect(startSpy()).not.toHaveBeenCalled();
     useJobReviewStore.getState().cancel();
     await flow;
     expect(startSpy()).not.toHaveBeenCalled();

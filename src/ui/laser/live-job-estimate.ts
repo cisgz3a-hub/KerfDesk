@@ -8,7 +8,11 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
-import type { JobDurationBreakdown } from '../../core/job/estimate-duration';
+import type {
+  JobDurationBreakdown,
+  JobDurationEstimate,
+  JobDurationEstimateOptions,
+} from '../../core/job/estimate-duration';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -28,6 +32,7 @@ import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy'
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
 export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = PREPARATION_COMPILED_SEGMENT_BUDGET;
+export type LiveJobEstimateOptions = Pick<JobDurationEstimateOptions, 'initialPosition'>;
 
 export type LiveJobEstimate =
   | { readonly kind: 'empty' }
@@ -36,6 +41,7 @@ export type LiveJobEstimate =
       readonly label: string;
       readonly totalSeconds: number;
       readonly breakdown: JobDurationBreakdown;
+      readonly manualPauseCount?: number;
     }
   | { readonly kind: 'too-large' }
   | { readonly kind: 'preparation-failed'; readonly message: string };
@@ -44,6 +50,7 @@ export function estimateLiveJob(
   project: Project,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
   jobOrigin?: JobOriginPlacement,
+  options: LiveJobEstimateOptions = {},
 ): LiveJobEstimate {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -67,7 +74,7 @@ export function estimateLiveJob(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimateLiveJobFromPrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin, options);
 }
 
 export async function estimateLiveJobSnapshot(
@@ -77,6 +84,7 @@ export async function estimateLiveJobSnapshot(
   renderVariableText: VariableTextRenderer,
   registration?: SimilarityTransform | null,
   jobOrigin?: JobOriginPlacement,
+  options: LiveJobEstimateOptions = {},
 ): Promise<LiveJobEstimate> {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -94,7 +102,7 @@ export async function estimateLiveJobSnapshot(
     ...(registration === undefined ? {} : { registration }),
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimateLiveJobFromPrepared(prepared, jobOrigin);
+  return estimateLiveJobFromPrepared(prepared, jobOrigin, options);
 }
 
 /**
@@ -106,6 +114,7 @@ export function estimateLiveJobUnbounded(
   project: Project,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
   jobOrigin?: JobOriginPlacement,
+  options: LiveJobEstimateOptions = {},
 ): LiveJobEstimate {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -113,13 +122,13 @@ export function estimateLiveJobUnbounded(
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  return estimateLiveJobFromPrepared(prepared, jobOrigin, { unbounded: true });
+  return estimateLiveJobFromPrepared(prepared, jobOrigin, { ...options, unbounded: true });
 }
 
 export function estimateLiveJobFromPrepared(
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
-  options: { readonly unbounded?: boolean } = {},
+  options: LiveJobEstimateOptions & { readonly unbounded?: boolean } = {},
 ): LiveJobEstimate {
   if (!prepared.ok) {
     return {
@@ -135,24 +144,38 @@ export function estimateLiveJobFromPrepared(
     return { kind: 'too-large' };
   }
 
-  const currentPosition =
+  const finishPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  // Placement controls the job's coordinates and return target, while the
+  // physical head may begin elsewhere in any placement mode.
+  const initialPosition = options.initialPosition ?? finishPosition;
   // ADR-127: measure the machine-space job. Identity when no rotary is active,
   // so flat jobs are unchanged. Kept in step with buildPreparedJobMetrics so
   // the live tile and Job Review cannot report different durations.
   const result = estimateJobDuration(
     machineSpaceJob(prepared.job, prepared.project.device, prepared.project.machine),
     prepared.project.device,
-    currentPosition === undefined
-      ? {}
-      : { initialPosition: currentPosition, finishPosition: currentPosition },
+    {
+      ...(initialPosition === undefined ? {} : { initialPosition }),
+      ...(finishPosition === undefined ? {} : { finishPosition }),
+    },
   );
+  return liveEstimateFromDuration(result);
+}
+
+function liveEstimateFromDuration(result: JobDurationEstimate): LiveJobEstimate {
+  if (result.unavailableReason !== undefined) {
+    return { kind: 'preparation-failed', message: result.unavailableReason };
+  }
   return result.totalSeconds > 0
     ? {
         kind: 'estimated',
         label: formatDuration(result.totalSeconds),
         totalSeconds: result.totalSeconds,
         breakdown: result.breakdown,
+        ...(result.manualPauseCount === undefined
+          ? {}
+          : { manualPauseCount: result.manualPauseCount }),
       }
     : { kind: 'empty' };
 }

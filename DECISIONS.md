@@ -9348,7 +9348,7 @@ ordinary Start guard.
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17, 2026-09-19
 
 ### Context
 
@@ -9384,6 +9384,46 @@ longer stack competing Abort buttons, and transient jog state no longer moves th
 the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
+
+### Amendment (2026-09-19, revised 2026-09-20) — a floating popup, never in normal flow
+
+**Context.** In normal flow between the workspace and the status bar, the bar's arrival and
+departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
+maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
+decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
+lower edge. A first revision absolutely positioned it on the canvas's lower edge; the maintainer
+then asked for it to be "above screen like a pop up that doesnt affect the rest and wont cause any
+jumping", which an absolute full-bleed strip inside the canvas is not.
+
+**Decision.**
+
+- The control is a **window-level floating popup**: `position: fixed`, bottom-centre, above the
+  status bar, rendered as an App-shell sibling rather than inside `<main>` (`App.tsx`). Being
+  fixed it occupies no layout box anywhere, so mounting or unmounting it cannot change the size or
+  position of the workspace, the tool strip, or either rail — and no ancestor's `overflow` can clip
+  it. Measured live at 1400×900: the `main`, canvas, rails and status-bar rects are identical
+  before and after it mounts.
+- It is sized by its content (`width: max-content`, capped at `min(720px, 100vw - 24px)`) with a
+  rounded radius, border, danger top edge and shadow, so it reads as a popup over a small patch
+  above the status bar rather than a full-bleed strip across the workspace.
+- It keeps a wrapping status line (state · progress · safety note) beside the unchanged ≥48 px
+  controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
+  order, and still directs the operator to the physical E-stop or power isolation.
+- Toasts leave the rails for the same reason: they share the canvas's available space (lower left
+  of the workspace, above the live controls) or a reserved row inside the open modal, as decided by
+  the placement hook the laptop-layout work introduced; they use a tinted surface with a coloured
+  edge instead of a solid fill, and a success confirmation auto-dismisses in 4 s (advisories and
+  failures keep 8 s). Only the newest three render, so a burst cannot bury the drawing. The toast
+  body ignores pointer input with only its dismiss control interactive — a draft that overlaid the
+  drawing with click-to-dismiss toasts had the import worker's "parsing in worker" advisory swallow
+  the mousedown starting a rectangle drag, which the `shape-properties` browser smoke caught.
+
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the fixed
+positioning, the content sizing and the placement outside `<main>`. While motion is active the
+popup covers a band above the status bar — at a typical width that includes the canvas zoom
+cluster (wheel and keyboard zoom keep working) and can reach the rails' lowest rows; it is
+transient and the canonical run controls are the ones inside it. A stack of up to three toasts briefly
+covers the lower left of the drawing or a row of the open dialog. The Machine rail is unchanged.
 
 ---
 
@@ -10053,6 +10093,42 @@ controller buffering, live override response, spindle-at-speed behavior, and rea
 pacing still require physical calibration; controller reports and simulator evidence do not prove
 them. The amendment is display and estimation state only: it changes no emitted G-code, Start or
 Frame authorization, controller command, settle contract, or other safety boundary.
+
+### Amendment 2026-09-19 — one emitted baseline for estimates and remaining time
+
+Pre-job estimates, prepared Job Review and the live countdown share the emitted-program timing
+model and device cut/travel calibration. CNC pecks, helical entry, XYZ motion, represented feeds,
+retracts, dwell and parking are timed from native output. Junction planning retains XYZ direction;
+arc timing uses the circular or helical route length rather than the shorter display chords.
+
+Serial delivery contributes only delay that cannot overlap earlier modeled execution. It counts
+the sender's trimmed UTF-8 lines, newline and 8N1 framing at the configured or driver-default baud.
+Host-managed tool changes restart the delivery window; their operator wait is excluded and
+disclosed. Motion calibration and observed route pacing do not scale dwell or serial delay.
+Ruida binary output does not use the G-code serial model.
+
+Known physical XYZ is an estimate input for every placement mode. It is separate from any final
+Current Position parking target and participates in background cache identity by coordinate
+values. A preloaded large job requests background estimation on initial mount. Superseded replies
+cannot replace the current result. The existing bounded Start timing sidecar keeps an unavailable
+result without retrying an unbounded parse or introducing a new Start gate. An unavailable live plan
+(no trusted position, unknown controller family, program over the countdown budget) never voids the
+pre-job estimate: Job Review and the time tile still estimate the emitted program with the estimator's
+own assumptions, as they did before the two shared one baseline. The one exception is a dwelling
+program on a connected controller that has not proven its G4 P units; that estimate stays unavailable
+rather than guess by a factor of a thousand.
+
+Freezing the sender is not proof of a physical hold. Run/deceleration continues consuming the
+estimate until fresh controller evidence establishes a settled hold or the existing host-tool-change
+boundary. Marlin position-only reports do not prove drain. Rounding is applied to total seconds
+before formatting units; an exhausted estimate continues to show that execution is awaiting
+controller completion. Only the established completion contract selects Complete.
+
+Geometric Preview playback incorporates the same total but distributes non-motion time over its
+route; it does not represent exact command-event placement. The estimator remains a model of
+configured motion limits and earliest serial arrival. RX/ACK behavior, host scheduling, overrides,
+spindle behavior and actual material/machine pacing require separate physical qualification. The
+Frame-first authorization contract and the emitted machine commands are unchanged by timing.
 
 ---
 
@@ -20104,7 +20180,49 @@ coverage. Integrated release checks and browser evidence are recorded in the cor
 No physical machine, firmware runtime, material process or packaged hardware transport is
 qualified by these software checks. Ruida remains experimental vector-only file export.
 
-## ADR-323 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
+## ADR-323 - Falcon Frame leaves the air pump alone and Job Review discloses an air-off opening operation (2026-09-19)
+
+**Status:** Accepted; amends the ADR-322 §4 Falcon A1 Pro command contract. Preserves the
+completed-Frame contract in ADRs 228, 230, 232 and 237.
+
+### Context
+
+The maintainer's Falcon A1 Pro burned dark smoke marks around the opening part of every job on
+wood, fading as the job progressed. The emitted program is time-invariant (`M4 S0` preamble,
+`S0` on every travel, dynamic power throughout), so the only start-specific behaviour was air:
+Frame sent the generic GRBL tool-off pair `M5`/`M9` plus a settle dwell immediately before Start,
+and the job writes the device's air command only right before the first operation whose Air
+setting is on. New operations default to Air off. Creality's A1 firmware treats `M9` as a
+stateful low/standby request with a `$152` delay, dropped the pump seconds after `M8` on firmware
+1.0.6, and fails the pump around dwell pauses (LightBurn forum threads 181704, 186138 and 175296;
+Creality forum thread 41420). The pump was therefore commanded off immediately before the burn
+and turned on late or never.
+
+### Decision
+
+1. The Falcon A1 Pro command contract overrides `frameToolOffLines` to `M5` alone. Frame still
+   asserts laser-off and every perimeter line carries `S0`; the pump keeps whatever state the
+   operator or the previous job left. The generic GRBL driver keeps `M5`/`M9` because CNC
+   projects trace with coolant off, and Stop, Abort and disconnect cleanup still send `M9`.
+2. Job Review adds an advisory when the device has a job-controlled air command and the first
+   laser operation runs with Air off. It names the opening operation and the operation before
+   which the command first appears, or states that the job never sends the command when every
+   operation has Air off. The Air column in the same review is the fix. This is a warning only;
+   no Start gate is added.
+3. The emitter is unchanged. Pre-arming `M8` at job start was rejected: an operation with Air
+   off is a legitimate choice (the A1's `M9` state is its documented gentle engraving flow), and
+   forcing air would silently change that operation's result.
+
+### Verification and limits
+
+`falcon-command-contract.test.ts` pins `['M5']` for the Falcon contract and `['M5', 'M9']` for
+the generic driver. `air-assist-start-warnings.test.ts` and `job-review-model.test.ts` pin the
+advisory texts and that they never change the acknowledgement. No hardware was operated; the
+pump-timing cause is inferred from the emitted bytes and public firmware reports, and a Falcon
+coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
+check.
+
+## ADR-324 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
 
 **Status:** Accepted
 

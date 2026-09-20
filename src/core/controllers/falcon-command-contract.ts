@@ -1,5 +1,5 @@
 import type { ControllerDriver, FrameBounds } from './controller-driver';
-import { buildJogCommand, type JogParams } from './grbl/commands';
+import { buildJogCommand, CMD_SPINDLE_OFF, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 /** Creality's official Falcon A1 Pro LightBurn device disables $J and settings
@@ -24,6 +24,13 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
       home: '$HX\n$HY',
       settingsQuery: null,
       buildInfoQuery: null,
+      // Frame asserts laser-off with M5 and every perimeter line carries S0;
+      // it must not touch the pump. Creality's A1 firmware treats M9 as a
+      // stateful low/standby request (`$152` delay) and has dropped the pump
+      // around dwells, so the generic M5+M9 tool-off immediately before Start
+      // left the opening operation burning without air (ADR-323). The generic
+      // GRBL driver keeps M5+M9 because CNC projects trace with coolant off.
+      frameToolOffLines: [CMD_SPINDLE_OFF],
       buildJog: buildFalconJog,
       buildFrameLines: buildFalconFrame,
       buildFrameRetract: (z, feed) =>

@@ -35,6 +35,38 @@ describe('JobTimeBadge', () => {
     expect(host.textContent).not.toContain('lines');
   });
 
+  it.each([
+    ['running', '<1s remaining'],
+    ['paused', 'Paused · <1s remaining'],
+    ['estimating', 'Estimating · <1s remaining'],
+  ] as const)('keeps a positive subsecond %s estimate visibly positive', (kind, label) => {
+    expect(render({ kind, remainingSeconds: 0.49 }).textContent).toBe(label);
+  });
+
+  it.each([
+    ['running', 'Estimate elapsed · waiting for controller'],
+    ['paused', 'Paused · estimate elapsed'],
+    ['estimating', 'Estimating · waiting for controller'],
+  ] as const)('does not imply completion when the %s estimate reaches zero', (kind, label) => {
+    const host = render({ kind, remainingSeconds: 0 });
+    expect(host.textContent).toBe(label);
+    expect(host.querySelector('[role="timer"]')?.getAttribute('data-time-state')).toBe(kind);
+    expect(host.textContent).not.toContain('Complete');
+    expect(host.textContent).not.toContain('0s');
+  });
+
+  it('carries rounded time into minutes before displaying a running countdown', () => {
+    expect(render({ kind: 'running', remainingSeconds: 59.5 }).textContent).toBe(
+      '~1m 0s remaining',
+    );
+  });
+
+  it('reports unavailable timing instead of zero for a non-finite countdown', () => {
+    expect(render({ kind: 'running', remainingSeconds: Number.NaN }).textContent).toBe(
+      'Time remaining unavailable · waiting for timing data',
+    );
+  });
+
   it('labels every non-running state without fabricating progress', () => {
     expect(render({ kind: 'estimating', remainingSeconds: 83 }).textContent).toBe(
       'Estimating · ~1m 23s remaining',

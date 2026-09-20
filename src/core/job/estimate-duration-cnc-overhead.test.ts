@@ -79,7 +79,10 @@ describe('CNC fixed spindle-start duration', () => {
     const estimate = estimateJobDuration(job, device);
     expect(estimate.breakdown.dwellSeconds).toBeCloseTo(seconds, 9);
     expect(estimate.totalSeconds).toBeCloseTo(
-      estimate.breakdown.cutSeconds + estimate.breakdown.travelSeconds + seconds,
+      estimate.breakdown.cutSeconds +
+        estimate.breakdown.travelSeconds +
+        seconds +
+        (estimate.breakdown.transportSeconds ?? 0),
       9,
     );
   });
@@ -94,7 +97,12 @@ describe('CNC fixed spindle-start duration', () => {
 
     expect(cncGrblStrategy.emit(job, device)).toContain('\nM0\n');
     expect(withDwell.breakdown.dwellSeconds).toBeCloseTo(5.803, 9);
-    expect(withDwell.totalSeconds - baseline.totalSeconds).toBeCloseTo(5.803, 9);
+    expect(
+      withDwell.totalSeconds -
+        (withDwell.breakdown.transportSeconds ?? 0) -
+        baseline.totalSeconds +
+        (baseline.breakdown.transportSeconds ?? 0),
+    ).toBeCloseTo(5.803, 9);
     expect(withDwell.breakdown.cutSeconds).toBe(baseline.breakdown.cutSeconds);
     expect(withDwell.breakdown.travelSeconds).toBe(baseline.breakdown.travelSeconds);
   });
@@ -149,20 +157,32 @@ describe('CNC Z-motion accounting', () => {
     });
     const estimate = estimateJobDuration(job, device, options);
     expect(emitted.totalSeconds).toBeCloseTo(expected, 9);
-    expect(estimate.totalSeconds).toBeCloseTo(emitted.totalSeconds, 9);
+    expect(estimate.totalSeconds - (estimate.breakdown.transportSeconds ?? 0)).toBeCloseTo(
+      emitted.totalSeconds,
+      9,
+    );
   });
 
-  it('places analytic plunge in cut and retract in rapid travel using the existing distances', () => {
+  it('prices the emitted plunge and retract with acceleration and the XYZ corner', () => {
     const flat = group({ spindleSpinupSec: 0 });
     const deep = { ...flat, safeZMm: 5, passes: flat.passes.map((pass) => ({ ...pass, zMm: -1 })) };
     const baseline = estimateJobDuration({ groups: [flat] }, device);
     const actual = estimateJobDuration({ groups: [deep] }, device);
-    // Both paths retain the same XY plan. Existing Z terms cover 6 mm each:
-    // plunge at 120 mm/min = 3 s; G0 retract at 6000 mm/min = 0.06 s.
-    expect(actual.breakdown.cutSeconds - baseline.breakdown.cutSeconds).toBeCloseTo(3, 9);
+    const acceleration = device.accelMmPerSec2;
+    const cornerSpeed = Math.min(
+      2,
+      Math.sqrt((acceleration * device.junctionDeviationMm * Math.SQRT1_2) / (1 - Math.SQRT1_2)),
+    );
+    // A 6 mm Z feed at 2 mm/s joins a 10 mm XY feed at 10 mm/s. Their
+    // 90-degree corner fixes the shared velocity; both have a cruise phase.
+    const plungeSeconds = 3 + (4 + (2 - cornerSpeed) ** 2) / (4 * acceleration);
+    const xySeconds = 1 + ((10 - cornerSpeed) ** 2 + 100) / (20 * acceleration);
+    expect(actual.breakdown.cutSeconds).toBeCloseTo(plungeSeconds + xySeconds, 9);
+    // The extra 5 mm initial safe-Z and 6 mm retract are rest-to-rest
+    // triangular rapids. The identical final XY park cancels in this delta.
     expect(
       (actual.breakdown.rapidTravelSeconds ?? 0) - (baseline.breakdown.rapidTravelSeconds ?? 0),
-    ).toBeCloseTo(0.06, 9);
+    ).toBeCloseTo(2 * Math.sqrt(5 / acceleration) + 2 * Math.sqrt(6 / acceleration), 8);
     expect(actual.breakdown.feedTravelSeconds).toBe(0);
 
     const calibrated = estimateJobDuration(

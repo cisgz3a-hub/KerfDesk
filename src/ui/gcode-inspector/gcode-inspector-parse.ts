@@ -19,6 +19,7 @@ export function inspectGcodeText(
 ): GcodeInspectorWorkerResult {
   const builder = createGcodeRenderModelBuilder({
     ...context,
+    retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
@@ -33,6 +34,7 @@ export async function inspectGcodeSource(
   const builder = createGcodeRenderModelBuilder({
     machineKind: source.machineKind,
     laserPowerControl: source.laserPowerControl,
+    retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = await indexGcodeBlobLines(

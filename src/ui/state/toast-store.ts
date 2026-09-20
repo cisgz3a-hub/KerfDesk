@@ -9,9 +9,17 @@
 
 import { create } from 'zustand';
 
-const AUTO_DISMISS_MS = 8000;
-
 export type ToastVariant = 'info' | 'success' | 'warning' | 'error';
+
+// Advisories and failures stay long enough to read. A success confirms
+// something the operator can already see on screen, so it leaves twice as
+// fast (maintainer, 2026-09-19: the green pop-ups were lingering in the way).
+const AUTO_DISMISS_MS: Readonly<Record<ToastVariant, number>> = {
+  info: 8000,
+  success: 4000,
+  warning: 8000,
+  error: 8000,
+};
 
 export type Toast = {
   readonly id: string;
@@ -48,7 +56,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const handle = setTimeout(() => {
       timers.delete(id);
       get().dismissToast(id);
-    }, AUTO_DISMISS_MS);
+    }, AUTO_DISMISS_MS[variant]);
     timers.set(id, handle);
   },
   dismissToast: (id) => {

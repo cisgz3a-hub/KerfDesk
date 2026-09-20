@@ -14,6 +14,18 @@ import { useUiStore } from '../state/ui-store';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 
+// The Windows module runner cannot turn the PWA plugin's virtual id into a
+// file path, so this file failed at collection on a Windows checkout (it was
+// fine on CI). Stub the hook the way PwaUpdateWatcher.test.tsx does; the
+// update watcher's own behaviour is covered there, not here.
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    offlineReady: [false, vi.fn()],
+    needRefresh: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}));
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -98,7 +110,7 @@ describe('App mount', () => {
     },
   );
 
-  it('anchors the live motion bar below the workspace so jog controls do not move', async () => {
+  it('floats the live motion popup outside the workspace so mounting it never reflows anything', async () => {
     useLaserStore.setState({ motionOperation: startMotionOperation('jog') });
 
     await act(async () => {
@@ -112,9 +124,19 @@ describe('App mount', () => {
     });
 
     const workspace = host.querySelector('main');
-    const liveMotionBar = host.querySelector('[aria-label="Live Motion"]');
+    const liveMotionBar = host.querySelector<HTMLElement>('[aria-label="Live Motion"]');
     expect(liveMotionBar).not.toBeNull();
-    expect(workspace?.nextElementSibling).toBe(liveMotionBar);
+    // In flow between <main> and the status bar, the bar resized the canvas
+    // every time a jog or auto-focus started and settled. As a `fixed` popup
+    // outside <main> it takes no layout space anywhere and sits in no
+    // ancestor's box, so the rails and the drawing stay exactly where they
+    // were and no overflow can clip it (ADR-207 amendment).
+    expect(workspace?.contains(liveMotionBar)).toBe(false);
+    expect(liveMotionBar?.style.position).toBe('fixed');
+    // Content-sized, not full-bleed: it must not claim the window's width.
+    expect(liveMotionBar?.style.width).toBe('max-content');
+    // Topmost, so no dialog can cover the software Abort path.
+    expect(liveMotionBar?.style.zIndex).toBe('2147483647');
   });
 });
 

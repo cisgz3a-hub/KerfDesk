@@ -28,7 +28,6 @@ import {
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { liveCanvasLifecyclePatch } from './live-canvas-run';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -168,10 +167,10 @@ function freezeStreamer(context: PauseResumeContext): void {
     if (state.streamer === null) return {};
     const pausedStreamer = pauseStreamer(state.streamer);
     if (pausedStreamer === state.streamer && state.streamer.status !== 'paused') return {};
-    return {
-      streamer: pausedStreamer,
-      ...liveCanvasLifecyclePatch(state, 'paused'),
-    };
+    // Freezing the sender does not prove the controller has stopped. The live
+    // clock and route keep following physical status through buffered motion
+    // and deceleration; a fresh settled hold freezes them separately.
+    return { streamer: pausedStreamer };
   });
 }
 

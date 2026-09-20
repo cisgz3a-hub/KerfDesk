@@ -138,7 +138,14 @@ export function OriginRow(props: {
           Reset origin
         </button>
         <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
-        {canSleep && homingEnabled && (
+        {/* The Position job card (NoHomingPositionGuide) owns this control only
+            while it is on the rail: a no-homing profile with no settled origin. It
+            leaves the rail the moment an origin exists (maintainer, 2026-07-17) —
+            which is exactly the state every finished job lands in — so the row
+            carries the release whenever the card is not showing it. Gating this on
+            homing alone stranded no-homing machines with no way to free the gantry
+            after a burn. */}
+        {canSleep && (homingEnabled || hasCustom) && (
           <button
             type="button"
             className="lf-btn"

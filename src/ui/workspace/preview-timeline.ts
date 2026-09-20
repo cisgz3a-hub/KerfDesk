@@ -20,6 +20,15 @@ export function buildPreviewTimeline(
 ): PreviewTimeline {
   const cutSeconds = finiteNonNegative(breakdown.cutSeconds);
   const travelSeconds = finiteNonNegative(breakdown.travelSeconds);
+  const motionSeconds = cutSeconds + travelSeconds;
+  const totalSeconds =
+    motionSeconds +
+    finiteNonNegative(breakdown.dwellSeconds ?? 0) +
+    finiteNonNegative(breakdown.transportSeconds ?? 0);
+  // The geometric Preview distributes category time over distance. Include
+  // non-motion time proportionately; exact event timing belongs to the emitted
+  // program/live clock, since this preview route has no source-line mapping.
+  const overheadScale = motionSeconds > 0 ? totalSeconds / motionSeconds : 1;
   const timing = previewCategoryTiming(toolpath, breakdown, cutSeconds, travelSeconds);
   const segments: PreviewTimelineSegment[] = [];
   let distanceMm = 0;
@@ -32,7 +41,7 @@ export function buildPreviewTimeline(
     const categoryTiming = timing[category];
     const duration =
       categoryTiming.distanceMm > 0
-        ? (categoryTiming.seconds * length) / categoryTiming.distanceMm
+        ? (categoryTiming.seconds * length * overheadScale) / categoryTiming.distanceMm
         : 0;
     segments.push({
       startDistanceMm: distanceMm,
@@ -46,7 +55,7 @@ export function buildPreviewTimeline(
 
   return {
     totalDistanceMm: distanceMm,
-    totalSeconds: cutSeconds + travelSeconds,
+    totalSeconds,
     segments,
   };
 }
