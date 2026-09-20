@@ -9,7 +9,12 @@ export function statusPositionPatch(
   Partial<
     Pick<
       LaserState,
-      'wcoCache' | 'ovCache' | 'accessoryCache' | 'workOriginActive' | 'workOriginSource'
+      | 'wcoCache'
+      | 'ovCache'
+      | 'accessoryCache'
+      | 'airAssistOn'
+      | 'workOriginActive'
+      | 'workOriginSource'
     >
   > {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
@@ -29,15 +34,19 @@ export function statusPositionPatch(
             ...exceptionalAccessoryLatch(state.accessoryCache, report.accessoryReportPresent),
           },
         };
+  const airPatch = manualAirPatch(report);
   if (state.positionEvidenceSuppressed === true) {
     return {
       statusReport: { ...report, mPos: null, wPos: null, wco: null },
       ...ovPatch,
       ...accessoryPatch,
+      ...airPatch,
       wcoCache: null,
     };
   }
-  if (report.wco === null) return { statusReport: report, ...ovPatch, ...accessoryPatch };
+  if (report.wco === null) {
+    return { statusReport: report, ...ovPatch, ...accessoryPatch, ...airPatch };
+  }
   // A non-trivial WCO always means a custom origin. A zero WCO is ambiguous: on a
   // no-homing machine the operator sets the origin right after Release/Wake, when
   // GRBL sits at machine 0,0, so the resulting G92 offset is exactly zero. That
@@ -50,10 +59,28 @@ export function statusPositionPatch(
     statusReport: report,
     ...ovPatch,
     ...accessoryPatch,
+    ...airPatch,
     wcoCache: report.wco,
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
   };
+}
+
+// Manual Air mirrors the controller's own coolant state whenever a frame
+// proves it: an explicit `A:` field, or `Ov:` without `A:` (GRBL omits `A:`
+// when nothing is energized). Vendor auto-focus routines, the probe preamble
+// (M5 M9), job and frame footers, and soft resets all switch coolant off
+// behind the app's back; the rail kept showing ON, and the next click sent
+// M9 to an already-off pump (maintainer, 2026-09-19: "air assist works for a
+// while and then stops"). Frames carrying neither field prove nothing and
+// leave the flag alone, so an in-flight M8 is not undone by a stale report.
+function manualAirPatch(report: StatusReport): Partial<Pick<LaserState, 'airAssistOn'>> {
+  const accessories = report.accessories;
+  if (accessories === null || accessories === undefined) return {};
+  const proven =
+    report.accessoryReportPresent === true || (report.ov !== null && report.ov !== undefined);
+  if (!proven) return {};
+  return { airAssistOn: accessories.flood || accessories.mist };
 }
 
 function exceptionalAccessoryLatch(

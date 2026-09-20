@@ -29,6 +29,7 @@ import {
   currentReplayExecutionSignature,
   replayCompilationMatches,
 } from '../start-job-execution-tracking';
+import { requiredFrameIssueFromPrepared } from '../required-frame-readiness';
 import { prepareCurrentStartJob } from '../start-job-source';
 import {
   buildJobReviewModel,
@@ -218,12 +219,21 @@ type RebuiltStart =
       readonly ok: false;
       readonly messages: ReadonlyArray<string>;
       readonly closeReview?: true;
+      /** The exact compile the refusal was raised against, when one exists.
+       * Shown so the operator reviews the job they edited; never startable. */
+      readonly display?: ReviewedStartBundle;
     };
 
 function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: false }>): boolean {
   if (rebuilt.closeReview === true) {
     useJobReviewStore.getState().close();
     return true;
+  }
+  // Publish the compiled model first, then the blocker over it: the stats,
+  // warnings, and per-operation compiled summaries follow the edit while
+  // Confirm stays unavailable until the operator resolves the refusal.
+  if (rebuilt.display !== undefined) {
+    useJobReviewStore.getState().completePrepare(modelFor(rebuilt.display));
   }
   useJobReviewStore.getState().failPrepare(rebuilt.messages);
   return false;
@@ -258,25 +268,46 @@ async function rebuildCurrentStart(
     laser,
     camera,
     completedReceipt?.artifact.jobOrigin,
-    purpose === 'start',
+    // The frame-first gate is applied below, after the compile, so a job
+    // edited inside the review can still refresh the review it is shown in.
+    false,
     signal,
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };
+  const bundle: ReviewedStartBundle = {
+    app,
+    project: app.project,
+    laser,
+    prepared,
+    laserModeStartSnapshot,
+    ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
+  };
+  const frameRefusal = frameFirstRefusal(purpose, bundle);
+  if (frameRefusal !== null) return frameRefusal;
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
     await onCompletedReplayChanged?.();
     return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
   }
   const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
   if (programIssue !== null) return { ok: false, messages: [programIssue] };
-  return {
-    ok: true,
-    bundle: {
-      app,
-      project: app.project,
-      laser,
-      prepared,
-      laserModeStartSnapshot,
-      ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
-    },
-  };
+  return { ok: true, bundle };
+}
+
+// Frame-first (ADR-228): Start needs a Frame of this exact compiled job. The
+// prepare pipeline used to refuse this inside the compile and drop the
+// result, which left the dialog showing the LAST framed job's stats and
+// "Partial compiled summary" after an edit — the operator changed 30% to 49%
+// and kept reading 30%. The refusal still blocks Confirm exactly as before;
+// the compile now travels with it so the review shows the edited job while
+// the banner asks for the re-Frame.
+function frameFirstRefusal(
+  purpose: JobReviewPurpose,
+  bundle: ReviewedStartBundle,
+): Extract<RebuiltStart, { readonly ok: false }> | null {
+  if (purpose !== 'start') return null;
+  const frameIssue = requiredFrameIssueFromPrepared({
+    prepared: bundle.prepared.prepared,
+    machine: bundle.laser,
+  });
+  return frameIssue === null ? null : { ok: false, messages: [frameIssue], display: bundle };
 }

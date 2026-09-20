@@ -9348,7 +9348,7 @@ ordinary Start guard.
 
 ## ADR-207 - One layout-stable live-motion bar owns run controls
 
-**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17
+**Status:** Amended | **Date:** 2026-07-15 | **Amended:** 2026-07-17, 2026-09-19
 
 ### Context
 
@@ -9384,6 +9384,46 @@ longer stack competing Abort buttons, and transient jog state no longer moves th
 the operator's pointer. Removing a panel or changing selection tools cannot remove the visible
 software Abort path, while the UI remains honest that only physical hardware can provide a
 safety-rated emergency stop.
+
+### Amendment (2026-09-19, revised 2026-09-20) — a floating popup, never in normal flow
+
+**Context.** In normal flow between the workspace and the status bar, the bar's arrival and
+departure resized the canvas on every jog, auto-focus, probe, or job start and settle. The
+maintainer reported the screen "jumping up and down" and the bar being in the way. The 2026-07-15
+decision kept the top-aligned jog controls stationary but still reflowed the drawing and the rails'
+lower edge. A first revision absolutely positioned it on the canvas's lower edge; the maintainer
+then asked for it to be "above screen like a pop up that doesnt affect the rest and wont cause any
+jumping", which an absolute full-bleed strip inside the canvas is not.
+
+**Decision.**
+
+- The control is a **window-level floating popup**: `position: fixed`, bottom-centre, above the
+  status bar, rendered as an App-shell sibling rather than inside `<main>` (`App.tsx`). Being
+  fixed it occupies no layout box anywhere, so mounting or unmounting it cannot change the size or
+  position of the workspace, the tool strip, or either rail — and no ancestor's `overflow` can clip
+  it. Measured live at 1400×900: the `main`, canvas, rails and status-bar rects are identical
+  before and after it mounts.
+- It is sized by its content (`width: max-content`, capped at `min(720px, 100vw - 24px)`) with a
+  rounded radius, border, danger top edge and shadow, so it reads as a popup over a small patch
+  above the status bar rather than a full-bleed strip across the workspace.
+- It keeps a wrapping status line (state · progress · safety note) beside the unchanged ≥48 px
+  controls and the ≥144 px **ABORT JOB** / **ABORT MOTION** action, keeps the highest app stacking
+  order, and still directs the operator to the physical E-stop or power isolation.
+- Toasts leave the rails for the same reason: they share the canvas's available space (lower left
+  of the workspace, above the live controls) or a reserved row inside the open modal, as decided by
+  the placement hook the laptop-layout work introduced; they use a tinted surface with a coloured
+  edge instead of a solid fill, and a success confirmation auto-dismisses in 4 s (advisories and
+  failures keep 8 s). Only the newest three render, so a burst cannot bury the drawing. The toast
+  body ignores pointer input with only its dismiss control interactive — a draft that overlaid the
+  drawing with click-to-dismiss toasts had the import worker's "parsing in worker" advisory swallow
+  the mousedown starting a rectangle drag, which the `shape-properties` browser smoke caught.
+
+**Consequences.** No layout shift on machine motion; `App.mount.test.tsx` pins the fixed
+positioning, the content sizing and the placement outside `<main>`. While motion is active the
+popup covers a band above the status bar — at a typical width that includes the canvas zoom
+cluster (wheel and keyboard zoom keep working) and can reach the rails' lowest rows; it is
+transient and the canonical run controls are the ones inside it. A stack of up to three toasts briefly
+covers the lower left of the drawing or a row of the open dialog. The Machine rail is unchanged.
 
 ---
 

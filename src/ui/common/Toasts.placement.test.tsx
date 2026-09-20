@@ -74,17 +74,46 @@ describe('Toast placement', () => {
     expect(notifications?.style.width).toBe('236px');
   });
 
+  // The Live Motion popup floats over the workspace's lower edge and is taller
+  // than the fixed bottom inset, so a stale floor let a topmost popup draw over
+  // the newest notification (measured live: toast bottom 82 px vs popup top
+  // 798 px at 1400x900).
+  it('lifts the stack clear of the live motion popup and restores when it closes', async () => {
+    const workspace = document.createElement('div');
+    workspace.setAttribute('data-toast-workspace', '');
+    document.body.append(workspace);
+    vi.spyOn(workspace, 'getBoundingClientRect').mockReturnValue(new DOMRect(50, 120, 830, 520));
+    renderToasts();
+    const notifications = document.querySelector<HTMLElement>('[aria-label="Notifications"]');
+    expect(notifications?.style.bottom).toBe('136px');
+
+    const popup = document.createElement('section');
+    popup.setAttribute('aria-label', 'Live Motion');
+    vi.spyOn(popup, 'getBoundingClientRect').mockReturnValue(new DOMRect(340, 570, 720, 68));
+    document.body.append(popup);
+    await flushPlacement();
+    // innerHeight 720 - popup top 570 + 12 gap, which beats the 136 px inset.
+    expect(notifications?.style.bottom).toBe('162px');
+
+    popup.remove();
+    await flushPlacement();
+    expect(notifications?.style.bottom).toBe('136px');
+  });
+
   it('reserves a row inside the modal and dismisses without submitting its form', () => {
     const { panel } = modal();
     const submitted = vi.fn((event: SubmitEvent) => event.preventDefault());
     panel.addEventListener('submit', submitted);
     renderToasts();
-    const notice = panel.querySelector<HTMLButtonElement>('.lf-toast');
+    const notice = panel.querySelector<HTMLElement>('.lf-toast');
+    const dismiss = notice?.querySelector('button');
     expect(panel.lastElementChild?.className).toBe('lf-toast-dialog-host');
     expect(panel.firstElementChild?.tagName).toBe('H2');
-    expect(notice?.textContent).toBe('Success: Frame complete');
-    expect(notice?.type).toBe('button');
-    act(() => notice?.click());
+    expect(notice?.querySelector('.lf-toast__message')?.textContent).toBe(
+      'Success: Frame complete',
+    );
+    expect(dismiss?.type).toBe('button');
+    act(() => dismiss?.click());
     expect(submitted).not.toHaveBeenCalled();
     expect(useToastStore.getState().toasts).toHaveLength(0);
     expect(panel.querySelector('.lf-toast-dialog-host')).toBeNull();
