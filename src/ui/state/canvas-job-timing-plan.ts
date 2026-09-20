@@ -11,6 +11,12 @@ import {
 
 const INITIAL_POSITION_TOLERANCE_MM = 0.05;
 
+/** The one live-plan refusal that also voids the pre-job estimate: a program
+ * that dwells on a connected controller which has not proven whether G4 P is
+ * seconds or milliseconds cannot be estimated without a thousandfold guess. */
+export const DWELL_EVIDENCE_UNAVAILABLE_REASON =
+  'current-session controller evidence cannot prove G4 P dwell uses seconds';
+
 export type CanvasJobTimingEvidence = {
   readonly fingerprint: GcodeFingerprint;
   readonly initialPosition: MotionPoint | null;
@@ -91,7 +97,7 @@ export function canvasJobTimingPlan(
   ) {
     return {
       kind: 'unavailable',
-      reason: 'current-session controller evidence cannot prove G4 P dwell uses seconds',
+      reason: DWELL_EVIDENCE_UNAVAILABLE_REASON,
       evidence,
     };
   }

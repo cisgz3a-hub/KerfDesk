@@ -9990,7 +9990,12 @@ Known physical XYZ is an estimate input for every placement mode. It is separate
 Current Position parking target and participates in background cache identity by coordinate
 values. A preloaded large job requests background estimation on initial mount. Superseded replies
 cannot replace the current result. The existing bounded Start timing sidecar keeps an unavailable
-result without retrying an unbounded parse or introducing a new Start gate.
+result without retrying an unbounded parse or introducing a new Start gate. An unavailable live plan
+(no trusted position, unknown controller family, program over the countdown budget) never voids the
+pre-job estimate: Job Review and the time tile still estimate the emitted program with the estimator's
+own assumptions, as they did before the two shared one baseline. The one exception is a dwelling
+program on a connected controller that has not proven its G4 P units; that estimate stays unavailable
+rather than guess by a factor of a thousand.
 
 Freezing the sender is not proof of a physical hold. Run/deceleration continues consuming the
 estimate until fresh controller evidence establishes a settled hold or the existing host-tool-change

@@ -9,7 +9,10 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
+import {
+  canvasJobTimingPlan,
+  DWELL_EVIDENCE_UNAVAILABLE_REASON,
+} from '../state/canvas-job-timing-plan';
 import {
   buildCanvasMotionPlan,
   reportedWorkPositionMm,
@@ -91,11 +94,19 @@ export function okPreparation(
     gcode,
     warnings,
     prepared,
+    // The live countdown needs proof (a trusted position, the controller
+    // family, a bounded program); the pre-job estimate does not. When the
+    // exact plan is unavailable the estimate is still built from the emitted
+    // program with the estimator's own assumptions, as it was before the two
+    // shared one baseline - an offline or dense job keeps its time. The one
+    // exception is unproven dwell units on a connected controller.
     metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
       gcode,
       ...(jobTimingPlan.kind === 'ok'
         ? { timeline: jobTimingPlan.plan }
-        : { unavailableReason: jobTimingPlan.reason }),
+        : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
+          ? { unavailableReason: jobTimingPlan.reason }
+          : {}),
       ...(jobTimingPlan.evidence.initialPosition === null
         ? {}
         : { initialPosition: jobTimingPlan.evidence.initialPosition }),
