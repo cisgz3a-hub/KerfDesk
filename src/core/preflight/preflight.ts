@@ -29,6 +29,8 @@ import {
   findOutOfBoundsCoords,
   type MotionBoundsOffset,
 } from '../invariants';
+// Deep import: the invariants barrel is at its public-export ratchet.
+import { hasFeedMotion } from '../invariants/predicates';
 import { machineBoundsForDevice } from '../devices';
 import { findLayerModeMismatchIssues } from './layer-mode-preflight';
 import {
@@ -156,7 +158,9 @@ export function runPreflight(
 
   appendLongBlankFeedIssues(project, gcodeLines, issues);
 
-  if (!gcodeLines.some((line) => /\bG1\b/.test(line))) {
+  // Modal: raster rows may hold an inherited G1 and pack their words, so the
+  // emptiness test has to read motion rather than match on `G1` (ADR-332).
+  if (!hasFeedMotion(gcodeLines)) {
     issues.push(emptyOutputIssue(project, outputLayers));
   }
 

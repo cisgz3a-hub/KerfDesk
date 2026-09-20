@@ -269,3 +269,34 @@ describe('parseStatusReport grblHAL MPG ownership', () => {
     expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|MPG:x>')?.mpgActive).toBeNull();
   });
 });
+
+describe('parseStatusReport Bf buffer state (ADR-331)', () => {
+  it('parses planner blocks free and RX bytes free from a grblHAL Falcon report', () => {
+    expect(
+      parseStatusReport('<Idle|MPos:191.500,106.500,-21.100,0.000|Bf:512,65535|FS:0,0>')?.buffer,
+    ).toEqual({ plannerBlocksFree: 512, rxBytesFree: 65535 });
+  });
+
+  it('parses the stock GRBL 1.1 idle report', () => {
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:15,128|FS:0,0>')?.buffer).toEqual({
+      plannerBlocksFree: 15,
+      rxBytesFree: 128,
+    });
+  });
+
+  it('reports null when the field is absent or malformed', () => {
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')?.buffer).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:15>')?.buffer).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:15,128,3>')?.buffer).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:-1,128>')?.buffer).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:15,12x>')?.buffer).toBeNull();
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|Bf:,>')?.buffer).toBeNull();
+  });
+
+  it('keeps the rest of the frame when Bf is malformed', () => {
+    const report = parseStatusReport('<Run|MPos:1.000,2.000,0.000|Bf:x|FS:1500,500>');
+    expect(report?.state).toBe('Run');
+    expect(report?.feed).toBe(1500);
+    expect(report?.buffer).toBeNull();
+  });
+});

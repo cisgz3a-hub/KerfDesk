@@ -12,6 +12,7 @@ import {
   recordSuccessfulConsoleCommand,
 } from './console-command-history';
 import { runConsoleCommand } from './run-console-command';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 
 type ConsoleCommandSubmission =
   | { readonly kind: 'manual-draft'; readonly input: string }
@@ -35,6 +36,28 @@ type ConsoleCommandDeckModel = {
 };
 
 /** Owns the shared Console draft, history, availability, and one-command dispatch state. */
+// Split out to keep the model hook under the per-function line cap.
+function useConsoleCommandAvailabilityState(
+  connection: ConsoleCommandAvailabilityState['connection'],
+): ConsoleCommandAvailabilityState {
+  return {
+    connection,
+    statusReport: useLaserStore((state) => state.statusReport),
+    fireActive: useLaserStore((state) => state.fireActive),
+    // Only `isActiveJob` reads this, and that reads only the status, so the
+    // per-acknowledgement replacement of the streamer object must not re-render
+    // the console deck (ADR-333).
+    streamer: useStoreWithEqualityFn(
+      useLaserStore,
+      (state) => state.streamer,
+      (a, b) => a?.status === b?.status,
+    ),
+    motionOperation: useLaserStore((state) => state.motionOperation),
+    controllerOperation: useLaserStore((state) => state.controllerOperation),
+    autofocusBusy: useLaserStore((state) => state.autofocusBusy),
+  };
+}
+
 export function useConsoleCommandDeckModel(
   enableHistory: boolean,
   onCommandSent: ((command: string) => void) | undefined,
@@ -47,15 +70,7 @@ export function useConsoleCommandDeckModel(
     activeControllerKind,
     activeControllerCommandSet ?? undefined,
   );
-  const availabilityState: ConsoleCommandAvailabilityState = {
-    connection,
-    statusReport: useLaserStore((state) => state.statusReport),
-    fireActive: useLaserStore((state) => state.fireActive),
-    streamer: useLaserStore((state) => state.streamer),
-    motionOperation: useLaserStore((state) => state.motionOperation),
-    controllerOperation: useLaserStore((state) => state.controllerOperation),
-    autofocusBusy: useLaserStore((state) => state.autofocusBusy),
-  };
+  const availabilityState = useConsoleCommandAvailabilityState(connection);
   const [command, setCommand] = useState('');
   const [history, setHistory] = useState(createConsoleCommandHistory);
   const [isSending, setIsSending] = useState(false);

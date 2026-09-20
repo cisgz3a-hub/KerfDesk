@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { parseGcodeWord, stripGcodeComment } from '../../core/invariants';
+import { scanModalMotionLine, type GcodeMotionMode } from '../../core/gcode/modal-motion-line';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
 import { compileJob } from '../../core/job';
 import {
@@ -82,18 +84,43 @@ function committedTraceProject(device?: DeviceProfile): Project {
   ).project;
 }
 
+// Raster rows may hold an inherited G1 and pack their words, so this walks the
+// program with the production modal scanner rather than matching line shapes
+// (ADR-332). The contract is unchanged: dynamic mode, then a laser-off runway
+// at the layer feed, then the first powered burn.
+function feedMoves(
+  gcode: string,
+): ReadonlyArray<{ readonly index: number; readonly s: number | null; readonly f: number | null }> {
+  const out: Array<{ index: number; s: number | null; f: number | null }> = [];
+  let motion: GcodeMotionMode | null = 0;
+  gcode.split('\n').forEach((raw, index) => {
+    const stripped = stripGcodeComment(raw);
+    if (stripped === '') return;
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (!scanned.isMotion || motion !== 1) return;
+    out.push({ index, s: parseGcodeWord(stripped, 'S'), f: parseGcodeWord(stripped, 'F') });
+  });
+  return out;
+}
+
 function expectDynamicRasterRunway(gcode: string): void {
-  const lines = gcode.split('\n');
-  const dynamicModeIndex = lines.indexOf('M4 S0');
-  const activeBurnIndex = lines.findIndex((line) => /^G1\b.*\bS[1-9]\d*$/.test(line));
-  const runwayIndex = lines.findIndex(
-    (line, index) => index > dynamicModeIndex && /^G1\b.*\bF876\b.*\bS0$/.test(line),
-  );
+  const dynamicModeIndex = gcode.split('\n').indexOf('M4 S0');
+  const moves = feedMoves(gcode);
+  // Power is modal: the runway is the first feed move whose effective S is 0,
+  // and the burn is the first whose effective S is positive.
+  let power = 0;
+  const effective = moves.map((move) => {
+    power = move.s ?? power;
+    return { ...move, power };
+  });
+  const runway = effective.find((move) => move.power === 0 && move.f === 876);
+  const burn = effective.find((move) => move.power > 0);
 
   expect(dynamicModeIndex).toBeGreaterThanOrEqual(0);
-  expect(runwayIndex).toBeGreaterThan(dynamicModeIndex);
-  expect(activeBurnIndex).toBeGreaterThan(runwayIndex);
-  expect(lines[activeBurnIndex]).toContain('S470');
+  expect(runway?.index).toBeGreaterThan(dynamicModeIndex);
+  expect(burn?.index).toBeGreaterThan(runway?.index ?? Number.POSITIVE_INFINITY);
+  expect(burn?.power).toBe(470);
 }
 
 describe('rasterized trace production output', () => {

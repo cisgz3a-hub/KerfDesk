@@ -3,6 +3,7 @@ import { createFramedRunPermit, type FramedRunCandidate } from './framed-run';
 import { useLaserStore } from './laser-store';
 import { connectWith, flushConnect, makeConnection } from './laser-store-console.test-support';
 import { startTestLaserJob } from './laser-test-start-helpers';
+import type { SerialTranscriptEntry } from './laser-transcript';
 
 function currentWorkZEvidence() {
   return {
@@ -405,7 +406,7 @@ describe('job stream transcript source', () => {
   // Ack-driven refills travel through the line handler's write wrapper — if
   // that path drops the source, every refill lands as 'system' and the
   // console floods with raw G-code during jobs.
-  it('tags mid-job refill writes as job traffic end-to-end', async () => {
+  it('tags both halves of the mid-job exchange as job traffic end-to-end', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     connection.emitLine('ok');
@@ -420,11 +421,44 @@ describe('job stream transcript source', () => {
     connection.emitLine('ok');
     for (let i = 0; i < 5; i += 1) await Promise.resolve();
 
-    const outbound = useLaserStore
-      .getState()
-      .transcript.filter((e) => e.direction === 'out' && e.raw.startsWith('G1 X99'));
-    // Initial window plus at least two refills.
+    // The exchange is held off the store while it floods (ADR-333) and lands
+    // with the next line anyone waits on — here the status poll's reply.
+    expect(jobStreamEntries()).toEqual([]);
+    connection.emitLine('<Run|MPos:1.000,0.000,0.000|FS:600,255>');
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+
+    const entries = jobStreamEntries();
+    const outbound = entries.filter((e) => e.direction === 'out');
+    const inbound = entries.filter((e) => e.direction === 'in');
+    // Initial window plus at least two refills, and the acks that drove them.
     expect(outbound.length).toBeGreaterThanOrEqual(3);
-    expect([...new Set(outbound.map((e) => e.source))]).toEqual(['job']);
+    expect(inbound.length).toBeGreaterThanOrEqual(2);
+    expect([...new Set(entries.map((e) => e.source))]).toEqual(['job']);
+    // Wire order survives the batch: the status reply is published last.
+    expect(useLaserStore.getState().transcript.at(-1)).toMatchObject({
+      direction: 'in',
+      kind: 'status',
+    });
+  });
+
+  it('keeps the operator log free of the acknowledgement flood', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+    await startTestLaserJob('G1 X1.000 F600 S255\nG1 X2.000 S255\nM5');
+    const logBefore = useLaserStore.getState().log.length;
+
+    connection.emitLine('ok');
+    connection.emitLine('ok');
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+
+    expect(useLaserStore.getState().log.length).toBe(logBefore);
   });
 });
+
+function jobStreamEntries(): ReadonlyArray<SerialTranscriptEntry> {
+  return useLaserStore
+    .getState()
+    .transcript.filter((entry) => entry.source === 'job' && entry.raw !== '');
+}

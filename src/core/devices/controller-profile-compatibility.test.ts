@@ -134,3 +134,59 @@ describe('controllerProfilesAreCompatible', () => {
     expect(controllerProfilesAreCompatible('marlin', null)).toBe(true);
   });
 });
+
+describe('controllerCompatibleProfile receive window on grblHAL (ADR-331)', () => {
+  it('lifts an inherited stock 120-byte window to the grblHAL request and reports it', () => {
+    const result = controllerCompatibleProfile(DEFAULT_DEVICE_PROFILE, 'grblhal');
+
+    expect(result.profile.rxBufferBytes).toBe(1024);
+    expect(result.corrections).toContainEqual(
+      expect.objectContaining({
+        field: 'rxBufferBytes',
+        from: '120',
+        to: '1024',
+        reason: expect.stringContaining('bounded by the capacity the controller reports'),
+      }),
+    );
+  });
+
+  it('keeps an explicit operator window on grblHAL and the stock default on stock GRBL', () => {
+    const explicit = controllerCompatibleProfile(
+      { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grblhal', rxBufferBytes: 512 },
+      'grblhal',
+    );
+    expect(explicit.profile.rxBufferBytes).toBe(512);
+    expect(explicit.corrections).toEqual([]);
+
+    const stock = controllerCompatibleProfile(DEFAULT_DEVICE_PROFILE, 'grbl-v1.1');
+    expect(stock.profile.rxBufferBytes).toBe(120);
+    expect(stock.corrections.map((item) => item.field)).not.toContain('rxBufferBytes');
+  });
+
+  it('restores the stock window when the family crosses off grblHAL', () => {
+    const grblhalProfile: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'grblhal',
+      rxBufferBytes: 1024,
+    };
+
+    for (const detected of ['fluidnc', 'grbl-v1.1'] as const) {
+      const crossed = controllerCompatibleProfile(grblhalProfile, detected);
+      expect(crossed.profile.rxBufferBytes, detected).toBe(120);
+      expect(crossed.corrections, detected).toContainEqual(
+        expect.objectContaining({
+          field: 'rxBufferBytes',
+          from: '1024',
+          to: '120',
+          reason: expect.stringContaining('does not carry over'),
+        }),
+      );
+    }
+
+    // An operator's own larger window is theirs on any family.
+    expect(
+      controllerCompatibleProfile({ ...grblhalProfile, rxBufferBytes: 512 }, 'fluidnc').profile
+        .rxBufferBytes,
+    ).toBe(512);
+  });
+});

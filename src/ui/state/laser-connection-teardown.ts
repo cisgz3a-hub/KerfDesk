@@ -4,6 +4,7 @@ import { cancelControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelScheduledControllerQualification } from './laser-controller-qualification';
 import { cancelResetCleanup } from './laser-reset-cleanup';
 import type { LiveRefs } from './laser-store';
+import { clearTranscriptBuffer } from './laser-transcript-buffer';
 
 type CloseRequest = {
   forgetRequested: boolean;
@@ -185,6 +186,9 @@ function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean)
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   refs.nextTranscriptId = 1;
+  // The next session starts a fresh transcript, so held-back stream lines from
+  // the dead one must not surface in it (ADR-333).
+  clearTranscriptBuffer(refs);
   refs.stallProbe = null;
   refs.heartbeatProbe = null;
   refs.controllerCommand = null;

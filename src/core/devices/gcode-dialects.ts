@@ -68,6 +68,15 @@ export type GrblGcodeDialect = {
   readonly parkAtOriginAfterJob: boolean;
   readonly emitSOnEveryBurnMove: boolean;
   readonly modalFeedrate: boolean;
+  /**
+   * Spell scanline motion compactly: hold the modal `G1`, hold an unchanged
+   * axis, trim trailing zeros, and drop the spaces between words (ADR-332).
+   * Roughly halves the bytes of a dithered raster row, which is what decides
+   * how much motion the controller's receive window holds and whether a
+   * 115200-baud link can keep up. Off for the conservative dialects, whose
+   * output stays byte-for-byte what it was.
+   */
+  readonly compactMotionWords: boolean;
 };
 
 const DEFAULT_DIALECT_ID: GrblGcodeDialectId = 'grbl-dynamic';
@@ -92,6 +101,7 @@ const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   parkAtOriginAfterJob: true,
   emitSOnEveryBurnMove: false,
   modalFeedrate: true,
+  compactMotionWords: true,
 };
 
 export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
@@ -109,6 +119,8 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     parkAtOriginAfterJob: true,
     emitSOnEveryBurnMove: false,
     modalFeedrate: true,
+    // The escape hatch for pre-1.1 firmware keeps the verbose spelling.
+    compactMotionWords: false,
   },
   GRBL_DYNAMIC_DIALECT,
   {
@@ -124,6 +136,7 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     parkAtOriginAfterJob: true,
     emitSOnEveryBurnMove: false,
     modalFeedrate: true,
+    compactMotionWords: true,
   },
   {
     id: 'neotronics-4040-safe',
@@ -136,6 +149,9 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     parkAtOriginAfterJob: false,
     emitSOnEveryBurnMove: true,
     modalFeedrate: false,
+    // This profile family exists because the machine is fussy about
+    // output; its bytes stay exactly as qualified.
+    compactMotionWords: false,
   },
 ];
 

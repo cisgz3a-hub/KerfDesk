@@ -222,6 +222,24 @@ function collectG1WordValues(gcode: string, word: 'S' | 'F'): readonly number[] 
   return out;
 }
 
+/**
+ * True when the program commands at least one feed (G1) move — the test for
+ * "did this compile produce any cutting at all". Modal, so it counts a compact
+ * coordinate-only block that inherits G1 from an earlier line (ADR-332); a
+ * pattern match on `G1` cannot, and misses a packed `G1X95` besides.
+ */
+export function hasFeedMotion(gcode: string | ReadonlyArray<string>): boolean {
+  let motion: GcodeMotionMode | null = 0;
+  for (const raw of iterateGcodeLines(asGcodeLines(gcode))) {
+    const stripped = stripGcodeComment(raw);
+    if (stripped === '') continue;
+    const scanned = scanModalMotionLine(stripped, motion);
+    motion = scanned.motion;
+    if (scanned.isMotion && motion === 1) return true;
+  }
+  return false;
+}
+
 // Collect every S value that appears on a G1 motion line.
 export function collectG1SValues(gcode: string): readonly number[] {
   return collectG1WordValues(gcode, 'S');

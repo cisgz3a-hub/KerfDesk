@@ -341,6 +341,10 @@ function sweepSpanLines(
   const first = spans[0];
   if (first === undefined) return [];
   const lines: string[] = [];
+  // Fill sweeps keep the verbose spelling. Their G1s are whole spans — metres
+  // of motion per line at the emitter's 5 mm minimum runway — so the planner
+  // cannot starve on them and the bytes buy nothing (ADR-332). Raster rows,
+  // one short G1 per power change, are where compaction pays.
   // Head starts where the planned runway move left it: the first span's start.
   let headX = formatGcodeCoordinateMm(first.start.x);
   let headY = formatGcodeCoordinateMm(first.start.y);
@@ -398,6 +402,7 @@ function emitRasterGroupHere(
     laserModeCommand: laserModeWord(dialect.rasterPowerMode),
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
+    compactMotionWords: dialect.compactMotionWords,
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
@@ -443,7 +448,7 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 // when the effective mode changes, and the same effective mode is used when a
 // multi-pass group re-arms between passes.
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
-  const dialect = resolveGrblDialect(device);
+  const dialect = emittedDialect(device, options);
   const parts: string[] = [];
   parts.push(preamble(dialect));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
@@ -478,6 +483,16 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
   if (group.kind === 'raster' || group.kind === 'cnc') return 'group-managed';
   return vectorPowerWord(group, dialect);
+}
+
+// The dialect this emission actually uses. Everything comes from the device
+// profile except the motion spelling, which a post-processing caller may pin
+// to verbose (ADR-332).
+function emittedDialect(device: DeviceProfile, options: OutputEmitOptions): GrblGcodeDialect {
+  const dialect = resolveGrblDialect(device);
+  return options.compactMotionWords === false && dialect.compactMotionWords
+    ? { ...dialect, compactMotionWords: false }
+    : dialect;
 }
 
 export const grblStrategy: OutputStrategy = {

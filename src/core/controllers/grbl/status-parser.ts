@@ -20,9 +20,13 @@
 // like `wcoCache`. A (active spindle/coolant accessories) is emitted only
 // alongside Ov and only while at least one accessory is active. Therefore an
 // Ov frame without A is a positive all-off observation; a frame with neither
-// field carries no new accessory evidence. Bf remains unparsed. Ln is optional
-// in GRBL builds; when present it is useful only as an additional route-match
-// bound and is never required for live progress.
+// field carries no new accessory evidence. Bf (planner blocks free, RX ring
+// bytes free) is parsed into `buffer`: the RX value is a FREE count, so it
+// equals the controller's receive capacity only while the host has nothing in
+// flight â€” the laser store latches that reading as receive-capacity evidence
+// that bounds the streaming window at Start (ADR-331). Ln is optional in GRBL
+// builds; when present it is useful only as an additional route-match bound
+// and is never required for live progress.
 
 export type GrblState =
   | 'Idle'
@@ -48,6 +52,14 @@ export type GrblPins = {
   readonly limitZ: boolean;
   readonly probe: boolean;
   readonly door: boolean;
+};
+
+// Controller buffer occupancy from the `Bf:` field (grbl 1.1 and grblHAL
+// report.c: `plan_get_block_buffer_available()`, then the serial RX ring's
+// free bytes; emitted only when the $10 report-mask buffer-state bit is set).
+export type BufferState = {
+  readonly plannerBlocksFree: number;
+  readonly rxBytesFree: number;
 };
 
 // Live override percentages from the `Ov:` field (ADR-103 G3).
@@ -80,6 +92,14 @@ export type StatusReport = {
    * it; UI code reads the laser-store's `ovCache`, never this field.
    */
   readonly ov?: OverrideValues | null;
+  /**
+   * Planner blocks free and RX ring bytes free from `Bf:`. Free counts, not
+   * capacity: while the host has nothing in flight the RX value IS the usable
+   * receive capacity (stock GRBL idles at `Bf:15,128`, a grblHAL Falcon A1 Pro
+   * at `Bf:512,65535`). Optional so hand-built test mocks need not set it;
+   * null when the frame omits the field or it is malformed.
+   */
+  readonly buffer?: BufferState | null;
   /**
    * Controller-commanded spindle/coolant state from `A:`. GRBL omits `A:`
    * when every accessory is off, but emits it only alongside `Ov:`. Thus an
@@ -156,6 +176,7 @@ export function parseStatusReport(line: string): StatusReport | null {
     wco: pickAxisField(fields, 'WCO'),
     pins: pickPins(fields),
     ov,
+    buffer: pickBufferState(fields),
     accessories: pickAccessories(fields, ov),
     accessoryReportPresent,
     mpgActive: pickMpgActive(fields),
@@ -171,6 +192,26 @@ function pickLineNumber(fields: ReadonlyArray<string>): number | null {
     return Number.isInteger(value) && value >= 0 ? value : null;
   }
   return null;
+}
+
+function pickBufferState(fields: ReadonlyArray<string>): BufferState | null {
+  for (const field of fields) {
+    if (!field.startsWith('Bf:')) continue;
+    const parts = field.slice('Bf:'.length).split(',');
+    if (parts.length !== 2) return null;
+    const [blocks, bytes] = parts.map(parseNonNegativeInteger);
+    if (blocks === null || bytes === null || blocks === undefined || bytes === undefined) {
+      return null;
+    }
+    return { plannerBlocksFree: blocks, rxBytesFree: bytes };
+  }
+  return null;
+}
+
+function parseNonNegativeInteger(text: string): number | null {
+  if (!/^\d+$/.test(text)) return null;
+  const value = Number.parseInt(text, 10);
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function pickMpgActive(fields: ReadonlyArray<string>): boolean | null {

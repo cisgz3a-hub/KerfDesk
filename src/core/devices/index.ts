@@ -101,6 +101,8 @@ export {
   normalizeScanOffsetTable,
 } from './scan-offset-profile';
 export type { GrblStreamingMode } from '../grbl-streaming';
+// The window-sizing helpers added by ADR-331 are imported from
+// `core/grbl-streaming` directly: this barrel is at its export ratchet.
 export {
   DEFAULT_GRBL_RX_BUFFER_BYTES,
   isGrblRxBufferBytes,

@@ -13,6 +13,10 @@ export type ConnectControllerOptions = {
   readonly controllerKind?: ControllerKind | undefined;
   readonly controllerCommandSet?: ControllerCommandSet | undefined;
   readonly baudRate?: number | undefined;
+  /** Ask the platform for the worker-hosted transport (ADR-334). Advisory:
+   * a runtime that cannot transfer the port's streams keeps the main-thread
+   * transport and the job streams exactly as it always has. */
+  readonly hostedStreaming?: boolean | undefined;
 };
 
 export type LaserStoreActions = {

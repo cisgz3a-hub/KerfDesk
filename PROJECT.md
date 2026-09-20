@@ -237,8 +237,9 @@ Verified end-to-end against scripted firmware simulators
   link; pure UDP session state machine as groundwork.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
   streaming mode, receive window, output dialect and active driver are reconciled.
-  Policy findings are advisory in Job Review; completed Frame for the exact job
-  remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+  The buffered receive window is bounded by the capacity the controller reports
+  (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
+  exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,

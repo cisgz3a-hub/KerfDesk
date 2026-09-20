@@ -161,7 +161,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
     };
     const out = emit(job);
     expect(out.match(/^; raster pass /gm)).toHaveLength(2);
-    expect(out.match(/^G0 X0\.000 Y0\.500 S0/gm)).toHaveLength(2);
+    expect(out.match(/^G0X0Y0\.5S0/gm)).toHaveLength(2);
   });
 
   it('does not double the M5 when a raster group is the last in the job', () => {

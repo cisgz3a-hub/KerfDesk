@@ -321,3 +321,79 @@ describe('LiveMotionBar', () => {
 function buttonsByText(host: HTMLElement, text: string): ReadonlyArray<HTMLButtonElement> {
   return [...host.querySelectorAll('button')].filter((button) => button.textContent === text);
 }
+
+// A controller-owned hold (its own feed-hold input, a lid or door switch) stops
+// the machine while the host streams on, so the bar used to read JOB RUNNING
+// over a stopped head with no reason shown (ADR-333).
+describe('LiveMotionBar controller-owned hold', () => {
+  function holdReport(state: 'Hold' | 'Door', door = false) {
+    return {
+      state,
+      subState: null,
+      mPos: { x: 0, y: 0, z: 0 },
+      wPos: null,
+      feed: 0,
+      spindle: 0,
+      wco: null,
+      ...(door
+        ? { pins: { limitX: false, limitY: false, limitZ: false, probe: false, door: true } }
+        : {}),
+    } as NonNullable<ReturnType<typeof useLaserStore.getState>['statusReport']>;
+  }
+
+  it('names a controller feed hold and what releases it', async () => {
+    useLaserStore.setState({ streamer: streamingStreamer(), statusReport: holdReport('Hold') });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('CONTROLLER HOLD');
+      expect(host.textContent).toContain('cycle start on the machine');
+      expect(host.textContent).not.toContain('JOB RUNNING');
+      // Progress is still shown: the operator needs to know where it stopped.
+      expect(host.textContent).toContain('lines');
+      // No Resume: releasing a hold the app never requested is the machine's.
+      expect(buttonByText(host, 'Resume')).toBeUndefined();
+      expect(buttonByText(host, 'ABORT JOB')).toBeInstanceOf(HTMLButtonElement);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('names an open door when the controller reports the pin', async () => {
+    useLaserStore.setState({
+      streamer: streamingStreamer(),
+      statusReport: holdReport('Door', true),
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('CONTROLLER DOOR HOLD');
+      expect(host.textContent).toContain('door or lid input open');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('leaves a host-requested pause with its own heading and Resume', async () => {
+    useLaserStore.setState({
+      streamer: pause(streamingStreamer()),
+      statusReport: holdReport('Hold'),
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('JOB PAUSED');
+      expect(host.textContent).not.toContain('CONTROLLER HOLD');
+      expect(buttonByText(host, 'Resume')).toBeInstanceOf(HTMLButtonElement);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('says nothing about a hold once the job is over', async () => {
+    useLaserStore.setState({ streamer: null, statusReport: holdReport('Hold') });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent ?? '').not.toContain('CONTROLLER HOLD');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+});

@@ -27,6 +27,13 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
+import { encodeWireBytes, extractSerialLines } from './serial-wire';
+import { createWorkerSerialConnection } from './worker-serial-connection';
+import type { SerialWorkerResponse } from './serial-worker-protocol';
+
+// Re-exported: the wire primitives moved to `serial-wire.ts` so the worker
+// transport shares them byte for byte (ADR-334).
+export { extractSerialLines };
 
 export const webSerial: SerialAdapter = {
   isSupported: () => typeof navigator !== 'undefined' && 'serial' in navigator,
@@ -71,6 +78,10 @@ function makePortRef(port: SerialPort): SerialPortRef {
     ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
       await openWithRetry(port, req.baudRate);
+      if (req.hostedStreaming === true) {
+        const hosted = tryWorkerHostedConnection(port);
+        if (hosted !== null) return hosted;
+      }
       return makeConnection(port);
     },
     forget: async () => {
@@ -81,6 +92,46 @@ function makePortRef(port: SerialPort): SerialPortRef {
       }
     },
   };
+}
+
+// The worker-hosted transport (ADR-334), or null when this runtime cannot give
+// it to us: no Worker, a blocked module worker, or a runtime that refuses to
+// transfer the port's streams. Every one of those falls back to the
+// main-thread connection rather than failing the connect, so opting in can
+// never cost the operator their machine.
+function tryWorkerHostedConnection(port: SerialPort): SerialConnection | null {
+  if (typeof Worker === 'undefined') return null;
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL('./serial-stream-worker.ts', import.meta.url), {
+      type: 'module',
+    });
+  } catch (err) {
+    console.warn('Serial worker could not start; streaming stays on the main thread:', err);
+    return null;
+  }
+  const handlers = new Set<(message: SerialWorkerResponse) => void>();
+  worker.onmessage = (event: MessageEvent<SerialWorkerResponse>) => {
+    for (const handler of handlers) handler(event.data);
+  };
+  try {
+    return createWorkerSerialConnection({
+      bridge: {
+        postMessage: (message, transfer) =>
+          worker.postMessage(message, (transfer ?? []) as Transferable[]),
+        onMessage: (handler) => {
+          handlers.add(handler);
+          return () => handlers.delete(handler);
+        },
+        terminate: () => worker.terminate(),
+      },
+      port,
+    });
+  } catch (err) {
+    console.warn('Serial streams could not be handed to the worker:', err);
+    worker.terminate();
+    return null;
+  }
 }
 
 function serialPortIdentity(port: SerialPort): SerialPortIdentity | null {
@@ -106,12 +157,20 @@ function boundedUsbId(value: unknown): number | undefined {
     : undefined;
 }
 
+// Chromium's default 255-byte serial buffers park the browser-side reader as
+// soon as the renderer is late to one read task during a dense `ok` flood
+// (~80 ms of job traffic), adding that delay to every ack round trip. A larger
+// buffer keeps bytes flowing through ordinary main-thread hiccups so they reach
+// the ack loop as one chunk (ADR-331).
+export const SERIAL_BUFFER_BYTES = 4096;
+
 // If port.open() throws "port is already open" we try one defensive close
 // + reopen before giving up. Covers the case where the stale-port sweep in
 // requestPort missed (e.g., a port that opened between getPorts() and now).
 async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> {
+  const options: SerialOptions = { baudRate, bufferSize: SERIAL_BUFFER_BYTES };
   try {
-    await port.open({ baudRate });
+    await port.open(options);
     return;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -122,7 +181,7 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
     } catch {
       // ignore; the open below will throw if we still can't.
     }
-    await port.open({ baudRate });
+    await port.open(options);
   }
 }
 
@@ -225,55 +284,6 @@ function makeConnection(port: SerialPort): SerialConnection {
       await forgetConnection();
     },
   };
-}
-
-// One byte per character, NOT UTF-8 (M12, AUDIT-2026-06-10). GRBL's wire
-// protocol is ASCII lines plus single raw realtime bytes above 0x7F
-// (jog-cancel 0x85, feed/spindle overrides 0x90–0xA2). TextEncoder turned
-// '\x85' into the two bytes 0xC2 0x85 — vanilla GRBL discards unknown high
-// bytes, so jog-cancel silently did nothing, and firmwares that buffer them
-// would corrupt the following line. Byte-per-char is identical to UTF-8 for
-// every ASCII string we emit and exact for the realtime bytes.
-function encodeWireBytes(data: string): Uint8Array {
-  const out = new Uint8Array(data.length);
-  for (let i = 0; i < data.length; i += 1) {
-    const code = data.charCodeAt(i);
-    if (code > 0xff) {
-      throw new Error(
-        `Serial write contains a character that is not a single-byte GRBL code: U+${code.toString(16).toUpperCase()}`,
-      );
-    }
-    out[i] = code;
-  }
-  return out;
-}
-
-// Cap on an in-progress (unterminated) serial line. GRBL status/response lines
-// are well under 200 bytes; a device streaming bytes WITHOUT a newline (line
-// noise, or a spoofed-device DoS) would otherwise grow the read buffer without
-// bound until OOM. Past this length the partial is dropped (security audit 2026-06-14).
-const MAX_SERIAL_LINE_LENGTH = 64 * 1024;
-
-// Pure line extractor for the serial read loop: appends `chunk` to `buffer`,
-// pulls out every \n-terminated line (trailing \r stripped), and returns the
-// remaining partial. An over-length partial (no newline in sight) is dropped so
-// the buffer cannot grow without bound; an over-length newline-terminated record
-// is dropped before it reaches subscribers. Exported for unit testing.
-export function extractSerialLines(
-  buffer: string,
-  chunk: string,
-): { readonly lines: ReadonlyArray<string>; readonly buffer: string } {
-  let next = buffer + chunk;
-  const lines: string[] = [];
-  let nl = next.indexOf('\n');
-  while (nl >= 0) {
-    const line = next.slice(0, nl).replace(/\r$/, '');
-    if (line.length <= MAX_SERIAL_LINE_LENGTH) lines.push(line);
-    next = next.slice(nl + 1);
-    nl = next.indexOf('\n');
-  }
-  if (next.length > MAX_SERIAL_LINE_LENGTH) next = '';
-  return { lines, buffer: next };
 }
 
 async function runReadLoop(

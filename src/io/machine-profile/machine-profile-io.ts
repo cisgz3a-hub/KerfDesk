@@ -304,6 +304,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       profile.controllerKind,
       normalizeGrblStreamingMode(profile.streamingMode),
     ),
+    ...(profile.workerHostedStreaming === true ? { workerHostedStreaming: true } : {}),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,

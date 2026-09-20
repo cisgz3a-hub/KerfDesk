@@ -1,4 +1,9 @@
-import { normalizeGrblRxBufferBytes, type GrblStreamingMode } from '../grbl-streaming';
+import {
+  DEFAULT_GRBL_RX_BUFFER_BYTES,
+  GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
+  normalizeGrblRxBufferBytes,
+  type GrblStreamingMode,
+} from '../grbl-streaming';
 import type { ControllerKind, DeviceProfile } from './device-profile';
 import { isMarlinGcodeDialectId, type GcodeDialectId } from './gcode-dialects';
 
@@ -33,7 +38,11 @@ export function controllerCompatibleProfile(
     profile.streamingMode,
   );
   const dialectId = compatibleDialectFor(resolvedControllerKind, profile.gcodeDialect.dialectId);
-  const rxBufferBytes = normalizeGrblRxBufferBytes(profile.rxBufferBytes);
+  const rxBufferBytes = compatibleRxBufferBytesFor(
+    resolvedControllerKind,
+    normalizeGrblRxBufferBytes(profile.rxBufferBytes),
+    profile.controllerKind,
+  );
   const corrections = controllerProfileCorrections({
     profile,
     resolvedControllerKind,
@@ -89,9 +98,44 @@ function controllerProfileCorrections(args: {
       'rxBufferBytes',
       String(args.profile.rxBufferBytes),
       String(args.rxBufferBytes),
-      'Use a bounded positive receive window.',
+      rxWindowCorrectionReason(args.resolvedControllerKind, args.rxBufferBytes),
     ),
   ];
+}
+
+// The stock-GRBL 120-byte window is the catalog default every profile inherits.
+// On grblHAL it holds only ~8 raster lines against a >= 1 KiB ring and a
+// 512-block planner, so any host or USB round trip longer than a few
+// milliseconds of motion starves the planner (stop-and-go burns, ADR-331).
+// A grblHAL family therefore lifts a window still sitting at the inherited
+// stock default; a value the operator typed is theirs and stays, EXCEPT the
+// stock default itself, which is indistinguishable from never having chosen.
+// Crossing back OFF grblHAL restores the stock default the same way the
+// streaming mode is restored, so a FluidNC or stock-GRBL board never inherits
+// a window sized for grblHAL's larger ring. The Start boundary bounds the
+// streamed window by the capacity the controller reports, so neither direction
+// can exceed a proven ring.
+function compatibleRxBufferBytesFor(
+  controllerKind: ControllerKind,
+  current: number,
+  configuredControllerKind: ControllerKind | undefined,
+): number {
+  if (controllerKind === 'grblhal') {
+    return current === DEFAULT_GRBL_RX_BUFFER_BYTES ? GRBLHAL_DEFAULT_RX_BUFFER_BYTES : current;
+  }
+  return configuredControllerKind === 'grblhal' && current === GRBLHAL_DEFAULT_RX_BUFFER_BYTES
+    ? DEFAULT_GRBL_RX_BUFFER_BYTES
+    : current;
+}
+
+function rxWindowCorrectionReason(controllerKind: ControllerKind, rxBufferBytes: number): string {
+  if (controllerKind === 'grblhal' && rxBufferBytes === GRBLHAL_DEFAULT_RX_BUFFER_BYTES) {
+    return 'grblHAL controllers keep a larger serial receive buffer; the streamed window stays bounded by the capacity the controller reports.';
+  }
+  if (controllerKind !== 'grblhal' && rxBufferBytes === DEFAULT_GRBL_RX_BUFFER_BYTES) {
+    return `A receive window sized for grblHAL does not carry over to ${controllerKind}; the stock receive window applies.`;
+  }
+  return 'Use a bounded positive receive window.';
 }
 
 function changedControllerKindCorrection(args: {

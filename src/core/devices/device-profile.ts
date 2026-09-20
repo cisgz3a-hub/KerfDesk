@@ -184,6 +184,15 @@ export type DeviceProfile = {
   // opt into one-line ping-pong for controllers that misreport/free buffers.
   readonly streamingMode: GrblStreamingMode;
   readonly rxBufferBytes: number;
+  /**
+   * Opt in to reading the serial port and writing job refills inside a worker
+   * (ADR-334), so a busy renderer cannot delay the acknowledgement round trip.
+   * Off by default and unqualified: it has no runtime coverage in this
+   * repository's test environment and no hardware evidence. A runtime that
+   * cannot hand the port's streams to a worker silently keeps the main-thread
+   * transport.
+   */
+  readonly workerHostedStreaming?: boolean;
   readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
   readonly cncSubProfile?: CncSubProfile;

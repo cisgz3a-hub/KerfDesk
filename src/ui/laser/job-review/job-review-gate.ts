@@ -9,6 +9,7 @@
 // the transmission layer already consumes.
 
 import type { JobCheckpoint } from '../../../core/recovery';
+import { streamingModeForController } from '../../../core/devices';
 import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
 import { currentOutputScope } from '../../state/output-scope-state';
@@ -19,6 +20,7 @@ import {
   type LaserModeStartEvidence,
   type LaserModeStartSnapshot,
 } from '../../state/laser-mode-start-evidence';
+import { resolveStartStreamWindow } from '../../state/laser-job-effective-stream-options';
 import { useLaserStore } from '../../state/laser-store';
 import type { LastCompletedReceipt } from '../../state/recovery';
 import { confirmCncSetup } from '../cnc-setup-acknowledgement';
@@ -150,12 +152,26 @@ function sameReviewedArtifact(
 function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
   const liveLaser = useLaserStore.getState();
   const configured = bundle.project.device.controllerKind ?? 'grbl-v1.1';
+  const device = bundle.project.device;
   const baseModel = buildJobReviewModel({
     project: bundle.project,
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
     outputScope: currentOutputScope(bundle.app),
+    // The same window resolution the Start boundary applies, from the live
+    // controller evidence at review time (ADR-331). Advisory only.
+    streamThroughput: {
+      window: resolveStartStreamWindow(
+        {
+          streamingMode: streamingModeForController(device.controllerKind, device.streamingMode),
+          rxBufferBytes: device.rxBufferBytes,
+        },
+        liveLaser,
+        liveLaser.activeControllerKind,
+      ),
+      controllerKind: liveLaser.activeControllerKind,
+    },
   });
   // FluidNC disclosures need the live identities, not just the profile, so
   // they join here rather than inside buildJobReviewModel. Advisory only.

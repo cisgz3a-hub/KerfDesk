@@ -70,6 +70,10 @@ export {
   wipeInFlight,
 } from './streamer';
 
+// `stream-pump` is imported directly by its two callers: this barrel is at its
+// public-export ratchet, and the pump is transport plumbing rather than part of
+// the controller surface (ADR-334).
+
 export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';
 export { buildResumeProgram, type ResumeOptions, type ResumeProgramResult } from './resume-program';
 export {

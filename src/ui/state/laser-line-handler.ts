@@ -50,12 +50,17 @@ import {
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
-import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
+import { advanceStream, settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
-import { pushLog } from './laser-store-helpers';
+import { hasUnsettledStreamAcks } from './laser-store-helpers';
 import { appendSystemNotice } from './laser-system-notice';
-import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
+import { inboundTranscriptEntry } from './laser-transcript';
+import {
+  bufferTranscriptEntry,
+  clearTranscriptBuffer,
+  publishTranscriptPatch,
+} from './laser-transcript-buffer';
 import { invalidateSettingsForMpgTakeover } from './laser-settings-mpg-takeover';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
@@ -197,13 +202,23 @@ function recordInboundLine(
   cls: ReturnType<HandlerRefs['driver']['classifyLine']>,
   line: string,
 ): void {
-  set({
-    log: pushLog(state, line),
-    transcript: appendTranscript(
-      state.transcript,
-      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls, refs.driver.kind),
-    ),
-  });
+  // A stream-owned `ok` is one of hundreds a second and its own source group is
+  // hidden by default, so it is held on the refs and published with the next
+  // line anyone is waiting to see — the status poll, at worst a quarter second
+  // later (ADR-333). Everything else publishes immediately, carrying whatever
+  // was held back ahead of itself so wire order survives.
+  const streamAck = cls.kind === 'ok' && hasUnsettledStreamAcks(state.streamer);
+  const buffered = streamAck && streamOwnsTerminalAck(state);
+  const entry = inboundTranscriptEntry(
+    nextTranscriptId(refs),
+    Date.now(),
+    line,
+    cls,
+    refs.driver.kind,
+    buffered ? 'job' : 'controller',
+  );
+  if (buffered) bufferTranscriptEntry(refs, entry, line);
+  else set(publishTranscriptPatch(refs, state, entry, line));
   if (refs.onLineArrived !== null) {
     const cb = refs.onLineArrived;
     refs.onLineArrived = null;
@@ -293,6 +308,9 @@ function handleWelcomeLine(
   const state = get();
   const nextSessionEpoch = state.controllerSessionEpoch + 1;
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
+  // The rebooted controller starts a new transcript; anything the old session
+  // held back belongs to neither (ADR-333).
+  clearTranscriptBuffer(refs);
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   clearCncLiveCaps();
@@ -330,6 +348,8 @@ function handleWelcomeLine(
     pendingTransportWrites: 0,
     accessoryCache: null,
     mpgActive: null,
+    // The rebooted firmware may expose a different receive ring; re-prove it.
+    rxCapacityEvidence: null,
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
     ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),

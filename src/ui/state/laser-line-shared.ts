@@ -9,14 +9,20 @@ import type { ControllerQualificationScheduleRefs } from './laser-controller-qua
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import type { SerialConnection } from '../../platform/types';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { TranscriptSource } from './laser-transcript';
+import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 
 export type HandlerRefs = ControllerLifecycleRefs &
   ResetCleanupRefs & {
     // Active firmware driver — classification and follow-up command bytes come
     // from here so this pipeline stays firmware-neutral (ADR-094).
     driver: ControllerDriver;
+    /** Present on the live store refs. Optional here because the narrow
+     * handler harnesses omit the transport; the hosted-refill helpers treat an
+     * absent connection as "this side writes refills" (ADR-334). */
+    connection?: SerialConnection | null;
     settingsCollector: SettingsCollectorState;
     settingsCollectorSessionEpoch: number | null;
     // One-shot callback fired by handleLine the next time any line arrives.
@@ -25,7 +31,8 @@ export type HandlerRefs = ControllerLifecycleRefs &
     // get().log.length on a 50 ms loop (R-L2 audit finding).
     onLineArrived: (() => void) | null;
     nextTranscriptId?: number;
-  } & ControllerQualificationScheduleRefs;
+  } & TranscriptBufferRefs &
+  ControllerQualificationScheduleRefs;
 
 export type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),

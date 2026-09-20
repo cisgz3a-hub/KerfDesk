@@ -47,8 +47,12 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, calibratedDevice);
 
-    expect(out).toContain('G0 X-1.000 Y0.500 S0\nG1 X0.000 F6000 S0');
-    expect(out).toContain('G0 X4.750 Y1.500 S0\nG1 X3.750 S0');
+    // Raster rows carry the compact motion spelling on this dialect (ADR-332):
+    // the reverse row's shift is the assertion, not the spacing. The runway G1
+    // holds the S0 the preceding rapid already set, so the beam stays dark
+    // without restating it.
+    expect(out).toContain('G0X-1Y0.5S0\nG1X0F6000');
+    expect(out).toContain('G0X4.75Y1.5S0\nG1X3.75');
   });
 
   it('leaves forward fill sweeps unchanged and shifts reverse sweeps along travel', () => {

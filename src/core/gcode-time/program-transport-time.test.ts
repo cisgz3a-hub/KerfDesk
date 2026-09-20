@@ -134,7 +134,11 @@ describe('emitted serial timing', () => {
           },
         ],
       },
-      6,
+      // Guards that this fixture is genuinely wire-bound. Compact raster
+      // spelling cut its delivery floor from ~6.1 s to ~4.6 s (ADR-332), which
+      // is the point of the compaction; the floor still dwarfs the 1 s of
+      // motion, so the program remains delivery-limited.
+      4,
     );
   });
 

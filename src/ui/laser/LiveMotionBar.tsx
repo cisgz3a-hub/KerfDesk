@@ -1,9 +1,14 @@
-import { progress } from '../../core/controllers/grbl';
+import type { StreamerStatus } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
+import { isActiveJobStatus, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
+import {
+  streamProgressPercent,
+  useLiveStreamProgress,
+  type LiveStreamProgress,
+} from './use-live-stream-progress';
 import {
   LiveMotionActionButton,
   LIVE_MOTION_ACTION_BUTTON_STYLE,
@@ -16,10 +21,10 @@ const TOOL_CHANGE_CONTINUE_TITLE =
   'Lift the re-zeroed bit to safe Z with the spindle off, then spin up and resume';
 
 type LaserSnapshot = ReturnType<typeof useLaserStore.getState>;
-type Streamer = NonNullable<LaserSnapshot['streamer']>;
 type ControllerOperation = NonNullable<LaserSnapshot['controllerOperation']>;
 type MotionOperation = NonNullable<LaserSnapshot['motionOperation']>;
 type PauseResumeTransition = NonNullable<LaserSnapshot['pauseResumeTransition']>;
+type ControllerHold = { readonly state: 'Hold' | 'Door'; readonly doorPin: boolean } | null;
 
 type MotionDescription = {
   readonly heading: string;
@@ -28,19 +33,23 @@ type MotionDescription = {
 };
 
 export function LiveMotionBar(): JSX.Element | null {
-  const streamer = useLaserStore((state) => state.streamer);
+  // Progress by value and throttled: the streamer object is replaced on every
+  // acknowledgement (ADR-333).
+  const streamProgress = useLiveStreamProgress();
   const controllerOperation = useLaserStore((state) => state.controllerOperation);
   const motionOperation = useLaserStore((state) => state.motionOperation);
   const fireActive = useLaserStore((state) => state.fireActive);
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
+  const controllerHold = useLaserStore(selectControllerHold);
   const stopJob = useLaserStore((state) => state.stopJob);
   const setFireActive = useLaserStore((state) => state.setFireActive);
   const description = describeLiveMotion(
-    streamer,
+    streamProgress,
     controllerOperation,
     motionOperation,
     fireActive,
     pauseResumeTransition,
+    controllerHold,
   );
   if (description === null) return null;
   const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
@@ -56,7 +65,7 @@ export function LiveMotionBar(): JSX.Element | null {
         </span>
       </div>
       <div role="group" aria-label="Live machine controls" style={actionsStyle}>
-        <LiveMotionPrimaryAction streamer={streamer} />
+        <LiveMotionPrimaryAction status={streamProgress.status} />
         <button
           type="button"
           className="lf-btn lf-btn--danger"
@@ -71,7 +80,7 @@ export function LiveMotionBar(): JSX.Element | null {
   );
 }
 
-function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | null }) {
+function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus | null }) {
   const pauseJob = useLaserStore((state) => state.pauseJob);
   const resumeJob = useLaserStore((state) => state.resumeJob);
   const continueToolChange = useLaserStore((state) => state.continueToolChange);
@@ -90,8 +99,7 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
       />
     );
   }
-  const canPause =
-    streamer?.status === 'streaming' || (streamer?.status === 'done' && isControllerRunning);
+  const canPause = status === 'streaming' || (status === 'done' && isControllerRunning);
   if (canPause) {
     return (
       <LiveMotionActionButton
@@ -101,7 +109,7 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
       />
     );
   }
-  if (streamer?.status === 'paused') {
+  if (status === 'paused') {
     return (
       <LiveMotionActionButton
         label="Resume"
@@ -110,7 +118,7 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
       />
     );
   }
-  if (streamer?.status === 'tool-change') {
+  if (status === 'tool-change') {
     return (
       <LiveMotionActionButton
         label="Continue"
@@ -123,17 +131,38 @@ function LiveMotionPrimaryAction({ streamer }: { readonly streamer: Streamer | n
   return null;
 }
 
+// The controller's own hold, as opposed to a host-requested pause. Scalars, so
+// the 250 ms status poll cannot re-render this bar unless one of them changes.
+function selectControllerHold(state: LaserSnapshot): ControllerHold {
+  const reported = state.statusReport?.state ?? null;
+  if (reported !== 'Hold' && reported !== 'Door') return null;
+  return { state: reported, doorPin: state.statusReport?.pins?.door === true };
+}
+
 function describeLiveMotion(
-  streamer: Streamer | null,
+  streamProgress: LiveStreamProgress,
   controllerOperation: ControllerOperation | null,
   motionOperation: MotionOperation | null,
   fireActive: boolean,
   pauseResumeTransition: PauseResumeTransition | null,
+  controllerHold: ControllerHold,
 ): MotionDescription | null {
-  if (streamer !== null && isActiveJob(streamer)) {
+  if (isActiveJobStatus(streamProgress.status)) {
+    // A hold the controller entered by itself — its own feed-hold input, a lid
+    // or door switch — stops motion while the host is still streaming happily,
+    // so the bar said JOB RUNNING over a stopped machine with no reason given
+    // (ADR-333). A host-requested pause is excluded: that one has its own
+    // heading and its own Resume control.
+    const heldReason =
+      controllerHold !== null && pauseResumeTransition === null && !isHostPaused(streamProgress)
+        ? controllerHoldDescription(controllerHold)
+        : null;
     return {
-      heading: jobHeading(streamer.status, pauseResumeTransition),
-      detail: jobProgress(streamer),
+      heading: heldReason?.heading ?? jobHeading(streamProgress.status, pauseResumeTransition),
+      detail:
+        heldReason === null
+          ? jobProgress(streamProgress)
+          : `${heldReason.detail} · ${jobProgress(streamProgress)}`,
       abortLabel: 'ABORT JOB',
     };
   }
@@ -161,8 +190,35 @@ function describeLiveMotion(
   return null;
 }
 
+function isHostPaused(streamProgress: LiveStreamProgress): boolean {
+  return streamProgress.status === 'paused';
+}
+
+// Deliberately no Resume button here. Releasing a controller-owned hold is the
+// machine's own cycle-start, and the app's Resume path carries the ADR-180
+// accessory-state proof a hold the app never requested has not established.
+// Naming the state and what releases it is the whole fix.
+function controllerHoldDescription(hold: NonNullable<ControllerHold>): {
+  readonly heading: string;
+  readonly detail: string;
+} {
+  if (hold.state === 'Door') {
+    return {
+      heading: 'CONTROLLER DOOR HOLD',
+      detail: hold.doorPin
+        ? 'The controller reports its door or lid input open and has stopped motion. Close it, then press cycle start on the machine'
+        : 'The controller is in its door-safety state and has stopped motion. Release it with cycle start on the machine',
+    };
+  }
+  return {
+    heading: 'CONTROLLER HOLD',
+    detail:
+      'The controller is holding motion on its own feed hold, not a pause from here. Release it with cycle start on the machine',
+  };
+}
+
 function jobHeading(
-  status: Streamer['status'],
+  status: StreamerStatus | null,
   pauseResumeTransition: PauseResumeTransition | null,
 ): string {
   if (pauseResumeTransition?.action === 'pause') return 'JOB PAUSING';
@@ -174,10 +230,9 @@ function jobHeading(
   return 'MACHINE FINISHING';
 }
 
-function jobProgress(streamer: Streamer): string {
-  if (streamer.total <= 0) return 'Preparing controller stream';
-  const percent = streamer.status === 'done' ? 99 : Math.round(progress(streamer) * 100);
-  return `${streamer.completed} / ${streamer.total} lines · ${percent}%`;
+function jobProgress(streamProgress: LiveStreamProgress): string {
+  if (streamProgress.total <= 0) return 'Preparing controller stream';
+  return `${streamProgress.completed} / ${streamProgress.total} lines · ${streamProgressPercent(streamProgress)}%`;
 }
 
 // Overlaid on the canvas's lower edge (ADR-207 amendment, 2026-09-19). In
