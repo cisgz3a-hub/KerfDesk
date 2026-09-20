@@ -1,6 +1,7 @@
 import type { DeviceProfile } from '../../../core/devices';
 import type { Job } from '../../../core/job';
-import { outputOperationLayers, type Layer } from '../../../core/scene';
+import type { Layer } from '../../../core/scene';
+import { operationNames } from './operation-names';
 
 // Job-controlled air (M7/M8) is written only immediately before the first
 // operation whose Air setting is on (grbl-strategy's coolant transition), and a
@@ -38,12 +39,4 @@ export function detectAirAssistStartWarnings(
       `before ${airName}. Expect smoke marks on the opening part of the burn; turn Air on ` +
       `for ${firstName} if it needs it.`,
   ];
-}
-
-function operationNames(layers: ReadonlyArray<Layer>): ReadonlyMap<string, string> {
-  const names = new Map<string, string>();
-  for (const layer of layers) {
-    for (const operation of outputOperationLayers(layer)) names.set(operation.id, operation.name);
-  }
-  return names;
 }

@@ -214,6 +214,17 @@ export type DeviceProfile = {
   // exposes this as a device choice (M7 vs M8); default disabled because many
   // hobby controllers leave these pins unwired or use M7 only when compiled in.
   readonly airAssistCommand: AirAssistCommand;
+  // Vendor firmware that cannot be trusted to restart air assist inside a
+  // running program. Creality's A1 family delays the real shutoff after M9 by
+  // `$152`, and its shipped build has dropped the pump seconds after a fresh
+  // M8 — the documented "air works while engraving but stops when it cycles
+  // over to cutting". For such a machine the emitter holds air on across an
+  // Air-off operation that sits between two Air-on ones instead of cycling
+  // M9/M8 over it (ADR-335). Absent keeps the plain per-operation cycling that
+  // stock GRBL, grblHAL, FluidNC, Marlin and Smoothieware each honour
+  // immediately, and is also how to get per-operation air back on an A1 once
+  // `$152=0` is set on the controller.
+  readonly airAssistRestartUnreliable?: boolean;
   // Optional Z metadata. XY bed dimensions are used for bounds checks today;
   // Z is informational/setup-facing until a dedicated Z workflow is enabled.
   // Bidirectional fill/raster compensation. Empty keeps emitted output
