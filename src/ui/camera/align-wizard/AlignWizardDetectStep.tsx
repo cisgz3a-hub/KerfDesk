@@ -76,5 +76,5 @@ export function DoneStep(props: { readonly basis: 'raw' | 'rectified' }): JSX.El
 const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const noteStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-faint)' };
-const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)' };
-const okStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-accent)' };
+const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)' };
+const okStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-accent-fg)' };

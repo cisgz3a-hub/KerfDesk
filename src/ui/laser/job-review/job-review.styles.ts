@@ -36,7 +36,7 @@ export const headerRowStyle: CSSProperties = {
 
 export const machineBadgeStyle: CSSProperties = {
   border: '1px solid var(--lf-accent)',
-  color: 'var(--lf-accent)',
+  color: 'var(--lf-accent-fg)',
   borderRadius: 4,
   padding: '1px 7px',
   fontSize: 11,

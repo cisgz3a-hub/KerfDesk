@@ -4,15 +4,10 @@
 import { progress } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
-import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
-import { useToastStore } from '../state/toast-store';
-import { jobTimeNoun } from '../machine/machine-labels';
+import { useLaserStore } from '../state/laser-store';
 import {
   actionGridStyle,
   containerStyle,
-  framedRunStatusStyle,
-  gridFullRowStyle,
-  primaryActionStyle,
   progressContainerStyle,
   progressFillStyle,
   progressLabelStyle,
@@ -26,23 +21,21 @@ import { AccessoryResetControls } from './AccessoryResetControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 import { StartFromLineControl } from './StartFromLineControl';
-import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
-import { useFramedRunLaserState } from './use-framed-run-laser-state';
-import { useFrameAction } from './use-frame-action';
-import { useJobEstimate } from './use-job-estimate';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
 import { RunAgainControl } from './RunAgainControl';
-import { framedRunReadinessIssue } from './framed-run-readiness';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
-import { startJobTitle } from './JobEstimatePresentation';
-import { LiveJobTimeBadge } from './LiveJobTimeBadge';
+import { JobActionControls } from './JobActionControls';
+import { JobSetupControls } from './JobSetupControls';
+import { jobControlsBusy, jobNeedsRecovery } from './job-controls-busy';
+import { CollapsibleRailSection } from './CollapsibleRailSection';
 
 type Props = {
   readonly disabled: boolean;
   readonly onConfigureAutofocus?: () => void;
   readonly onConfigureHoming?: () => void;
   readonly onStartJob: () => void;
+  readonly dockedJobActions?: boolean;
 };
 
 // Both setup entries are optional so bare <JobControls> renders standalone;
@@ -73,17 +66,14 @@ export function JobControls(props: Props): JSX.Element {
   // can't jog into a head still physically finishing motion — and an errored job
   // needs an explicit Abort. The Live Motion bar remains mounted through that 'done'
   // window, and through a tool-change hold, independently of this rail.
-  const jobNeedsRecovery =
-    status !== undefined &&
-    ['streaming', 'paused', 'tool-change', 'errored', 'done'].includes(status);
+  const needsRecovery = jobNeedsRecovery(status);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const ovCache = useLaserStore((s) => s.ovCache);
   const accessoryCache = useLaserStore((s) => s.accessoryCache ?? null);
   const controllerState = useLaserStore((s) => s.statusReport?.state ?? null);
-  const motionBusy = motionOperation !== null;
-  const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
+  const controlsBusy = jobControlsBusy(status, motionOperation, controllerOperation);
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
   // Maintainer-directed rail order (ADR-225, amended 2026-07-17): origin
   // directly under the jog pad, job actions next so Start/Frame stay above the
@@ -93,15 +83,16 @@ export function JobControls(props: Props): JSX.Element {
   return (
     <div style={containerStyle}>
       <OriginRow disabled={disabled} streaming={controlsBusy} />
-      <span style={sectionCaptionStyle}>Job</span>
+      <span style={sectionCaptionStyle}>{props.dockedJobActions ? 'Machine setup' : 'Job'}</span>
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
         onConfigureAutofocus={configure.autofocus}
         onConfigureHoming={configure.homing}
         onStartJob={onStartJob}
+        dockedJobActions={props.dockedJobActions}
       />
-      <StartBlockerNotice />
+      {!props.dockedJobActions && <StartBlockerNotice />}
       <AccessoryResetControls
         accessories={accessoryCache}
         controlsBusy={controlsBusy}
@@ -114,14 +105,14 @@ export function JobControls(props: Props): JSX.Element {
       {controllerOperation !== null && (
         <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
       )}
-      {jobNeedsRecovery && (
+      {needsRecovery && (
         <RunningControls
           isStreaming={isStreaming}
           isPaused={isPaused}
           isToolChange={isToolChange}
         />
       )}
-      <JobPlacementControls streaming={controlsBusy} />
+      <PlacementSection streaming={controlsBusy} collapsed={props.dockedJobActions === true} />
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
@@ -149,232 +140,51 @@ function shouldShowIdleOverrideReset(
   return !controlsBusy && hasOverrides && overrides !== null && hasNonDefaultOverrides(overrides);
 }
 
-function useSetupRowModel(props: { readonly disabled: boolean; readonly streaming: boolean }) {
-  const onFrame = useFrameAction();
-  const onAutofocus = useAutofocusAction();
-  // A permit can become stale from an artwork, scope, placement, or controller
-  // change. Subscribe to exactly the fields that comparison
-  // reads so the status text changes immediately without the whole rail
-  // re-rendering per mousemove and per controller ack; Start repeats the same
-  // comparison at handoff.
-  const app = useExecutionSignatureAppState();
-  const laser = useFramedRunLaserState();
-  const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
-  // ADR-101 §5 (provisional): auto-focus is a laser focus routine; it hides
-  // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
-  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const home = useLaserStore((s) => s.home);
-  const estimate = useJobEstimate();
-  const busy = props.disabled || props.streaming;
-  const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
-  const framedReady = framedRunIssue === null;
-  return {
-    onFrame,
-    onAutofocus,
-    home,
-    busy,
-    homingEnabled,
-    isCncMachine: machineKind === 'cnc',
-    frameOperationActive: laser.motionOperation?.kind === 'frame',
-    hasFramedRun: laser.framedRun !== null,
-    framedRunIssue,
-    framedReady,
-    frameControl: frameControlProps(busy, laser.statusReport?.state),
-    startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
-    frameLabel: framedReady ? 'Frame again' : 'Frame job',
-    startControl: startControlProps(
-      busy,
-      framedReady
-        ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : 'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
-    ),
-    // No portable autofocus G-code exists, so an empty command becomes a
-    // direct setup entry instead of a disabled control that leaves users
-    // hunting for the vendor-specific command field.
-    noAutofocus: autofocusCommand.trim() === '',
-    estimate,
-  };
-}
-
 function SetupRow(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
   readonly onConfigureAutofocus: () => void;
   readonly onConfigureHoming: () => void;
   readonly onStartJob: () => void;
+  readonly dockedJobActions: boolean | undefined;
 }): JSX.Element {
-  const {
-    onFrame,
-    onAutofocus,
-    home,
-    busy,
-    homingEnabled,
-    isCncMachine,
-    frameOperationActive,
-    hasFramedRun,
-    framedRunIssue,
-    framedReady,
-    frameControl,
-    startLabel,
-    frameLabel,
-    startControl,
-    noAutofocus,
-    estimate,
-  } = useSetupRowModel(props);
-  // Start leads the grid full-width; Frame pairs beside Home under it. Both
-  // run-the-machine actions wear the light-green go look (maintainer request,
-  // matching LightBurn's green Start), so "moves the head" reads at a glance.
-  return (
-    <>
-      <div style={actionGridStyle}>
-        <button
-          type="button"
-          className="lf-btn lf-btn--go"
-          style={primaryActionStyle}
-          onClick={props.onStartJob}
-          disabled={startControl.disabled}
-          title={startControl.title}
-        >
-          {startLabel}
-        </button>
-        <button
-          type="button"
-          className="lf-btn lf-btn--go"
-          onClick={onFrame}
-          disabled={frameControl.disabled}
-          title={frameControl.title}
-        >
-          {frameLabel}
-        </button>
-        <HomeButton
-          onHome={() => void home()}
-          onConfigureHoming={props.onConfigureHoming}
-          busy={busy}
-          streaming={props.streaming}
-          homingEnabled={homingEnabled}
-        />
-        {!isCncMachine && (
-          <AutofocusButton
-            needsSetup={noAutofocus}
-            busy={busy}
-            streaming={props.streaming}
-            onConfigure={props.onConfigureAutofocus}
-            onRun={onAutofocus}
-          />
-        )}
-      </div>
-      <span role="status" style={framedRunStatusStyle} title={framedRunIssue ?? undefined}>
-        {framedRunStatusText(frameOperationActive, framedReady, hasFramedRun, framedRunIssue)}
-      </span>
-      <LiveJobTimeBadge estimate={estimate} />
-    </>
+  const setup = (
+    <JobSetupControls
+      disabled={props.disabled}
+      streaming={props.streaming}
+      onConfigureAutofocus={props.onConfigureAutofocus}
+      onConfigureHoming={props.onConfigureHoming}
+      compact={props.dockedJobActions === true}
+    />
   );
-}
-
-function framedRunStatusText(
-  frameOperationActive: boolean,
-  framedReady: boolean,
-  hasFramedRun: boolean,
-  framedRunIssue: string | null,
-): string {
-  if (frameOperationActive) return 'Framing exact job…';
-  if (framedReady) return 'Ready to start — framed job unchanged';
-  if (!hasFramedRun) return 'Not framed — prepare and Frame this job first';
-  return `Frame expired — ${framedRunIssue}`;
-}
-
-// A machine whose homing switches were never declared otherwise leaves a dead
-// grey Home button with no way forward, so an unconfigured profile turns the
-// button into its own setup entry — the same offer-the-fix shape auto-focus
-// uses below.
-function HomeButton(props: {
-  readonly onHome: () => void;
-  readonly onConfigureHoming: () => void;
-  readonly busy: boolean;
-  readonly streaming: boolean;
-  readonly homingEnabled: boolean;
-}): JSX.Element {
-  if (!props.homingEnabled) {
-    return (
-      <button
-        type="button"
-        className="lf-btn"
-        onClick={props.onConfigureHoming}
-        disabled={props.streaming}
-        title="Homing is off for this machine. Open Machine Setup to turn on $H homing."
-      >
-        Set up homing
-      </button>
-    );
-  }
+  if (props.dockedJobActions) return <div style={actionGridStyle}>{setup}</div>;
   return (
-    <button
-      type="button"
-      className="lf-btn"
-      onClick={props.onHome}
-      disabled={props.busy}
-      title="Send $H — home all axes"
+    <JobActionControls
+      disabled={props.disabled}
+      streaming={props.streaming}
+      onStartJob={props.onStartJob}
     >
-      Home
-    </button>
-  );
-}
-
-function AutofocusButton(props: {
-  readonly needsSetup: boolean;
-  readonly busy: boolean;
-  readonly streaming: boolean;
-  readonly onConfigure: () => void;
-  readonly onRun: () => void;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      className="lf-btn"
-      style={gridFullRowStyle}
-      onClick={props.needsSetup ? props.onConfigure : props.onRun}
-      disabled={props.needsSetup ? props.streaming : props.busy}
-      title={
-        props.needsSetup
-          ? 'Open Machine Setup at Auto-focus setup.'
-          : 'Run the auto-focus command configured in Machine Setup.'
-      }
-    >
-      {props.needsSetup ? 'Set up auto-focus' : 'Auto-focus'}
-    </button>
+      {setup}
+    </JobActionControls>
   );
 }
 
 const doNothing = (): void => undefined;
 
-type ControlButtonProps = {
-  readonly disabled: boolean;
-  readonly title: string;
-};
-
-function frameControlProps(busy: boolean, state: string | undefined): ControlButtonProps {
-  const ready = state === 'Idle';
-  return {
-    disabled: busy || !ready,
-    title: ready
-      ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
-      : frameBlockedTitle(state),
-  };
-}
-
-function startControlProps(busy: boolean, fallbackTitle: string): ControlButtonProps {
-  return {
-    disabled: busy,
-    title: fallbackTitle,
-  };
-}
-
-function frameBlockedTitle(state: string | undefined): string {
-  if (state === undefined) {
-    return 'Wait for an Idle status report before framing.';
-  }
-  return `Machine must be Idle before framing (currently ${state}).`;
+function PlacementSection(props: {
+  readonly streaming: boolean;
+  readonly collapsed: boolean;
+}): JSX.Element {
+  const controls = <JobPlacementControls streaming={props.streaming} />;
+  if (!props.collapsed) return controls;
+  return (
+    <CollapsibleRailSection
+      label="Placement & output"
+      title="Choose the start position, job origin, and artwork included in the job."
+    >
+      {controls}
+    </CollapsibleRailSection>
+  );
 }
 
 function ProgressBar({
@@ -410,21 +220,5 @@ function describeProgressDisplay(
     percent: Math.round(progress(streamer) * 100),
     label: `${lineText} lines`,
     title: 'G-code lines acknowledged by the controller.',
-  };
-}
-
-function useAutofocusAction(): () => void {
-  const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
-  const autofocus = useLaserStore((s) => s.autofocus);
-  const pushToast = useToastStore((s) => s.pushToast);
-  return () => {
-    if (autofocusCommand.trim() === '') {
-      pushToast('No autofocus command configured. Set it in Device settings.', 'warning');
-      return;
-    }
-    void autofocus(autofocusCommand).then((result) => {
-      const t = describeAutofocusResult(result);
-      pushToast(t.message, t.variant);
-    });
   };
 }

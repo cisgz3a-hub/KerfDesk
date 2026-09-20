@@ -1,9 +1,10 @@
+import { applicationHeader, selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
 import { Buffer } from 'node:buffer';
 import { test, expect, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('banner', { name: 'Toolbar' })).toContainText('KerfDesk');
+  await expect(applicationHeader(page)).toContainText('KerfDesk');
 });
 
 test('opens and saves a deterministic project through the real file workflow', async ({
@@ -13,7 +14,7 @@ test('opens and saves a deterministic project through the real file workflow', a
   await page.getByRole('button', { name: 'Open...' }).click();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
 
-  await page.getByRole('button', { name: 'Save As...' }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect
     .poll(async () => (await kerfdesk.events()).map((event) => event.kind))
     .toContain('file-saved');
@@ -24,13 +25,14 @@ test('connects to deterministic GRBL serial and opens the deterministic USB came
   page,
   kerfdesk,
 }) => {
+  await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect
     .poll(async () => (await kerfdesk.events()).map((event) => event.kind))
     .toContain('serial-open');
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await (await toolbarCommand(page, 'Camera')).click();
   await page.getByRole('button', { name: 'Start USB camera' }).click();
 
   await expect
@@ -44,7 +46,7 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
   page,
 }) => {
   const bridge = await installRtspBridgeRoutes(page);
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await (await toolbarCommand(page, 'Camera')).click();
 
   await page.getByText(/^RTSP camera/).click();
   await page.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
@@ -65,7 +67,7 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
 
   await page.getByRole('button', { name: 'Close camera panel' }).click();
   bridge.setProbeAvailable(false);
-  await page.getByRole('button', { name: 'Camera' }).click();
+  await (await toolbarCommand(page, 'Camera')).click();
   await page.getByText(/^RTSP camera/).click();
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(page.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();

@@ -25,6 +25,7 @@ import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import { buildDisplayPolylines } from './display-polylines';
 import { strokePolylinesBatched } from './draw-vector-strokes';
+import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import {
   previewRouteForDrawing,
   registerExecutablePlanPreviewRoute,
@@ -84,7 +85,7 @@ function drawObjectPolylinesFaint(
   for (const path of obj.paths) {
     const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
-    ctx.strokeStyle = resolution.operation?.color ?? path.color;
+    ctx.strokeStyle = canvasVectorDisplayColor(resolution.operation?.color ?? path.color);
     ctx.lineWidth = resolution.operation?.output === false ? 0.75 : 1.5;
     const display = buildDisplayPolylines(path.polylines);
     strokePolylinesBatched(ctx, obj, display.polylines, view);

@@ -89,7 +89,7 @@
   display: grid;
   justify-items: center;
   gap: 6px;
-  color: var(--lf-text-faint);
+  color: var(--lf-material-surface-text);
   font-size: var(--lf-text-xs);
   text-align: center;
 }

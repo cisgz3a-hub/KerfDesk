@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -315,13 +316,13 @@ async function importDragon(page: Page): Promise<void> {
     },
     { name: FIXTURE_NAME, base64: FIXTURE_BYTES.toString('base64') },
   );
-  await page.getByRole('button', { name: 'Import...', exact: true }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
 }
 
 async function saveProject(page: Page, fixture: KerfDeskFixture): Promise<Project> {
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect
     .poll(async () => Object.keys(await fixture.savedFiles()).some((name) => name.endsWith('.lf2')))
     .toBe(true);

@@ -144,7 +144,7 @@
   min-width: 0;
   overflow-y: auto;
   padding: 16px 12px;
-  background: #fbfcfe;
+  background: var(--lf-bg-0);
   border-right: 1px solid var(--lf-border);
 }
 

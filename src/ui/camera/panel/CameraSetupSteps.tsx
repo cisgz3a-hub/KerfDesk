@@ -77,7 +77,7 @@ function stepStyle(state: StepState): React.CSSProperties {
   return {
     color:
       state === 'done'
-        ? 'var(--lf-accent)'
+        ? 'var(--lf-accent-fg)'
         : state === 'next'
           ? 'var(--lf-text)'
           : 'var(--lf-text-faint)',

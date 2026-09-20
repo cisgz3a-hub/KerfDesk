@@ -69,7 +69,7 @@ const noticeStyle: React.CSSProperties = {
   padding: 8,
   border: '1px solid var(--lf-warning)',
   borderRadius: 6,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };
 const listStyle: React.CSSProperties = { margin: '4px 0 0', paddingLeft: 18 };

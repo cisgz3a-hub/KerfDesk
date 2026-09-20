@@ -182,6 +182,6 @@ const textStyle: React.CSSProperties = {
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
 const causeStyle: React.CSSProperties = {
   ...textStyle,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontWeight: 500,
 };

@@ -1,50 +1,78 @@
 // canvas-theme — the named Canvas2D palette (ADR-047).
 //
 // Draw modules render with raw ctx fill/stroke values; CSS custom properties
-// can't reach them, so the canvas palette lives here as TS constants. Values
-// are byte-identical to the literals they replace — the workspace viewport
-// (light bed on a light surround) deliberately KEEPS its current look while
-// the chrome around it goes dark; WYSIWYG against white material wins.
+// can't reach them, so the canvas palette resolves raw paints here. Bed,
+// rulers and drawing ink follow the operating-system theme (ADR-049 amendment).
+// Artwork display contrast is handled separately from stored artwork colours;
+// material, image pixels and output/toolpath semantics stay independent.
 //
 // The two values genuinely shared with the chrome (selection ↔ --lf-accent,
 // out-of-bounds ↔ --lf-danger) are pinned against tokens.css by
 // theme-sync.test.ts so the frames cannot drift apart silently.
 
+import { getCanvasColorScheme } from './canvas-color-scheme';
+
+export const DARK_CANVAS_BED = '#242930';
+
+function themed(light: string, dark: string): string {
+  return getCanvasColorScheme() === 'dark' ? dark : light;
+}
+
 export const canvasTheme = {
-  // The DOM surface AROUND the bed (Workspace canvas area) — part of the
-  // deliberately-light viewport, not the dark chrome.
-  viewportSurround: '#fafafa',
+  // Used as a DOM background only, so the off-bed surround can follow CSS.
+  viewportSurround: 'var(--lf-bg-canvas)',
   // Bed + grid (draw-scene)
-  bedFill: '#ffffff',
-  bedStroke: '#888888',
-  grid: '#d8d8d8',
+  get bedFill() {
+    return themed('#ffffff', DARK_CANVAS_BED);
+  },
+  get bedStroke() {
+    return themed('#a2afbf', '#65758b');
+  },
+  get grid() {
+    return themed('#dce2ea', '#343b46');
+  },
+  get artworkInk() {
+    return themed('#1a1a1a', '#e0e7f2');
+  },
   origin: '#cc0000',
   // Selection chrome (draw-scene)
-  selection: '#1976d2',
+  selection: '#3175d0',
   selectionHandleFill: '#ffffff',
   pathNodeHandleFill: '#ffffff',
   pathNodeHandleStroke: '#00a884',
   pathNodeHandleActiveFill: '#00a884',
   pathNodeHandleActiveStroke: '#ffffff',
-  selectionMarqueeFill: 'rgba(25, 118, 210, 0.12)',
+  selectionMarqueeFill: 'rgba(49, 117, 208, 0.12)',
   rotateHandleStroke: '#fff',
   snapGuide: '#00a884',
-  measureStroke: '#7b1fa2',
-  outOfBounds: '#c62828',
+  get measureStroke() {
+    return themed('#7b1fa2', '#d6a5f5');
+  },
+  outOfBounds: '#b43337',
   openFillContour: '#f57c00',
   cncTabHandleFill: '#f7c948',
   cncTabHandleStroke: '#5b4512',
-  noGoZoneFill: 'rgba(198, 40, 40, 0.12)',
+  noGoZoneFill: 'rgba(180, 51, 55, 0.12)',
   // CNC stock footprint (draw-stock, H.2) — wood-toned so it reads as
   // material, not chrome.
   stockFill: 'rgba(193, 154, 107, 0.12)',
   stockStroke: 'rgba(160, 120, 70, 0.55)',
   // Rulers (draw-rulers)
-  rulerBackground: '#f0f0f0',
-  rulerBorder: '#bbb',
-  rulerText: '#666',
-  rulerMajorTick: '#666',
-  rulerMinorTick: '#aaa',
+  get rulerBackground() {
+    return themed('#f5f7fa', '#272c34');
+  },
+  get rulerBorder() {
+    return themed('#dce2ea', '#3d4653');
+  },
+  get rulerText() {
+    return themed('#5f6f85', '#a0afc3');
+  },
+  get rulerMajorTick() {
+    return themed('#5f6f85', '#a0afc3');
+  },
+  get rulerMinorTick() {
+    return themed('#a2afbf', '#65758b');
+  },
   // Preview toolpath (draw-preview)
   previewTravel: '#bbbbbb',
   previewFeedTravel: '#7c5ce7',
@@ -59,14 +87,17 @@ export const canvasTheme = {
   traceSourceTint: '#3b82c4',
   // Design Studio sketch geometry (design-canvas-draw, ADR-272). Sketch
   // entities have no layer yet — they only acquire one at Apply — so they need
-  // their own default ink. Near-black on the light bed, matching the
-  // WYSIWYG-against-white rationale above; construction guides are muted so
-  // they read as scaffolding rather than as cuts.
-  designGeometry: '#1a1a1a',
-  designConstruction: '#9aa0a6',
+  // their own theme-aware ink. Construction guides remain muted.
+  get designGeometry() {
+    return themed('#1a1a1a', '#e0e7f2');
+  },
+  get designConstruction() {
+    return themed('#9aa0a6', '#a0afc3');
+  },
   // Off-bed surround in the Design Studio. Deliberately a clear grey rather than
-  // the near-white viewportSurround: on the Studio canvas the surround and the bed
-  // are painted side by side, and #fafafa against #ffffff is a 2% difference that
-  // leaves the bed invisible — you cannot see that you have drawn off the sheet.
-  designSurround: '#dfe3e8',
+  // the main viewport: the Studio surround and bed are painted side by side,
+  // so a clear boundary makes drawing off the sheet immediately visible.
+  get designSurround() {
+    return themed('#dfe3e8', '#191d23');
+  },
 } as const;

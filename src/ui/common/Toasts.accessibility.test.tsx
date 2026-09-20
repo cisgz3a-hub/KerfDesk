@@ -26,16 +26,16 @@ describe('Toasts accessibility', () => {
     await act(async () => useToastStore.getState().pushToast('Check the fixture', 'warning'));
 
     const region = host.querySelector('[role="region"][aria-label="Notifications"]');
-    const toast = region?.querySelector<HTMLElement>(':scope > div');
-    const message = toast?.querySelector('span');
+    const toast = region?.querySelector<HTMLElement>('.lf-toast');
+    const message = toast?.querySelector('.lf-toast__message');
     const dismiss = toast?.querySelector('button');
     expect(region?.getAttribute('aria-live')).toBe('polite');
     expect(message?.textContent).toBe('Warning: Check the fixture');
     expect(dismiss?.getAttribute('aria-label')).toContain('warning notification');
-    // Overlaid on the canvas, the body must not swallow a click or drag meant
-    // for the drawing; only the dismiss control takes pointer input.
-    expect(toast?.style.pointerEvents).toBe('none');
-    expect(dismiss?.style.pointerEvents).toBe('auto');
+    // Sharing the canvas's space, the body must not swallow a click or drag
+    // meant for the drawing; Toasts.css makes .lf-toast pointer-events: none
+    // and only the dismiss control a pointer target.
+    expect(dismiss?.className).toBe('lf-toast__dismiss');
 
     await act(async () => root.unmount());
   });

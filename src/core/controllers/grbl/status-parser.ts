@@ -258,7 +258,11 @@ function pickAxisField(
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
     const parts = f.slice(label.length + 1).split(',');
-    if (parts.length !== 3) return null;
+    // grblHAL/Falcon reports include additional axes after XYZ. Keep the
+    // coordinates KerfDesk uses, while still rejecting malformed vectors.
+    if (parts.length < 3 || parts.some((token) => parseCanonicalStatusNumber(token) === null)) {
+      return null;
+    }
     const [xToken, yToken, zToken] = parts;
     const x = parseCanonicalStatusNumber(xToken);
     const y = parseCanonicalStatusNumber(yToken);

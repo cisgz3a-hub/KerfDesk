@@ -55,12 +55,13 @@ export function StatusDisplay(): JSX.Element {
 }
 
 const panelStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, Menlo, monospace',
-  fontSize: 12,
-  background: 'var(--lf-bg-input)',
-  border: '1px solid var(--lf-border)',
-  padding: 6,
-  borderRadius: 4,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  fontSize: 'var(--lf-text-sm)',
+  fontVariantNumeric: 'tabular-nums',
+  borderBottom: '1px solid var(--lf-border)',
+  padding: '0 0 10px',
 };
 const stateRowStyle: React.CSSProperties = { color: 'var(--lf-success-fg)' };
 const posRowStyle: React.CSSProperties = { color: 'var(--lf-text)' };
@@ -71,4 +72,9 @@ const feedRowStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 // previous workpiece or recovering after a power-cycle.
 const originDefaultStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
 const originCustomStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', fontWeight: 600 };
-const dimStyle: React.CSSProperties = { fontStyle: 'italic', color: 'var(--lf-text-faint)' };
+const dimStyle: React.CSSProperties = {
+  fontSize: 'var(--lf-text-sm)',
+  color: 'var(--lf-text-muted)',
+  paddingBottom: 10,
+  borderBottom: '1px solid var(--lf-border)',
+};

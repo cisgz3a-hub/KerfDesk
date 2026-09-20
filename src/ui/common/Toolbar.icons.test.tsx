@@ -13,7 +13,8 @@ describe('Toolbar icon presentation', () => {
     const commands = TOOLBAR_COMMANDS.map(([id, label]) => command(id, label));
     const view = await renderToolbarCommands(commands);
     try {
-      const buttons = [...view.host.querySelectorAll('button[data-help-id]')];
+      await openMore(view.host);
+      const buttons = [...document.querySelectorAll('button[data-help-id]')];
       expect(buttons).toHaveLength(commands.length);
       for (const button of buttons) {
         expect(button.getAttribute('aria-label')).not.toBe('');
@@ -35,10 +36,11 @@ describe('Toolbar icon presentation', () => {
     }
   });
 
-  it('keeps specialist labels available for wide toolbar layouts', async () => {
+  it('keeps specialist labels available in More', async () => {
     const view = await renderToolbar(command('tools.box-generator', 'Box Generator...'));
     try {
-      const button = view.host.querySelector('button[aria-label="Box Generator..."]');
+      await openMore(view.host);
+      const button = document.querySelector('button[aria-label="Box Generator..."]');
       expect(button?.querySelector('.lf-toolbar-icon svg')).not.toBeNull();
       expect(button?.querySelector('.lf-toolbar-command-label')?.textContent).toBe(
         'Box Generator...',
@@ -48,6 +50,12 @@ describe('Toolbar icon presentation', () => {
     }
   });
 });
+
+async function openMore(host: HTMLElement): Promise<void> {
+  const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="More commands"]');
+  if (trigger === null) throw new Error('More commands missing');
+  await act(async () => trigger.click());
+}
 
 function command(id: AppCommand['id'], label: string): AppCommand {
   return {
@@ -99,7 +107,9 @@ const TOOLBAR_COMMANDS: ReadonlyArray<readonly [AppCommand['id'], string]> = [
   ['tools.place-board', 'Place Board'],
   ['tools.box-generator', 'Box Generator...'],
   ['tools.trace-image', 'Trace Image...'],
+  ['tools.edit-image', 'Image Studio...'],
   ['tools.convert-to-bitmap', 'Convert to Bitmap...'],
   ['file.save-gcode', 'Save G-code...'],
   ['window.toggle-preview', 'Preview'],
+  ['file.inspect-gcode', 'Inspect G-code...'],
 ];

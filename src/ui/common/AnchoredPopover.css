@@ -1,0 +1,16 @@
+.lf-anchored-popover {
+  position: fixed;
+  z-index: 500;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--lf-text);
+  background: var(--lf-bg-1);
+  border: 1px solid var(--lf-border);
+  border-radius: 7px;
+  box-shadow: var(--lf-shadow-menu, 0 8px 24px var(--lf-border));
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+}

@@ -10,4 +10,4 @@ export const sectionStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--lf-border)',
 };
 export const noteStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', margin: 0 };
-export const errStyle: React.CSSProperties = { color: 'var(--lf-danger)', margin: 0 };
+export const errStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', margin: 0 };

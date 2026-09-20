@@ -1,0 +1,37 @@
+.lf-menu-chrome {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--lf-bg-0);
+  border-bottom: 1px solid var(--lf-border);
+  color: var(--lf-text);
+  font: var(--lf-text-md) var(--lf-font);
+}
+
+.lf-menu-brand {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.lf-menu-build {
+  margin-left: auto;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-xs);
+}
+
+@media (max-width: 700px) {
+  .lf-menu-chrome {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    padding: 4px 8px;
+  }
+
+  .lf-menu-build {
+    display: none;
+  }
+}

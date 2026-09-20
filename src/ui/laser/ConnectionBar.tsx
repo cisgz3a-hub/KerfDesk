@@ -58,6 +58,7 @@ function ConnectionActions(props: Props): JSX.Element {
         <>
           <button
             type="button"
+            className="lf-btn"
             onClick={props.onDisconnect}
             disabled={props.disabled}
             title={`Close the current ${props.machineNoun} serial connection but keep device permission.`}
@@ -66,6 +67,7 @@ function ConnectionActions(props: Props): JSX.Element {
           </button>
           <button
             type="button"
+            className="lf-btn"
             onClick={props.onForget}
             disabled={props.disabled}
             title={`Disconnect and remove this ${props.machineNoun} from the browser's permitted devices.`}
@@ -88,6 +90,7 @@ function connectButton(props: Props, label: string, disabled: boolean): JSX.Elem
   return (
     <button
       type="button"
+      className="lf-btn"
       onClick={props.onConnect}
       disabled={disabled}
       title={`Open the browser serial picker and connect to your ${props.machineNoun} controller.`}
@@ -191,7 +194,13 @@ function connectionStatusColor(connection: ConnectionState): string {
   }
 }
 
-const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  minWidth: 0,
+};
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const errorStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', fontSize: 11 };
 const qualificationStyle: React.CSSProperties = {

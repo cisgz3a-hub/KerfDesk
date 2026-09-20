@@ -256,6 +256,6 @@ const kindSelectStyle: React.CSSProperties = { fontSize: 12, padding: '2px 4px' 
 const numberInputStyle: React.CSSProperties = { width: 76, padding: '2px 6px' };
 const errorStyle: React.CSSProperties = {
   flexBasis: '100%',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontSize: 11,
 };

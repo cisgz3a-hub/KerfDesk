@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 import { mkdtempSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -94,7 +95,7 @@ test('production Import Image accepts a qualified 200 MiB PNG without UI whole-f
   const sampler = setInterval(() => void sampleHeap(), 100);
   try {
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: 'Import...' }).click();
+    await (await toolbarCommand(page, 'Import...')).click();
     await (await chooser).setFiles(fixturePath);
     await expect
       .poll(() => importedAssetState(page), { timeout: 280_000, intervals: [250, 500, 1_000] })

@@ -50,9 +50,9 @@ export function JogSettingsRow(props: {
 }
 
 const rowStyle: React.CSSProperties = {
-  display: 'flex',
+  display: 'grid',
+  gridTemplateColumns: 'auto minmax(0, 1fr) minmax(0, 1fr)',
   alignItems: 'flex-end',
-  flexWrap: 'wrap',
   gap: 8,
 };
 const labelStyle: React.CSSProperties = { fontWeight: 600 };
@@ -60,5 +60,6 @@ const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 2,
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
+  minWidth: 0,
 };

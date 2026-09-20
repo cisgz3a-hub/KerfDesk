@@ -7,6 +7,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { Icon } from '../kit';
 import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
@@ -29,6 +30,7 @@ export function LayerRow(props: {
     <section
       aria-label={`Operation ${props.layer.name}`}
       aria-current={active ? 'true' : undefined}
+      className="lf-operation-card"
       style={rowStyle(props.layer.output, active)}
     >
       <OperationActivation
@@ -38,39 +40,69 @@ export function LayerRow(props: {
         isActive={active}
         onActivate={activate}
       />
-      <LayerOrderControls
-        layer={props.layer}
-        canMoveUp={props.canMoveUp}
-        canMoveDown={props.canMoveDown}
-      />
-      <div style={togglesStyle}>
-        <label title="Show or hide this operation on the workspace">
-          <input
-            type="checkbox"
-            checked={props.layer.visible}
-            aria-label={`Show ${props.layer.name}`}
-            title="Show or hide this operation on the workspace"
-            onChange={(event) => setLayerParam(props.layer.id, { visible: event.target.checked })}
-          />{' '}
-          Show
-        </label>
-        <label title="Include this operation in preview and machine output">
-          <input
-            type="checkbox"
-            checked={props.layer.output}
-            aria-label={`Output ${props.layer.name}`}
-            title="Include this operation in preview and machine output"
-            onChange={(event) => setLayerParam(props.layer.id, { output: event.target.checked })}
-          />{' '}
-          Output
-        </label>
-      </div>
-      <div style={actionsStyle}>
-        <SelectLayerObjectsButton layer={props.layer} />
-        <LayerSettingsClipboardButtons layer={props.layer} />
-        <DeleteLayerButton layer={props.layer} />
-      </div>
+      <button
+        type="button"
+        className="lf-btn lf-btn--ghost lf-operation-card__visibility"
+        aria-label={`${props.layer.visible ? 'Hide' : 'Show'} operation ${props.layer.name}`}
+        aria-pressed={props.layer.visible}
+        title={`${props.layer.visible ? 'Hide' : 'Show'} this operation on the workspace`}
+        onClick={() => setLayerParam(props.layer.id, { visible: !props.layer.visible })}
+      >
+        <Icon name="eye" size={18} />
+      </button>
+      <OperationManagement {...props} />
     </section>
+  );
+}
+
+function OperationManagement(props: {
+  readonly layer: Layer;
+  readonly canMoveUp: boolean;
+  readonly canMoveDown: boolean;
+}): JSX.Element {
+  const setLayerParam = useStore((state) => state.setLayerParam);
+  return (
+    <details className="lf-operation-card__management">
+      <summary
+        aria-label={`More controls for ${props.layer.name}`}
+        title="Operation order, output, clipboard and delete controls"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+        }}
+      >
+        <span aria-hidden="true">•••</span>
+      </summary>
+      <div className="lf-operation-card__management-body">
+        <LayerOrderControls {...props} />
+        <div style={togglesStyle}>
+          <label title="Show or hide this operation on the workspace">
+            <input
+              type="checkbox"
+              checked={props.layer.visible}
+              aria-label={`Show ${props.layer.name}`}
+              title="Show or hide this operation on the workspace"
+              onChange={(event) => setLayerParam(props.layer.id, { visible: event.target.checked })}
+            />{' '}
+            Show
+          </label>
+          <label title="Include this operation in preview and machine output">
+            <input
+              type="checkbox"
+              checked={props.layer.output}
+              aria-label={`Output ${props.layer.name}`}
+              title="Include this operation in preview and machine output"
+              onChange={(event) => setLayerParam(props.layer.id, { output: event.target.checked })}
+            />{' '}
+            Output
+          </label>
+        </div>
+        <div style={actionsStyle}>
+          <SelectLayerObjectsButton layer={props.layer} />
+          <LayerSettingsClipboardButtons layer={props.layer} />
+          <DeleteLayerButton layer={props.layer} />
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -128,30 +160,36 @@ function format(value: number): string {
 function rowStyle(output: boolean, active: boolean): React.CSSProperties {
   return {
     display: 'grid',
-    gridTemplateColumns: '18px minmax(0, 1fr) auto',
+    gridTemplateColumns: 'minmax(0, 1fr)',
     alignItems: 'center',
-    gap: 8,
-    padding: '8px 9px',
+    gap: 0,
+    padding: '12px 10px',
     marginBottom: 6,
     border: `1px solid ${active ? 'var(--lf-accent)' : 'var(--lf-border)'}`,
     borderRadius: 6,
-    background: 'var(--lf-bg-2)',
+    background: active ? 'var(--lf-tint-info)' : 'var(--lf-bg-1)',
     opacity: output ? 1 : 0.58,
   };
 }
 
-const swatchStyle: React.CSSProperties = { width: 16, height: 16, borderRadius: 4 };
+const swatchStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  borderRadius: 3,
+  border: '1px solid var(--lf-border-strong)',
+};
 const activationStyle: React.CSSProperties = {
-  gridColumn: '1 / 3',
+  gridColumn: '1 / -1',
   display: 'grid',
   gridTemplateColumns: '18px minmax(0, 1fr)',
   alignItems: 'center',
   gap: 8,
   minWidth: 0,
-  padding: 0,
+  padding: '0 60px 0 0',
   border: 0,
   background: 'transparent',
   color: 'var(--lf-text)',
+  font: 'inherit',
   cursor: 'pointer',
   textAlign: 'left',
 };
@@ -172,16 +210,16 @@ const activeBadgeStyle: React.CSSProperties = {
   padding: '1px 5px',
   border: '1px solid var(--lf-accent)',
   borderRadius: 999,
-  fontSize: 9,
+  fontSize: 10,
   fontWeight: 600,
   textTransform: 'uppercase',
 };
 const summaryStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  whiteSpace: 'normal',
 };
 const togglesStyle: React.CSSProperties = {
   gridColumn: '2 / -1',

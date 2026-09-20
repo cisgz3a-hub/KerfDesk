@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -89,7 +90,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await expect(submit).toBeFocused();
   await submit.click();
   await expect(dialog).toBeHidden();
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('traced-image'),
   );
@@ -128,7 +129,15 @@ test('keeps the preview and actions usable on a narrow screen and restores focus
   await dialog.screenshot({ path: testInfo.outputPath('tracer-mobile.png') });
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeFocused();
+  const more = page.getByRole('button', { name: 'More commands', exact: true });
+  await expect(more).toBeFocused();
+  await more.press('ArrowDown');
+  const trace = page.getByRole('menuitem', { name: 'Trace Image...', exact: true });
+  await trace.focus();
+  await trace.press('Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
 });
 
@@ -136,7 +145,7 @@ async function openTrace(page: Page, fixture: KerfDeskFixture) {
   await fixture.setOpenFiles([
     { name: 'tracer-ui.png', kind: 'png-fixture', width: 64, height: 96 },
   ]);
-  await page.getByRole('button', { name: 'Import...', exact: true }).click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
   const notifications = page.getByRole('button', { name: /^Dismiss .* notification:/ });
   while (await notifications.count()) await notifications.first().click();
