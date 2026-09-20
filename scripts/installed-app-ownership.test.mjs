@@ -13,7 +13,7 @@ test(
       $tokens = $null; $parseErrors = $null
       $ast = [System.Management.Automation.Language.Parser]::ParseFile($env:QUALIFICATION_HELPER, [ref]$tokens, [ref]$parseErrors)
       if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
-      foreach ($name in @('Select-FileDialogControls', 'Assert-OwnedControls', 'Initialize-WindowTools')) {
+      foreach ($name in @('Select-FileDialogControls', 'Test-FilenameCombo', 'Assert-OwnedControls', 'Initialize-WindowTools')) {
         $definition = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
         if ($null -eq $definition) { throw "Missing function $name" }
         . ([ScriptBlock]::Create($definition.Extent.Text))
@@ -44,6 +44,17 @@ test(
       $rejected = $false
       try { Select-FileDialogControls @($rows + $rows[0]) 100 200 | Out-Null } catch { $rejected = $true }
       if (-not $rejected) { throw 'Duplicate handle admitted' }
+      # windows-latest modern dialog: the filename combo reports control ID 0 and is
+      # hosted by a FloatNotifySink; a control-ID-0 combo anywhere else stays unrelated.
+      $modern = @(
+        (Control 600 100 'DUIViewWndClassName' 0), (Control 610 600 'FloatNotifySink' 0),
+        (Control 620 610 'ComboBox' 0), (Control 630 620 'Edit' 1001),
+        (Control 640 600 'ComboBox' 0), (Control 650 640 'Edit' 1001),
+        (Control 660 100 'ComboBoxEx32' 41477), (Control 670 660 'ComboBox' 41477), (Control 680 670 'Edit' 41477),
+        (Control 690 100 'Button' 1), (Control 700 100 'Button' 2)
+      )
+      $modernSelected = Select-FileDialogControls $modern 100 200
+      if (($modernSelected.edits.handle -join ',') -ne '630' -or ($modernSelected.buttons.handle -join ',') -ne '690') { throw 'Modern filename combo discrimination failed' }
       # Check revalidation with an in-memory inventory, never real local windows.
       $script:ownershipChecks = 0
       function Assert-OwnedDialog($Dialog) { $script:ownershipChecks++ }

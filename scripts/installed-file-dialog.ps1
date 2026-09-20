@@ -226,7 +226,7 @@ function Select-FileDialogControls($Controls, [long]$DialogHandle, [int]$DialogP
     for ($depth = 0; $depth -lt 16 -and $null -ne $current; $depth++) {
       if ($seen.ContainsKey($current.handle) -or $current.processId -ne $DialogProcessId) { break }
       $seen[$current.handle] = $true
-      if ($current.className -in @('ComboBox', 'ComboBoxEx32') -and $current.controlId -eq 1148 -and $current.visible -and $current.enabled) { $filenameCombo = $true }
+      if ($current.className -in @('ComboBox', 'ComboBoxEx32') -and $current.visible -and $current.enabled -and (Test-FilenameCombo $current $byHandle)) { $filenameCombo = $true }
       if ($current.parentHandle -eq $DialogHandle) { $ownedAncestry = $true; break }
       $current = $byHandle[$current.parentHandle]
     }
@@ -235,6 +235,18 @@ function Select-FileDialogControls($Controls, [long]$DialogHandle, [int]$DialogP
     if ($control.className -eq 'Button' -and $control.controlId -eq 1) { $buttons += $control }
   }
   return [pscustomobject]@{ edits = $edits; buttons = $buttons }
+}
+
+# The classic common dialog exposes the filename combo as control 1148 (cmb13).
+# The modern dialog on windows-latest (Server 2025, 2026-09-19 evidence) reports
+# control ID 0 for it; there the combo is the one hosted directly by a
+# FloatNotifySink in the DUIView, which neither the address band (a
+# ComboBoxEx32 under the progress control) nor the search box uses.
+function Test-FilenameCombo($Control, $ByHandle) {
+  if ($Control.controlId -eq 1148) { return $true }
+  if ($Control.controlId -ne 0) { return $false }
+  $parent = $ByHandle[$Control.parentHandle]
+  return ($null -ne $parent) -and ($parent.className -eq 'FloatNotifySink')
 }
 
 function Assert-OwnedControls($Dialog, $Selection) {
