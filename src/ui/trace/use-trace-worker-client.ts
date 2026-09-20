@@ -18,9 +18,11 @@
 // fallback or relaxed retry. The replacement pays worker startup, not backlog.
 //
 // Each message, fatal callback and watchdog belongs to its specific worker.
-// Retired callbacks cannot act on a replacement. The unchanged 30s watchdog
-// bounds startup/no acknowledgement, then restarts on the 'started' ack to
-// give the current computation its own budget.
+// Retired callbacks cannot act on a replacement. The 30s watchdog bounds
+// SILENCE: it is armed at post time, restarted on the 'started' ack, and
+// restarted again on every heartbeat the worker sends from inside the trace.
+// A worker that is merely slow keeps its budget; one that has stopped speaking
+// does not.
 
 import type { Bounds, ColoredPath } from '../../core/scene';
 import {
@@ -63,8 +65,8 @@ type Pending = {
   readonly resolve: (result: TraceResult) => void;
   readonly reject: (err: Error) => void;
   // Restart this request's hung-worker budget. Called on the worker's
-  // 'started' ack, i.e. the moment the request stops queueing and starts
-  // computing.
+  // 'started' ack — the moment the request stops queueing and starts
+  // computing — and on every heartbeat from inside that computation.
   readonly restartWatchdog: () => void;
 };
 
@@ -79,10 +81,15 @@ let nextRequestId = 0;
 let latestTraceEpoch = 0;
 const pendingByRequestId = new Map<number, Pending>();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
-// Bound a worker request so excessive computation cannot leave preview/commit
-// pending forever. This is an execution deadline, not a complexity guarantee:
-// valid artwork can still expose a slow algorithm despite a capped pixel grid.
-const TRACE_WORKER_TIMEOUT_MS = 30_000;
+// How long a request may go without a word from its worker before that worker
+// is treated as dead. It bounds SILENCE, not work: the worker heartbeats from
+// inside the trace every 250 ms, so a dense line drawing that legitimately
+// traces for minutes keeps its budget, while a worker that has crashed,
+// wedged, or never started still fails here. It used to bound total execution,
+// which made it a size refusal in disguise — a 600px coloring-page rosette
+// grid traces in about 19 s, so a page-sized one was abandoned mid-work and
+// reported to the operator as "Trace worker timed out" (rule 7 / ADR-241).
+const TRACE_WORKER_SILENCE_MS = 30_000;
 
 class TraceWorkerRuntimeError extends Error {}
 
@@ -127,8 +134,11 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
   if (workerInstance !== worker) return;
   const pending = pendingByRequestId.get(e.data.id);
   if (pending === undefined || pending.worker !== worker) return;
-  if (e.data.kind === 'started') {
-    // Startup completed and this owner is about to trace the current request.
+  if (e.data.kind === 'started' || e.data.kind === 'progress') {
+    // 'started': startup completed and this owner is about to trace this
+    // request. 'progress': it is still inside that trace. Either way the
+    // worker has just proved it is alive, which is the only thing the budget
+    // below is entitled to judge.
     pending.restartWatchdog();
     return;
   }
@@ -283,14 +293,14 @@ function armWatchdog(worker: Worker, id: number): Watchdog {
     if (pendingByRequestId.get(id)?.worker !== worker) return;
     rejectAllPendingAndRetireWorker(worker, new Error('Trace worker timed out'));
   };
-  let timer = setTimeout(fire, TRACE_WORKER_TIMEOUT_MS);
+  let timer = setTimeout(fire, TRACE_WORKER_SILENCE_MS);
   return {
     clear: () => {
       clearTimeout(timer);
     },
     restart: () => {
       clearTimeout(timer);
-      timer = setTimeout(fire, TRACE_WORKER_TIMEOUT_MS);
+      timer = setTimeout(fire, TRACE_WORKER_SILENCE_MS);
     },
   };
 }

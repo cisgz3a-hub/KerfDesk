@@ -20849,3 +20849,50 @@ either, so no test and no manual check in this project can execute the worker sh
 transfer, or the two halves talking to each other. There is no hardware evidence of any kind.
 That is why it ships off, why every failure path falls back to the main-thread transport, and why
 the Machine Setup control says so. Anyone enabling it should air-cut first.
+
+## ADR-335 - The trace worker's budget bounds silence, not work (2026-09-21)
+
+**Status:** Accepted; amends the trace worker watchdog. Preserves rule 7 / ADR-241: nothing here
+refuses artwork by size.
+
+### Context
+
+A dense line drawing — the coloring-page case this app exists for — failed with "Trace worker
+timed out" and produced nothing. The watchdog was a fixed 30 s execution deadline: armed at post
+time and restarted once on the worker's `started` ack, it then had to cover the entire trace.
+
+A trace never hands the worker's event loop back, so the client had no way to tell a worker that
+had crashed from one that was still working. The deadline was therefore a size refusal wearing a
+liveness check's clothing, and the threshold was far lower than it looked: a 600 px rosette grid
+measures about 19 s on this machine, so a page-sized drawing had no chance of fitting.
+
+### Decision
+
+1. The worker heartbeats. `TraceWorkerResponse` gains `{ kind: 'progress' }`, posted at most every
+   250 ms from inside the computation.
+2. The heartbeat rides the trace's own checkpoints — the resumable `TraceSteps` generators the
+   inline cooperative runner already drives. The worker's runner asks for checkpoints
+   (`next(true)`) purely to get an execution point inside the hot loops; unlike the inline runner
+   it never awaits, so the algorithm's order and the worker's blocked event loop are exactly as
+   the native drain left them. Measured cost on a dense 600 px drawing: 18.9 s to 21.0 s, about
+   11%, against a trace that previously did not finish at all.
+3. `TRACE_WORKER_TIMEOUT_MS` becomes `TRACE_WORKER_SILENCE_MS`, restarted by every heartbeat as
+   well as by `started`. A worker that has crashed, wedged, or never started still fails after
+   30 s of silence, and supersession still retires its worker unchanged.
+
+### Verification and limits
+
+`trace-worker-heartbeat.test.ts` pins that checkpoints are requested, that beats are at most one
+per interval and carry the request id, that a short trace stays silent, and that a failing trace
+still reports its error. `use-trace-worker-client-timeout.test.ts` adds a trace running five
+budgets long that survives on its heartbeats, and a worker that beats and then goes quiet, which
+is still terminated one budget after its last word. Each new test fails against the previous
+worker and client. The existing ack-then-hang and supersede cases are unchanged.
+
+Live: the 2000 px drawing that failed twice with "Trace worker timed out" now completes in 339 s —
+eleven times the old deadline — at 41,773 paths and 1,279,890 points.
+
+This bounds the wait; it does not shorten it. Nothing yet tells the operator that a five-minute
+trace is progressing rather than stuck, and the tracer's cost on dense ink (19 s at 600 px) is
+itself unaddressed — both are open. The heartbeat cannot rescue a worker wedged between two
+checkpoints inside one long step; that case still reads as silence, correctly.
