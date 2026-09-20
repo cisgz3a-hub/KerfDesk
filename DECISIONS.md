@@ -20103,3 +20103,45 @@ Persistence, setup, bounds, air commands, head variants and settings adoption ha
 coverage. Integrated release checks and browser evidence are recorded in the correction record.
 No physical machine, firmware runtime, material process or packaged hardware transport is
 qualified by these software checks. Ruida remains experimental vector-only file export.
+
+## ADR-323 - Falcon Frame leaves the air pump alone and Job Review discloses an air-off opening operation (2026-09-19)
+
+**Status:** Accepted; amends the ADR-322 §4 Falcon A1 Pro command contract. Preserves the
+completed-Frame contract in ADRs 228, 230, 232 and 237.
+
+### Context
+
+The maintainer's Falcon A1 Pro burned dark smoke marks around the opening part of every job on
+wood, fading as the job progressed. The emitted program is time-invariant (`M4 S0` preamble,
+`S0` on every travel, dynamic power throughout), so the only start-specific behaviour was air:
+Frame sent the generic GRBL tool-off pair `M5`/`M9` plus a settle dwell immediately before Start,
+and the job writes the device's air command only right before the first operation whose Air
+setting is on. New operations default to Air off. Creality's A1 firmware treats `M9` as a
+stateful low/standby request with a `$152` delay, dropped the pump seconds after `M8` on firmware
+1.0.6, and fails the pump around dwell pauses (LightBurn forum threads 181704, 186138 and 175296;
+Creality forum thread 41420). The pump was therefore commanded off immediately before the burn
+and turned on late or never.
+
+### Decision
+
+1. The Falcon A1 Pro command contract overrides `frameToolOffLines` to `M5` alone. Frame still
+   asserts laser-off and every perimeter line carries `S0`; the pump keeps whatever state the
+   operator or the previous job left. The generic GRBL driver keeps `M5`/`M9` because CNC
+   projects trace with coolant off, and Stop, Abort and disconnect cleanup still send `M9`.
+2. Job Review adds an advisory when the device has a job-controlled air command and the first
+   laser operation runs with Air off. It names the opening operation and the operation before
+   which the command first appears, or states that the job never sends the command when every
+   operation has Air off. The Air column in the same review is the fix. This is a warning only;
+   no Start gate is added.
+3. The emitter is unchanged. Pre-arming `M8` at job start was rejected: an operation with Air
+   off is a legitimate choice (the A1's `M9` state is its documented gentle engraving flow), and
+   forcing air would silently change that operation's result.
+
+### Verification and limits
+
+`falcon-command-contract.test.ts` pins `['M5']` for the Falcon contract and `['M5', 'M9']` for
+the generic driver. `air-assist-start-warnings.test.ts` and `job-review-model.test.ts` pin the
+advisory texts and that they never change the acknowledgement. No hardware was operated; the
+pump-timing cause is inferred from the emitted bytes and public firmware reports, and a Falcon
+coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
+check.

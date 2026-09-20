@@ -2316,6 +2316,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 10. **$10 unusual config.** Set `$10=1` (WPos-only) and repeat steps
     2–3. The cache should still update — WCO is reported on a
     separate bit from MPos/WPos.
+11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+    then Start: the pump must be running at the first burn line. Frame
+    no longer sends `M9` on the Falcon command set, so a pump the
+    operator left on stays on. With the first operation's Air off, Job
+    Review shows the air-off opening-operation advisory; Start is not
+    blocked.
 
 When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —

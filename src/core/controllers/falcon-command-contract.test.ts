@@ -9,6 +9,7 @@ describe('Falcon A1 Pro vendor command contract', () => {
     expect(selectControllerDriver('grbl-v1.1')).toBe(grblDriver);
     expect(grblDriver.commands.settingsQuery).toBe('$$');
     expect(grblDriver.commands.home).toBe('$H');
+    expect(grblDriver.commands.frameToolOffLines).toEqual(['M5', 'M9']);
     for (const kind of ['fluidnc', 'marlin', 'smoothieware', 'ruida'] as const) {
       expect(selectControllerDriver(kind, commandSet)).toBe(selectControllerDriver(kind));
     }
@@ -40,10 +41,12 @@ describe('Falcon A1 Pro vendor command contract', () => {
     expect(() => buildJog({ dx: 0, feed: 500 })).toThrow(/axis/);
   });
 
-  it('frames with zero-power G1 lines instead of native $J commands', () => {
+  it('frames with zero-power G1 lines instead of native $J commands and leaves the pump alone', () => {
     const driver = selectControllerDriver('grblhal', commandSet);
     const lines = driver.commands.buildFrameLines({ minX: 0, minY: 1, maxX: 10, maxY: 5 }, 500);
-    expect(driver.commands.frameToolOffLines).toEqual(['M5', 'M9']);
+    // ADR-323: laser-off only. An M9 here put the A1 pump into its standby
+    // state right before Start, so the opening operation burned without air.
+    expect(driver.commands.frameToolOffLines).toEqual(['M5']);
     expect(lines).toEqual([
       'G21 G90\n',
       'G1 X0.000 Y1.000 F500 S0\n',
