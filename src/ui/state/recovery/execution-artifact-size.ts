@@ -170,6 +170,22 @@ export function assertExecutionArtifactSizeWithinBudget(
   additionalBinaryBytes = 0,
   allowTransientFunctions = false,
 ): void {
+  measureExecutionArtifactBytesWithinBudget(value, additionalBinaryBytes, allowTransientFunctions);
+}
+
+/** Enforce the archive budget and return the measurement in ONE traversal.
+ *
+ * The returned total is the complete estimate, never an early-exit lower
+ * bound: the walk stops early only once it passes the remaining budget, and
+ * that is exactly the case this throws on. Callers that need both the guard
+ * and the recorded size must use this instead of asserting and then
+ * estimating again — the traversal visits one node per motion-manifest point,
+ * so a second pass costs real time before the first wire write. */
+export function measureExecutionArtifactBytesWithinBudget(
+  value: unknown,
+  additionalBinaryBytes = 0,
+  allowTransientFunctions = false,
+): number {
   if (
     !Number.isSafeInteger(additionalBinaryBytes) ||
     additionalBinaryBytes < 0 ||
@@ -178,9 +194,31 @@ export function assertExecutionArtifactSizeWithinBudget(
     throw new Error('Execution artifact exceeds the safe archive size.');
   }
   const remaining = MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - additionalBinaryBytes;
-  if (estimateExecutionArtifactBytes(value, remaining, allowTransientFunctions) > remaining) {
+  const bytes = estimateExecutionArtifactBytes(value, remaining, allowTransientFunctions);
+  if (bytes > remaining) {
     throw new Error('Execution artifact exceeds the safe archive size.');
   }
+  return bytes;
+}
+
+const memoizedArtifactBytes = new WeakMap<object, number>();
+
+/** Identity-memoized full estimate for an immutable archived artifact.
+ *
+ * Snapshot hydration re-measures every retained execution-history artifact on
+ * every refresh, and a refresh runs after each recovery mutation — including
+ * the one that arms a fresh Start. The retained set is bounded by run count
+ * and bytes, not by node count, so twenty traced jobs cost seconds of
+ * main-thread work per refresh. Archived artifacts are immutable and the
+ * snapshot coordinator deliberately hands the same object references back
+ * across refreshes, so caching on identity returns the identical number
+ * without re-walking. */
+export function memoizedExecutionArtifactBytes(artifact: object): number {
+  const cached = memoizedArtifactBytes.get(artifact);
+  if (cached !== undefined) return cached;
+  const bytes = estimateExecutionArtifactBytes(artifact);
+  memoizedArtifactBytes.set(artifact, bytes);
+  return bytes;
 }
 
 function boundedAdd(total: number, value: number): number {
