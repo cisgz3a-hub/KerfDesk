@@ -27,6 +27,7 @@ import { buildDisplayPolylines } from './display-polylines';
 import { strokePolylinesBatched } from './draw-vector-strokes';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import {
+  planPreviewRouteEligible,
   previewRouteForDrawing,
   registerExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
@@ -203,16 +204,29 @@ export function buildPreviewToolpathFromPrepared(
     scanningOffsets: project.device.scanningOffsets,
     bedSizeMm: { widthMm: project.device.bedWidth, heightMm: project.device.bedHeight },
   });
-  // The plan-preview gate already excludes streamed rasters. Their freshly
-  // built machine array has no remaining consumer, so reuse its slots instead
-  // of retaining two full routes while mapping millions of raster steps.
+  // Ask the plan-preview gate BEFORE mapping: only a comparison against the
+  // machine route keeps it alive past this point. A streamed raster never
+  // compares, and neither does a route the gate declines, so their freshly
+  // built machine array has no remaining consumer — reuse its slots instead
+  // of retaining two full routes while mapping millions of raster or fill
+  // steps. Callers that ask for no plan keep the pure mapper.
   const streamedRaster = prepared.job.groups.some(
     (group) => group.kind === 'raster' && group.rowProvider !== undefined,
   );
-  const mapPreview = streamedRaster ? mapOwnedToolpathToScene : mapToolpathToScene;
+  const planPreview =
+    options.executablePlan === true &&
+    planPreviewRouteEligible({
+      prepared,
+      ...(jobOrigin === undefined ? {} : { jobOrigin }),
+      routeStepCount: machineToolpath.steps.length,
+    });
+  const mapPreview =
+    streamedRaster || (options.executablePlan === true && !planPreview)
+      ? mapOwnedToolpathToScene
+      : mapToolpathToScene;
   const previewToolpath = mapPreview(machineToolpath, prepared.jobOriginOffset, project.device);
   registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
-  if (options.executablePlan === true && !streamedRaster) {
+  if (planPreview) {
     registerExecutablePlanPreviewRoute({
       previewToolpath,
       legacyMachineToolpath: machineToolpath,

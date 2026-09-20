@@ -413,7 +413,13 @@ kind, coordinate, cumulative segment-distance allocation, total route-length mis
 without two drawable points or whose declared scrubber length disagrees with its polyline geometry
 also falls back. ADR-243 streamed rasters also
 fall back because v1's exact-program carrier would defeat their bounded-memory row-provider path;
-a streaming plan representation is required before that case can migrate. CNC currently falls back
+a streaming plan representation is required before that case can migrate. ADR-325 extends that
+bounded-memory rule by size: a machine route longer than the compiled-work advisory the operator
+already sees for the same program (`MAX_PLAN_PREVIEW_ROUTE_STEPS`) keeps the legacy route, because
+verifying a second authority costs the whole emitted program at once and then retains a complete
+second route — roughly four times the legacy route's memory, which exhausted the renderer on a
+dense traced fill. The gate is asked before the scene mapping, so a declined route is consumed in
+place instead of being copied. CNC currently falls back
 because the emitted plan includes the preamble safe-Z rise and postamble retract that
 `toolpath-cnc.ts` deliberately omits at the job boundaries. That source-confirmed difference is not
 hidden by a projection rule; reconciling it requires its own reviewed compatibility decision.

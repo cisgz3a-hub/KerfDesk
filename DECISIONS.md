@@ -20221,3 +20221,66 @@ advisory texts and that they never change the acknowledgement. No hardware was o
 pump-timing cause is inferred from the emitted bytes and public firmware reports, and a Falcon
 coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
 check.
+
+## ADR-325 - The plan-backed preview authority stops at the advisory program size (2026-09-20)
+
+**Status:** Accepted; amends the ADR-244 large-job preparation path and the second consumer
+migration slice in `docs/architecture/10-executable-plan-mathematical-contract.md` §13.
+Preserves ADR-241/ADR-243 (no size refusals) and rule 7: nothing here refuses a job.
+
+### Context
+
+Tracing a dense line drawing — a detailed coloring-page dragon — and leaving the traced artwork
+on its default Fill operation crashed the renderer with Chrome's "Aw, Snap! Out of Memory". The
+same symptom on Frame was addressed in ADR-323's sibling timing work (PR #799), which stopped a
+moving head from keying a fresh background preparation per status report. That removed the
+repetition; it did not change what ONE preparation costs, and the crash survived it.
+
+The cost is the preview's second authority. `buildPreviewToolpathFromPrepared` builds the legacy
+machine route, maps a scene copy of it, then — for every job that is not a streamed raster —
+emits the whole G-code program and the v1 plan to verify a plan-backed route at emit precision
+and retains that verified route beside the legacy one for as long as the preview lives. Four
+complete routes plus the program exist at the peak.
+
+Measured on a synthetic fill inside a 4 GB heap, the size of Chrome's renderer budget:
+
+| fill segments | route steps | with the plan authority | without |
+| --- | --- | --- | --- |
+| 1,000,000 | 2,100,001 | 2,925 MB | 991 MB |
+| 2,000,000 | 4,200,001 | heap OOM | 1,584 MB |
+| 3,000,000 | 6,300,001 | heap OOM | 1,990 MB |
+
+A dense trace reaches those counts easily: every thin stroke outline becomes its own filled
+region, so the span count scales with contour crossings times hatch rows. The compiled job is
+not the problem — it is roughly 207 bytes per segment. The copies are.
+
+### Decision
+
+1. `planPreviewRouteEligible` holds every rule that decides whether a prepared job may carry the
+   plan-backed preview authority: the existing current-position and ADR-243 streamed-raster
+   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_STEPS` keeps
+   the legacy route. That constant is `MAX_COMPILED_MOTION_SEGMENTS`, the same 250,000 the
+   operator is already shown as "Large program: … preparation, preview, and streaming may be
+   slow". Route steps never undercount the motion segments that raise that advisory.
+2. `buildPreviewToolpathFromPrepared` asks the gate BEFORE mapping. Only the plan comparison
+   keeps the freshly built machine route alive past that point, so when the gate declines, the
+   machine array is consumed in place by `mapOwnedToolpathToScene` — the treatment streamed
+   rasters already had — instead of retaining two complete routes. Callers that never ask for a
+   plan keep the pure mapper unchanged.
+3. Nothing about the drawn geometry changes. The plan route is adopted only after
+   `comparePreviewRoutesAtEmitPrecision` proves it equal to the legacy route at the emitter's
+   own precision, and every consumer already falls back to the legacy route when it is absent.
+   Bytes, bounds, timing, Frame and Start are untouched: none of them read this route.
+
+### Verification and limits
+
+`draw-preview-plan-route-budget.test.ts` pins the boundary (admitted at the budget, declined one
+step past it), the current-position and streamed-raster refusals, that an ordinary job still
+reports `executable-plan`, and that an over-budget fill reports `legacy-toolpath` AND hands back
+the same steps array it was built into. The 2,000,000-segment case above, which exited 134 on a
+4 GB heap before, now completes in 1,584 MB; in the running app a 577,048-segment traced fill
+prepares in 549 MB of renderer heap where a 330,976-segment one previously reached 1,446 MB.
+
+The preparation worker still holds the compiled Job alive for the length of the acknowledged
+chunk transfer, and a preview still costs one full route on each side of that boundary. Both
+remain open; neither is what exhausted the renderer here. No hardware was operated.
