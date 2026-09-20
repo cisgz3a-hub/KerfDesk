@@ -3,6 +3,7 @@
 // (future) steps greyed below the current state. Clicking any row jumps
 // there; budget-evicted steps surface as a trimmed note, never a block.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { jumpEditorHistory, type HistoryTarget } from './editor-time-travel';
 import { useImageEditorStore } from './image-editor-store';
 
@@ -46,7 +47,12 @@ export function HistoryPanel(): JSX.Element | null {
 
   return (
     <aside style={panelStyle} aria-label="History panel">
-      <strong style={headerStyle}>History</strong>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+      >
+        <strong style={headerStyle}>History</strong>
+        <TutorialButton tutorialId="image-layers" compact label="Image history" />
+      </div>
       <div style={listStyle}>
         {rows.map((row) => (
           <button

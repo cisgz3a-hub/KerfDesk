@@ -1,3 +1,4 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useMemo, useState } from 'react';
 import { helpProps } from '../help/help-topics';
 import { useLaserStore } from '../state/laser-store';
@@ -74,6 +75,7 @@ function ConsoleHeader(props: {
     <div style={headerStyle}>
       <span style={titleStyle}>Console</span>
       <div style={headerButtonsStyle}>
+        <TutorialButton tutorialId="console" compact label="Console" />
         <button
           type="button"
           onClick={props.onCopy}

@@ -8,8 +8,20 @@
 
 import { useState } from 'react';
 import { formatFieldNumber, parseFieldNumber } from './design-field-format';
-import { DESIGN_TOOL_BY_KIND } from './design-tool';
+import { DESIGN_TOOL_BY_KIND, type DesignToolKind } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
+import { TutorialButton } from '../tutorials/TutorialButton';
+
+const TOOL_TUTORIALS: Partial<Record<DesignToolKind, string>> = {
+  select: 'design-edit',
+  line: 'studio-line',
+  path: 'studio-path',
+  rect: 'studio-rectangle',
+  circle: 'studio-circle',
+  arc: 'studio-arc',
+  fillet: 'studio-fillet',
+  chamfer: 'studio-chamfer',
+};
 
 export function DesignOptionsBar(): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -20,6 +32,10 @@ export function DesignOptionsBar(): JSX.Element | null {
   return (
     <div style={barStyle} role="toolbar" aria-label={`${tool.label} options`}>
       <span style={toolNameStyle}>{tool.label}</span>
+      <TutorialButton
+        tutorialId={TOOL_TUTORIALS[session.tool] ?? 'design-studio'}
+        label={`${tool.label} tutorial`}
+      />
       {session.tool === 'fillet' ? (
         <SizeField
           label="Radius"
@@ -93,6 +109,7 @@ function SizeField(props: {
 
 const barStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 'var(--lf-space-3)',
   padding: '3px 10px',

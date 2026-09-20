@@ -1,0 +1,30 @@
+.lf-tutorial-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  min-height: 28px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-2);
+  color: var(--lf-text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.lf-tutorial-button:hover {
+  border-color: var(--lf-accent);
+  color: var(--lf-accent);
+}
+.lf-tutorial-button:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: 2px;
+}
+.lf-tutorial-button--compact {
+  padding: 4px;
+  width: 28px;
+}

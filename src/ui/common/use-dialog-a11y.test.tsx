@@ -15,6 +15,9 @@ function FocusHarness({ tick }: { readonly tick: number }): JSX.Element {
   useDialogA11y(ref, () => undefined);
   return (
     <div ref={ref} role="dialog" aria-modal="true" tabIndex={-1} data-tick={tick}>
+      <button type="button" data-dialog-secondary-focus="">
+        Help
+      </button>
       <input aria-label="first" />
       <input aria-label="second" />
     </div>
@@ -36,7 +39,7 @@ afterEach(() => {
 });
 
 describe('useDialogA11y', () => {
-  it('keeps focus where the user put it when the parent re-renders with a new onClose', async () => {
+  it('focuses the main control ahead of secondary help and preserves later focus on rerender', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -49,8 +52,9 @@ describe('useDialogA11y', () => {
       const second = host.querySelector<HTMLInputElement>('input[aria-label="second"]');
       if (first === null || second === null) throw new Error('inputs missing');
 
-      // Initial focus lands on the first focusable element.
+      // Secondary header help does not replace the form's original initial focus.
       expect(document.activeElement).toBe(first);
+      expect(host.querySelector('button')?.tabIndex).toBe(0);
 
       // The operator moves to the second field (e.g. opens the air-assist select).
       await act(async () => second.focus());

@@ -66,8 +66,10 @@ describe('ProbePanel', () => {
     useStore.getState().setMachineKind('cnc');
     const { host, root } = await renderPanel();
     try {
-      const button = host.querySelector('button');
-      if (button === null) throw new Error('Run button missing');
+      const button = [...host.querySelectorAll('button')].find((control) =>
+        control.textContent?.includes('Run probe'),
+      );
+      if (button === undefined) throw new Error('Run button missing');
       expect(button.disabled).toBe(true);
       await act(async () => {
         useLaserStore.setState({

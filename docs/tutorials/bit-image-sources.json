@@ -1,0 +1,93 @@
+[
+  {
+    "id": "bit-straight",
+    "source": "https://www.whitesiderouterbits.com/products/sc33",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Parallel cylindrical cutting body, two straight axial flutes with no twist, flat cutting end perpendicular to axis, square outer corners. Not a ball, cone or drill point.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-aa25353c-45bc-4aa6-9a7a-46c38f57ca5b.png"
+  },
+  {
+    "id": "bit-upcut",
+    "source": "https://www.whitesiderouterbits.com/products/ru2100",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Two-flute UPCUT flat end mill, right-hand helical flutes pulling chips toward shank in ordinary clockwise rotation. Constant cylindrical cutting diameter and flat square tip. Not a reverse downcut helix.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-c4a08604-c1e4-4644-8ea3-644e48cf709c.png"
+  },
+  {
+    "id": "bit-downcut",
+    "source": "https://www.whitesiderouterbits.com/products/rd2100",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Two-flute DOWNCUT flat end mill: opposite helix from a conventional upcut end mill, pushing chips toward the tip in ordinary clockwise rotation. Front visible flutes slope from upper left to lower right, reverse helix from the upcut example. Constant cylindrical diameter and flat square cutting tip.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-3aeab7af-294a-426f-8a54-31e818862a75.png"
+  },
+  {
+    "id": "bit-compression",
+    "source": "https://www.whitesiderouterbits.com/products/ud2100",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Two-flute COMPRESSION flat end mill. Cutting body has two opposite helical directions with a clearly visible meeting junction. SHORT UPCUT tip segment (bottom one quarter of cutting length) meets LONGER DOWNCUT upper section (upper three quarters). Flat square tip, cylindrical outer cutting envelope, no ball or cone. Show opposing flute directions clearly; not one single uniform spiral.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-fbd1c766-7472-4456-833d-05c32b9d0c1e.png"
+  },
+  {
+    "id": "bit-o-flute-upcut",
+    "source": "https://www.amanatool.com/pub/media/productattachments/Aluminum-O-Flute-Speed-Chart-v6.pdf",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Single O-flute UPCUT end mill with exactly ONE broad polished rounded open flute spiraling upward, one cutting lip and roomy smooth concave chip gullet. Flat end. No second spiral flute. Right-hand upcut helix, not downcut.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-bf308b3f-458a-45da-aebe-e5249aaebc3d.png"
+  },
+  {
+    "id": "bit-o-flute-downcut",
+    "source": "https://www.amanatool.com/51778-z-solid-carbide-cnc-spiral-o-flute-aluminum-cutting-1-8-dia-x-3-4-x-1-4-shank-down-cut-zrn-coated-router-bit.html",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Single O-flute DOWNCUT end mill with exactly ONE broad polished rounded open flute spiraling opposite to upcut. Flute slopes upper left to lower right on front. Flat end. No second spiral flute. Generic uncoated example, not branded exact product.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-5951d1b4-14f7-4148-a8ef-f43922c11e30.png"
+  },
+  {
+    "id": "bit-o-flute-straight",
+    "source": "https://www.whitesiderouterbits.com/products/sa1600",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Single O-flute STRAIGHT cutter with ONE broad oval concave open gullet and a straight axial cutting lip, zero helical twist. Flat bottom and cylindrical outer diameter. Single wide polished flute, not two-flute spiral.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-d6fa2fb7-d2e6-4e17-9b5d-4a82da5783de.png"
+  },
+  {
+    "id": "bit-o-flute-double",
+    "source": "https://www.amanatool.com/pub/media/custom/upload/File-1460474484.pdf",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: DOUBLE O-flute cutter, a representative straight design with TWO broad polished concave O-shaped chip gullets and two straight axial cutting lips, no helix. Constant cylinder with flat bottom. Clear rounded hollow gullets, not slender many-flute mill.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-9477ca79-8f75-4029-bc9b-aecdbbac0474.png"
+  },
+  {
+    "id": "bit-mortise",
+    "source": "https://www.whitesiderouterbits.com/products/1300",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: MORTISE router bit, SHORT BROAD cylindrical flat-bottom cutting head on a noticeably narrower smooth shank. Two carbide cutting edges with short slight downshear angle, square flat bottom for square-bottom mortises. No bearing/pilot, no long spiral body, no ball tip.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-0a3f49e9-74cd-43bd-a636-1a2c7c5d825b.png"
+  },
+  {
+    "id": "bit-ball-nose",
+    "source": "https://shop.carbide3d.com/products/202-25-ball-cutter",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Two-flute BALL-NOSE end mill. Untapered parallel cylindrical cutting body ending in full HEMISPHERICAL rounded tip, radius half cutter diameter. Flutes continue around hemisphere. No flat bottom, cone, drill point or just tiny radiused corners.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-8972f476-eaf1-4928-a9b2-b31081db521c.png"
+  },
+  {
+    "id": "bit-core-box",
+    "source": "https://www.whitesiderouterbits.com/products/1403",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: CORE-BOX or round-nose router bit. Short broad router head wider than the shank, two straight carbide cutting edges ending in a semicircular FULL RADIUS round bottom, radius half cutting width. A curved U-shaped bottom profile. No bearing, no pilot, no pointed cone, no flat-bottomed center.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-6bad4d32-1f81-4f7e-853c-40024a1e6e1a.png"
+  },
+  {
+    "id": "bit-o-flute-ball-nose",
+    "source": "https://www.amanatool.com/products/cnc-router-bits/plastic-cutting-cnc-router-bits/solid-carbide-spiral-o-flute-ball-nose-plastic-cutting.html",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: O-flute UPCUT BALL-NOSE cutter. Constant untapered cylindrical cutting envelope with broad smooth open polished O-style flute, ending in full hemispherical nose. Show rounded tip clearly. No flat end, taper or drill point. Generic family representative not branded exact Amana product.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-79614278-7db4-4d7a-aefa-a4cfcdd5c54b.png",
+    "editPrompt": "Use case: precise-object-edit. Input image is the edit target for a generic O-flute UPCUT BALL-NOSE CNC cutter identification photograph. Correct only the helical direction: reverse the spiral so the visible front cutting lip slopes from LOWER LEFT toward UPPER RIGHT (/), conventional right-hand upcut helix. The existing visible helix slopes upper-left toward lower-right and is incorrect. Preserve the constant cylindrical untapered body, full hemispherical rounded nose, broad polished open O-flute, smooth shank above, vertical composition, neutral studio background and lighting. No labels or extra objects. Do not flatten or point the rounded tip."
+  },
+  {
+    "id": "bit-v-groove",
+    "source": "https://www.inventables.com/products/carbide-tip-v-bit-60-degree-1-4-in-cutting-x-1-8-in-shank",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: V-GROOVE router cutter. Broad symmetrical conical head with two cutting wings beneath narrower cylindrical shank. Straight sloping cutting faces meet at a sharp central POINT, representative 60-degree included cone. No flat tip, bearing, ball or spiral cylindrical cutting end.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-724879ad-0e02-4b5a-8962-3722e488de34.png"
+  },
+  {
+    "id": "bit-engraving-point",
+    "source": "https://www.harveytool.com/products/specialty-profiles/engraving-cutters/pointed",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Slender conical ENGRAVING cutter. Slim pointed taper cut from a cylindrical carbide shank, one clearly visible split/relieved flat cutting face on conical tip. Ends in a true fine sharp POINT. No pyramid, ball, blunt flat tip or broad V-router head.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-9c22cc98-6aa5-4432-b785-b03255736640.png"
+  },
+  {
+    "id": "bit-engraving-flat",
+    "source": "https://www.harveytool.com/products-en-ca/specialty-profiles/engraving-cutters/tipped-off",
+    "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Slender conical tipped-off ENGRAVING cutter. Slim taper cut from cylindrical carbide shank with one split/relieved flat cutting face. Cone terminates in a clearly visible SMALL FLAT LAND perpendicular to axis, about 1/6 of shank width. Close enough to distinguish flat land from sharp point. Not a ball, pyramid or full-width flat end mill.",
+    "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-d72a8b52-338e-450a-a3b5-49eee9518b57.png"
+  }
+]

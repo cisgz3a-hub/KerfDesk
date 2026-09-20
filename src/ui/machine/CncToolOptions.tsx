@@ -18,6 +18,7 @@ const FAMILY_LABELS = new Map<string, string>([
   ['o-flute-double', 'Double O-flute plastic-cutting bits'],
   ['mortise', 'Mortise-bit envelopes'],
   ['ball-nose', 'Ball-nose end mills'],
+  ['o-flute-ball-nose', 'O-flute ball-nose bits'],
   ['core-box', 'Core-box / round-nose bits'],
   ['v-groove', 'V-groove bits (point-cone model)'],
   ['engraving', 'Legacy engraving tools'],

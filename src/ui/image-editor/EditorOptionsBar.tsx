@@ -9,6 +9,24 @@ import {
   SelectionModifyRow,
 } from './EditorSelectionControls';
 import { useImageEditorStore } from './image-editor-store';
+import type { EditorTool } from './editor-session';
+import { TutorialButton } from '../tutorials/TutorialButton';
+
+const TOOL_TUTORIALS: Record<EditorTool['kind'], string> = {
+  brush: 'image-paint',
+  pencil: 'image-paint',
+  eraser: 'image-paint',
+  line: 'image-paint',
+  marquee: 'image-select',
+  lasso: 'image-select',
+  wand: 'image-select',
+  bucket: 'image-fill',
+  gradient: 'image-fill',
+  clone: 'image-retouch',
+  heal: 'image-retouch',
+  crop: 'image-crop',
+  move: 'image-transform',
+};
 
 const SWATCHES: readonly PaintColor[] = [
   { r: 0, g: 0, b: 0 },
@@ -38,6 +56,7 @@ export function EditorOptionsBar(): JSX.Element {
   const showModes = isSelectTool && tool.kind !== 'move';
   return (
     <div style={barStyle} aria-label="Tool options">
+      <TutorialButton tutorialId={TOOL_TUTORIALS[tool.kind]} label="Tool tutorial" />
       {showModes ? <SelectionModeButtons /> : null}
       {isPaintTool ? <PaintOptions showColor={showsColor(tool.kind)} /> : null}
       {tool.kind === 'clone' ? <CloneHint hasSource={tool.source !== null} /> : null}

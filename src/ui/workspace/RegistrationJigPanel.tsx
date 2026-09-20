@@ -5,6 +5,7 @@
 // mouse handling and keyboard shortcuts keep working while it is open; it stays
 // open until the operator closes it (toolbar toggle or the × here).
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 import {
   findRegistrationBoxes,
@@ -70,6 +71,7 @@ export function RegistrationJigPanel(): JSX.Element | null {
         >
           Registration Jig
         </strong>
+        <TutorialButton tutorialId="registration" compact label="Registration jig" />
         <Button variant="ghost" aria-label="Close registration jig panel" onClick={close}>
           ×
         </Button>
@@ -357,8 +359,9 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
       {open && (
         <ol style={helpListStyle}>
           <li>
-            Pick Rectangle or Circle, set the size and grid, then create the jig set. Pick{' '}
-            <strong>Outline only</strong>, then Start to burn every outline on scrap.
+            Create the jig set with the chosen shape, size and grid. Pick{' '}
+            <strong>Outline only</strong>. Complete Frame, then Start opens Job Review before
+            burning every outline on scrap.
           </li>
           <li>Put one object inside each burned outline.</li>
           <li>
@@ -378,13 +381,13 @@ function RegistrationJigHelp(props: { readonly outlineCount: number }): JSX.Elem
             </li>
           )}
           <li>
-            Pick <strong>Artwork only</strong>, then Start. Each jig's artwork finishes before the
-            next jig begins.
+            Pick <strong>Artwork only</strong> and complete a new Frame. Start opens Job Review.
+            Each jig's artwork finishes before the next jig begins.
           </li>
           <li style={helpNoteStyle}>
-            Drag the outline onto your material to move it; Remove outline deletes it. On a
-            no-homing machine, Set Origin + Frame (Laser panel) first; a homing machine can burn
-            straight from the outline's position.
+            Drag an outline to move it; Remove outline deletes it. Set the work origin first on a
+            no-homing machine. Every machine needs a completed Frame for the exact current job;
+            frame again after changing output or placement.
           </li>
         </ol>
       )}

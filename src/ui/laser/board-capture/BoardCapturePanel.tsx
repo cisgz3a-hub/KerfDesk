@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '../../kit';
+import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
@@ -215,6 +216,7 @@ function PanelHeader(props: {
   return (
     <header style={headerStyle}>
       <strong>Place Board</strong>
+      <TutorialButton tutorialId="board" compact label="Place board" />
       <Button
         variant="ghost"
         aria-label="Close board capture panel"

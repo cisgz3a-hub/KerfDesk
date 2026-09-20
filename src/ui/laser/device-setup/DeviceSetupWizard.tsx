@@ -101,7 +101,12 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   });
   const dialogTitle = state.machineKind === 'cnc' ? 'CNC Startup Setup' : 'Machine Setup';
   return (
-    <Dialog title={dialogTitle} size="xl" onClose={save.saving ? () => undefined : props.onClose}>
+    <Dialog
+      tutorialId="machine-setup"
+      title={dialogTitle}
+      size="xl"
+      onClose={save.saving ? () => undefined : props.onClose}
+    >
       <SetupLayout
         state={state}
         dispatch={dispatch}

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "registration",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-88bbd626-d443-4d7d-9a6e-b1a8f253063e.png",
+    "prompt": "Use case: precise-object-edit. Edit this existing three-strip tutorial picture based on the actual app's Rectangle jig geometry. Preserve leather keychain, its engraving, wood board, positions, angles, lighting, three equal panels and 2:3 canvas. Correct ONLY the burned placement marks:\nTOP strip: replace the rounded-rectangle burned outline with a SHARP-CORNERED rectangle, four straight sides and four 90-degree corners. Same outer width and height as leather keychain's bounding rectangle. REMOVE the small burned circular hole mark entirely, leaving only the simple rectangular perimeter. Keep the wood flat and intact, just a thin scorched surface line, no cutout.\nMIDDLE and BOTTOM: the same leather keychain must sit centered EXACTLY within that sharp-cornered rectangle. Its rounded corners leave tiny exposed corners of the rectangle visible on wood outside the rounded leather. No additional gaps at the middle of each side. Do not change the leather's small punched hole. Do not add any marks inside that hole on wood. Middle leather plain; bottom leather engraved with the same botanical motif.\nReason: app offers a rectangular bounding outline, not a custom keychain contour. Maintain identical fixed wood and coordinates through all panels. No labels, numbers, arrows or UI.",
+    "frames": 3,
+    "reference": "exec-1b4672bf-7d6b-4dc1-bffd-8cc88c378a2c.png"
+  },
+  {
+    "id": "laser-line",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-6c0ef759-35f1-46dd-8f34-e306dfd310ee.png",
+    "prompt": "Use case: scientific-educational. Generate ONE photographic educational storyboard composed of THREE equal horizontal strips stacked vertically. Each strip is a 2:1 landscape, overall image 2:3. Identical camera, crop and lighting across the strips, clean realistic close-up product photography on neutral background. No text, numbers, labels, arrows, UI, logos, hands, sparks, beam or operating machinery. Each strip occupies exactly one third of image height. Subject: laser line processing of one simple rectangular shape on a pale solid birch plywood test board. TOP: blank intact flat pale birch board with no design. MIDDLE: same intact board with only one thin dark rounded-rectangle perimeter scored on its surface; interior untouched. BOTTOM: the same rounded rectangle cut all the way through with its solid matching rectangular piece shifted slightly to the right, exposing the empty through-opening and dark cut edges. The point is a Line operation follows an outline, and settings determine surface marking versus cutting. Same fixed board in all panels, overhead view. Do not depict any area-fill engraving or recess. Mark only the narrow perimeter in middle.",
+    "frames": 3
+  },
+  {
+    "id": "laser-fill",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-cbab57eb-b465-489a-a0d6-6ded697ee9d9.png",
+    "prompt": "Use case: scientific-educational. Generate ONE photographic educational storyboard composed of THREE equal horizontal strips stacked vertically. Each strip is a 2:1 landscape, overall image 2:3. Identical camera, crop and lighting across the strips, clean realistic close-up product photography on neutral background. No text, numbers, labels, arrows, UI, logos, hands, sparks, beam or operating machinery. Each strip occupies exactly one third of image height. Subject: fill engraving a simple ring-shaped closed vector onto a square pale wooden coaster. TOP: one plain square wooden coaster with only two very thin dark concentric circles marking the boundary of a broad ring, untouched pale centre. MIDDLE: same coaster and exact ring; UPPER half of the ring is filled with closely spaced dark horizontal engraved scan lines, lower half still unfilled, centre stays light. BOTTOM: same coaster with completed uniformly dark engraved ring between the circles, pale empty centre and pale wood outside. No material cutouts or holes; shallow surface engraving only. Overhead fixed view, workpiece fills most of strip. Clearly show area coverage inside boundary and centre excluded.",
+    "frames": 3
+  },
+  {
+    "id": "pocket",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-2f493a1d-1ffb-434a-ae28-ae7576819cdd.png",
+    "prompt": "Use case: scientific-educational. Create ONE realistic educational product photo, landscape 2:1 composition. Close-up of a pale birch wood sample on a neutral grey tabletop, natural wood grain, soft neutral studio lighting. No text, numbers, arrows, labels, UI, logos, hands, tools, machinery or sparks. Show a single thick rectangular block of wood with a broad rounded-rectangle CNC POCKET milled into its top face. Slightly oblique overhead angle clearly shows a flat recessed floor, shallow vertical walls, and the unavoidable rounded INTERNAL corners from a round end mill. The pocket does not pass through the material: continuous wood floor and substantial wood remain beneath. Outer block edges remain unchanged. Subtle parallel cutter tracks only on floor. Visually teach clearing the enclosed area to a fixed depth.",
+    "frames": 1
+  },
+  {
+    "id": "vcarve",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-95a81167-ed51-4179-a6ae-d6df714fe4af.png",
+    "prompt": "Use case: scientific-educational. Create ONE realistic educational product photo, landscape 2:1 composition. Close-up of a pale birch wood sample on a neutral grey tabletop, natural wood grain, soft neutral studio lighting. No text, numbers, arrows, labels, UI, logos, hands, tools, machinery or sparks. Show two clean CNC V-carved tapered leaf-shaped grooves in a thick pale wood plaque, one narrow shallow groove and one wider deeper groove beside it. Both grooves are continuous concave V channels with sloping faces, crisp sharp pointed ends and wood texture inside, not raised leaves or dark laser burns. Use a close oblique view and raking neutral light to make the V-shaped cross sections and changing groove widths visible. The wider groove is clearly deeper. No circular pocket floors, no flat-bottomed engraved patches.",
+    "frames": 1
+  },
+  {
+    "id": "raster",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-14b7e215-4ec7-498c-8d8f-4946225ef091.png",
+    "prompt": "Use case: scientific-educational. Create ONE realistic educational product photo, landscape 2:1 composition. Close-up of a pale birch wood sample on a neutral grey tabletop, natural wood grain, soft neutral studio lighting. No text, numbers, arrows, labels, UI, logos, hands, tools, machinery or sparks. Show a wooden square coaster with a small realistic portrait of a fox engraved as a fine black-and-brown stippled raster dot pattern on the light wood. Half the composition shows the complete coaster and half is a matching larger close-up detail of its engraved fox eye and fur, separated by a soft plain margin. Both views clearly show tone represented by varied dot density, not carved grooves or a coloured photo glued to wood. No inset frame, no text. Physical output example only, no tool or laser beam.",
+    "frames": 1
+  },
+  {
+    "id": "box-result",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-3f3bcb17-f95f-42c5-a7f4-a1b1f5e81025.png",
+    "prompt": "Use case: scientific-educational. Create ONE realistic educational product photo, landscape 2:1 composition, neutral grey worktable, natural material texture and soft studio light. No text, numbers, labels, arrows, UI, logos, hands, tools, machinery or sparks. A single small empty open-top birch plywood box with four walls and a base. Three-quarter overhead close-up reveals empty interior and two outer sides. Crisp flush finger joints interlock vertically at corners; thin dark laser-cut edges. All top rims straight, no tabs protruding from free top edges. Physically plausible five-panel box, no lid, no other parts. Leave modest clear margin around the finished object.",
+    "frames": 1
+  },
+  {
+    "id": "profile-tabs",
+    "path": "C:\\Users\\Asus\\.codex\\generated_images\\01a0b94a-ca80-72d2-9225-51add3eb8b5b\\exec-24ca43a2-25c6-4296-9c3f-bc3c8ddb1f82.png",
+    "prompt": "Use case: scientific-educational. Create ONE realistic educational product photo, landscape 2:1 composition, neutral grey worktable, natural material texture and soft studio light. No text, numbers, labels, arrows, UI, logos, hands, tools, machinery or sparks. Close oblique view of a CNC-routed rectangular birch plywood sheet. An oval plaque has been routed all the way around its outer perimeter except FOUR small intact thin material bridges connecting the oval to the surrounding waste. Show the wide routed channel clearly and the four short bridges at evenly spaced compass positions, the bridges below the top surface and connected to both sides across the channel. Oval plaque sits flat in the sheet still retained by those four tabs. There is NO material removed from the broad interior face of the oval. Rounded corners and clean pale routed edges, not charred laser edges. The picture must clearly teach holding tabs preventing a profile-cut part falling free.",
+    "frames": 1
+  }
+]

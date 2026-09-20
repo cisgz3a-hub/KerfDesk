@@ -4,6 +4,7 @@
 // live project state or hardware command changes when a field is edited.
 
 import { DEFAULT_ROTARY_SETUP, type DeviceProfile } from '../../../core/devices';
+import { TutorialButton } from '../../tutorials/TutorialButton';
 import { scanOffsetMagnitudeLimitMm } from '../../../core/devices/scan-offset-profile';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
@@ -37,22 +38,26 @@ export function DeviceSetupOptionsStep({
       <div style={introStyle}>
         <strong>Options and calibration — everything here is optional.</strong>
         <span>
-          Each row shows its current state, so nothing needs opening just to check it. Safety zones
-          are enforced by job, frame, export, resume, and bounded jog checks; the other features
-          stay off or uncalibrated until configured.
+          Each row shows its current state. No-go zones appear as job warnings; a completed Frame
+          for the exact job remains the ordinary Start gate. Other features stay off or uncalibrated
+          until configured.
         </span>
       </div>
-      <OptionSection title="No-go zones" status={noGoZoneStatus(draft)}>
+      <OptionSection title="No-go zones" tutorialId="machine-setup" status={noGoZoneStatus(draft)}>
         <SafetyZonesPanel zones={draft.noGoZones} onChange={(noGoZones) => update({ noGoZones })} />
       </OptionSection>
-      <OptionSection title="Z axis and probe" status={zAxisStatus(draft)}>
+      <OptionSection title="Z axis and probe" tutorialId="cnc-probe" status={zAxisStatus(draft)}>
         <ZRows device={draft} update={update} />
         <p style={mutedStyle}>
           Recording a probe does not run a probe cycle. Work-zero probing remains a separate,
           supervised hardware operation after setup is saved.
         </p>
       </OptionSection>
-      <OptionSection title="Planner and time estimate" status={plannerStatus(draft)}>
+      <OptionSection
+        title="Planner and time estimate"
+        tutorialId="optimization"
+        status={plannerStatus(draft)}
+      >
         <PlannerFields
           accel={draft.accelMmPerSec2}
           jd={draft.junctionDeviationMm}
@@ -83,7 +88,11 @@ function LaserCalibrationSections(props: {
   const { draft, update } = props;
   return (
     <>
-      <OptionSection title="Raster scan-offset calibration" status={scanOffsetStatus(draft)}>
+      <OptionSection
+        title="Raster scan-offset calibration"
+        tutorialId="scan-offset"
+        status={scanOffsetStatus(draft)}
+      >
         <ScanOffsetEditor
           value={draft.scanningOffsets}
           maxOffsetMagnitudeMm={scanOffsetMagnitudeLimitMm(draft)}
@@ -114,6 +123,7 @@ function LaserCalibrationSections(props: {
       </OptionSection>
       <OptionSection
         title="Auto-focus setup"
+        tutorialId="machine-setup"
         status={autofocusStatus(draft)}
         open={props.openAutofocus}
       >
@@ -122,13 +132,13 @@ function LaserCalibrationSections(props: {
           onChange={(autofocusCommand) => update({ autofocusCommand })}
         />
       </OptionSection>
-      <OptionSection title="Rotary attachment" status={rotaryStatus(draft)}>
+      <OptionSection title="Rotary attachment" tutorialId="rotary" status={rotaryStatus(draft)}>
         <DeviceSetupRotaryFields
           value={draft.rotary ?? DEFAULT_ROTARY_SETUP}
           onChange={(rotary) => update({ rotary })}
         />
       </OptionSection>
-      <OptionSection title="Camera" status={cameraStatus(draft)}>
+      <OptionSection title="Camera" tutorialId="camera" status={cameraStatus(draft)}>
         <CameraStatusBody profile={draft} />
       </OptionSection>
     </>
@@ -137,6 +147,7 @@ function LaserCalibrationSections(props: {
 
 function OptionSection(props: {
   readonly title: string;
+  readonly tutorialId: string;
   readonly status: string;
   readonly open?: boolean;
   readonly children: React.ReactNode;
@@ -147,7 +158,10 @@ function OptionSection(props: {
         <span>{props.title}</span>
         <span style={summaryStatusStyle}>{props.status}</span>
       </summary>
-      <div style={bodyStyle}>{props.children}</div>
+      <div style={bodyStyle}>
+        <TutorialButton tutorialId={props.tutorialId} />
+        {props.children}
+      </div>
     </details>
   );
 }

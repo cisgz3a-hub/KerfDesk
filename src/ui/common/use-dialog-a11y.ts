@@ -4,7 +4,7 @@
 //
 //   1. Escape closes the dialog.
 //   2. Tab / Shift+Tab cycle within the dialog (focus trap).
-//   3. Initial focus lands on the first focusable element on mount.
+//   3. Initial focus lands on the first main control on mount.
 //   4. Closing returns focus to whatever was focused before opening.
 //
 // Caller wires `useDialogA11y(ref, onClose)` and passes the same `ref`
@@ -69,13 +69,9 @@ export function useDialogA11y(
     const node = ref.current;
     if (node === null) return undefined;
 
-    // Initial focus — the first focusable child, or the dialog itself
+    // Initial focus — the first main control, or the dialog itself
     // (which becomes focusable when we set tabindex="-1" on it in JSX).
-    const initial =
-      optionsRef.current.initialFocus === 'surface'
-        ? node
-        : (node.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? node);
-    initial.focus();
+    initialFocusTarget(node, optionsRef.current).focus();
     const releaseFocusRecovery = recoverDialogFocus(node, FOCUSABLE_SELECTOR, () =>
       isTopmostModal(node),
     );
@@ -107,6 +103,16 @@ export function useDialogA11y(
     // once for the dialog's lifetime. onClose is read via onCloseRef so its
     // changing identity never re-triggers this (see the ref above).
   }, [ref]);
+}
+
+function initialFocusTarget(node: HTMLElement, options: DialogA11yOptions): HTMLElement {
+  if (options.initialFocus === 'surface') return node;
+  // Supplemental help stays keyboard reachable without replacing the main control on open.
+  return (
+    Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).find(
+      (element) => element.closest('[data-dialog-secondary-focus]') === null,
+    ) ?? node
+  );
 }
 
 function isTopmostModal(node: HTMLElement): boolean {

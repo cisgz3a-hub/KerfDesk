@@ -69,6 +69,7 @@ describe('registration authoring and persistence (O5)', () => {
         plungeMmPerMin: 123,
         spindleRpm: 9000,
       });
+      expect(container.querySelector('[data-cnc-tool-picture] img')).toBeNull();
       const depth = container.querySelector<HTMLInputElement>('[aria-label="Registration depth"]')!;
       const changeCount = changes.length;
       act(() => {
@@ -83,6 +84,9 @@ describe('registration authoring and persistence (O5)', () => {
         select.value = 'small';
         select.dispatchEvent(new Event('change', { bubbles: true }));
       });
+      expect(container.querySelector('[data-cnc-tool-picture] img')?.getAttribute('src')).toContain(
+        'bit-straight-',
+      );
       editNumber(container, 'Registration hole diameter', '3');
       editNumber(container, 'Registration depth', '3.7');
       editNumber(container, 'Registration depth per pass', '1.1');

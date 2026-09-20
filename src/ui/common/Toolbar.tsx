@@ -10,6 +10,7 @@ import { shortcutHint } from './shortcut-list';
 import { ToolbarIcon } from './ToolbarIcon';
 import { ToolbarCommands } from './ToolbarCommands';
 import { WorkspaceLayoutSelect } from './WorkspaceLayoutSelect';
+import { TutorialButton } from '../tutorials/TutorialButton';
 import './Toolbar.css';
 
 export function Toolbar(props: {
@@ -23,6 +24,10 @@ export function Toolbar(props: {
       <ToolbarProjectName />
       <div className="lf-toolbar-utilities">
         <ConnectionBadge />
+        {/* Learn keeps its visible label: it is a destination, not a modifier,
+            and the tutorial library is how a new operator finds everything the
+            overflow popover hides. */}
+        <TutorialButton label="Learn" />
         <WorkspaceLayoutSelect />
         <button
           type="button"

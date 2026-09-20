@@ -1,4 +1,5 @@
 import { Button } from '../kit';
+import { TutorialButton } from '../tutorials/TutorialButton';
 import type { CanvasBitmapSize } from '../workspace/use-canvas-bitmap-size';
 import { TextFormattingFields } from './TextFormattingFields';
 import { CanvasTextSymbols } from './CanvasTextSymbols';
@@ -29,6 +30,7 @@ export function CanvasTextPanel(props: {
       <div className="lf-canvas-text-heading">
         <strong>Text</strong>
         <span>Editing on canvas</span>
+        <TutorialButton tutorialId="text" compact label="Text" />
       </div>
       <div className="lf-canvas-text-scroll">
         <fieldset className="lf-canvas-text-fields" disabled={actions.saving}>
