@@ -10,6 +10,7 @@ import { disconnectedControllerQualification } from './laser-controller-qualific
 import { closeConnectionOnce } from './laser-connection-teardown';
 import type { ConnectControllerOptions } from './laser-store-action-types';
 import type { LaserState, LiveRefs } from './laser-store';
+import type { SerialOpenRequest } from '../../platform/types';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -73,7 +74,7 @@ export async function runConnectAction(
       return;
     }
     const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
-    const connection = await portRef.open({ baudRate });
+    const connection = await portRef.open(serialOpenRequest(baudRate, options));
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await closeCancelledConnection(refs, attempt, connection);
       return;
@@ -90,6 +91,16 @@ export async function runConnectAction(
       controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
     }));
   }
+}
+
+// Split out to keep runConnectAction under the complexity cap. The hosted
+// transport is advisory: the platform silently keeps the main-thread one when
+// it cannot hand the port to a worker (ADR-334).
+function serialOpenRequest(baudRate: number, options: ConnectControllerOptions): SerialOpenRequest {
+  return {
+    baudRate,
+    ...(options.hostedStreaming === true ? { hostedStreaming: true } : {}),
+  };
 }
 
 async function closeCancelledConnection(

@@ -196,6 +196,7 @@ function AdvancedConnection(props: {
         {props.state.draft.streamingMode === 'char-counted' ? (
           <RxWindowRow state={props.state} update={props.update} />
         ) : null}
+        <HostedStreamingRow state={props.state} update={props.update} />
         <p style={mutedStyle}>{guide.streamingExplanation}</p>
       </div>
     </details>
@@ -220,9 +221,30 @@ function RxWindowRow(props: {
             props.update({ rxBufferBytes: Math.floor(rxBufferBytes) });
         }}
         aria-label="Controller receive window bytes"
-        title="Set the controller receive-buffer allowance used by buffered streaming."
+        title="Set the controller receive-buffer allowance used by buffered streaming. Start never streams more than the capacity the controller reports; grblHAL profiles default to 1024 bytes."
       />
       <span style={mutedInlineStyle}>bytes</span>
+    </Row>
+  );
+}
+
+// ADR-334. Off by default and labelled as untested on purpose: the worker
+// transport has no runtime coverage in this repository and no hardware
+// evidence, so an operator turning it on is choosing to try it.
+function HostedStreamingRow(props: {
+  readonly state: DeviceSetupStepProps['state'];
+  readonly update: (patch: Partial<DeviceProfile>) => void;
+}): JSX.Element {
+  return (
+    <Row label="Stream in worker">
+      <input
+        type="checkbox"
+        checked={props.state.draft.workerHostedStreaming === true}
+        aria-label="Read the serial port and refill the job stream in a worker"
+        title="Experimental, untested on hardware. Reads the port and writes job refills off the main thread, so a busy interface cannot delay the controller. A browser that cannot hand the port to a worker keeps the normal transport."
+        onChange={(event) => props.update({ workerHostedStreaming: event.target.checked })}
+      />
+      <span style={mutedInlineStyle}>experimental, untested on hardware</span>
     </Row>
   );
 }

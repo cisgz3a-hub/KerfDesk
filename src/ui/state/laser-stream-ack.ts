@@ -22,6 +22,7 @@ import {
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
 import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
+import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
 // receive order. While the streamer still has unsettled acks, the earliest
@@ -33,6 +34,22 @@ import { consumeUntrackedAck } from './laser-untracked-ack-ledger';
 // an ack the stream cannot own settles the counter; it must then not reach
 // advanceStream either — a stale ok fed to a fresh job stream frees RX
 // budget GRBL has not freed (phantom refill past the real buffer).
+/**
+ * Whether the next terminal ok/error on the wire belongs to the job stream.
+ * Pure mirror of the ownership branch in `settleUntrackedAck` below, for the
+ * callers that must know BEFORE the ledger settles — the transcript tags and
+ * buffers a stream-owned acknowledgement rather than publishing it per line
+ * (ADR-333). `laser-stream-ack.test.ts` pins the two against each other over a
+ * state matrix so they cannot drift.
+ */
+export function streamOwnsTerminalAck(
+  state: Pick<LaserState, 'streamer' | 'pendingUntrackedAcks'>,
+): boolean {
+  if (state.streamer?.status === 'disconnected') return false;
+  if (state.pendingUntrackedAcks === 0) return true;
+  return hasUnsettledStreamAcks(state.streamer);
+}
+
 export function settleUntrackedAck(
   set: SetFn,
   state: LaserState,
@@ -95,7 +112,13 @@ export function advanceStream(
   if (finishedStreaming) {
     beginPostJobSettle(set, get, refs, safeWrite);
   }
-  if (stepped.toSend.length > 0) {
+  // While the worker owns the refill it has already written these bytes from
+  // the same pure step on the same line, so writing them here would duplicate
+  // them (ADR-334). Handing back happens the moment the status leaves
+  // 'streaming', because every status change is this side's decision.
+  if (hostedRefillArmed(refs) && stepped.state.status !== 'streaming') {
+    void releaseHostedRefill(refs);
+  } else if (stepped.toSend.length > 0 && !hostedRefillArmed(refs)) {
     // Refills are the job stream continuing: tag them so the console's
     // "hide job stream" filter keeps hiding them. No action — the catch
     // below owns the failure notice.

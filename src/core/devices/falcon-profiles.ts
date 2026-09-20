@@ -1,3 +1,4 @@
+import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from './device-profile';
 
 export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
@@ -15,6 +16,11 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   bedWidth: 358,
   bedHeight: 268,
   baudRate: 115200,
+  // grblHAL keeps a >= 1 KiB serial receive ring (the live-verified A1 Pro
+  // idles at `Bf:512,65535`); the stock 120-byte window starved its planner
+  // on dense raster jobs. Start still bounds this by the controller's own
+  // `Bf:` capacity report (ADR-331).
+  rxBufferBytes: GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
   airAssistCommand: 'M8',
   autofocusCommand: '$HZ1',
   maxFeed: 10000,
@@ -34,7 +40,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
     {
       label: 'Creality Falcon A1 Pro manufacturer configuration',
       status: 'public-spec-starter',
-      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
+      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (grblHAL 512-block planner, 64 KiB receive ring), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
     },
   ],
 };

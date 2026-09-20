@@ -19,13 +19,19 @@ import { finishedJobStateReset } from './laser-session-reset';
 import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import { rxCapacityEvidencePatch } from './laser-rx-capacity-evidence';
 import { statusObservationPatch } from './laser-status-observation';
 import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
-import { MPG_ACTIVE_COMMAND_MESSAGE, pushLog, streamerCanPauseForMpg } from './laser-store-helpers';
+import {
+  isActiveJob,
+  MPG_ACTIVE_COMMAND_MESSAGE,
+  pushLog,
+  streamerCanPauseForMpg,
+} from './laser-store-helpers';
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 
 export function handleStatusLine(
@@ -95,6 +101,8 @@ export function handleStatusLine(
     ...positionPatch,
     statusSequence: nextSequence,
     ...statusObservationPatch(state, nextSequence, positionInvalidated),
+    ...rxCapacityEvidencePatch(state, report, Date.now()),
+    ...controllerHoldLogPatch(state, report),
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...autofocusRecoveryPatch,
@@ -167,6 +175,26 @@ function mpgJobInterruptionPatch(
     ...liveCanvasLifecyclePatch(state, 'paused'),
     lastWriteError: message,
     log: pushLog(state, `[lf2] ${message}`),
+  };
+}
+
+// A hold the controller entered by itself stops the machine while the host
+// keeps streaming, so nothing in the app's own state changes and the operator
+// got no record of it. One line at the transition, not per status report
+// (ADR-333). The live bar names the state while it lasts.
+function controllerHoldLogPatch(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'log'>> {
+  if (report.state !== 'Hold' && report.state !== 'Door') return {};
+  const previous = state.statusReport?.state;
+  if (previous === 'Hold' || previous === 'Door') return {};
+  if (!isActiveJob(state.streamer)) return {};
+  return {
+    log: pushLog(
+      state,
+      `[lf2] Controller entered ${report.state} during the job. Motion is stopped until the machine's own cycle start releases it; KerfDesk did not request this pause.`,
+    ),
   };
 }
 

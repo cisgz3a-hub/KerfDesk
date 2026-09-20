@@ -1045,8 +1045,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 9. Transient camera-marker Frames are the narrow exception: their candidates are reviewed before
    dispatch and their completed permits carry review evidence from birth, so Start streams them
    without reopening Job Review.
-10. App builds the streamer and writes the first batch (as much as the RX window allows — default
-   120 bytes, per-profile `rxBufferBytes`). Every `ok` advances one line and progress reflects
+10. App builds the streamer and writes the first batch (as much as the RX window allows). The
+   window is the profile's `rxBufferBytes` request (stock GRBL 120 bytes; grblHAL profiles 1024)
+   bounded by the receive capacity the controller proved this session — a stock `$I` ring size
+   or the free bytes of a status `Bf:` report taken while nothing was in flight — and falls back
+   to the stock 120 bytes when a GRBL-family controller proved nothing (ADR-331). Job Review
+   warns, never refuses, when that window buffers too little motion for ordinary host latency
+   or the program outruns the serial link. Every `ok` advances one line and progress reflects
    `completed / total`.
 11. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab

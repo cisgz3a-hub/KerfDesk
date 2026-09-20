@@ -32,8 +32,10 @@ describe('grblStrategy raster scan calibration', () => {
 
     const out = grblStrategy.emit(job, device);
 
-    expect(out).toContain('G0 X10.000 Y0.500 S0');
-    expect(out).toContain('G0 X11.750 Y1.500 S0');
+    // Raster rows carry the compact motion spelling on this dialect (ADR-332);
+    // the coordinates are what this test is about.
+    expect(out).toContain('G0X10Y0.5S0');
+    expect(out).toContain('G0X11.75Y1.5S0');
   });
 
   it('selects scan compensation using the emitted fractional feed', () => {
@@ -67,7 +69,7 @@ describe('grblStrategy raster scan calibration', () => {
     const output = grblStrategy.emit(job, device);
 
     expect(output).toContain('feed 0.75 mm/min');
-    expect(output).toContain('G0 X11.250 Y1.500 S0');
-    expect(output).not.toContain('G0 X11.900 Y1.500 S0');
+    expect(output).toContain('G0X11.25Y1.5S0');
+    expect(output).not.toContain('G0X11.9Y1.5S0');
   });
 });

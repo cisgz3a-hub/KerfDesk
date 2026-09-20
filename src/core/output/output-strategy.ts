@@ -12,6 +12,15 @@ export type OutputEmitOptions = {
    * device dialect keeps its normal finish policy. Null omits a laser park;
    * CNC retains its safe finishing policy. */
   readonly finishPosition?: Vec2 | null;
+  /**
+   * Force the verbose motion spelling regardless of the dialect (ADR-332).
+   * The strategies that post-process a GRBL body must pass this: the Marlin
+   * fan transform recognizes motion with `/^(G0|G1)\b/` and the Smoothieware
+   * rescaler finds power with `/\bS(\d+)/`, and neither matches a packed
+   * `X10S500`, so a compacted body would lose its power conversion silently.
+   * Typed as `false` only — nothing may switch compaction ON from here.
+   */
+  readonly compactMotionWords?: false;
 };
 
 /** The emit options a job's origin placement implies. A current-position job

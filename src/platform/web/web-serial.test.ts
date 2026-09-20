@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { extractSerialLines, webSerial } from './web-serial';
+import { extractSerialLines, SERIAL_BUFFER_BYTES, webSerial } from './web-serial';
 
 const originalSerialDescriptor = Object.getOwnPropertyDescriptor(navigator, 'serial');
 const WIRE_BYTE_MAX = 0xff;
@@ -114,6 +114,16 @@ describe('webSerial connection cleanup', () => {
 
     expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.open).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the port with a 4 KiB serial buffer so late renderer reads do not park the reader (ADR-331)', async () => {
+    const port = installMockSerial(new MockPort());
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    await ref.open({ baudRate: 115200 });
+
+    expect(SERIAL_BUFFER_BYTES).toBe(4096);
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200, bufferSize: SERIAL_BUFFER_BYTES });
   });
 
   it('releases reader and writer locks on cable-yank without forgetting the port', async () => {

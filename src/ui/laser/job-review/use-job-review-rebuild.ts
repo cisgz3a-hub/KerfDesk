@@ -43,13 +43,16 @@ export function useJobReviewRebuildTrigger(): () => void {
       if (
         current.controllerSessionEpoch === previous.controllerSessionEpoch &&
         current.controllerSettings === previous.controllerSettings &&
-        current.controllerSettingsObservation === previous.controllerSettingsObservation
+        current.controllerSettingsObservation === previous.controllerSettingsObservation &&
+        current.rxCapacityEvidence === previous.rxCapacityEvidence
       ) {
         return;
       }
       // $30/$32 truth and same-session provenance are part of the reviewed
-      // acknowledgement. Rebuild immediately so the live rows, prompt, and
-      // evidence recorded by Confirm cannot disagree.
+      // acknowledgement, and the controller's reported receive capacity decides
+      // the streaming window the throughput advisories describe (ADR-331).
+      // Rebuild immediately so the live rows, prompt, and evidence recorded by
+      // Confirm cannot disagree.
       requestRebuildNow();
     });
     return (): void => {

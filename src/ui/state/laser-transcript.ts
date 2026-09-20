@@ -60,6 +60,10 @@ export function inboundTranscriptEntry(
   // the GRBL classifier is only the fallback for display-time/test use.
   response: ControllerEvent = classifyResponse(raw),
   controllerKind: ControllerKind = 'grbl-v1.1',
+  // An acknowledgement the job stream owns is tagged 'job', the same source
+  // its outbound chunk carries, so the console's "show stream" filter and the
+  // Super Console's Stream group cover both halves of the exchange (ADR-333).
+  source: TranscriptSource = 'controller',
 ): SerialTranscriptEntry {
   return {
     id,
@@ -67,7 +71,7 @@ export function inboundTranscriptEntry(
     direction: 'in',
     raw,
     kind: inboundKind(response),
-    source: 'controller',
+    source,
     ...decoded(response, controllerKind),
   };
 }

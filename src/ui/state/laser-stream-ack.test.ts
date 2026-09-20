@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createStreamer, step } from '../../core/controllers/grbl';
+import { createStreamer, disconnect, onAck, pause, step } from '../../core/controllers/grbl';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
-import { advanceStream } from './laser-stream-ack';
+import { advanceStream, settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -50,4 +50,36 @@ describe('advanceStream write-failure ownership', () => {
     expect(get().streamer?.status).toBe('streaming');
     expect(get().safetyNotice).toBeNull();
   });
+});
+
+// The transcript tags and buffers a stream-owned acknowledgement before the
+// ledger settles (ADR-333), so its predicate has to agree with the routing
+// `settleUntrackedAck` actually performs. Neither can be trusted to describe
+// the other, so this pins them against each other over the state matrix.
+describe('streamOwnsTerminalAck agrees with the settled owner', () => {
+  const STREAMERS = {
+    none: null,
+    streaming: step(createStreamer('G1 X1\nG1 X2\nG1 X3\n')).state,
+    paused: pause(step(createStreamer('G1 X1\nG1 X2\nG1 X3\n')).state),
+    drained: onAck(step(createStreamer('M5\n')).state, 'ok').state,
+    disconnected: disconnect(step(createStreamer('G1 X1\nG1 X2\n')).state),
+  } as const;
+
+  for (const [label, streamer] of Object.entries(STREAMERS)) {
+    for (const pendingUntrackedAcks of [0, 1, 2]) {
+      for (const kind of ['ok', 'error'] as const) {
+        it(`matches for a ${kind} with ${label} and ${pendingUntrackedAcks} owed acks`, () => {
+          const { refs, set, get } = makeLineHandlerHarness();
+          set({ streamer, pendingUntrackedAcks });
+          const predicted = streamOwnsTerminalAck(get());
+
+          const settled = settleUntrackedAck(set, get(), kind, refs);
+
+          expect(settled.owner === 'stream', `${label}/${pendingUntrackedAcks}/${kind}`).toBe(
+            predicted,
+          );
+        });
+      }
+    }
+  }
 });

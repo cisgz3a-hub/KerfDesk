@@ -26,6 +26,7 @@ import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import { appendTranscript, systemTranscriptEntry, type TranscriptSource } from './laser-transcript';
+import { clearTranscriptBuffer, type TranscriptBufferRefs } from './laser-transcript-buffer';
 import { useStore } from './store';
 import {
   consoleCommandTranscriptSource,
@@ -53,7 +54,7 @@ export type ConsoleActionRefs = ControllerLifecycleRefs & {
   settingsCollector: SettingsCollectorState;
   settingsCollectorSessionEpoch: number | null;
   nextTranscriptId: number;
-};
+} & TranscriptBufferRefs;
 
 export function consoleActions(
   set: SetFn,
@@ -107,8 +108,13 @@ export function consoleActions(
     },
     selectPrimaryWcsForFrame: () => selectPrimaryWcsForFrame(set, get, refs, write),
     // Both retained histories, not just the displayed one: `log` is a parallel
-    // 200-line ring buffer that Clear used to leave untouched.
-    clearTranscript: () => set({ transcript: [], log: [] }),
+    // 200-line ring buffer that Clear used to leave untouched. Anything the
+    // stream buffer is holding back is dropped too, or Clear would be undone
+    // by the next status report (ADR-333).
+    clearTranscript: () => {
+      clearTranscriptBuffer(refs);
+      set({ transcript: [], log: [] });
+    },
   };
 }
 

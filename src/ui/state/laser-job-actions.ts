@@ -66,6 +66,8 @@ import {
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
+import type { SerialConnection } from '../../platform/types';
+import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -80,6 +82,7 @@ type JobActionContext = {
   readonly refs: ResetCleanupRefs &
     ControllerLifecycleRefs & {
       readonly driver: ControllerDriver;
+      readonly connection?: SerialConnection | null;
     };
   readonly safeWrite: SafeWriteFn;
   readonly driver: DriverFn;
@@ -173,6 +176,10 @@ async function runStartJob(
     try {
       await safeWrite(stepped.toSend, 'start');
       set((state) => liveCanvasExecutionAcceptedPatch(state));
+      // The first window is on the wire and accounted for, so the transport
+      // may take the refill from here (ADR-334). A transport that cannot host
+      // it, or a stream that is no longer simply streaming, is a no-op.
+      await armHostedRefill(context.refs, get().streamer);
     } catch (error) {
       containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
       // The first transport write did not resolve as accepted, so the staged
@@ -241,6 +248,9 @@ async function prepareStartBoundary(
 }
 
 async function runStopJob(context: JobActionContext): Promise<void> {
+  // Abort changes the stream's status, so this side owns the writes again
+  // before anything else happens (ADR-334).
+  await releaseHostedRefill(context.refs);
   const { set, get, refs, safeWrite, driver } = context;
   const transitionCancellationMessage =
     'Pause or Resume was cancelled because the operator requested Abort.';

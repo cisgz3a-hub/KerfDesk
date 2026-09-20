@@ -28,6 +28,8 @@ import {
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
+import type { SerialConnection } from '../../platform/types';
+import { releaseHostedRefill } from './laser-hosted-refill';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -38,7 +40,7 @@ type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type PauseResumeContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: PostJobSettleRefs;
+  readonly refs: PostJobSettleRefs & { readonly connection?: SerialConnection | null };
   readonly safeWrite: SafeWriteFn;
   readonly driver: () => ControllerDriver;
   readonly failDarkStop: () => Promise<void>;
@@ -61,6 +63,9 @@ const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
 
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
+  // Pause is about to change the stream's status, so this side takes the
+  // refill back first and keeps it for the rest of the job (ADR-334).
+  await releaseHostedRefill(context.refs);
   const activeDriver = context.driver();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   // ADR-180 amendment 2 (2026-07-25): CNC Pause now takes the same safety-door

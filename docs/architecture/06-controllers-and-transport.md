@@ -142,7 +142,8 @@ transport-precondition refusal (another controller physically owns the machine).
 ## Cross-reference slot — Phase 2
 
 1. **Buffer strategy.** Does LightBurn use character-counted or simple send-response? What buffer size?
-   Ours is 120 bytes copying CNCjs.
+   Ours is character-counted, sized from what the controller reports: stock GRBL 120 bytes
+   copying CNCjs, grblHAL profiles 1024 bounded by the `Bf:` capacity the board proves (ADR-331).
 2. **`error:N` handling.** `streamer.ts:38` claims error-as-terminal matches LightBurn. **Verify** —
    this is a claim about a competitor made in a code comment with no cited source.
 3. **Pause semantics.** Does LightBurn's pause use `!` feed hold, or also shut accessories down? Ours

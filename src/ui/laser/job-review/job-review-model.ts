@@ -40,6 +40,10 @@ import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
+import {
+  detectStreamThroughputWarnings,
+  type StreamThroughputInput,
+} from './stream-throughput-warnings';
 
 export type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -70,12 +74,17 @@ export type JobReviewModel = {
   readonly effectiveOperations: ReturnType<typeof buildEffectiveOperationReview>;
 };
 
+export type JobReviewStreamThroughput = Pick<StreamThroughputInput, 'window' | 'controllerKind'>;
+
 export function buildJobReviewModel(args: {
   readonly project: Project;
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly overrides: OverrideValues | null;
   readonly outputScope?: OutputScope;
+  /** Live streaming window for the connected controller (ADR-331); callers
+   * without a live session omit it and get no throughput advisory. */
+  readonly streamThroughput?: JobReviewStreamThroughput;
 }): JobReviewModel {
   const machineKind = machineKindOf(args.project.machine);
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
@@ -112,6 +121,14 @@ export function buildJobReviewModel(args: {
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),
+      ...(args.streamThroughput === undefined
+        ? []
+        : detectStreamThroughputWarnings({
+            ...args.streamThroughput,
+            gcode: args.prepared.gcode,
+            motionSeconds: commandedMotionSeconds(args.prepared.metrics.duration),
+            transportSeconds: args.prepared.metrics.duration.breakdown.transportSeconds ?? 0,
+          })),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),
@@ -126,6 +143,13 @@ export function buildJobReviewModel(args: {
       args.project.scene,
     ),
   };
+}
+
+// Cut plus travel: the seconds the planner expects motion to be commanded,
+// which is the denominator for line and byte rates. Fixed G4 dwells stream no
+// motion, so they are excluded.
+function commandedMotionSeconds(estimate: PreparedCurrentStart['metrics']['duration']): number {
+  return estimate.breakdown.cutSeconds + estimate.breakdown.travelSeconds;
 }
 
 function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {

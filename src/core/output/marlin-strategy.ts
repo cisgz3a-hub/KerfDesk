@@ -23,7 +23,12 @@ export const marlinStrategy = {
     const intermediateJob =
       dialect.powerMode === 'fan' ? marlinFanRasterJob(job, device.maxPowerS) : job;
     const body = withoutGrblWorkspacePreamble(
-      grblStrategy.emit(intermediateJob, intermediateDevice, options),
+      // The fan and inline transforms read the emitted body line by line, so
+      // it has to arrive in the verbose spelling (ADR-332).
+      grblStrategy.emit(intermediateJob, intermediateDevice, {
+        ...options,
+        compactMotionWords: false,
+      }),
     );
     return dialect.powerMode === 'fan'
       ? toMarlinFanGcode(body, MARLIN_FAN_MAX_POWER)

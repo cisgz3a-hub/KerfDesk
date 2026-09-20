@@ -11,6 +11,7 @@ import {
   type OutputScope,
   type SceneObject,
 } from '../../core/scene';
+import { collectG1FValues, collectG1SValues } from '../../core/invariants';
 import { emitGcode, materializeProgram } from './emit-gcode';
 
 // The ADR-243 raster case below compiles a 6.25M-pixel error-diffusion sweep.
@@ -187,8 +188,11 @@ describe('emitGcode', () => {
       const { gcode, preflight } = emitGcode(project);
       expect(preflight.issues).toEqual([]);
       expect(gcode).toContain('M4 S0');
-      // The dark pixel produced a powered run somewhere in the sweep.
-      expect(gcode).toMatch(/G1 X[\d.]+ F\d+ S\d+/);
+      // The dark pixel produced a powered run somewhere in the sweep. Read
+      // through the modal collector rather than matching a line shape, so the
+      // assertion holds in either motion spelling (ADR-332).
+      expect(collectG1SValues(gcode).some((s) => s > 0)).toBe(true);
+      expect(collectG1FValues(gcode)).toContain(1500);
     },
   );
 

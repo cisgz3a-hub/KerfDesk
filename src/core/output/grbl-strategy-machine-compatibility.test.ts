@@ -302,7 +302,7 @@ describe('grblStrategy machine compatibility dialects', () => {
   it('uses the catalog raster laser mode for raster output', () => {
     const out = grblStrategy.emit(singleRasterJob, DEFAULT_DEVICE_PROFILE);
 
-    expect(out).toContain('M5\nM4 S0\nG0 X0.000 Y0.500 S0');
+    expect(out).toContain('M5\nM4 S0\nG0X0Y0.5S0');
   });
 
   it('uses controlled laser-off travel and reasserts burn feed for Neotronics raster output', () => {

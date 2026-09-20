@@ -5,6 +5,7 @@ import {
   expectedS,
   findLaserOnTravelIssues,
   findOutOfBoundsCoords,
+  hasFeedMotion,
 } from './predicates';
 
 describe('findLaserOnTravelIssues', () => {
@@ -139,5 +140,24 @@ describe('collectG1FValues', () => {
 
   it('collects feeds from compact inherited motion', () => {
     expect(collectG1FValues('G1X1Y1F1000\nX2Y2F900')).toEqual([1000, 900]);
+  });
+});
+
+describe('hasFeedMotion (ADR-332)', () => {
+  it('finds a feed move in the verbose, packed and modal spellings', () => {
+    expect(hasFeedMotion('G21\nG0 X1.000 Y0.000 S0\nG1 X2.000 F600 S500\nM5')).toBe(true);
+    expect(hasFeedMotion('G21\nG0X1Y0S0\nG1X2F600S500\nM5')).toBe(true);
+    // The burn moves after the first hold their inherited G1.
+    expect(hasFeedMotion('G21\nG0X1Y0S0\nG1X2F600\nX3S500\nM5')).toBe(true);
+  });
+
+  it('reports no feed motion for rapids, comments and an empty program', () => {
+    expect(hasFeedMotion('G21\nG90\nG0 X1.000 Y0.000 S0\nG0X2Y0S0\nM5')).toBe(false);
+    expect(hasFeedMotion('; G1 X10.000 is only a comment\nG21')).toBe(false);
+    expect(hasFeedMotion('')).toBe(false);
+  });
+
+  it('does not count a G1 that carries no target', () => {
+    expect(hasFeedMotion('G21\nG1 F600\nM5')).toBe(false);
   });
 });

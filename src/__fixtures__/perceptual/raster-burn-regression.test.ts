@@ -18,6 +18,7 @@
 // stays documented: correlation alone cannot see a uniform energy scale.
 
 import { describe, expect, it } from 'vitest';
+import { parseGcodeWord, stripGcodeComment } from '../../core/invariants';
 import {
   compileRasterFixture,
   horizontalRampLuma,
@@ -65,13 +66,29 @@ function flattenPower(gcode: string, sMax: number): string {
   );
 }
 
-/** Half the scan rows never emitted — a row-provider or skip-row regression. */
+/**
+ * Half the scan rows never emitted — a row-provider or skip-row regression.
+ *
+ * A sweep begins on the rapid that carries the new Y. That is read as WORDS,
+ * not as a line shape: the compact raster spelling writes `G0X-1Y0.05S0` with
+ * no spaces anywhere (ADR-332), so a pattern like `/^G0 .*Y/` matches nothing
+ * and this injection silently becomes a no-op — which is the one failure mode
+ * a negative control must never have. It throws rather than return the program
+ * unharmed, so a future spelling change cannot quietly disarm it again.
+ */
 function dropAlternateRows(gcode: string): string {
   const kept: string[] = [];
   let sweepIndex = -1;
   for (const line of gcode.split('\n')) {
-    if (/^G0 .*Y/.test(line)) sweepIndex += 1;
+    const block = stripGcodeComment(line);
+    if (parseGcodeWord(block, 'G') === 0 && parseGcodeWord(block, 'Y') !== null) sweepIndex += 1;
     if (sweepIndex < 0 || sweepIndex % 2 === 0) kept.push(line);
+  }
+  const lines = gcode.split('\n');
+  if (sweepIndex < 1 || kept.length === lines.length) {
+    throw new Error(
+      `dropAlternateRows injected nothing: ${sweepIndex + 1} sweeps found in ${lines.length} lines`,
+    );
   }
   return kept.join('\n');
 }

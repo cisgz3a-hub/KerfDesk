@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
+import { collectG1FValues } from '../../core/invariants';
 import { compileJob } from '../../core/job';
 import { offsetForEmittedFeed } from '../../core/job/scan-offset';
 import { grblStrategy } from '../../core/output/grbl-strategy';
@@ -85,8 +86,10 @@ describe('audit Job Review intent disclosures', () => {
         },
       };
       const output = grblStrategy.emit(compileJob(project.scene, project.device), project.device);
-      expect(output).toMatch(/\bF1000\b/);
-      expect(output).not.toMatch(/\bF1001\b/);
+      // Read the feed words through the modal collector: raster rows pack
+      // their words, so `\bF1000\b` would not match `G1X5F1000` (ADR-332).
+      expect(collectG1FValues(output)).toContain(1000);
+      expect(collectG1FValues(output)).not.toContain(1001);
       expect(detectJobIntentWarnings(project).join('\n')).not.toContain(
         'outside the saved scan-offset table',
       );

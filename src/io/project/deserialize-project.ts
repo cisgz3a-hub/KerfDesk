@@ -313,6 +313,11 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
   });
   const normalized = {
     ...dev,
+    // Only an explicit `true` opts in to the worker transport (ADR-334), and
+    // only then is the field written back, so a project that never chose it
+    // round-trips unchanged. Every consumer compares against `true`, so a junk
+    // value carried in from an edited file reads as off.
+    ...(dev['workerHostedStreaming'] === true ? { workerHostedStreaming: true } : {}),
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
     junctionDeviationMm: numberOrDefault(
       dev['junctionDeviationMm'],

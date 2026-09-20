@@ -32,6 +32,14 @@
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import {
+  createModalMotionWriter,
+  formatMotionCoordinateMm,
+  joinMotionWords,
+  motionWordStyleFor,
+  type ModalMotionWriter,
+  type MotionWordStyle,
+} from '../gcode/motion-words';
+import {
   planRasterRowSweeps,
   rasterControllerCoordinateMm,
   type RasterRowSweepPlan,
@@ -78,6 +86,11 @@ export type EmitRasterInput = {
   readonly scanOffsetMm?: number;
   readonly bidirectional?: boolean;
   readonly laserModeCommand?: 'M3' | 'M4';
+  // Spell sweep motion compactly (ADR-332): hold the modal G1, hold an
+  // unchanged axis, trim trailing zeros, drop the spaces between words. Halves
+  // the bytes of a dithered row without moving the head one micron. Defaults
+  // off so the conservative dialects and existing callers keep their bytes.
+  readonly compactMotionWords?: boolean;
   readonly modalFeedrate?: boolean;
   readonly emitSOnEveryBurnMove?: boolean;
   readonly controlledLaserOffTravelFeedMmPerMin?: number;
@@ -186,6 +199,37 @@ function* inputRowsInProviderOrder(
   }
 }
 
+type SweepExtents = {
+  readonly activeStartX: number;
+  readonly activeEndX: number;
+  readonly startX: number;
+  readonly endX: number;
+  readonly rowShiftX: number;
+};
+
+// Sweep extents are the ACTIVE span's pixel edges plus overscan, not the full
+// image bounds. For a row with content only in cols 40..60 of a 200-col image,
+// the head only visits world X from (minX + 40*pw - overscan) to
+// (minX + 61*pw + overscan). A reversed sweep runs the other way and carries
+// the bidirectional scan offset.
+function sweepExtents(
+  input: EmitRasterInput,
+  pixelWidthMm: number,
+  reverse: boolean,
+  sweepPlan: RasterRowSweepPlan,
+): SweepExtents {
+  const span = sweepPlan.span;
+  const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
+  const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+  return {
+    activeStartX,
+    activeEndX,
+    startX: reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm,
+    endX: reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm,
+    rowShiftX: reverse ? -(input.scanOffsetMm ?? 0) : 0,
+  };
+}
+
 function emitSpanSweep(
   input: EmitRasterInput,
   worldY: number,
@@ -196,22 +240,30 @@ function emitSpanSweep(
   sweepPlan: RasterRowSweepPlan,
   dotWidthCorrectionMm: number,
 ): string {
+  const style = motionWordStyleFor(input.compactMotionWords ?? false);
+  // One writer per row: every row opens with a travel that states its motion
+  // word and both axes, so nothing is ever held across a row boundary.
+  const writer = createModalMotionWriter(style);
   const lines: string[] = [];
-  const span = sweepPlan.span;
-  // Sweep extents are the ACTIVE span's pixel edges plus overscan,
-  // not the full image bounds. For a row with content only in cols
-  // 40..60 of a 200-col image, the head only visits world X from
-  // (minX + 40*pw - overscan) to (minX + 61*pw + overscan).
-  const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
-  const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-  const startX = reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm;
-  const endX = reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm;
-  const rowShiftX = reverse ? -(input.scanOffsetMm ?? 0) : 0;
+  const { activeStartX, activeEndX, startX, endX, rowShiftX } = sweepExtents(
+    input,
+    pixelWidthMm,
+    reverse,
+    sweepPlan,
+  );
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
   lines.push(
-    formatLaserOffTravel(startX + rowShiftX, worldY, input.controlledLaserOffTravelFeedMmPerMin),
+    formatLaserOffTravel(
+      startX + rowShiftX,
+      worldY,
+      input.controlledLaserOffTravelFeedMmPerMin,
+      writer,
+      style,
+    ),
   );
-  let prevS = -1;
+  // The travel above always carries S0, so a compact row may hold that modal
+  // power rather than restating it on the first burn move.
+  let prevS = style.modalMotion ? 0 : -1;
   // The controller only sees three-decimal coordinates. Track that formatted
   // head position so a positive-power fragment which exists in floating-point
   // geometry, but collapses on the controller grid, is never armed in place.
@@ -232,6 +284,8 @@ function emitSpanSweep(
         shouldEmitFeed,
         input.modalFeedrate ?? true,
         input.emitSOnEveryBurnMove ?? false,
+        writer,
+        style,
       ),
     );
     shouldEmitFeed = false;
@@ -248,21 +302,60 @@ function emitSpanSweep(
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
   if (sweepPlan.leadOutMm > 0 || dotWidthCorrectionMm <= 0) {
-    lines.push(formatLaserOffG1(endX + rowShiftX, feed, input.modalFeedrate ?? true));
+    lines.push(
+      formatLaserOffG1(endX + rowShiftX, feed, input.modalFeedrate ?? true, writer, style),
+    );
   }
   return lines.join(LINE_END);
 }
 
-function formatLaserOffTravel(x: number, y: number, controlledFeed: number | undefined): string {
+function formatLaserOffTravel(
+  x: number,
+  y: number,
+  controlledFeed: number | undefined,
+  writer: ModalMotionWriter,
+  style: MotionWordStyle,
+): string {
   if (controlledFeed !== undefined) {
-    return `G1 X${fmt(x)} Y${fmt(y)} F${formatGcodeFeedMmPerMin(controlledFeed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
+    return joinMotionWords(
+      [
+        writer.motion('G1'),
+        writer.axis('X', x),
+        writer.axis('Y', y),
+        `F${formatGcodeFeedMmPerMin(controlledFeed)}`,
+        'S0',
+      ],
+      style,
+      INTENTIONAL_LASER_OFF_MOTION_COMMENT,
+    );
   }
-  return `G0 X${fmt(x)} Y${fmt(y)} S0`;
+  return joinMotionWords(
+    [writer.motion('G0'), writer.axis('X', x), writer.axis('Y', y), 'S0'],
+    style,
+  );
 }
 
-function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): string {
-  const feedWord = modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
-  return `G1 X${fmt(x)}${feedWord} S0`;
+// The row's closing move. Its X word is written even when the head already
+// sits there, so the line stays a motion block that darkens the beam rather
+// than a bare modal `S0`.
+function formatLaserOffG1(
+  x: number,
+  feed: number,
+  modalFeedrate: boolean,
+  writer: ModalMotionWriter,
+  style: MotionWordStyle,
+): string {
+  const motionWord = writer.motion('G1');
+  const axisWord = writer.axis('X', x);
+  return joinMotionWords(
+    [
+      motionWord,
+      axisWord === '' ? `X${formatMotionCoordinateMm(x, style)}` : axisWord,
+      modalFeedrate ? '' : `F${formatGcodeFeedMmPerMin(feed)}`,
+      'S0',
+    ],
+    style,
+  );
 }
 
 // One G1 closing a run. Emits S only when it changed from the
@@ -276,11 +369,18 @@ function formatRunG1(
   isVeryFirstG1: boolean,
   modalFeedrate: boolean,
   emitSOnEveryBurnMove: boolean,
+  writer: ModalMotionWriter,
+  style: MotionWordStyle,
 ): string {
-  const parts: string[] = [`G1 X${fmt(x)}`];
-  if (isVeryFirstG1 || !modalFeedrate) parts.push(`F${formatGcodeFeedMmPerMin(feed)}`);
-  if (s !== prevS || emitSOnEveryBurnMove) parts.push(`S${s}`);
-  return parts.join(' ');
+  return joinMotionWords(
+    [
+      writer.motion('G1'),
+      writer.axis('X', x),
+      isVeryFirstG1 || !modalFeedrate ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
+      s !== prevS || emitSOnEveryBurnMove ? `S${s}` : '',
+    ],
+    style,
+  );
 }
 
 function headerComment(input: EmitRasterInput): string {

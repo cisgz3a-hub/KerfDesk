@@ -1,11 +1,12 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { outboundTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
-  appendTranscript,
-  outboundTranscriptEntry,
-  type TranscriptSource,
-} from './laser-transcript';
+  bufferTranscriptEntry,
+  publishTranscriptPatch,
+  type TranscriptBufferRefs,
+} from './laser-transcript-buffer';
 import type { LaserState } from './laser-store';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import { JOG_MPG_INTERRUPTION_MESSAGE } from './frame-status-failure';
@@ -16,12 +17,13 @@ import {
   serialWriteErrorMessage,
 } from './laser-store-helpers';
 
-export type SafeWriteRefs = UntrackedAckLedgerRefs & {
-  connection: SerialConnection | null;
-  readonly driver: ControllerDriver;
-  nextTranscriptId: number;
-  writeEpoch?: number;
-};
+export type SafeWriteRefs = UntrackedAckLedgerRefs &
+  TranscriptBufferRefs & {
+    connection: SerialConnection | null;
+    readonly driver: ControllerDriver;
+    nextTranscriptId: number;
+    writeEpoch?: number;
+  };
 
 // Advisory queries ($G and friends) are ordinary owed-ack lines: every
 // newline-terminated write owes exactly one terminal ok on the untracked-ack
@@ -127,13 +129,16 @@ function commitSuccessfulWrite(
   action: LaserSafetyAction | undefined,
   motionOperationId: LaserMotionOperationId | undefined,
 ): void {
+  const entry = outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source);
+  // A refill chunk is the other half of the acknowledgement flood, so it is
+  // held back the same way and published with the next line that matters
+  // (ADR-333). The transport counter is NOT deferred: Start's queue fence and
+  // the motion settlement read it.
+  if (source === 'job') bufferTranscriptEntry(refs, entry);
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
     ...motionTransportWritePatch(state, action, -1, motionOperationId),
-    transcript: appendTranscript(
-      state.transcript,
-      outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source),
-    ),
+    ...(source === 'job' ? {} : publishTranscriptPatch(refs, state, entry)),
   }));
 }
 

@@ -8,6 +8,7 @@ import {
   type ProfileEvidence,
 } from './device-profile';
 import { validateCameraProfileShape } from '../camera';
+import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
@@ -48,6 +49,9 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
   name: 'Generic grblHAL 400×400',
   machineFamily: 'generic-grblhal',
   controllerKind: 'grblhal',
+  // grblHAL core defaults to a 1024-byte receive ring (stream.h); the window
+  // is still bounded at Start by the controller's own `Bf:` report (ADR-331).
+  rxBufferBytes: GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
   capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones', 'rotary'],
   evidence: [
     {

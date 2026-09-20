@@ -21,7 +21,9 @@ export const smoothiewareStrategy = {
     const body = grblStrategy.emit(
       rescaleRasterJob(job, device.maxPowerS, SMOOTHIE_VIRTUAL_MAX_POWER),
       { ...device, maxPowerS: SMOOTHIE_VIRTUAL_MAX_POWER },
-      options,
+      // `rescaleSWords` below rewrites every S word by regex, so the body must
+      // arrive in the verbose spelling (ADR-332).
+      { ...options, compactMotionWords: false },
     );
     return `${SMOOTHIE_CMD_FIRE_OFF}\n${nativePowerModes(rescaleSWords(body, device.maxPowerS))}`;
   },

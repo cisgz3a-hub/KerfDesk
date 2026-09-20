@@ -20514,3 +20514,338 @@ reads is meaningless, as it already was across the worker boundary. `stepValues`
 Float64 slots per step for layout compatibility with the importer, so the packed cost is about
 85 bytes a step rather than the ~60 a tighter layout would give. Routes below the budget, and any
 route carrying per-vertex Z or a tool id, keep step objects.
+---
+
+## ADR-331 - The buffered streaming window is bounded by controller-reported receive capacity (2026-09-20)
+
+**Status:** Accepted; amends ADR-157 (receive-window reconciliation) and the streaming step of
+the Start sequence in `WORKFLOW.md`. Reads serial delivery from ADR-221's emitted baseline
+rather than modelling the wire again.
+
+### Context
+
+A maintainer burning artwork on a Creality Falcon A1 Pro reported the machine stopping mid-burn
+and restarting on its own, "as if the G-code stops feeding and then starts again". The Falcon runs
+grblHAL: a live 2026-07-19 status report read `Bf:512,65535` (512 planner blocks, a 64 KiB receive
+ring). Every catalog profile, including the two grblHAL ones, inherited the stock-GRBL
+`rxBufferBytes` of 120, and the Start boundary could only narrow that request, never raise it
+(`Math.min(requested, evidence)`), while the only evidence it consulted was a stock `$I`
+response that grblHAL never provides (its extended `$I` is not stock proof and the Falcon vendor
+command set forbids `$I` anyway). The status `Bf:` field, which the app already received four
+times a second during every job, was deliberately unparsed.
+
+Measured on the emitted output, a dithered raster line averages 15 bytes, so 120 bytes keep
+about eight lines in flight - 5 to 20 ms of commanded motion at ordinary engraving speeds.
+grblHAL acknowledges a line as soon as the planner admits it (`grblHAL/core` `protocol.c`
+reports status after `gc_execute_block` returns, and `motion_control.c`'s `mc_line` spins only
+while the planner is full, which eight lines against 512 blocks never reach; read 2026-09-19),
+so the acknowledgement round trip is the pure host + USB latency; whenever that exceeds the
+buffered motion, the planner empties, the machine decelerates to a stop, and it restarts when
+the next refill lands. The repository's
+GRBL simulator reproduces it: with the stock window and a 16 ms round trip the planner sits
+empty for over a tenth of the burn, while a 1024-byte window never lets it drop below a hundred
+blocks (`streamer-planner-starvation.test.ts`). A second, window-independent limit exists for
+high-entropy dithers: at 115200 baud the link carries about 11.5 KB/s, which a 0.1 mm dither
+outruns above roughly 5000 mm/min.
+
+Per-acknowledgement host work (three store updates and one serial write per `ok`) measured at
+about 0.15 ms; console rendering adds a few milliseconds per read chunk. Neither is a stall
+source by itself; both only add to the round trip that the tiny window cannot tolerate. Group
+boundary `M3`/`M4`/`M5`/`M8`/`M9` words force a planner sync on every GRBL family and are the only
+deliberate self-resuming stops in the chain; the app raises no pause on its own that resumes on
+its own.
+
+### Decision
+
+1. The status parser reads `Bf:` into `StatusReport.buffer` (planner blocks free, RX bytes free).
+   The laser store latches the largest RX-free reading observed while the host had nothing in
+   flight (no job line unacknowledged, no queued command owed an ack) as session-scoped
+   `rxCapacityEvidence`; a banner, reconnect, disconnect or port close clears it.
+2. The Start window is the profile's request bounded by proven capacity. Proof is the current
+   session's stock `$I` ring size or the latched `Bf:` capacity, whichever is smaller, less an
+   8-byte safety margin (the same headroom CNCjs keeps under stock GRBL's 128-byte ring, so a
+   stock `Bf:15,128` resolves to exactly the historical 120) and never above the streamer's
+   4096-byte hard cap. Stock GRBL and grblHAL with no proof this session fall back to the stock
+   120 bytes; FluidNC and the ping-pong families keep the profile value, as before. The window
+   is never raised above the profile request.
+3. grblHAL catalog profiles (Falcon A1 Pro grblHAL, Generic grblHAL) request 1024 bytes,
+   grblHAL core's default `RX_BUFFER_SIZE`. The ADR-157 compatibility policy lifts a window
+   still sitting at the inherited stock 120 when the resolved controller family is grblHAL, and
+   restores the stock 120 when a profile configured for grblHAL is reconciled against another
+   family, so a FluidNC or stock-GRBL board never inherits a window sized for grblHAL's ring.
+   Both directions are reported as corrections. A value the operator typed is theirs and
+   survives, except the stock default itself, which cannot be distinguished from never having
+   chosen. Saved projects are reconciled on load, so an existing Falcon project picks the new
+   window up without operator action.
+4. Job Review gains three advisories computed from the exact prepared program, the resolved
+   window and the emitted-timeline estimate, all warnings: the buffered motion the window holds
+   (below 50 ms, naming why the window is that size), estimated serial delivery that could not
+   hide under motion (the `transportSeconds` of ADR-221's emitted baseline, above 1 s and 5% of
+   motion — the wire limit no window can fix), and a line wider than the window, which Start
+   refuses factually
+   and which readiness cannot see because it checks the profile request. A completed Frame for
+   the exact job remains the sole ordinary Start policy gate (ADR-228).
+5. Web Serial ports open with a 4096-byte buffer instead of Chromium's 255-byte default so a
+   late renderer read task does not park the browser-side reader during a dense `ok` flood.
+
+### Consequences
+
+The Falcon streams with 1024 bytes (about 60-70 raster lines, 70-400 ms of motion) once its first
+idle status report proves the ring, which removes the host-latency starvation the maintainer
+saw; the delivery advisory names the cases no window can fix. A grblHAL build whose `$10` mask
+omits buffer state streams with the stock window and Job Review says why. A recovery capsule
+recorded before this change keeps its own 120-byte request — integrity compares an artifact with
+the profile embedded in it, so old capsules stay resumable and simply resume conservatively.
+Per-acknowledgement store coalescing, console render throttling, controller Hold/Door surfacing
+and G-code word compaction were identified as further upgrades and are not part of this decision.
+
+### Verification and limits
+
+Status-parser, capacity-evidence, window-resolution, compatibility-policy, catalog, Job Review
+advisory and serial-open tests cover the software contract; the simulator starvation test
+demonstrates the mechanism. No hardware was operated: the Falcon's actual USB bridge latency,
+its `$10` mask and its `$394`/`$673` spindle and coolant delays remain unverified, and the
+maintainer's next burn is the physical check. The `Bf:` composition is read from `grblHAL/core`
+`report.c` (`plan_get_block_buffer_available()`, then `hal.stream.get_rx_buffer_free()`) and the
+1024-byte ring default from its `stream.h`; stock GRBL's idle 128 from `gnea/grbl` `serial.c`
+(`serial_get_rx_buffer_available`), all read 2026-09-19.
+
+---
+
+## ADR-332 - Raster rows are spelled compactly, bounded by what the readers and wrappers can parse (2026-09-20)
+
+**Status:** Accepted; extends ADR-331 (the evidence-bounded streaming window) and amends the
+ADR-020 raster emission shape. The conservative dialects keep their qualified bytes.
+
+### Context
+
+ADR-331 widened the streaming window so a grblHAL controller buffers more raster motion. The
+other half of the same problem is how much each line costs. Measured on a 400 x 20 dithered
+image, 38% of the emitted raster bytes carried no information: the `G1` word repeated on every
+line although motion mode is modal, three fixed decimals so a 0.1 mm grid always ended in `00`,
+a space between every word, and an `S0` restated on each row's runway when the preceding rapid
+had already set it.
+
+Those bytes are the binding constraint twice over. They decide how many lines fit the receive
+window, which is what keeps the planner fed, and they decide whether a 115200-baud link can
+deliver a row faster than the head burns it.
+
+Nothing about the compact spelling changes a commanded position. grbl 1.1 discards whitespace on
+receive, executes a block carrying axis words and no motion word in the current motion mode, and
+parses `10` and `10.000` as the same number. Every reader in this repository already agrees:
+they gate on axis words rather than on a `G` word and share one modal engine
+(`core/gcode/modal-axes.ts`, `core/gcode/modal-motion-line.ts`), and the safety invariants -
+laser-on-travel, blank feed, bounds, no-go zones - were written modal from the start.
+
+Two places were not. The laser preflight decided a compile was empty with `/\bG1\b/`, which
+fails on a packed `G1X95` because there is no word boundary after `1`, and would also miss a row
+that holds its motion word. And the strategies that post-process a GRBL body are shape-bound by
+construction: the Marlin fan transform recognizes motion with `/^(G0|G1)\b/` before converting
+power to `M106`, and the Smoothieware strategy rewrites power with `/\bS(\d+)/`. Either would
+have passed a compact line through unconverted and left the beam on the wrong scale.
+
+### Decision
+
+1. A GRBL dialect carries `compactMotionWords`. It is on for `grbl-dynamic` and `grbl-raster`
+   and off for `grbl-compatible` (the pre-1.1 escape hatch) and `neotronics-4040-safe` (a profile
+   family that exists because its machine is fussy about output).
+2. Raster sweeps spell motion under that flag: hold the modal `G1`, hold an unchanged axis, trim
+   trailing fractional zeros, drop the spaces between words, and hold the modal `S0` the row's
+   opening rapid already set. One writer per row, so every row still opens with an explicit
+   motion word and both axes, and the row's closing laser-off move always restates its axis word
+   rather than collapsing to a bare `S0`. Spelling lives in `core/gcode/motion-words.ts`; no
+   coordinate, feed or power value is computed there.
+3. Fill sweeps, vector cuts, preamble and postamble keep the verbose spelling. A fill G1 is a
+   whole span - at least the emitter's 5 mm runway - so it cannot starve a planner and the bytes
+   buy nothing against the test churn.
+4. `OutputEmitOptions.compactMotionWords` may only be passed as `false`, and the Marlin and
+   Smoothieware strategies pass it, so a body either of them post-processes always arrives
+   verbose. Nothing can switch compaction on from a call site.
+5. The preflight emptiness test reads motion through the shared modal scanner
+   (`hasFeedMotion`), not a pattern match.
+
+### Consequences
+
+A dithered raster row is roughly 38% smaller, which doubles the motion a given receive window
+holds and lowers the serial floor in the same proportion: the emitted-timeline fixture for an
+alternating-power raster fell from about 6.1 s of delivery to about 4.6 s. ADR-331's Job Review
+advisories measure the real program, so they follow this automatically and warn less often. The
+saving applies to every controller family that gets the compact dialects, including stock GRBL,
+whose 128-byte buffer cannot be widened at all.
+
+Emitted bytes changed, so the fixture snapshots, byte pins and the assertions that matched line
+shapes were updated; several now read feeds and powers through the modal collectors instead,
+which makes them independent of spelling. A reader outside this repository that requires a
+motion word on every line would need the verbose dialect.
+
+### Verification and limits
+
+A parity test emits the same image both ways and compares the motion each produces through the
+shared modal reader - block count, points, kind and length - so "same bytes fewer, same motion"
+is checked rather than asserted. Alongside it: the compact shape, the verbose default staying
+byte-identical, no power-only block, and a bounded byte saving. Repository-wide suites pass.
+
+No hardware was operated. The spelling rests on grbl 1.1's documented parser behaviour and on
+our own readers; a Falcon burn remains the physical check, and the conservative dialects are
+unchanged precisely because their machines are the ones without that evidence.
+
+---
+
+## ADR-333 - The acknowledgement flood stays off the store and out of the renderer (2026-09-20)
+
+**Status:** Accepted; extends ADR-331 (the evidence-bounded streaming window) and amends the
+ADR-224 Job Review / ADR-207 live-bar display contracts where they read the streamer.
+
+### Context
+
+ADR-331 widened the receive window and ADR-332 halved the bytes per raster line. Both attack the
+same failure: the controller's planner running dry because an acknowledgement round trip took
+longer than the motion the window held. The third contributor is the host itself.
+
+A dense raster acknowledges 400 to 1500 lines a second, and each one did four things to the
+React-observable store: recorded the inbound line into `log` and `transcript`, replaced the
+streamer, then bracketed the refill write with a transport-counter increment and decrement.
+Measured through the real store, that was 134 to 171 microseconds per acknowledgement, about
+two thirds of it inside the store's own update copying a hundred-key state and notifying every
+subscriber. None of it is a stall on its own; all of it lands on the one thread that has to
+answer the controller, so it inflates exactly the round trip the window cannot tolerate.
+
+The renderer made it worse. The console panel subscribed to the whole `transcript` array and
+reconciled a 150-row list on every inbound line and every write, measured at 3.7 ms per update
+in jsdom — for output its own default filter hides, because an inbound job acknowledgement was
+recorded with source `controller` while only the outbound chunk was tagged `job`. The live
+motion bar, the job rail and the console command deck each subscribed to the streamer object,
+which is replaced on every acknowledgement, so all three re-rendered per acknowledged line to
+move a progress figure no one can read at that rate.
+
+Separately, a hold the controller entered by itself — its own feed-hold input, a lid or door
+switch — changes nothing in the app's state. The stream keeps refilling, the heartbeat keeps
+passing, and the stall watchdog is deliberately suspended in Hold and Door. The live bar read
+`JOB RUNNING` over a stopped machine, with the state visible only as a raw `Hold:0` label
+elsewhere and no record in the log.
+
+### Decision
+
+1. A stream-owned inbound `ok` is tagged source `job`, the same as the refill chunk it answers,
+   so both halves of the exchange fall under the console's existing "show stream" filter and the
+   Super Console's Stream group. The tag comes from `streamOwnsTerminalAck`, a pure mirror of the
+   ownership branch the ack ledger uses, pinned against it over a state matrix.
+2. Those entries, inbound and outbound, are appended to a buffer on the refs instead of the
+   store. The next line anyone waits on — a status report, an error, a banner, any console or
+   motion reply — publishes them ahead of itself in one update, in wire order. The status poll
+   runs at four a second while connected, so the transcript is never more than a quarter second
+   behind and stays complete. Every path that resets the transcript clears the buffer.
+3. The transport counter is NOT deferred: Start's queue fence and the motion settlement read it.
+4. The live bar, the job rail and the console deck subscribe to the streamer by value, not by
+   identity. Status is published immediately, since it flips a control or a heading; the line
+   count is published at most every 120 ms and re-read from the store at that moment, so a burst
+   resolves to the newest figure and the final count arrives with the status change into `done`.
+5. While a job is active and the controller reports Hold or Door without the app having asked for
+   it, the live bar names that state and what releases it, and one line records the transition in
+   the log. No Resume control is offered for it: releasing a controller-owned hold is the
+   machine's own cycle start, and the app's Resume path carries accessory-state proof under
+   ADR-180 that a hold the app never requested has not established.
+
+### Consequences
+
+Per-acknowledgement store updates drop from four to three, and the console's per-line work
+disappears: a burst of twelve acknowledgements now produces no render at all, then one. The
+transcript keeps every line and its millisecond timestamps, so it remains the tool for measuring
+real acknowledgement latency on a machine. An operator whose machine stops on its own hold is
+told which state it is in and what will clear it, instead of reading `JOB RUNNING`.
+
+The cost is a bounded publication delay on console output during a burn, and one more thing that
+must be cleared on teardown. A test that streams a job and asserts transcript contents has to
+let a status report through first, which is what production does.
+
+### Verification and limits
+
+Unit tests cover the buffer's ordering, retention caps and session clearing; the ownership
+predicate is pinned against the real ack routing across streamer states and owed-ack counts; a
+React test proves twelve acknowledgements coalesce into one render carrying the newest count,
+that a status change is immediate, and that an unrelated slice changing renders nothing. The hold
+surfacing has display tests for a feed hold, a reported open door, a host pause keeping its own
+heading, and silence with no job. Repository-wide suites pass.
+
+No hardware was operated. The per-acknowledgement figures are Node measurements and the render
+costs are jsdom; neither is a Chrome profile on the maintainer's machine.
+
+---
+
+## ADR-334 - The refill may be hosted in a serial worker, off by default and unqualified (2026-09-20)
+
+**Status:** Accepted as an opt-in experiment. Off by default; not qualified by tests, a browser or
+hardware. Completes the sequence ADR-331 (evidence-bounded window), ADR-332 (compact raster
+spelling) and ADR-333 (host churn) against the same failure.
+
+### Context
+
+Those three decisions attacked the Falcon's stop-and-go from both ends: the window now holds 70 to
+400 ms of motion instead of 5 to 20, a dithered row costs 38% fewer bytes, and the per
+acknowledgement host work no longer includes a store update per line or a render per line. What
+remains is structural. The read loop, the acknowledgement ledger and the refill all run on the
+renderer's main thread, so a main-thread stall still lands inside the acknowledgement round trip.
+It now takes a stall of 145 ms or more to starve the planner rather than 16, but this app does
+produce those: a Job Review compile, a large image edit, canvas re-rasterisation on a wheel
+gesture, a garbage-collection pause.
+
+Two platform facts make a worker possible. `navigator.serial` is exposed in a dedicated worker
+(MDN, `WorkerNavigator.serial`; `requestPort` still needs transient activation, so the picker
+stays on the main thread), and `ReadableStream` is a transferable object, so the port's duplex
+streams can be handed to a worker after the operator has granted the port.
+
+### Decision
+
+1. The refill loop becomes one pure function, `core/controllers/grbl/stream-pump.ts`: read a line,
+   decide whether it was a terminal acknowledgement, return the next bytes. Both sides of the
+   handover call it, so the algorithm cannot differ between them.
+2. A worker may own the byte pipe: the main thread opens the port and transfers `readable` and
+   `writable`, and the worker runs the read loop, forwards EVERY line unchanged and in order, and
+   — only while armed — writes the refill before forwarding the line that triggered it. It owns no
+   judgement: what a status report means, whether an error is fatal, whether a pause is safe and
+   when a job is over all stay on the main thread, which sees the same lines it always saw.
+3. Exactly one side writes refills, and ownership moves only through an acknowledged handshake.
+   The main thread keeps writing until the worker's `armed` arrives and keeps deferring until its
+   `released` does. Every store action that changes the stream's status takes the refill back
+   first. Hosting is armed once, after the first window is on the wire, and is not re-armed after
+   a pause or a tool change: a second handover point would need its own proof for a benefit that
+   only applies to the remainder of an interrupted job.
+4. Every wait on the worker is bounded, and a worker that stops answering loses the refill rather
+   than keeping it — better that this side writes than that nobody does. A failed refill out
+   there routes into the one containment path a failed refill here already uses.
+5. It is off by default, behind `workerHostedStreaming` on the device profile, offered in Machine
+   Setup as experimental and untested on hardware. A runtime that has no `Worker`, cannot start a
+   module worker, or refuses to transfer the streams keeps the main-thread transport silently:
+   opting in cannot cost an operator their machine, and with the flag off the app is byte for byte
+   the app it was.
+
+### Consequences
+
+With the flag on, nothing the interface does can delay the wire: the renderer can block for a
+second and the controller still gets its refills. With it off — the default, and every automated
+test in this repository — the transport is unchanged.
+
+The cost is a second implementation of the write path and a handshake to keep it single-writer.
+That is the reason for the narrow split: the worker is a byte pipe plus one pure function, and
+everything that decides anything stayed where its tests are.
+
+### Verification and limits
+
+State plainly what is and is not covered. The pump is tested directly, including that it equals
+the `onAck` + `step` loop it replaces line for line, and it streams a 40-line job to completion
+against the firmware simulator with the machine ending where the program says. The worker's logic
+is driven through real `ReadableStream`/`WritableStream` objects: line forwarding and order across
+split chunks, refills only while armed, the handover acknowledgements, write acknowledgement and
+failure by id, and lock release on close. The renderer's half is driven through a fake bridge:
+the stream transfer, write resolution and rejection, subscriber isolation, that `isArmed` flips
+only on the worker's own acknowledgement in both directions, that a silent worker cannot hang
+Disconnect, and that an unsolicited close reads as a dropped cable. The store side is tested for
+not writing a refill while armed, writing it when the transport cannot host, and taking the
+refill back the moment the stream stops streaming.
+
+NOT verified, anywhere: a real `Worker`. This repository's test environment has no worker, no
+`navigator.serial` and no transferable streams, and the in-app browser pane has no serial API
+either, so no test and no manual check in this project can execute the worker shell, the stream
+transfer, or the two halves talking to each other. There is no hardware evidence of any kind.
+That is why it ships off, why every failure path falls back to the main-thread transport, and why
+the Machine Setup control says so. Anyone enabling it should air-cut first.

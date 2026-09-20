@@ -2,7 +2,6 @@
 // Canonical live-job actions live in the App-shell LiveMotionBar (ADR-207).
 
 import { TutorialButton } from '../tutorials/TutorialButton';
-import { progress } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -30,6 +29,11 @@ import { JobActionControls } from './JobActionControls';
 import { JobSetupControls } from './JobSetupControls';
 import { jobControlsBusy, jobNeedsRecovery } from './job-controls-busy';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
+import {
+  streamProgressPercent,
+  useLiveStreamProgress,
+  type LiveStreamProgress,
+} from './use-live-stream-progress';
 
 type Props = {
   readonly disabled: boolean;
@@ -55,8 +59,11 @@ export function JobControls(props: Props): JSX.Element {
   const { disabled, onStartJob } = props;
   const configure = configureCallbacks(props);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  const streamer = useLaserStore((s) => s.streamer);
-  const status = streamer?.status;
+  // By value and throttled: the streamer object is replaced on every
+  // acknowledgement, and this rail only shows a status and a line count
+  // (ADR-333).
+  const streamProgress = useLiveStreamProgress();
+  const status = streamProgress.status ?? undefined;
   const isStreaming = status === 'streaming';
   const isPaused = status === 'paused';
   const isToolChange = status === 'tool-change';
@@ -125,7 +132,7 @@ export function JobControls(props: Props): JSX.Element {
       <ExecutionArchivePanel />
       <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
-      {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
+      {streamProgress.total > 0 && <ProgressBar progress={streamProgress} />}
     </div>
   );
 }
@@ -193,12 +200,8 @@ function PlacementSection(props: {
   );
 }
 
-function ProgressBar({
-  streamer,
-}: {
-  readonly streamer: NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']>;
-}): JSX.Element {
-  const display = describeProgressDisplay(streamer);
+function ProgressBar({ progress }: { readonly progress: LiveStreamProgress }): JSX.Element {
+  const display = describeProgressDisplay(progress);
   return (
     <div style={progressContainerStyle} title={display.title}>
       <div
@@ -210,11 +213,13 @@ function ProgressBar({
   );
 }
 
-function describeProgressDisplay(
-  streamer: NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']>,
-): { readonly percent: number; readonly label: string; readonly title: string } {
-  const lineText = `${streamer.completed} / ${streamer.total}`;
-  if (streamer.status === 'done') {
+function describeProgressDisplay(progress: LiveStreamProgress): {
+  readonly percent: number;
+  readonly label: string;
+  readonly title: string;
+} {
+  const lineText = `${progress.completed} / ${progress.total}`;
+  if (progress.status === 'done') {
     return {
       percent: 99,
       label: `Machine finishing (${lineText} sent)`,
@@ -223,7 +228,7 @@ function describeProgressDisplay(
     };
   }
   return {
-    percent: Math.round(progress(streamer) * 100),
+    percent: streamProgressPercent(progress),
     label: `${lineText} lines`,
     title: 'G-code lines acknowledged by the controller.',
   };

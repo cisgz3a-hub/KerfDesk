@@ -62,6 +62,11 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       throw new Error('Falcon profiles missing');
 
     expect(specific.profile.controllerKind).toBe('grblhal');
+    // ADR-331: grblHAL rings are >= 1 KiB; the stock 120-byte window starved
+    // the Falcon's 512-block planner on dense raster jobs.
+    expect(specific.profile.rxBufferBytes).toBe(1024);
+    expect(profileCatalogEntryById('generic-grblhal')?.profile.rxBufferBytes).toBe(1024);
+    expect(fallback.profile.rxBufferBytes).toBe(120);
     expect(specific.profile.name).toBe('Creality Falcon A1 Pro (vendor command set)');
     expect(specific.profile.maxFeed).toBe(10000);
     expect(specific.profile.framingFeedMmPerMin).toBe(10000);

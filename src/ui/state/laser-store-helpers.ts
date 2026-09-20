@@ -25,7 +25,7 @@ import {
   PROBE_PLATE_REMOVAL_REQUIRED_MESSAGE,
 } from './work-z-zero-evidence';
 
-const LOG_MAX = 200;
+export const LOG_MAX = 200;
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
@@ -58,9 +58,14 @@ export function pushLog(state: LaserState, line: string): ReadonlyArray<string> 
 // physically finished motion. laser-line-handler clears the streamer after a
 // later Idle status report.
 export function isActiveJob(streamer: StreamerState | null): boolean {
+  return streamer !== null && isActiveJobStatus(streamer.status);
+}
+
+/** The status half of `isActiveJob`, for the UI paths that subscribe to the
+ * streamer's status by value rather than holding the object (ADR-333). */
+export function isActiveJobStatus(status: StreamerState['status'] | null): boolean {
   return (
-    streamer !== null &&
-    ['streaming', 'paused', 'tool-change', 'done', 'errored'].includes(streamer.status)
+    status !== null && ['streaming', 'paused', 'tool-change', 'done', 'errored'].includes(status)
   );
 }
 
@@ -368,6 +373,7 @@ type InitialLaserState = Pick<
   | 'wcoCache'
   | 'activeWcs'
   | 'ovCache'
+  | 'rxCapacityEvidence'
   | 'accessoryCache'
   | 'mpgActive'
   | 'workOriginActive'

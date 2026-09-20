@@ -46,7 +46,11 @@ import {
   initialLaserState,
   pushLog,
 } from './laser-store-helpers';
-import { containLostStreamHeartbeat } from './laser-stream-heartbeat-containment';
+import {
+  containActiveStreamWriteFailure,
+  containLostStreamHeartbeat,
+  streamWriteOwner,
+} from './laser-stream-heartbeat-containment';
 import {
   canSendQueuedStatusQuery,
   controllerOperationOwnsPolling,
@@ -132,6 +136,13 @@ function attachConnectedController(
   refs.unsubscribeLine = connection.onLine((line) => {
     if (refs.connection !== connection) return;
     handleLine(set, get, refs, safeWrite, line);
+  });
+  // A refill written out in the worker can fail the same way one written here
+  // can, and it means the same thing: bytes for a live job may or may not have
+  // reached the controller. Route it into the one containment path (ADR-334).
+  connection.hostedStreaming?.onWriteError(() => {
+    if (refs.connection !== connection) return;
+    containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', streamWriteOwner(get()));
   });
   refs.unsubscribeClose = connection.onClose(() => {
     if (refs.connection !== connection) return;
@@ -220,6 +231,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     ovCache: null,
     accessoryCache: null,
     mpgActive: null,
+    rxCapacityEvidence: null,
     workOriginActive: false,
     workOriginSource: 'none',
     frameVerification: null,

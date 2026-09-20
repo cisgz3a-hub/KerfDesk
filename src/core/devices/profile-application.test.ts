@@ -38,11 +38,14 @@ describe('profileWithControllerFactsResult', () => {
       bedHeight: 415,
       maxFeed: 10000,
       framingFeedMmPerMin: 8000,
+      // ADR-331: the inherited stock window is lifted to the grblHAL request.
+      rxBufferBytes: 1024,
     });
     expect(result.corrections.map((item) => item.field)).toEqual([
       'controllerKind',
       'streamingMode',
       'gcodeDialect',
+      'rxBufferBytes',
     ]);
   });
 

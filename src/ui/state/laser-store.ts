@@ -44,6 +44,8 @@ import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
+import type { RxCapacityEvidence } from './laser-rx-capacity-evidence';
+import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
@@ -198,6 +200,11 @@ export type LaserState = LaserStoreActions &
     // that omit the intermittent field; null/undefined means never observed in
     // this controller/transport session.
     readonly mpgActive?: boolean | null;
+    /** Largest controller-reported free RX byte count observed while nothing
+     * was in flight this session (status `Bf:`), the live receive-capacity
+     * proof that bounds the buffered streaming window at Start (ADR-331).
+     * Session-scoped; null/undefined means the controller never reported it. */
+    readonly rxCapacityEvidence?: RxCapacityEvidence | null;
     readonly workOriginActive: boolean;
     readonly workOriginSource: WorkOriginSource;
     // Monotonic identity for XY work-origin mutations. Place Board registration
@@ -277,7 +284,8 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
-} & ResetCleanupRefs &
+} & TranscriptBufferRefs &
+  ResetCleanupRefs &
   ConnectAttemptOwnershipRefs &
   ConnectionTeardownOwnershipRefs &
   ControllerQualificationScheduleRefs & {

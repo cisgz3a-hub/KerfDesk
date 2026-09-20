@@ -24,6 +24,8 @@ export {
   type RArcGeometry,
   type XyPoint,
 } from './arc-solve';
+// `motion-words` is imported directly by the emitter that spells with it: this
+// barrel is at its public-export ratchet (ADR-332).
 export {
   formatGcodeCoordinateMm,
   GCODE_COORDINATE_DECIMAL_PLACES,

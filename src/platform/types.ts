@@ -58,6 +58,28 @@ export type FileSaveRequest = {
 
 export type SerialOpenRequest = {
   readonly baudRate: number;
+  /** Ask for the worker-hosted transport (ADR-334). Advisory: a runtime that
+   * cannot transfer the port's streams into a worker returns the ordinary
+   * main-thread connection instead, and the caller cannot tell except by
+   * looking for `hostedStreaming` on the result. */
+  readonly hostedStreaming?: boolean;
+};
+
+/**
+ * Present only on a transport that can host the character-counting refill off
+ * the main thread (ADR-334). Ownership changes solely through these two
+ * promises, each resolved by the transport's own acknowledgement, so exactly
+ * one side writes refills at any moment. Absent means the main thread writes
+ * them, as it always has.
+ */
+export type HostedStreamRefill = {
+  readonly isArmed: () => boolean;
+  /** Hand the refill over from this exact stream position. */
+  readonly arm: (streamer: unknown) => Promise<void>;
+  /** Take it back before changing the stream's status. */
+  readonly release: () => Promise<void>;
+  /** A refill write failed out there; the caller owns the containment. */
+  readonly onWriteError: (handler: (message: string) => void) => () => void;
 };
 
 export type SerialConnection = {
@@ -73,6 +95,7 @@ export type SerialConnection = {
   readonly close: () => Promise<void>;
   // Explicit permission revocation. Normal Disconnect must retain the pairing.
   readonly forget?: () => Promise<void>;
+  readonly hostedStreaming?: HostedStreamRefill;
 };
 
 /** Browser-exposed transport identity. VID/PID describe the USB adapter/model;
