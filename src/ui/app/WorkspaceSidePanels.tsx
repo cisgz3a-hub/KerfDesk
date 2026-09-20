@@ -1,59 +1,67 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { COLLAPSED_RAIL_WIDTH_PX } from '../common';
 import { CutsLayersPanel } from '../layers';
 import { LaserWindow } from '../laser';
+import { WorkspaceJobActions } from '../laser/WorkspaceJobActions';
 import { Icon, type IconName } from '../kit';
 import { useUiStore } from '../state/ui-store';
+import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
-
-type PanelId = 'cuts' | 'machine';
+import type { RailPanelId } from '../state/ui-rail-panel';
+import { useWorkspaceLayout } from './use-workspace-layout';
 
 export function WorkspaceSidePanels(): JSX.Element {
-  const compact = useCompactWorkspace();
-  const [active, setActive] = useState<PanelId>('cuts');
+  const layout = useWorkspaceLayout();
+  const [active, setActive] = useState<RailPanelId>('layers');
   const [cutsOpen, setCutsOpen] = useState(true);
   const [machineOpen, setMachineOpen] = useState(true);
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
   const runOrderOpen = useUiStore((state) => state.cutsLayersView === 'run-order');
+  const panelId = useId();
   useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
 
-  if (compact) {
+  function selectPanel(panel: RailPanelId): void {
+    setActive(panel);
+    useUiStore.getState().setRailPanelVisible(panel, true);
+  }
+
+  if (layout === 'compact') {
+    const wide = active === 'layers' && runOrderOpen;
+    const collapsed = active === 'layers' ? !layersExpanded : !machinePanel.isExpanded;
     return (
       <section
         aria-label="Workspace side panels"
-        style={{
-          ...compactShellStyle,
-          width: runOrderOpen ? 'min(46vw, 430px)' : 'min(38vw, 340px)',
-          minWidth: runOrderOpen ? 320 : 260,
-        }}
+        data-layout="compact"
+        className={`lf-workspace-panels lf-workspace-panels--compact${wide ? ' lf-workspace-panels--run-order' : ''}`}
+        style={collapsed ? collapsedCompactPanelStyle : undefined}
       >
-        <div role="tablist" aria-label="Side panel" style={switcherStyle}>
-          <PanelTab
-            label="Cuts / Layers"
-            selected={active === 'cuts'}
-            onSelect={() => setActive('cuts')}
-          />
-          <PanelTab
-            label="Machine"
-            selected={active === 'machine'}
-            onSelect={() => setActive('machine')}
-          />
-        </div>
+        <CompactPanelTabs
+          panelId={panelId}
+          active={active}
+          collapsed={collapsed}
+          onSelect={selectPanel}
+        />
         <div
+          id={panelId}
           role="tabpanel"
-          aria-label={active === 'cuts' ? 'Cuts / Layers' : 'Machine'}
-          style={compactPanelStyle}
+          aria-labelledby={`${panelId}-${active}`}
+          className="lf-workspace-panel-body"
         >
-          {active === 'cuts' ? <CutsLayersPanel /> : <LaserWindow />}
+          {active === 'layers' ? <CutsLayersPanel /> : <LaserWindow dockedJobActions />}
         </div>
+        {!collapsed ? <WorkspaceJobActions /> : null}
       </section>
     );
   }
 
   return (
-    <section aria-label="Workspace side panels" style={desktopShellStyle}>
-      <div style={collapseBarStyle}>
+    <section
+      aria-label="Workspace side panels"
+      data-layout="spacious"
+      className="lf-workspace-panels"
+    >
+      <div className="lf-workspace-panel-toggles">
         <PanelToggle
           label="Layers"
           icon="panel-left"
@@ -67,7 +75,7 @@ export function WorkspaceSidePanels(): JSX.Element {
           onToggle={() => setMachineOpen((open) => !open)}
         />
       </div>
-      <div style={desktopPanelsStyle}>
+      <div className="lf-workspace-desktop-panels">
         {cutsOpen ? (
           <ResizablePanel label="Cuts / Layers" wide={runOrderOpen} collapsed={!layersExpanded}>
             <CutsLayersPanel />
@@ -75,7 +83,10 @@ export function WorkspaceSidePanels(): JSX.Element {
         ) : null}
         {machineOpen ? (
           <ResizablePanel label="Machine controls" collapsed={!machinePanel.isExpanded}>
-            <LaserWindow />
+            <div className="lf-workspace-machine-body">
+              <LaserWindow dockedJobActions />
+            </div>
+            {machinePanel.isExpanded ? <WorkspaceJobActions /> : null}
           </ResizablePanel>
         ) : null}
       </div>
@@ -83,15 +94,54 @@ export function WorkspaceSidePanels(): JSX.Element {
   );
 }
 
+function CompactPanelTabs(props: {
+  readonly panelId: string;
+  readonly active: RailPanelId;
+  readonly collapsed: boolean;
+  readonly onSelect: (panel: RailPanelId) => void;
+}): JSX.Element {
+  return (
+    <div
+      role="tablist"
+      aria-label="Side panel"
+      aria-orientation={props.collapsed ? 'vertical' : 'horizontal'}
+      className={`lf-workspace-panel-tabs${props.collapsed ? ' lf-workspace-panel-tabs--collapsed' : ''}`}
+    >
+      <PanelTab
+        id={`${props.panelId}-layers`}
+        controls={props.panelId}
+        label="Artwork"
+        icon="layers"
+        selected={props.active === 'layers'}
+        onSelect={() => props.onSelect('layers')}
+      />
+      <PanelTab
+        id={`${props.panelId}-machine`}
+        controls={props.panelId}
+        label="Machine"
+        icon="sliders"
+        selected={props.active === 'machine'}
+        onSelect={() => props.onSelect('machine')}
+      />
+    </div>
+  );
+}
+
 function useWorkspacePanelFocus(
-  setActive: (panel: PanelId) => void,
+  setActive: (panel: RailPanelId) => void,
   setCutsOpen: (open: boolean) => void,
   setMachineOpen: (open: boolean) => void,
 ): void {
   const request = useUiStore((state) => state.railPanelFocusRequest);
+  const resetRevision = useWorkspaceLayoutStore((state) => state.resetRevision);
+  useEffect(() => {
+    setActive('layers');
+    setCutsOpen(true);
+    setMachineOpen(true);
+  }, [resetRevision, setActive, setCutsOpen, setMachineOpen]);
   useEffect(() => {
     if (request?.panel === 'layers') {
-      setActive('cuts');
+      setActive('layers');
       setCutsOpen(true);
     } else if (request?.panel === 'machine') {
       setActive('machine');
@@ -100,45 +150,62 @@ function useWorkspacePanelFocus(
   }, [request, setActive, setCutsOpen, setMachineOpen]);
 }
 
-function useCompactWorkspace(): boolean {
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') {
-      setCompact(window.innerWidth <= 1199);
-      return;
-    }
-    const query = window.matchMedia('(max-width: 1199px)');
-    const update = (): void => setCompact(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-  return compact;
+function moveTabFocus(event: KeyboardEvent<HTMLButtonElement>): void {
+  const vertical =
+    event.currentTarget.parentElement?.getAttribute('aria-orientation') === 'vertical';
+  const [previousKey, nextKey] = vertical ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
+    return;
+  // Both arrow axes belong to the focused tabs. Even an unused axis must not
+  // bubble to the window's selected-artwork nudge shortcut.
+  event.preventDefault();
+  event.stopPropagation();
+  if (![previousKey, nextKey, 'Home', 'End'].includes(event.key)) return;
+  const buttons = Array.from(
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
+  );
+  if (buttons.length === 0) return;
+  const index = buttons.indexOf(event.currentTarget);
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : (index + (event.key === nextKey ? 1 : -1) + buttons.length) % buttons.length;
+  const target = buttons[next];
+  if (target === undefined) return;
+  target.click();
+  target.focus();
 }
 
 function PanelTab(props: {
+  readonly id: string;
+  readonly controls: string;
   readonly label: string;
+  readonly icon: IconName;
   readonly selected: boolean;
   readonly onSelect: () => void;
 }): JSX.Element {
   return (
     <button
+      id={props.id}
       type="button"
       role="tab"
+      aria-label={props.label}
+      aria-controls={props.controls}
       aria-selected={props.selected}
+      tabIndex={props.selected ? 0 : -1}
       title={`Show ${props.label} panel`}
       className={props.selected ? 'lf-btn lf-btn--primary' : 'lf-btn lf-btn--ghost'}
       onClick={props.onSelect}
+      onKeyDown={moveTabFocus}
     >
-      {props.label}
+      <Icon name={props.icon} size={15} />
+      <span className="lf-workspace-panel-label">{props.label}</span>
     </button>
   );
 }
 
-// The label stays constant; aria-pressed drives the accent fill (via
-// .lf-btn[aria-pressed='true']) so the button reads as "on" when the panel is
-// shown — the panel-toggle convention in VS Code / Figma / LightBurn, clearer
-// than a label that flips between Hide and Show.
 function PanelToggle(props: {
   readonly label: string;
   readonly icon: IconName;
@@ -149,7 +216,6 @@ function PanelToggle(props: {
     <button
       type="button"
       className="lf-btn"
-      style={panelToggleStyle}
       aria-pressed={props.expanded}
       title={`${props.expanded ? 'Hide' : 'Show'} ${props.label} panel`}
       onClick={props.onToggle}
@@ -169,6 +235,7 @@ function ResizablePanel(props: {
   return (
     <div
       aria-label={`${props.label} resizable panel`}
+      className="lf-workspace-resizable-panel"
       style={
         props.collapsed
           ? collapsedResizablePanelStyle
@@ -182,26 +249,6 @@ function ResizablePanel(props: {
   );
 }
 
-const desktopShellStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  minWidth: 0,
-  flexShrink: 0,
-};
-const collapseBarStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 6,
-  padding: 4,
-  borderBottom: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-0)',
-};
-const panelToggleStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-};
-const desktopPanelsStyle: React.CSSProperties = { display: 'flex', minHeight: 0, flex: 1 };
 const resizablePanelStyle: React.CSSProperties = {
   width: 300,
   minWidth: 240,
@@ -210,6 +257,11 @@ const resizablePanelStyle: React.CSSProperties = {
   resize: 'horizontal',
   overflow: 'hidden',
 };
+const collapsedCompactPanelStyle: React.CSSProperties = {
+  width: COLLAPSED_RAIL_WIDTH_PX,
+  maxWidth: COLLAPSED_RAIL_WIDTH_PX,
+  boxSizing: 'border-box',
+};
 const collapsedResizablePanelStyle: React.CSSProperties = {
   ...resizablePanelStyle,
   width: COLLAPSED_RAIL_WIDTH_PX,
@@ -217,18 +269,3 @@ const collapsedResizablePanelStyle: React.CSSProperties = {
   maxWidth: COLLAPSED_RAIL_WIDTH_PX,
   resize: 'none',
 };
-const compactShellStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  flexShrink: 0,
-  minHeight: 0,
-};
-const switcherStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 4,
-  padding: 4,
-  borderBottom: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-0)',
-};
-const compactPanelStyle: React.CSSProperties = { minHeight: 0, flex: 1, overflow: 'hidden' };

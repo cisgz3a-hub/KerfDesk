@@ -115,7 +115,10 @@ describe('Toolbar Convert to Bitmap', () => {
         );
       });
 
-      const openButton = [...host.querySelectorAll('button')].find((button) =>
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('button[aria-label="More commands"]')?.click(),
+      );
+      const openButton = [...document.querySelectorAll('button')].find((button) =>
         button.textContent?.includes('Convert to Bitmap'),
       );
       if (!(openButton instanceof HTMLButtonElement)) throw new Error('button missing');
@@ -164,7 +167,8 @@ describe('Toolbar Convert to Bitmap', () => {
 });
 
 describe('Toolbar shortcut hint (audit M27/A.5)', () => {
-  it('renders the KerfDesk product name in the app chrome', async () => {
+  it('shows the current project name alongside the toolbar utilities', async () => {
+    useStore.setState({ savedName: 'Welcome sign.kerf', dirty: true });
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -174,8 +178,9 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
-      expect(host.textContent).toContain('KerfDesk');
-      expect(host.textContent).not.toContain('LaserForge');
+      const name = host.querySelector('[aria-label="Current project"]');
+      expect(name?.textContent).toBe('Welcome sign.kerf');
+      expect(name?.getAttribute('title')).toContain('unsaved changes');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -301,25 +306,24 @@ describe('Toolbar separators', () => {
     invoke: vi.fn(),
   });
 
-  it('renders separators only between non-empty groups plus the two structural ones', async () => {
+  it('renders separators only between non-empty file and creation groups', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
     try {
       await act(async () => {
         root = createRoot(host);
-        // file.new and window.toggle-preview live in different toolbar groups.
+        // File and creation commands remain separate without empty groups.
         root.render(
           <Toolbar
-            commands={[command('file.new', 'New'), command('window.toggle-preview', 'Preview')]}
+            commands={[command('file.new', 'New'), command('tools.add-text', 'Text...')]}
             machineKind="laser"
           />,
         );
       });
 
       const separators = host.querySelectorAll('[role="separator"]');
-      // 1 structural (after the badges) + 1 between the two visible groups.
-      expect(separators).toHaveLength(2);
+      expect(separators).toHaveLength(1);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -337,7 +341,7 @@ describe('Toolbar separators', () => {
       });
 
       const separators = [...host.querySelectorAll('[role="separator"]')];
-      expect(separators).toHaveLength(1);
+      expect(separators).toHaveLength(0);
       // The empty-group bug rendered adjacent separators (a stray "| |").
       for (const separator of separators) {
         expect(separator.nextElementSibling?.getAttribute('role')).not.toBe('separator');

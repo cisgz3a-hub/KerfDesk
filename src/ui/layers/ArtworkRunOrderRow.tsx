@@ -177,7 +177,7 @@ const detailsStyle: React.CSSProperties = {
   gap: 2,
   fontSize: 11,
 };
-const effectiveStyle: React.CSSProperties = { color: 'var(--lf-accent)', fontWeight: 650 };
+const effectiveStyle: React.CSSProperties = { color: 'var(--lf-accent-fg)', fontWeight: 650 };
 const footerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',

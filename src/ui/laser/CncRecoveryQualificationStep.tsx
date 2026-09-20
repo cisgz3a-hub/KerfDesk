@@ -108,7 +108,7 @@ const dangerStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',
   borderRadius: 6,
   padding: '8px 10px',
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   fontWeight: 650,
   fontSize: 12,
 };

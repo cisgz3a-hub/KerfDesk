@@ -194,4 +194,4 @@ const fieldStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = { width: 110 };
 const noteStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-faint)' };
-const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger)' };
+const errStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)' };

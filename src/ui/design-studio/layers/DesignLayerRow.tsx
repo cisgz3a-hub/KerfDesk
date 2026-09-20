@@ -156,7 +156,7 @@ const selectionBadgeStyle: React.CSSProperties = {
   letterSpacing: 0.4,
   padding: '0 5px',
   borderRadius: 999,
-  color: 'var(--lf-bg-1)',
+  color: 'var(--lf-on-fill)',
   background: 'var(--lf-accent)',
   flexShrink: 0,
 };

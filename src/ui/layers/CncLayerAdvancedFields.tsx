@@ -288,7 +288,7 @@ function VCarveFields(props: {
 
 const vbitWarningStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--lf-danger)',
+  color: 'var(--lf-danger-fg)',
   padding: '2px 0 2px 4px',
 };
 

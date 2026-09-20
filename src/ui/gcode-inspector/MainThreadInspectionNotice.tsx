@@ -9,6 +9,6 @@ export function MainThreadInspectionNotice(): JSX.Element {
 
 const noticeStyle: React.CSSProperties = {
   margin: '8px 12px',
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };

@@ -21,7 +21,7 @@ export function InspectionPressureNotice(props: {
 
 const pressureStyle: React.CSSProperties = {
   padding: '6px 12px',
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   background: 'var(--lf-warning-wash)',
   fontSize: 'var(--lf-text-xs)',
 };

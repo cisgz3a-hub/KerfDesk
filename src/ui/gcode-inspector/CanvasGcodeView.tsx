@@ -139,7 +139,7 @@ const barStyle: React.CSSProperties = {
 const nameStyle: React.CSSProperties = { fontWeight: 600 };
 
 const staleStyle: React.CSSProperties = {
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 'var(--lf-text-xs)',
 };
 

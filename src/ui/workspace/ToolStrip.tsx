@@ -5,12 +5,15 @@
 // lf-btn pressed fill); the active name lives on each IconButton.
 
 import { useRef } from 'react';
+import libraryIcon from 'lucide-static/icons/library.svg?raw';
+import studioIcon from 'lucide-static/icons/shapes.svg?raw';
 
 import { IconButton, type IconName } from '../kit';
 import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
+import './tool-strip.css';
 
 type Tool = {
   readonly mode: ToolMode;
@@ -38,7 +41,7 @@ export function ToolStrip(): JSX.Element {
   const resetToolMode = useUiStore((s) => s.resetToolMode);
   const setLibraryDialogOpen = useUiStore((s) => s.setLibraryDialogOpen);
   return (
-    <aside aria-label="Drawing tools" className="lf-rail" style={stripStyle}>
+    <aside aria-label="Drawing tools" className="lf-rail lf-toolstrip">
       {TOOLS.map((tool) => (
         <IconButton
           key={tool.helpKey}
@@ -55,23 +58,25 @@ export function ToolStrip(): JSX.Element {
         />
       ))}
       {toolMode.kind === 'node' ? <NodeCommandBar nodeToolButtonRef={nodeToolButtonRef} /> : null}
+      <span className="lf-toolstrip__divider" aria-hidden="true" />
       <button
         type="button"
         aria-label="Open design library"
         title="Insert ready-made line art from the bundled design library (ADR-105)."
         onClick={() => setLibraryDialogOpen(true)}
-        style={libraryButtonStyle}
+        className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
-        Lib
+        {/* Icons are pinned build assets, never user-supplied SVG. */}
+        <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: libraryIcon }} />
       </button>
       <button
         type="button"
         aria-label="Open Design Studio"
         title="Draw a part to size by hand — precision tools, snapping, and dimensions in a full window (ADR-272)."
         onClick={() => useDesignStudioStore.getState().openStudio()}
-        style={studioButtonStyle}
+        className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
-        Design
+        <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: studioIcon }} />
       </button>
     </aside>
   );
@@ -100,7 +105,7 @@ function NodeCommandBar(props: {
     selectedNodes.filter((ref) => ref.geometry === 'curve' && ref.handle === undefined).length ===
     2;
   return (
-    <div role="toolbar" aria-label="Curve node actions" style={nodeActionsStyle}>
+    <div role="toolbar" aria-label="Curve node actions" className="lf-toolstrip__node-actions">
       <NodeAction
         label="Smooth"
         title="Align the incoming and outgoing curve handles"
@@ -157,7 +162,7 @@ function NodeAction(props: {
       title={props.title}
       disabled={props.disabled}
       onClick={props.onClick}
-      style={nodeActionStyle}
+      className="lf-btn lf-toolstrip__node-action"
     >
       {props.label}
     </button>
@@ -173,36 +178,3 @@ function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'cnc-tabs') return false;
   return tool.kind === 'draw' && tool.shape === current.shape;
 }
-
-const libraryButtonStyle: React.CSSProperties = {
-  marginTop: 'var(--lf-space-4)',
-  fontSize: 11,
-  padding: '6px 4px',
-};
-
-const studioButtonStyle: React.CSSProperties = {
-  fontSize: 11,
-  padding: '6px 4px',
-};
-
-const stripStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--lf-space-4)',
-  padding: 'var(--lf-space-4)',
-  flexShrink: 0,
-};
-
-const nodeActionsStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-  paddingTop: 4,
-  borderTop: '1px solid var(--lf-border)',
-};
-
-const nodeActionStyle: React.CSSProperties = {
-  minWidth: 48,
-  padding: '3px 4px',
-  fontSize: 10,
-};

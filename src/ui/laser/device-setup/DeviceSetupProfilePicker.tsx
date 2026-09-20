@@ -163,5 +163,5 @@ const reasonsStyle: React.CSSProperties = {
 const warningStyle: React.CSSProperties = {
   margin: '2px 0 4px',
   fontSize: 11,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
 };

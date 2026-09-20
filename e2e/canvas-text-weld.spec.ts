@@ -1,3 +1,4 @@
+import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { Page } from '@playwright/test';
 import type { AppState } from '../src/ui/state/store';
@@ -59,7 +60,7 @@ test('welds Dancing Script joins, retains editing and saves the setting with und
   );
   expect(welded.undo).toBe(raw.undo + 1);
   await page.screenshot({ path: testInfo.outputPath('script-after.png') });
-  await page.getByRole('button', { name: 'Save As...', exact: true }).click();
+  await (await toolbarCommand(page, 'Save As...')).click();
   await expect
     .poll(async () =>
       Object.values(await kerfdesk.savedFiles()).some((file) =>

@@ -1,0 +1,79 @@
+.lf-toolstrip {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  width: 50px;
+  min-height: 0;
+  padding: 8px 5px;
+  border-left: 0;
+  border-right: 1px solid var(--lf-border);
+  overscroll-behavior: contain;
+}
+
+.lf-toolstrip > button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+}
+
+.lf-toolstrip > button > svg,
+.lf-toolstrip > button > span > svg {
+  width: 19px;
+  height: 19px;
+}
+
+.lf-toolstrip button:focus-visible {
+  outline-offset: -2px;
+}
+
+.lf-toolstrip > .lf-btn:not([aria-pressed='true']):not(:hover) {
+  background: var(--lf-bg-0);
+}
+
+.lf-toolstrip__divider {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--lf-border);
+}
+
+.lf-toolstrip__launcher span,
+.lf-toolstrip__launcher svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+
+/* Curve actions keep their readable names, widening only the active rail. */
+.lf-toolstrip:has(.lf-toolstrip__node-actions) {
+  width: 58px;
+}
+
+.lf-toolstrip__node-actions {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 3px;
+  width: 100%;
+  padding-top: 5px;
+  border-top: 1px solid var(--lf-border);
+}
+
+.lf-toolstrip__node-action {
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 2px;
+  font-size: var(--lf-text-xs);
+}
+
+@media (max-height: 650px) {
+  .lf-toolstrip {
+    gap: 3px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}

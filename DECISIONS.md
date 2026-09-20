@@ -2840,6 +2840,10 @@ that is a separate LightBurn convention for vector user units and is unaffected.
 
 **Status:** Accepted. | **Date:** 2026-06-13
 
+> **Amendment note (2026-09-19).** The light-only choice below is amended by the
+> theme-aware workspace palette at the end of this entry. The shared token
+> architecture remains in force; the workspace bed now follows the theme too.
+
 ### Context
 
 ADR-047 built the design-token system with a **unified dark chrome** over a
@@ -2915,8 +2919,8 @@ change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
 
 The transient startup surface uses a separate charcoal/copper palette and a typographic
 KerfDesk wordmark over sculpted timber artwork, with **Created by Ons Houtkombuis** as live text.
-This is the maintainer-requested loading-screen identity; the workspace keeps ADR-049's light
-chrome. The static HTML provides readable branding before either JavaScript or the artwork is
+This is the maintainer-requested loading-screen identity; the workspace follows the theme-aware
+palette amendment below. The static HTML provides readable branding before either JavaScript or the artwork is
 available. A compressed local WebP is explicitly precached for offline launches, with a plain
 charcoal background as fallback. No remote font or image service is used at runtime.
 
@@ -2924,6 +2928,35 @@ The activity bar is indeterminate, reduced motion disables animation, and the sc
 the workspace after the canvas has a paint opportunity without a minimum branding hold.
 A mounted root crash screen is revealed promptly; the existing bounded wait after main-module
 execution remains for a missing canvas. The loading screen adds no modal or operator action.
+
+### Amendment (2026-09-19): theme-aware workspace palette
+
+The maintainer accepted the responsive workspace preview and its blue and soft
+grey palette. The application now uses light tokens by default and overrides
+chrome surfaces, text, tints, and native-control `color-scheme` through
+`prefers-color-scheme: dark`. This supersedes the light-only restriction above;
+it does not add a separate in-app theme preference.
+
+Light chrome uses white panels, `#f5f7fa` bars, `#dce2ea` borders, and `#253248`
+text. The shared blue fill is `#3175d0`, minimally deeper than the preview blue
+so small white labels meet AA contrast. Dark chrome uses `#20242b` panels,
+`#272c34` bars, and `#e0e7f2` text. Semantic text uses the `--lf-*-fg` tokens;
+semantic fills retain white `--lf-on-fill` text in either theme.
+
+The maintainer's approved dark preview supersedes the always-light workspace bed.
+The canvas surround, bed, grid, rulers and Design Studio drawing surface now
+follow the chrome theme: dark mode uses a `#242930` bed, `#343b46` grid and
+`#272c34` rulers. Black and other low-contrast vector paints are adapted only at
+display time, with neutral artwork using `#e0e7f2` ink on the dark bed. Chromatic
+paints retain their relative channel order when lightened for visibility. Light
+mode retains the white bed and original artwork paints. OS theme changes redraw
+the canvas and invalidate its preview-background cache immediately.
+
+Canvas selection and out-of-bounds chrome still share the corresponding accent
+and danger values pinned by `theme-sync.test.ts`. Stored artwork colours, raster
+pixels, exports, toolpath semantics and machine behaviour are unchanged. Material
+and image-specific previews keep their own rendering semantics. The static error
+page remains its existing light presentation.
 
 ---
 
@@ -7245,6 +7278,25 @@ desktop widths gain vertical space while specialist labels remain available
 where room permits. Operators on narrow windows may need to horizontally scroll
 the command group, but every command also remains available from the menus.
 
+### Amendment (2026-09-19): measured overflow and compact transform controls
+
+The command lane now measures the available space and moves commands into a
+labelled **More** popover instead of requiring horizontal scrolling or hiding
+specialist labels at a fixed breakpoint. Commands in the row and popover share
+the command registry, including their handlers, accessible names, tooltips,
+shortcuts, disabled reasons, and pressed states. Overflow adapts to the actual
+window width and the space occupied by the toolbar's utilities. The command lane
+does not wrap; at 700 px and below, utilities and commands may occupy separate rows.
+This replaces the earlier fixed 1280 px label rule and horizontal-scroll fallback.
+
+The toolbar also exposes the saved Auto / Compact / Spacious workspace preference
+defined in ADR-139's amendment. The numeric toolbar retains X/Y, width/height,
+rotation, and the aspect-ratio control; the nine-point transform anchor moves into
+a keyboard-accessible **Anchor** popover without changing transform semantics.
+The drawing strip uses a 44 px default width, scrolls when necessary, and keeps
+all tools, design-library access, and Design Studio access. Curve actions may
+widen it to retain readable labels. No capability is removed to fit the window.
+
 ## ADR-139 - Right workspace rails are independently collapsible, with machine controls fail-visible
 
 **Status:** Superseded in part by ADR-207 | **Date:** 2026-07-13
@@ -7290,6 +7342,35 @@ preference, so a panel that was collapsed before Start collapses again after the
 stream fully settles. Panel visibility remains session-only; persistence across
 launches can be added later if user testing shows that preference is valuable.
 At 700 px and below, the initial canvas no longer collapses to zero width.
+
+### Amendment (2026-09-19): saved responsive workspace layout
+
+The earlier width-triggered collapse defaults are replaced by an explicit
+**Auto / Compact / Spacious** preference. It is local application UI state,
+persisted across reloads, never project or undo data. If browser storage is
+unavailable, changing the layout still works for the current session.
+
+- **Auto** chooses Compact at viewport width <=1439 CSS px or height <=719 CSS
+  px, and Spacious otherwise. Width and height both matter because short laptop
+  windows lose usable canvas area even when their horizontal resolution is high.
+- **Compact** presents one sidebar with keyboard-accessible Artwork and Machine
+  tabs, a scrolling settings body, and the shared job-actions dock beneath it.
+  Selecting a tab makes its existing panel available; commands that request a
+  particular panel focus the corresponding tab.
+- **Spacious** presents the two panels side by side, preserving independent
+  horizontal resize, hide/show, and collapse/expand controls. Run order continues
+  to widen the Artwork / Operations panel.
+- Below 960 CSS px wide, the workspace always uses a single Compact sidebar,
+  even with Spacious selected. The saved preference is retained and takes effect
+  again once the window can accommodate it.
+- **Reset Workspace Layout** restores Auto and opens both panels. Compact still
+  displays one tab at a time. Panel visibility and manual panel sizing remain
+  distinct from the persisted layout preference.
+
+ADR-207 remains unchanged: Pause, Resume, Continue, and software Abort belong to
+the independent Live Motion bar, and panel visibility never changes those active
+operation controls. The job dock is a presentation change under ADR-225's
+amendment; switching layouts does not Frame, Start, connect, or send machine work.
 
 ## ADR-140 - CNC profile finish allowance + finishing pass (Phase H follow-up, 2026-07-13)
 
@@ -10217,6 +10298,30 @@ re-landed after a merge race via #261).
    the release -> wake -> unlock -> set-origin wizard behind it is unchanged.
 
 **Amendment (2026-07-17, same day).** Placement moves below the job actions: the placement block above the cluster pushed Start/Frame under the 720p fold, and the maintainer requires the go-actions visible without scrolling. Final rail order: origin -> job actions -> placement -> hand-positioning guide. Placement stays a set-once compile setting and is re-presented in the pre-start Job Review dialog (ADR-224), so nothing is lost at Start time. The ux-shell e2e restores the hard above-the-fold assertion for Start job and Frame at laptop height.
+
+### Amendment (2026-09-19): job actions outside the settings scroller
+
+Frame and the primary Set up & Frame / Start framed job action now share a job
+dock outside the scrolling settings body. Compact keeps this dock below both the
+Artwork and Machine tabs. Spacious places it below the expanded Machine panel;
+the operator's explicit hide/collapse controls still apply. The dock includes the
+existing frame-readiness explanation, job estimate, and Start blocker notice.
+Origin, placement, homing, focus, and other setup controls remain available in the
+Machine panel.
+
+The dock uses the existing Frame and Start handlers and the same readiness and
+busy-state inputs as the inline controls. The primary action still prepares and
+Frames when the exact job is not framed, then opens the existing Start-time
+review when its Frame evidence is current. It does not add a second permission
+model or change the sole ordinary Start policy gate: completed Frame for the
+exact reviewed job, as governed by ADRs 228, 230, 232, and 237. Policy findings
+remain review warnings, and the existing factual transport/output/handoff
+boundaries remain unchanged.
+
+The workspace dock presents Frame as a neutral button and the primary action as
+the shared blue filled button, replacing the earlier go-green presentation there.
+The shared inline go-action variant remains available to existing callers. The
+Live Motion bar and its Pause, Resume, Continue, and Abort behaviour are unchanged.
 
 ---
 

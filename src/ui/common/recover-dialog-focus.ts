@@ -46,13 +46,19 @@ function isUnavailable(element: HTMLElement): boolean {
 
 /** Return focus without taking it away from another dialog or a deliberate move. */
 export function restoreDialogFocus(node: HTMLElement, target: HTMLElement | null): void {
-  if (target === null || !target.isConnected) return;
+  if (target === null) return;
+  // Responsive toolbars can move an opener into an overflow menu while its
+  // dialog is open. Return to that menu's trigger when the original is gone.
+  const restoredTarget = target.isConnected
+    ? target
+    : document.getElementById(target.dataset['dialogFocusFallback'] ?? '');
+  if (restoredTarget === null || isUnavailable(restoredTarget)) return;
   const active = document.activeElement;
   if (active !== null && active !== document.body && !node.contains(active)) return;
   const remaining = Array.from(
     document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'),
   ).filter((dialog) => dialog !== node);
   const topmost = remaining[remaining.length - 1];
-  if (topmost !== undefined && !topmost.contains(target)) return;
-  target.focus();
+  if (topmost !== undefined && !topmost.contains(restoredTarget)) return;
+  restoredTarget.focus();
 }

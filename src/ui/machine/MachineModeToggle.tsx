@@ -86,7 +86,7 @@ const segStyle: React.CSSProperties = {
 const activeSegStyle: React.CSSProperties = {
   ...segStyle,
   background: 'var(--lf-accent)',
-  color: 'var(--lf-bg)',
+  color: 'var(--lf-on-fill)',
 };
 const unavailableSegStyle: React.CSSProperties = {
   ...segStyle,

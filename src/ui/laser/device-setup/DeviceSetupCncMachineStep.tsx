@@ -173,5 +173,5 @@ const warningStyle: React.CSSProperties = {
   padding: 8,
   fontSize: 12,
   lineHeight: 1.45,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
 };

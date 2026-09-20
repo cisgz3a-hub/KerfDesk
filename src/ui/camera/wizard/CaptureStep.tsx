@@ -198,5 +198,5 @@ const videoBoxStyle: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const noteStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-faint)' };
-const lockedStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-accent)' };
+const lockedStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-accent-fg)' };
 const statusStyle: React.CSSProperties = { margin: 0, fontSize: 12 };

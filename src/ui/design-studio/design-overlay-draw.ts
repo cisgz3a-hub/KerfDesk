@@ -193,7 +193,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, atPx: Vec2, text: string): voi
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, width, LABEL_HEIGHT_PX);
-  ctx.fillStyle = canvasTheme.designGeometry;
+  ctx.fillStyle = canvasTheme.noticeText;
   ctx.textBaseline = 'middle';
   ctx.fillText(text, x + LABEL_PADDING_PX, y + LABEL_HEIGHT_PX / 2);
 }

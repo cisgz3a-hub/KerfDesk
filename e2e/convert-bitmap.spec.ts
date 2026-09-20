@@ -45,15 +45,31 @@ test.beforeEach(async ({ page, kerfdesk }) => {
   });
   await page.goto('/');
   await kerfdesk.setOpenFiles([{ name: 'overlap.svg', text: overlappingSvg }]);
-  await page.getByRole('button', { name: 'Import...', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Convert to Bitmap...', exact: true }),
-  ).toBeEnabled();
+  await page.getByRole('button', { name: 'More commands', exact: true }).click();
+  await page
+    .getByRole('menu', { name: 'More commands', exact: true })
+    .getByRole('menuitem', { name: 'Import...', exact: true })
+    .click();
+  await expectBitmapAvailable(page);
 });
 
 async function openDialog(page: Page) {
-  await page.getByRole('button', { name: 'Convert to Bitmap...', exact: true }).click();
+  await page.getByRole('button', { name: 'More commands', exact: true }).click();
+  await page
+    .getByRole('menu', { name: 'More commands', exact: true })
+    .getByRole('menuitem', { name: 'Convert to Bitmap...', exact: true })
+    .click();
   return page.getByRole('dialog', { name: 'Convert to Bitmap', exact: true });
+}
+
+async function expectBitmapAvailable(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'More commands', exact: true }).click();
+  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
+  await expect(
+    menu.getByRole('menuitem', { name: 'Convert to Bitmap...', exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
 }
 
 test('native conversion preserves nonzero overlap and PNG pixels through Undo and Redo', async ({
@@ -100,9 +116,7 @@ test('native conversion preserves nonzero overlap and PNG pixels through Undo an
   expect(result).toEqual({ width: 150, height: 100, mismatch: 0, center: 127 });
   await page.screenshot({ path: testInfo.outputPath('converted.png') });
   await page.keyboard.press('Control+z');
-  await expect(
-    page.getByRole('button', { name: 'Convert to Bitmap...', exact: true }),
-  ).toBeEnabled();
+  await expectBitmapAvailable(page);
   await page.keyboard.press('Control+Shift+z');
   await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
   expect(errors).toEqual([]);
@@ -131,9 +145,7 @@ test('busy conversion prevents duplicate work, cancels with Escape, and can be r
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   expect(await page.evaluate(() => window.__bitmapConversionTest.terminated)).toBe(1);
-  await expect(
-    page.getByRole('button', { name: 'Convert to Bitmap...', exact: true }),
-  ).toBeEnabled();
+  await expectBitmapAvailable(page);
   await page.evaluate(() => {
     window.__bitmapConversionTest.hold = false;
   });

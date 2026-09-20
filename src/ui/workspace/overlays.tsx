@@ -244,9 +244,7 @@ const emptyHintStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   pointerEvents: 'none',
-  // Dark-on-light: this hint sits on the always-light viewport (ADR-047).
-  // eslint-disable-next-line no-restricted-syntax -- deliberate light-surface literal (always-light canvas viewport, ADR-047 exception).
-  color: '#888',
+  color: 'var(--lf-text-muted)',
   fontStyle: 'italic',
   fontSize: 14,
   fontFamily: 'system-ui, sans-serif',

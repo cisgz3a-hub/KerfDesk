@@ -1,15 +1,20 @@
-// Toasts — bottom-right stack of non-blocking notifications. Reads from
+// Toasts — a non-blocking notification stack in the workspace or modal. Reads from
 // useToastStore; auto-dismiss lives in the store. Per ADR-015 / CLAUDE.md
 // this component is a thin renderer; click on a toast manually dismisses it.
 
+import { createPortal } from 'react-dom';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
+import { useToastPlacement } from './use-toast-placement';
+import './Toasts.css';
 
 export function Toasts(): JSX.Element {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismissToast);
-  return (
+  const placement = useToastPlacement(toasts.length > 0);
+  const notifications = (
     <div
-      style={containerStyle}
+      className={`lf-toasts${placement.host === null ? ' lf-toasts--workspace' : ''}`}
+      style={placement.host === null ? placement.style : undefined}
       role="region"
       aria-label="Notifications"
       aria-live="polite"
@@ -23,7 +28,8 @@ export function Toasts(): JSX.Element {
             key={toast.id}
             type="button"
             onClick={() => dismiss(toast.id)}
-            style={{ ...toastStyle, ...variantStyle(toast.variant) }}
+            className="lf-toast"
+            style={variantStyle(toast.variant)}
             aria-label={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
             title={`Dismiss ${variantLabel.toLowerCase()} notification: ${toast.message}`}
           >
@@ -34,6 +40,7 @@ export function Toasts(): JSX.Element {
       })}
     </div>
   );
+  return placement.host === null ? notifications : createPortal(notifications, placement.host);
 }
 
 function toastVariantLabel(variant: ToastVariant): string {
@@ -61,29 +68,3 @@ function variantStyle(variant: ToastVariant): React.CSSProperties {
       return { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' };
   }
 }
-
-const containerStyle: React.CSSProperties = {
-  position: 'fixed',
-  right: 16,
-  bottom: 32, // above the StatusBar
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-  // csstype only admits numbers for zIndex, so var(--lf-z-toast) needs an
-  // assertion; browsers resolve the custom property fine (toasts layer
-  // above dialog backdrops, per the tokens.css z-map).
-  zIndex: 'var(--lf-z-toast)' as React.CSSProperties['zIndex'],
-  pointerEvents: 'none',
-};
-const toastStyle: React.CSSProperties = {
-  pointerEvents: 'auto',
-  padding: '8px 14px',
-  borderRadius: 4,
-  border: 'none',
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 13,
-  boxShadow: 'var(--lf-shadow)',
-  cursor: 'pointer',
-  textAlign: 'left',
-  maxWidth: 360,
-};

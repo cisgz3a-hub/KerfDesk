@@ -82,6 +82,6 @@ const explanationStyle: React.CSSProperties = { flexBasis: '100%', margin: 0, fo
 const limitationStyle: React.CSSProperties = {
   flexBasis: '100%',
   margin: 0,
-  color: 'var(--lf-warning)',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
 };

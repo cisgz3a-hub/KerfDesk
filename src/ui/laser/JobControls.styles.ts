@@ -23,11 +23,13 @@ export const primaryActionStyle: CSSProperties = {
 // Scannable group headers for the placement/origin clusters — text-only so the
 // rail gains anatomy without adding more nested boxes.
 export const sectionCaptionStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
   fontWeight: 600,
   letterSpacing: 0.4,
   textTransform: 'uppercase',
   color: 'var(--lf-text-faint)',
+  marginTop: 4,
+  lineHeight: 1.4,
 };
 export const progressContainerStyle: CSSProperties = {
   position: 'relative',
@@ -52,7 +54,7 @@ export const progressLabelStyle: CSSProperties = {
   color: 'var(--lf-text)',
 };
 export const estimateStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
   color: 'var(--lf-text-muted)',
   // Sits on its own line under the Start row, hugging the trailing edge like a
   // status detail rather than competing with the action buttons.
@@ -60,7 +62,7 @@ export const estimateStyle: CSSProperties = {
   fontVariantNumeric: 'tabular-nums',
 };
 export const framedRunStatusStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 'var(--lf-text-sm)',
   lineHeight: 1.3,
   color: 'var(--lf-text-muted)',
 };
