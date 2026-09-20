@@ -31,7 +31,10 @@ import { renderVariableText } from '../text/render-variable-text';
 import { PreparationTransferSender } from './preparation-transfer-sender';
 import type { PreparationTransferAcknowledgement } from './preparation-transfer-protocol';
 
-const transferSender = new PreparationTransferSender((response) => self.postMessage(response));
+const transferSender = new PreparationTransferSender((response, transfer) => {
+  if (transfer === undefined) self.postMessage(response);
+  else self.postMessage(response, transfer as Transferable[]);
+});
 
 type PreparationOptions = Pick<
   LargeJobPreparationOptions,

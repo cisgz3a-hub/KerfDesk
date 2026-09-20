@@ -30,6 +30,7 @@
 //   - Environments without Worker (vitest/jsdom) get null: callers keep the
 //     paused fallback behavior.
 
+import { PackedToolpathSteps } from '../../core/job/packed-toolpath-steps';
 import type { Project } from '../../core/scene';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
@@ -308,18 +309,41 @@ function handleWorkerMessage(e: MessageEvent<PreparationWorkerResponse>): void {
   const settled = activeRequest;
   activeRequest = null;
   retireWorker();
-  if (e.data.kind === 'ok') {
-    settled.resolve({
-      toolpath: e.data.toolpath,
-      estimate: e.data.estimate,
-      ...(e.data.jobOriginOffset === undefined ? {} : { jobOriginOffset: e.data.jobOriginOffset }),
-    });
-  } else if (e.data.kind === 'estimate') {
-    settled.resolve({ estimate: e.data.estimate });
-  } else {
-    settled.reject(new Error(e.data.message));
-  }
+  settleWorkerResponse(settled, e.data);
   dispatchNextRequest();
+}
+
+type SettledResponse = Exclude<
+  PreparationWorkerResponse,
+  PreparationTransferResponse | { readonly kind: 'progress' }
+>;
+
+function settleWorkerResponse(settled: ActiveRequest, response: SettledResponse): void {
+  if (response.kind === 'error') {
+    settled.reject(new Error(response.message));
+    return;
+  }
+  if (response.kind === 'estimate') {
+    settled.resolve({ estimate: response.estimate });
+    return;
+  }
+  if (response.kind === 'packed') {
+    // The buffers arrived by transfer; the route is read out of them one step
+    // at a time and never becomes an array of objects on this side either.
+    const { kind: _kind, id: _id, toolpath, packed, ...prepared } = response;
+    settled.resolve({
+      ...prepared,
+      toolpath: { ...toolpath, steps: new PackedToolpathSteps(packed) },
+    });
+    return;
+  }
+  settled.resolve({
+    toolpath: response.toolpath,
+    estimate: response.estimate,
+    ...(response.jobOriginOffset === undefined
+      ? {}
+      : { jobOriginOffset: response.jobOriginOffset }),
+  });
 }
 
 function isTransferResponse(

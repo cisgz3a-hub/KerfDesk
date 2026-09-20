@@ -1,3 +1,4 @@
+import type { ToolpathStepList } from '../../core/job/toolpath-steps';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import {
   stepIndexAtLength,
@@ -64,14 +65,14 @@ const EMPTY_FRAME: PreparedPreviewFrame = {
 };
 
 function selectSteps(
-  steps: ReadonlyArray<ToolpathStep>,
+  steps: ToolpathStepList,
   count: number,
   showTravel: boolean,
 ): ReadonlyArray<PreviewDisplayStep> {
   const selected: PreviewDisplayStep[] = [];
   // Apply the original prefix's stride before omitting hidden travel/plunges.
   for (const index of displayStepIndices(count)) {
-    const step = steps[index];
+    const step = steps.at(index);
     if (step === undefined) continue;
     const command = displayStep(step, showTravel);
     if (command !== null) selected.push(command);
@@ -108,7 +109,7 @@ function previewPrefix(route: Toolpath, cut: number) {
   if (cut <= 0) return { count: 0, partial: null, head: firstPoint(steps) };
   const cumulative = toolpathCumulativeLengths(steps);
   const count = stepIndexAtLength(cumulative, cut);
-  const step = steps[count];
+  const step = steps.at(count);
   if (step === undefined) return { count, partial: null, head: lastPoint(steps) };
   const consumed = count === 0 ? 0 : (cumulative[count - 1] ?? 0);
   const partial = truncateStep(step, cut - consumed);
@@ -148,17 +149,17 @@ function truncateStep(step: ToolpathStep, length: number): ToolpathStep {
   return { ...step, polyline, length };
 }
 
-function firstPoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
-  const first = steps[0];
+function firstPoint(steps: ToolpathStepList): Vec2 | null {
+  const first = steps.at(0);
   if (first === undefined) return null;
   if (first.kind === 'travel') return first.from;
   if (first.kind === 'plunge') return first.at;
   return first.polyline[0] ?? null;
 }
 
-function lastPoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
+function lastPoint(steps: ToolpathStepList): Vec2 | null {
   for (let index = steps.length - 1; index >= 0; index--) {
-    const step = steps[index];
+    const step = steps.at(index);
     if (step === undefined) continue;
     const point = stepHead(step);
     if (point !== null) return point;

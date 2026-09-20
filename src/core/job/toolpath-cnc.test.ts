@@ -52,7 +52,7 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     );
     const kinds = toolpath.steps.map((s) => s.kind);
     expect(kinds.slice(0, 3)).toEqual(['travel', 'plunge', 'cut']);
-    const travel = toolpath.steps[0];
+    const travel = toolpath.steps.at(0);
     if (travel?.kind !== 'travel') throw new Error('expected travel');
     expect(travel.z).toEqual({ from: REPRESENTED_SAFE_Z_MM, to: REPRESENTED_SAFE_Z_MM });
   });
@@ -65,7 +65,7 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     // travel, plunge(-1.5), cut, plunge(-3), cut — no intermediate retract.
     const kinds = toolpath.steps.map((s) => s.kind);
     expect(kinds).toEqual(['travel', 'plunge', 'cut', 'plunge', 'cut']);
-    const secondPlunge = toolpath.steps[3];
+    const secondPlunge = toolpath.steps.at(3);
     if (secondPlunge?.kind !== 'plunge') throw new Error('expected plunge');
     expect(secondPlunge.fromZ).toBe(-1.5);
     expect(secondPlunge.toZ).toBe(-3);
@@ -79,7 +79,7 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     const toolpath = buildToolpath({ groups: [group(passes)] }, { startPoint: { x: 0, y: 0 } });
     const kinds = toolpath.steps.map((s) => s.kind);
     expect(kinds).toEqual(['travel', 'plunge', 'cut', 'plunge', 'travel', 'plunge', 'cut']);
-    const retract = toolpath.steps[3];
+    const retract = toolpath.steps.at(3);
     if (retract?.kind !== 'plunge') throw new Error('expected retract plunge');
     expect(retract.toZ).toBe(REPRESENTED_SAFE_Z_MM);
   });

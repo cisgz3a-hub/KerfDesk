@@ -9,18 +9,21 @@
 // produces a new array, so array identity is a sound key: a real edit replaces
 // the array and misses naturally. Identity-keyed and GC-bounded.
 
-import type { ToolpathStep } from './toolpath-types';
+import { packedStepLength } from './packed-toolpath';
+import { packedToolpathOf } from './packed-toolpath-steps';
+import type { ToolpathStepList } from './toolpath-steps';
 
-const cumulativeLengthCache = new WeakMap<ReadonlyArray<ToolpathStep>, Float64Array>();
+const cumulativeLengthCache = new WeakMap<ToolpathStepList, Float64Array>();
 
 /** Running sum of step lengths: entry i is the arc length at the END of step i. */
-export function toolpathCumulativeLengths(steps: ReadonlyArray<ToolpathStep>): Float64Array {
+export function toolpathCumulativeLengths(steps: ToolpathStepList): Float64Array {
   const cached = cumulativeLengthCache.get(steps);
   if (cached !== undefined) return cached;
   const cumulative = new Float64Array(steps.length);
+  const packed = packedToolpathOf(steps);
   let total = 0;
   for (let index = 0; index < steps.length; index += 1) {
-    total += steps[index]?.length ?? 0;
+    total += packed === null ? (steps.at(index)?.length ?? 0) : packedStepLength(packed, index);
     cumulative[index] = total;
   }
   cumulativeLengthCache.set(steps, cumulative);

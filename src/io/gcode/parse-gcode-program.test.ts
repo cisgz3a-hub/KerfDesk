@@ -15,7 +15,7 @@ describe('parseGcodeProgram linear motion', () => {
     );
     const kinds = result.toolpath.steps.map((step) => step.kind);
     expect(kinds).toEqual(['plunge', 'travel', 'plunge', 'cut', 'plunge']);
-    const cut = result.toolpath.steps[3];
+    const cut = result.toolpath.steps.at(3);
     if (cut?.kind !== 'cut') throw new Error('cut step missing');
     expect(cut.polyline).toEqual([
       { x: 10, y: 0 },
@@ -50,7 +50,7 @@ describe('parseGcodeProgram arcs', () => {
   it('flattens an I/J quarter circle onto the analytic radius', () => {
     // CCW quarter around (0,10): from (0,0) to (10,10).
     const result = ok(['G21 G90 G17', 'G1 F500', 'G3 X10 Y10 I0 J10'].join('\n'));
-    const arc = result.toolpath.steps[0];
+    const arc = result.toolpath.steps.at(0);
     if (arc?.kind !== 'cut') throw new Error('arc cut missing');
     for (const point of arc.polyline) {
       expect(Math.hypot(point.x - 0, point.y - 10)).toBeCloseTo(10, 6);
@@ -61,7 +61,7 @@ describe('parseGcodeProgram arcs', () => {
 
   it('emits a full circle for an I/J arc that returns to its start', () => {
     const result = ok(['G21 G90', 'G2 X0 Y0 I5 J0 F500'].join('\n'));
-    const arc = result.toolpath.steps[0];
+    const arc = result.toolpath.steps.at(0);
     if (arc?.kind !== 'cut') throw new Error('arc cut missing');
     expect(arc.length).toBeCloseTo(Math.PI * 10, 6);
   });
@@ -72,7 +72,7 @@ describe('parseGcodeProgram arcs', () => {
     // arc's midpoint is above the chord? Pin it analytically: the midpoint
     // of the CW minor arc lies on the OPPOSITE side of the center.
     const cw = ok(['G21 G90', 'G2 X10 Y0 R10 F500'].join('\n'));
-    const cwArc = cw.toolpath.steps[0];
+    const cwArc = cw.toolpath.steps.at(0);
     if (cwArc?.kind !== 'cut') throw new Error('cw arc missing');
     const cwMaxY = Math.max(...cwArc.polyline.map((p) => p.y));
     const cwMinY = Math.min(...cwArc.polyline.map((p) => p.y));
@@ -82,7 +82,7 @@ describe('parseGcodeProgram arcs', () => {
     expect(cwMinY).toBeGreaterThanOrEqual(-1e-6);
 
     const ccw = ok(['G21 G90', 'G3 X10 Y0 R10 F500'].join('\n'));
-    const ccwArc = ccw.toolpath.steps[0];
+    const ccwArc = ccw.toolpath.steps.at(0);
     if (ccwArc?.kind !== 'cut') throw new Error('ccw arc missing');
     const ccwMinY = Math.min(...ccwArc.polyline.map((p) => p.y));
     expect(ccwMinY).toBeLessThan(-1);

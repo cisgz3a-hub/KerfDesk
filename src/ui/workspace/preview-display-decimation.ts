@@ -18,7 +18,7 @@ export function previewDisplayDecimation(
   let drawnSteps = 0;
   let drawnSegments = 0;
   for (const index of displayStepIndices(toolpath.steps.length, threshold)) {
-    const step = toolpath.steps[index];
+    const step = toolpath.steps.at(index);
     if (step === undefined) continue;
     drawnSteps += 1;
     drawnSegments += displaySegmentCount(step, threshold);

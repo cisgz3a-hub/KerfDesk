@@ -11,6 +11,7 @@ import type * as CoreJob from '../../core/job';
 import type { FillGroup, Job, Toolpath } from '../../core/job';
 import { createProject } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
+import { PackedToolpathSteps } from '../../core/job/packed-toolpath-steps';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
 import {
   MAX_PLAN_PREVIEW_ROUTE_STEPS,
@@ -145,7 +146,18 @@ describe('plan preview route budget', () => {
     if (machineRoute === undefined) throw new Error('missing machine route');
     expect(machineRoute.steps.length).toBeGreaterThan(MAX_PLAN_PREVIEW_ROUTE_STEPS);
     expect(previewRouteSource(preview)).toBe('legacy-toolpath');
-    // Slot reuse, not a second retained route.
-    expect(preview.steps).toBe(machineRoute.steps);
+    // Columnar buffers, not a second retained route, and the machine array it
+    // was mapped out of is drained slot by slot rather than left beside it.
+    expect(preview.steps).toBeInstanceOf(PackedToolpathSteps);
+    expect(preview.steps.length).toBe(machineRoute.steps.length);
+    expect(
+      [...(machineRoute.steps as unknown as Array<unknown>)].every((step) => step === undefined),
+    ).toBe(true);
+    // Still readable end to end, one step at a time, out of the buffers.
+    expect(preview.steps.at(0)).toBeDefined();
+    expect(preview.steps.at(preview.steps.length - 1)).toBeDefined();
+    expect(preview.steps.filter((step) => step.kind === 'cut')).toHaveLength(
+      MAX_PLAN_PREVIEW_ROUTE_STEPS,
+    );
   }, 120000);
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ToolpathStepList } from '../../core/job/toolpath-steps';
 import type { ToolpathStep } from '../../core/job';
 import {
   createLayer,
@@ -96,7 +97,7 @@ function closedPolyline(points: ReadonlyArray<Vec2>): Polyline {
   return { closed: true, points };
 }
 
-function contiguousCutLoops(steps: ReadonlyArray<ToolpathStep>): ReadonlyArray<Polyline> {
+function contiguousCutLoops(steps: ToolpathStepList): ReadonlyArray<Polyline> {
   const loops: Polyline[] = [];
   let points: Vec2[] = [];
   const finishLoop = (): void => {

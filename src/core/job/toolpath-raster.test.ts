@@ -130,12 +130,12 @@ describe('buildToolpath raster preview rows', () => {
       'cut',
       'travel',
     ]);
-    expect(tp.steps[0]).toMatchObject({
+    expect(tp.steps.at(0)).toMatchObject({
       kind: 'travel',
       from: { x: 10, y: 20.5 },
       to: { x: 11, y: 20.5 },
     });
-    expect(tp.steps[1]).toMatchObject({
+    expect(tp.steps.at(1)).toMatchObject({
       kind: 'cut',
       color: '#444444',
       source: {
@@ -153,12 +153,12 @@ describe('buildToolpath raster preview rows', () => {
         { x: 13, y: 20.5 },
       ],
     });
-    expect(tp.steps[4]).toMatchObject({
+    expect(tp.steps.at(4)).toMatchObject({
       kind: 'travel',
       from: { x: 15, y: 21.5 },
       to: { x: 14, y: 21.5 },
     });
-    expect(tp.steps[5]).toMatchObject({
+    expect(tp.steps.at(5)).toMatchObject({
       kind: 'cut',
       color: '#444444',
       polyline: [
@@ -193,7 +193,7 @@ describe('buildToolpath raster preview rows', () => {
     );
     const cutIndex = tp.steps.findIndex((step) => step.kind === 'cut');
     const cutStart = tp.steps.slice(0, cutIndex).reduce((sum, step) => sum + step.length, 0);
-    const cut = tp.steps[cutIndex];
+    const cut = tp.steps.at(cutIndex);
     if (cut?.kind !== 'cut') throw new Error('expected raster cut step');
 
     const sliced = sliceToolpath(tp, cutStart + cut.length / 2);

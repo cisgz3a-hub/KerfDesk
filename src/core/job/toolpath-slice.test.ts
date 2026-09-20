@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ToolpathStepList } from './toolpath-steps';
 
 import type { Vec2 } from '../scene';
 import { sliceToolpath } from './toolpath-slice';
@@ -103,7 +104,7 @@ function expectSliceMatchesReference(toolpath: Toolpath, cut: number): void {
     expect(sliced.partial).toBeNull();
     return;
   }
-  expect(sliced.partial?.kind).toBe(toolpath.steps[expected.index]?.kind);
+  expect(sliced.partial?.kind).toBe(toolpath.steps.at(expected.index)?.kind);
   expect(sliced.partial?.length).toBe(expected.remaining);
   expect(sliced.head).toEqual(sliced.partial === null ? null : headOfReference(sliced.partial));
 }
@@ -114,12 +115,12 @@ function expectSliceMatchesReference(toolpath: Toolpath, cut: number): void {
  * unchanged, so matching both values proves the sliced result is unchanged too.
  */
 function referenceSlicePoint(
-  steps: ReadonlyArray<ToolpathStep>,
+  steps: ToolpathStepList,
   cut: number,
 ): { readonly index: number; readonly remaining: number } {
   let remaining = cut;
   for (let index = 0; index < steps.length; index += 1) {
-    const step = steps[index];
+    const step = steps.at(index);
     if (step === undefined) continue;
     if (remaining >= step.length) {
       remaining -= step.length;

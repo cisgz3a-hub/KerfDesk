@@ -74,13 +74,13 @@ describe('buildToolpath', () => {
     );
 
     expect(tp.steps.map((s) => s.kind)).toEqual(['travel', 'cut', 'travel']);
-    expect(tp.steps[0]).toMatchObject({
+    expect(tp.steps.at(0)).toMatchObject({
       kind: 'travel',
       from: { x: 0, y: 0 },
       to: { x: 10, y: 0 },
       length: 10,
     });
-    expect(tp.steps[2]).toMatchObject({
+    expect(tp.steps.at(2)).toMatchObject({
       kind: 'travel',
       from: { x: 20, y: 0 },
       to: { x: 0, y: 0 },
@@ -117,13 +117,13 @@ describe('buildToolpath', () => {
 
     expect(tp.steps.map((s) => s.kind)).toEqual(['travel', 'cut', 'travel']);
     expect(tp.totalLength).toBe(14);
-    expect(tp.steps[0]).toMatchObject({
+    expect(tp.steps.at(0)).toMatchObject({
       kind: 'travel',
       from: { x: 8, y: 5 },
       to: { x: 10, y: 5 },
       length: 2,
     });
-    expect(tp.steps[1]).toMatchObject({
+    expect(tp.steps.at(1)).toMatchObject({
       kind: 'cut',
       color: '#000',
       polyline: [
@@ -132,7 +132,7 @@ describe('buildToolpath', () => {
       ],
       length: 10,
     });
-    expect(tp.steps[2]).toMatchObject({
+    expect(tp.steps.at(2)).toMatchObject({
       kind: 'travel',
       from: { x: 20, y: 5 },
       to: { x: 22, y: 5 },
@@ -184,14 +184,14 @@ describe('buildToolpath', () => {
     // One scanline, 3 ink spans / 2 holes: ink spans are cuts, the interior
     // holes are laser-off travels — the preview matches the emitted sweep.
     expect(tp.steps.map((s) => s.kind)).toEqual(['cut', 'travel', 'cut', 'travel', 'cut']);
-    expect(tp.steps[1]).toMatchObject({
+    expect(tp.steps.at(1)).toMatchObject({
       kind: 'travel',
       motion: 'feed',
       from: { x: 5, y: 0 },
       to: { x: 8, y: 0 },
       length: 3,
     });
-    expect(tp.steps[3]).toMatchObject({
+    expect(tp.steps.at(3)).toMatchObject({
       kind: 'travel',
       motion: 'feed',
       from: { x: 12, y: 0 },
@@ -244,7 +244,7 @@ describe('buildToolpath', () => {
       'cut',
       'travel',
     ]);
-    const controlledRemainder = tp.steps[2];
+    const controlledRemainder = tp.steps.at(2);
     expect(controlledRemainder).toMatchObject({
       kind: 'travel',
       motion: 'rapid',
@@ -255,7 +255,7 @@ describe('buildToolpath', () => {
     }
     expect(controlledRemainder.to.x).toBeCloseTo(11.62, 6);
     expect(controlledRemainder.length).toBeCloseTo(4.605, 6);
-    const feedEntry = tp.steps[3];
+    const feedEntry = tp.steps.at(3);
     expect(feedEntry).toMatchObject({
       kind: 'travel',
       motion: 'feed',

@@ -11,6 +11,8 @@
 // arc-length math stay valid untouched.
 
 import { toSceneCoords } from '../../core/devices';
+import { packToolpathFrom, planPackedToolpath } from '../../core/job/packed-toolpath';
+import { PackedToolpathSteps } from '../../core/job/packed-toolpath-steps';
 import type { DeviceProfile } from '../../core/devices';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
@@ -56,6 +58,33 @@ export function mapOwnedToolpathToScene(
     steps[index] = mapStep(step, mapPoint);
   });
   return { steps, totalLength: toolpath.totalLength };
+}
+
+/**
+ * Map a fresh machine route into scene space as columnar buffers, consuming it.
+ *
+ * The same one-owner rule as mapOwnedToolpathToScene, with the mapped route
+ * landing in typed arrays instead of a second complete array of step objects:
+ * each source slot is released as its step is packed, so a multi-million-step
+ * fill costs its buffers rather than roughly 217 bytes a step. A route whose
+ * steps have no packed column falls back to the object mapping unchanged.
+ */
+export function mapOwnedToolpathToPackedScene(
+  toolpath: Toolpath,
+  jobOriginOffset: Vec2,
+  device: DeviceProfile,
+): Toolpath {
+  const plan = planPackedToolpath(toolpath.steps);
+  if (plan === null) return mapOwnedToolpathToScene(toolpath, jobOriginOffset, device);
+  const steps = toolpath.steps as Array<ToolpathStep | undefined>;
+  const mapPoint = scenePointMapper(jobOriginOffset, device);
+  const packed = packToolpathFrom(plan, (index) => {
+    const step = steps[index];
+    if (step === undefined) throw new Error('owned preview route lost a step while packing');
+    steps[index] = undefined;
+    return mapStep(step, mapPoint);
+  });
+  return { steps: new PackedToolpathSteps(packed), totalLength: toolpath.totalLength };
 }
 
 function scenePointMapper(jobOriginOffset: Vec2, device: DeviceProfile): (p: Vec2) => Vec2 {

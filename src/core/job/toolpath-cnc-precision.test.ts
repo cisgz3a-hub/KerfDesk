@@ -146,7 +146,7 @@ describe('CNC Preview precision boundaries', () => {
       'plunge',
       'cut',
     ]);
-    const travel = steps[3];
+    const travel = steps.at(3);
     if (travel?.kind !== 'travel') throw new Error('expected mixed-kind boundary travel');
     expect(travel.from).toEqual({
       x: parseGrblCncCoordinate('10.0004'),
@@ -225,7 +225,7 @@ describe('CNC Preview precision boundaries', () => {
       'plunge',
       'cut',
     ]);
-    const travel = steps[3];
+    const travel = steps.at(3);
     if (travel?.kind !== 'travel') throw new Error('expected represented boundary travel');
     expect(travel.to).toEqual({
       x: parseGrblCncCoordinate('10.0004'),

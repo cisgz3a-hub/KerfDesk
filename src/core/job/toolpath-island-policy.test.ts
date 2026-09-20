@@ -31,13 +31,13 @@ describe('buildToolpath Island Fill motion policy', () => {
     });
 
     expect(tp.steps.map((step) => step.kind)).toEqual(['travel', 'cut', 'travel']);
-    expect(tp.steps[0]).toMatchObject({
+    expect(tp.steps.at(0)).toMatchObject({
       kind: 'travel',
       from: { x: 5, y: 5 },
       to: { x: 10, y: 5 },
       length: 5,
     });
-    expect(tp.steps[2]).toMatchObject({
+    expect(tp.steps.at(2)).toMatchObject({
       kind: 'travel',
       from: { x: 13, y: 5 },
       to: { x: 18, y: 5 },
