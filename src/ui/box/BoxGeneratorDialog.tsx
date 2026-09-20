@@ -45,6 +45,7 @@ export function BoxGeneratorDialog(props: {
 
   return (
     <Dialog
+      tutorialId="box"
       onClose={handleCancel}
       title="Box Generator"
       as="form"

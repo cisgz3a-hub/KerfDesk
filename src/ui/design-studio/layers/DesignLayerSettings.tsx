@@ -9,6 +9,8 @@ import { cncToolGeometryLabel } from '../../common/cnc-tool-geometry-label';
 import { SetupOwnedValueRow } from '../../layers/SetupOwnedValueRow';
 import { DesignLayerFields } from './DesignLayerFields';
 import { DESIGN_SETTINGS_STYLE } from './design-layer-settings-styles';
+import { TutorialButton } from '../../tutorials/TutorialButton';
+import { cncOperationTutorial } from '../../layers/operation-tutorial';
 
 export function DesignLayerSettings(props: {
   readonly layer: DesignLayer;
@@ -23,6 +25,7 @@ export function DesignLayerSettings(props: {
     layer.vClearToolId !== undefined || (layer.cutType === 'v-carve' && flatDepthEnabled);
   return (
     <div style={DESIGN_SETTINGS_STYLE}>
+      <TutorialButton tutorialId={cncOperationTutorial(layer.cutType)} label="Cut type tutorial" />
       <DesignLayerFields
         layer={layer}
         stockThicknessMm={props.stockThicknessMm}

@@ -38,6 +38,7 @@ export function Relief3DViewerDialog(props: {
   );
   return (
     <Viewer3DDialogShell
+      tutorialId="cnc-relief"
       ariaLabel="Relief 3D viewer"
       canvasAriaLabel="Relief 3D preview"
       title={plan.title}

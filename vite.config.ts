@@ -107,6 +107,29 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}'],
+        // Optional lesson pictures must never join the install-time app download.
+        // Keep Workbox's default node_modules exclusion when adding our own.
+        globIgnores: ['**/node_modules/**/*', '**/tutorial-images/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, url, sameOrigin }) =>
+              sameOrigin &&
+              request.destination === 'image' &&
+              /\/tutorial-images\/.+\.webp$/i.test(url.pathname),
+            handler: 'CacheFirst',
+            method: 'GET',
+            options: {
+              // Version picture URLs when their contents change; hits never revalidate.
+              cacheName: 'kerfdesk-tutorial-images-v1',
+              cacheableResponse: { statuses: [200], headers: { 'Content-Type': 'image/webp' } },
+              expiration: {
+                maxEntries: 64,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+                purgeOnQuotaError: true,
+              },
+            },
+          },
+        ],
         // Some bundled chunks and font assets exceed Workbox's 2 MB default;
         // raise the ceiling so the whole app precaches for offline use.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
@@ -134,7 +157,7 @@ export default defineConfig({
     // load for the CNC/relief 3D preview, so it can't be split below Vite's
     // 500 KB default. Raising the ceiling to a documented 750 KB budget keeps a
     // clean, warning-free build while still flagging any NEW oversized chunk.
-    // The service worker still precaches every emitted asset for offline use.
+    // The service worker still precaches emitted app chunks for offline use.
     // A real three.js code-split is tracked as a separate refactor.
     chunkSizeWarningLimit: 750,
     rollupOptions: {

@@ -13,6 +13,7 @@ export function QuickNestDialog(props: {
   const [method, setMethod] = useState<QuickNestOptions['method']>('outline');
   return (
     <Dialog
+      tutorialId="nest"
       title="Quick Nest"
       size="sm"
       as="form"

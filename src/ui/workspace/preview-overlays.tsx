@@ -4,6 +4,7 @@
 // verification surface — a silently-empty preview or an unexplained red
 // outline is a trust leak.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useMemo } from 'react';
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
@@ -154,6 +155,7 @@ export function PreviewControlsPanel(props: {
       role="group"
       aria-label="Preview route controls and statistics"
     >
+      <TutorialButton tutorialId="preview" compact label="Preview" />
       <PreviewRouteControls disabled={props.disabled} passBoundaries={passBoundaries} />
       {props.onOpen3D !== undefined ? (
         <button

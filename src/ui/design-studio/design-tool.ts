@@ -75,7 +75,7 @@ export const DESIGN_TOOLS: ReadonlyArray<DesignToolDefinition> = [
     kind: 'line',
     rail: 'create',
     label: 'Line',
-    hint: 'Click the start, then the end. Shift constrains to 45 degrees; type a length to set it exactly.',
+    hint: 'Drag from start to end. Shift constrains to 45 degrees; select the finished line to enter its exact length.',
     shortcut: 'l',
     needsSelection: false,
   },

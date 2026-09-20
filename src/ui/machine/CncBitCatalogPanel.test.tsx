@@ -85,7 +85,7 @@ describe('CncBitCatalogPanel', () => {
       expect(host.textContent).toContain('Dovetail cutters');
       expect(host.textContent).toContain('Reference-only cutter families');
       expect(host.textContent).not.toContain('geometry not yet modeled');
-      expect(host.querySelector('button')).toBeNull();
+      expect(host.querySelector('[aria-label="CNC bit catalog"] button')).toBeNull();
       expect(host.querySelector('a')).toBeNull();
     } finally {
       await act(async () => root.unmount());
@@ -123,11 +123,11 @@ describe('CncBitCatalogPanel', () => {
       await search(host, 'Combination drill/thread');
       expect(host.textContent).toContain('Combination drill/thread mills');
       expect(host.textContent).toContain('Reference-only cutter families');
-      expect(host.querySelector('button')).toBeNull();
+      expect(host.querySelector('[aria-label="CNC bit catalog"] button')).toBeNull();
 
       await search(host, 'Driven rotary-wheel');
       expect(host.textContent).toContain('Driven rotary-wheel knives');
-      expect(host.querySelector('button')).toBeNull();
+      expect(host.querySelector('[aria-label="CNC bit catalog"] button')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();

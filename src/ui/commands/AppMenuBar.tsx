@@ -12,6 +12,7 @@ import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 import { handleMenuKeyDown } from './menu-keyboard';
 import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
+import { CommandTutorialButton } from './CommandTutorialButton';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -126,27 +127,34 @@ function MenuItem(props: {
   const command = props.command;
   const commandHelp = commandHelpId(command.id);
   return (
-    <button
-      type="button"
-      role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
-      {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
-      className="lf-menu-item"
-      disabled={!command.enabled}
-      title={controlHelp(commandHelp, command.disabledReason)}
-      data-help-id={commandHelp}
-      style={menuItemStyle}
-      onClick={() => {
-        if (runCommand(command)) props.onCommandRun();
-      }}
-    >
-      <span style={checkmarkStyle} aria-hidden="true">
-        {command.active === true ? '✓' : ''}
-      </span>
-      <span style={menuLabelStyle}>{command.label}</span>
-      {command.shortcut !== undefined ? (
-        <span style={shortcutStyle}>{command.shortcut}</span>
-      ) : null}
-    </button>
+    <div role="none" style={{ display: 'flex', alignItems: 'stretch' }}>
+      <button
+        type="button"
+        role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
+        className="lf-menu-item"
+        disabled={!command.enabled}
+        title={controlHelp(commandHelp, command.disabledReason)}
+        data-help-id={commandHelp}
+        style={{ ...menuItemStyle, flex: 1 }}
+        onClick={(event) => {
+          if (command.id === 'help.tutorials') {
+            // The menu row disappears before the tutorial captures its return target.
+            event.currentTarget.closest('details')?.querySelector('summary')?.focus();
+          }
+          if (runCommand(command)) props.onCommandRun();
+        }}
+      >
+        <span style={checkmarkStyle} aria-hidden="true">
+          {command.active === true ? '✓' : ''}
+        </span>
+        <span style={menuLabelStyle}>{command.label}</span>
+        {command.shortcut !== undefined ? (
+          <span style={shortcutStyle}>{command.shortcut}</span>
+        ) : null}
+      </button>
+      <CommandTutorialButton command={command} onOpen={props.onCommandRun} />
+    </div>
   );
 }
 

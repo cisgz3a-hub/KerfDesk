@@ -1,3 +1,4 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster';
 import type { Layer, RasterImage } from '../../core/scene';
@@ -170,7 +171,12 @@ function patchFromDraft(draft: AdjustImageDraft): AdjustImageApply {
 function DialogHeader({ source }: { readonly source: string }): JSX.Element {
   return (
     <header style={styles.headerStyle}>
-      <h2 className="lf-dialog-title">Adjust Image</h2>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+      >
+        <h2 className="lf-dialog-title">Adjust Image</h2>
+        <TutorialButton tutorialId="image-adjust" />
+      </div>
       <p className="lf-subheading" style={styles.subheadingStyle}>
         {source}
       </p>

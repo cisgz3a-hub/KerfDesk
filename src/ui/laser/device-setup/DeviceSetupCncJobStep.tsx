@@ -5,6 +5,7 @@ import { CncBitPreviewToast } from '../../cnc-viewer3d/CncBitPreviewToast';
 import { CncMaterialOptions } from '../../common/CncMaterialOptions';
 import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { CncToolOptions } from '../../machine/CncToolOptions';
+import { CncToolPicture } from '../../machine/CncToolPicture';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncBitLibrary } from './DeviceSetupCncBitLibrary';
@@ -121,6 +122,8 @@ function DraftDefaultBitSelect(props: {
   readonly onChange: (machine: CncMachineConfig) => void;
 }): JSX.Element {
   const [previewTool, setPreviewTool] = useState<CncTool | null>(null);
+  const [pictureRequested, setPictureRequested] = useState(false);
+  const currentTool = props.machine.tools.find((tool) => tool.id === props.machine.toolId);
   const dismissPreview = useCallback(() => setPreviewTool(null), []);
   const changeDefaultBit = (toolId: string): void => {
     if (toolId === props.machine.toolId) return;
@@ -128,6 +131,7 @@ function DraftDefaultBitSelect(props: {
     if (selectedTool === undefined) return;
     props.onChange({ ...props.machine, toolId });
     setPreviewTool(selectedTool);
+    setPictureRequested(true);
   };
   return (
     <>
@@ -142,6 +146,9 @@ function DraftDefaultBitSelect(props: {
           <CncToolOptions tools={props.machine.tools} />
         </select>
       </label>
+      {currentTool === undefined ? null : (
+        <CncToolPicture key={currentTool.id} tool={currentTool} initiallyOpen={pictureRequested} />
+      )}
       {previewTool === null ? null : (
         <CncBitPreviewToast tool={previewTool} onDismiss={dismissPreview} />
       )}

@@ -6,6 +6,7 @@
 // when minimized. Every state has a visible Minimize/Expand and Exit (×) — the
 // bare Dialog only closed on Escape, which is why "there was no exit button".
 
+import { TutorialButton } from '../../tutorials/TutorialButton';
 import type { CSSProperties, ReactNode } from 'react';
 import { Dialog } from '../../kit';
 
@@ -20,6 +21,7 @@ export function CameraWizardFrame(props: {
     <div style={headerStyle}>
       <strong>{props.title}</strong>
       <div style={buttonRowStyle}>
+        <TutorialButton tutorialId="camera" compact label="Camera calibration" />
         <button
           type="button"
           className="lf-btn"

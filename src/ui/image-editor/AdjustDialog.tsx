@@ -3,6 +3,7 @@
 // dialog grammar). A floating panel, not a modal backdrop, so the operator
 // can still pan/zoom the canvas to inspect the preview.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect } from 'react';
 import { lumaHistogram } from '../../core/image-adjust';
 import { maskBounds } from '../../core/image-select';
@@ -15,6 +16,15 @@ import { CurvesEditor } from './CurvesEditor';
 import { adjustmentById, DEFAULT_CURVE_POINTS, type AdjustParamSpec } from './editor-adjustments';
 import type { EditorSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
+
+function AdjustmentHeading(props: { readonly label: string }): JSX.Element {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <strong style={{ fontSize: 13 }}>{props.label}</strong>
+      <TutorialButton tutorialId="image-tone" compact label="Image adjustments" />
+    </div>
+  );
+}
 
 export function AdjustDialogPanel(): JSX.Element | null {
   const dialog = useAdjustDialogStore((s) => s.dialog);
@@ -57,7 +67,7 @@ function PanelBody(props: {
         e.stopPropagation();
       }}
     >
-      <strong style={{ fontSize: 13 }}>{spec.label}</strong>
+      <AdjustmentHeading label={spec.label} />
       {spec.hasHistogram ? <Histogram session={session} /> : null}
       {dialog.id === 'curves' ? (
         <CurvesEditor points={dialog.curvePoints ?? DEFAULT_CURVE_POINTS} session={session} />

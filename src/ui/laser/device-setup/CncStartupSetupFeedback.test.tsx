@@ -51,9 +51,11 @@ describe('CNC Startup Setup cutter feedback', () => {
     const view = await renderHost();
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'default-bit' }));
+      expect(view.host.querySelector('[data-cnc-tool-picture] img')).toBeNull();
       await changeSelect(view.host, 'Default CNC bit', fixture.alternate.id);
 
       expect(view.host.textContent).toContain('Modeled cutting envelope');
+      expect(view.host.querySelector('[data-cnc-tool-picture] img')).not.toBeNull();
       expect(cncMachine().toolId).toBe(fixture.machine.toolId);
       expect(useToastStore.getState().toasts).toEqual([]);
 

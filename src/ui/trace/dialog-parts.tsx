@@ -2,6 +2,7 @@
 import type { RasterImage } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
+import { TutorialButton } from '../tutorials/TutorialButton';
 
 export const VISIBLE_TRACE_PRESET_NAMES = [
   'Line Art',
@@ -43,6 +44,7 @@ export function TraceDialogHeader(props: {
           </span>
         </p>
       </div>
+      <TutorialButton tutorialId="trace" />
       <button
         type="button"
         className="lf-btn lf-trace-close"

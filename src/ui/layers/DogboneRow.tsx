@@ -3,6 +3,7 @@
 // square joinery seats into routed slots; a laser kerf has no such limit.
 // The bit diameter prefills from the machine's active bit.
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { activeCncTool } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
@@ -37,6 +38,7 @@ export function DogboneRow(): JSX.Element | null {
     <section aria-label="Dogbone corners" style={sectionStyle}>
       <span style={labelStyle}>Dogbone</span>
       <span style={controlStyle}>
+        <TutorialButton tutorialId="dogbone" compact label="Dogbone corners" />
         <ClearableNumberField
           ariaLabel="Dogbone bit diameter"
           title="Bit diameter used to size the corner overcut circles."

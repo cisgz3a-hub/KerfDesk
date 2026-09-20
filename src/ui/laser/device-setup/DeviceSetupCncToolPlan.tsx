@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import type { CncMachineConfig, CncTool, Layer } from '../../../core/scene';
 import { CncMaterialOptions } from '../../common/CncMaterialOptions';
 import { MANUAL_FEEDS_LABEL } from '../../common/cnc-material-vocabulary';
 import { CncToolOptions } from '../../machine/CncToolOptions';
+import { CncToolPicture } from '../../machine/CncToolPicture';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 
 const JOB_MATERIAL_VALUE = '__job-material__';
@@ -81,6 +83,7 @@ function OperationToolPlan(props: {
           value={props.draft.toolId}
           emptyLabel="Use job default bit"
           tools={props.machine.tools}
+          defaultTool={props.machine.tools.find((tool) => tool.id === props.machine.toolId)}
           onChange={(toolId) => edit({ toolId })}
         />
         <ToolSelect
@@ -118,24 +121,42 @@ function ToolSelect(props: {
   readonly value: string | null;
   readonly emptyLabel: string;
   readonly tools: ReadonlyArray<CncTool>;
+  readonly defaultTool?: CncTool | undefined;
   readonly onChange: (toolId: string | null) => void;
 }): JSX.Element {
+  const [pictureRequested, setPictureRequested] = useState(false);
+  const tool =
+    props.value === null
+      ? props.defaultTool
+      : props.tools.find((entry) => entry.id === props.value);
   const isMissing =
     props.value !== null && !props.tools.some((candidate) => candidate.id === props.value);
   return (
-    <label style={fieldStyle}>
-      <span>{props.label}</span>
-      <select
-        value={props.value ?? ''}
-        onChange={(event) => props.onChange(event.target.value === '' ? null : event.target.value)}
-        aria-label={props.ariaLabel}
-        title={`Choose ${props.label.toLowerCase()} for this operation in Startup Setup.`}
-      >
-        <option value="">{props.emptyLabel}</option>
-        {isMissing ? <option value={props.value ?? ''}>Current unavailable bit</option> : null}
-        <CncToolOptions tools={props.tools} />
-      </select>
-    </label>
+    <div style={fieldStyle}>
+      <label style={fieldStyle}>
+        <span>{props.label}</span>
+        <select
+          value={props.value ?? ''}
+          onChange={(event) => {
+            props.onChange(event.target.value === '' ? null : event.target.value);
+            setPictureRequested(true);
+          }}
+          aria-label={props.ariaLabel}
+          title={`Choose ${props.label.toLowerCase()} for this operation in Startup Setup.`}
+        >
+          <option value="">{props.emptyLabel}</option>
+          {isMissing ? <option value={props.value ?? ''}>Current unavailable bit</option> : null}
+          <CncToolOptions tools={props.tools} />
+        </select>
+      </label>
+      {tool === undefined ? null : (
+        <CncToolPicture
+          key={`${tool.id}:${props.value ?? 'job-default'}`}
+          tool={tool}
+          initiallyOpen={pictureRequested}
+        />
+      )}
+    </div>
   );
 }
 

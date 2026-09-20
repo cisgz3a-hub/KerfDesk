@@ -390,6 +390,12 @@ describe('AppMenuBar', () => {
           new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),
         );
       });
+      expect(document.activeElement?.getAttribute('aria-label')).toBe('Tutorial: Measure');
+      await act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),
+        );
+      });
       expect(document.activeElement?.textContent).toBe('Material Test...');
 
       await act(async () => {

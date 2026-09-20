@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   type CncLayerSettings,
   type CncMachineConfig,
+  type CncTool,
 } from '../../../core/scene';
 import type { CncTileRegistration } from '../../../core/scene/machine';
 import { NumberField } from '../../common/NumberField';
 import { Row, unitStyle } from '../device-settings-shared';
+import { CncToolPicture } from '../../machine/CncToolPicture';
 
 export function registrationDraftFromCurrentSettings(
   machine: CncMachineConfig,
@@ -53,30 +56,14 @@ export function DeviceSetupRegistrationFields(props: {
   const edit = (patch: Partial<CncTileRegistration>): void =>
     props.onChange({ ...settings, ...patch });
   const tool = props.machine.tools.find((candidate) => candidate.id === settings.toolId);
-  const supported = props.machine.tools.filter((candidate) => candidate.kind === 'end-mill');
   return (
     <fieldset style={fieldStyle}>
       <legend>Registration cutting plan</legend>
-      <Row label="Cutter">
-        <select
-          aria-label="Registration cutter"
-          title="Choose the flat end mill used for registration holes. This choice stays independent of artwork operations."
-          value={settings.toolId}
-          onChange={(event) => edit({ toolId: event.target.value })}
-        >
-          <option value="">Choose a flat end mill</option>
-          {tool?.kind !== 'end-mill' && settings.toolId !== '' ? (
-            <option value={settings.toolId}>
-              Unavailable or unsupported cutter ({settings.toolId})
-            </option>
-          ) : null}
-          {supported.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name} ({candidate.diameterMm} mm)
-            </option>
-          ))}
-        </select>
-      </Row>
+      <RegistrationCutter
+        tools={props.machine.tools}
+        toolId={settings.toolId}
+        onChange={(toolId) => edit({ toolId })}
+      />
       {REGISTRATION_FIELDS.map(([key, label, unit]) => (
         <Row key={key} label={label}>
           <NumberField
@@ -95,6 +82,44 @@ export function DeviceSetupRegistrationFields(props: {
         cutterTooWide={tool !== undefined && tool.diameterMm > settings.holeDiameterMm}
       />
     </fieldset>
+  );
+}
+
+function RegistrationCutter(props: {
+  readonly tools: ReadonlyArray<CncTool>;
+  readonly toolId: string;
+  readonly onChange: (toolId: string) => void;
+}): JSX.Element {
+  const [pictureRequested, setPictureRequested] = useState(false);
+  const tool = props.tools.find((candidate) => candidate.id === props.toolId);
+  const supported = props.tools.filter((candidate) => candidate.kind === 'end-mill');
+  return (
+    <>
+      <Row label="Cutter">
+        <select
+          aria-label="Registration cutter"
+          title="Choose the flat end mill used for registration holes. This choice stays independent of artwork operations."
+          value={props.toolId}
+          onChange={(event) => {
+            props.onChange(event.target.value);
+            setPictureRequested(true);
+          }}
+        >
+          <option value="">Choose a flat end mill</option>
+          {tool?.kind !== 'end-mill' && props.toolId !== '' ? (
+            <option value={props.toolId}>Unavailable or unsupported cutter ({props.toolId})</option>
+          ) : null}
+          {supported.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.name} ({candidate.diameterMm} mm)
+            </option>
+          ))}
+        </select>
+      </Row>
+      {tool?.kind === 'end-mill' ? (
+        <CncToolPicture key={tool.id} tool={tool} initiallyOpen={pictureRequested} />
+      ) : null}
+    </>
   );
 }
 

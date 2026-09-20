@@ -1,3 +1,4 @@
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useMemo, useRef, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { DEFAULT_BITMAP_BRIGHTNESS_PERCENT } from '../../core/raster';
@@ -54,7 +55,12 @@ export function ConvertToBitmapDialog(props: {
   return (
     <Dialog onClose={props.onCancel} ariaLabel="Convert to Bitmap" size="sm">
       <form ref={formRef} onSubmit={onSubmit} style={formStyle}>
-        <h2 className="lf-dialog-title">Convert to Bitmap</h2>
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+        >
+          <h2 className="lf-dialog-title">Convert to Bitmap</h2>
+          <TutorialButton tutorialId="convert" />
+        </div>
         <Field label="Source">
           <span style={sourceStyle} title={props.sourceName}>
             {props.sourceName}

@@ -4,6 +4,7 @@
 // laser-only Shape Properties gate. The result is a NEW object; the
 // sources stay (VCarve/Offsetter convention).
 
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
@@ -29,6 +30,7 @@ export function OffsetPathsRow(): JSX.Element | null {
     <section aria-label="Offset paths" style={sectionStyle}>
       <span style={labelStyle}>Offset</span>
       <span style={controlStyle}>
+        <TutorialButton tutorialId="offset" compact label="Offset paths" />
         <ClearableNumberField
           ariaLabel="Offset distance"
           title="Distance in millimeters between the shape and its offset copy."

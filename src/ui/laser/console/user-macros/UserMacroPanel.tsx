@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react';
 import type { UserMacro } from './user-macro-collection';
 import { useUserMacroPanelModel, type MacroEditor } from './use-user-macro-panel-model';
 
 export function UserMacroPanel(props: {
   readonly isSending: boolean;
   readonly isInputDisabled: boolean;
+  readonly help?: ReactNode;
   readonly onRun: (command: string, macro: UserMacro) => Promise<void>;
 }): JSX.Element {
   const model = useUserMacroPanelModel(props.onRun);
@@ -14,6 +16,7 @@ export function UserMacroPanel(props: {
         User macros ({model.macros.length})
       </summary>
       <div style={bodyStyle}>
+        {props.help}
         <div style={provenanceStyle}>User-saved / local / one Console command</div>
         <MacroSelector
           macros={model.macros}

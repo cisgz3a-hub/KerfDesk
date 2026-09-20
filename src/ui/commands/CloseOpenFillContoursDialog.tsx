@@ -32,6 +32,7 @@ export function CloseOpenFillContoursDialog(props: {
 
   return (
     <Dialog
+      tutorialId="laser-fill"
       title="Close Fill Contours With Tolerance"
       size="sm"
       onClose={props.onCancel}

@@ -20222,6 +20222,28 @@ pump-timing cause is inferred from the emitted bytes and public firmware reports
 coupon (Frame, then Start with Air on; pump audible at the first burn line) remains the physical
 check.
 
+## ADR-324 - On-demand visual tutorials share an isolated learning surface (2026-09-19)
+
+**Status:** Accepted
+
+### Context
+
+Short hover descriptions name controls but do not teach unfamiliar drawing, image, CAM and machine workflows. Users need a visual explanation close to the tool they are using, plus a searchable place to discover the rest of the application.
+
+### Decision
+
+Provide explicit Tutorial buttons in feature dialogs, rails, active tool controls and command menus. Add Learn to the toolbar and Visual tutorials to Help. All entry points open one lazy-loaded, accessible learning surface with a searchable, machine-filtered catalog. Never open a tutorial automatically at startup.
+
+Lessons contain source-verified instructions, expected results and bundled SVG examples with manually selectable Before/Action/Result stages and optional finite playback. Researched, compressed WebP pictures illustrate physical processes and CNC cutter geometry. Mount tutorial images only when their lesson opens, and cutter images only when explicitly expanded or the selected cutter changes. Keep responsive images out of the service-worker precache and cache successful same-origin WebP responses on use in a bounded runtime cache. Illustrations are separate sample artwork, not a controller simulation. Retain static stage controls under reduced motion. Persist only local lesson position/completion, tolerating unavailable or malformed storage.
+
+Keep tutorial UI state separate from project data, undo and machine actions. Opening, browsing, replaying and closing help must preserve the working project and any underlying dialog draft. Reuse modal registration, focus trapping and focus restoration, portal above editor dialogs, and preserve the existing live-motion bar's highest stacking order. Opening help must never submit a tool form. Contextual menu help remains usable for a disabled command without invoking it.
+
+Use explicit stable lesson IDs, an exhaustive command mapping, source entry-point coverage tests and renderer/interaction tests. New tool controls should wire their lesson at the same time. Do not advertise planned tools as working features, prescribe universal machining values, or change Frame, Start, review policy or output semantics. The existing exact-job Frame and Start-time Job Review contract remains authoritative.
+
+### Consequences
+
+The catalog and SVG illustrations are bundled and precached for offline use without new dependencies or video hosting. Optional photographs are cached after viewing; unvisited images or responsive sizes retain readable instructions and a diagram fallback offline. Packaged desktop builds include the local image files. Pictures and diagrams do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.
+
 ## ADR-325 - The plan-backed preview authority stops at the advisory program size (2026-09-20)
 
 **Status:** Accepted; amends the ADR-244 large-job preparation path and the second consumer

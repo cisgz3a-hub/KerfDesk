@@ -5,6 +5,7 @@
 // toolbar / Tools menu via the `tools.camera` command (like the registration
 // jig); it renders nothing until opened, and its own × button closes it.
 
+import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useEffect, useState } from 'react';
 import { usePlatform } from '../../app';
 import { loadCameraPanelWide, saveCameraPanelWide } from '../../state/camera-preference-storage';
@@ -52,6 +53,7 @@ function CameraPanelOpen(): JSX.Element {
     >
       <div style={headerStyle}>
         <strong>Camera</strong>
+        <TutorialButton tutorialId="camera" compact label="Camera" />
         <button
           type="button"
           className="lf-btn"

@@ -37,16 +37,16 @@ export function ArrayDialog(props: {
     rotateCopies,
     totalAngle,
   };
-  const submit = (): void => props.onApply(arraySpecFromDraft(mode, draft));
   return (
     <Dialog
+      tutorialId="array"
       title="Array"
       size="sm"
       as="form"
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        submit();
+        props.onApply(arraySpecFromDraft(mode, draft));
       }}
     >
       <div role="tablist" aria-label="Array type" style={tabsStyle}>

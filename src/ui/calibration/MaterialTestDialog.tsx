@@ -74,6 +74,7 @@ export function MaterialTestDialog(props: {
   // missing (every other modal had it via use-dialog-a11y).
   return (
     <Dialog
+      tutorialId="material-test"
       onClose={props.onCancel}
       title="Material Test"
       as="form"

@@ -11,6 +11,7 @@ import {
   windowCommands,
 } from './command-families';
 import { discussionsCommand, reportBugCommand } from './support-command-family';
+import { tutorialsCommand } from './help-command-family';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import { laserCommands } from './laser-command-family';
@@ -32,6 +33,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       ...laserCommands(ctx),
       ...windowCommands(ctx),
       helpCommand(ctx),
+      tutorialsCommand(),
       safetyHelpCommand(ctx),
       connectionHelpCommand(ctx),
       reportBugCommand(),

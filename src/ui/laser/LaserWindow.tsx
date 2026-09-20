@@ -178,7 +178,11 @@ function MachineRailHeading(props: {
   readonly onCollapse: () => void;
 }): JSX.Element {
   return (
-    <RailPanelHeading title={machineDisplayName(props.machineKind)} onCollapse={props.onCollapse} />
+    <RailPanelHeading
+      title={machineDisplayName(props.machineKind)}
+      tutorialId="machine-setup"
+      onCollapse={props.onCollapse}
+    />
   );
 }
 

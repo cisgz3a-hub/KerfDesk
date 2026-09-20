@@ -51,7 +51,7 @@ export class RecoveryArtifactStore {
   async stage(artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> {
     if (
       !isCurrentExecutionArtifact(artifact) ||
-      !artifactFitsArchiveBudget(artifact) ||
+      !artifactClaimsArchiveBudget(artifact) ||
       !(await executionArtifactIntegrityIsValid(artifact))
     ) {
       return failure('conflict');
@@ -152,4 +152,14 @@ function artifactFitsArchiveBudget(artifact: ExecutionArtifactV1): boolean {
     estimateExecutionArtifactBytes(artifact, MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES) <=
     MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES
   );
+}
+
+/** Cheap fail-fast on the artifact's own recorded size. Never authorizes a
+ * write on its own: the recorded count is not covered by the provenance
+ * digest, so the full recount below still runs immediately before
+ * persistence. This only avoids paying for an extra whole-graph traversal on
+ * the Start path when the claim is already over budget or absent. */
+function artifactClaimsArchiveBudget(artifact: ExecutionArtifactV1): boolean {
+  const claimed = artifact.estimatedArtifactBytes;
+  return claimed === undefined || claimed <= MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES;
 }

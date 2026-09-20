@@ -28,7 +28,7 @@ import {
 } from './execution-provenance';
 import {
   assertExecutionArtifactSizeWithinBudget,
-  estimateExecutionArtifactBytes,
+  measureExecutionArtifactBytesWithinBudget,
 } from './execution-artifact-size';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
@@ -202,8 +202,12 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     archivedControllerObservation,
     ...(args.provenance === undefined ? {} : { provenance: args.provenance }),
   };
-  assertExecutionArtifactSizeWithinBudget(artifact);
-  return { ...artifact, estimatedArtifactBytes: estimateExecutionArtifactBytes(artifact) };
+  // One traversal, not two: the budget guard already produced the exact size
+  // whenever it did not throw, and this runs between Start and the first byte.
+  return {
+    ...artifact,
+    estimatedArtifactBytes: measureExecutionArtifactBytesWithinBudget(artifact),
+  };
 }
 
 function archivedObservationForArtifact(args: {
