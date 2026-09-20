@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
+import { hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { sectionCaptionStyle } from './JobControls.styles';
@@ -48,7 +48,9 @@ export function NoHomingPositionGuide(props: {
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
-  const originSettled = workOriginActive || hasCustomOrigin(wcoCache);
+  // XY predicate on purpose: a CNC Zero Z touch-off is a Z-only offset that
+  // placement does not count as an origin, so the card must keep coaching.
+  const originSettled = workOriginActive || hasCustomXyOrigin(wcoCache);
   const actions = useGuideActions(connection.kind === 'connected', status, originSettled);
   if (homingEnabled) return null;
   const phase = status === 'Sleep' && actions.phase === 'idle' ? 'positioning' : actions.phase;

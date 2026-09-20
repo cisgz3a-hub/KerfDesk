@@ -1,8 +1,8 @@
 // Compile-input fix offers for blocked Starts (maintainer, 2026-07-17,
 // frame-first). The only setup refusals left are placement inputs the job
-// literally cannot compile without — a User Origin that was never set, or an
-// Absolute start with a stale custom origin still active. Both offer their
-// one-click remedy in place. Each offer fires only when its gate is the SOLE
+// literally cannot compile without — a User or Verified Origin that was never
+// set, or an Absolute start with a stale custom origin still active. Each offers
+// its one-click remedy in place. Each offer fires only when its gate is the SOLE
 // refusal message — the dispatcher in start-blocked-fix-offers enforces that
 // before delegating here.
 
@@ -12,14 +12,20 @@ import { useToastStore } from '../state/toast-store';
 import {
   ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE,
   USER_ORIGIN_REQUIRED_MESSAGE,
+  VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 
-export const SET_ORIGIN_OFFER_PROMPT =
-  'User Origin needs a custom work origin.\n\n' +
+const SET_ORIGIN_OFFER_BODY =
   'OK: set the work origin at the current head position — the job runs from here — and ' +
   'then Frame the updated placement before starting.\n' +
   'Cancel: leave the job blocked.';
+
+export const SET_ORIGIN_OFFER_PROMPT =
+  'User Origin needs a custom work origin.\n\n' + SET_ORIGIN_OFFER_BODY;
+
+export const VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT =
+  'Verified Origin needs a custom work origin.\n\n' + SET_ORIGIN_OFFER_BODY;
 
 export const RESET_ORIGIN_OFFER_PROMPT =
   'Absolute Coordinates requires the custom work origin to be cleared.\n\n' +
@@ -27,13 +33,16 @@ export const RESET_ORIGIN_OFFER_PROMPT =
   'Cancel: leave the job blocked.';
 
 export async function offerSetupFixForBlockedStart(message: string): Promise<BlockedStartRepair> {
-  if (message === USER_ORIGIN_REQUIRED_MESSAGE) return offerSetOriginHere();
+  if (message === USER_ORIGIN_REQUIRED_MESSAGE) return offerSetOriginHere(SET_ORIGIN_OFFER_PROMPT);
+  if (message === VERIFIED_ORIGIN_REQUIRED_MESSAGE) {
+    return offerSetOriginHere(VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT);
+  }
   if (message === ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE) return offerResetOrigin();
   return 'unrepaired';
 }
 
-async function offerSetOriginHere(): Promise<BlockedStartRepair> {
-  if (!jobAwareConfirm(SET_ORIGIN_OFFER_PROMPT)) return 'unrepaired';
+async function offerSetOriginHere(prompt: string): Promise<BlockedStartRepair> {
+  if (!jobAwareConfirm(prompt)) return 'unrepaired';
   try {
     // The store action itself waits for the post-G92 WCO status frame on
     // WCS-reporting controllers, so a plain retry already sees the origin.

@@ -13,7 +13,8 @@
 //     mirror X within the bed.
 //
 // Result: what the user sees at the TOP of the canvas (low SVG Y) lands at
-// the BACK of the bed for front-* origins, and at the FRONT for rear-*.
+// the BACK of the bed on every origin: front-* origins flip Y to get there,
+// rear-* origins already have machine 0 at the rear with +Y toward the operator.
 
 import { assertNever, type Vec2 } from '../scene';
 import type { DeviceProfile, Origin } from './device-profile';

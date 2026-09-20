@@ -243,14 +243,26 @@ function retainedDeviceFields(device: DeviceProfile): Readonly<Record<string, un
   );
 }
 
+// Selection only shapes the program while "Selected artwork only" is on; with it
+// off, validateOutputScope returns the scene untouched for any selection, so the
+// ids must not perturb the retention key. That key is also the Frame permit's
+// execution signature, and a bare canvas click after Frame was expiring the
+// permit with "output selection changed" (ADR-327).
+function executionOutputScope(scope: OutputScope): OutputScope {
+  return scope.cutSelectedGraphics || scope.selectedObjectIds.length === 0
+    ? scope
+    : { ...scope, selectedObjectIds: [] };
+}
+
 export function canvasPlanRetentionKey(
   project: Project,
   outputScope: OutputScope,
   placement: JobPlacementSettings,
   registration?: unknown,
 ): string {
+  const scope = executionOutputScope(outputScope);
   const optionsKey = JSON.stringify({
-    outputScope,
+    outputScope: scope,
     placement,
     hasRegistration: registration !== undefined,
     registration: registration ?? null,
@@ -263,7 +275,7 @@ export function canvasPlanRetentionKey(
     device: retainedDeviceFields(project.device),
     optimization: project.optimization,
     variables: project.variables,
-    outputScope,
+    outputScope: scope,
     placement,
     ...(registration === undefined ? {} : { registration }),
   });

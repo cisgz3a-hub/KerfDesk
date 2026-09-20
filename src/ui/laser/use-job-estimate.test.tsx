@@ -265,6 +265,31 @@ describe('useJobEstimate debounce (H16)', () => {
     await unmount();
   });
 
+  it('resolves Verified Origin placement with the export fallback like User Origin (ADR-327)', async () => {
+    workerMocks.prepareJobEstimateOffThread.mockReturnValue(new Promise(() => undefined));
+    useStore.setState({ jobPlacement: { startFrom: 'verified-origin', anchor: 'front-left' } });
+    const unmount = await renderProbe();
+
+    await act(async () => {
+      useStore.setState({ project: overBudgetRasterProject() });
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+    });
+
+    // Disconnected machine: the live resolution refuses, but the estimate must
+    // time the work-zero-relative job (not a silently substituted Absolute one)
+    // and key the worker request exactly like the preview does.
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' },
+      }),
+    );
+
+    await unmount();
+  });
+
   it('settles while a connected controller polls and the resolved placement is unchanged', async () => {
     useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
     useLaserStore.setState({ statusReport: idleReportAtX(0) });

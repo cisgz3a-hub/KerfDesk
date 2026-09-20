@@ -77,7 +77,7 @@ import {
 } from './laser-store-helpers';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
-export { hasCustomOrigin, type WorkCoordinateOffset } from './origin-actions';
+export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
 export type { StartJobOptions } from './laser-job-options';
 
 /** Connect-time controller selection. Omitted fields fall back to the GRBL

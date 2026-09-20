@@ -1,9 +1,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { JobStartMode } from '../../core/job';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type WorkCoordinateOffset } from '../state/laser-store';
 import { OriginRow } from './OriginRow';
 import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
@@ -65,7 +66,10 @@ afterEach(() => {
     streamer: null,
     motionOperation: null,
   });
-  useStore.setState({ project: createProject() });
+  useStore.setState({
+    project: createProject(),
+    jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' },
+  });
   useJogControlPreferences.setState({
     stepMm: DEFAULT_JOG_STEP_MM,
     requestedFeedMmPerMin: DEFAULT_JOG_FEED_MM_PER_MIN,
@@ -280,5 +284,91 @@ describe('OriginRow release motors reachability', () => {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
     }
+  });
+});
+
+describe('OriginRow Set origin and the Start-from mode (ADR-327)', () => {
+  async function startFromAfterSetOrigin(
+    startFrom: 'absolute' | 'verified-origin' | 'current-position',
+  ): Promise<string> {
+    useLaserStore.setState({ setOriginHere: async () => undefined });
+    useStore.setState({ jobPlacement: { startFrom, anchor: 'back-center' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      await act(async () => buttonByText(host, 'Set origin here').click());
+      return useStore.getState().jobPlacement.startFrom;
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  }
+
+  it('upgrades Absolute Coordinates to User Origin once an origin exists', async () => {
+    expect(await startFromAfterSetOrigin('absolute')).toBe('user-origin');
+    expect(useStore.getState().jobPlacement.anchor).toBe('back-center');
+  });
+
+  it('keeps an explicit Verified Origin selection', async () => {
+    expect(await startFromAfterSetOrigin('verified-origin')).toBe('verified-origin');
+  });
+
+  it('keeps an explicit Current Position selection', async () => {
+    expect(await startFromAfterSetOrigin('current-position')).toBe('current-position');
+  });
+});
+
+describe('OriginRow Set-origin attention pulse (ADR-327)', () => {
+  async function setOriginClassName(state: {
+    readonly startFrom: JobStartMode;
+    readonly wcoCache: WorkCoordinateOffset | null;
+  }): Promise<string> {
+    // No-homing default profile, connected and Idle: the pulse's only other
+    // condition is a missing XY origin.
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: statusReport('Idle'),
+      workOriginActive: false,
+      workOriginSource: 'none',
+      wcoCache: state.wcoCache,
+    });
+    useStore.setState({ jobPlacement: { startFrom: state.startFrom, anchor: 'front-left' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+      return buttonByText(host, 'Set origin here').className;
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+      useLaserStore.setState({ connection: { kind: 'disconnected' } });
+    }
+  }
+
+  it('pulses for Verified Origin with no origin on a no-homing machine', async () => {
+    expect(await setOriginClassName({ startFrom: 'verified-origin', wcoCache: null })).toContain(
+      'lf-btn--attention',
+    );
+  });
+
+  it('keeps pulsing after a Z-only touch-off, which is not an XY origin', async () => {
+    expect(
+      await setOriginClassName({ startFrom: 'user-origin', wcoCache: { x: 0, y: 0, z: 5 } }),
+    ).toContain('lf-btn--attention');
+  });
+
+  it('stops pulsing once an XY origin exists', async () => {
+    expect(
+      await setOriginClassName({ startFrom: 'user-origin', wcoCache: { x: 12, y: 34, z: 0 } }),
+    ).not.toContain('lf-btn--attention');
+  });
+
+  it('stays quiet for Current Position, which reads the live head', async () => {
+    expect(
+      await setOriginClassName({ startFrom: 'current-position', wcoCache: null }),
+    ).not.toContain('lf-btn--attention');
   });
 });
