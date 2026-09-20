@@ -20284,3 +20284,57 @@ prepares in 549 MB of renderer heap where a 330,976-segment one previously reach
 The preparation worker still holds the compiled Job alive for the length of the acknowledged
 chunk transfer, and a preview still costs one full route on each side of that boundary. Both
 remain open; neither is what exhausted the renderer here. No hardware was operated.
+
+## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
+
+**Status:** Accepted; closes the worker-retention limit ADR-325 recorded as open. Amends the
+ADR-244 worker message contract. No change to bytes, preflight, Frame, Start or any response.
+
+### Context
+
+ADR-244's worker hands a prepared route to the UI in acknowledged chunks: it posts one chunk,
+waits for the main thread to accept it, then posts the next. On a large traced fill that handover
+is thousands of round trips, and for its whole length the worker had, in one suspended `async`
+message handler:
+
+- the structured clone of the Project the request arrived with,
+- the compiled `Job` the route was derived from, and
+- the route itself, which the transfer releases slot by slot as chunks are acknowledged.
+
+Only the third has a consumer. The first two are each the same order of size as the route, and
+they sat at the worker's peak for the entire handover.
+
+Measured by driving the real handler over a 1.6M-step fill with a 46 MB scene, acknowledging each
+chunk on its own task, as a real port delivery does:
+
+| | first chunk | transfer-complete | request released during transfer |
+| --- | --- | --- | --- |
+| before | 701 MB | 379 MB | no |
+| after | 434 MB | 112 MB | yes |
+
+On a small scene the same probe measured 345 MB → 247 MB at the first chunk. The earlier reading
+in ADR-325 ("~400 MB of dead weight") was taken with microtask-paced acknowledgements, where the
+collector never runs between chunks; it understated both the cost and the fix.
+
+### Decision
+
+1. `self.onmessage` is a synchronous dispatcher, not an `async` handler. It builds the promise
+   chain and returns, so its frame — and the request in it — is gone before the transfer runs.
+   Only the request id and the route reach the transfer.
+2. The prepare and the derivation of the payload live in their own frames (`previewPayload`,
+   `estimateResponse`). Returning the payload ends that frame, so the hydrated project and the
+   compiled Job are unreachable before the first chunk is posted.
+3. Error handling is unchanged in effect: a rejection anywhere in the chain still posts
+   `{ kind: 'error', message }` for the same id, and acknowledgement and bridge messages are
+   still answered before anything else.
+
+### Verification and limits
+
+`preparation-worker-retention.test.ts` drives the real handler over a chunked fill, acknowledging
+each chunk on its own task, and pins both halves: the dispatcher is not an async function, and —
+where `--expose-gc` is available — the request is collected before the final chunk. Both
+assertions fail against the previous handler. `src/ui/workspace` is otherwise unchanged and green.
+
+A preview still costs one full route on each side of the worker boundary; that is inherent to
+showing one and stays open. The acknowledged transfer still releases route slots only as chunks
+are accepted, so the worker's peak remains proportional to the route. No hardware was operated.
