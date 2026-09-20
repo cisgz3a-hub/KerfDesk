@@ -65,6 +65,7 @@ function disconnectedLaser() {
     workOriginActive: false,
     wcoCache: null,
     trustedPositionEpoch: 0,
+    homingState: 'unknown' as const,
     statusQuery: 'realtime-report' as const,
   };
 }

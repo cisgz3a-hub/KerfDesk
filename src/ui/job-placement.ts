@@ -16,6 +16,8 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
 // exactly and offer the one-click remedy (Set origin here / Reset origin).
 export const USER_ORIGIN_REQUIRED_MESSAGE =
   'User Origin needs a custom work origin. Click "Set origin here" first.';
+export const VERIFIED_ORIGIN_REQUIRED_MESSAGE =
+  'Verified Origin needs a custom work origin. Click "Set origin here" first.';
 export const ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE =
   'Absolute Coordinates requires the custom work origin to be cleared. Reset origin first, or choose User Origin.';
 
@@ -134,6 +136,22 @@ export function resolveExportJobPlacement(
   }
 }
 
+// Preview and the live estimate never move the machine. User Origin and Verified
+// Origin output is work-zero relative, so both can be inspected before the
+// controller origin exists — they take the export fallback. Absolute and Current
+// Position keep the live resolution: their bytes depend on live machine state or
+// on no custom origin being active. Start still uses resolveJobPlacement and the
+// completed Frame (ADR-228); the worker cache keys on the resolved jobOrigin, so
+// preview and estimate must share this exact rule (ADR-327).
+export function resolvePreviewJobPlacement(
+  settings: JobPlacementSettings,
+  machine: MachinePlacementSnapshot,
+): ResolvedJobPlacement {
+  return settings.startFrom === 'user-origin' || settings.startFrom === 'verified-origin'
+    ? resolveExportJobPlacement(settings, machine)
+    : resolveJobPlacement(settings, machine);
+}
+
 export function trustedMotionOffsetForPreflight(
   device: DeviceProfile,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
@@ -216,7 +234,7 @@ function resolveVerifiedOrigin(
   if (!customOriginIsActive(machine)) {
     return {
       ok: false,
-      messages: ['Verified Origin needs a custom work origin. Click "Set origin here" first.'],
+      messages: [VERIFIED_ORIGIN_REQUIRED_MESSAGE],
     };
   }
   return {

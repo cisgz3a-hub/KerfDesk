@@ -20,11 +20,7 @@ import {
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import {
-  resolveExportJobPlacement,
-  resolveJobPlacement,
-  type ResolvedJobPlacement,
-} from '../job-placement';
+import { resolvePreviewJobPlacement, type ResolvedJobPlacement } from '../job-placement';
 import {
   isPreparationSuperseded,
   prepareJobEstimateOffThread,
@@ -101,13 +97,10 @@ function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>
   return useMemo(() => {
     // Estimate and preview must resolve placement identically: the worker
     // client caches by jobOrigin, so a divergent resolution here made the
-    // SAME over-budget project prepare twice, serially. User Origin falls
-    // back to its work-zero-relative export placement when the live
-    // resolution fails (disconnected / origin unset) — the same rule
-    // usePreviewPlacement in use-preview-toolpath.ts applies.
-    const resolvePlacement =
-      jobPlacement.startFrom === 'user-origin' ? resolveExportJobPlacement : resolveJobPlacement;
-    return resolvePlacement(jobPlacement, {
+    // SAME over-budget project prepare twice, serially. The shared rule lives
+    // in resolvePreviewJobPlacement (work-zero-relative modes fall back to the
+    // export placement while the live resolution fails).
+    return resolvePreviewJobPlacement(jobPlacement, {
       statusReport,
       workOriginActive,
       wcoCache,

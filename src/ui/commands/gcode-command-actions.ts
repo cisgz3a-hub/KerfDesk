@@ -72,6 +72,9 @@ export function saveGcodeContext(
       statusReport: laser.statusReport,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,
+      // Current Position bakes the live WPos into the bytes; an inch-reporting
+      // controller ($13=1) must be normalized here exactly as Preview/Start do.
+      reportInches: laser.controllerSettings?.reportInches === true,
     },
     controllerSettings: laser.controllerSettings,
     settingsCapability: laser.capabilities.settings,

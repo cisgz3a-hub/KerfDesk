@@ -4,11 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
-import {
-  resolveExportJobPlacement,
-  resolveJobPlacement,
-  type JobPlacementSettings,
-} from '../job-placement';
+import { resolvePreviewJobPlacement, type JobPlacementSettings } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath } from './draw-preview';
@@ -174,12 +170,10 @@ function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
   const wcoCache = useLaserStore((state) => state.wcoCache);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   return useMemo(() => {
-    // Preview does not move the machine. User Origin output is work-zero
-    // relative, so it can be inspected before the controller origin is set.
-    // Start still uses resolveJobPlacement and remains blocked.
-    const resolvePlacement =
-      jobPlacement.startFrom === 'user-origin' ? resolveExportJobPlacement : resolveJobPlacement;
-    return resolvePlacement(jobPlacement, {
+    // Preview does not move the machine: work-zero-relative modes take the
+    // export fallback so they can be inspected before the controller origin is
+    // set; Start still uses resolveJobPlacement and remains blocked.
+    return resolvePreviewJobPlacement(jobPlacement, {
       statusReport,
       workOriginActive,
       wcoCache,

@@ -5,7 +5,7 @@ import { TutorialButton } from '../tutorials/TutorialButton';
 import { type JobStartMode } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
+import { hasCustomOrigin, hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { actionGridStyle, gridFullRowStyle, sectionCaptionStyle } from './JobControls.styles';
 import { clampJogFeed } from './jog-control-policy';
@@ -28,13 +28,14 @@ const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
 
 const SET_ORIGIN_ATTENTION_TITLE =
   'No work origin is set. Move the head over the workpiece zero (jog or hand-place), ' +
-  'then click here — jobs starting from User Origin run relative to this point.';
+  'then click here — jobs starting from User or Verified Origin run relative to this point.';
 
 /** The pulse coaches exactly one situation: a no-homing machine, ready to
- * move, whose User Origin start mode has no origin behind it yet. Any other
- * start mode does not need an origin (Current Position reads the live head;
- * Absolute ignores work offsets; the hand-position wizard sets its own), and
- * a busy or disconnected rail should stay quiet. */
+ * move, whose User or Verified Origin start mode has no XY origin behind it
+ * yet (a Z-only touch-off is not one — placement keys on hasCustomXyOrigin).
+ * Any other start mode does not need an origin (Current Position reads the
+ * live head; Absolute ignores work offsets), and a busy or disconnected rail
+ * should stay quiet. */
 function needsSetOriginAttention(state: {
   readonly homingEnabled: boolean;
   readonly hasCustom: boolean;
@@ -42,7 +43,10 @@ function needsSetOriginAttention(state: {
   readonly startFrom: JobStartMode;
 }): boolean {
   return (
-    !state.homingEnabled && !state.busy && !state.hasCustom && state.startFrom === 'user-origin'
+    !state.homingEnabled &&
+    !state.busy &&
+    !state.hasCustom &&
+    (state.startFrom === 'user-origin' || state.startFrom === 'verified-origin')
   );
 }
 
@@ -105,6 +109,7 @@ export function OriginRow(props: {
   // have no origin vocabulary at all — the whole row disappears.
   if (wcs === 'none') return null;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
+  const hasCustomXy = workOriginActive || hasCustomXyOrigin(wcoCache);
   const persistentOrUnknown =
     workOriginSource === 'g54-persistent' || workOriginSource === 'unknown';
   const { onSet, onReset, onRelease } = makeOriginHandlers({
@@ -125,7 +130,12 @@ export function OriginRow(props: {
       <div style={actionGridStyle}>
         <SetOriginButton
           busy={busy}
-          needsAttention={needsSetOriginAttention({ homingEnabled, hasCustom, busy, startFrom })}
+          needsAttention={needsSetOriginAttention({
+            homingEnabled,
+            hasCustom: hasCustomXy,
+            busy,
+            startFrom,
+          })}
           onSet={onSet}
         />
         <button
@@ -176,6 +186,17 @@ type OriginHandlerDeps = {
   readonly pushToast: (message: string, variant: 'success') => void;
 };
 
+// A fresh origin makes only Absolute unusable (it refuses while a custom origin
+// is active), so that is the one mode Set origin upgrades to User Origin. An
+// explicit User, Verified, or Current Position choice is the operator's and is
+// never rewritten under them (ADR-193; ADR-327). The mode is read when the
+// controller acknowledges, not when the button rendered: Set origin waits up to
+// a few seconds for the work-offset frame and the dropdown may change meanwhile.
+function placementAfterSetOrigin(setJobPlacement: OriginHandlerDeps['setJobPlacement']): void {
+  const startFrom: JobStartMode = useStore.getState().jobPlacement.startFrom;
+  if (startFrom === 'absolute') setJobPlacement({ startFrom: 'user-origin' });
+}
+
 // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
 // intermittently (every Nth status per `$10`), so the StatusDisplay readout
 // may take 1-30 frames (~0.25-7.5s) to update after a G92. The toast gives
@@ -190,7 +211,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .setOrigin()
         .then(() => {
-          deps.setJobPlacement({ startFrom: 'user-origin' });
+          placementAfterSetOrigin(deps.setJobPlacement);
           deps.pushToast('Origin set to current head position (G92).', 'success');
         })
         .catch(reportOriginActionFailure);
@@ -279,7 +300,7 @@ function AdvancedOriginControls(props: {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        setJobPlacement({ startFrom: 'user-origin' });
+        placementAfterSetOrigin(setJobPlacement);
         pushToast('Persistent G54 origin set to current head position.', 'success');
       })
       .catch(reportOriginActionFailure);

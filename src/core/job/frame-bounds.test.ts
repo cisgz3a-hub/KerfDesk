@@ -170,6 +170,41 @@ describe('computeFrameBounds', () => {
     );
   });
 
+  it('keeps Frame and compiled placement in step on a rear-left origin (ADR-327)', () => {
+    const scene = {
+      ...EMPTY_SCENE,
+      layers: [createLayer({ id: 'red', color: '#ff0000', mode: 'line' })],
+      objects: [
+        vectorObject([
+          {
+            color: '#ff0000',
+            polylines: [
+              {
+                closed: true,
+                points: [
+                  { x: 0, y: 0 },
+                  { x: 20, y: 0 },
+                  { x: 20, y: 20 },
+                  { x: 0, y: 20 },
+                ],
+              },
+            ],
+          },
+        ]),
+      ],
+    };
+    const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' as const };
+    const placement: JobOriginPlacement = { startFrom: 'user-origin', anchor: 'front-left' };
+    const framed = computeFrameBounds(scene, device, { jobOrigin: placement });
+
+    expect(framed).toEqual(
+      computeJobBounds(applyJobOrigin(compileJob(scene, device), placement, device), device),
+    );
+    // rear-left machine +Y points toward the operator, so the artwork's physical
+    // front edge is machine maxY and the placed job spans Y -20..0.
+    expect(framed).toEqual({ minX: 0, minY: -20, maxX: 20, maxY: 0 });
+  });
+
   it('returns null when all output layers are disabled', () => {
     const scene = {
       ...createProject().scene,

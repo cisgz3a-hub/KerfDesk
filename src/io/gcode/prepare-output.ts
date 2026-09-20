@@ -205,11 +205,13 @@ function resolveJobOriginOffset(
   // lands inside the burned box instead of at the bed corner. No-op when no jig
   // is present (returns null -> existing placement logic below).
   const boxBounds = computeRegistrationBoxBounds(project.scene, project.device);
-  if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin);
+  if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin, project.device);
 
   if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
     const fullBounds = fullSceneOutputBounds(project);
-    return fullBounds === null ? ZERO_OFFSET : jobOriginOffsetFromBounds(fullBounds, jobOrigin);
+    return fullBounds === null
+      ? ZERO_OFFSET
+      : jobOriginOffsetFromBounds(fullBounds, jobOrigin, project.device);
   }
   return jobOriginOffset(compiled, jobOrigin, project.device);
 }
