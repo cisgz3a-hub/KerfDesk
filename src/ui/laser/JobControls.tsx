@@ -1,6 +1,7 @@
 // JobControls — Machine-rail setup, detailed run status, overrides, and progress.
 // Canonical live-job actions live in the App-shell LiveMotionBar (ADR-207).
 
+import type { ReactNode } from 'react';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
@@ -30,6 +31,7 @@ import { JobActionControls } from './JobActionControls';
 import { JobSetupControls } from './JobSetupControls';
 import { jobControlsBusy, jobNeedsRecovery } from './job-controls-busy';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
+import { openMachineSetup } from './device-setup';
 import {
   streamProgressPercent,
   useLiveStreamProgress,
@@ -42,6 +44,7 @@ type Props = {
   readonly onConfigureHoming?: () => void;
   readonly onStartJob: () => void;
   readonly dockedJobActions?: boolean;
+  readonly setupExtras?: ReactNode;
 };
 
 // Both setup entries are optional so bare <JobControls> renders standalone;
@@ -51,8 +54,10 @@ function configureCallbacks(props: Props): {
   readonly homing: () => void;
 } {
   return {
-    autofocus: props.onConfigureAutofocus ?? doNothing,
-    homing: props.onConfigureHoming ?? doNothing,
+    autofocus:
+      props.onConfigureAutofocus ??
+      (() => openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })),
+    homing: props.onConfigureHoming ?? (() => openMachineSetup({ kind: 'step', step: 'confirm' })),
   };
 }
 
@@ -92,12 +97,12 @@ export function JobControls(props: Props): JSX.Element {
   return (
     <div style={containerStyle}>
       <OriginRow disabled={disabled} streaming={controlsBusy} />
-      <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-      >
-        <span style={sectionCaptionStyle}>{props.dockedJobActions ? 'Machine setup' : 'Job'}</span>
-        <TutorialButton tutorialId="frame-start" label="Frame & Start tutorial" />
-      </div>
+      {!props.dockedJobActions && (
+        <div className="lf-machine-section-heading">
+          <span style={sectionCaptionStyle}>Job</span>
+          <TutorialButton tutorialId="frame-start" compact label="Frame & Start" />
+        </div>
+      )}
       <SetupRow
         disabled={disabled}
         streaming={controlsBusy}
@@ -105,6 +110,8 @@ export function JobControls(props: Props): JSX.Element {
         onConfigureHoming={configure.homing}
         onStartJob={onStartJob}
         dockedJobActions={props.dockedJobActions}
+        setupExtras={props.setupExtras}
+        setupLabel={machineKind === 'cnc' ? 'Homing & maintenance' : 'Homing & focus'}
       />
       {!props.dockedJobActions && <StartBlockerNotice />}
       <AccessoryResetControls
@@ -131,8 +138,13 @@ export function JobControls(props: Props): JSX.Element {
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
       <SecondPassControl busy={controlsBusy} machineKind={machineKind} />
-      <ExecutionArchivePanel />
-      <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
+      <CollapsibleRailSection
+        label="History & recovery"
+        title="View stored runs, export a previous execution, or restart an interrupted job."
+      >
+        <ExecutionArchivePanel />
+        <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
+      </CollapsibleRailSection>
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
       {streamProgress.total > 0 && <ProgressBar progress={streamProgress} />}
     </div>
@@ -162,6 +174,8 @@ function SetupRow(props: {
   readonly onConfigureHoming: () => void;
   readonly onStartJob: () => void;
   readonly dockedJobActions: boolean | undefined;
+  readonly setupExtras: ReactNode;
+  readonly setupLabel: string;
 }): JSX.Element {
   const setup = (
     <JobSetupControls
@@ -172,19 +186,30 @@ function SetupRow(props: {
       compact={props.dockedJobActions === true}
     />
   );
-  if (props.dockedJobActions) return <div style={actionGridStyle}>{setup}</div>;
+  if (props.dockedJobActions) {
+    return (
+      <CollapsibleRailSection
+        label={props.setupLabel}
+        title="Home the machine, configure focus, and open machine maintenance tools."
+      >
+        <div style={actionGridStyle}>{setup}</div>
+        {props.setupExtras}
+      </CollapsibleRailSection>
+    );
+  }
   return (
-    <JobActionControls
-      disabled={props.disabled}
-      streaming={props.streaming}
-      onStartJob={props.onStartJob}
-    >
-      {setup}
-    </JobActionControls>
+    <>
+      <JobActionControls
+        disabled={props.disabled}
+        streaming={props.streaming}
+        onStartJob={props.onStartJob}
+      >
+        {setup}
+      </JobActionControls>
+      {props.setupExtras}
+    </>
   );
 }
-
-const doNothing = (): void => undefined;
 
 function PlacementSection(props: {
   readonly streaming: boolean;

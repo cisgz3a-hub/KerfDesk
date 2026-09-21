@@ -1,0 +1,141 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 8,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006847446,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "document canvas draws one undoable pencil stroke, cancels an unfinished stroke, and zooms without changing pixels",
+          "status": "passed",
+          "title": "document canvas draws one undoable pencil stroke, cancels an unfinished stroke, and zooms without changing pixels",
+          "duration": 67.36259999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "curve canvas adds, drags and removes a control point without committing document pixels",
+          "status": "passed",
+          "title": "curve canvas adds, drags and removes a control point without committing document pixels",
+          "duration": 10.83660000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "colour pad maps pointer coordinates to saturation and brightness and clamps an outside drag",
+          "status": "passed",
+          "title": "colour pad maps pointer coordinates to saturation and brightness and clamps an outside drag",
+          "duration": 42.13369999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006864435,
+      "endTime": 1790006864556.1338,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorGestures.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "status": "passed",
+          "title": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "duration": 1191.3181999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "status": "passed",
+          "title": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "duration": 9.805100000001403,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "symbol disclosure expands and each accent button inserts its own character",
+          "status": "passed",
+          "title": "symbol disclosure expands and each accent button inserts its own character",
+          "duration": 8.399400000000242,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "status": "failed",
+          "title": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "duration": 37.50879999999961,
+          "failureMessages": [
+            "AssertionError: weld checkbox updates draft: expected { content: '', sizeMm: 10, …(9) } to match object { weldOverlaps: true }\n(16 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at D:/LaserForge/ui-audit-20260921/src/ui/text/TextControls.audit.test.tsx:100:57\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "status": "passed",
+          "title": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "duration": 36.95420000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Add Text Cancel closes without editing the project",
+          "status": "passed",
+          "title": "Add Text Cancel closes without editing the project",
+          "duration": 23.847499999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006859872,
+      "endTime": 1790006861180.8474,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/text/TextControls.audit.test.tsx"
+    }
+  ]
+}

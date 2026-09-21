@@ -25,9 +25,7 @@ export const primaryActionStyle: CSSProperties = {
 export const sectionCaptionStyle: CSSProperties = {
   fontSize: 'var(--lf-text-sm)',
   fontWeight: 600,
-  letterSpacing: 0.4,
-  textTransform: 'uppercase',
-  color: 'var(--lf-text-faint)',
+  color: 'var(--lf-text-muted)',
   marginTop: 4,
   lineHeight: 1.4,
 };

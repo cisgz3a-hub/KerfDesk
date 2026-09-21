@@ -21,11 +21,14 @@ afterEach(() => {
 });
 
 describe('CommandShell canvas text activation', () => {
-  it('arms canvas typing from the toolbar without opening the old text dialog', async () => {
+  it('arms canvas typing from More without opening the old text dialog', async () => {
     useUiStore.setState({ textDialog: null });
     const { host, root } = await renderShell(mockPlatform());
     try {
-      const text = host.querySelector('button[data-help-id="command:tools.add-text"]');
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('button[aria-label="More commands"]')?.click(),
+      );
+      const text = document.querySelector('button[data-help-id="command:tools.add-text"]');
       if (!(text instanceof HTMLButtonElement)) throw new Error('Text command missing');
       await act(async () => text.dispatchEvent(new MouseEvent('click', { bubbles: true })));
       expect(useUiStore.getState().toolMode).toEqual({ kind: 'text' });

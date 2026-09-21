@@ -66,12 +66,16 @@ declare global {
     __centerlineWorkerProbe: WorkerProbe;
   }
 }
-const nativeWorkers = new WeakMap<Page, { url: string; closed: boolean }[]>();
+interface NativeWorkerObservation {
+  url: string;
+  closed: boolean;
+}
+const nativeWorkers = new WeakMap<Page, NativeWorkerObservation[]>();
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(240_000);
   expect(createHash('sha256').update(FIXTURE_BYTES).digest('hex')).toBe(FIXTURE_SHA256);
-  const observed: { url: string; closed: boolean }[] = [];
+  const observed: NativeWorkerObservation[] = [];
   nativeWorkers.set(page, observed);
   page.on('worker', (worker) => {
     if (!worker.url().includes('trace-worker')) return;
@@ -280,6 +284,7 @@ test('cancels an actively tracing Sharp dragon from the dialog without committin
   );
   const active = (await observations(page)).at(-1);
   if (active === undefined) throw Error('Missing active Sharp trace');
+  const activeNativeWorker = await captureActiveNativeWorker(page, active.owner);
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click({ timeout: 5_000 });
   await expect(dialog).not.toBeVisible({ timeout: 5_000 });
   await expect
@@ -292,19 +297,24 @@ test('cancels an actively tracing Sharp dragon from the dialog without committin
       ),
     )
     .toEqual(expect.any(Number));
-  await expect.poll(() => nativeWorkers.get(page)?.[active.owner - 1]?.closed).toBe(true);
+  await expect.poll(() => activeNativeWorker.closed).toBe(true);
+  await expect
+    .poll(() => nativeWorkers.get(page)?.filter((worker) => !worker.closed).length)
+    .toBe(0);
   const project = await saveProject(page, kerfdesk);
   expect(project.scene.objects).toHaveLength(2);
   expect(project.scene.objects.some((object) => object.kind === 'traced-image')).toBe(false);
   expect(
-    (await observations(page)).find((request) => request.id === active.id)?.outcome,
+    (await observations(page)).find(
+      (request) => request.owner === active.owner && request.id === active.id,
+    )?.outcome,
   ).toBeNull();
 });
 
 test('superseding an active dragon trace terminates its real worker and completes the replacement', async ({
   page,
 }) => {
-  const outcome = await page.evaluate(async (fixtureUrl) => {
+  const replacement = await page.evaluateHandle(async (fixtureUrl) => {
     const clientPath = '/src/ui/trace/use-trace-worker-client.ts';
     const loaderPath = '/src/ui/trace/image-loader.ts';
     const presetsPath = '/src/core/trace/trace-presets.ts';
@@ -338,21 +348,38 @@ test('superseding an active dragon trace terminates its real worker and complete
         throw Error('Dragon request settled before active supersession');
       }),
     ]);
-    const data = new Uint8ClampedArray(32 * 32 * 4).fill(255);
-    for (let y = 14; y < 18; y++)
-      for (let x = 4; x < 28; x++) {
-        const index = (y * 32 + x) * 4;
-        data[index] = data[index + 1] = data[index + 2] = 0;
-      }
-    const replacement = await client.traceImage({ width: 32, height: 32, data }, options);
-    return {
-      obsolete: await obsolete,
-      width: replacement.width,
-      height: replacement.height,
-      polylines: replacement.paths.flatMap((p) => p.polylines).length,
-      sourceIntact: image.data.every((byte, index) => byte === original[index]),
+    // Let Playwright observe the running worker before superseding it. A worker
+    // terminated during startup may never produce a browser worker event.
+    return async () => {
+      const data = new Uint8ClampedArray(32 * 32 * 4).fill(255);
+      for (let y = 14; y < 18; y++)
+        for (let x = 4; x < 28; x++) {
+          const index = (y * 32 + x) * 4;
+          data[index] = data[index + 1] = data[index + 2] = 0;
+        }
+      const replacement = await client.traceImage({ width: 32, height: 32, data }, options);
+      return {
+        obsolete: await obsolete,
+        width: replacement.width,
+        height: replacement.height,
+        polylines: replacement.paths.flatMap((p) => p.polylines).length,
+        sourceIntact: image.data.every((byte, index) => byte === original[index]),
+      };
     };
   }, FIXTURE_URL);
+  await page.waitForFunction(
+    () =>
+      window.__centerlineWorkerProbe.requests.some(
+        (request) => request.beats > 0 && request.settledAt === null,
+      ),
+    undefined,
+    { timeout: WORKER_SILENCE_MS },
+  );
+  const active = (await observations(page)).at(-1);
+  if (active === undefined) throw Error('Missing active dragon trace');
+  const activeNativeWorker = await captureActiveNativeWorker(page, active.owner);
+  const outcome = await replacement.evaluate((runReplacement) => runReplacement());
+  await replacement.dispose();
   expect(outcome).toMatchObject({
     obsolete: { kind: 'TraceRequestSupersededError' },
     width: 32,
@@ -380,9 +407,43 @@ test('superseding an active dragon trace terminates its real worker and complete
     expect.any(Number),
   );
   expect(workers.find((worker) => worker.owner === current.owner)?.terminatedAt).toBeNull();
-  await expect.poll(() => nativeWorkers.get(page)?.[0]?.closed).toBe(true);
+  await expect.poll(() => activeNativeWorker.closed).toBe(true);
+  await expect
+    .poll(() => nativeWorkers.get(page)?.filter((worker) => !worker.closed).length)
+    .toBe(1);
+  expect(nativeWorkers.get(page)?.find((worker) => !worker.closed)).not.toBe(activeNativeWorker);
   expect(nativeWorkers.get(page)).toHaveLength(2);
 });
+
+async function captureActiveNativeWorker(
+  page: Page,
+  owner: number,
+): Promise<NativeWorkerObservation> {
+  // Constructor ordinals include workers retired before Playwright reports
+  // them. Capture the sole observed open instance at the active-request barrier;
+  // owner-specific termination remains a separate assertion in the page probe.
+  await expect
+    .poll(() => nativeWorkers.get(page)?.filter((worker) => !worker.closed).length)
+    .toBe(1);
+  const worker = nativeWorkers.get(page)?.find((candidate) => !candidate.closed);
+  if (worker === undefined) throw Error('Missing browser-observed active trace worker');
+  expect(
+    await page.evaluate((expectedOwner) => {
+      const probe = window.__centerlineWorkerProbe;
+      return {
+        openOwners: probe.workers
+          .filter((candidate) => candidate.terminatedAt === null)
+          .map((candidate) => candidate.owner),
+        activelyTracing: probe.requests.some(
+          (request) =>
+            request.owner === expectedOwner && request.beats > 0 && request.settledAt === null,
+        ),
+      };
+    }, owner),
+  ).toEqual({ openOwners: [owner], activelyTracing: true });
+  expect(worker.closed).toBe(false);
+  return worker;
+}
 
 async function importDragon(page: Page): Promise<void> {
   await page.evaluate(

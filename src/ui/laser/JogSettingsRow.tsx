@@ -12,7 +12,6 @@ export function JogSettingsRow(props: {
 }): JSX.Element {
   return (
     <div style={rowStyle}>
-      <span style={labelStyle}>Jog</span>
       <label style={fieldStyle}>
         Step
         <select
@@ -51,11 +50,10 @@ export function JogSettingsRow(props: {
 
 const rowStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'auto minmax(0, 1fr) minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
   alignItems: 'flex-end',
   gap: 8,
 };
-const labelStyle: React.CSSProperties = { fontWeight: 600 };
 const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

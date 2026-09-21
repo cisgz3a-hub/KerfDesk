@@ -1,0 +1,891 @@
+{
+  "metadata": {
+    "previousSourceSnapshot": "pr-integration-source/buttons.json",
+    "currentSourceSnapshot": "pr-final-source/buttons.json",
+    "upstreamRange": { "from": "9d72ba798", "to": "af1a1b83f7ece14a46e3386b1845bb35daf971ac" },
+    "integratedHead": "35b873829c9eb6681d52cc966dc7e15564be4360",
+    "sourceDigest": "46a5737e33d88d6fd46d90f49496b6f12229e8a0d38074f4bad895f03cbd93ad",
+    "sourceFilesScanned": 2637,
+    "previousControls": 815,
+    "currentControls": 817,
+    "currentCommandIds": 94,
+    "unchangedCatalogueSignatures": 810,
+    "changedOrRelocatedDefinitions": 5,
+    "introducedDefinitions": 2,
+    "netControlChange": 2,
+    "auditedCurrentDefinitions": 7,
+    "dispositions": { "verified-behaviour": 7 },
+    "executedCases": 132,
+    "executedFiles": 6,
+    "failedCases": 0,
+    "skippedCases": 0,
+    "limits": "The seven verdicts apply only to cited software behaviours in the current tutorial scope. Matching signatures and dated 805/815-control verdicts are not automatically fresh runtime evidence. JSDOM photo tests do not prove image decoding or physical results; menu/copy consistency tests do not execute the operations described by each lesson."
+  },
+  "controls": [
+    {
+      "id": "src/ui/tutorials/TutorialHost.tsx:46:11",
+      "label": "Close tutorials",
+      "kind": "native-button",
+      "change": "changed-or-relocated-definition",
+      "historicalIds": ["src/ui/tutorials/TutorialHost.tsx:42:11"],
+      "expectedOutcome": "Close exits the entire tutorial session immediately and clears the lesson trail; the displayed Escape hint is reserved for the library.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes 'first-project' card and contextual button open the named lesson without editing the project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real library card -> tutorial store, then contextual TutorialButton -> real host and named first step; project/undo/dirty identity is preserved and Close removes the modal. All 93 parameterised cases are listed in lessonBindings. JSDOM, no hardware or network effects."
+        },
+        {
+          "file": "src/ui/tutorials/tutorial-navigation.test.tsx",
+          "test": "walking the catalog starts fresh when a different contextual lesson opens after Close",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Actual Close button removes the dialog. A new contextual open has no stale trail; successive Escapes return to the library and close."
+        }
+      ],
+      "notes": "Close was executed in every one of the 93 lesson-binding cases. Escape from a lesson has a different, separately verified one-level return behaviour."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:46:15",
+      "label": "{hidden} more for other machines",
+      "kind": "native-button",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "expectedOutcome": "When another machine filter hides matching lessons, Include lessons for the other machine type selects all machines, shows the exact expanded card set and disappears.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": ["hidden > 0"],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the other-machine link and every category show the exact matching lessons without editing the project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real TutorialHost/Centre state and library DOM. Initial hidden count is checked against the independent machine tags; the link selects all machines and removes itself. Every category is clicked and its exact card-title set, pressed state and starter-panel visibility are asserted; project/undo/dirty are unchanged."
+        }
+      ],
+      "notes": "Introduced native button. Visible and hidden states are exercised in the real default laser library."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:103:11",
+      "label": "{category}",
+      "kind": "native-button",
+      "change": "changed-or-relocated-definition",
+      "historicalIds": ["src/ui/tutorials/TutorialLibrary.tsx:56:11"],
+      "expectedOutcome": "Each category selects exactly that category of lessons; All restores every lesson and the opening panel.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the other-machine link and every category show the exact matching lessons without editing the project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real TutorialHost/Centre state and library DOM. Initial hidden count is checked against the independent machine tags; the link selects all machines and removes itself. Every category is clicked and its exact card-title set, pressed state and starter-panel visibility are asserted; project/undo/dirty are unchanged."
+        }
+      ],
+      "notes": "Moved into Filters with unchanged dispatch. Every current category and All is clicked with all machines selected; combined search/machine behaviour also passes in TutorialHost.test.tsx."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:146:5",
+      "label": "{tutorial.category} {tutorial.minutes} min {tutorial.title} {tutorial.summary} {tutorial.machine === 'all' ? 'Laser + CNC' : tutorial.machine === 'laser' ? 'Laser' : 'CNC router'} {done ? '✓ Completed' : progress !== undefined ? `Continue · step ${progress.step + 1} of ${tutorial.steps.length} →` : `${tutorial.steps.length} steps →`}",
+      "kind": "native-button",
+      "change": "changed-or-relocated-definition",
+      "historicalIds": ["src/ui/tutorials/TutorialLibrary.tsx:143:5"],
+      "expectedOutcome": "Each lesson card opens its named lesson; incomplete/completed progress remains local to tutorials.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes 'first-project' card and contextual button open the named lesson without editing the project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real library card -> tutorial store, then contextual TutorialButton -> real host and named first step; project/undo/dirty identity is preserved and Close removes the modal. All 93 parameterised cases are listed in lessonBindings. JSDOM, no hardware or network effects."
+        },
+        {
+          "file": "src/ui/tutorials/TutorialHost.test.tsx",
+          "test": "TutorialHost learning flow opens the contextual lesson, navigates, restarts and records completion in the library",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Actual reader step navigation, completion, restart and library card completion status. Does not assert every variant of the newly worded Continue label."
+        }
+      ],
+      "notes": "All 93 current card bindings are executed and listed in lessonBindings. The card label/data-done presentation changed; completion state is checked, but every string variant of Continue step counts is not independently asserted."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialReader.tsx:128:9",
+      "label": "← {previous === undefined ? 'All tutorials' : previous.title}",
+      "kind": "native-button",
+      "change": "changed-or-relocated-definition",
+      "historicalIds": ["src/ui/tutorials/TutorialReader.tsx:114:9"],
+      "expectedOutcome": "Back names and returns to the prior related lesson when a trail exists; otherwise it opens the library while retaining the tutorial session.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the related-lesson Back button restores its parent and then the library without editing the project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Actual library -> parent -> related reader, then both Back branches are clicked. Exact heading/tutorialId, trail push/pop and eventual open library are asserted with project/undo identity preserved."
+        },
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes every opening-path button opens its named lesson and Back returns to the library",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Each Getting started catalogue entry is clicked through its rendered opening-path button. Exact tutorial ID, heading, first step, library return and cleared trail are asserted with project/undo identity preserved. Covers every current mapped starter item."
+        },
+        {
+          "file": "src/ui/tutorials/tutorial-navigation.test.tsx",
+          "test": "walking the catalog walks back out of a lesson opened from \"Learn next\", one level per Escape",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Actual related-lesson click and Escape events return to the parent, then library, then closed. This does not click the Back button; that has separate evidence."
+        }
+      ],
+      "notes": "Both clicked Back branches and the equivalent Escape route are exercised. The step navigation Back button is a separate unchanged definition."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialStart.tsx:25:11",
+      "label": "{resume.started ? 'Continue' : 'Start'} : {resume.tutorial.title} {' '} →",
+      "kind": "native-button",
+      "change": "changed-or-relocated-definition",
+      "historicalIds": ["src/ui/tutorials/TutorialLibrary.tsx:118:9"],
+      "expectedOutcome": "Offer Continue for a half-read lesson; otherwise Start the first unfinished starter lesson; hide this primary action once the opening path is complete and nothing is half-read.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": ["not resume === undefined"],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the learning brand and first-project shortcut switch to their intended views",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "The brand is clicked from a contextual lesson to the library; the initial primary action opens first-project in the real reader."
+        },
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the primary Start skips completed opening lessons and disappears after the opening path is complete",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real host with seeded localStorage progress: the first completed starter is skipped, Start opens the next starter at step zero, and the primary action disappears when the starter path is complete. Done markers, progress value and unchanged project/undo are asserted."
+        },
+        {
+          "file": "src/ui/tutorials/tutorial-navigation.test.tsx",
+          "test": "walking the catalog offers the half-read lesson as the library’s next action",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real host with seeded half-read progress; Continue opens the expected import lesson at its saved step. This proves software resume, not reading comprehension or completion of the instructed work."
+        }
+      ],
+      "notes": "Replaces the fixed first-project shortcut. Fresh, completed-first, half-read and completed-path states are exercised through the real host and local progress storage."
+    },
+    {
+      "id": "src/ui/tutorials/TutorialStart.tsx:43:15",
+      "label": "{isDone ? '✓' : index + 1} {tutorial.title} {isDone ? 'Done' : state === undefined ? `${tutorial.minutes} min` : 'In progress'}",
+      "kind": "native-button",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "expectedOutcome": "Every opening-path button opens its own named starter lesson, with completed items remaining revisitable.",
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "note": "Catalogue visibility is not exhaustive; executed states and limits are identified in the evidence."
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes every opening-path button opens its named lesson and Back returns to the library",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Each Getting started catalogue entry is clicked through its rendered opening-path button. Exact tutorial ID, heading, first step, library return and cleared trail are asserted with project/undo identity preserved. Covers every current mapped starter item."
+        },
+        {
+          "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+          "test": "individual tutorial control outcomes the primary Start skips completed opening lessons and disappears after the opening path is complete",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+          "boundary": "Real host with seeded localStorage progress: the first completed starter is skipped, Start opens the next starter at step zero, and the primary action disappears when the starter path is complete. Done markers, progress value and unchanged project/undo are asserted."
+        }
+      ],
+      "notes": "Introduced mapped native button. Every current starter item is clicked from fresh progress; completed-state availability/Done markers are inspected, but clicking an already-completed starter item is not separately exercised."
+    }
+  ],
+  "keyboardBehaviour": [
+    {
+      "file": "src/ui/tutorials/tutorial-navigation.test.tsx",
+      "test": "walking the catalog steps a lesson with the arrow keys and remembers where it stopped",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+      "boundary": "Actual keyboard events in the reader advance/reverse steps, persist the selected step and stop at both bounds. Typing-target and modifier-key variants are outside this case."
+    },
+    {
+      "file": "src/ui/tutorials/tutorial-navigation.test.tsx",
+      "test": "walking the catalog walks back out of a lesson opened from \"Learn next\", one level per Escape",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json",
+      "boundary": "Actual related-lesson click and Escape events return to the parent, then library, then closed. This does not click the Back button; that has separate evidence."
+    }
+  ],
+  "lessonBindings": [
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'first-project' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'projects' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'import' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'workspace' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'shortcuts' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'design-library' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'project-notes' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'select' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'rectangle' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'ellipse' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'polygon' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'star' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'polyline' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'nodes' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'measure' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'text' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'text-layout' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'variable-text' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'design-studio' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'design-precision' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'design-edit' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-line' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-path' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-rectangle' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-circle' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-arc' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-fillet' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'studio-chamfer' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-studio' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-adjust' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-mask' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'trace' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'trace-batch' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-paint' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-select' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-fill' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-retouch' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-crop' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-layers' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-transform' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-text' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'image-tone' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'weld' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'subtract' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'intersect' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'exclude' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'convert' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'align' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'distribute' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'array' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'nest' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'operations' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'laser-cut' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'laser-fill' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'laser-image' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'materials' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-profile' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-pocket' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-engrave' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-vcarve' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-drill' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-relief' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-tabs' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'tool-library' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-inlay' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-probe' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-surfacing' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'machine-setup' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'connection' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'jog' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'origin' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'frame-start' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'preview' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'gcode' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'console' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'macros' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'recovery' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'box' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'box-fit' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'material-test' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'interval-test' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'scan-offset' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'focus-test' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'camera' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'registration' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'board' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'rotary' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'print-cut' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'optimization' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'labs' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'offset' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'dogbone' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    },
+    {
+      "file": "src/ui/tutorials/TutorialControls.audit.test.tsx",
+      "test": "individual tutorial control outcomes 'cnc-tiling' card and contextual button open the named lesson without editing the project",
+      "result": "passed",
+      "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-vitest.json"
+    }
+  ],
+  "retiredSourceLocations": [
+    {
+      "id": "src/ui/tutorials/TutorialHost.tsx:42:11",
+      "label": "Close tutorials",
+      "currentIds": ["src/ui/tutorials/TutorialHost.tsx:46:11"]
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:56:11",
+      "label": "{category}",
+      "currentIds": ["src/ui/tutorials/TutorialLibrary.tsx:103:11"]
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:118:9",
+      "label": "Start your first project →",
+      "currentIds": ["src/ui/tutorials/TutorialStart.tsx:25:11"]
+    },
+    {
+      "id": "src/ui/tutorials/TutorialLibrary.tsx:143:5",
+      "label": "{tutorial.category} {tutorial.minutes} min {tutorial.title} {tutorial.summary} {tutorial.machine === 'all' ? 'Laser + CNC' : tutorial.machine === 'laser' ? 'Laser' : 'CNC router'} {progress?.completed === true ? '✓ Completed' : progress !== undefined ? 'Continue →' : `${tutorial.steps.length} visual steps →`}",
+      "currentIds": ["src/ui/tutorials/TutorialLibrary.tsx:146:5"]
+    },
+    {
+      "id": "src/ui/tutorials/TutorialReader.tsx:114:9",
+      "label": "← All tutorials",
+      "currentIds": ["src/ui/tutorials/TutorialReader.tsx:128:9"]
+    }
+  ],
+  "changedFilesFromUpstream": [
+    "DECISIONS.md",
+    "docs/tutorials/README.md",
+    "src/ui/layers/CutSettingsDialog.tutorial.test.tsx",
+    "src/ui/tutorials/TutorialHost.test.tsx",
+    "src/ui/tutorials/TutorialHost.tsx",
+    "src/ui/tutorials/TutorialLibrary.tsx",
+    "src/ui/tutorials/TutorialPhoto.test.tsx",
+    "src/ui/tutorials/TutorialReader.tsx",
+    "src/ui/tutorials/TutorialStart.tsx",
+    "src/ui/tutorials/calibration-tutorials.ts",
+    "src/ui/tutorials/cnc-detail-tutorials.ts",
+    "src/ui/tutorials/cnc-tutorials.ts",
+    "src/ui/tutorials/cnc-utility-tutorials.ts",
+    "src/ui/tutorials/controller-tutorials.ts",
+    "src/ui/tutorials/image-tool-tutorials.ts",
+    "src/ui/tutorials/laser-tutorials.ts",
+    "src/ui/tutorials/layout-tutorials.ts",
+    "src/ui/tutorials/machine-setup-tutorials.ts",
+    "src/ui/tutorials/placement-tutorials.ts",
+    "src/ui/tutorials/production-generator-tutorials.ts",
+    "src/ui/tutorials/production-tool-tutorials.ts",
+    "src/ui/tutorials/project-tutorials.ts",
+    "src/ui/tutorials/run-tutorials.ts",
+    "src/ui/tutorials/studio-tool-tutorials.ts",
+    "src/ui/tutorials/tutorial-fidelity.test.ts",
+    "src/ui/tutorials/tutorial-journey.ts",
+    "src/ui/tutorials/tutorial-navigation.test.tsx",
+    "src/ui/tutorials/tutorial-store.ts",
+    "src/ui/tutorials/tutorials.css"
+  ],
+  "regressionAttempt": {
+    "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-initial-vitest.json",
+    "executed": 1,
+    "failed": 1,
+    "skipped": 95,
+    "finding": "Audit expected retired Start your first project wording; the primary action now names the next lesson. Updated the audit selector and independently asserted its initial destination. Close title/trail resets were also updated to the new intended contract."
+  },
+  "compiledBrowserEvidence": {
+    "file": "e2e/interface-simplification.spec.ts",
+    "test": "routine controls stay visible while setup, history, and tutorials remain reachable",
+    "result": "passed",
+    "report": "docs/audits/2026-09-21-interface/pr-final-tutorial-browser.json",
+    "boundary": "Parent-run Chromium check against compiled app: contextual Jogging opens; Escape returns lesson to library and then workspace, with focus restored to its opener. This is one routine-control scenario, not a full browser pass of all tutorial controls."
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 14,
+  "numPassedTests": 13,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790004655421,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit interval Cancel calls only cancellation without generating a job",
+          "status": "passed",
+          "title": "interval Cancel calls only cancellation without generating a job",
+          "duration": 93.6931999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit material Cancel calls only cancellation without generating a job",
+          "status": "passed",
+          "title": "material Cancel calls only cancellation without generating a job",
+          "duration": 15.222700000000259,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit scan offset Cancel calls only cancellation without generating a job",
+          "status": "passed",
+          "title": "scan offset Cancel calls only cancellation without generating a job",
+          "duration": 22.940799999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Print and Cut captures each target, applies the reviewed pair, disables and cancels independently",
+          "status": "failed",
+          "title": "Print and Cut captures each target, applies the reviewed pair, disables and cancels independently",
+          "duration": 23.879199999999855,
+          "failureMessages": [
+            "Error: Missing button: Disable registration\n    at button (D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineDialogControls.audit.test.tsx:32:22)\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineDialogControls.audit.test.tsx:69:15\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineDialogControls.audit.test.tsx:69:5\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit rotary type and reverse toggles are saved only by Apply and Cancel does not apply a draft",
+          "status": "passed",
+          "title": "rotary type and reverse toggles are saved only by Apply and Cancel does not apply a draft",
+          "duration": 29.984999999999673,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Cut Planner edits inside-first, applies that value by button and cancels without applying again",
+          "status": "passed",
+          "title": "Cut Planner edits inside-first, applies that value by button and cancels without applying again",
+          "duration": 16.892100000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Labs toggles each remaining feature, persists them, resets all, and Done closes",
+          "status": "passed",
+          "title": "Labs toggles each remaining feature, persists them, resets all, and Done closes",
+          "duration": 15.999199999999746,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004658209,
+      "endTime": 1790004658426.9993,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineDialogControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit controlled laser-off travel enable respects max feed and disable returns undefined",
+          "status": "passed",
+          "title": "controlled laser-off travel enable respects max feed and disable returns undefined",
+          "duration": 52.58530000000064,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit homing and laser mode checkboxes produce profile patches without issuing controller commands",
+          "status": "passed",
+          "title": "homing and laser mode checkboxes produce profile patches without issuing controller commands",
+          "duration": 19.499700000000303,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit air restart checkbox is hidden without air output and updates only the profile flag with M8",
+          "status": "passed",
+          "title": "air restart checkbox is hidden without air output and updates only the profile flag with M8",
+          "duration": 7.720600000000559,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit probe presence checkbox records availability without requesting a probe",
+          "status": "passed",
+          "title": "probe presence checkbox records availability without requesting a probe",
+          "duration": 7.23240000000078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit legacy safety zones add, disable and remove the selected persisted zone",
+          "status": "passed",
+          "title": "legacy safety zones add, disable and remove the selected persisted zone",
+          "duration": 21.837799999999334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit setup safety zones add, disable and remove the selected persisted zone",
+          "status": "passed",
+          "title": "setup safety zones add, disable and remove the selected persisted zone",
+          "duration": 15.362999999999374,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine profile control audit"],
+          "fullName": "Machine profile control audit advanced estimator disclosure opens and closes without mutating estimate settings",
+          "status": "passed",
+          "title": "advanced estimator disclosure opens and closes without mutating estimate settings",
+          "duration": 11.299000000000888,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004668938,
+      "endTime": 1790004669073.299,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineProfileControls.audit.test.tsx"
+    }
+  ]
+}

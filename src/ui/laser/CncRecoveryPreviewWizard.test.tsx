@@ -169,6 +169,16 @@ function completePhysicalQualification(qualificationId: string): void {
 }
 
 describe('CncRecoveryPreviewWizard', () => {
+  it('audit Back returns to evidence and Close exits ready review without starting recovery', () => {
+    const { onClose } = renderWizard(previewProject());
+    act(() => wizardButton('Next: Geometry').click());
+    expect(host?.textContent).toContain('Select uncertainty and runway');
+    act(() => wizardButton('Back').click());
+    expect(host?.textContent).toContain('Evidence audit');
+    act(() => wizardButton('Close').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(runCncSupervisedRecoveryFlow).not.toHaveBeenCalled();
+  });
   it('keeps execution gated until geometry and every physical qualification are explicit', async () => {
     const { capsule, onClose } = renderWizard(previewProject());
     expect(host?.textContent).toContain('Evidence audit');

@@ -22,7 +22,7 @@ export function JobSetupControls(props: Props): JSX.Element {
   return (
     <>
       <HomeButton
-        onHome={() => void home()}
+        onHome={() => void home().catch(() => undefined)}
         onConfigureHoming={props.onConfigureHoming}
         busy={busy}
         streaming={props.streaming}

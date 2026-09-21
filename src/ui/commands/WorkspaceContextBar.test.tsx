@@ -112,6 +112,23 @@ describe('WorkspaceContextBar', () => {
     expect(Number.parseFloat(menu.style.left)).toBeLessThan(999);
     expect(Number.parseFloat(menu.style.top)).toBeLessThan(999);
   });
+
+  it('runs a More action exactly once and dismisses both menu levels', async () => {
+    const alignLeft = vi.fn();
+    const duplicate = vi.fn();
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    const h = await renderBar(
+      commands({ 'arrange.align-left': alignLeft, 'edit.duplicate': duplicate }),
+    );
+
+    await clickButton(h, 'More');
+    await clickButton(h, 'Align Left');
+
+    expect(alignLeft).toHaveBeenCalledTimes(1);
+    expect(duplicate).not.toHaveBeenCalled();
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
+    expect(h.querySelector('[role="menu"]')).toBeNull();
+  });
 });
 
 async function renderBar(appCommands: ReadonlyArray<AppCommand>): Promise<HTMLDivElement> {

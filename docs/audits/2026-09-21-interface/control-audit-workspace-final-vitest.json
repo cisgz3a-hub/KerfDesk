@@ -1,0 +1,260 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 22,
+  "numPassedTests": 22,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006590009,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes select selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "select selects exactly its tool mode without changing artwork",
+          "duration": 1718.1080999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes node selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "node selects exactly its tool mode without changing artwork",
+          "duration": 410.407100000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes measure selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "measure selects exactly its tool mode without changing artwork",
+          "duration": 319.2436999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes text selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "text selects exactly its tool mode without changing artwork",
+          "duration": 167.40290000000095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes rect selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "rect selects exactly its tool mode without changing artwork",
+          "duration": 243.3868999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes ellipse selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "ellipse selects exactly its tool mode without changing artwork",
+          "duration": 150.85650000000896,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes polygon selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "polygon selects exactly its tool mode without changing artwork",
+          "duration": 162.50770000000193,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes star selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "star selects exactly its tool mode without changing artwork",
+          "duration": 214.51230000000214,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes polyline selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "polyline selects exactly its tool mode without changing artwork",
+          "duration": 326.613400000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes position-laser selects exactly its tool mode without changing artwork",
+          "status": "passed",
+          "title": "position-laser selects exactly its tool mode without changing artwork",
+          "duration": 143.73619999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Open Design Studio creates a resumable session",
+          "status": "passed",
+          "title": "Open Design Studio creates a resumable session",
+          "duration": 144.8058000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Smooth updates the selected handles with undoable geometry",
+          "status": "passed",
+          "title": "Smooth updates the selected handles with undoable geometry",
+          "duration": 252.119200000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Corner updates the selected handles with undoable geometry",
+          "status": "passed",
+          "title": "Corner updates the selected handles with undoable geometry",
+          "duration": 217.75830000000133,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Curve and Line convert the outgoing segment and explain their unavailable states",
+          "status": "passed",
+          "title": "Curve and Line convert the outgoing segment and explain their unavailable states",
+          "duration": 262.6287000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Start reorders a closed path and Break opens it at the selected node",
+          "status": "passed",
+          "title": "Start reorders a closed path and Break opens it at the selected node",
+          "duration": 209.89160000000265,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Zoom in/out and both fit-to-bed entry points change only the view",
+          "status": "passed",
+          "title": "Zoom in/out and both fit-to-bed entry points change only the view",
+          "duration": 390.32450000000244,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Fit to selection zooms to actual selected artwork",
+          "status": "passed",
+          "title": "Fit to selection zooms to actual selected artwork",
+          "duration": 151.08030000000144,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes aspect lock makes width edits scale height proportionally",
+          "status": "passed",
+          "title": "aspect lock makes width edits scale height proportionally",
+          "duration": 367.8154000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Play, Pause, Restart and both pass buttons change the scrubber as labelled",
+          "status": "passed",
+          "title": "Play, Pause, Restart and both pass buttons change the scrubber as labelled",
+          "duration": 297.46080000000075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes preview travel toggle, tutorial and 3D entry dispatch without changing the route",
+          "status": "passed",
+          "title": "preview travel toggle, tutorial and 3D entry dispatch without changing the route",
+          "duration": 236.85050000000047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig remaining actions"],
+          "fullName": "registration jig remaining actions air assist updates the outline operation and Advanced settings opens that operation",
+          "status": "passed",
+          "title": "air assist updates the outline operation and Advanced settings opens that operation",
+          "duration": 942.271900000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig remaining actions"],
+          "fullName": "registration jig remaining actions Remove outline preserves artwork, tutorial opens the jig lesson, and Close only hides the panel",
+          "status": "passed",
+          "title": "Remove outline preserves artwork, tutorial opens the jig lesson, and Close only hides the panel",
+          "duration": 257.1252999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006653021,
+      "endTime": 1790006660624.1252,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/WorkspaceButtons.audit.test.tsx"
+    }
+  ]
+}

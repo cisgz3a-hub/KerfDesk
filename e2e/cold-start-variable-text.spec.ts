@@ -16,7 +16,7 @@ test('cold Vite start renders variable outline text without optimization reloads
 
   await page.goto('/');
   await expect(applicationHeader(page)).toContainText('KerfDesk');
-  await page.getByRole('button', { name: 'Text...' }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await page
     .getByLabel('KerfDesk workspace', { exact: true })
     .click({ position: { x: 150, y: 200 } });

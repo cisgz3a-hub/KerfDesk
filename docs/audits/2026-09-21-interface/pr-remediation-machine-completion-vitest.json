@@ -1,0 +1,138 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 3,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 8,
+  "numFailedTests": 0,
+  "numPendingTests": 1,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790013248863,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "status": "skipped",
+          "title": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "offers Done after an unknown-dwell run settles even though its live estimate was unavailable",
+          "status": "passed",
+          "title": "offers Done after an unknown-dwell run settles even though its live estimate was unavailable",
+          "duration": 172.96889999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013266736,
+      "endTime": 1790013266908.969,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CompletedJobNotice.simulator.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility ignores a saved worker opt-in when the selected driver is marlin",
+          "status": "passed",
+          "title": "ignores a saved worker opt-in when the selected driver is marlin",
+          "duration": 8.886600000000271,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility ignores a saved worker opt-in when the selected driver is smoothieware",
+          "status": "passed",
+          "title": "ignores a saved worker opt-in when the selected driver is smoothieware",
+          "duration": 1.4747000000002117,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver grbl-v1.1",
+          "status": "passed",
+          "title": "keeps an explicit worker opt-in for the GRBL-family driver grbl-v1.1",
+          "duration": 1.3805999999999585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver grblhal",
+          "status": "passed",
+          "title": "keeps an explicit worker opt-in for the GRBL-family driver grblhal",
+          "duration": 1.1165000000000873,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver fluidnc",
+          "status": "passed",
+          "title": "keeps an explicit worker opt-in for the GRBL-family driver fluidnc",
+          "duration": 1.0728999999996631,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver undefined",
+          "status": "passed",
+          "title": "keeps an explicit worker opt-in for the GRBL-family driver undefined",
+          "duration": 0.9169999999999163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker transport firmware eligibility"],
+          "fullName": "worker transport firmware eligibility keeps the ordinary transport when the compatible driver has no worker opt-in",
+          "status": "passed",
+          "title": "keeps the ordinary transport when the compatible driver has no worker opt-in",
+          "duration": 0.8833999999997104,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013269714,
+      "endTime": 1790013269729.8833,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/state/laser-connect-hosted-eligibility.test.ts"
+    }
+  ]
+}

@@ -176,6 +176,8 @@ function ToolbarButtonContent(props: { readonly command: AppCommand }): JSX.Elem
 }
 
 function primaryLabel(command: AppCommand): string {
+  if (command.id === 'file.open') return 'Open';
+  if (command.id === 'file.import') return 'Import';
   if (command.id === 'tools.add-text') return 'Text';
   if (command.id === 'tools.trace-image') return 'Trace image';
   // Image Studio is no longer a primary button; in More it keeps its full label.
@@ -184,6 +186,7 @@ function primaryLabel(command: AppCommand): string {
 }
 
 function toolbarButtonClass(id: CommandId): string {
+  if (id === 'file.import') return 'lf-btn lf-toolbar-command lf-toolbar-command--import';
   return ICON_ONLY_TOOLBAR_COMMANDS.has(id)
     ? 'lf-btn lf-toolbar-command lf-toolbar-command--icon-only'
     : 'lf-btn lf-toolbar-command';
@@ -207,13 +210,9 @@ export function ToolbarSeparator(props: { readonly className?: string } = {}): J
 
 const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
   'file.new',
-  'file.open',
-  'file.save',
   'file.save-as',
-  'file.import',
   'file.import-svg',
   'file.import-image',
   'file.save-gcode',
-  'window.toggle-preview',
   'file.inspect-gcode',
 ]);

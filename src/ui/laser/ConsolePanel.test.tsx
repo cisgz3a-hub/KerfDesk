@@ -43,6 +43,44 @@ afterEach(() => {
 });
 
 describe('ConsolePanel', () => {
+  it('audit status and stream filters reveal and hide their distinct transcript categories', async () => {
+    useLaserStore.setState({
+      transcript: [
+        {
+          id: 1,
+          at: 1,
+          direction: 'in',
+          raw: '<Idle|MPos:0,0,0>',
+          kind: 'status',
+          source: 'controller',
+        },
+        { id: 2, at: 2, direction: 'out', raw: 'G1 X123', kind: 'gcode', source: 'job' },
+      ],
+    });
+    const { host, unmount } = await renderPanel();
+    try {
+      const status = host.querySelector<HTMLInputElement>(
+        'input[title="Show periodic controller status reports."]',
+      )!;
+      const stream = host.querySelector<HTMLInputElement>(
+        'input[title="Show high-volume job stream writes that are hidden by default."]',
+      )!;
+      await act(async () => status.click());
+      expect(host.textContent).toContain('<Idle|');
+      expect(host.textContent).not.toContain('G1 X123');
+      await act(async () => stream.click());
+      expect(host.textContent).toContain('G1 X123');
+      await act(async () => {
+        status.click();
+        stream.click();
+      });
+      expect(host.textContent).not.toContain('<Idle|');
+      expect(host.textContent).not.toContain('G1 X123');
+      expect(useLaserStore.getState().transcript).toHaveLength(2);
+    } finally {
+      await unmount();
+    }
+  });
   it.each(['unavailable', 'rejected', 'throws'] as const)(
     'offers a manual transcript when clipboard is %s',
     async (failure) => {

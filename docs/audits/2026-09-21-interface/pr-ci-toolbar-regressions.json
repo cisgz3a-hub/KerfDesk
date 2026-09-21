@@ -1,0 +1,195 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\LaserForge\\ui-audit-20260921\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/convert-bitmap.spec.ts",
+      "e2e/workbench.e2e.ts",
+      "--grep",
+      "native conversion preserves|busy conversion prevents|unqualified bitmap legacy",
+      "--reporter=list,json",
+      "--output",
+      "test-results"
+    ],
+    "configFile": "D:\\LaserForge\\ui-audit-20260921\\playwright.config.ts",
+    "rootDir": "D:/LaserForge/ui-audit-20260921/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/LaserForge/ui-audit-20260921/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/LaserForge/ui-audit-20260921/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "D:\\LaserForge\\ui-audit-20260921\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "convert-bitmap.spec.ts",
+      "file": "convert-bitmap.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "native conversion preserves nonzero overlap and PNG pixels through Undo and Redo",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5696,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:26:59.565Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b5df3809ce79221a6772-136de44df0f15576db03",
+          "file": "convert-bitmap.spec.ts",
+          "line": 72,
+          "column": 1
+        },
+        {
+          "title": "busy conversion prevents duplicate work, cancels with Escape, and can be retried",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12066,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:27:05.520Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b5df3809ce79221a6772-70d7ae65f20f38e06c3a",
+          "file": "convert-bitmap.spec.ts",
+          "line": 122,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "workbench.e2e.ts",
+      "file": "workbench.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "unqualified bitmap legacy fallback still reaches Trace and commits",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10614,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:27:17.712Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "45c1b7a700f723f82dee-b75f034a3fd497f7f44f",
+          "file": "workbench.e2e.ts",
+          "line": 483,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-21T17:26:58.807Z",
+    "duration": 30079.426,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

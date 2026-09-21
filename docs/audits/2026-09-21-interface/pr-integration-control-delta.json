@@ -1,0 +1,685 @@
+{
+  "metadata": {
+    "historicalSourceSnapshot": "current-source/buttons.json",
+    "historicalControlMatrix": "control-audit.json",
+    "currentSourceSnapshot": "pr-integration-source/buttons.json",
+    "auditCommit": "2b67903cad06579c16ee8cc9b92ea321b7f2177d",
+    "integratedHead": "ef151088b45a119e5dc9d192fed2e07493c950a2",
+    "sourceDigest": "c4256ab394fe578f8391e0df5346e8eb4bc6b4ac1f4f60a5a81d5a16ee9b5e29",
+    "sourceFilesScanned": 2635,
+    "historicalControls": 805,
+    "currentControls": 815,
+    "unchangedCatalogueSignatures": 796,
+    "relocatedOrReplacedHistoricalDefinitions": 9,
+    "replacementDefinitions": 8,
+    "introducedDefinitions": 11,
+    "netControlChange": 10,
+    "historicalCommands": 91,
+    "currentCommands": 94,
+    "limits": "A matching catalogue signature does not prove its implementation remains correct; old dispositions are historical and are not automatically applied to current controls. Each new verdict is limited to its cited assertions and fixture; source-reviewed availability expressions and untested conditional variants are not runtime passes.",
+    "supplementalControlDispositions": { "verified-behaviour": 18, "verified-boundary": 1 },
+    "supplementalControlEvidence": {
+      "executedCasesCited": 5,
+      "aggregateReport": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+      "aggregateTests": 68,
+      "aggregatePassed": 68,
+      "aggregateFiles": 9,
+      "reportType": "Latest executed result per unique case, with sourceReport provenance and all raw attempts retained; not a single clean 68-case run."
+    }
+  },
+  "addedCommands": ["window.theme-light", "window.theme-dark", "window.theme-system"],
+  "removedCommands": [],
+  "controls": [
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupConfirmStep.tsx:61:9",
+      "kind": "disclosure",
+      "label": "Travel speeds {state.draft.maxFeed} mm/min output limit",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "Travel speeds was clicked twice in the hybrid CNC dialog.",
+      "expectedOutcome": "Open and close Travel speeds within Essentials, exposing or hiding its fields without committing setup."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx:38:9",
+      "kind": "disclosure",
+      "label": "Controller and connection settings {guide.label} · change if needed",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "Controller and connection settings was clicked twice in the real dialog.",
+      "expectedOutcome": "Open and close Controller and connection settings in the Machine stage without committing setup."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx:41:15",
+      "kind": "input-control",
+      "label": "Select the workspace mode after saving. This does not power the toolhead.",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": ["hybrid"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {
+        "onChange": "() => dispatch({ kind: 'select-machine-kind', machineKind: kind })"
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all machine capability and active-toolhead radios update only the real setup reducer",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-corrected-vitest.json",
+          "boundary": "Real React useReducer(deviceSetupReducer) harness: checked machine choice and exact machineKinds for all three choices, then exact machineKind for both active modes. Live project object identity is unchanged. No physical toolhead switching or saved mode change is exercised."
+        }
+      ],
+      "notes": "Both active-toolhead choices were clicked after selecting Laser + CNC. Hybrid-only visibility is also source-reviewed; no non-hybrid absence assertion is claimed.",
+      "expectedOutcome": "For a hybrid draft, choose the active laser or CNC workspace mode in the setup reducer without changing the live project."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx:67:7",
+      "kind": "input-control",
+      "label": "props.label",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx:66:7"],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onChange": "props.onChange" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all machine capability and active-toolhead radios update only the real setup reducer",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-corrected-vitest.json",
+          "boundary": "Real React useReducer(deviceSetupReducer) harness: checked machine choice and exact machineKinds for all three choices, then exact machineKind for both active modes. Live project object identity is unchanged. No physical toolhead switching or saved mode change is exercised."
+        }
+      ],
+      "notes": "All three mapped machine-choice radios were clicked and checked; the live project remains unchanged.",
+      "expectedOutcome": "Select Laser only, CNC only or Laser + CNC and update the draft machineKinds to the corresponding exact set."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupMachineStep.tsx:59:9",
+      "kind": "disclosure",
+      "label": "Air assist and test fire {state.draft.airAssistCommand} · Fire {' '} {state.draft.fireControl?.enabled === true ? 'enabled' : 'off'}",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "The disclosure was round-tripped; inner Fire/air operations are outside this assertion.",
+      "expectedOutcome": "Open and close Air assist and test fire fields without triggering either output or committing setup."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:57:9",
+      "kind": "button-component-call",
+      "label": "{showAll ? 'Show fewer profiles' : `Browse all ${matches.length} profiles`}",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": ["query.trim() === '' && matches.length > 2"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "() => setShowAll(!showAll)" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Real React setup reducer harness: profile count, aria-expanded, every rendered profile-details open/close, unchanged draft before selection, chosen draft name, disabled Selected button and unchanged live project are asserted. No profile is committed to the live project by this case."
+        }
+      ],
+      "notes": "The test asserts two initial cards, more than two expanded cards, aria-expanded=true and two cards after collapse. Search-dependent visibility is source-reviewed.",
+      "expectedOutcome": "Expand the two-profile shortlist to all matching profiles, then restore the shortlist with Show fewer without committing a profile."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:101:9",
+      "kind": "button-component-call",
+      "label": "props.isActive ? `Selected ${profile.name}` : `Use ${profile.name}`",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:122:7"],
+      "availability": {
+        "disabledWhen": "props.isActive",
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "props.onUse" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Real React setup reducer harness: profile count, aria-expanded, every rendered profile-details open/close, unchanged draft before selection, chosen draft name, disabled Selected button and unchanged live project are asserted. No profile is committed to the live project by this case."
+        }
+      ],
+      "notes": "The selected card name reaches the real reducer draft; Selected.disabled is asserted. Complete profile field equality and saving the profile are outside this case.",
+      "expectedOutcome": "Use the chosen profile as the setup draft and disable the Selected action for the active profile, leaving the live project unchanged."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:121:9",
+      "kind": "disclosure",
+      "label": "Profile details",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Real React setup reducer harness: profile count, aria-expanded, every rendered profile-details open/close, unchanged draft before selection, chosen draft name, disabled Selected button and unchanged live project are asserted. No profile is committed to the live project by this case."
+        }
+      ],
+      "notes": "Every visible Profile details summary after Browse all is clicked twice; details.open and draft identity are asserted.",
+      "expectedOutcome": "Open and close profile details for each rendered matching profile without altering the draft."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupReviewSections.tsx:171:9",
+      "kind": "button-component-call",
+      "label": "`Edit ${title}`",
+      "change": "relocated-or-replaced",
+      "historicalIds": [
+        "src/ui/laser/device-setup/DeviceSetupCncReview.tsx:20:9",
+        "src/ui/laser/device-setup/DeviceSetupReviewStep.tsx:275:9"
+      ],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "onEdit" },
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx",
+          "test": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Real current Review cards in a CNC fixture; each of the five named buttons invokes a dispatch spy exactly once with its independent expected route. This is a callback boundary, not integration through the reducer or dialog navigation. The laser-only card variant is source-reviewed only."
+        }
+      ],
+      "notes": "Five CNC-fixture bindings are executed. The Laser machine output -> confirm binding is inspected source only; other machine-kind combinations are not counted as fresh passes.",
+      "expectedOutcome": "Edit routes Machine and connection to identify, Workspace and coordinates to confirm, CNC machine output/current job to cnc-setup, and Safety and optional features to options."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupReviewStep.tsx:96:7",
+      "kind": "disclosure",
+      "label": "Controller settings Optional {queuedWriteCount === 0 ? 'No writes queued' : `${queuedWriteCount} setting${queuedWriteCount === 1 ? '' : 's'} queued for Save`}",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "Round-tripped with no writes queued. Automatic expansion after queuedWriteCount becomes positive is not exercised.",
+      "expectedOutcome": "Open and close the optional Controller settings review without queuing or applying writes."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupReviewStep.tsx:123:9",
+      "kind": "disclosure",
+      "label": "Hardware commissioning checklist",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "The native disclosure is round-tripped. This does not perform or qualify any checklist task.",
+      "expectedOutcome": "Show and hide the hardware commissioning checklist as guidance without marking physical checks complete."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupShell.tsx:99:9",
+      "kind": "native-button",
+      "label": "`Go to step ${index + 1}: ${STAGES[step].title}`",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupWizard.tsx:180:9"],
+      "availability": {
+        "disabledWhen": "saving",
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "() => dispatch({ kind: 'go', step })" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual MachineSetupDialogHost, React state, setup reducer and project store; navigation, retained name draft, one Save undo entry, closed dialog and discarded later Cancel edit asserted. Platform adapter is a fixture with no serial support; Home and GRBL writes are spies and remain uncalled. Saving/invalid/firmware-write variants are not exercised by this case."
+        }
+      ],
+      "notes": "All three stepper destinations are clicked; the retained name is asserted when returning to Essentials. Disabled-during-save availability is source-reviewed.",
+      "expectedOutcome": "Navigate directly among all three named stages while preserving the edited setup draft."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupShell.tsx:125:7",
+      "kind": "button-component-call",
+      "label": "Cancel without saving",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupWizard.tsx:209:7"],
+      "availability": {
+        "disabledWhen": "props.saving",
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "props.onClose" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual MachineSetupDialogHost, React state, setup reducer and project store; navigation, retained name draft, one Save undo entry, closed dialog and discarded later Cancel edit asserted. Platform adapter is a fixture with no serial support; Home and GRBL writes are spies and remain uncalled. Saving/invalid/firmware-write variants are not exercised by this case."
+        }
+      ],
+      "notes": "After one successful save, a second name edit is cancelled; dialog idle state, unchanged saved name and unchanged undo count are asserted.",
+      "expectedOutcome": "Cancel closes Machine Setup and discards later draft edits without changing the previously saved profile or undo count."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupShell.tsx:137:11",
+      "kind": "button-component-call",
+      "label": "Back",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupWizard.tsx:216:7"],
+      "availability": {
+        "disabledWhen": "props.saving",
+        "enclosingConditions": ["not stage === 'identify'"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "() => props.dispatch({ kind: 'back' })" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual MachineSetupDialogHost, React state, setup reducer and project store; navigation, retained name draft, one Save undo entry, closed dialog and discarded later Cancel edit asserted. Platform adapter is a fixture with no serial support; Home and GRBL writes are spies and remain uncalled. Saving/invalid/firmware-write variants are not exercised by this case."
+        }
+      ],
+      "notes": "The test returns to Machine, reopens Essentials via the stepper and checks the changed name remains. First-stage absence and saving-disabled variants are source-reviewed.",
+      "expectedOutcome": "Back returns from Essentials to Machine while retaining the edited draft for a later visit."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupShell.tsx:146:11",
+      "kind": "button-component-call",
+      "label": "{saveButtonLabel(props)}",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupWizard.tsx:224:9"],
+      "availability": {
+        "disabledWhen": "!ready || props.saving",
+        "enclosingConditions": ["stage === 'review'"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "props.onSave" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual MachineSetupDialogHost, React state, setup reducer and project store; navigation, retained name draft, one Save undo entry, closed dialog and discarded later Cancel edit asserted. Platform adapter is a fixture with no serial support; Home and GRBL writes are spies and remain uncalled. Saving/invalid/firmware-write variants are not exercised by this case."
+        }
+      ],
+      "notes": "The new project device name, exactly one additional undo entry and closed dialog are asserted. Queued firmware writes, CNC-specific Save and invalid/busy states are outside this case.",
+      "expectedOutcome": "Save the valid software setup once, add one undo entry and close the dialog without homing or controller setting writes in the no-write fixture."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupShell.tsx:158:11",
+      "kind": "button-component-call",
+      "label": "{stage === 'identify' ? 'Check essentials' : 'Review setup'}",
+      "change": "relocated-or-replaced",
+      "historicalIds": ["src/ui/laser/device-setup/DeviceSetupWizard.tsx:236:9"],
+      "availability": {
+        "disabledWhen": "props.saving",
+        "enclosingConditions": ["not stage === 'review'"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": { "onClick": "() => props.dispatch({ kind: 'next' })" },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual MachineSetupDialogHost, React state, setup reducer and project store; navigation, retained name draft, one Save undo entry, closed dialog and discarded later Cancel edit asserted. Platform adapter is a fixture with no serial support; Home and GRBL writes are spies and remain uncalled. Saving/invalid/firmware-write variants are not exercised by this case."
+        }
+      ],
+      "notes": "Both forward labels are clicked and their target fieldsets are asserted. Saving-disabled availability is source-reviewed.",
+      "expectedOutcome": "Check essentials advances Machine to Essentials; Review setup advances Essentials to Review & save."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupStages.tsx:37:9",
+      "kind": "disclosure",
+      "label": "Connect and detect {connected ? 'Connected' : 'Optional · you can do this later'}",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "The disclosure is round-tripped in the fixture dialog; Connect/Detect child actions are outside this assertion.",
+      "expectedOutcome": "Open and close Connect and detect within the Machine stage without initiating a connection."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupStages.tsx:72:11",
+      "kind": "disclosure",
+      "label": "CNC job setup Stock, material, bits and tool plan",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": ["props.state.machineKind === 'cnc'"],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "The section is round-tripped with a hybrid machine in CNC mode. Laser-mode absence is source-reviewed only.",
+      "expectedOutcome": "For active CNC setup, open and close the CNC job setup section without editing or committing job settings."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupStages.tsx:90:9",
+      "kind": "disclosure",
+      "label": "Accessories and calibration Optional · keep your existing settings",
+      "change": "introduced-definition",
+      "historicalIds": [],
+      "availability": {
+        "disabledWhen": null,
+        "enclosingConditions": [],
+        "evidenceLevel": "source-reviewed unless an executed assertion is identified in notes"
+      },
+      "handlers": {},
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/MachineSetupStages.audit.test.tsx",
+          "test": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-machine-vitest.json",
+          "sourceReport": "docs/audits/2026-09-21-interface/pr-integration-machine-stages-vitest.json",
+          "boundary": "Actual dialog and native details.open round trip for all eight named summaries in a hybrid CNC fixture; live project object identity and No writes queued are asserted. Full draft equality, child settings actions, queued-write auto-opening and hardware effects are not asserted."
+        }
+      ],
+      "notes": "The section is round-tripped. Its child actions retain their separately dated audit evidence and are not re-proven by opening the section.",
+      "expectedOutcome": "Open and close Accessories and calibration in Essentials without committing optional settings."
+    }
+  ],
+  "retiredSourceLocations": [
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupCncReview.tsx:20:9",
+      "label": "Edit",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupReviewSections.tsx:171:9"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx:66:7",
+      "label": "`Configure Machine Setup for ${props.label}.`",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx:67:7"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:122:7",
+      "label": "{props.isActive ? 'Selected' : `Use ${profile.name}`}",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx:101:9"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupReviewStep.tsx:275:9",
+      "label": "Edit",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupReviewSections.tsx:171:9"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupWizard.tsx:180:9",
+      "label": "`Go to step ${index + 1}: ${STEP_TITLES[step]}`",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupShell.tsx:99:9"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupWizard.tsx:209:7",
+      "label": "Cancel without saving",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupShell.tsx:125:7"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupWizard.tsx:216:7",
+      "label": "Back",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupShell.tsx:137:11"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupWizard.tsx:224:9",
+      "label": "{saveButtonLabel(props.saving, props.firmwareWriteCount, props.state.machineKind)}",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupShell.tsx:146:11"]
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupWizard.tsx:236:9",
+      "label": "Next",
+      "currentIds": ["src/ui/laser/device-setup/DeviceSetupShell.tsx:158:11"]
+    }
+  ],
+  "changedSourceFiles": [
+    "src/core/job/fill-hatching.ts",
+    "src/core/job/first-process-point.ts",
+    "src/core/job/layer-fill.ts",
+    "src/ui/app/main.tsx",
+    "src/ui/commands/AppMenuBar.tsx",
+    "src/ui/commands/app-command-context-types.ts",
+    "src/ui/commands/command-context-helpers.ts",
+    "src/ui/commands/command-registry-test-helpers.ts",
+    "src/ui/commands/command-types.ts",
+    "src/ui/commands/use-app-commands.ts",
+    "src/ui/commands/window-panel-commands.ts",
+    "src/ui/common/ToolbarCommands.tsx",
+    "src/ui/common/use-toolbar-overflow.ts",
+    "src/ui/help/command-help-topics.ts",
+    "src/ui/help/help-topics.ts",
+    "src/ui/laser/ConnectedMachineProfile.tsx",
+    "src/ui/laser/ControllerConnectionControls.tsx",
+    "src/ui/laser/DeviceProfilePowerFields.tsx",
+    "src/ui/laser/JobActionControls.tsx",
+    "src/ui/laser/JogPadAirAssist.tsx",
+    "src/ui/laser/LaserWindow.css",
+    "src/ui/laser/device-settings-shared.tsx",
+    "src/ui/laser/device-setup/DeviceSetupCapabilityStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupCncReview.tsx",
+    "src/ui/laser/device-setup/DeviceSetupConfirmStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupConnectStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupMachineCapability.tsx",
+    "src/ui/laser/device-setup/DeviceSetupMachineStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupOptionsStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupProfilePicker.tsx",
+    "src/ui/laser/device-setup/DeviceSetupReviewSections.tsx",
+    "src/ui/laser/device-setup/DeviceSetupReviewStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupShell.tsx",
+    "src/ui/laser/device-setup/DeviceSetupStages.tsx",
+    "src/ui/laser/device-setup/DeviceSetupSummary.tsx",
+    "src/ui/laser/device-setup/DeviceSetupWizard.tsx",
+    "src/ui/laser/device-setup/device-setup-fields.css",
+    "src/ui/laser/device-setup/device-setup-flow.ts",
+    "src/ui/laser/device-setup/device-setup-review.css",
+    "src/ui/laser/device-setup/device-setup-steps.ts",
+    "src/ui/laser/device-setup/device-setup-test-helpers.ts",
+    "src/ui/laser/device-setup/device-setup.css",
+    "src/ui/laser/device-setup/machine-setup-dialog-store.ts",
+    "src/ui/laser/use-frame-action.ts",
+    "src/ui/state/canvas-motion-plan.ts",
+    "src/ui/state/frame-preparation-store.ts",
+    "src/ui/theme/app-theme.ts",
+    "src/ui/theme/canvas-color-scheme.ts",
+    "src/ui/theme/canvas-theme.ts",
+    "src/ui/theme/tokens.css",
+    "src/ui/theme/use-app-theme.ts",
+    "src/ui/tutorials/calibration-tutorials.ts",
+    "src/ui/tutorials/command-tutorials.ts",
+    "src/ui/tutorials/machine-setup-tutorials.ts",
+    "src/ui/workspace/idle-canvas-motion-worker-client.ts"
+  ],
+  "commandAudit": [
+    {
+      "id": "window.theme-light",
+      "expectedOutcome": "Dispatch setAppTheme('light') and close the menu, with no unrelated callback.",
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+          "test": "every registered application menu action 'window.theme-light' clicks through the menu to the expected outcome",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-menu-vitest.json",
+          "boundary": "Actual menu and command registry, mocked setAppTheme context callback. The separate compiled-app checks cover real Light/Dark menu effects and a seeded system preference following OS changes."
+        }
+      ],
+      "notes": "The compiled browser case also clicks this menu item and asserts the resulting canvas brightness."
+    },
+    {
+      "id": "window.theme-dark",
+      "expectedOutcome": "Dispatch setAppTheme('dark') and close the menu, with no unrelated callback.",
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+          "test": "every registered application menu action 'window.theme-dark' clicks through the menu to the expected outcome",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-menu-vitest.json",
+          "boundary": "Actual menu and command registry, mocked setAppTheme context callback. The separate compiled-app checks cover real Light/Dark menu effects and a seeded system preference following OS changes."
+        }
+      ],
+      "notes": "The compiled browser case also clicks this menu item and asserts the resulting canvas brightness."
+    },
+    {
+      "id": "window.theme-system",
+      "expectedOutcome": "Dispatch setAppTheme('system') and close the menu, with no unrelated callback.",
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+          "test": "every registered application menu action 'window.theme-system' clicks through the menu to the expected outcome",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-integration-menu-vitest.json",
+          "boundary": "Actual menu and command registry, mocked setAppTheme context callback. The separate compiled-app checks cover real Light/Dark menu effects and a seeded system preference following OS changes."
+        }
+      ],
+      "notes": "The compiled browser system-theme case seeds stored preference; it does not click Match System."
+    }
+  ]
+}

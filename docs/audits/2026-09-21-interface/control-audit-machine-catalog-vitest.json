@@ -1,0 +1,96 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 6,
+  "numPassedTests": 2,
+  "numFailedTests": 0,
+  "numPendingTests": 4,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790007146683,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture audit catalog manufacturer source disclosures open and close without changing tools",
+          "status": "passed",
+          "title": "audit catalog manufacturer source disclosures open and close without changing tools",
+          "duration": 440.4421000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture audit picture summary clicks mount and hide the selected photo without changing the project",
+          "status": "passed",
+          "title": "audit picture summary clicks mount and hide the selected photo without changing the project",
+          "duration": 72.66530000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture mounts only the requested photo, unmounts on close, and leaves project and tool state intact",
+          "status": "skipped",
+          "title": "mounts only the requested photo, unmounts on close, and leaves project and tool state intact",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture retains teaching after an image failure and recovers when the selected family changes",
+          "status": "skipped",
+          "title": "retains teaching after an image failure and recovers when the selected family changes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture shows the new custom bit kind after selection without filling dimensions or saving a tool",
+          "status": "skipped",
+          "title": "shows the new custom bit kind after selection without filling dimensions or saving a tool",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncToolPicture"],
+          "fullName": "CncToolPicture does not load the catalog pictures until a family is expanded",
+          "status": "skipped",
+          "title": "does not load the catalog pictures until a family is expanded",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007176524,
+      "endTime": 1790007177037.6653,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/machine/CncToolPicture.test.tsx"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ test('loads the hashed production bundle and edits script through its outline wo
   expect(scriptSources.some((source) => /^(?:\.\/|\/)assets\/.+\.js$/u.test(source))).toBe(true);
   expect(scriptSources.some((source) => source.includes('/src/'))).toBe(false);
 
-  await page.getByRole('button', { name: 'Text...', exact: true }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await page.getByLabel('KerfDesk workspace', { exact: true }).click({
     position: { x: 180, y: 220 },
   });

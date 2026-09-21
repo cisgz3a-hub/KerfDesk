@@ -101,6 +101,25 @@ afterEach(() => {
 });
 
 describe('SuperConsoleLauncher / SuperConsoleDialog', () => {
+  it('audit Follow latest toggles its preference without hiding or deleting transcript lines', async () => {
+    useLaserStore.setState({ transcript: [transcriptEntry(1), transcriptEntry(2)] });
+    const { host, unmount } = await renderLauncher();
+    await openDialog(host);
+    try {
+      const follow = document.body.querySelector<HTMLInputElement>(
+        'input[title="Keep the transcript scrolled to the newest visible line."]',
+      )!;
+      expect(follow.checked).toBe(true);
+      await act(async () => follow.click());
+      expect(follow.checked).toBe(false);
+      expect(visibleRows()).toBe(2);
+      await act(async () => follow.click());
+      expect(follow.checked).toBe(true);
+      expect(useLaserStore.getState().transcript).toHaveLength(2);
+    } finally {
+      await unmount();
+    }
+  });
   it('opens the dialog and shows the full transcript, beyond the docked 150-entry cap', async () => {
     const entries = Array.from({ length: 201 }, (_, i) => transcriptEntry(i + 1));
     useLaserStore.setState({ transcript: entries } as Partial<

@@ -1,0 +1,2591 @@
+{
+  "numTotalTestSuites": 88,
+  "numPassedTestSuites": 88,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 220,
+  "numPassedTests": 220,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005498571,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner offers one nonblocking recovery choice in StrictMode without stealing focus",
+          "status": "passed",
+          "title": "offers one nonblocking recovery choice in StrictMode without stealing focus",
+          "duration": 63.83030000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner restores only on request and preserves a dirty durable copy before clearing its source",
+          "status": "passed",
+          "title": "restores only on request and preserves a dirty durable copy before clearing its source",
+          "duration": 19.47499999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner hides the choice without discarding or rewriting the backup",
+          "status": "passed",
+          "title": "hides the choice without discarding or rewriting the backup",
+          "duration": 9.323899999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner withdraws recovery after editing and cannot replace the current project",
+          "status": "passed",
+          "title": "withdraws recovery after editing and cannot replace the current project",
+          "duration": 8.69190000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner withdraws recovery after opening an empty project and cannot replace the current project",
+          "status": "passed",
+          "title": "withdraws recovery after opening an empty project and cannot replace the current project",
+          "duration": 6.448700000000372,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner withdraws recovery after New Project and cannot replace the current project",
+          "status": "passed",
+          "title": "withdraws recovery after New Project and cannot replace the current project",
+          "duration": 5.548699999999826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AutosaveRecoveryBanner"],
+          "fullName": "AutosaveRecoveryBanner does not offer a delayed autosave read after New Project",
+          "status": "passed",
+          "title": "does not offer a delayed autosave read after New Project",
+          "duration": 3.0473000000001775,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005612285,
+      "endTime": 1790005612401.0474,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/AutosaveRecoveryBanner.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["desktop close recovery notice"],
+          "fullName": "desktop close recovery notice shows a nonmodal pending stop with a working Keep app open control",
+          "status": "passed",
+          "title": "shows a nonmodal pending stop with a working Keep app open control",
+          "duration": 53.991599999999835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["desktop close recovery notice"],
+          "fullName": "desktop close recovery notice keeps an unconfirmed stop warning readable until explicit acknowledgement",
+          "status": "passed",
+          "title": "keeps an unconfirmed stop warning readable until explicit acknowledgement",
+          "duration": 9.523899999999685,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005661723,
+      "endTime": 1790005661786.524,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/DesktopCloseNotice.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["web G-code prebuild dialog"],
+          "fullName": "web G-code prebuild dialog does not select a destination until complete bytes are ready and the operator clicks",
+          "status": "passed",
+          "title": "does not select a destination until complete bytes are ready and the operator clicks",
+          "duration": 174.57700000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["electron G-code prebuild dialog"],
+          "fullName": "electron G-code prebuild dialog does not select a destination until complete bytes are ready and the operator clicks",
+          "status": "passed",
+          "title": "does not select a destination until complete bytes are ready and the operator clicks",
+          "duration": 83.55450000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["G-code save placement units (ADR-327)"],
+          "fullName": "G-code save placement units (ADR-327) places a Current Position export with the controller report units",
+          "status": "passed",
+          "title": "places a Current Position export with the controller report units",
+          "duration": 114.05289999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005603126,
+      "endTime": 1790005603499.053,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/GcodeSaveDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ProjectBedReconciliationBanner"],
+          "fullName": "ProjectBedReconciliationBanner discloses machine and bed changes with both nonblocking choices",
+          "status": "passed",
+          "title": "discloses machine and bed changes with both nonblocking choices",
+          "duration": 38.57179999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005673390,
+      "endTime": 1790005673428.5718,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/ProjectBedReconciliationBanner.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Workspace chrome keyboard ownership"],
+          "fullName": "Workspace chrome keyboard ownership consumes the unused arrow axis before and after restoring collapsed tabs (Shift=false)",
+          "status": "passed",
+          "title": "consumes the unused arrow axis before and after restoring collapsed tabs (Shift=false)",
+          "duration": 127.46209999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace chrome keyboard ownership"],
+          "fullName": "Workspace chrome keyboard ownership consumes the unused arrow axis before and after restoring collapsed tabs (Shift=true)",
+          "status": "passed",
+          "title": "consumes the unused arrow axis before and after restoring collapsed tabs (Shift=true)",
+          "duration": 33.36449999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace chrome keyboard ownership"],
+          "fullName": "Workspace chrome keyboard ownership switches sidebar tabs without editing selected artwork (Shift=false)",
+          "status": "passed",
+          "title": "switches sidebar tabs without editing selected artwork (Shift=false)",
+          "duration": 41.33809999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace chrome keyboard ownership"],
+          "fullName": "Workspace chrome keyboard ownership switches sidebar tabs without editing selected artwork (Shift=true)",
+          "status": "passed",
+          "title": "switches sidebar tabs without editing selected artwork (Shift=true)",
+          "duration": 41.3135999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace chrome keyboard ownership"],
+          "fullName": "Workspace chrome keyboard ownership lets native status scrolling handle navigation keys without changing artwork",
+          "status": "passed",
+          "title": "lets native status scrolling handle navigation keys without changing artwork",
+          "duration": 22.64800000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005598242,
+      "endTime": 1790005598508.648,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/workspace-chrome-shortcuts.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels offers independently collapsible, resizable desktop panels",
+          "status": "passed",
+          "title": "offers independently collapsible, resizable desktop panels",
+          "duration": 62.4385999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels shrinks collapsed rail shells instead of leaving blank resizable columns",
+          "status": "passed",
+          "title": "shrinks collapsed rail shells instead of leaving blank resizable columns",
+          "duration": 15.379900000000816,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels keeps the stored machine-panel preference while a job is active",
+          "status": "passed",
+          "title": "keeps the stored machine-panel preference while a job is active",
+          "duration": 9.285100000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels uses one tabbed rail at the compact breakpoint",
+          "status": "passed",
+          "title": "uses one tabbed rail at the compact breakpoint",
+          "duration": 22.417900000000373,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels reopens a hidden desktop panel when another surface routes to it",
+          "status": "passed",
+          "title": "reopens a hidden desktop panel when another surface routes to it",
+          "duration": 12.394099999999526,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels keeps one job dock while switching tabs and opens the selected collapsed rail",
+          "status": "passed",
+          "title": "keeps one job dock while switching tabs and opens the selected collapsed rail",
+          "duration": 16.82759999999962,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels reclaims compact width when layers collapses and restores it from its tab",
+          "status": "passed",
+          "title": "reclaims compact width when layers collapses and restores it from its tab",
+          "duration": 16.36909999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels reclaims compact width when machine collapses and restores it from its tab",
+          "status": "passed",
+          "title": "reclaims compact width when machine collapses and restores it from its tab",
+          "duration": 14.317299999999705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels restores a collapsed panel with the vertical tab key ArrowDown",
+          "status": "passed",
+          "title": "restores a collapsed panel with the vertical tab key ArrowDown",
+          "duration": 13.500099999999293,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels restores a collapsed panel with the vertical tab key ArrowUp",
+          "status": "passed",
+          "title": "restores a collapsed panel with the vertical tab key ArrowUp",
+          "duration": 12.595800000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels restores a collapsed panel with the vertical tab key End",
+          "status": "passed",
+          "title": "restores a collapsed panel with the vertical tab key End",
+          "duration": 10.34269999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels restores a collapsed panel with the vertical tab key Home",
+          "status": "passed",
+          "title": "restores a collapsed panel with the vertical tab key Home",
+          "duration": 9.180199999999786,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels collapses and restores the compact column through the shared Window/F12 action and reset",
+          "status": "passed",
+          "title": "collapses and restores the compact column through the shared Window/F12 action and reset",
+          "duration": 13.19669999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels preserves the manual spacious preference through a temporarily narrow window",
+          "status": "passed",
+          "title": "preserves the manual spacious preference through a temporarily narrow window",
+          "duration": 11.59439999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceSidePanels"],
+          "fullName": "WorkspaceSidePanels reset layout reopens hidden desktop panels and restores automatic sizing",
+          "status": "passed",
+          "title": "reset layout reopens hidden desktop panels and restores automatic sizing",
+          "duration": 11.396200000000135,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005608009,
+      "endTime": 1790005608261.3962,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/WorkspaceSidePanels.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar renders toggle commands as checked menu items",
+          "status": "passed",
+          "title": "renders toggle commands as checked menu items",
+          "duration": 59.065399999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar renders command families and runs enabled commands",
+          "status": "passed",
+          "title": "renders command families and runs enabled commands",
+          "duration": 17.347499999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar labels the laser command family with the machine noun (ADR-101 §7)",
+          "status": "passed",
+          "title": "labels the laser command family with the machine noun (ADR-101 §7)",
+          "duration": 8.604599999999891,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar leaves disabled commands disabled with a reason",
+          "status": "passed",
+          "title": "leaves disabled commands disabled with a reason",
+          "duration": 10.098199999999906,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar marks menu families and command items with stable help ids",
+          "status": "passed",
+          "title": "marks menu families and command items with stable help ids",
+          "duration": 17.856199999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar keeps only one top menu family open at a time",
+          "status": "passed",
+          "title": "keeps only one top menu family open at a time",
+          "duration": 14.376299999999901,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar closes the open top menu when the user clicks outside the menu bar",
+          "status": "passed",
+          "title": "closes the open top menu when the user clicks outside the menu bar",
+          "duration": 10.762900000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar renders separators between Tools menu groups and hides none of the commands",
+          "status": "passed",
+          "title": "renders separators between Tools menu groups and hides none of the commands",
+          "duration": 19.31730000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar renders no separators in a family without a grouping layout",
+          "status": "passed",
+          "title": "renders no separators in a family without a grouping layout",
+          "duration": 8.33680000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar closes the open top menu when Escape is pressed",
+          "status": "passed",
+          "title": "closes the open top menu when Escape is pressed",
+          "duration": 8.840800000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["AppMenuBar"],
+          "fullName": "AppMenuBar implements menubar arrow, Home/End, and menu-item navigation",
+          "status": "passed",
+          "title": "implements menubar arrow, Home/End, and menu-item navigation",
+          "duration": 30.47700000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005529652,
+      "endTime": 1790005529857.477,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/AppMenuBar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog submits point rotation count and signed total angle",
+          "status": "passed",
+          "title": "submits point rotation count and signed total angle",
+          "duration": 86.9190000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog cancels without applying an array",
+          "status": "passed",
+          "title": "cancels without applying an array",
+          "duration": 11.46069999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005637607,
+      "endTime": 1790005637705.4607,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/ArrayDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CloseOpenFillContoursDialog"],
+          "fullName": "CloseOpenFillContoursDialog previews tolerance repair counts and applies only after confirmation",
+          "status": "passed",
+          "title": "previews tolerance repair counts and applies only after confirmation",
+          "duration": 74.80380000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005646770,
+      "endTime": 1790005646844.8037,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/CloseOpenFillContoursDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar keeps all transform fields available with the anchor grid collapsed",
+          "status": "passed",
+          "title": "keeps all transform fields available with the anchor grid collapsed",
+          "duration": 90.14519999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar snaps a refused edit back to the value the scene actually holds",
+          "status": "passed",
+          "title": "snaps a refused edit back to the value the scene actually holds",
+          "duration": 34.35279999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar renders disabled numeric fields when nothing is selected",
+          "status": "passed",
+          "title": "renders disabled numeric fields when nothing is selected",
+          "duration": 17.8753999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar explains the 9-point anchor buttons on hover",
+          "status": "passed",
+          "title": "explains the 9-point anchor buttons on hover",
+          "duration": 41.3791999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar stores the selected anchor for numeric fields and canvas transforms",
+          "status": "passed",
+          "title": "stores the selected anchor for numeric fields and canvas transforms",
+          "duration": 36.56959999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar opens the selected anchor with the keyboard and navigates all nine positions",
+          "status": "passed",
+          "title": "opens the selected anchor with the keyboard and navigates all nine positions",
+          "duration": 61.08470000000034,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar dismisses the anchor picker with Escape without changing the anchor",
+          "status": "passed",
+          "title": "dismisses the anchor picker with Escape without changing the anchor",
+          "duration": 44.85490000000027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar commits an exact X position edit through the selection transform path",
+          "status": "passed",
+          "title": "commits an exact X position edit through the selection transform path",
+          "duration": 18.15099999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar marks a blank draft invalid without coercing it to zero or creating undo history",
+          "status": "passed",
+          "title": "marks a blank draft invalid without coercing it to zero or creating undo history",
+          "duration": 15.585700000000543,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar treats step as an editing increment rather than refusing finite values",
+          "status": "passed",
+          "title": "treats step as an editing increment rather than refusing finite values",
+          "duration": 14.839399999999841,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar starts with the aspect-ratio lock off",
+          "status": "passed",
+          "title": "starts with the aspect-ratio lock off",
+          "duration": 11.336299999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["NumericEditsBar"],
+          "fullName": "NumericEditsBar edits width without rescaling height by default",
+          "status": "passed",
+          "title": "edits width without rescaling height by default",
+          "duration": 11.968499999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005527452,
+      "endTime": 1790005527850.9685,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/NumericEditsBar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ProjectNotesDialog"],
+          "fullName": "ProjectNotesDialog edits project notes and submits the new text",
+          "status": "passed",
+          "title": "edits project notes and submits the new text",
+          "duration": 81.91120000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005658075,
+      "endTime": 1790005658156.9111,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/ProjectNotesDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["QuickNestDialog"],
+          "fullName": "QuickNestDialog defaults to outline nesting and submits an explicit method choice",
+          "status": "passed",
+          "title": "defaults to outline nesting and submits an explicit method choice",
+          "duration": 77.16609999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005644003,
+      "endTime": 1790005644080.166,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/QuickNestDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["UndoHistoryDialog"],
+          "fullName": "UndoHistoryDialog shows current, undo, and redo history summaries",
+          "status": "passed",
+          "title": "shows current, undo, and redo history summaries",
+          "duration": 60.48019999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["UndoHistoryDialog"],
+          "fullName": "UndoHistoryDialog runs undo and redo actions from the dialog",
+          "status": "passed",
+          "title": "runs undo and redo actions from the dialog",
+          "duration": 16.562200000000075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005645443,
+      "endTime": 1790005645519.5623,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/UndoHistoryDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar shows empty-workspace commands in a vertical dropdown without selection-only actions",
+          "status": "passed",
+          "title": "shows empty-workspace commands in a vertical dropdown without selection-only actions",
+          "duration": 59.249000000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar runs enabled quick-bar commands through the command object and closes",
+          "status": "passed",
+          "title": "runs enabled quick-bar commands through the command object and closes",
+          "duration": 15.697300000000041,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar shows Fill Selection in the selected-object dropdown",
+          "status": "passed",
+          "title": "shows Fill Selection in the selected-object dropdown",
+          "duration": 7.447300000000041,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar keeps disabled command buttons inert",
+          "status": "passed",
+          "title": "keeps disabled command buttons inert",
+          "duration": 8.367600000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar expands context More actions inside the vertical dropdown and excludes laser machine commands",
+          "status": "passed",
+          "title": "expands context More actions inside the vertical dropdown and excludes laser machine commands",
+          "duration": 18.339899999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar clamps the floating surface inside the viewport",
+          "status": "passed",
+          "title": "clamps the floating surface inside the viewport",
+          "duration": 6.494500000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005614073,
+      "endTime": 1790005614188.4944,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/WorkspaceContextBar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) renders nothing without a pending request",
+          "status": "passed",
+          "title": "renders nothing without a pending request",
+          "duration": 27.330600000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) shows the three-way prompt naming the project and action",
+          "status": "passed",
+          "title": "shows the three-way prompt naming the project and action",
+          "duration": 52.228599999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) gives Save the initial focus and registers a modal (shortcut gate)",
+          "status": "passed",
+          "title": "gives Save the initial focus and registers a modal (shortcut gate)",
+          "duration": 14.504599999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) clicking Save resolves save and closes",
+          "status": "passed",
+          "title": "clicking Save resolves save and closes",
+          "duration": 22.46699999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) clicking Don't Save resolves discard and closes",
+          "status": "passed",
+          "title": "clicking Don't Save resolves discard and closes",
+          "duration": 13.257700000000114,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) clicking Cancel resolves cancel and closes",
+          "status": "passed",
+          "title": "clicking Cancel resolves cancel and closes",
+          "duration": 12.813400000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) Escape resolves cancel",
+          "status": "passed",
+          "title": "Escape resolves cancel",
+          "duration": 11.038700000000063,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ConfirmSaveDialog (LU18)"],
+          "fullName": "ConfirmSaveDialog (LU18) fails a second overlapping request closed instead of replacing the dialog",
+          "status": "passed",
+          "title": "fails a second overlapping request closed instead of replacing the dialog",
+          "duration": 11.360400000000027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005625662,
+      "endTime": 1790005625827.3604,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/ConfirmSaveDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DesktopPreviewUpdateButton"],
+          "fullName": "DesktopPreviewUpdateButton stays visually absent when no newer Preview exists",
+          "status": "passed",
+          "title": "stays visually absent when no newer Preview exists",
+          "duration": 35.5299,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesktopPreviewUpdateButton"],
+          "fullName": "DesktopPreviewUpdateButton announces and links a newer Preview to the fixed official page",
+          "status": "passed",
+          "title": "announces and links a newer Preview to the fixed official page",
+          "duration": 9.18119999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DesktopPreviewUpdateButton"],
+          "fullName": "DesktopPreviewUpdateButton remains passive and available while a machine job is active",
+          "status": "passed",
+          "title": "remains passive and available while a machine job is active",
+          "duration": 4.815200000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005650026,
+      "endTime": 1790005650075.8152,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/DesktopPreviewUpdateButton.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DownloadDesktopLink"],
+          "fullName": "DownloadDesktopLink links directly to the public release repository in a new tab",
+          "status": "passed",
+          "title": "links directly to the public release repository in a new tab",
+          "duration": 36.45640000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DownloadDesktopLink"],
+          "fullName": "DownloadDesktopLink is hidden inside the desktop app (id=electron)",
+          "status": "passed",
+          "title": "is hidden inside the desktop app (id=electron)",
+          "duration": 3.9435000000000855,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005668060,
+      "endTime": 1790005668100.9436,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/DownloadDesktopLink.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary renders children when no error is thrown",
+          "status": "passed",
+          "title": "renders children when no error is thrown",
+          "duration": 27.593000000000075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary swaps in the CrashScreen when a child throws",
+          "status": "passed",
+          "title": "swaps in the CrashScreen when a child throws",
+          "duration": 35.49000000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary crash screen includes a Try again button and a Copy diagnostic button",
+          "status": "passed",
+          "title": "crash screen includes a Try again button and a Copy diagnostic button",
+          "duration": 8.999000000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary reassures the user no data leaves the machine",
+          "status": "passed",
+          "title": "reassures the user no data leaves the machine",
+          "duration": 7.218600000000151,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary shows a working ABORT in the crash screen when motion was live (F60/F65)",
+          "status": "passed",
+          "title": "shows a working ABORT in the crash screen when motion was live (F60/F65)",
+          "duration": 10.80340000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary omits the crash-screen ABORT when nothing was moving",
+          "status": "passed",
+          "title": "omits the crash-screen ABORT when nothing was moving",
+          "duration": 9.837500000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ErrorBoundary"],
+          "fullName": "ErrorBoundary falls back to a manual-copy textarea instead of a blocking prompt (H13)",
+          "status": "passed",
+          "title": "falls back to a manual-copy textarea instead of a blocking prompt (H13)",
+          "duration": 11.635700000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005624247,
+      "endTime": 1790005624358.6357,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/ErrorBoundary.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["InstallButton"],
+          "fullName": "InstallButton is hidden until the browser offers an install prompt",
+          "status": "passed",
+          "title": "is hidden until the browser offers an install prompt",
+          "duration": 25.55690000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["InstallButton"],
+          "fullName": "InstallButton shows an Install button after beforeinstallprompt fires",
+          "status": "passed",
+          "title": "shows an Install button after beforeinstallprompt fires",
+          "duration": 14.113999999999805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["InstallButton"],
+          "fullName": "InstallButton prompts the browser and hides itself when clicked",
+          "status": "passed",
+          "title": "prompts the browser and hides itself when clicked",
+          "duration": 14.676300000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005666772,
+      "endTime": 1790005666826.6763,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/InstallButton.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton renders nothing when no update is ready",
+          "status": "passed",
+          "title": "renders nothing when no update is ready",
+          "duration": 42.5599000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton shows the Update button when an update is ready and the machine is idle",
+          "status": "passed",
+          "title": "shows the Update button when an update is ready and the machine is idle",
+          "duration": 8.74169999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton applies the update through the staged callback on click",
+          "status": "passed",
+          "title": "applies the update through the staged callback on click",
+          "duration": 12.421399999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable while a job is streaming",
+          "status": "passed",
+          "title": "keeps the button reachable while a job is streaming",
+          "duration": 6.0448999999998705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable while a job is paused",
+          "status": "passed",
+          "title": "keeps the button reachable while a job is paused",
+          "duration": 4.532899999999927,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable while a job is done (awaiting Idle cleanup)",
+          "status": "passed",
+          "title": "keeps the button reachable while a job is done (awaiting Idle cleanup)",
+          "duration": 3.879000000000133,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable while a job is errored (needs operator handling)",
+          "status": "passed",
+          "title": "keeps the button reachable while a job is errored (needs operator handling)",
+          "duration": 3.0545999999999367,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable during a terminal safety notice",
+          "status": "passed",
+          "title": "keeps the button reachable during a terminal safety notice",
+          "duration": 5.164299999999912,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable during a motion operation",
+          "status": "passed",
+          "title": "keeps the button reachable during a motion operation",
+          "duration": 4.098400000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the button reachable during a controller operation",
+          "status": "passed",
+          "title": "keeps the button reachable during a controller operation",
+          "duration": 8.472400000000107,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton mounts an empty polite live region before any update is ready",
+          "status": "passed",
+          "title": "mounts an empty polite live region before any update is ready",
+          "duration": 2.843800000000101,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton announces readiness through the live region",
+          "status": "passed",
+          "title": "announces readiness through the live region",
+          "duration": 2.7206999999998516,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PwaUpdateButton"],
+          "fullName": "PwaUpdateButton keeps the live region truthful while a job is active",
+          "status": "passed",
+          "title": "keeps the live region truthful while a job is active",
+          "duration": 2.3034999999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005616834,
+      "endTime": 1790005616941.3035,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/PwaUpdateButton.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["SaveFilenamePanel"],
+          "fullName": "SaveFilenamePanel keeps the filename editable without registering a blocking modal",
+          "status": "passed",
+          "title": "keeps the filename editable without registering a blocking modal",
+          "duration": 53.783100000000104,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SaveFilenamePanel"],
+          "fullName": "SaveFilenamePanel queues overlapping save names instead of replacing either request",
+          "status": "passed",
+          "title": "queues overlapping save names instead of replacing either request",
+          "duration": 14.39370000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005636241,
+      "endTime": 1790005636309.3938,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/SaveFilenamePanel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar scrolls telemetry without moving the fixed action rail",
+          "status": "passed",
+          "title": "scrolls telemetry without moving the fixed action rail",
+          "duration": 94.19210000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar renders clean status text for empty workspace and bed size",
+          "status": "passed",
+          "title": "renders clean status text for empty workspace and bed size",
+          "duration": 39.48900000000049,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar renders selected-object dimensions without corrupted separators",
+          "status": "passed",
+          "title": "renders selected-object dimensions without corrupted separators",
+          "duration": 12.913499999999658,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar summarizes grouped and locked artwork for Lane 9 workspace workflows",
+          "status": "passed",
+          "title": "summarizes grouped and locked artwork for Lane 9 workspace workflows",
+          "duration": 23.55289999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar hosts the Update button in the fixed action rail when an update is ready",
+          "status": "passed",
+          "title": "hosts the Update button in the fixed action rail when an update is ready",
+          "duration": 24.660799999999654,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar shows no Update button when no update is ready",
+          "status": "passed",
+          "title": "shows no Update button when no update is ready",
+          "duration": 12.87159999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["StatusBar"],
+          "fullName": "StatusBar warns when selected Fill-layer vector geometry has open contours",
+          "status": "passed",
+          "title": "warns when selected Fill-layer vector geometry has open contours",
+          "duration": 24.482500000000073,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005591822,
+      "endTime": 1790005592054.4824,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/StatusBar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toasts accessibility"],
+          "fullName": "Toasts accessibility names the notification region and exposes severity without relying on color",
+          "status": "passed",
+          "title": "names the notification region and exposes severity without relying on color",
+          "duration": 60.890499999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005669607,
+      "endTime": 1790005669667.8904,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toasts.accessibility.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toast placement"],
+          "fullName": "Toast placement follows available canvas geometry when the workspace shrinks above live controls",
+          "status": "passed",
+          "title": "follows available canvas geometry when the workspace shrinks above live controls",
+          "duration": 66.22949999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toast placement"],
+          "fullName": "Toast placement lifts the stack clear of the live motion popup and restores when it closes",
+          "status": "passed",
+          "title": "lifts the stack clear of the live motion popup and restores when it closes",
+          "duration": 12.562599999999748,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toast placement"],
+          "fullName": "Toast placement reserves a row inside the modal and dismisses without submitting its form",
+          "status": "passed",
+          "title": "reserves a row inside the modal and dismisses without submitting its form",
+          "duration": 26.55709999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toast placement"],
+          "fullName": "Toast placement moves the same notices into newly opened modals and restores the canvas placement on close",
+          "status": "passed",
+          "title": "moves the same notices into newly opened modals and restores the canvas placement on close",
+          "duration": 15.544199999999819,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005619101,
+      "endTime": 1790005619222.5442,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toasts.placement.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toasts"],
+          "fullName": "Toasts renders the pre-emit advisory a .rd save raises, so the operator can read it",
+          "status": "passed",
+          "title": "renders the pre-emit advisory a .rd save raises, so the operator can read it",
+          "duration": 61.85370000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toasts"],
+          "fullName": "Toasts renders nothing when no toast has been raised",
+          "status": "passed",
+          "title": "renders nothing when no toast has been raised",
+          "duration": 3.237999999999829,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toasts"],
+          "fullName": "Toasts renders only the newest three toasts of a burst",
+          "status": "passed",
+          "title": "renders only the newest three toasts of a burst",
+          "duration": 8.934899999999743,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005622882,
+      "endTime": 1790005622955.9348,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toasts.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar Box Generator"],
+          "fullName": "Toolbar Box Generator shows Box Generator in the create tools group and opens the generator dialog",
+          "status": "passed",
+          "title": "shows Box Generator in the create tools group and opens the generator dialog",
+          "duration": 269.2319000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005642357,
+      "endTime": 1790005642626.232,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.box-generator.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "returns dialog focus to More when resizing removes the original toolbar opener",
+          "status": "passed",
+          "title": "returns dialog focus to More when resizing removes the original toolbar opener",
+          "duration": 89.82529999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005653460,
+      "endTime": 1790005653549.8252,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.dialog-focus.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation provides an icon and accessible name for every registered toolbar command",
+          "status": "passed",
+          "title": "provides an icon and accessible name for every registered toolbar command",
+          "duration": 134.53949999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation shows a readable action label alongside the primary file icon",
+          "status": "passed",
+          "title": "shows a readable action label alongside the primary file icon",
+          "duration": 9.543999999999869,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation keeps specialist labels available in More",
+          "status": "passed",
+          "title": "keeps specialist labels available in More",
+          "duration": 15.048999999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005629228,
+      "endTime": 1790005629387.049,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.icons.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions prioritises the file-to-preview workflow and reveals image actions with an image selection",
+          "status": "passed",
+          "title": "prioritises the file-to-preview workflow and reveals image actions with an image selection",
+          "duration": 316.0007999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions keeps extra commands reachable with registry help, shortcuts, disabled state and dispatch",
+          "status": "passed",
+          "title": "keeps extra commands reachable with registry help, shortcuts, disabled state and dispatch",
+          "duration": 49.740999999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions moves tools into More as available width shrinks and restores them as it grows",
+          "status": "passed",
+          "title": "moves tools into More as available width shrinks and restores them as it grows",
+          "duration": 59.28650000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions supports keyboard opening, skips disabled commands, and restores focus on Escape",
+          "status": "passed",
+          "title": "supports keyboard opening, skips disabled commands, and restores focus on Escape",
+          "duration": 40.9402999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions closes on outside pointer input without running a command or stealing focus",
+          "status": "passed",
+          "title": "closes on outside pointer input without running a command or stealing focus",
+          "duration": 49.118899999999485,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions clamps the menu inside a short viewport and repositions on resize",
+          "status": "passed",
+          "title": "clamps the menu inside a short viewport and repositions on resize",
+          "duration": 36.81970000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005582534,
+      "endTime": 1790005583086.8196,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.overflow.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar Convert to Bitmap"],
+          "fullName": "Toolbar Convert to Bitmap opens the LightBurn-style options dialog and passes Render Type plus DPI",
+          "status": "passed",
+          "title": "opens the LightBurn-style options dialog and passes Render Type plus DPI",
+          "duration": 370.0477000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) shows the current project name alongside the toolbar utilities",
+          "status": "passed",
+          "title": "shows the current project name alongside the toolbar utilities",
+          "duration": 20.295099999999366,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) shows the Install-app button once the browser offers a PWA install prompt",
+          "status": "passed",
+          "title": "shows the Install-app button once the browser offers a PWA install prompt",
+          "duration": 17.711699999999837,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) lists every shipped shortcut family, including the late arrivals",
+          "status": "passed",
+          "title": "lists every shipped shortcut family, including the late arrivals",
+          "duration": 12.176299999999173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) opens the Keyboard Shortcuts dialog from the toolbar button",
+          "status": "passed",
+          "title": "opens the Keyboard Shortcuts dialog from the toolbar button",
+          "duration": 75.97979999999734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)",
+          "status": "passed",
+          "title": "labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)",
+          "duration": 7.4703000000008615,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar separators"],
+          "fullName": "Toolbar separators renders separators only between non-empty file and preview groups",
+          "status": "passed",
+          "title": "renders separators only between non-empty file and preview groups",
+          "duration": 12.951100000002043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar separators"],
+          "fullName": "Toolbar separators renders no group separator and no double separator when only one group is visible",
+          "status": "passed",
+          "title": "renders no group separator and no double separator when only one group is visible",
+          "duration": 34.15200000000186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar command buttons"],
+          "fullName": "Toolbar command buttons runs toolbar clicks through the command registry command object",
+          "status": "passed",
+          "title": "runs toolbar clicks through the command registry command object",
+          "duration": 18.06079999999929,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar command buttons"],
+          "fullName": "Toolbar command buttons marks toolbar command buttons with stable help ids",
+          "status": "passed",
+          "title": "marks toolbar command buttons with stable help ids",
+          "duration": 12.59939999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005561822,
+      "endTime": 1790005562406.5994,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Workspace layout menu"],
+          "fullName": "Workspace layout menu opens a checked radio menu with the saved choice and exposes the current value",
+          "status": "passed",
+          "title": "opens a checked radio menu with the saved choice and exposes the current value",
+          "duration": 67.37339999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace layout menu"],
+          "fullName": "Workspace layout menu navigates without changing preferences, then saves and restores the chosen layout",
+          "status": "passed",
+          "title": "navigates without changing preferences, then saves and restores the chosen layout",
+          "duration": 42.917000000000144,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Workspace layout menu"],
+          "fullName": "Workspace layout menu dismisses on Escape, Tab and outside input without changing the choice",
+          "status": "passed",
+          "title": "dismisses on Escape, Tab and outside input without changing the choice",
+          "duration": 29.535700000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005615452,
+      "endTime": 1790005615591.5356,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/WorkspaceLayoutSelect.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow opens the contextual lesson, navigates, restarts and records completion in the library",
+          "status": "passed",
+          "title": "opens the contextual lesson, navigates, restarts and records completion in the library",
+          "duration": 1206.7200000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow resumes saved progress after closing and safely clamps a saved step from an older lesson",
+          "status": "passed",
+          "title": "resumes saved progress after closing and safely clamps a saved step from an older lesson",
+          "duration": 254.95470000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow combines search, category and machine filters and resets all three after no results",
+          "status": "passed",
+          "title": "combines search, category and machine filters and resets all three after no results",
+          "duration": 563.2618000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow keeps a nested dialog draft and project intact and restores its tutorial opener on Escape",
+          "status": "passed",
+          "title": "keeps a nested dialog draft and project intact and restores its tutorial opener on Escape",
+          "duration": 295.2481000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow returns to Help after opening the tutorial library through its ordinary menu command",
+          "status": "passed",
+          "title": "returns to Help after opening the tutorial library through its ordinary menu command",
+          "duration": 157.87839999999778,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow makes a disabled command lesson usable without running that command or losing menu focus",
+          "status": "passed",
+          "title": "makes a disabled command lesson usable without running that command or losing menu focus",
+          "duration": 85.97609999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005513688,
+      "endTime": 1790005516252.976,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialHost.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader mounts no images while closed or browsing, and only the selected lesson picture when open",
+          "status": "passed",
+          "title": "mounts no images while closed or browsing, and only the selected lesson picture when open",
+          "duration": 459.06230000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader maps the four registration instructions to outline, outline, placement and engraving",
+          "status": "passed",
+          "title": "maps the four registration instructions to outline, outline, placement and engraving",
+          "duration": 66.60899999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader falls back to SVG after failure while keeping instructions and navigation usable",
+          "status": "passed",
+          "title": "falls back to SVG after failure while keeping instructions and navigation usable",
+          "duration": 36.26839999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader retries a failed picture with one Show picture click and can switch views afterwards",
+          "status": "passed",
+          "title": "retries a failed picture with one Show picture click and can switch views afterwards",
+          "duration": 54.14170000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal registration step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal registration step inside its picture frames",
+          "duration": 87.81299999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-cut step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-cut step inside its picture frames",
+          "duration": 75.68330000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-fill step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-fill step inside its picture frames",
+          "duration": 36.30769999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-image step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-image step inside its picture frames",
+          "duration": 33.41889999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-pocket step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-pocket step inside its picture frames",
+          "duration": 44.35359999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-vcarve step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-vcarve step inside its picture frames",
+          "duration": 38.64399999999932,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal box step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal box step inside its picture frames",
+          "duration": 41.72810000000027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-profile step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-profile step inside its picture frames",
+          "duration": 35.17740000000049,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-tabs step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-tabs step inside its picture frames",
+          "duration": 37.82890000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader clamps stale saved progress to the last written step and its mapped picture",
+          "status": "passed",
+          "title": "clamps stale saved progress to the last written step and its mapped picture",
+          "duration": 14.45219999999972,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader does not mutate project, history or active tool through picture controls and failure recovery",
+          "status": "passed",
+          "title": "does not mutate project, history or active tool through picture controls and failure recovery",
+          "duration": 94.8698000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005519546,
+      "endTime": 1790005520702.8699,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialPhoto.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CncStockCanvasHud"],
+          "fullName": "CncStockCanvasHud stays off the laser canvas and starts folded with the current CNC stock summary",
+          "status": "passed",
+          "title": "stays off the laser canvas and starts folded with the current CNC stock summary",
+          "duration": 79.07229999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncStockCanvasHud"],
+          "fullName": "CncStockCanvasHud expands into read-only facts and collapses back to the compact state",
+          "status": "passed",
+          "title": "expands into read-only facts and collapses back to the compact state",
+          "duration": 65.96219999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncStockCanvasHud"],
+          "fullName": "CncStockCanvasHud opens the exact Startup Setup stock editor without changing the project",
+          "status": "passed",
+          "title": "opens the exact Startup Setup stock editor without changing the project",
+          "duration": 22.556099999999788,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005634489,
+      "endTime": 1790005634656.5562,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/CncStockCanvasHud.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ZoomControls snap toggle"],
+          "fullName": "ZoomControls snap toggle toggles workspace snapping from the canvas overlay",
+          "status": "passed",
+          "title": "toggles workspace snapping from the canvas overlay",
+          "duration": 72.04359999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ZoomControls start marker toggle"],
+          "fullName": "ZoomControls start marker toggle sits after Snap, defaults on, and persists the hidden state",
+          "status": "passed",
+          "title": "sits after Snap, defaults on, and persists the hidden state",
+          "duration": 13.383299999999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005656742,
+      "endTime": 1790005656828.3833,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/overlays.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Preview overlay derived-work reuse"],
+          "fullName": "Preview overlay derived-work reuse does not rescan unchanged routes on parent renders while resolution notices update",
+          "status": "passed",
+          "title": "does not rescan unchanged routes on parent renders while resolution notices update",
+          "duration": 69.47460000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Preview overlay derived-work reuse"],
+          "fullName": "Preview overlay derived-work reuse refreshes warnings for a changed project and a changed toolpath",
+          "status": "passed",
+          "title": "refreshes warnings for a changed project and a changed toolpath",
+          "duration": 30.689499999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Preview overlay derived-work reuse"],
+          "fullName": "Preview overlay derived-work reuse updates ETA and travel controls without rescanning, then refreshes changed distances",
+          "status": "passed",
+          "title": "updates ETA and travel controls without rescanning, then refreshes changed distances",
+          "duration": 61.39709999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Preview overlay derived-work reuse"],
+          "fullName": "Preview overlay derived-work reuse reuses pass boundaries across parent renders and updates pass jumps for a new route",
+          "status": "passed",
+          "title": "reuses pass boundaries across parent renders and updates pass jumps for a new route",
+          "duration": 107.00910000000022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005586533,
+      "endTime": 1790005586802.009,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/preview-overlays-rerender.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["PreviewStatsPanel"],
+          "fullName": "PreviewStatsPanel discloses dwell, streaming overhead and unpriced operator waits",
+          "status": "passed",
+          "title": "discloses dwell, streaming overhead and unpriced operator waits",
+          "duration": 46.380699999999706,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatsPanel"],
+          "fullName": "PreviewStatsPanel shows the total estimated time when the live estimate is available",
+          "status": "passed",
+          "title": "shows the total estimated time when the live estimate is available",
+          "duration": 8.363100000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatsPanel"],
+          "fullName": "PreviewStatsPanel shows a clear large-job state when live estimation is paused",
+          "status": "passed",
+          "title": "shows a clear large-job state when live estimation is paused",
+          "duration": 7.309999999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatsPanel"],
+          "fullName": "PreviewStatsPanel discloses CNC plunge and spindle dwell in the playback total",
+          "status": "passed",
+          "title": "discloses CNC plunge and spindle dwell in the playback total",
+          "duration": 22.665199999999913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatsPanel"],
+          "fullName": "PreviewStatsPanel labels whether route preview is for the whole project or selected output",
+          "status": "passed",
+          "title": "labels whether route preview is for the whole project or selected output",
+          "duration": 6.664700000000266,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays visibly discloses bounded 2D resolution without blocking preview",
+          "status": "passed",
+          "title": "visibly discloses bounded 2D resolution without blocking preview",
+          "duration": 6.936000000000149,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays shows route-too-large status instead of the empty-project hint",
+          "status": "passed",
+          "title": "shows route-too-large status instead of the empty-project hint",
+          "duration": 3.365900000000238,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays shows the placement-failure reason instead of the empty-project hint (PRV-01)",
+          "status": "passed",
+          "title": "shows the placement-failure reason instead of the empty-project hint (PRV-01)",
+          "duration": 2.683599999999842,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays shows the exact preparation failure instead of the empty-project hint",
+          "status": "passed",
+          "title": "shows the exact preparation failure instead of the empty-project hint",
+          "duration": 2.645599999999831,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays discloses display-only raster downsampling after output compilation",
+          "status": "passed",
+          "title": "discloses display-only raster downsampling after output compilation",
+          "duration": 27.755899999999656,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewStatusOverlays"],
+          "fullName": "PreviewStatusOverlays states source and drawn counts when route display is decimated",
+          "status": "passed",
+          "title": "states source and drawn counts when route display is decimated",
+          "duration": 5.315300000000207,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewRouteControls"],
+          "fullName": "PreviewRouteControls renders playback controls and writes route preview state",
+          "status": "passed",
+          "title": "renders playback controls and writes route preview state",
+          "duration": 34.66750000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewRouteControls"],
+          "fullName": "PreviewRouteControls disables playback controls when no route can be played",
+          "status": "passed",
+          "title": "disables playback controls when no route can be played",
+          "duration": 5.371899999999641,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["PreviewControlsPanel"],
+          "fullName": "PreviewControlsPanel combines playback controls and stats in one bottom panel",
+          "status": "passed",
+          "title": "combines playback controls and stats in one bottom panel",
+          "duration": 16.652999999999793,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005572220,
+      "endTime": 1790005572418.653,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/preview-overlays.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["jig construction draft validation"],
+          "fullName": "jig construction draft validation keeps invalid or oversized grid  out of the scene",
+          "status": "passed",
+          "title": "keeps invalid or oversized grid  out of the scene",
+          "duration": 89.37850000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["jig construction draft validation"],
+          "fullName": "jig construction draft validation keeps invalid or oversized grid 0 out of the scene",
+          "status": "passed",
+          "title": "keeps invalid or oversized grid 0 out of the scene",
+          "duration": 28.428699999999935,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["jig construction draft validation"],
+          "fullName": "jig construction draft validation keeps invalid or oversized grid 1.5 out of the scene",
+          "status": "passed",
+          "title": "keeps invalid or oversized grid 1.5 out of the scene",
+          "duration": 16.698099999999613,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["jig construction draft validation"],
+          "fullName": "jig construction draft validation keeps invalid or oversized grid 10000 out of the scene",
+          "status": "passed",
+          "title": "keeps invalid or oversized grid 10000 out of the scene",
+          "duration": 16.242999999999938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005665233,
+      "endTime": 1790005665383.243,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/RegistrationJigOutlineControls.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel prompts to create an outline when no jig exists",
+          "status": "passed",
+          "title": "prompts to create an outline when no jig exists",
+          "duration": 76.80450000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel keeps How to use collapsed until the operator opens it",
+          "status": "passed",
+          "title": "keeps How to use collapsed until the operator opens it",
+          "duration": 40.66690000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked",
+          "status": "passed",
+          "title": "flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked",
+          "duration": 74.01299999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel keeps Artwork only disabled until actual artwork exists",
+          "status": "passed",
+          "title": "keeps Artwork only disabled until actual artwork exists",
+          "duration": 52.59730000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel auto-selects Artwork only when creating a box around existing artwork",
+          "status": "passed",
+          "title": "auto-selects Artwork only when creating a box around existing artwork",
+          "duration": 31.875200000000405,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel edits the registration outline operation instead of leaving generic defaults hidden",
+          "status": "passed",
+          "title": "edits the registration outline operation instead of leaving generic defaults hidden",
+          "duration": 41.26770000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel offers a circle outline for round blanks",
+          "status": "passed",
+          "title": "offers a circle outline for round blanks",
+          "duration": 50.95759999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel moves when the header is dragged",
+          "status": "passed",
+          "title": "moves when the header is dragged",
+          "duration": 25.485100000000784,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel moves with arrow keys when the drag handle is focused",
+          "status": "passed",
+          "title": "moves with arrow keys when the drag handle is focused",
+          "duration": 48.771999999999935,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel locks the box via the Lock box checkbox",
+          "status": "passed",
+          "title": "locks the box via the Lock box checkbox",
+          "duration": 61.28900000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel disables unlock and Replace and warns for a captured board (CAM-04)",
+          "status": "passed",
+          "title": "disables unlock and Replace and warns for a captured board (CAM-04)",
+          "duration": 62.998999999999796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel leaves unlock and Replace enabled for a jig outline (CAM-04)",
+          "status": "passed",
+          "title": "leaves unlock and Replace enabled for a jig outline (CAM-04)",
+          "duration": 33.05330000000049,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel creates five jigs, copies selected artwork to all, and toggles both runs set-wide",
+          "status": "passed",
+          "title": "creates five jigs, copies selected artwork to all, and toggles both runs set-wide",
+          "duration": 102.62089999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel reopens an existing rectangular set with its rows, columns, and spacing",
+          "status": "passed",
+          "title": "reopens an existing rectangular set with its rows, columns, and spacing",
+          "duration": 54.70420000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel refreshes saved grid geometry when a project opens while the panel is already mounted",
+          "status": "passed",
+          "title": "refreshes saved grid geometry when a project opens while the panel is already mounted",
+          "duration": 28.36740000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005567675,
+      "endTime": 1790005568462.3674,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/RegistrationJigPanel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip teaches the selected drawing tool without changing the tool or artwork",
+          "status": "passed",
+          "title": "teaches the selected drawing tool without changing the tool or artwork",
+          "duration": 93.67660000000069,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms text placement directly and shows the active text tool",
+          "status": "passed",
+          "title": "arms text placement directly and shows the active text tool",
+          "duration": 19.285800000000563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip uses help topics for drawing tool hover explanations",
+          "status": "passed",
+          "title": "uses help topics for drawing tool hover explanations",
+          "duration": 14.257200000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip toggles an already-active draw tool back to Select mode",
+          "status": "passed",
+          "title": "toggles an already-active draw tool back to Select mode",
+          "duration": 15.270700000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms node edit mode without toggling normal Select transforms",
+          "status": "passed",
+          "title": "arms node edit mode without toggling normal Select transforms",
+          "duration": 14.80789999999979,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms the Measure tool from the tool strip",
+          "status": "passed",
+          "title": "arms the Measure tool from the tool strip",
+          "duration": 26.950399999999718,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip shows curve-node actions and converts the selected segment",
+          "status": "passed",
+          "title": "shows curve-node actions and converts the selected segment",
+          "duration": 50.49499999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip keeps Join available for two anchors and returns focus to Edit nodes after success",
+          "status": "passed",
+          "title": "keeps Join available for two anchors and returns focus to Edit nodes after success",
+          "duration": 50.703199999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip does not turn unsupported interior anchors into a narrower disabled-state guard",
+          "status": "passed",
+          "title": "does not turn unsupported interior anchors into a narrower disabled-state guard",
+          "duration": 13.715400000000045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms the Star tool from the tool strip",
+          "status": "passed",
+          "title": "arms the Star tool from the tool strip",
+          "duration": 12.702699999999822,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip opens the design library from the tool strip",
+          "status": "passed",
+          "title": "opens the design library from the tool strip",
+          "duration": 13.635800000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005577348,
+      "endTime": 1790005577675.6357,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/ToolStrip.test.tsx"
+    }
+  ]
+}

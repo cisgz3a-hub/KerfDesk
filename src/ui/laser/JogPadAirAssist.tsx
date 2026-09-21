@@ -91,6 +91,7 @@ function AirAssistControl(props: {
       onClick={() => props.onToggle(!props.enabled)}
       aria-label={label}
       aria-pressed={props.enabled}
+      className="lf-manual-air"
       title={title}
       style={airAssistButtonStyle(props.enabled, props.readiness)}
     >
@@ -217,9 +218,9 @@ function airAssistButtonStyle(
   if (readiness !== 'ready' && !enabled) {
     return {
       ...airAssistButtonBaseStyle,
-      borderColor: 'var(--lf-warning)',
-      background: 'var(--lf-tint-warning)',
-      color: 'var(--lf-warning-fg)',
+      borderColor: 'var(--lf-border)',
+      background: 'var(--lf-bg-0)',
+      color: 'var(--lf-text-muted)',
       cursor: 'pointer',
     };
   }
@@ -234,7 +235,7 @@ function airAssistButtonStyle(
 
 const airAssistButtonBaseStyle: React.CSSProperties = {
   gridArea: 'air',
-  minHeight: 116,
+  minHeight: 60,
   padding: '8px 6px',
   display: 'flex',
   flexDirection: 'column',
@@ -252,12 +253,12 @@ const airAssistTitleStyle: React.CSSProperties = {
   lineHeight: 1.15,
 };
 const airAssistStateStyle: React.CSSProperties = {
-  fontSize: 20,
+  fontSize: 14,
   fontWeight: 600,
   lineHeight: 1,
 };
 const airAssistCommandStyle: React.CSSProperties = {
-  fontSize: 'var(--lf-text-sm)',
+  fontSize: 11,
   lineHeight: 1.2,
 };
 // Spans the jog grid's full width (the "warning" row) and stacks its text

@@ -134,6 +134,7 @@ function isFireKey(key: string): boolean {
 
 function fireButtonStyle(active: boolean): React.CSSProperties {
   return {
+    gridArea: 'fire',
     minWidth: 76,
     height: 58,
     display: 'flex',

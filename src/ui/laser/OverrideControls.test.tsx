@@ -37,6 +37,47 @@ async function renderControls(): Promise<{ host: HTMLDivElement; root: Root }> {
 }
 
 describe('OverrideControls', () => {
+  it.each(['cnc', 'laser'] as const)(
+    'audit every %s override button requests its exact realtime byte',
+    async (kind) => {
+      const original = useLaserStore.getState().sendRealtimeOverride;
+      const send = vi.fn(async (_byte: RealtimeOverrideByte) => undefined);
+      useLaserStore.setState({ sendRealtimeOverride: send, activeJobMachineKind: kind });
+      const { host, root } = await renderControls();
+      try {
+        const power = kind === 'cnc' ? 'spindle' : 'laser power';
+        const cases = [
+          ['Slow the feed override by 10%', 0x92],
+          ['Slow the feed override by 1%', 0x94],
+          ['Raise the feed override by 1%', 0x93],
+          ['Raise the feed override by 10%', 0x91],
+          ['Reset the feed override to 100%', 0x90],
+          [`Slow the ${power} override by 10%`, 0x9b],
+          [`Slow the ${power} override by 1%`, 0x9d],
+          [`Raise the ${power} override by 1%`, 0x9c],
+          [`Raise the ${power} override by 10%`, 0x9a],
+          [`Reset the ${power} override to 100%`, 0x99],
+          ['Limit rapid moves to 25%', 0x97],
+          ['Limit rapid moves to 50%', 0x96],
+          ['Restore rapid moves to full speed', 0x95],
+        ] as const;
+        const buttons = [...host.querySelectorAll('button')];
+        expect(buttons).toHaveLength(cases.length);
+        for (const [title, byte] of cases) {
+          const button = buttons.find((candidate) => candidate.title.startsWith(title));
+          expect(button, title).toBeDefined();
+          send.mockClear();
+          await act(async () => button!.click());
+          expect(send).toHaveBeenCalledExactlyOnceWith(String.fromCharCode(byte));
+        }
+      } finally {
+        await act(async () => root.unmount());
+        useLaserStore.setState({ sendRealtimeOverride: original });
+        host.remove();
+      }
+    },
+  );
+
   it('shows cached Ov percentages, or dashes before the first Ov frame', async () => {
     const { host, root } = await renderControls();
     try {

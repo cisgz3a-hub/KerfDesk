@@ -1,0 +1,408 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 5,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 33,
+  "numPassedTests": 32,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006456246,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "ready Inspector routes every camera control, source toggle and travel/direction switch to the scene",
+          "status": "passed",
+          "title": "ready Inspector routes every camera control, source toggle and travel/direction switch to the scene",
+          "duration": 392.8162000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "all preview transport buttons dispatch their exact action and empty programs disable stepping and play",
+          "status": "passed",
+          "title": "all preview transport buttons dispatch their exact action and empty programs disable stepping and play",
+          "duration": 29.337799999999334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "health findings use zero-based source positions and omit navigation when no line exists",
+          "status": "passed",
+          "title": "health findings use zero-based source positions and omit navigation when no line exists",
+          "duration": 19.948200000000725,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas view buttons dispatch design and G-code choices without changing machine state",
+          "status": "passed",
+          "title": "canvas view buttons dispatch design and G-code choices without changing machine state",
+          "duration": 6.373799999999392,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas refresh dispatches compilation, is unavailable during compile or active run, and releases a completed run",
+          "status": "passed",
+          "title": "canvas refresh dispatches compilation, is unavailable during compile or active run, and releases a completed run",
+          "duration": 13.784999999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Inspector dialog Close and CNC-only simulator handoff invoke their respective callbacks",
+          "status": "passed",
+          "title": "Inspector dialog Close and CNC-only simulator handoff invoke their respective callbacks",
+          "duration": 22.83100000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006476759,
+      "endTime": 1790006477244.831,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/gcode-inspector/InspectorControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "every CNC display mode selects its semantic mode and PNG requests export",
+          "status": "passed",
+          "title": "every CNC display mode selects its semantic mode and PNG requests export",
+          "duration": 57.27330000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "3D viewer lesson remains available while building and Close invokes the dialog owner",
+          "status": "passed",
+          "title": "3D viewer lesson remains available while building and Close invokes the dialog owner",
+          "duration": 26.80269999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "bitmap Cancel remains usable while busy and does not invoke conversion",
+          "status": "passed",
+          "title": "bitmap Cancel remains usable while busy and does not invoke conversion",
+          "duration": 38.15750000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006495711,
+      "endTime": 1790006495833.1575,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/raster/ViewerAndConversionControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing keeps a clicked draft outside project/history and commits its position in one undo step",
+          "status": "passed",
+          "title": "keeps a clicked draft outside project/history and commits its position in one undo step",
+          "duration": 190.6280000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing preserves edit transforms, operation bindings and settings while changing text",
+          "status": "passed",
+          "title": "preserves edit transforms, operation bindings and settings while changing text",
+          "duration": 62.860099999999875,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing cancels edited content with Escape and leaves the original project untouched",
+          "status": "passed",
+          "title": "cancels edited content with Escape and leaves the original project untouched",
+          "duration": 39.288399999999456,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing finishes an unchanged edit without adding an undo step",
+          "status": "passed",
+          "title": "finishes an unchanged edit without adding an undo step",
+          "duration": 35.167600000000675,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing finishes an empty new session without adding artwork or history",
+          "status": "passed",
+          "title": "finishes an empty new session without adding artwork or history",
+          "duration": 30.710900000000038,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing keeps plain Enter for multiline input and saves once with Ctrl+Enter",
+          "status": "passed",
+          "title": "keeps plain Enter for multiline input and saves once with Ctrl+Enter",
+          "duration": 50.33879999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing does not finish or cancel IME composition on 'Enter'",
+          "status": "passed",
+          "title": "does not finish or cancel IME composition on 'Enter'",
+          "duration": 40.82060000000092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing does not finish or cancel IME composition on 'Escape'",
+          "status": "passed",
+          "title": "does not finish or cancel IME composition on 'Escape'",
+          "duration": 40.29570000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing does not finish or cancel IME composition on 'Enter'",
+          "status": "passed",
+          "title": "does not finish or cancel IME composition on 'Enter'",
+          "duration": 55.99150000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing ignores a delayed save after new-project",
+          "status": "passed",
+          "title": "ignores a delayed save after new-project",
+          "duration": 45.84029999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing ignores a delayed save after new-session",
+          "status": "passed",
+          "title": "ignores a delayed save after new-session",
+          "duration": 57.569400000000314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing ignores a delayed save after unmount",
+          "status": "passed",
+          "title": "ignores a delayed save after unmount",
+          "duration": 34.42540000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing does not let an older draft replace the latest typed preview",
+          "status": "passed",
+          "title": "does not let an older draft replace the latest typed preview",
+          "duration": 56.555599999999686,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing saves on a primary canvas click and prevents that click starting another interaction",
+          "status": "passed",
+          "title": "saves on a primary canvas click and prevents that click starting another interaction",
+          "duration": 35.149899999998524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["canvas text editing"],
+          "fullName": "canvas text editing remains editable and saves exactly once through StrictMode effect replay",
+          "status": "passed",
+          "title": "remains editable and saves exactly once through StrictMode effect replay",
+          "duration": 58.41899999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006470696,
+      "endTime": 1790006471531.419,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/text/CanvasTextEditor.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "status": "passed",
+          "title": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "duration": 4453.0084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "status": "passed",
+          "title": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "duration": 43.03989999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "symbol disclosure expands and each accent button inserts its own character",
+          "status": "passed",
+          "title": "symbol disclosure expands and each accent button inserts its own character",
+          "duration": 85.6921999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "status": "failed",
+          "title": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "duration": 231.59540000000015,
+          "failureMessages": [
+            "AssertionError: expected false to be true // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/text/TextControls.audit.test.tsx:73:39\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "status": "passed",
+          "title": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "duration": 262.5061999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Add Text Cancel closes without editing the project",
+          "status": "passed",
+          "title": "Add Text Cancel closes without editing the project",
+          "duration": 219.90250000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006481613,
+      "endTime": 1790006486911.9026,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/text/TextControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "opens 'Sharp' finishing disclosure and Reset clears real override state",
+          "status": "passed",
+          "title": "opens 'Sharp' finishing disclosure and Reset clears real override state",
+          "duration": 185.4359999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "opens 'Edge Detection' finishing disclosure and Reset clears real override state",
+          "status": "passed",
+          "title": "opens 'Edge Detection' finishing disclosure and Reset clears real override state",
+          "duration": 30.25330000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "trace header Close, source-removal toggle, Cancel and submit dispatch distinct dialog actions",
+          "status": "passed",
+          "title": "trace header Close, source-removal toggle, Cancel and submit dispatch distinct dialog actions",
+          "duration": 42.38959999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006493906,
+      "endTime": 1790006494164.3896,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/TraceControls.audit.test.tsx"
+    }
+  ]
+}

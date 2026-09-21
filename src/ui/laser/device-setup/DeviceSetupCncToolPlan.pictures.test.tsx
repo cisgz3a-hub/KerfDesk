@@ -80,6 +80,16 @@ async function choose(label: string, value: string): Promise<void> {
 }
 
 describe('Tool Plan picture selection', () => {
+  it('audit operation disclosure opens and closes without changing tool assignments', () => {
+    const details = host.querySelector('details')!;
+    const summary = details.querySelector('summary')!;
+    expect(details.open).toBe(false);
+    act(() => summary.click());
+    expect(details.open).toBe(true);
+    act(() => summary.click());
+    expect(details.open).toBe(false);
+    expect(changed).not.toHaveBeenCalled();
+  });
   it('opens only the selected primary picture, keeps the native value, and resolves job-default geometry', async () => {
     const label = 'Startup bit for Carving';
     expect(host.querySelector('img')).toBeNull();

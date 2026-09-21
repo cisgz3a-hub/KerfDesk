@@ -21412,7 +21412,49 @@ the active-row well elsewhere, so "info" stays distinct from "warning".
 - **NOT verified:** no hardware — no machine is available to this project. This
   change emits no G-code and touches no machine behaviour.
 
-## ADR-340 - Painted laser passes derive from sealed execution, with independent Frame and recovery (2026-09-22)
+---
+
+## ADR-340 - Task-focused controls and explicit completed-run dismissal
+
+**Date:** 2026-09-21
+**Status:** Accepted for implementation; local software and browser verification recorded in the interface audit.
+
+### Context
+
+The operator found the interface too crowded and requested an audit of buttons, a more professional
+layout, and a way to clear a finished job. The machine panel mixed frequent positioning with
+occasional configuration and recovery. A successful run retained its completed preview until the
+project changed, without an explicit way to acknowledge it.
+
+### Decision
+
+- Keep Open, Import, Import Image, Save and Preview in the primary toolbar when space permits.
+  Trace image appears with an eligible image selection; Image Studio stays in More, preserving
+  the toolbar decision merged in PR #825. Preserve every other registered toolbar command in More
+  and its existing menu/shortcut route; use the same dispatch and enabled-state definitions.
+- Group the drawing palette into Edit and Draw. In the machine panel, keep positioning and origin
+  together and reveal homing/focus, maintenance and history through named disclosures. Keep
+  active recovery notices visible, Frame/Start in their existing dock, and Live Motion as the
+  sole Pause/Resume/Continue/Abort surface. Contextual tutorials remain accessible.
+- Add Job complete / Done only after the current run has both a finished lifecycle and completed
+  timing, with no unsettled stream, active operation or retained controller fault. Check identity
+  and current state again at click time. Done changes only the completed `liveCanvasRun` display.
+- Retain artwork, undo history, the compiled/reviewed plan, machine coordinates, Frame evidence,
+  replay receipt and execution archive. Do not send a controller command or delete the project.
+  Acknowledging completion does not operate motors, disconnect, reset, or start another job.
+- Preserve the governing Frame-first contract of ADRs 228, 230, 232 and 237. This is a presentation
+  change, not a new machine qualification or authorization model.
+
+### Evidence
+
+[Interface audit](docs/audits/2026-09-21-interface/README.md) records the control inventory,
+confirmed defects, functional checks, browser layouts and limitations. Source and simulated
+controller evidence do not qualify physical controller or material behaviour. Implementation is
+local until separately reviewed and published.
+
+---
+
+## ADR-341 - Painted laser passes derive from sealed execution, with independent Frame and recovery (2026-09-22)
 
 ### Context
 

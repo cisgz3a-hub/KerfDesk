@@ -1,16 +1,16 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures/kerfdesk-test';
+import { toolbarCommand } from './fixtures/workspace-ui';
 
 async function toolbarPreview(page: Page) {
-  await page.getByRole('button', { name: 'More commands', exact: true }).click();
-  return page
-    .getByRole('menu', { name: 'More commands', exact: true })
-    .getByRole('menuitemcheckbox', { name: 'Preview', exact: true });
+  return toolbarCommand(page, 'Preview');
 }
 
 async function expectToolbarPreviewState(page: Page, active: boolean) {
-  await expect(await toolbarPreview(page)).toHaveAttribute('aria-checked', String(active));
-  await page.keyboard.press('Escape');
+  const preview = await toolbarPreview(page);
+  const inMenu = (await preview.getAttribute('role')) === 'menuitemcheckbox';
+  await expect(preview).toHaveAttribute(inMenu ? 'aria-checked' : 'aria-pressed', String(active));
+  if (inMenu) await page.keyboard.press('Escape');
 }
 
 test('keeps empty Preview reachable from toolbar, Window menu, and P', async ({ page }) => {

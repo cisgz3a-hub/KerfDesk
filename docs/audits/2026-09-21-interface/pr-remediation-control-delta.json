@@ -1,0 +1,362 @@
+{
+  "metadata": {
+    "comparedWith": "pr-final-source/buttons.json",
+    "comparedWithSourceDigest": "46a5737e33d88d6fd46d90f49496b6f12229e8a0d38074f4bad895f03cbd93ad",
+    "incomingMainCommit": "39eebb6fcb723a2e51f9866a7c0c7dedf396b981",
+    "branchHeadAtInitialScan": "628c227327942d5bb962eb9a774ca1f54fb3523b",
+    "sourceDigest": "6c2a4a8e2db18672807546a0d7d57db7102821eb372478675ce998835d3c7635",
+    "sourceFilesScanned": 2641,
+    "controls": 817,
+    "commands": 94,
+    "previousControls": 817,
+    "previousCommands": 94,
+    "addedControlDefinitions": 0,
+    "removedControlDefinitions": 0,
+    "addedCommands": [],
+    "removedCommands": [],
+    "unchangedCatalogueSignatures": 817,
+    "affectedCatalogueRecords": 3,
+    "distinctChangedOperatorControls": 2,
+    "directControlSourceFilesChanged": [
+      "src/ui/laser/OriginRow.tsx",
+      "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx"
+    ],
+    "temporaryInventory": "artifacts/pr-publication/source-remediation",
+    "temporaryInventoryCommitted": false,
+    "signatureLimit": "All 817 catalogue signatures match because ordinary component props and parent-component guards are not resolved. The three affected records are identified from the actual source diff, not inferred to be unchanged.",
+    "broaderScopeLimit": "The incoming 67-file merge also changes transport, autosave, tracing, preview and job preparation paths. This supplement audits the two changed operator controls only; it does not revalidate all underlying behaviour of every unchanged control.",
+    "integratedHead": "9d05cc626cee59187370b16d31095f257de8cb2e",
+    "directControlEvidence": {
+      "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+      "reportTests": 132,
+      "reportPassed": 132,
+      "reportFiles": 15,
+      "distinctCasesCited": 6,
+      "dispositions": { "verified-boundary": 2, "verified-behaviour": 1 }
+    },
+    "transportBoundaryEvidence": {
+      "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+      "passedCasesCited": 7,
+      "reportPassed": 8,
+      "reportSkipped": 1,
+      "otherExecutedCase": "CompletedJobNotice simulator: unknown dwell settles and Done remains available; tracked by the machine audit owner, not counted as evidence for these visibility controls."
+    },
+    "distinctPassingCasesCited": 13
+  },
+  "controls": [
+    {
+      "id": "src/ui/laser/OriginRow.tsx:88:5",
+      "historicalId": "src/ui/laser/OriginRow.tsx:88:5",
+      "label": "Release motors",
+      "kind": "native-button",
+      "change": "inherited-parent-visibility-change",
+      "expectedOutcome": "Avoid a second Release motors action after a Z-only touch-off: OriginRow and NoHomingPositionGuide offer exactly one action in the tested origin states. The visible OriginRow button still requires confirmation and remains inert while streaming.",
+      "availability": "The native child returns null when props.show is false and is disabled while props.busy. The whole OriginRow is absent when WCS support is none. Its parent gate is the changed behaviour.",
+      "parentGate": {
+        "before": "Parent ReleaseMotorsButton show = canSleep && (homingEnabled || hasCustom), where hasCustom includes any X/Y/Z offset.",
+        "after": "Parent ReleaseMotorsButton show = canSleep && (homingEnabled || hasCustomXy), where hasCustomXy = workOriginActive || hasCustomXyOrigin(wcoCache)."
+      },
+      "sourceRecord": {
+        "id": "src/ui/laser/OriginRow.tsx:88:5",
+        "area": "laser",
+        "file": "src/ui/laser/OriginRow.tsx",
+        "line": 88,
+        "component": "ReleaseMotorsButton",
+        "kind": "native-button",
+        "tag": "button",
+        "label": "Release motors",
+        "handlers": { "onClick": "props.onRelease" },
+        "disabled": "props.busy",
+        "visibilityConditions": [],
+        "title": "Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward.",
+        "helpId": null,
+        "tutorialId": null,
+        "href": null,
+        "spreadProps": [],
+        "testPointers": [
+          "src/ui/laser/MachineRunControls.audit.test.tsx",
+          "src/ui/laser/OriginRow.attention.test.tsx",
+          "src/ui/laser/OriginRow.test.tsx",
+          "src/ui/laser/release-motors-complementarity.test.tsx"
+        ],
+        "evidence": "source-inventory-only",
+        "reviewFlags": []
+      },
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control after a Z-only touch-off with no XY origin",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control with no origin at all",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control once an XY origin is settled",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/MachineRunControls.audit.test.tsx",
+          "test": "Machine run control audit Release motors requires confirmation and does not release while streaming",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow button click; cancellation leaves a releaseMotors spy untouched, approval calls it once, and a streaming-disabled click does not call it again. The store action is mocked, so this stops before serial writes or physical motor release."
+        }
+      ],
+      "notes": "Software visibility is verified across the three origin fixtures; action execution is verified only at the mocked store boundary. The native definition and its call site describe one operator control, not two independently visible buttons."
+    },
+    {
+      "id": "src/ui/laser/OriginRow.tsx:177:9",
+      "historicalId": "src/ui/laser/OriginRow.tsx:176:9",
+      "label": "ReleaseMotorsButton call site",
+      "kind": "button-component-call",
+      "change": "call-site-parent-visibility-change",
+      "expectedOutcome": "Pass the same XY-origin predicate used by the hand-position guide so a Z-only offset does not produce duplicate release controls.",
+      "availability": "Sleep capability plus homing or a settled XY origin makes the row own Release motors. busy remains props.disabled || props.streaming. Parent props are not included in the catalogue signature.",
+      "parentGate": {
+        "before": "show={canSleep && (homingEnabled || hasCustom)}",
+        "after": "show={canSleep && (homingEnabled || hasCustomXy)}"
+      },
+      "sourceRecord": {
+        "id": "src/ui/laser/OriginRow.tsx:177:9",
+        "area": "laser",
+        "file": "src/ui/laser/OriginRow.tsx",
+        "line": 177,
+        "component": "OriginRow",
+        "kind": "button-component-call",
+        "tag": "ReleaseMotorsButton",
+        "label": "",
+        "handlers": {},
+        "disabled": null,
+        "visibilityConditions": [],
+        "title": null,
+        "helpId": null,
+        "tutorialId": null,
+        "href": null,
+        "spreadProps": [],
+        "testPointers": [
+          "src/ui/laser/MachineRunControls.audit.test.tsx",
+          "src/ui/laser/OriginRow.attention.test.tsx",
+          "src/ui/laser/OriginRow.test.tsx",
+          "src/ui/laser/release-motors-complementarity.test.tsx"
+        ],
+        "evidence": "source-inventory-only",
+        "reviewFlags": []
+      },
+      "disposition": "verified-boundary",
+      "evidence": [
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control after a Z-only touch-off with no XY origin",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control with no origin at all",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/release-motors-complementarity.test.tsx",
+          "test": "Release motors is offered by exactly one surface offers one control once an XY origin is settled",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow and NoHomingPositionGuide rendered together against the no-homing store fixture with sleep capability and connected Idle state. Exactly one combined Release motors button is asserted. These cases do not click the control or operate a controller."
+        },
+        {
+          "file": "src/ui/laser/MachineRunControls.audit.test.tsx",
+          "test": "Machine run control audit Release motors requires confirmation and does not release while streaming",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual OriginRow button click; cancellation leaves a releaseMotors spy untouched, approval calls it once, and a streaming-disabled click does not call it again. The store action is mocked, so this stops before serial writes or physical motor release."
+        }
+      ],
+      "notes": "Software visibility is verified across the three origin fixtures; action execution is verified only at the mocked store boundary. The native definition and its call site describe one operator control, not two independently visible buttons."
+    },
+    {
+      "id": "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx:236:7",
+      "historicalId": "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx:233:7",
+      "label": "Read the serial port and refill the job stream in a worker",
+      "kind": "input-control",
+      "change": "inherited-parent-visibility-change",
+      "expectedOutcome": "Offer the checkbox for GRBL, grblHAL and FluidNC, hide it for Marlin and Smoothieware, and retain the draft opt-in when switching away and back without enabling an unsupported worker transport.",
+      "availability": "The outer section requires a serial driver; the new parent guard requires a GRBL-family driver. The checkbox itself has no disabled prop and updates only workerHostedStreaming in the setup draft.",
+      "parentGate": {
+        "before": "HostedStreamingRow was unconditionally rendered inside AdvancedConnection for serial controllers.",
+        "after": "HostedStreamingRow is rendered only when isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) is true."
+      },
+      "sourceRecord": {
+        "id": "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx:236:7",
+        "area": "laser",
+        "file": "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx",
+        "line": 236,
+        "component": "HostedStreamingRow",
+        "kind": "input-control",
+        "tag": "input",
+        "label": "Read the serial port and refill the job stream in a worker",
+        "handlers": {
+          "onChange": "(event) => props.update({ workerHostedStreaming: event.target.checked })"
+        },
+        "disabled": null,
+        "visibilityConditions": [],
+        "title": "Experimental, untested on hardware. Reads the port and writes job refills off the main thread, so a busy interface cannot delay the controller. A browser that cannot hand the port to a worker keeps the normal transport.",
+        "helpId": null,
+        "tutorialId": null,
+        "href": null,
+        "spreadProps": [],
+        "testPointers": ["src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"],
+        "evidence": "source-inventory-only",
+        "reviewFlags": []
+      },
+      "disposition": "verified-behaviour",
+      "evidence": [
+        {
+          "file": "src/ui/laser/device-setup/DeviceSetupWizard.test.tsx",
+          "test": "DeviceSetupWizard offers worker streaming only for GRBL-family controllers and keeps its saved preference",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual setup wizard/reducer under a mock PlatformProvider. Clicks the GRBL checkbox, verifies checked state, selects Marlin and Smoothieware and verifies absence, then selects grblHAL, FluidNC and GRBL and verifies the draft opt-in survives. Does not Save the profile or open a serial session."
+        },
+        {
+          "file": "src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx",
+          "test": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-vitest.json",
+          "boundary": "Actual Identify disclosures toggle and checkbox click dispatches the expected workerHostedStreaming draft patch to a spy; the live project preference stays unchanged. Callback boundary complements the real wizard draft case."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility ignores a saved worker opt-in when the selected driver is marlin",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility ignores a saved worker opt-in when the selected driver is smoothieware",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver grbl-v1.1",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver grblhal",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver fluidnc",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility keeps an explicit worker opt-in for the GRBL-family driver undefined",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        },
+        {
+          "file": "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+          "test": "worker transport firmware eligibility keeps the ordinary transport when the compatible driver has no worker opt-in",
+          "result": "passed",
+          "report": "docs/audits/2026-09-21-interface/pr-remediation-machine-completion-vitest.json",
+          "boundary": "Actual useLaserStore.connect action reaches a mocked serial port open method, which records exact SerialOpenRequest options and throws before a serial session starts. Marlin/Smoothieware ignore a saved opt-in; GRBL/grblHAL/FluidNC/default retain an explicit opt-in; opting out uses ordinary transport. No serial streaming or hardware qualification."
+        }
+      ],
+      "notes": "Fresh software evidence covers checkbox availability and draft retention. The test title says saved preference, but its assertions exercise an unsaved setup draft and do not commit a project profile. Seven additional connect-action cases verify transport selection only at the mocked port.open boundary."
+    }
+  ],
+  "changedFilesFromUpstream": [
+    "DECISIONS.md",
+    "WORKFLOW.md",
+    "docs/audits/2026-09-21-claude-pr-remediation.md",
+    "e2e/serial-worker-handover.e2e.ts",
+    "e2e/trace-presets-stress-worker.e2e.ts",
+    "src/__fixtures__/worker-stream-invalidation.test.ts",
+    "src/core/trace/centerline/bend-scan-work.test.ts",
+    "src/core/trace/centerline/sharpen-bends.ts",
+    "src/platform/types.ts",
+    "src/platform/web/serial-worker-core.test.ts",
+    "src/platform/web/serial-worker-core.ts",
+    "src/platform/web/serial-worker-protocol.ts",
+    "src/platform/web/worker-handover.test-support.ts",
+    "src/platform/web/worker-handover.test.ts",
+    "src/platform/web/worker-refill-handover.ts",
+    "src/platform/web/worker-serial-connection.test.ts",
+    "src/platform/web/worker-serial-connection.ts",
+    "src/ui/laser/OriginRow.tsx",
+    "src/ui/laser/device-setup/DeviceSetupIdentifyStep.tsx",
+    "src/ui/laser/device-setup/DeviceSetupWizard.test.tsx",
+    "src/ui/laser/device-setup/device-setup-wizard.test-support.tsx",
+    "src/ui/laser/release-motors-complementarity.test.tsx",
+    "src/ui/laser/start-job-preparation-dwell.test.ts",
+    "src/ui/laser/start-job-preparation.ts",
+    "src/ui/laser/start-job-readiness.ts",
+    "src/ui/laser/start-job-source.ts",
+    "src/ui/state/autosave-durable-read.ts",
+    "src/ui/state/autosave-durable.ts",
+    "src/ui/state/autosave-local-storage.ts",
+    "src/ui/state/autosave-unreadable-race.test.ts",
+    "src/ui/state/autosave-unreadable-retirement.test.ts",
+    "src/ui/state/canvas-job-timing-plan.ts",
+    "src/ui/state/laser-connect-action.ts",
+    "src/ui/state/laser-connect-hosted-eligibility.test.ts",
+    "src/ui/state/laser-hosted-refill.test.ts",
+    "src/ui/state/laser-hosted-refill.ts",
+    "src/ui/state/laser-job-actions.ts",
+    "src/ui/state/laser-line-handler.ts",
+    "src/ui/state/laser-safe-write.ts",
+    "src/ui/state/laser-status-line.ts",
+    "src/ui/state/laser-transcript-buffer.test.ts",
+    "src/ui/state/laser-transcript-buffer.ts",
+    "src/ui/state/laser-transcript-marlin.test.ts",
+    "src/ui/state/recovery/recovery-artifact-identity.ts",
+    "src/ui/state/recovery/recovery-legacy-insert.ts",
+    "src/ui/state/recovery/recovery-start-handoff-host.ts",
+    "src/ui/state/recovery/recovery-start-handoff-mutations.ts",
+    "src/ui/state/recovery/recovery-start-handoff.ts",
+    "src/ui/state/recovery/recovery-start-intent-reconciliation.test.ts",
+    "src/ui/trace/ImportImageDialog.test.ts",
+    "src/ui/trace/region-enhance-trace.test.ts",
+    "src/ui/trace/region-enhance-trace.ts",
+    "src/ui/trace/trace-region.ts",
+    "src/ui/trace/use-trace-preview-cancel.test.tsx",
+    "src/ui/trace/use-trace-preview.test.ts",
+    "src/ui/trace/use-trace-preview.ts",
+    "src/ui/trace/use-trace-worker-client-cancel.test.ts",
+    "src/ui/trace/use-trace-worker-client.ts",
+    "src/ui/workspace/draw-burn-state.test.ts",
+    "src/ui/workspace/draw-burn-trail.test.ts",
+    "src/ui/workspace/draw-burn-trail.ts",
+    "src/ui/workspace/draw-canvas-motion.ts",
+    "src/ui/workspace/draw-preview-plan-route-budget.test.ts",
+    "src/ui/workspace/draw-preview.ts",
+    "src/ui/workspace/executable-plan-preview-route.ts",
+    "src/ui/workspace/preview-route-budget.ts",
+    "src/ui/workspace/route-range-walk.ts"
+  ]
+}

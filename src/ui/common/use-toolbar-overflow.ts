@@ -21,19 +21,32 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
 // go once one is already there. The Studio stays a click away in More, and sits
 // with the other image tools under the Tools menu.
 const PRIMARY_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
-  ['file.new', 'file.open', 'file.save'],
-  ['tools.add-text', 'tools.trace-image', 'file.import-image'],
+  ['file.open', 'file.import', 'file.import-image', 'file.save'],
+  ['tools.trace-image'],
+  ['window.toggle-preview'],
 ];
 const PRIMARY_IDS = PRIMARY_GROUPS.flat();
 // Dropped into More in this order as the toolbar narrows.
 const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
   'file.import-image',
   'tools.trace-image',
-  'tools.add-text',
-  'file.new',
   'file.open',
   'file.save',
+  'window.toggle-preview',
+  'file.import',
 ];
+
+function primaryCommandIds(commands: ReadonlyArray<AppCommand>): ReadonlyArray<CommandId> {
+  // Trace is useful beside a selected image. Image Studio stays in More.
+  const imageSelected = commands.some(
+    (command) => command.id === 'tools.trace-image' && command.enabled,
+  );
+  return PRIMARY_IDS.filter(
+    (id) =>
+      (imageSelected || id !== 'tools.trace-image') &&
+      commands.some((command) => command.id === id),
+  );
+}
 
 export function toolbarGroups(
   commands: ReadonlyArray<AppCommand>,
@@ -87,11 +100,14 @@ export function useToolbarOverflow(commands: ReadonlyArray<AppCommand>): {
     };
   }, [commands]);
   const registered = toolbarGroups(commands).flat();
+  const primaryIds = primaryCommandIds(commands);
+  const isPrimary = (command: AppCommand): boolean =>
+    visible.includes(command.id) && primaryIds.includes(command.id);
   return {
     containerRef,
     measureRef,
-    primary: registered.filter((command) => visible.includes(command.id)),
-    overflow: registered.filter((command) => !visible.includes(command.id)),
+    primary: registered.filter(isPrimary),
+    overflow: registered.filter((command) => !isPrimary(command)),
   };
 }
 
@@ -101,7 +117,7 @@ function fittingCommands(
   available: number,
   moreWidth: number,
 ): ReadonlyArray<CommandId> {
-  let visible = PRIMARY_IDS.filter((id) => commands.some((command) => command.id === id));
+  let visible = primaryCommandIds(commands);
   const registered = toolbarGroups(commands).flat();
   for (const candidate of OVERFLOW_PRIORITY) {
     const groupCount = PRIMARY_GROUPS.filter((group) =>

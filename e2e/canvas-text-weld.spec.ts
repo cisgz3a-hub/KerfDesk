@@ -23,7 +23,7 @@ test('welds Dancing Script joins, retains editing and saves the setting with und
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
-  await page.getByRole('button', { name: 'Text...', exact: true }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await canvas.click({ position: { x: 180, y: 220 } });
   const input = page.getByRole('textbox', { name: 'Text content on canvas' });
   await input.fill('my');

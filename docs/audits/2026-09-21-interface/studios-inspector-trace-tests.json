@@ -1,0 +1,675 @@
+{
+  "numTotalTestSuites": 13,
+  "numPassedTestSuites": 13,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 59,
+  "numPassedTests": 59,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006031838,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "ready Inspector routes every camera control, source toggle and travel/direction switch to the scene",
+          "status": "passed",
+          "title": "ready Inspector routes every camera control, source toggle and travel/direction switch to the scene",
+          "duration": 204.36179999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "all preview transport buttons dispatch their exact action and empty programs disable stepping and play",
+          "status": "passed",
+          "title": "all preview transport buttons dispatch their exact action and empty programs disable stepping and play",
+          "duration": 14.158100000000104,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "health findings use zero-based source positions and omit navigation when no line exists",
+          "status": "passed",
+          "title": "health findings use zero-based source positions and omit navigation when no line exists",
+          "duration": 6.811099999999897,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas view buttons dispatch design and G-code choices without changing machine state",
+          "status": "passed",
+          "title": "canvas view buttons dispatch design and G-code choices without changing machine state",
+          "duration": 5.272300000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas refresh dispatches compilation, is unavailable during compile or active run, and releases a completed run",
+          "status": "passed",
+          "title": "canvas refresh dispatches compilation, is unavailable during compile or active run, and releases a completed run",
+          "duration": 9.176000000000386,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Inspector dialog Close and CNC-only simulator handoff invoke their respective callbacks",
+          "status": "passed",
+          "title": "Inspector dialog Close and CNC-only simulator handoff invoke their respective callbacks",
+          "duration": 14.378799999999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006052150,
+      "endTime": 1790006052404.379,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/gcode-inspector/InspectorControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Trace Cancel while successful work is pending"],
+          "fullName": "Trace Cancel while successful work is pending closes ordinary-vector before its successful reply and preserves document state",
+          "status": "passed",
+          "title": "closes ordinary-vector before its successful reply and preserves document state",
+          "duration": 106.39930000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Cancel while successful work is pending"],
+          "fullName": "Trace Cancel while successful work is pending closes camera-raster before its successful reply and preserves document state",
+          "status": "passed",
+          "title": "closes camera-raster before its successful reply and preserves document state",
+          "duration": 36.28780000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006056140,
+      "endTime": 1790006056283.2878,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/ImportImageDialog.cancel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["sameTraceSource"],
+          "fullName": "sameTraceSource true when the live source is unchanged",
+          "status": "passed",
+          "title": "true when the live source is unchanged",
+          "duration": 3.9440999999997075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["sameTraceSource"],
+          "fullName": "sameTraceSource false when the source was removed",
+          "status": "passed",
+          "title": "false when the source was removed",
+          "duration": 0.5555999999996857,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["sameTraceSource"],
+          "fullName": "sameTraceSource false when the image content (dataUrl) changed",
+          "status": "passed",
+          "title": "false when the image content (dataUrl) changed",
+          "duration": 0.4780000000000655,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["sameTraceSource"],
+          "fullName": "sameTraceSource false when the pixel grid changed",
+          "status": "passed",
+          "title": "false when the pixel grid changed",
+          "duration": 0.5153000000000247,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["sameTraceSource"],
+          "fullName": "sameTraceSource false when the object is no longer a raster",
+          "status": "passed",
+          "title": "false when the object is no longer a raster",
+          "duration": 0.5021999999999025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) reuses a matching ready preview without decoding or tracing again",
+          "status": "passed",
+          "title": "reuses a matching ready preview without decoding or tracing again",
+          "duration": 5.578299999999672,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) retraces instead of reusing a preview whose options no longer match",
+          "status": "passed",
+          "title": "retraces instead of reusing a preview whose options no longer match",
+          "duration": 1.2835999999997512,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) commits when the live source is unchanged",
+          "status": "passed",
+          "title": "commits when the live source is unchanged",
+          "duration": 4.836099999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) does not commit into a replacement document with an equivalent source clone",
+          "status": "passed",
+          "title": "does not commit into a replacement document with an equivalent source clone",
+          "duration": 0.9565999999999804,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) silently drops a deferred completion after its exact owner is lost",
+          "status": "passed",
+          "title": "silently drops a deferred completion after its exact owner is lost",
+          "duration": 1.4411000000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) applies Scanline as an object-level fill override",
+          "status": "passed",
+          "title": "applies Scanline as an object-level fill override",
+          "duration": 1.5805999999997766,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) commits no fill override when the dialog sends no fill style (CNC)",
+          "status": "passed",
+          "title": "commits no fill override when the dialog sends no fill style (CNC)",
+          "duration": 3.3047999999998865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) applies Follow Shape as an object-level offset fill override",
+          "status": "passed",
+          "title": "applies Follow Shape as an object-level offset fill override",
+          "duration": 1.958599999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) applies Island Fill as an object-level island fill override",
+          "status": "passed",
+          "title": "applies Island Fill as an object-level island fill override",
+          "duration": 1.9308000000000902,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) passes Delete Image After trace through commit and reports source deleted",
+          "status": "passed",
+          "title": "passes Delete Image After trace through commit and reports source deleted",
+          "duration": 2.094600000000355,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) commits a bounded trace in source-image coordinates",
+          "status": "passed",
+          "title": "commits a bounded trace in source-image coordinates",
+          "duration": 4.020999999999731,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) scales a 6000px source boundary before a fresh 2048px commit trace",
+          "status": "passed",
+          "title": "scales a 6000px source boundary before a fresh 2048px commit trace",
+          "duration": 7.777599999999893,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) aborts (no overlay) when the live source content changed mid-dialog",
+          "status": "passed",
+          "title": "aborts (no overlay) when the live source content changed mid-dialog",
+          "duration": 0.8134000000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["commit source revalidation (P2-A)"],
+          "fullName": "commit source revalidation (P2-A) aborts when the live source was removed mid-dialog",
+          "status": "passed",
+          "title": "aborts when the live source was removed mid-dialog",
+          "duration": 0.480199999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006047349,
+      "endTime": 1790006047394.4802,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/ImportImageDialog.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls defaults laser traces to editable vectors with the raster scan escape",
+          "status": "passed",
+          "title": "defaults laser traces to editable vectors with the raster scan escape",
+          "duration": 141.67989999999918,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls offers all five trace presets including the rebuilt Edge Detection",
+          "status": "passed",
+          "title": "offers all five trace presets including the rebuilt Edge Detection",
+          "duration": 36.01380000000063,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls shows Fill Style only for filled-contour presets",
+          "status": "passed",
+          "title": "shows Fill Style only for filled-contour presets",
+          "duration": 70.27299999999923,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls opens CNC on Smooth while leaving every preset selectable",
+          "status": "passed",
+          "title": "opens CNC on Smooth while leaving every preset selectable",
+          "duration": 31.318199999999706,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls keeps CNC tracing vector-only",
+          "status": "passed",
+          "title": "keeps CNC tracing vector-only",
+          "duration": 27.39100000000144,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls commits a CNC trace with no laser fill override",
+          "status": "passed",
+          "title": "commits a CNC trace with no laser fill override",
+          "duration": 37.111800000000585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls shows vector trace settings without image-adjustment controls",
+          "status": "passed",
+          "title": "shows vector trace settings without image-adjustment controls",
+          "duration": 40.20260000000053,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls disables alpha-mask tracing when the source image has no transparent pixels",
+          "status": "passed",
+          "title": "disables alpha-mask tracing when the source image has no transparent pixels",
+          "duration": 24.939000000000306,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls keeps alpha-mask tracing disabled until source transparency is known",
+          "status": "passed",
+          "title": "keeps alpha-mask tracing disabled until source transparency is known",
+          "duration": 19.937299999999595,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls keeps alpha-mask tracing available for transparent source images",
+          "status": "passed",
+          "title": "keeps alpha-mask tracing available for transparent source images",
+          "duration": 24.535499999999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls shows the edge-specific controls when Edge Detection is selected",
+          "status": "passed",
+          "title": "shows the edge-specific controls when Edge Detection is selected",
+          "duration": 35.9413999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls does not show contour-only Smoothness and Optimize controls for Centerline",
+          "status": "passed",
+          "title": "does not show contour-only Smoothness and Optimize controls for Centerline",
+          "duration": 37.69460000000072,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Trace Image workflow controls"],
+          "fullName": "Trace Image workflow controls reveals the boundary-mode toggle only after a region is boxed",
+          "status": "passed",
+          "title": "reveals the boundary-mode toggle only after a region is boxed",
+          "duration": 46.02639999999883,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006043579,
+      "endTime": 1790006044152.0264,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/ImportImageDialog.workflow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection starts in Overlay and switches layers without replacing the trace or points",
+          "status": "passed",
+          "title": "starts in Overlay and switches layers without replacing the trace or points",
+          "duration": 87.37789999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection starts with a faded comparison and remembers its preference without fading Original",
+          "status": "passed",
+          "title": "starts with a faded comparison and remembers its preference without fading Original",
+          "duration": 21.2958000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection zooms every layer together, preserves the viewport centre, and resets with Fit",
+          "status": "passed",
+          "title": "zooms every layer together, preserves the viewport centre, and resets with Fit",
+          "duration": 26.32549999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection maps a boundary through zoom, scrolling and letterboxing in every comparison mode",
+          "status": "passed",
+          "title": "maps a boundary through zoom, scrolling and letterboxing in every comparison mode",
+          "duration": 29.14260000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection keeps view controls local while replacing a pending trace with its new result",
+          "status": "passed",
+          "title": "keeps view controls local while replacing a pending trace with its new result",
+          "duration": 16.040700000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection uses Trace view when no source bitmap is available",
+          "status": "passed",
+          "title": "uses Trace view when no source bitmap is available",
+          "duration": 5.821300000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection bounds inspection zoom and leaves every view control separate from form submission",
+          "status": "passed",
+          "title": "bounds inspection zoom and leaves every view control separate from form submission",
+          "duration": 23.403999999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview comparison and inspection"],
+          "fullName": "TracePreview comparison and inspection cancels an unfinished boundary when the pointer leaves the stage",
+          "status": "passed",
+          "title": "cancels an unfinished boundary when the pointer leaves the stage",
+          "duration": 8.078199999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview status"],
+          "fullName": "TracePreview status announces the { kind: 'idle' } phase without reporting stale counts",
+          "status": "passed",
+          "title": "announces the { kind: 'idle' } phase without reporting stale counts",
+          "duration": 4.133899999999812,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview status"],
+          "fullName": "TracePreview status announces the { kind: 'decoding' } phase without reporting stale counts",
+          "status": "passed",
+          "title": "announces the { kind: 'decoding' } phase without reporting stale counts",
+          "duration": 3.181799999999839,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview status"],
+          "fullName": "TracePreview status announces the { kind: 'tracing' } phase without reporting stale counts",
+          "status": "passed",
+          "title": "announces the { kind: 'tracing' } phase without reporting stale counts",
+          "duration": 4.4693999999999505,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview status"],
+          "fullName": "TracePreview status announces an error and reports result polylines and stored points when ready",
+          "status": "passed",
+          "title": "announces an error and reports result polylines and stored points when ready",
+          "duration": 8.533799999999928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview status"],
+          "fullName": "TracePreview status reports an empty result honestly",
+          "status": "passed",
+          "title": "reports an empty result honestly",
+          "duration": 3.19620000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006048670,
+      "endTime": 1790006048911.1963,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/trace-preview-view.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls shows the source bitmap and Fade Image toggle",
+          "status": "passed",
+          "title": "shows the source bitmap and Fade Image toggle",
+          "duration": 51.6114,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls changes only the source image opacity when Fade Image is toggled",
+          "status": "passed",
+          "title": "changes only the source image opacity when Fade Image is toggled",
+          "duration": 14.071700000000078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls shows traced nodes when Show Points is toggled",
+          "status": "passed",
+          "title": "shows traced nodes when Show Points is toggled",
+          "duration": 12.449600000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls reports a dragged Boundary rectangle in image pixels",
+          "status": "passed",
+          "title": "reports a dragged Boundary rectangle in image pixels",
+          "duration": 8.872299999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls ignores Boundary drags while the preview frame is collapsed",
+          "status": "passed",
+          "title": "ignores Boundary drags while the preview frame is collapsed",
+          "duration": 9.906099999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TracePreview source overlay controls"],
+          "fullName": "TracePreview source overlay controls clears the active Boundary rectangle",
+          "status": "passed",
+          "title": "clears the active Boundary rectangle",
+          "duration": 6.626199999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006053396,
+      "endTime": 1790006053499.6262,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/trace/TracePreview.test.tsx"
+    }
+  ]
+}

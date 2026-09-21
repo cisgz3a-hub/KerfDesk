@@ -8,7 +8,7 @@ interface Props {
 
 export function CollapsibleRailSection({ label, title, children }: Props): JSX.Element {
   return (
-    <details style={sectionStyle}>
+    <details className="lf-machine-disclosure" style={sectionStyle}>
       <summary style={summaryStyle} title={title}>
         {label}
       </summary>

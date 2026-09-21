@@ -98,6 +98,23 @@ function buttonByText(text: string): HTMLButtonElement {
 }
 
 describe('JobReviewDialog', () => {
+  it('audit Controller Machine and Warnings disclosures toggle without resolving review', async () => {
+    useJobReviewStore.getState().open(model);
+    await render();
+    for (const prefix of ['Controller', 'Machine', 'Warnings']) {
+      const summary = [...host.querySelectorAll('summary')].find((node) =>
+        node.textContent?.trim().startsWith(prefix),
+      );
+      expect(summary).toBeDefined();
+      const details = summary!.parentElement as HTMLDetailsElement;
+      const initial = details.open;
+      await act(async () => summary!.click());
+      expect(details.open).toBe(!initial);
+      await act(async () => summary!.click());
+      expect(details.open).toBe(initial);
+    }
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  });
   it('renders nothing while no review is pending', async () => {
     await render();
     expect(host.textContent).toBe('');
