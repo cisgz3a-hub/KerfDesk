@@ -37,6 +37,10 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   await installImageOpenPicker(page);
   await page.goto('/');
   await (await toolbarCommand(page, 'Import...')).click();
+  await page
+    .getByRole('tablist', { name: 'Edit artwork or operation' })
+    .getByRole('tab', { name: 'Artwork', exact: true })
+    .click();
   await page.getByRole('button', { name: /^Edit Image/ }).click();
 
   const editor = page.getByRole('dialog', { name: /^Image Studio/ });
@@ -46,6 +50,26 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   await expect
     .poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width * element.height))
     .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      canvas.evaluate((element: HTMLCanvasElement) => {
+        const host = element.parentElement;
+        return (
+          host !== null &&
+          host.clientWidth > 0 &&
+          host.clientHeight > 0 &&
+          element.width === host.clientWidth &&
+          element.height === host.clientHeight
+        );
+      }),
+    )
+    .toBe(true);
+  const canvasSize = () =>
+    canvas.evaluate((element: HTMLCanvasElement) => ({
+      width: element.width,
+      height: element.height,
+    }));
+  const baselineCanvasSize = await canvasSize();
 
   const baseTextPatch = await captureTextCanvasPatch(canvas);
   await editor.getByRole('button', { name: /^Text/ }).click();
@@ -55,6 +79,9 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   await textDialog.getByRole('button', { name: 'OK', exact: true }).click();
   await expect(textDialog).toHaveCount(0);
   await expect(editor.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+  // Text temporarily changes the options bar height. Restore the original
+  // canvas coordinates before comparing the same transparent image pixels.
+  await expect.poll(canvasSize).toEqual(baselineCanvasSize);
   await waitForTwoFrames(page);
 
   const textPatch = await captureTextCanvasPatch(canvas);

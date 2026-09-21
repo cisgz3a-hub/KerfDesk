@@ -92,7 +92,7 @@ describe('artwork control audit: utilities', () => {
       }));
       const source = useStore.getState().project.scene.objects[0];
       const host = await mount(<OffsetPathsRow />);
-      await click(button(host, label));
+      await click(button(host, `${label} copy`));
       const objects = useStore.getState().project.scene.objects;
       expect(objects).toHaveLength(2);
       expect(objects[0]).toBe(source);

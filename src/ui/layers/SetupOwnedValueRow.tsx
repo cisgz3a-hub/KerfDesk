@@ -18,6 +18,7 @@ export function SetupOwnedValueRow(props: {
     <div style={containerStyle}>
       <button
         type="button"
+        className="lf-setup-reference-button"
         aria-expanded={isExpanded}
         aria-controls={explanationId}
         aria-label={`${props.label}: ${props.value}. Managed in Startup Setup.`}
@@ -26,7 +27,9 @@ export function SetupOwnedValueRow(props: {
         onClick={() => setIsExpanded((current) => !current)}
       >
         <span style={labelStyle}>{props.label}</span>
-        <span style={valueStyle}>{props.value}</span>
+        <span className="lf-setup-reference-value" style={valueStyle}>
+          {props.value}
+        </span>
         <span aria-hidden="true" style={infoStyle}>
           Info
         </span>
@@ -62,7 +65,7 @@ const referenceButtonStyle: React.CSSProperties = {
   width: '100%',
   minHeight: 30,
   display: 'grid',
-  gridTemplateColumns: '100px minmax(0, 1fr) auto',
+  gridTemplateColumns: 'var(--lf-setup-reference-columns, 100px minmax(0, 1fr) auto)',
   alignItems: 'center',
   gap: 8,
   padding: '4px 7px',
@@ -79,7 +82,7 @@ const labelStyle: React.CSSProperties = { fontSize: 12 };
 const valueStyle: React.CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  whiteSpace: 'var(--lf-setup-reference-white-space, nowrap)' as React.CSSProperties['whiteSpace'],
   fontSize: 12,
   fontWeight: 600,
   color: 'var(--lf-text-muted)',

@@ -19,6 +19,7 @@ import {
   rectangle,
   renderFields,
   roundTrip,
+  selectOption,
   settingsFor,
 } from './settings-fixtures';
 
@@ -56,8 +57,8 @@ describe('S1: untouched CNC controls retain exact persisted ownership', () => {
   });
 });
 
-describe('S5: calculator material and recipe are one saved operation', () => {
-  it('applies job material to a manual operation and survives ordinary Save/reload and undo', async () => {
+describe('S5: operation material and recipe are one saved operation', () => {
+  it('requires an explicit job-material choice and survives ordinary Save/reload and undo', async () => {
     const jobMachine = { ...machine, stock: { ...machine.stock, materialKey: 'hardwood' } };
     const before = roundTrip(projectFor(layerWith(), jobMachine));
     expect(settingsFor(before).materialKey).toBeUndefined();
@@ -68,8 +69,16 @@ describe('S5: calculator material and recipe are one saved operation', () => {
         (button) => button.textContent === 'Apply to layer',
       );
       if (apply === undefined) throw new Error('Missing calculator Apply');
-      expect(apply.disabled).toBe(false);
+      expect(apply.disabled).toBe(true);
       await act(async () => apply.click());
+      expect(useStore.getState().project).toBe(before);
+      expect(useStore.getState().undoStack).toHaveLength(0);
+      expect(
+        view.host.querySelector('output[aria-label="Material for feeds calculator"]')?.textContent,
+      ).toContain('Manual');
+
+      await selectOption(view.host, 'Material', '__job-material__');
+      expect(apply.disabled).toBe(false);
       const after = useStore.getState().project;
       expect(settingsFor(after)).toMatchObject({
         materialKey: 'hardwood',
@@ -80,8 +89,10 @@ describe('S5: calculator material and recipe are one saved operation', () => {
       expect(useStore.getState().undoStack).toHaveLength(1);
       await act(async () => useStore.getState().undo());
       expect(settingsFor(useStore.getState().project)).toEqual(settingsFor(before));
+      expect(apply.disabled).toBe(true);
       await act(async () => useStore.getState().redo());
       expect(settingsFor(useStore.getState().project)).toEqual(settingsFor(after));
+      expect(apply.disabled).toBe(false);
     } finally {
       await view.dispose();
     }

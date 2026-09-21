@@ -84,6 +84,7 @@ baseTest(
     expect(workerUrls.length).toBeGreaterThan(0);
 
     await page.keyboard.press('Escape');
+    await page.locator('summary').filter({ hasText: 'All operations' }).click();
     await page.getByLabel('More controls for fixture', { exact: true }).click();
     await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();
     await expect(page.getByRole('region', { name: 'Selected artwork operation' })).toBeVisible();

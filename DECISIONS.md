@@ -17115,10 +17115,35 @@ default bit, tiling, and Tool Plan are available in its optional **CNC job setup
 CNC is active. Existing **Startup Setup** entry points and exact-field links open that stage and
 the relevant section. They do not add a fourth stage.
 
-This changes the placement described in Decision 1, not ownership: the setup draft remains the sole
-writable owner of these values. The machine-versus-current-job scopes, explicit material Apply,
-manual-value preservation, read-only Artwork/Job Review references, atomic Save/Cancel boundary,
-and firmware-write policy below remain unchanged.
+This changes the placement described in Decision 1. The later amendment below permits direct
+per-operation material and cutter choices in Artwork. Machine and current-job default scopes,
+explicit job-material Apply, manual-value preservation, read-only Job Review, the setup draft's
+atomic Save/Cancel boundary, and firmware-write policy remain unchanged.
+
+### Amendment — direct operation choices, 2026-09-22
+
+The maintainer now requests material and bit choices directly in **Artwork settings > Operation >
+Tool & material**. This supersedes the exclusive Startup Setup ownership of per-operation material
+and primary/secondary cutter assignments in decisions 2, 3 and 8 below. Both surfaces edit the same
+persisted operation bindings; opening or selecting artwork still never launches setup automatically.
+
+- Choosing an operation material explicitly applies the existing machine-aware starting feed,
+  plunge, spindle speed and depth per pass to that operation. The panel explains this before the
+  choice. **Manual** clears the material recipe while retaining the current numeric values.
+- A primary bit choice changes only that operation's tool binding. **Use job default bit** removes
+  its override. Changing a bit refreshes material-recipe feeds, while manual cutting values remain
+  exact. Applicable clearing, pocket roughing and relief finishing bits are editable here too.
+- Shared operations retain their existing scope: the inspector identifies the artworks affected and
+  offers **Make unique**. Operation choices do not change unrelated operations or current-job
+  defaults. Undo, project persistence and compiler tool resolution use the existing contracts.
+- Startup Setup remains the owner of machine limits, current-job defaults and stock. Its own draft,
+  Save and Cancel boundary is unchanged. Machine references remain accessible from Artwork settings,
+  with **Machine maximum** immediately beside **Artwork spindle speed**. Job Review stays read-only.
+- Purpose-specific expandable sections replace the always-visible Advanced block. Closing a group
+  keeps its editors mounted, preserving pending values and undo reconciliation.
+
+The original decision below records the earlier placement and is subject to this amendment. No
+hardware commands, schema migration or Frame/Start policy changes are introduced.
 
 ### Context
 

@@ -7,6 +7,8 @@ import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { laserOperationTutorial } from './operation-tutorial';
+import { LaserProcessField } from './LaserProcessField';
+import './laser-operation-settings.css';
 
 function ProcessTutorial(props: {
   readonly mode: LayerMode;
@@ -48,36 +50,34 @@ export function LaserOperationFields(props: {
     commit,
   };
   return (
-    <>
+    <div className="lf-laser-operation-fields">
       {hasMixedFields(props.mixedFields) ? (
-        <p style={hintStyle}>
+        <p className="lf-laser-help lf-laser-notice">
           Mixed settings. Changes apply to all {props.objectIds.length} selected artworks; other
           settings stay independent.
         </p>
       ) : null}
-      <ProcessField
-        operation={props.operation}
+      <LaserProcessField
+        mode={props.operation.mode}
         mixed={props.mixedFields.mode === true}
-        ariaContext={props.ariaContext}
+        ariaLabel={`Mode for ${props.ariaContext}`}
         onChange={(mode) => commit({ mode })}
+        help={
+          <ProcessTutorial mode={props.operation.mode} mixed={props.mixedFields.mode === true} />
+        }
       />
       <LayerRowSettingsFields layer={props.operation} operationTarget={target} />
-      <ProcessTutorial mode={props.operation.mode} mixed={props.mixedFields.mode === true} />
-      <label title="Turn job-controlled air assist on for this operation" style={airAssistStyle}>
-        <input
-          type="checkbox"
-          {...mixedCheckboxProps(props.operation.airAssist, props.mixedFields.airAssist)}
-          aria-label="Air assist for selected operation"
-          title="Turn job-controlled air assist on for this operation"
-          onChange={(event) => commit({ airAssist: event.target.checked })}
-        />{' '}
-        Air assist
-      </label>
+      <AirAssistField
+        checked={props.operation.airAssist}
+        mixed={props.mixedFields.airAssist === true}
+        onChange={(airAssist) => commit({ airAssist })}
+      />
       <button
         type="button"
         title="Open advanced laser operation settings"
         onClick={openSettings}
         disabled={cutSettingsBlocked}
+        className="lf-btn lf-laser-advanced-button"
       >
         Advanced cut settings
       </button>
@@ -92,43 +92,33 @@ export function LaserOperationFields(props: {
             : {})}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
-function ProcessField(props: {
-  readonly operation: Layer;
+function AirAssistField(props: {
+  readonly checked: boolean;
   readonly mixed: boolean;
-  readonly ariaContext: string;
-  readonly onChange: (mode: LayerMode) => void;
+  readonly onChange: (airAssist: boolean) => void;
 }): JSX.Element {
   return (
-    <label style={fieldRowStyle}>
-      <span>Process</span>
-      <select
-        value={props.mixed ? '' : props.operation.mode}
-        aria-label={`Mode for ${props.ariaContext}`}
-        title="Choose how the laser processes the selected artwork"
-        onChange={(event) => props.onChange(event.target.value as LayerMode)}
-      >
-        {props.mixed ? (
-          <option value="" disabled>
-            Mixed
-          </option>
-        ) : null}
-        <option value="line">Line</option>
-        <option value="fill">Fill</option>
-        <option value="image">Image</option>
-      </select>
+    <label
+      className="lf-laser-air-assist"
+      title="Turn job-controlled air assist on for this operation"
+    >
+      <input
+        type="checkbox"
+        {...mixedCheckboxProps(props.checked, props.mixed)}
+        aria-label="Air assist for selected operation"
+        title="Turn job-controlled air assist on for this operation"
+        onChange={(event) => props.onChange(event.target.checked)}
+      />
+      <span>
+        <strong>Air assist</strong>
+        <span className="lf-laser-help">
+          Request airflow during this operation on supported machines.
+        </span>
+      </span>
     </label>
   );
 }
-
-const hintStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-muted)' };
-const airAssistStyle: React.CSSProperties = { fontSize: 12 };
-const fieldRowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '100px 1fr',
-  gap: 8,
-  alignItems: 'center',
-};

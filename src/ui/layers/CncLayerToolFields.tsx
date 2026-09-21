@@ -1,5 +1,5 @@
 // Operation-owned relief, entry, and motion-polish fields for CNC artwork.
-// All cutter assignments live in Startup Setup's Tool Plan.
+// Cutter assignments live with Tool & material in the operation editor.
 
 import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
@@ -35,7 +35,7 @@ export function ReliefLayerRows(props: {
   );
 }
 
-// Cutter assignment lives in Startup Setup; the operation still owns its
+// Cutter assignment lives in Tool & material; the operation also owns its
 // finishing scallop target.
 function ReliefScallopRow(props: {
   readonly layer: Layer;
@@ -51,7 +51,7 @@ function ReliefScallopRow(props: {
         value={props.settings.reliefScallopMm ?? 0.025}
         onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
         ariaLabel={`Relief scallop height for ${props.layer.color}`}
-        title="Scallop height target (mm) for the relief finishing bit assigned in Startup Setup — smaller = finer finishing rows, longer job."
+        title="Scallop height target (mm) for the relief finishing bit chosen in Tool & material — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
       <span style={rampUnitStyle}>mm</span>
@@ -72,45 +72,49 @@ export function MotionPolishRows(props: {
     props.settings.cutType === 'profile-inside' ||
     props.settings.cutType === 'pocket';
   return (
-    <Row label="Entry">
+    <>
       {showCutDirection ? (
-        <select
-          value={props.settings.cutDirection ?? ''}
-          onChange={(e) => {
-            if (e.target.value === '') {
-              const { cutDirection: _removed, ...rest } = props.settings;
-              props.onCommitSettings(rest);
-            } else {
-              props.onCommit({
-                cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
-              });
-            }
-          }}
-          aria-label={`Cut direction for ${props.layer.color}`}
-          title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
-          style={directionSelectStyle}
-        >
-          <option value="">Default direction</option>
-          <option value="climb">Climb</option>
-          <option value="conventional">Conventional</option>
-        </select>
+        <Row label="Cut direction">
+          <select
+            value={props.settings.cutDirection ?? ''}
+            onChange={(e) => {
+              if (e.target.value === '') {
+                const { cutDirection: _removed, ...rest } = props.settings;
+                props.onCommitSettings(rest);
+              } else {
+                props.onCommit({
+                  cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
+                });
+              }
+            }}
+            aria-label={`Cut direction for ${props.layer.color}`}
+            title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
+            style={directionSelectStyle}
+          >
+            <option value="">Default direction</option>
+            <option value="climb">Climb</option>
+            <option value="conventional">Conventional</option>
+          </select>
+        </Row>
       ) : null}
-      <ClearableNumberField
-        min={0}
-        max={isVCarve ? Number.MAX_VALUE : 45}
-        step={0.5}
-        value={(isVCarve ? props.settings.vCarveRampEntryDeg : props.settings.rampEntryDeg) ?? 0}
-        onCommit={(deg) => commitRampEntry(props.settings, deg, props.onCommitSettings)}
-        ariaLabel={`Ramp entry angle for ${props.layer.color}`}
-        title={
-          isVCarve
-            ? "Requested maximum entry angle. The certified medial depth profile may supersede it; Job Review reports that explicitly. Use only the cutter manufacturer's approved angle. 0 = profile-controlled entry."
-            : 'Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default).'
-        }
-        style={rampInputStyle}
-      />
-      <span style={rampUnitStyle}>{isVCarve ? '° requested' : '° ramp'}</span>
-    </Row>
+      <Row label="Ramp entry">
+        <ClearableNumberField
+          min={0}
+          max={isVCarve ? Number.MAX_VALUE : 45}
+          step={0.5}
+          value={(isVCarve ? props.settings.vCarveRampEntryDeg : props.settings.rampEntryDeg) ?? 0}
+          onCommit={(deg) => commitRampEntry(props.settings, deg, props.onCommitSettings)}
+          ariaLabel={`Ramp entry angle for ${props.layer.color}`}
+          title={
+            isVCarve
+              ? "Requested maximum entry angle. The certified medial depth profile may supersede it; Job Review reports that explicitly. Use only the cutter manufacturer's approved angle. 0 = profile-controlled entry."
+              : 'Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default).'
+          }
+          style={rampInputStyle}
+        />
+        <span style={rampUnitStyle}>{isVCarve ? '° requested' : '° ramp'}</span>
+      </Row>
+    </>
   );
 }
 
@@ -159,14 +163,14 @@ export function HelicalEntryRows(props: {
             });
           }}
           aria-label={`Helical entry for ${props.layer.color}`}
-          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, edit Startup Setup > Tool Plan and choose Single bit because the two operations cannot currently compile together."
+          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, choose Single bit under Tool & material because the two operations cannot currently compile together."
         />
         <span style={helixLabelStyle}>Use circular ramp</span>
       </Row>
       {helix !== undefined && props.settings.pocketRoughToolId !== undefined ? (
         <p role="note" style={helixConflictStyle}>
-          Helical entry cannot compile while a pocket roughing bit is assigned. Edit Startup Setup
-          &gt; Tool Plan and choose Single bit for this artwork.
+          Helical entry cannot compile while a pocket roughing bit is assigned. Choose Single bit
+          under Pocket roughing bit in Tool &amp; material above.
         </p>
       ) : null}
       {helix === undefined ? null : (
@@ -239,9 +243,11 @@ function HelixNumberRow(props: {
 
 function Row(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <div style={rowStyle}>
+    <div className="lf-cnc-setting-row" style={rowStyle}>
       <span style={labelStyle}>{props.label}</span>
-      <div style={valueStyle}>{props.children}</div>
+      <div className="lf-cnc-setting-value" style={valueStyle}>
+        {props.children}
+      </div>
     </div>
   );
 }

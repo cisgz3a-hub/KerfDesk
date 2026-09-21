@@ -13,7 +13,7 @@ import { CncLayerFields } from './CncLayerFields';
 import { CutsLayersPanel } from './CutsLayersPanel';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { SelectedReliefProperties } from './SelectedReliefProperties';
-import { click, layer, mount } from './control-audit-test-support';
+import { button, click, layer, mount } from './control-audit-test-support';
 
 async function lesson(host: HTMLElement, id: string) {
   const trigger = host.querySelector<HTMLButtonElement>(`[data-tutorial-id="${id}"]`);
@@ -59,7 +59,14 @@ describe('artwork control audit: contextual lesson bindings', () => {
   it('opens the holding tabs lesson from the profile fields', async () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().importSvgObject(svgObj('Part', ['#000000']));
-    await lesson(await mount(<CncLayerFields layer={layer()} />), 'cnc-tabs');
+    const host = await mount(<CncLayerFields layer={layer()} />);
+    const summary = [...host.querySelectorAll('summary')].find((element) =>
+      element.textContent?.startsWith('Holding tabs'),
+    );
+    if (summary === undefined) throw new Error('Missing Holding tabs disclosure');
+    await click(summary);
+    expect(summary.closest('details')?.open).toBe(true);
+    await lesson(host, 'cnc-tabs');
   });
   it('opens the material library lesson from the panel and the preset wizard', async () => {
     await lesson(await mount(<MaterialLibraryPanel />), 'materials');
@@ -87,6 +94,7 @@ describe('artwork control audit: contextual lesson bindings', () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().importSvgObject({ ...object, paths });
     const host = await mount(<CutsLayersPanel />);
+    await click(button(host, 'Artwork'));
     await lesson(host, 'offset');
     useTutorialStore.getState().closeTutorial();
     await lesson(host, 'dogbone');

@@ -6,6 +6,17 @@ import { CutsLayersPanel } from './CutsLayersPanel';
 import { CncLayerFields } from './CncLayerFields';
 import { arrangeTwo, button, click, input, layer, mount } from './control-audit-test-support';
 
+async function openDisclosure(host: HTMLElement, label: string): Promise<void> {
+  const summary = [...host.querySelectorAll('summary')].find((element) =>
+    element.textContent?.trim().startsWith(label),
+  );
+  const details = summary?.closest('details');
+  if (summary === undefined || details === null || details === undefined)
+    throw new Error(`Missing disclosure: ${label}`);
+  if (!details.open) await click(summary);
+  expect(details.open).toBe(true);
+}
+
 describe('artwork control audit: cut settings', () => {
   it.each([
     ['line', ['visible', 'output', 'tabsEnabled', 'tabSkipInnerShapes']],
@@ -14,13 +25,21 @@ describe('artwork control audit: cut settings', () => {
       'image',
       ['negativeImage', 'imageBidirectional', 'passThrough', 'allowUncalibratedBidirectionalScan'],
     ],
-  ] as const)('commits every %s advanced checkbox only on OK', async (mode, fields) => {
+  ] as const)('commits every %s advanced checkbox only on Apply settings', async (mode, fields) => {
     arrangeTwo();
     const id = layer(1).id;
     useStore.getState().setLayerParam(id, { mode });
     const before = layer(1);
     const host = await mount(<CutsLayersPanel />);
     await click(button(host, 'Advanced cut settings'));
+    await openDisclosure(
+      host,
+      mode === 'line'
+        ? 'Visibility & output'
+        : mode === 'fill'
+          ? 'Calibration override'
+          : 'Image & calibration extras',
+    );
     const expected: Record<string, boolean> = {};
     for (const field of fields) {
       const checkbox = input(host, `input[name="${field}"]`);
@@ -28,7 +47,7 @@ describe('artwork control audit: cut settings', () => {
       await click(checkbox);
     }
     expect(layer(1)).toBe(before);
-    await click(button(host, 'OK'));
+    await click(button(host, 'Apply settings'));
     expect(layer(1)).toMatchObject(expected);
     expect(layer().visible).toBe(true);
     expect(layer().output).toBe(true);
@@ -46,6 +65,7 @@ describe('artwork control audit: cut settings', () => {
       useStore.getState().setLayerParam(layer(1).id, { mode });
       const before = layer(1)[field];
       const host = await mount(<CutsLayersPanel />);
+      await openDisclosure(host, mode === 'fill' ? 'Fill options' : 'Image options');
       await click(input(host, `input[aria-label="${label} for selected objects"]`));
       expect(layer(1)[field]).toBe(!before);
     },
@@ -57,6 +77,7 @@ describe('artwork control audit: cut settings', () => {
     useStore.getState().setLayerParam(id, { power: 63, speed: 888 });
     const host = await mount(<CutsLayersPanel />);
     await click(button(host, 'Advanced cut settings'));
+    await openDisclosure(host, 'Saved defaults');
     await click(button(host, 'Make Default'));
     expect(useStore.getState().layerDefaults.byColor[layer(1).color]).toMatchObject({
       power: 63,
@@ -65,10 +86,11 @@ describe('artwork control audit: cut settings', () => {
     await click(button(host, 'Make Default for All'));
     expect(useStore.getState().layerDefaults.allColors).toMatchObject({ power: 63, speed: 888 });
     await act(async () => useStore.getState().setLayerParam(id, { power: 12, speed: 222 }));
+    await openDisclosure(host, 'Saved defaults');
     await click(button(host, 'Reset to Default'));
     expect(layer(1)).toMatchObject({ power: 63, speed: 888 });
     expect(input(host, '[aria-label="Cut settings power"]').value).toBe('63');
-    await click(button(host, 'OK'));
+    await click(button(host, 'Apply settings'));
     expect(layer(1).power).toBe(63);
   });
 
@@ -87,6 +109,7 @@ describe('artwork control audit: cut settings', () => {
       return <CncLayerFields layer={target} />;
     }
     const host = await mount(<Fields />);
+    await openDisclosure(host, 'Entry & travel');
     const reset = [...host.querySelectorAll<HTMLButtonElement>('button')].find((element) =>
       element.textContent?.startsWith('Use cutter radius'),
     )!;

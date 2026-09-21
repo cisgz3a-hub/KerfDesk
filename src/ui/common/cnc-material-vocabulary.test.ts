@@ -1,5 +1,5 @@
-// Pins "one term per concept" for the no-recipe state across the sole Startup
-// authoring flow and its read-only Artwork / Job Review representations.
+// Pins "one term per concept" for the no-recipe state across Startup Setup,
+// the Artwork operation editor, and Job Review.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -9,7 +9,7 @@ const SURFACES = [
   'src/ui/laser/device-setup/DeviceSetupCncJobStep.tsx',
   'src/ui/laser/device-setup/DeviceSetupCncToolPlan.tsx',
   'src/ui/laser/device-setup/DeviceSetupCncReview.tsx',
-  'src/ui/layers/CncSetupReferenceFields.tsx',
+  'src/ui/layers/CncOperationToolFields.tsx',
   'src/ui/laser/job-review/JobReviewStockCard.tsx',
 ];
 

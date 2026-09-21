@@ -42,6 +42,10 @@ async function drawRectangle(page: Page): Promise<void> {
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 8 });
   await page.mouse.up();
+  await page
+    .getByRole('tablist', { name: 'Edit artwork or operation' })
+    .getByRole('tab', { name: 'Artwork', exact: true })
+    .click();
   await expect(page.getByRole('spinbutton', { name: 'Rectangle width' })).toBeVisible();
 }
 

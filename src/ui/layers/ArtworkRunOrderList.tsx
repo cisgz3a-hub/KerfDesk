@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { ArtworkRunOrderRow } from './ArtworkRunOrderRow';
 import type { ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
 
-const ROW_HEIGHT = 152;
+// Includes the eight-pixel gap after each fixed-height card.
+const ROW_HEIGHT = 224;
 const OVERSCAN = 3;
 
 export function ArtworkRunOrderList(props: {
   readonly rows: ReadonlyArray<ArtworkRunOrderRowModel>;
+  readonly total?: number;
   readonly activeKey: string | null;
   readonly machineKind: 'laser' | 'cnc';
+  readonly numberingActive?: boolean;
   readonly reveal: { readonly position: number; readonly token: number } | null;
   readonly onFocus: (row: ArtworkRunOrderRowModel) => void;
   readonly onMove: (row: ArtworkRunOrderRowModel, position: number) => void;
@@ -36,39 +39,40 @@ export function ArtworkRunOrderList(props: {
     else element.scrollTop = top;
   }, [props.reveal, props.rows]);
 
-  const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  // A filtered list may be much shorter than the old scroll position. Clamp
+  // before slicing so it cannot render an empty window or a negative spacer.
+  const boundedScrollTop = Math.min(
+    scrollTop,
+    Math.max(0, props.rows.length * ROW_HEIGHT - viewportHeight),
+  );
+  const start = Math.max(0, Math.floor(boundedScrollTop / ROW_HEIGHT) - OVERSCAN);
   const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN * 2;
   const end = Math.min(props.rows.length, start + visibleCount);
   return (
     <div
       ref={ref}
       aria-label="Artwork run order list"
-      style={viewportStyle}
+      className="lf-run-order-list"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
       <div style={{ height: start * ROW_HEIGHT }} />
-      <div style={itemsStyle}>
+      <div>
         {props.rows.slice(start, end).map((row) => (
-          <ArtworkRunOrderRow
-            key={row.key}
-            row={row}
-            active={props.activeKey === row.key}
-            machineKind={props.machineKind}
-            onFocus={() => props.onFocus(row)}
-            onMove={(position) => props.onMove(row, position)}
-            onEditSettings={() => props.onEditSettings(row)}
-          />
+          <div key={row.key} style={{ height: ROW_HEIGHT }}>
+            <ArtworkRunOrderRow
+              row={row}
+              total={props.total ?? props.rows.length}
+              active={props.activeKey === row.key}
+              machineKind={props.machineKind}
+              numberingActive={props.numberingActive ?? false}
+              onFocus={() => props.onFocus(row)}
+              onMove={(position) => props.onMove(row, position)}
+              onEditSettings={() => props.onEditSettings(row)}
+            />
+          </div>
         ))}
       </div>
       <div style={{ height: (props.rows.length - end) * ROW_HEIGHT }} />
     </div>
   );
 }
-
-const viewportStyle: React.CSSProperties = {
-  minHeight: 240,
-  flex: 1,
-  overflowY: 'auto',
-  paddingRight: 3,
-};
-const itemsStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };

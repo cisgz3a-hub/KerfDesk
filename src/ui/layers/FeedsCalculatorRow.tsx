@@ -28,7 +28,7 @@ export function FeedsCalculatorRow(props: {
   const tool = machine?.kind === 'cnc' ? layerCncTool(machine, props.settings) : null;
   if (machine?.kind !== 'cnc' || tool === null) return null;
 
-  const material = effectiveMaterial(machine.stock.materialKey, props.settings);
+  const material = effectiveMaterial(props.settings);
   const flutes = effectiveFluteCount(tool, props.settings);
   const rpm = props.settings.spindleRpm;
   const result =
@@ -56,8 +56,8 @@ export function FeedsCalculatorRow(props: {
         <span style={fieldStyle}>
           Flutes
           <output
-            aria-label="Bit flute count from Startup Setup"
-            title="Read-only here. Set the cutter's actual flute count in the Startup Setup bit library."
+            aria-label="Bit flute count for feeds calculator"
+            title="Read-only here. Set the cutter's actual flute count when adding or editing its library entry."
             style={readOnlyMaterialStyle}
           >
             {flutes}
@@ -104,14 +104,14 @@ function effectiveFluteCount(tool: CncTool, settings: CncLayerSettings): number 
 function ReadOnlyMaterial(props: { readonly material: ChiploadMaterial | null }): JSX.Element {
   const label =
     props.material === null
-      ? 'Manual — choose material in Startup Setup'
+      ? 'Manual — choose material in Tool & material'
       : (CHIPLOAD_MATERIALS.find((item) => item.value === props.material)?.label ?? props.material);
   return (
     <span style={fieldStyle}>
       Material
       <output
-        aria-label="Chipload material from Startup Setup"
-        title="Read-only here. Change the operation material in Startup Setup."
+        aria-label="Material for feeds calculator"
+        title="Read-only here. Change this operation's material in Tool & material above."
         style={readOnlyMaterialStyle}
       >
         {label}
@@ -139,14 +139,10 @@ function FeedsCalculatorResultText(props: {
   );
 }
 
-function effectiveMaterial(
-  stockMaterialKey: string | undefined,
-  settings: CncLayerSettings,
-): ChiploadMaterial | null {
+function effectiveMaterial(settings: CncLayerSettings): ChiploadMaterial | null {
   const source = settings.feedSource;
   const key =
-    settings.materialKey ??
-    (source?.kind === 'material-recipe' ? source.materialKey : stockMaterialKey);
+    settings.materialKey ?? (source?.kind === 'material-recipe' ? source.materialKey : undefined);
   return key !== undefined && isChiploadMaterialKey(key) ? key : null;
 }
 
