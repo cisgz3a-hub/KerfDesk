@@ -16,6 +16,7 @@ import { useLaserStore } from '../state/laser-store';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
 import '../theme/tokens.css';
+import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 
@@ -23,6 +24,10 @@ const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
   throw new Error('Root element #app-root not found in index.html.');
 }
+
+// Stamp the saved theme on <html> BEFORE the first render, so the chrome never
+// paints a frame in one theme and then flips (ADR-339).
+initAppTheme();
 
 startPagedAssetReconciliation();
 watchPagedRasterOwnership();

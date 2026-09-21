@@ -4,6 +4,7 @@
 // command-families -> command-types stays acyclic (import/no-cycle).
 
 import type { MachineKind, SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
+import type { AppThemePreference } from '../theme/app-theme';
 import { commandHelpId, commandTitle, controlHelp } from '../help/help-topics';
 
 export const COMMAND_FAMILY_ORDER = [
@@ -101,6 +102,9 @@ export type CommandId =
   | 'window.toggle-machine-panel'
   | 'window.toggle-side-panels'
   | 'window.reset-layout'
+  | 'window.theme-light'
+  | 'window.theme-dark'
+  | 'window.theme-system'
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
@@ -248,6 +252,9 @@ export type AppCommandContext = {
   readonly toggleMachinePanel: () => void;
   readonly toggleSidePanels: () => void;
   readonly resetWorkspaceLayout: () => void;
+  // Appearance (ADR-339). The app opens light; this is how dark is reached.
+  readonly appTheme: AppThemePreference;
+  readonly setAppTheme: (preference: AppThemePreference) => void;
   readonly resetView: () => void;
   readonly projectNotes: () => void;
   readonly undoHistory: () => void;

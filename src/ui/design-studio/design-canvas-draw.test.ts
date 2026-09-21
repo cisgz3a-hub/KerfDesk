@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Sketch } from '../../core/design';
+import { setAppThemePreference } from '../theme/app-theme';
 import { canvasTheme } from '../theme/canvas-theme';
 import { gridStepMm, paintDesignCanvas, type DesignCanvasPaint } from './design-canvas-draw';
 
@@ -44,7 +45,10 @@ function recordingContext(): {
 
 const emptySketch: Sketch = { entities: [] };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setAppThemePreference('light');
+  vi.unstubAllGlobals();
+});
 
 const basePaint: DesignCanvasPaint = {
   view: { pxPerMm: 2, panXmm: 0, panYmm: 0 },
@@ -161,7 +165,8 @@ describe('paintDesignCanvas — entities', () => {
   };
 
   it('keeps default sketch geometry visible on a dark bed without changing layer data', () => {
-    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    // ADR-339: dark is the application's own preference, not the desktop's.
+    setAppThemePreference('dark');
     const drawing: Sketch = { entities: [sketch.entities[0]!] };
     const before = JSON.stringify(drawing);
     const { ctx } = recordingContext();
