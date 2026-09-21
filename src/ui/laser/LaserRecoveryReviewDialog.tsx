@@ -2,11 +2,12 @@ import { useRef, useState } from 'react';
 import { assertNever } from '../../core/scene';
 import type { RecoveryCapsule } from '../state/recovery';
 import { Dialog, DialogActions } from '../kit';
+import { LaserRecoveryRestartPicker } from './LaserRecoveryRestartPicker';
 
 export type LaserRecoveryReviewDialogProps = {
   readonly capsule: RecoveryCapsule;
   readonly onClose: () => void;
-  readonly onStart: (capsule: RecoveryCapsule) => Promise<boolean>;
+  readonly onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>;
 };
 
 /**
@@ -17,15 +18,29 @@ export type LaserRecoveryReviewDialogProps = {
  * review change the live session before the operator makes the final choice.
  */
 export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps): JSX.Element {
-  const start = useRecoveryStart(props);
+  const [selection, setSelection] = useState<{
+    key: string;
+    fromLine: number | undefined;
+  } | null>(null);
+  const fingerprint = props.capsule.artifact.fingerprint;
+  const selectionKey = `${props.capsule.runId}:${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
+  const fromLine = selection?.key === selectionKey ? selection.fromLine : undefined;
+  const start = useRecoveryStart(props, fromLine);
   return (
     <Dialog
       tutorialId="recovery"
       title="Review interrupted laser job"
-      size="md"
+      size="lg"
       onClose={start.closeReadOnly}
     >
       <RecoveryReviewContent capsule={props.capsule} />
+      <LaserRecoveryRestartPicker
+        key={selectionKey}
+        capsule={props.capsule}
+        fromLine={fromLine}
+        disabled={start.state === 'starting'}
+        onChange={(line) => setSelection({ key: selectionKey, fromLine: line })}
+      />
       {start.state === 'failed' ? (
         <div role="alert" aria-live="polite" style={failureStyle}>
           {start.failureMessage}
@@ -42,7 +57,10 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
 
 type RecoveryStartState = 'idle' | 'starting' | 'failed';
 
-function useRecoveryStart(props: LaserRecoveryReviewDialogProps): {
+function useRecoveryStart(
+  props: LaserRecoveryReviewDialogProps,
+  fromLine: number | undefined,
+): {
   readonly state: RecoveryStartState;
   readonly failureMessage: string;
   readonly closeReadOnly: () => void;
@@ -60,7 +78,11 @@ function useRecoveryStart(props: LaserRecoveryReviewDialogProps): {
     setFailureMessage('');
     setState('starting');
     try {
-      if (await props.onStart(props.capsule)) {
+      const started =
+        fromLine === undefined
+          ? await props.onStart(props.capsule)
+          : await props.onStart(props.capsule, fromLine);
+      if (started) {
         props.onClose();
         return;
       }

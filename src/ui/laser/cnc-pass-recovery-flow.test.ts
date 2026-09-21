@@ -358,7 +358,7 @@ describe('runCncPassRecoveryFlow', () => {
 
     expect(started).toBe(false);
     const alerts = vi.mocked(jobAwareAlert).mock.calls.map(([message]) => String(message));
-    expect(alerts.some((message) => message.includes('differs'))).toBe(true);
+    expect(alerts.some((message) => message.includes('No recovery G-code was sent'))).toBe(true);
     expect(repo.getSnapshot().recoveryCapsule).not.toBeNull();
   });
 

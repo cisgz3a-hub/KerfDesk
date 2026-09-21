@@ -78,7 +78,7 @@ export async function runCncSupervisedRecoveryFlow(
   review: CncSupervisedRecoveryReview,
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<boolean> {
-  const context = prepareRecoveryContext(capsule, review);
+  const context = await prepareRecoveryContext(capsule, review);
   if (context === null) return false;
   const planned = planRecoveryProgram(capsule, context);
   if (planned === null) return false;
@@ -112,10 +112,10 @@ export async function runCncSupervisedRecoveryFlow(
   );
 }
 
-function prepareRecoveryContext(
+async function prepareRecoveryContext(
   capsule: RecoveryCapsule,
   review: CncSupervisedRecoveryReview,
-): RecoveryContext | null {
+): Promise<RecoveryContext | null> {
   if (capsule.artifact.machineKind !== 'cnc') {
     jobAwareAlert('Cannot start CNC recovery:\n\nThe retained checkpoint is not a CNC job.');
     return null;
@@ -125,7 +125,7 @@ function prepareRecoveryContext(
     jobAwareAlert(`Cannot start CNC recovery:\n\n${reviewIssue}`);
     return null;
   }
-  const source = recoverySource(capsule);
+  const source = await recoverySource(capsule);
   if (source === null) return null;
   const manifest = recoveryManifest(capsule, source);
   if (manifest === null) return null;
@@ -274,11 +274,11 @@ function confirmRecoveryStart(planned: PlannedRecovery): CncSetupAttestation | n
   );
 }
 
-function recoverySource(capsule: RecoveryCapsule): RecoverySource | null {
+async function recoverySource(capsule: RecoveryCapsule): Promise<RecoverySource | null> {
   if (capsule.artifact.kind === 'exact-execution') {
     return prepareArchivedRecoverySource(capsule.artifact);
   }
-  const source = prepareRecoverySource({
+  const source = await prepareRecoverySource({
     outputScope: capsule.artifact.outputScope,
     ...(capsule.artifact.jobOrigin === undefined ? {} : { jobOrigin: capsule.artifact.jobOrigin }),
   });

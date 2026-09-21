@@ -14,6 +14,7 @@ import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { createExecutionArtifact, type ExecutionArtifactV1 } from '../state/recovery';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { deriveCncArtifactPassSpans } from './cnc-pass-span-derivation';
@@ -144,7 +145,7 @@ describe('deriveCncArtifactPassSpans', () => {
       prepared: artifact.prepared,
       outputScope: artifact.outputScope,
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
-      canvasPlan: artifact.canvasPlan,
+      canvasPlan: executionArtifactCanvasPlan(artifact),
       controllerSettings: artifact.archivedControllerObservation.settings,
       createdAtIso: artifact.createdAtIso,
     });

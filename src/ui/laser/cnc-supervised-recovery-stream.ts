@@ -58,7 +58,7 @@ export async function streamCncRecoveryProgram(
   claimedCapsule: RecoveryCapsule,
   repository: RecoveryRepository,
 ): Promise<boolean> {
-  const laser = useLaserStore.getState();
+  const laser = planned.source.controllerSnapshot;
   const recoveryRunId = createRunId();
   const initialPosition = reportedWorkPositionMm(
     laser,

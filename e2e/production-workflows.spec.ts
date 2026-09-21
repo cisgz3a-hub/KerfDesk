@@ -662,7 +662,7 @@ test('keeps the finished route and confirms it only after the stream settles Idl
 test('preserves an interrupted laser checkpoint after a cable disconnect', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
@@ -706,6 +706,21 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).toContainText(
     'Reviewing or closing this saved job does not change the current canvas',
   );
+  const restartCanvas = review.getByRole('img', { name: /^Laser recovery canvas:/ });
+  await expect(restartCanvas).toBeVisible();
+  await selectRecoveryMovement(restartCanvas);
+  const selectedLine = await review
+    .getByTestId('selected-recovery-movement')
+    .getAttribute('data-raw-line');
+  if (selectedLine === null) throw new Error('Expected the selected original G-code line.');
+  await expect(review.getByRole('spinbutton', { name: 'Restart from G-code line' })).toHaveValue(
+    selectedLine,
+  );
+  const beforeZoom = await restartCanvas.getAttribute('viewBox');
+  if (beforeZoom === null) throw new Error('Expected the saved route viewport.');
+  await review.getByRole('button', { name: 'Zoom in recovery canvas' }).click();
+  await expect(restartCanvas).not.toHaveAttribute('viewBox', beforeZoom);
+  await review.screenshot({ path: testInfo.outputPath('saved-laser-restart-preview.png') });
   await review.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(review).not.toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
@@ -716,7 +731,129 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
     .toBeGreaterThan(savedBeforeReview);
   expect(await savedProject(kerfdesk)).toEqual(currentProject);
   expect(serialWriteBytes(await kerfdesk.events())).toEqual(writesBeforeReview);
+
+  // Resume the sealed job after reconnect, without framing the edited canvas.
+  await kerfdesk.setAutoAcknowledge(true);
+  await connectAndHome(page, kerfdesk);
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await selectRecoveryMovement(review.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  await kerfdesk.setAutoAcknowledge(false);
+  const queriesBeforeResume = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === 0x3f,
+  ).length;
+  await review.getByRole('button', { name: 'Start supervised recovery', exact: true }).click();
+  await expect
+    .poll(
+      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
+    )
+    .toBeGreaterThan(queriesBeforeResume);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(review).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await kerfdesk.acknowledgeSerial(1);
+  await kerfdesk.disconnectSerial();
+  await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  if (!(await recovery.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
+    await recovery.getByText('Interrupted job saved', { exact: true }).click();
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await expect(review).toContainText('Exact job artifact saved');
+  await expect(review.getByRole('img', { name: /^Laser recovery canvas:/ })).toBeVisible();
+  await review.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
 });
+
+test('prepares a large image restart preview and starts only the selected remainder', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  const workerUrls: string[] = [];
+  page.on('worker', (worker) => workerUrls.push(worker.url()));
+  await selectAll(page);
+  await runMenuCommand(page, 'Edit', 'Delete');
+  await kerfdesk.setOpenFiles([
+    { name: 'restart-image.png', kind: 'png-fixture', width: 600, height: 600 },
+  ]);
+  await (await toolbarCommand(page, 'Import...')).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('60');
+  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await fillAndCommit(page, 'Selection width', '20');
+  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await fillAndCommit(page, 'Selection height', '20');
+  await connectAndHome(page, kerfdesk);
+  await dismissNotifications(page);
+  const alerts: string[] = [];
+  page.on('dialog', (dialog) => {
+    alerts.push(dialog.message());
+    void dialog.accept();
+  });
+  await page.getByText('Start from line…', { exact: true }).click();
+  const beforePreview = serialWrites(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'Choose laser restart point' });
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
+  expect(serialWrites(await kerfdesk.events()).slice(beforePreview.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  expect(Number(await preview.getByLabel('Restart from G-code line').inputValue())).toBeGreaterThan(
+    50,
+  );
+  await preview.screenshot({ path: testInfo.outputPath('image-restart-preview.png') });
+  await preview.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(serialWrites(await kerfdesk.events())).not.toContain('resume preamble');
+
+  await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  await kerfdesk.setAutoAcknowledge(false);
+  const queriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === 0x3f,
+  ).length;
+  await preview.getByRole('button', { name: 'Start selected remainder', exact: true }).click();
+  await expect
+    .poll(
+      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
+    )
+    .toBeGreaterThan(queriesBefore);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(preview).not.toBeVisible();
+  expect(
+    alerts.some((message) => message.includes('Background recovery compilation is not available')),
+  ).toBe(false);
+  expect(alerts.some((message) => message.includes('Review resume from requested line'))).toBe(
+    true,
+  );
+  await kerfdesk.disconnectSerial();
+});
+
+async function selectRecoveryMovement(
+  canvas: import('@playwright/test').Locator,
+  halfway = false,
+): Promise<void> {
+  const path = await canvas.locator('path').first().getAttribute('d');
+  const segments = Array.from((path ?? '').matchAll(/M([^,]+),([^L]+)L([^,]+),([^M]+)/g));
+  const segment = segments[halfway ? Math.floor(segments.length / 2) : 0];
+  if (segment === undefined) throw new Error('Expected a displayed recovery movement.');
+  const [left = NaN, top = NaN, width = NaN, height = NaN] = (
+    (await canvas.getAttribute('viewBox')) ?? ''
+  )
+    .split(' ')
+    .map(Number);
+  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0)
+    throw new Error('Expected a finite recovery viewport.');
+  const box = await canvas.boundingBox();
+  if (box === null) throw new Error('Expected visible recovery canvas.');
+  const x = (Number(segment[1]) + Number(segment[3])) / 2;
+  const y = (Number(segment[2]) + Number(segment[4])) / 2;
+  await canvas.click({
+    position: {
+      x: ((x - left) / width) * box.width,
+      y: ((y - top) / height) * box.height,
+    },
+  });
+}
 
 test('uses jog speed for XY buttons and return to work zero without hijacking canvas arrows', async ({
   page,

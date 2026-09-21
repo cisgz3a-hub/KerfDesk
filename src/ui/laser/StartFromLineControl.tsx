@@ -1,11 +1,14 @@
 // StartFromLineControl — laser start-from-line recovery plus CNC guidance to
 // checkpoint-bound supervised recovery (ADR-103 H1, ADR-200).
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { runStartFromLineFlow } from './start-job-flow';
+import { prepareRecoverySource, type PreparedRecoverySource } from './start-job-source';
+import { ManualLaserRestartDialog } from './ManualLaserRestartDialog';
 
 const MIN_LINE = 1;
-const MAX_LINE = 1_000_000;
+const MAX_LINE = Number.MAX_SAFE_INTEGER;
 
 export function StartFromLineControl(props: {
   readonly disabled: boolean;
@@ -13,24 +16,27 @@ export function StartFromLineControl(props: {
   readonly machineKind: 'laser' | 'cnc';
 }): JSX.Element {
   const [line, setLine] = useState(MIN_LINE);
-  const blocked = props.disabled || props.busy;
+  const [preparing, setPreparing] = useState(false);
+  const [preview, setPreview] = useState<PreparedRecoverySource | null>(null);
+  const inFlight = useRef(false);
+  const blocked = props.disabled || props.busy || preparing || preview !== null;
+  const resume = async (chooseOnCanvas = false): Promise<void> => {
+    if (inFlight.current || blocked) return;
+    inFlight.current = true;
+    setPreparing(true);
+    try {
+      if (chooseOnCanvas) setPreview(await prepareRecoverySource());
+      else await runStartFromLineFlow(line);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      jobAwareAlert(`Could not prepare recovery:\n\n${reason}`);
+    } finally {
+      inFlight.current = false;
+      setPreparing(false);
+    }
+  };
   if (props.machineKind === 'cnc') {
-    return (
-      <details style={boxStyle}>
-        <summary
-          style={summaryStyle}
-          title="Explain why line-number restart stays blocked and where supervised CNC recovery appears."
-        >
-          CNC interruption recovery
-        </summary>
-        <p style={hintStyle}>
-          Automatic line-number restart remains blocked because acknowledgements do not prove cut
-          completion. After an interrupted native contour job, use the retained checkpoint&apos;s{' '}
-          <strong>Review supervised recovery</strong> action to select the uncertainty point,
-          physically requalify the machine, and generate a new recovery job.
-        </p>
-      </details>
-    );
+    return <CncInterruptionGuidance />;
   }
   return (
     <details style={boxStyle}>
@@ -48,6 +54,7 @@ export function StartFromLineControl(props: {
           min={MIN_LINE}
           max={MAX_LINE}
           step={1}
+          disabled={blocked}
           value={line}
           onChange={(e) => {
             const v = Math.floor(Number(e.target.value));
@@ -58,16 +65,45 @@ export function StartFromLineControl(props: {
         <button
           type="button"
           disabled={blocked}
-          onClick={() => void runStartFromLineFlow(line)}
+          onClick={() => void resume()}
           title="Rebuild spindle/feed/position state at that line and replay the rest of the job. Work zero must be unchanged."
         >
-          Resume from line
+          {preparing ? 'Preparing recovery…' : 'Resume from line'}
         </button>
       </div>
+      <button type="button" disabled={blocked} onClick={() => void resume(true)}>
+        Choose restart point…
+      </button>
       <p style={hintStyle}>
         Requires the same work zero as the original run. The head moves to the recorded position
         with the beam off, then the remaining laser program is replayed. This manual tool is not an
         exact sealed replay and creates no execution-archive or recovery record.
+      </p>
+      {preview === null ? null : (
+        <ManualLaserRestartDialog
+          source={preview}
+          initialLine={line}
+          onClose={() => setPreview(null)}
+        />
+      )}
+    </details>
+  );
+}
+
+function CncInterruptionGuidance(): JSX.Element {
+  return (
+    <details style={boxStyle}>
+      <summary
+        style={summaryStyle}
+        title="Explain why line-number restart stays blocked and where supervised CNC recovery appears."
+      >
+        CNC interruption recovery
+      </summary>
+      <p style={hintStyle}>
+        Automatic line-number restart remains blocked because acknowledgements do not prove cut
+        completion. After an interrupted native contour job, use the retained checkpoint&apos;s{' '}
+        <strong>Review supervised recovery</strong> action to select the uncertainty point,
+        physically requalify the machine, and generate a new recovery job.
       </p>
     </details>
   );

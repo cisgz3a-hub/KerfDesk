@@ -318,6 +318,63 @@ describe('interrupted laser job intent separation', () => {
     expect(resumeProgram.endsWith(exactTail)).toBe(true);
   });
 
+  it.each([false, true])(
+    'keeps rejected recovery retryable without overwriting a replacement checkpoint (%s)',
+    async (replaceCheckpoint) => {
+      const gcode = await compileCurrentLaserJob();
+      const checkpoint = createJobCheckpoint({
+        gcode,
+        machineKind: 'laser',
+        outputScope: DEFAULT_OUTPUT_SCOPE,
+        nowIso: '2026-09-21T00:00:00.000Z',
+      });
+      writeJobCheckpoint(checkpoint);
+      const replacement = advanceJobCheckpoint(checkpoint, 2, '2026-09-21T00:01:00.000Z');
+      const programWrites: string[] = [];
+      const rejected = vi.fn(async (program: string, options?: StartJobOptions) => {
+        useLaserStore.setState({
+          trustedPositionEpoch: (useLaserStore.getState().trustedPositionEpoch ?? 0) + 1,
+        });
+        if (replaceCheckpoint) writeJobCheckpoint(replacement);
+        options?.assertFinalStartAuthorized?.();
+        programWrites.push(program);
+      });
+      useLaserStore.setState({ startJob: rejected });
+      await runCheckpointResumeFlow(checkpoint);
+      expect(rejected).toHaveBeenCalledOnce();
+      expect(programWrites).toEqual([]);
+      const retryable = replaceCheckpoint ? replacement : checkpoint;
+      expect(readJobCheckpoint()).toEqual(retryable);
+      useLaserStore.setState({
+        startJob: vi.fn(async (program, options) => {
+          options?.assertFinalStartAuthorized?.();
+          programWrites.push(program);
+        }),
+      });
+      await runCheckpointResumeFlow(retryable);
+      expect(programWrites).toHaveLength(1);
+    },
+  );
+
+  it('keeps a resume marker after authorization when transport acceptance is uncertain', async () => {
+    const gcode = await compileCurrentLaserJob();
+    const checkpoint = createJobCheckpoint({
+      gcode,
+      machineKind: 'laser',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      nowIso: '2026-09-21T00:00:00.000Z',
+    });
+    writeJobCheckpoint(checkpoint);
+    useLaserStore.setState({
+      startJob: vi.fn(async (_program, options) => {
+        options?.assertFinalStartAuthorized?.();
+        throw new Error('Transport failed after the first write could have been accepted.');
+      }),
+    });
+    await runCheckpointResumeFlow(checkpoint);
+    expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
+  });
+
   it('manual start-from-line invalidates an unrelated legacy recovery record after acceptance', async () => {
     const unrelated = advanceJobCheckpoint(
       createJobCheckpoint({

@@ -31,8 +31,9 @@ import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 export async function runLaserRecoveryCapsuleFlow(
   capsule: RecoveryCapsule,
   repository: RecoveryRepository = recoveryRepository,
+  options: { readonly fromLine?: number } = {},
 ): Promise<boolean> {
-  const planned = planLaserRecovery(capsule);
+  const planned = await planLaserRecovery(capsule, options.fromLine);
   if (planned === null) return false;
   const claim = await claimLaserRecovery(capsule, repository);
   if (claim === null) return false;
@@ -63,14 +64,17 @@ type StagedLaserRecovery = PlannedLaserRecovery &
     readonly laser: ReturnType<typeof useLaserStore.getState>;
   };
 
-function planLaserRecovery(capsule: RecoveryCapsule): PlannedLaserRecovery | null {
+async function planLaserRecovery(
+  capsule: RecoveryCapsule,
+  requestedFromLine?: number,
+): Promise<PlannedLaserRecovery | null> {
   if (capsule.artifact.machineKind !== 'laser') {
     jobAwareAlert('Cannot start laser recovery:\n\nThe saved artifact is not a laser job.');
     return null;
   }
-  const source = recoverySource(capsule);
+  const source = await recoverySource(capsule);
   if (source === null) return null;
-  const fromLine = rawResumeLine(source.gcode, capsule.ackedLines);
+  const fromLine = requestedFromLine ?? rawResumeLine(source.gcode, capsule.ackedLines);
   const resume = buildLaserResumeProgram(source.gcode, fromLine);
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
@@ -84,7 +88,8 @@ function planLaserRecovery(capsule: RecoveryCapsule): PlannedLaserRecovery | nul
     resume.lines.join('\n'),
   );
   if (laserModeStartEvidence === null || laserModeStartEvidence === undefined) return null;
-  if (!jobAwareConfirm(resumeConfirmation('laser', fromLine, resume.fromLine))) return null;
+  if (!jobAwareConfirm(resumeConfirmation('laser', fromLine, resume.fromLine, 'saved-recovery')))
+    return null;
   return {
     capsule,
     source,
@@ -120,7 +125,7 @@ async function stageLaserRecoveryAttempt(
   claim: ClaimedLaserRecovery,
   repository: RecoveryRepository,
 ): Promise<StagedLaserRecovery | null> {
-  const laser = useLaserStore.getState();
+  const laser = planned.source.controllerSnapshot;
   const initialPosition = reportedWorkPositionMm(
     laser,
     laser.controllerSettings?.reportInches === true,
@@ -278,11 +283,11 @@ async function streamLaserRecoveryAttempt(
   return true;
 }
 
-function recoverySource(capsule: RecoveryCapsule) {
+async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecoverySource | null> {
   if (capsule.artifact.kind === 'exact-execution') {
     return prepareArchivedRecoverySource(capsule.artifact);
   }
-  const source = prepareRecoverySource({
+  const source = await prepareRecoverySource({
     outputScope: capsule.artifact.outputScope,
     ...(capsule.artifact.jobOrigin === undefined ? {} : { jobOrigin: capsule.artifact.jobOrigin }),
   });

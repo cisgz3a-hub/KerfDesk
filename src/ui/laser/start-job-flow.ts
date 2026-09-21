@@ -366,7 +366,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
     return;
   }
-  const prepared = prepareRecoverySource();
+  const prepared = await prepareRecoverySource();
   if (prepared === null) return;
   await streamResumeFromRawLine(
     prepared.project,
@@ -374,6 +374,8 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     fromLine,
     prepared.canvasPlan,
     prepared.laserModeStartSnapshot,
+    undefined,
+    prepared.controllerSnapshot,
   );
 }
 
@@ -397,7 +399,7 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
   // resets the live output scope and re-resolves current-position against the
   // post-crash head, both of which would renumber every line and trip the
   // fingerprint refusal below. The frozen origin reproduces the exact bytes.
-  const prepared = prepareRecoverySource({
+  const prepared = await prepareRecoverySource({
     outputScope: checkpoint.outputScope,
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
@@ -420,5 +422,6 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     prepared.canvasPlan,
     prepared.laserModeStartSnapshot,
     checkpoint,
+    prepared.controllerSnapshot,
   );
 }
