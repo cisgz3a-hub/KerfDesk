@@ -28,6 +28,7 @@ type ReviewGateArgs = {
 
 const originalFrame = useLaserStore.getState().frame;
 const originalSelectPrimaryWcsForFrame = useLaserStore.getState().selectPrimaryWcsForFrame;
+const originalRequestControllerStatus = useLaserStore.getState().requestControllerStatus;
 const originalCapabilities = useLaserStore.getState().capabilities;
 
 function expectedWcsNormalizationWarning(wcs: 'G55' | 'G56' | 'G57' | 'G58' | 'G59'): string {
@@ -162,6 +163,7 @@ afterEach(() => {
   useLaserStore.setState({
     frame: originalFrame,
     selectPrimaryWcsForFrame: originalSelectPrimaryWcsForFrame,
+    requestControllerStatus: originalRequestControllerStatus,
     capabilities: originalCapabilities,
     streamer: null,
     statusReport: null,
@@ -180,15 +182,19 @@ describe('Frame WCS disclosure and completion reporting', () => {
     'retains the owned normalization from %s on the permit for the Start review',
     async (originalWcs) => {
       const selectPrimaryWcsForFrame = selectG54WithFreshIdle();
+      const requestControllerStatus = vi.fn(async () => undefined);
       useLaserStore.setState({
         activeWcs: originalWcs,
         selectPrimaryWcsForFrame,
+        requestControllerStatus,
         frame: successfulFrame(),
       });
 
       await expect(runFrameNow()).resolves.toBe(true);
 
       expect(selectPrimaryWcsForFrame).toHaveBeenCalledTimes(1);
+      // The post-G54 position is asked for, not awaited from the next poll tick.
+      expect(requestControllerStatus).toHaveBeenCalledTimes(1);
       // ADR-237: Frame runs dialog-free; the disclosure rides the permit
       // into the Job Review that Start opens.
       expect(reviewHarness.runJobReviewGate).not.toHaveBeenCalled();
@@ -200,15 +206,18 @@ describe('Frame WCS disclosure and completion reporting', () => {
 
   it('does not write or add a normalization warning when G54 is already active', async () => {
     const selectPrimaryWcsForFrame = vi.fn(async () => undefined);
+    const requestControllerStatus = vi.fn(async () => undefined);
     useLaserStore.setState({
       activeWcs: 'G54',
       selectPrimaryWcsForFrame,
+      requestControllerStatus,
       frame: successfulFrame(),
     });
 
     await expect(runFrameNow()).resolves.toBe(true);
 
     expect(selectPrimaryWcsForFrame).not.toHaveBeenCalled();
+    expect(requestControllerStatus).not.toHaveBeenCalled();
     expect(
       useLaserStore.getState().framedRun?.candidate.frameWcsNormalizationWarning,
     ).toBeUndefined();

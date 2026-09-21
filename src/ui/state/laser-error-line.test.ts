@@ -112,6 +112,7 @@ function makeLaserState(): LaserState {
     selectPrimaryWcsForFrame: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
+    requestControllerStatus: async () => undefined,
   };
 }
 

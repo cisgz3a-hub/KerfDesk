@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
@@ -27,6 +28,7 @@ export function JobActionControls(props: Props): JSX.Element {
   const status = (
     <span
       role="status"
+      aria-busy={model.preparingFrame}
       className={props.docked ? 'lf-job-dock__readiness' : undefined}
       style={props.docked ? undefined : framedRunStatusStyle}
       title={model.framedRunIssue ?? undefined}
@@ -71,6 +73,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const estimate = useJobEstimate();
   const framePending = useFramePreparationStore((state) => state.pending);
+  const progress = useFramePreparationStore((state) => state.progress);
   const preparingFrame = framePending && laser.motionOperation?.kind !== 'frame';
   const busy = props.disabled || props.streaming || framePending;
   const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
@@ -79,6 +82,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     onFrame,
     framedRunIssue,
     framedReady,
+    preparingFrame,
     frameControl: frameControlProps(busy, laser.statusReport?.state),
     startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
     frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
@@ -93,7 +97,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       framedReady,
       laser.framedRun !== null,
       framedRunIssue,
-      preparingFrame,
+      preparingFrame ? preparingFrameStatusText(progress) : null,
     ),
     estimate,
   };
@@ -148,10 +152,10 @@ function framedRunStatusText(
   framedReady: boolean,
   hasFramedRun: boolean,
   framedRunIssue: string | null,
-  preparingFrame: boolean,
+  preparingText: string | null,
 ): string {
   if (frameOperationActive) return 'Framing exact job…';
-  if (preparingFrame) return 'Preparing the exact job for Frame…';
+  if (preparingText !== null) return preparingText;
   if (framedReady) return 'Ready to start — framed job unchanged';
   if (!hasFramedRun) return 'Not framed — prepare and Frame this job first';
   return `Frame expired — ${framedRunIssue}`;
@@ -165,6 +169,24 @@ function frameControlProps(busy: boolean, state: string | undefined) {
       ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
       : frameBlockedTitle(state),
   };
+}
+
+// Compiler phases as the operator experiences them, not as the pipeline names
+// them. Numeric progress only arrives for jobs the compiler fans out (CNC
+// regions); every other preparation reads the phase alone, and the phase-less
+// wording covers the seconds before the first report.
+const PREPARING_PHASE_TEXT: Record<OutputCompilationProgress['phase'], string> = {
+  normalizing: 'reading shapes',
+  planning: 'planning toolpaths',
+  merging: 'merging results',
+  finalizing: 'finishing',
+};
+
+function preparingFrameStatusText(progress: OutputCompilationProgress | null): string {
+  if (progress === null) return 'Preparing the exact job for Frame…';
+  const phase = PREPARING_PHASE_TEXT[progress.phase];
+  if (progress.total <= 0) return `Preparing the exact job for Frame — ${phase}…`;
+  return `Preparing the exact job for Frame — ${phase} ${progress.completed}/${progress.total}…`;
 }
 
 function frameBlockedTitle(state: string | undefined): string {

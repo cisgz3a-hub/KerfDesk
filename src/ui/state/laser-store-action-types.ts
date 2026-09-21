@@ -38,6 +38,11 @@ export type LaserStoreActions = {
   /** Owned G54 selection used before preparing Frame so Frame and emitted
    * program resolve coordinates in the same canonical WCS. */
   readonly selectPrimaryWcsForFrame: () => Promise<void>;
+  /** One realtime status query outside the periodic poll, so a caller that
+   * needs a fresh report after an owned command gets it in one round trip
+   * instead of waiting for the next poll tick. Inert to the planner; a no-op
+   * without a realtime query or while a controller operation owns polling. */
+  readonly requestControllerStatus: () => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
