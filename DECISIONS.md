@@ -2843,6 +2843,12 @@ that is a separate LightBurn convention for vector user units and is unaffected.
 > **Amendment note (2026-09-19).** The light-only choice below is amended by the
 > theme-aware workspace palette at the end of this entry. The shared token
 > architecture remains in force; the workspace bed now follows the theme too.
+>
+> **Superseded in part by ADR-339 (2026-09-21).** That amendment's
+> operating-system following is reversed: the app opens LIGHT on every machine
+> and dark is an in-app preference. ADR-049's own "no toggle" ruling is reversed
+> with it, and the light palette below has been re-hued to warm neutrals with a
+> copper accent. The token architecture still stands.
 
 ### Context
 
@@ -2930,6 +2936,11 @@ A mounted root crash screen is revealed promptly; the existing bounded wait afte
 execution remains for a missing canvas. The loading screen adds no modal or operator action.
 
 ### Amendment (2026-09-19): theme-aware workspace palette
+
+> **Superseded in part by ADR-339.** The OS-following below is reversed, and the
+> blue palette it accepted is replaced by warm neutrals with a copper accent.
+> The theme-AWARE canvas this amendment introduced survives — only the thing
+> that *decides* the theme changed.
 
 The maintainer accepted the responsive workspace preview and its blue and soft
 grey palette. The application now uses light tokens by default and overrides
@@ -21146,3 +21157,117 @@ contour box index, the detail detector and the membership tests all in the same 
 cliff is unchanged: a drawing whose chains fall inside the sharpener's window still pays for it,
 and one just outside still skips it. Making the scan proportional to its window rather than to the
 chain would need a ring view with modular indexing through every gate, which is its own decision.
+
+---
+
+## ADR-339 - KerfDesk opens light, and its chrome is warm neutral with a copper accent (2026-09-21)
+
+**Status:** Accepted. | **Date:** 2026-09-21
+
+### Context
+
+ADR-049 established a single light chrome and said so explicitly: the dark values
+were *removed, not kept behind a toggle*, because "a second theme block would be
+dead complexity". Its **2026-09-19 amendment** then handed the decision to the
+operating system — chrome and workspace bed both followed `prefers-color-scheme`
+— and recorded that it "does not add a separate in-app theme preference".
+
+The consequence is what this decision answers: a maintainer whose desktop is in
+dark mode opens KerfDesk in dark, having never asked for it. The maintainer also
+judged the palette too blue, and that is not only the dark theme — the *light*
+theme was blue too: `#f5f7fa` bars, `#dce2ea` borders, `#253248` text and a
+`#3175d0` accent. Restoring light alone would not have addressed it.
+
+Two independent readers of `prefers-color-scheme` had grown up by then: the
+`@media` block in `tokens.css` (chrome) and `canvas-color-scheme.ts` (bed, grid,
+rulers, artwork ink, Design Studio). Nothing made them agree.
+
+### Decision
+
+**1 — The application owns the theme, not the desktop.** New
+`src/ui/theme/app-theme.ts` holds a three-value preference — `light` | `dark` |
+`system` — defaulting to **light**, persisted in `localStorage` under
+`kerfdesk.theme.v1`. It is a machine-local viewing preference, so it never
+enters the `.lf2` project (same rationale as the camera panel width). The module
+stamps the resolved theme onto `<html>` as `data-theme`; `tokens.css` keys its
+dark block off `:root[data-theme='dark']` rather than a media query, and
+`canvas-color-scheme.ts` becomes a thin adapter over the same module, so the two
+frames cannot resolve the theme differently. `main.tsx` stamps before the first
+render, so no frame paints in the wrong theme.
+
+This reverses the amendment's "no in-app theme preference", and also reverses
+ADR-049's original "no toggle": dark exists now, so it has to be reachable.
+**Window > Appearance** carries Light / Dark / Match System as a radio group.
+`system` still tracks the desktop live — that is the old behaviour, kept as an
+opt-in rather than as the default.
+
+**2 — Warm neutrals and a copper accent.** The greys lose their blue cast in
+both themes (light bars `#f1efec`, panels `#faf9f7`, borders `#ddd9d3`, text
+`#2b2823`; dark bars `#2e2b27`, panels `#252320`, text `#ece7df`). The accent is
+copper taken from the startup wordmark's `#c99a63`, deepened to **`#a85a2a`**:
+the brand tan carries only 3.6:1 against white and these fills hold small white
+labels, whereas `#a85a2a` is 5.02:1. `--lf-accent` is NOT re-declared in dark —
+lightening it there would drop button text below AA.
+
+**3 — The light surfaces are off-white, not pure white.** Panels sit at
+`#faf9f7` and bars at `#f1efec` so the chrome does not glare. The **bed stays
+`#ffffff`**: it stands for white material and ADR-049's WYSIWYG rationale is
+untouched, which also makes the work surface the brightest thing on screen.
+
+**4 — The canvas selection splits off the chrome accent.** `--lf-canvas-selection`
+(`#3175d0`) is a new token that no chrome uses. The bed already speaks a warm
+machine-state language — amber scorch, gold tab handles, safety red — so a
+copper selection box would read as one of them. `theme-sync.test.ts` pins the
+new token to `canvasTheme.selection` and adds a second test asserting
+`--lf-accent` is *not* the selection, so the split stays recorded rather than
+merely uncoupled.
+
+**5 — Hover wells follow the accent.** Five of the six `--lf-tint-info` uses in
+`tokens.css` were hover/active wells, sitting cool underneath a copper border;
+they move to `--lf-tint-accent`, which gets its own warm value instead of
+aliasing `--lf-tint-info`. `.lf-banner--info` keeps the cool tint, and so does
+the active-row well elsewhere, so "info" stays distinct from "warning".
+
+### Consequences
+
+- KerfDesk opens the same on every machine. An OS dark mode no longer changes
+  the app, and with JavaScript unavailable or not yet run the light palette
+  stands, which is the shipped look.
+- The burn scorch and ember ramp are **untouched**. Their values were set by a
+  measured ink/bed separation pass, and the reason to re-tune them — keeping the
+  UI accent from reading as machine state — is met by keeping the accent off the
+  bed entirely instead.
+- `public/404.html` moves onto the same neutrals and copper; it still carried
+  ADR-049's original `#f8fafc`/`#1976d2` blue.
+- The `#app-splash` charcoal/copper branding and the fixed-dark 3D viewport
+  background are unchanged; neither was theme-aware.
+- `prefers-color-scheme` now appears in exactly one place in `src/`.
+
+### Alternatives rejected
+
+- **Remove dark entirely**, restoring ADR-049's original shape: rejected by the
+  maintainer, who chose to keep dark reachable rather than delete it.
+- **Keep following the OS, with light merely as the fallback:** that is the
+  behaviour this decision exists to undo.
+- **A copper canvas selection**, so chrome and bed share one accent: rejected —
+  see decision 4. Moving the scorch out of copper's way instead would have meant
+  re-tuning a palette whose current values were perceptually measured.
+
+### Verification
+
+- Contrast computed, not eyeballed, before the values were written down: white
+  labels on `--lf-accent` 5.02:1; `--lf-accent-fg` 6.64:1 on panels; `text` /
+  `text-muted` / `text-faint` 12.79 / 5.03 / 4.53:1 against the *bars*, the
+  darkest chrome ground. `--lf-text-faint` had to be darkened from `#7a746b` to
+  `#726c63`, which fell to 4.03:1 once the surfaces were dulled.
+- `app-theme.test.ts` covers the light default over a dark desktop, the
+  `data-theme` stamp, persistence across a fresh module, `system` following the
+  desktop only when asked, subscriber notification and listener release, a junk
+  stored value, and a denied `localStorage`.
+- The two theme-aware drawing suites now drive the preference the way an
+  operator does instead of faking the desktop.
+- Verified live on the dev server, both themes: switching through
+  Window > Appearance repaints chrome and canvas together, and the choice
+  survives a reload.
+- **NOT verified:** no hardware — no machine is available to this project. This
+  change emits no G-code and touches no machine behaviour.
