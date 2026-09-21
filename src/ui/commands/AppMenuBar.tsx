@@ -215,6 +215,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
     {
       label: 'Image',
       ids: [
+        'tools.edit-image',
         'tools.adjust-image',
         'tools.apply-image-mask',
         'tools.crop-image',
