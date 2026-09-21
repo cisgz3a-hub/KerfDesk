@@ -1,5 +1,10 @@
 import type { Tutorial, TutorialVisual } from './tutorial-types';
 
+type Stage = {
+  readonly title: string;
+  readonly result: string;
+};
+
 type StudioTool = {
   readonly id: string;
   readonly name: string;
@@ -8,6 +13,8 @@ type StudioTool = {
   readonly prepare: string;
   readonly gesture: string;
   readonly finish: string;
+  /** Named per tool: drawing an arc is not "making the geometry". */
+  readonly stages: readonly [Stage, Stage, Stage];
   readonly tip: string;
 };
 
@@ -24,22 +31,22 @@ function studioToolLesson(tool: StudioTool): Tutorial {
     visual: tool.visual,
     steps: [
       {
-        title: `Choose ${tool.name}`,
+        title: tool.stages[0].title,
         instruction: tool.prepare,
         focus: tool.name,
-        result: 'The tool hint and options match the action you are about to take.',
+        result: tool.stages[0].result,
       },
       {
-        title: 'Make the geometry',
+        title: tool.stages[1].title,
         instruction: tool.gesture,
         focus: 'Follow the drawing gesture',
-        result: tool.summary,
+        result: tool.stages[1].result,
       },
       {
-        title: 'Inspect and apply',
+        title: tool.stages[2].title,
         instruction: tool.finish,
         focus: 'Check → Apply',
-        result: 'The checked drawing is ready to apply to the project.',
+        result: tool.stages[2].result,
       },
     ],
     tip: tool.tip,
@@ -51,6 +58,20 @@ function studioToolLesson(tool: StudioTool): Tutorial {
 export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   studioToolLesson({
     id: 'studio-line',
+    stages: [
+      {
+        title: 'Choose Line and set snapping',
+        result: 'Endpoints will land where you intend, free or snapped.',
+      },
+      {
+        title: 'Drag from start to end',
+        result: 'A single straight segment exists between the two points.',
+      },
+      {
+        title: 'Set an exact length or angle',
+        result: 'The segment measures what the design requires, not what the drag gave.',
+      },
+    ],
     name: 'Line',
     visual: 'line',
     summary: 'Create a straight segment between two points.',
@@ -64,6 +85,17 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-path',
+    stages: [
+      {
+        title: 'Decide open or closed',
+        result: 'You know whether this outline must enclose an area.',
+      },
+      { title: 'Click each corner in order', result: 'The corners join into one connected path.' },
+      {
+        title: 'Check the closing segment',
+        result: 'The path ends exactly as intended, open or closed.',
+      },
+    ],
     name: 'Polyline',
     visual: 'polyline',
     summary: 'Create a connected outline from a series of clicked corners.',
@@ -77,6 +109,20 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-rectangle',
+    stages: [
+      {
+        title: 'Choose Rectangle and a first corner',
+        result: 'The starting corner is where you want it.',
+      },
+      {
+        title: 'Drag to the opposite corner',
+        result: 'A rectangle spans the two corners, square or free.',
+      },
+      {
+        title: 'Type the exact width and height',
+        result: 'The rectangle measures the size the material needs.',
+      },
+    ],
     name: 'Rectangle',
     visual: 'rectangle',
     summary: 'Create a rectangle from two opposite corners.',
@@ -89,6 +135,17 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-circle',
+    stages: [
+      {
+        title: 'Choose Circle and its centre',
+        result: 'The centre sits where the feature belongs.',
+      },
+      { title: 'Drag out to the rim', result: 'The drag distance has set the radius.' },
+      {
+        title: 'Confirm radius against diameter',
+        result: 'The hole or disc is the size you meant, not twice it.',
+      },
+    ],
     name: 'Circle',
     visual: 'circle',
     summary: 'Create a circle by choosing its centre and radius.',
@@ -102,6 +159,20 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-arc',
+    stages: [
+      {
+        title: 'Find the centre it turns about',
+        result: 'You know which circle the arc is a part of.',
+      },
+      {
+        title: 'Click centre, start, then sweep',
+        result: 'The arc follows the sweep you traced, not the other way round.',
+      },
+      {
+        title: 'Check which way it went',
+        result: 'The arc covers the intended side of the circle.',
+      },
+    ],
     name: 'Arc',
     visual: 'arc',
     summary: 'Create part of a circle from a centre, start and end.',
@@ -115,6 +186,20 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-fillet',
+    stages: [
+      {
+        title: 'Set a radius that will fit',
+        result: 'The radius is small enough for the adjoining segments.',
+      },
+      {
+        title: 'Click the corner to round',
+        result: 'The sharp corner is replaced by a tangent curve.',
+      },
+      {
+        title: 'Check the curve meets both edges',
+        result: 'The rounding blends instead of leaving a step.',
+      },
+    ],
     name: 'Fillet',
     visual: 'fillet',
     summary: 'Replace a sharp corner with a rounded transition.',
@@ -128,6 +213,20 @@ export const STUDIO_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   studioToolLesson({
     id: 'studio-chamfer',
+    stages: [
+      {
+        title: 'Clear any existing corner radius',
+        result: 'The corner is sharp, so a bevel can be cut from it.',
+      },
+      {
+        title: 'Click the corner to flatten',
+        result: 'A straight bevel replaces the sharp corner.',
+      },
+      {
+        title: 'Measure what the bevel removed',
+        result: 'Enough edge remains on both legs of the corner.',
+      },
+    ],
     name: 'Chamfer',
     visual: 'trim',
     summary: 'Replace a sharp corner with a straight bevel.',

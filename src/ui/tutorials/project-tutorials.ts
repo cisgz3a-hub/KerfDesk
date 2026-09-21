@@ -176,7 +176,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Open the reference',
         instruction:
-          'Click Keyboard Shortcuts in the top toolbar. Browse the File, Tools, Edit, Transform and View groups.',
+          'Click Keyboard Shortcuts in the top toolbar. Browse the File, Tools, Edit, Transform and View groups, then the final group named after your machine.',
         focus: 'Keyboard Shortcuts',
         result: 'The current shortcut reference is visible in one place.',
       },
@@ -186,6 +186,14 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
           'Close the reference. Use F to fit the bed, Ctrl+D to duplicate selected artwork, and Ctrl+Z to undo the duplication.',
         focus: 'F · Ctrl+D · Ctrl+Z',
         result: 'You can navigate, repeat and undo common work quickly.',
+      },
+      {
+        title: 'Know the two job keys',
+        instruction:
+          'The last group is named after your machine. Ctrl+Enter runs the same Start flow as the Start button, so it still needs a connected machine and a completed Frame. Ctrl+. aborts a running job, or cancels a jog, from any window.',
+        focus: 'Ctrl+Enter · Ctrl+.',
+        result:
+          'Start behaves exactly as the button does, and Abort stays reachable while you type.',
       },
       {
         title: 'Finish or leave a tool',

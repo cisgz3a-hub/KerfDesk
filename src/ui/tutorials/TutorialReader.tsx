@@ -28,8 +28,20 @@ export function TutorialReader(props: ReaderProps): JSX.Element {
     const frame = window.requestAnimationFrame(() => heading.current?.focus());
     return () => window.cancelAnimationFrame(frame);
   }, [stepIndex]);
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    // Steps are a sequence; let the keyboard walk it. Typing targets keep
+    // their own arrow behaviour (the reader has none today, but the example
+    // controls and any future field must not be hijacked).
+    if (event.target instanceof HTMLElement && isTypingTarget(event.target)) return;
+    const next = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (next === 0) return;
+    const target = stepIndex + next;
+    if (target < 0 || target >= tutorial.steps.length) return;
+    event.preventDefault();
+    go(target);
+  };
   return (
-    <div className="lf-learn-reader">
+    <div className="lf-learn-reader" onKeyDown={onKeyDown}>
       <LessonHeading tutorial={tutorial} />
       <div className="lf-learn-lesson-grid">
         <VisualColumn tutorial={tutorial} stepIndex={stepIndex} />
@@ -108,16 +120,22 @@ function VisualColumn({
 }
 
 function LessonHeading({ tutorial }: { readonly tutorial: Tutorial }): JSX.Element {
+  const cameFrom = useTutorialStore((state) => state.trail.at(-1));
+  const previous = findTutorial(cameFrom ?? null);
   return (
     <>
       <div className="lf-learn-reader-top">
         <button
           type="button"
           className="lf-btn lf-btn--ghost"
-          title="Return to the tutorial library"
-          onClick={() => useTutorialStore.getState().openTutorial()}
+          title={
+            previous === undefined
+              ? 'Return to the tutorial library (Escape)'
+              : `Back to ${previous.title} (Escape)`
+          }
+          onClick={() => useTutorialStore.getState().goBack()}
         >
-          ← All tutorials
+          ← {previous === undefined ? 'All tutorials' : previous.title}
         </button>
         <span>
           {tutorial.category} <span aria-hidden="true">/</span> {tutorial.minutes} min
@@ -212,6 +230,9 @@ function ReaderNavigation(props: {
       >
         Restart
       </button>
+      <span className="lf-learn-key-hint">
+        <kbd>←</kbd> <kbd>→</kbd> steps · <kbd>Esc</kbd> back
+      </span>
     </div>
   );
 }
@@ -235,5 +256,11 @@ function RelatedLessons(props: { readonly tutorial: Tutorial }): JSX.Element {
         );
       })}
     </div>
+  );
+}
+
+function isTypingTarget(node: HTMLElement): boolean {
+  return (
+    node.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(node.tagName.toUpperCase())
   );
 }

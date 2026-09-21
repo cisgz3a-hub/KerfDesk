@@ -8,7 +8,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Select closed artwork > Cut type: Inlay pair (pocket + insert)',
+    location: 'Select closed artwork → Cut type: Inlay pair (pocket + insert)',
     prerequisites: 'CNC mode, closed vector artwork and an end mill assigned to the operation.',
     visual: 'cnc-inlay',
     steps: [
@@ -55,7 +55,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'cnc',
     minutes: 4,
-    location: 'Machine controls > Probe (touch plate)',
+    location: 'Machine controls → Probe (touch plate)',
     prerequisites:
       'For real probing, a connected supported controller and probe, measured plate and cutter, stopped spindle and clear setup.',
     visual: 'probe',
@@ -111,7 +111,7 @@ export const CNC_UTILITY_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Machine > CNC Utilities > Surface spoilboard',
+    location: 'Machine controls → Surface spoilboard',
     prerequisites:
       'CNC mode with the intended active bit, machine limits and stock footprint configured.',
     visual: 'pocket',

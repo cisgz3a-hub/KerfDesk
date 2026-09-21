@@ -9,7 +9,7 @@ export const CONTROLLER_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls > Console, or Super console',
+    location: 'Machine controls → Console, or Super console',
     prerequisites:
       'A controller connection for live traffic; existing transcript entries can be inspected without sending commands.',
     visual: 'console',
@@ -56,7 +56,7 @@ export const CONTROLLER_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Console or Super console > User macros',
+    location: 'Console or Super console → User macros',
     prerequisites:
       'A single controller command whose meaning you already understand. Saving a macro is local; running it sends to the controller.',
     visual: 'console',
@@ -95,7 +95,7 @@ export const CONTROLLER_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Interrupted job saved card > Review',
+    location: 'Interrupted job saved card → Review',
     prerequisites:
       'A retained interrupted-job record. Review can be opened without starting recovery.',
     visual: 'history',

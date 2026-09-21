@@ -83,13 +83,6 @@
   flex: 1;
   overscroll-behavior: contain;
 }
-.lf-learn-hero {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 24px;
-  align-items: center;
-  padding: 12px 0 24px;
-}
 .lf-learn-eyebrow {
   font-size: 10px;
   font-weight: 700;
@@ -98,7 +91,7 @@
 }
 .lf-learn h1 {
   margin: 8px 0;
-  font-size: clamp(24px, 2.8vw, 34px);
+  font-size: clamp(22px, 2.4vw, 30px);
   font-weight: 650;
   line-height: 1.2;
   letter-spacing: -1px;
@@ -115,21 +108,99 @@
 .lf-learn p {
   margin: 8px 0 16px;
 }
-.lf-learn-hero p {
-  max-width: 520px;
+.lf-learn-start {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: 32px;
+  align-items: start;
+  padding: 4px 0 22px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--lf-border);
+}
+.lf-learn-start-lead p {
+  max-width: 460px;
   color: var(--lf-text-muted);
 }
-.lf-learn-hero-art {
-  border-radius: 12px;
+.lf-learn-progress {
+  margin-top: 16px;
+  max-width: 300px;
+}
+.lf-learn-progress-bar {
+  height: 4px;
+  border-radius: 3px;
+  background: var(--lf-bg-2);
   overflow: hidden;
-  border: 1px solid var(--lf-border);
-  transform: rotate(-2deg);
+}
+.lf-learn-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--lf-accent);
+  border-radius: 3px;
+  transition: width 260ms ease;
 }
 .lf-learn-progress-count {
   display: block;
   color: var(--lf-text-muted);
   font-size: 11px;
-  margin-top: 12px;
+  margin-top: 7px;
+}
+.lf-learn-path {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lf-learn-path button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lf-text);
+  font-size: 12px;
+}
+.lf-learn-path button:hover {
+  border-color: var(--lf-border);
+  background: var(--lf-bg-2);
+}
+.lf-learn-path-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--lf-border);
+  color: var(--lf-text-muted);
+  font-size: 10px;
+}
+.lf-learn-path button[data-done] .lf-learn-path-mark {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-bg-0, #111827);
+}
+.lf-learn-path-name {
+  flex: 1;
+  min-width: 0;
+}
+.lf-learn-path-state {
+  flex-shrink: 0;
+  color: var(--lf-text-muted);
+  font-size: 10px;
+}
+.lf-learn-inline-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--lf-accent);
+  font-size: 12px;
+  text-decoration: underline;
 }
 .lf-learn-filters {
   display: flex;
@@ -289,8 +360,7 @@
   font-weight: 650;
   letter-spacing: 1px;
 }
-.lf-learn-example > svg,
-.lf-learn-hero-art > svg {
+.lf-learn-example > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -401,6 +471,18 @@
   gap: 7px;
   margin-top: 18px;
 }
+.lf-learn-key-hint {
+  margin-left: auto;
+  align-self: center;
+  color: var(--lf-text-muted);
+  font-size: 10px;
+}
+.lf-learn-key-hint kbd {
+  border: 1px solid var(--lf-border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 9px;
+}
 .lf-learn-tip {
   display: flex;
   gap: 18px;
@@ -473,12 +555,12 @@
   .lf-learn-header {
     padding: 10px 16px;
   }
-  .lf-learn-header-note,
-  .lf-learn-hero-art {
+  .lf-learn-header-note {
     display: none;
   }
-  .lf-learn-hero {
+  .lf-learn-start {
     grid-template-columns: 1fr;
+    gap: 18px;
   }
   .lf-learn-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));

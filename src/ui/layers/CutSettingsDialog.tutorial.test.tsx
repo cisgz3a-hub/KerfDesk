@@ -59,11 +59,18 @@ it('opens help for the draft cut mode without submitting or losing edits, and fo
       });
       expect(useTutorialStore.getState().tutorialId).toBe(lesson);
       expect(onApply).not.toHaveBeenCalled();
-      await act(async () => {
-        document.activeElement?.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
-        );
-      });
+      // Escape walks out a level at a time: lesson, then library, then closed.
+      const escape = async (): Promise<void> => {
+        await act(async () => {
+          document.activeElement?.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+          );
+        });
+      };
+      await escape();
+      expect(useTutorialStore.getState().tutorialId).toBeNull();
+      expect(useTutorialStore.getState().isOpen).toBe(true);
+      await escape();
       expect(useTutorialStore.getState().isOpen).toBe(false);
       expect(mode.value).toBe(value);
       expect(power.value).toBe('42');

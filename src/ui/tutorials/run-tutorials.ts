@@ -8,7 +8,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Machine controls > Job',
+    location: 'Machine controls → Job',
     prerequisites:
       'For a real run, prepared artwork, the intended operation settings and origin, and a connected machine with suitable workholding.',
     visual: 'frame',
@@ -60,7 +60,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Toolbar > Preview, Window > Preview, or P',
+    location: 'Top toolbar → Preview, Window → Preview, or P',
     prerequisites: 'A project with artwork and operations included in Output.',
     visual: 'preview',
     steps: [
@@ -116,7 +116,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'File > Inspect G-code (3D), Open G-code or Save G-code',
+    location: 'File → Inspect G-code (3D), Open G-code or Save G-code',
     prerequisites: 'An output-ready project, or an existing program file to inspect.',
     visual: 'gcode',
     steps: [
