@@ -25,7 +25,10 @@ $env:PLAYWRIGHT_PORT='5186'
 pnpm exec playwright test e2e/convert-bitmap.spec.ts e2e/workbench.e2e.ts --grep 'native conversion preserves|busy conversion prevents|unqualified bitmap legacy' '--reporter=list,json'
 ```
 
-## Sharp trace timing
+## Sharp trace timing: initial repair
+
+This section preserves the initial repair at `e796b9aa`. The subsequent main integration below
+supersedes that temporary test contract; it does not turn the failed local run into a pass.
 
 The hosted failure attachment records a successful worker result in **29,117.7 ms** with 101
 heartbeats, 7,711 closed paths and 348,018 vertices. Its strict **30,000 ms** compute ceiling
@@ -53,3 +56,22 @@ Browser-test TypeScript and scoped ESLint passed after these test-only changes. 
 did not alter application source or its catalogue digest. Main's subsequent tutorial update is
 documented separately in [the final supplement](pr-final-tutorial-integration.md). No hardware
 was operated.
+
+## Subsequent main integration
+
+Main `39eebb6fcb723a2e51f9866a7c0c7dedf396b981` ([PR #826](https://github.com/cisgz3a-hub/KerfDesk/pull/826))
+independently corrects the same test to match ADR-336: the production watchdog limits **silence**,
+not total tracing time. Its accepted fixture checks less than 30 seconds between worker messages,
+retains a finite 180-second completion wait and 240-second case deadline, and allows 15 seconds
+for rendering. It also verifies cancellation of an actively heartbeating native worker and
+retains exact committed-geometry and responsiveness assertions.
+
+The merge adopts that upstream fixture, superseding the temporary 30-second total-compute
+assertion above. This is not a new passing performance claim: the failed local report remains
+unchanged, and current tracing checks judge the documented liveness contract. No product tracing
+algorithm was changed by this conflict resolution.
+
+The original [release CI run](https://github.com/cisgz3a-hub/KerfDesk/actions/runs/35628985399)
+passed on `c508774b93f3fd1fb59daeffe59ad8def2b1b321`, including 15,112 passing unit cases,
+22 skipped cases and 130 release-integrity tests. That result predates the later main integrations
+and cannot replace required checks on the final PR commit.

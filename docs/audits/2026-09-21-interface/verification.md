@@ -6,6 +6,25 @@ Branch: `codex/ui-audit-20260921`, based on `377e692baf26a9f66ba3877f157213095c5
 The primary checkout and its unrelated edits were preserved. Publication status is tracked by the
 associated PR; the software evidence below does not qualify a physical machine or packaged desktop.
 
+## Latest upstream remediation integration
+
+Main `39eebb6fcb723a2e51f9866a7c0c7dedf396b981` was subsequently merged at
+`9d05cc626cee59187370b16d31095f257de8cb2e`. The one conflict was the tracing browser fixture;
+the resolution retains main's documented heartbeat/silence contract and its cancellation and
+geometry assertions. The prior strict-compute local failure is retained in
+[the browser-gate history](pr-ci-followup.md), not relabelled as a pass.
+
+[The compact source supplement](pr-remediation-controls.md) records the unchanged 817-definition /
+94-command count with changed parent visibility conditions. [Machine integration evidence](pr-remediation-machine.md)
+records the current completion, origin, setup, dwell and recovery checks. The earlier reports
+below remain evidence for their dated source states.
+
+The production build, including application TypeScript, passed on this merged source. The narrow
+machine integration passes 140 distinct cases: 132 in the initial report and eight additional
+cases in the focused follow-up. Those eight include a real-store GRBL simulator run whose live
+dwell estimate is unavailable; settled completion still exposes Done and clicking it leaves the
+project and outbound command history unchanged. These are software and simulator results.
+
 ## Final tutorial integration and browser-gate follow-up
 
 Main's tutorial update at `af1a1b83f7ece14a46e3386b1845bb35daf971ac` was subsequently merged

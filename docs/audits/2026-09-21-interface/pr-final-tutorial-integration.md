@@ -5,6 +5,9 @@ Main advanced from `9d72ba798` to `af1a1b83f7ece14a46e3386b1845bb35daf971ac`
 `35b873829c9eb6681d52cc966dc7e15564be4360`. The earlier **805/91** and **815/94**
 control/command inventories and their evidence remain dated snapshots.
 
+Main's later remediation merge is recorded in [the compact source supplement](pr-remediation-controls.md).
+The inventory and digest below retain this tutorial-integration source state.
+
 The separate [final source inventory](pr-final-source/buttons.json) contains **817 control
 definitions and 94 command IDs**, across 2,637 scanned source files. Its SHA-256 of scanned
 paths and contents is `46a5737e33d88d6fd46d90f49496b6f12229e8a0d38074f4bad895f03cbd93ad`.

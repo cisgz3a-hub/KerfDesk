@@ -17,6 +17,13 @@ check. The earlier 805- and 815-definition catalogues remain dated evidence.
 [The browser-gate follow-up](pr-ci-followup.md) preserves the initial hosted failures and the
 test-fixture corrections, including the unsuccessful local Sharp benchmark.
 
+**Latest remediation integration:** main `39eebb6fc` is included at `9d05cc626`.
+[The compact control supplement](pr-remediation-controls.md) records the final source digest
+and changed parent visibility conditions; the count remains **817 definitions / 94 commands**.
+[Machine integration checks](pr-remediation-machine.md) cover completed-run dismissal alongside
+the upstream origin, streaming, dwell and recovery repairs. The tracing fixture now follows
+main's ADR-336 silence contract, as explained in the browser-gate follow-up.
+
 ## Result
 
 **Follow-up completed 2026-09-22:** [the button-by-button functional audit](control-audit.md)
