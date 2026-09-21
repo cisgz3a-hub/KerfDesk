@@ -143,6 +143,23 @@ ACKs, uncertain writes, superseded starts and pre-wire rejection. The adjacent l
 containment and checkpoint suites passed all 38 tests across six files; final TypeScript,
 edited-file lint, formatting and whitespace checks passed.
 
+### Integrated release verification
+
+The complete `pnpm release:check` passed after integration with main: 2,237 test files and
+14,902 tests passed, with 14 files / 22 tests skipped. All 130 release-integrity tests, lint,
+type checks, formatting, repository gates, web build and Electron main build passed. Browser
+type checking, discovery, cold startup and the production-bundle smoke passed.
+
+The full development browser run passed 145 workflows and exposed one startup-fixture timing
+failure. The identical assertion also failed on unchanged main (`39eebb6fc`). Diagnostics showed
+successful startup with no application or HTTP errors: cold development modules needed 27.6 seconds
+after the held entry request was released, while warm loads took 6.0 seconds. The startup test now
+waits for `DOMContentLoaded` before its unchanged 10-second workspace-render assertion, as the
+adjacent startup test already does. This corrects the test's load boundary without changing
+production startup behaviour or relaxing the render assertion.
+All four startup scenarios passed after this correction. Production code is unchanged from the
+successful full release verification.
+
 ## Physical and product limits
 
 Software tests and fake Web Serial establish the application contract, not physical burn fidelity.

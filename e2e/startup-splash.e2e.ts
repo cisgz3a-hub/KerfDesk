@@ -18,6 +18,9 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
     await expect.poll(() => beam.evaluate((element) => element.getAnimations().length)).toBe(0);
 
     await main.release();
+    // Releasing the entry request starts its ES module graph; wait for those
+    // scripts to execute before checking the mounted workspace's readiness.
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toBeVisible();
     await expect(splash).toHaveCount(0);
   } finally {
