@@ -164,6 +164,30 @@ function MenuItem(props: {
 type MenuGroupLayout = { readonly label: string; readonly ids: ReadonlyArray<CommandId> };
 
 const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>> = {
+  window: [
+    {
+      label: 'Panels',
+      ids: [
+        'window.toggle-layers-panel',
+        'window.toggle-machine-panel',
+        'window.toggle-side-panels',
+        'window.reset-layout',
+      ],
+    },
+    {
+      label: 'View',
+      ids: [
+        'window.toggle-preview',
+        'window.fit-view',
+        'window.project-notes',
+        'window.undo-history',
+      ],
+    },
+    {
+      label: 'Appearance',
+      ids: ['window.theme-light', 'window.theme-dark', 'window.theme-system'],
+    },
+  ],
   tools: [
     {
       label: 'Create & measure',

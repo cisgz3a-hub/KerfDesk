@@ -13,6 +13,8 @@ export function railPanelCommandContext(
   | 'toggleMachinePanel'
   | 'toggleSidePanels'
   | 'resetWorkspaceLayout'
+  | 'appTheme'
+  | 'setAppTheme'
 > {
   return {
     jobActive,
@@ -22,5 +24,7 @@ export function railPanelCommandContext(
     toggleMachinePanel: dialogs.toggleMachinePanel,
     toggleSidePanels: dialogs.toggleSidePanels,
     resetWorkspaceLayout: dialogs.resetWorkspaceLayout,
+    appTheme: dialogs.appTheme,
+    setAppTheme: dialogs.setAppTheme,
   };
 }

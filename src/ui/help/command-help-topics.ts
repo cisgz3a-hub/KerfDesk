@@ -343,6 +343,18 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Restore both workspace side panels to their standard visible layout.',
   },
+  'window.theme-light': {
+    family: 'window',
+    tooltip: 'Use the light workspace theme. This is how KerfDesk opens on every machine.',
+  },
+  'window.theme-dark': {
+    family: 'window',
+    tooltip: 'Use the dark workspace theme for the chrome and the workspace bed.',
+  },
+  'window.theme-system': {
+    family: 'window',
+    tooltip: 'Follow the light/dark setting of the operating system, and change with it.',
+  },
   'window.fit-view': {
     family: 'window',
     tooltip: 'Fit the full machine bed into the workspace view.',

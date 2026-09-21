@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { setAppThemePreference } from '../theme/app-theme';
 import { canvasTheme } from '../theme/canvas-theme';
 import * as drawing from './draw-scene';
 import { Workspace } from './Workspace';
@@ -13,18 +14,20 @@ import { Workspace } from './Workspace';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
+  setAppThemePreference('light');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });
 
-it('repaints an unchanged workspace and invalidates its preview background when the OS theme changes', async () => {
-  let dark = false;
+// ADR-339: the theme is the application's own choice, so the repaint is driven
+// by the preference. The matchMedia stub stays because `subscribeAppTheme`
+// still attaches a desktop listener (that is how 'system' tracks the OS), and
+// this test is the thing that proves the listener is released on unmount.
+it('repaints an unchanged workspace and invalidates its preview background when the theme changes', async () => {
   const listeners = new Set<() => void>();
   vi.stubGlobal('matchMedia', () => ({
-    get matches() {
-      return dark;
-    },
+    matches: false,
     addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
     removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
   }));
@@ -41,20 +44,15 @@ it('repaints an unchanged workspace and invalidates its preview background when 
     const lightBed = canvasTheme.bedFill;
     expect(before).toBeDefined();
 
-    await act(async () => {
-      dark = true;
-      listeners.forEach((listener) => listener());
-    });
+    await act(async () => setAppThemePreference('dark'));
     const after = draw.mock.calls.at(-1);
     expect(draw.mock.calls.length).toBeGreaterThan(count);
     expect(canvasTheme.bedFill).not.toBe(lightBed);
+    // Same project, same scene — only the palette moved.
     expect(after?.[3]).toBe(before?.[3]);
     expect(after?.[4].previewBackgroundKey).not.toBe(before?.[4].previewBackgroundKey);
 
-    await act(async () => {
-      dark = false;
-      listeners.forEach((listener) => listener());
-    });
+    await act(async () => setAppThemePreference('light'));
     expect(canvasTheme.bedFill).toBe(lightBed);
   } finally {
     await act(async () => root.unmount());
