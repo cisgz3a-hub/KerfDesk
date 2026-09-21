@@ -58,7 +58,7 @@ describe('MachineSetupDialogHost', () => {
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'spindle-max' }));
       expect(view.host.textContent).toContain('CNC Startup Setup');
-      expect(view.host.textContent).toContain('Step 5 of 7 — CNC Startup Setup');
+      expect(view.host.textContent).toContain('Step 2 of 3');
       expect(document.activeElement?.getAttribute('aria-label')).toBe(
         'Spindle maximum in Startup Setup',
       );
@@ -66,7 +66,7 @@ describe('MachineSetupDialogHost', () => {
       expect(cncMachine().params.spindleMaxRpm).toBe(before);
       await act(async () => button(view.host, 'Cancel without saving').click());
       expect(cncMachine().params.spindleMaxRpm).toBe(before);
-      expect(view.host.textContent).not.toContain('Step 5 of 7');
+      expect(view.host.textContent).not.toContain('Step 2 of 3');
     } finally {
       await view.unmount();
     }
@@ -79,6 +79,7 @@ describe('MachineSetupDialogHost', () => {
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'material' }));
       expect(select(view.host, 'Project material')).toBeInstanceOf(HTMLSelectElement);
+      expect(select(view.host, 'Project material').closest('details')?.open).toBe(true);
       expect(select(view.host, 'Default CNC bit')).toBeInstanceOf(HTMLSelectElement);
       expect(input(view.host, 'Stock thickness')).toBeInstanceOf(HTMLInputElement);
       expect(select(view.host, 'Saved setup profile')).toBeInstanceOf(HTMLSelectElement);
@@ -120,14 +121,14 @@ describe('MachineSetupDialogHost', () => {
       await changeSelect(view.host, 'Project material', material.value);
       await act(async () => button(view.host, `Apply ${material.label}`).click());
       await changeSelect(view.host, 'Default CNC bit', nextTool.id);
-      const details = view.host.querySelector('details');
+      const details = select(view.host, `Startup bit for ${layer.name}`).closest('details');
       if (!(details instanceof HTMLDetailsElement)) throw new Error('Tool Plan operation missing');
       await act(async () => {
         details.open = true;
       });
       await changeSelect(view.host, `Startup bit for ${layer.name}`, nextTool.id);
       expect(cncMachine().stock.materialKey).toBeUndefined();
-      await act(async () => stepButton(view.host, 7, 'Review & save').click());
+      await act(async () => stepButton(view.host, 3, 'Review & save').click());
       await act(async () => button(view.host, 'Save CNC startup setup').click());
       const after = cncMachine();
       expect(after.stock.materialKey).toBe(material.value);
@@ -199,7 +200,7 @@ describe('MachineSetupDialogHost', () => {
       expect(useStore.getState().cncLibrary.customTools).toContainEqual(custom);
       expect(cncMachine().tools.some((tool) => tool.id === custom.id)).toBe(true);
       expect(useStore.getState().project.scene.layers[0]?.cnc?.toolId).toBe(custom.id);
-      await act(async () => stepButton(view.host, 7, 'Review & save').click());
+      await act(async () => stepButton(view.host, 3, 'Review & save').click());
       await act(async () => button(view.host, 'Save CNC startup setup').click());
       expect(cncMachine().tools.some((tool) => tool.id === custom.id)).toBe(false);
       expect(useStore.getState().cncLibrary.customTools).not.toContainEqual(custom);
@@ -244,7 +245,7 @@ describe('MachineSetupDialogHost', () => {
         buttonByAria(view.host, `Add ${catalog.tool.name} from catalog`).click(),
       );
       await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '18');
-      await act(async () => stepButton(view.host, 7, 'Review & save').click());
+      await act(async () => stepButton(view.host, 3, 'Review & save').click());
       await act(async () => button(view.host, 'Save CNC startup setup').click());
 
       expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(17);

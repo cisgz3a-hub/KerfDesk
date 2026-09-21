@@ -302,6 +302,7 @@ function pushEvenOddScanlineHatches(
 ): void {
   if (xs.length < 2) return;
   xs.sort((a, b) => a - b);
+  cancelEvenMultiplicityIntersections(xs);
   const forward = bidirectional ? scanIndex % 2 === 0 : true;
   for (let i = 0; i + 1 < xs.length; i += 2) {
     const xa = xs[i];
@@ -311,6 +312,24 @@ function pushEvenOddScanlineHatches(
     const [x0, x1] = forward ? [xa, xb] : [xb, xa];
     pushHatch(out, x0, x1, y, !forward);
   }
+}
+
+// Shared boundaries cross twice and do not change even-odd membership. Compact
+// in place so they neither split a continuous burn nor allocate another array.
+function cancelEvenMultiplicityIntersections(xs: number[]): void {
+  let kept = 0;
+  for (let start = 0; start < xs.length; ) {
+    const x = xs[start];
+    if (x === undefined) break;
+    let end = start + 1;
+    while (end < xs.length && sameIntersectionX(xs[end], x)) end += 1;
+    if ((end - start) % 2 === 1) {
+      xs[kept] = x;
+      kept += 1;
+    }
+    start = end;
+  }
+  xs.length = kept;
 }
 
 type WindingIntersection = {

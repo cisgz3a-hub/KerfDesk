@@ -11420,6 +11420,29 @@ highest-value remaining motion fix now that Editable vectors is the default trac
 guided-steps and draft-commit decisions, ADR-210's capability contract, and the firmware write
 policy are unchanged)
 
+### Amendment — 2026-09-21: three visible stages
+
+The maintainer requested a shorter, clearer setup after reviewing the six-step layout. Both Laser
+and CNC now use **Machine → Essentials → Review & save**. **Machine** combines capability cards,
+the searchable catalog and **Controller and connection settings**, with optional **Connect and
+detect** and a separate **Import or export a machine profile** disclosure. The catalog begins with
+up to two compact previews, including the selected catalog profile; search or **Browse all N
+profiles** reveals the full list. **Essentials** groups work area, origin, homing and the applicable
+output/machine limits. **Accessories and calibration** is optional; **CNC job setup** appears only
+while CNC is active. Hybrids keep their CNC machine limits available while Laser is active.
+**Review & save** leads with compact summaries and Edit routes, then the physical pre-run checklist
+and optional **Controller settings**. CNC setting ownership remains as specified by ADR-306.
+
+Stage navigation is always available, including while a draft needs correction. Validation applies
+to the final Save, so operators can reach the field that needs attention without a Next gate.
+Connection remains optional and offline saving is supported. The existing section IDs remain valid
+for deep links, which open the containing stage and required disclosure.
+
+This amendment supersedes the original decision's page composition, optional-section placement and
+Next gates. It preserves capability/profile selection, explicit detected-value application, the
+single atomic draft and Save/Cancel boundary, per-setting firmware consent and verification, and all
+Frame/Start behavior. The original decision below records the previous layout.
+
 ### Context
 
 Maintainer direction (2026-07-21, in chat, with screenshots): Machine Setup is still too
@@ -17084,6 +17107,19 @@ no toolpath-resolution context.
 **Date:** 2026-08-09
 **Status:** Accepted; implemented and software/browser verified; controller and hardware qualification pending
 
+### Amendment — 2026-09-21: CNC setup within Essentials
+
+Machine Setup now has three visible stages under the ADR-240 amendment. CNC **Machine limits**
+appears in **Essentials**, including for a hybrid with Laser active. The current-job stock, material,
+default bit, tiling, and Tool Plan are available in its optional **CNC job setup** section only while
+CNC is active. Existing **Startup Setup** entry points and exact-field links open that stage and
+the relevant section. They do not add a fourth stage.
+
+This changes the placement described in Decision 1, not ownership: the setup draft remains the sole
+writable owner of these values. The machine-versus-current-job scopes, explicit material Apply,
+manual-value preservation, read-only Artwork/Job Review references, atomic Save/Cancel boundary,
+and firmware-write policy below remain unchanged.
+
 ### Context
 
 The maintainer rejected the repeated CNC setup questions shown around artwork. The current contract
@@ -20318,6 +20354,44 @@ prepares in 549 MB of renderer heap where a 330,976-segment one previously reach
 The preparation worker still holds the compiled Job alive for the length of the acknowledged
 chunk transfer, and a preview still costs one full route on each side of that boundary. Both
 remain open; neither is what exhausted the renderer here. No hardware was operated.
+
+### Amendment (2026-09-21) - Dense Sharp fills and repeated Frame requests
+
+The original-image follow-up found another allocation before the preview route exists. A
+1254 x 1254 owl traced with Sharp contains 14,389 contours and 494,902 vertices. Its default
+scanline Fill exhausted a 4 GB heap in the polygon union performed by `layer-fill`, before
+`compileJob` returned. The earlier statement that compilation was not the problem applied to
+the measured dragon/synthetic jobs; it did not cover this contour arrangement.
+
+A single even-odd path on a traced-image Scan Line operation now passes its transformed
+contours directly to the even-odd scanline sweep. The sweep already resolves holes, overlaps
+and crossings, so this case does not need a polygon arrangement. Contours are appended with
+iteration rather than an argument spread. Coincident scanline crossings cancel by parity,
+keeping touching ink in one continuous span. Multiple paths, non-zero winding, other artwork
+kinds, Island Fill and Offset Fill retain their existing normalization.
+
+This preserves the source fill region, not byte identity with the former polygon engine:
+the old union rounded boundaries to 1 micrometre and collapsed short edges before hatching.
+The direct sweep keeps source coordinates until the normal downstream representation rules.
+A regression pins a boundary just above a hatch row so this difference is explicit. No trace
+resolution, retained source vertices, hatch spacing, output size limit or refusal is added.
+
+Idle canvas marker workers now reserve the same memory lane as background preparation and
+retire on every terminal response before releasing it. Selecting the first process marker
+reads only the required contour/scanline/raster row/pass instead of allocating a full route.
+The marker selector is tested against the existing full route, including CNC precision and
+scan offsets; it does not change the emitted route.
+
+Ordinary Frame calls share one pending Promise through preparation and physical completion.
+Frame and Start show the preparation state and disable repeated button dispatch. Compilation
+failure and stale-job cancellation release ownership for a retry. Existing exact-job checks,
+Frame completion evidence, and the completed-Frame Start gate remain authoritative.
+
+Verification includes the original owl through Chrome Sharp tracing, committed geometry,
+filled Preview, scrubbing/playback and simulated-controller Frame; a 150,000-contour compiler
+regression; analytic fill-boundary tests; worker-lifetime/queue tests; and marker parity tests.
+See `docs/audits/2026-09-21-sharp-owl-verification.md` for measurements and limitations. No
+hardware was operated; browser evidence is not controller/material qualification.
 
 ## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
 

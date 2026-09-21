@@ -14,25 +14,20 @@ import {
   initDeviceSetup,
   machineSetupProfile,
   machineSetupValidationIssues,
+  type DeviceSetupStep,
   type DeviceSetupState,
 } from './device-setup-flow';
+import { deviceSetupStage } from './device-setup-steps';
 
 function open(detected: Partial<DeviceProfile> | null = null): DeviceSetupState {
   return initDeviceSetup(DEFAULT_DEVICE_PROFILE, detected, { machine: LASER_MACHINE_CONFIG });
 }
 
 describe('unified machine setup flow', () => {
-  it('starts with the machine-type choice before profile, connection, and confirmation', () => {
+  it('starts at Machine in a three-stage setup', () => {
     const state = open();
-    expect(state.step).toBe('capability');
-    expect(DEVICE_SETUP_STEP_ORDER).toEqual([
-      'capability',
-      'identify',
-      'connect',
-      'confirm',
-      'options',
-      'review',
-    ]);
+    expect(state.step).toBe('identify');
+    expect(DEVICE_SETUP_STEP_ORDER).toEqual(['identify', 'confirm', 'review']);
   });
 
   it('walks the laser sequence without running a probe', () => {
@@ -44,18 +39,26 @@ describe('unified machine setup flow', () => {
     expect(DEVICE_SETUP_STEP_ORDER).not.toContain('probe');
   });
 
-  it('adds one dedicated Startup Setup page only for an active CNC project', () => {
+  it('uses the same three stages for laser and CNC', () => {
     expect(deviceSetupStepOrder('laser')).toEqual(DEVICE_SETUP_STEP_ORDER);
     expect(deviceSetupStepOrder('cnc')).toEqual(CNC_DEVICE_SETUP_STEP_ORDER);
-    expect(CNC_DEVICE_SETUP_STEP_ORDER).toEqual([
-      'capability',
-      'identify',
-      'connect',
-      'confirm',
-      'cnc-setup',
-      'options',
-      'review',
-    ]);
+    expect(CNC_DEVICE_SETUP_STEP_ORDER).toEqual(['identify', 'confirm', 'review']);
+  });
+
+  it.each<[DeviceSetupStep, DeviceSetupStep, DeviceSetupStep, DeviceSetupStep]>([
+    ['capability', 'identify', 'confirm', 'identify'],
+    ['identify', 'identify', 'confirm', 'identify'],
+    ['connect', 'identify', 'confirm', 'identify'],
+    ['confirm', 'confirm', 'review', 'identify'],
+    ['cnc-setup', 'confirm', 'review', 'identify'],
+    ['options', 'confirm', 'review', 'identify'],
+    ['review', 'review', 'review', 'confirm'],
+  ])('retains the %s target and navigates from its visible stage', (target, stage, next, back) => {
+    const state = deviceSetupReducer(open(), { kind: 'go', step: target });
+    expect(state.step).toBe(target);
+    expect(deviceSetupStage(target)).toBe(stage);
+    expect(deviceSetupReducer(state, { kind: 'next' }).step).toBe(next);
+    expect(deviceSetupReducer(state, { kind: 'back' }).step).toBe(back);
   });
 
   it('keeps DeviceProfile and CNC config in the same draft', () => {
@@ -126,7 +129,7 @@ describe('unified machine setup flow', () => {
     expect(correctedGrblLabel.draft.controllerCommandSet).toBe('creality-falcon-a1-pro');
   });
 
-  it('blocks unsupported CNC/controller combinations', () => {
+  it('flags unsupported CNC/controller combinations without blocking navigation', () => {
     let state = deviceSetupReducer(open(), {
       kind: 'set-machine-kinds',
       machineKinds: ['cnc'],
@@ -134,7 +137,7 @@ describe('unified machine setup flow', () => {
     state = deviceSetupReducer(state, { kind: 'go', step: 'identify' });
     state = deviceSetupReducer(state, { kind: 'select-controller', controllerKind: 'marlin' });
     expect(machineSetupValidationIssues(state).join(' ')).toMatch(/cannot run KerfDesk CNC jobs/);
-    expect(canAdvanceDeviceSetup(state)).toBe(false);
+    expect(canAdvanceDeviceSetup(state)).toBe(true);
   });
 
   it('allows a zero CNC spindle spin-up delay', () => {
@@ -154,7 +157,7 @@ describe('unified machine setup flow', () => {
     );
   });
 
-  it('never strands invalid CNC limits before their dedicated edit page', () => {
+  it('never strands invalid CNC limits before Essentials', () => {
     let state = deviceSetupReducer(open(), {
       kind: 'set-machine-kinds',
       machineKinds: ['cnc'],
@@ -166,12 +169,15 @@ describe('unified machine setup flow', () => {
         params: { ...state.cncDraft.params, safeZMm: 0, spindleMaxRpm: 0 },
       },
     });
-    state = deviceSetupReducer(state, { kind: 'go', step: 'confirm' });
+    state = deviceSetupReducer(state, { kind: 'go', step: 'identify' });
     expect(machineSetupValidationIssues(state)).not.toHaveLength(0);
     expect(canAdvanceDeviceSetup(state)).toBe(true);
     state = deviceSetupReducer(state, { kind: 'next' });
-    expect(state.step).toBe('cnc-setup');
+    expect(state.step).toBe('confirm');
     expect(canAdvanceDeviceSetup(state)).toBe(true);
+    state = deviceSetupReducer(state, { kind: 'next' });
+    expect(state.step).toBe('review');
+    expect(machineSetupValidationIssues(state)).not.toHaveLength(0);
   });
 
   it('persists both output capabilities and CNC machine values for a hybrid machine', () => {
@@ -338,20 +344,23 @@ describe('unified machine setup flow', () => {
     expect(state.detectedApplied).toBe(false);
   });
 
-  it('blocks invalid geometry on editing steps while capability and connect stay passable', () => {
+  it('keeps invalid geometry reachable from every editing section', () => {
     let state = deviceSetupReducer(open(), { kind: 'edit', patch: { bedWidth: 0 } });
-    // Capability and connect hold no fixable field, so Next never strands the
-    // operator there; the pages that host fields gate on the same issues.
-    expect(state.step).toBe('capability');
-    expect(canAdvanceDeviceSetup(state)).toBe(true);
-    state = deviceSetupReducer(state, { kind: 'go', step: 'identify' });
-    expect(canAdvanceDeviceSetup(state)).toBe(false);
-    state = deviceSetupReducer(state, { kind: 'go', step: 'connect' });
-    expect(canAdvanceDeviceSetup(state)).toBe(true);
-    state = deviceSetupReducer(state, { kind: 'go', step: 'confirm' });
-    expect(canAdvanceDeviceSetup(state)).toBe(false);
+    for (const step of [
+      'capability',
+      'identify',
+      'connect',
+      'confirm',
+      'cnc-setup',
+      'options',
+    ] as const) {
+      state = deviceSetupReducer(state, { kind: 'go', step });
+      expect(canAdvanceDeviceSetup(state)).toBe(true);
+      expect(machineSetupValidationIssues(state)).not.toHaveLength(0);
+    }
     state = deviceSetupReducer(state, { kind: 'edit', patch: { bedWidth: 400 } });
     expect(canAdvanceDeviceSetup(state)).toBe(true);
+    expect(machineSetupValidationIssues(state)).toHaveLength(0);
   });
 
   it('keeps firmware writes queued in the draft and clears them when the contract changes', () => {

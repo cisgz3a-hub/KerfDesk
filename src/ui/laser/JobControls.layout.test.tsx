@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { JobControls } from './JobControls';
 
 (
@@ -10,6 +11,7 @@ import { JobControls } from './JobControls';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
+  useFramePreparationStore.setState({ pending: false });
   useStore.getState().newProject();
   useLaserStore.setState({
     streamer: null,
@@ -20,6 +22,20 @@ afterEach(() => {
 });
 
 describe('JobControls action hierarchy', () => {
+  it('shows pending Frame preparation and prevents duplicate run actions', async () => {
+    useFramePreparationStore.setState({ pending: true });
+    const view = await renderControls();
+    try {
+      expect(button(view.host, 'Preparing Frame…').disabled).toBe(true);
+      expect(button(view.host, 'Set up & Frame').disabled).toBe(true);
+      expect(view.host.textContent).toContain('Preparing the exact job for Frame…');
+      await act(async () => useFramePreparationStore.setState({ pending: false }));
+      expect(button(view.host, 'Set up & Frame').disabled).toBe(false);
+      expect(button(view.host, 'Frame job')).toBeDefined();
+    } finally {
+      await view.unmount();
+    }
+  });
   // Maintainer-directed order (ADR-225, amended 2026-07-17): origin first,
   // job actions next so Start/Frame stay above the fold on short windows,
   // placement below them, and the hand-positioning guide last as a fallback.

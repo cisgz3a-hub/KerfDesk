@@ -26,6 +26,7 @@ import {
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
 import {
+  deviceSetupStage,
   deviceSetupStepOrder,
   isDeviceSetupStep,
   type DeviceSetupStep,
@@ -39,11 +40,8 @@ export {
   type DeviceSetupStep,
 } from './device-setup-steps';
 
-// Six steps (ADR-240, maintainer-ordered): machine type first, then the
-// profile catalog, then a dedicated connect-and-detect page, then one flat
-// confirm page (coordinates + machine output), optional calibrations as
-// closed status rows, and firmware comparison + review before the single
-// atomic Save.
+// Three visible stages share one draft. Legacy section targets still open
+// their matching editor, and only the final Save changes the project.
 export type DeviceSetupState = {
   readonly step: DeviceSetupStep;
   // Physical output capability. This may contain both kinds, while
@@ -123,7 +121,7 @@ export function initDeviceSetup(
   const machineKinds = initialMachineKinds(profile, baselineKind);
   const machineKind = initialActiveMachineKind(machineKinds, baselineKind);
   return {
-    step: 'capability',
+    step: 'identify',
     machineKinds,
     machineKind,
     baseline: profile,
@@ -407,28 +405,13 @@ export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyA
 }
 
 export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
-  switch (state.step) {
-    // Capability and connect always advance: their pages hold no field that
-    // could resolve a validation issue, so blocking Next there would strand
-    // the operator away from the fix.
-    case 'capability':
-    case 'connect':
-    case 'cnc-setup':
-      return true;
-    case 'confirm':
-      return state.machineKind === 'cnc' || machineSetupValidationIssues(state).length === 0;
-    case 'identify':
-    case 'options':
-      return machineSetupValidationIssues(state).length === 0;
-    case 'review':
-      return false;
-    default:
-      return assertNever(state.step);
-  }
+  // Review explains all invalid values. Navigation must never strand a user
+  // away from an editor; validation belongs to the final Save action.
+  return deviceSetupStage(state.step) !== 'review';
 }
 
 export function isFirstDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
-  return step === deviceSetupStepOrder(machineKind)[0];
+  return deviceSetupStage(step) === deviceSetupStepOrder(machineKind)[0];
 }
 
 export function isLastDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
@@ -438,7 +421,7 @@ export function isLastDeviceSetupStep(step: DeviceSetupStep, machineKind: Machin
 
 function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
   const order = deviceSetupStepOrder(state.machineKind);
-  const index = order.indexOf(state.step);
+  const index = order.indexOf(deviceSetupStage(state.step));
   if (index < 0) return order[0] ?? state.step;
   const clamped = Math.min(order.length - 1, Math.max(0, index + delta));
   return order[clamped] ?? state.step;
