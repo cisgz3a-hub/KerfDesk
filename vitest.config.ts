@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 import { vitestMaxWorkers } from './src/__fixtures__/vitest-workers';
@@ -8,6 +9,16 @@ import { vitestMaxWorkers } from './src/__fixtures__/vitest-workers';
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    resolve: {
+      alias: {
+        // See src/__fixtures__/pwa-register-stub.ts: the plugin's virtual id
+        // has no file path for Vitest's Windows module runner, which fails
+        // suites at collection on the windows-latest lanes only.
+        'virtual:pwa-register/react': fileURLToPath(
+          new URL('./src/__fixtures__/pwa-register-stub.ts', import.meta.url),
+        ),
+      },
+    },
     test: {
       environment: 'jsdom',
       globals: false,
