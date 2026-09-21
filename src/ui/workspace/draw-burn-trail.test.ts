@@ -176,7 +176,7 @@ describe('drawBurnTail', () => {
   it('walks only the tail window, not the whole confirmed route', () => {
     const long = plan('G21\nG90\nM3 S0\nG0 X0 Y0\nG1 X1000 S500');
     const recording = strokeRecorder();
-    drawBurnTail(recording.ctx, long, liveRun(long, 1000), {
+    drawBurnTail(recording.ctx, long, liveRun(long, 990), {
       scale: 1,
       offsetX: 0,
       offsetY: 0,

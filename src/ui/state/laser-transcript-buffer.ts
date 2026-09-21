@@ -10,12 +10,10 @@
 // second for output its own filter hides by default.
 //
 // So a stream-owned `ok` is appended to a plain array on the refs instead. The
-// next line that is NOT part of that flood — a status report (four a second
-// while connected), an error, a banner, any console or motion reply — carries
-// the buffered entries into the store ahead of itself, in wire order. The
-// transcript therefore stays complete and correctly ordered; it is only
-// published in batches, and never more than a quarter second late while the
-// status poll is running.
+// next non-job line publishes the batch immediately. Job-only traffic also
+// publishes on the first entry at least 250 ms after the batch began: Marlin
+// cannot poll status while streaming. Fixed-size rings retain the newest
+// history even if no such flush arrives.
 //
 // The buffer is diagnostic history, not machine state: nothing in the ack
 // ledger, the streamer or the safety notices reads it, and every teardown that
@@ -26,23 +24,43 @@ import { TRANSCRIPT_MAX, type SerialTranscriptEntry } from './laser-transcript';
 import { LOG_MAX } from './laser-store-helpers';
 
 export type TranscriptBufferRefs = {
-  /** Entries recorded but not yet published, oldest first. */
+  /** Bounded rings; publication restores oldest-first order. */
   bufferedTranscript?: SerialTranscriptEntry[];
-  /** Raw log lines for the same entries, in the same order. */
   bufferedLog?: string[];
+  bufferedTranscriptStart?: number;
+  bufferedLogStart?: number;
+  bufferedTranscriptAt?: number | null;
 };
+
+export const TRANSCRIPT_BATCH_MS = 250;
 
 type TranscriptPatch = Pick<LaserState, 'log' | 'transcript'>;
 
 /** Hold one entry back from the store. `logLine` is omitted for records that
- * never appear in the operator log (outbound job chunks). */
+ * never appear in the operator log (outbound job chunks). Returns true when
+ * this arrival should publish the batch, independent of controller polling. */
 export function bufferTranscriptEntry(
   refs: TranscriptBufferRefs,
   entry: SerialTranscriptEntry,
   logLine?: string,
-): void {
-  (refs.bufferedTranscript ??= []).push(entry);
-  if (logLine !== undefined) (refs.bufferedLog ??= []).push(logLine);
+): boolean {
+  refs.bufferedTranscriptAt ??= entry.at;
+  refs.bufferedTranscriptStart = pushRing(
+    (refs.bufferedTranscript ??= []),
+    refs.bufferedTranscriptStart ?? 0,
+    entry,
+    TRANSCRIPT_MAX,
+  );
+  if (logLine !== undefined) {
+    refs.bufferedLogStart = pushRing(
+      (refs.bufferedLog ??= []),
+      refs.bufferedLogStart ?? 0,
+      logLine,
+      LOG_MAX,
+    );
+  }
+  const age = entry.at - refs.bufferedTranscriptAt;
+  return age >= TRANSCRIPT_BATCH_MS || age < 0;
 }
 
 export function hasBufferedTranscript(refs: TranscriptBufferRefs): boolean {
@@ -60,8 +78,8 @@ export function publishTranscriptPatch(
   entry?: SerialTranscriptEntry,
   logLine?: string,
 ): TranscriptPatch {
-  const entries = refs.bufferedTranscript ?? [];
-  const logLines = refs.bufferedLog ?? [];
+  const entries = orderedRing(refs.bufferedTranscript ?? [], refs.bufferedTranscriptStart ?? 0);
+  const logLines = orderedRing(refs.bufferedLog ?? [], refs.bufferedLogStart ?? 0);
   const patch: TranscriptPatch = {
     transcript: appendBounded(state.transcript, entries, entry, TRANSCRIPT_MAX),
     log: appendBounded(state.log, logLines, logLine, LOG_MAX),
@@ -76,6 +94,22 @@ export function publishTranscriptPatch(
 export function clearTranscriptBuffer(refs: TranscriptBufferRefs): void {
   refs.bufferedTranscript = [];
   refs.bufferedLog = [];
+  refs.bufferedTranscriptStart = 0;
+  refs.bufferedLogStart = 0;
+  refs.bufferedTranscriptAt = null;
+}
+
+function pushRing<T>(items: T[], start: number, item: T, max: number): number {
+  if (items.length < max) {
+    items.push(item);
+    return start;
+  }
+  items[start] = item;
+  return (start + 1) % max;
+}
+
+function orderedRing<T>(items: T[], start: number): ReadonlyArray<T> {
+  return start === 0 ? items : [...items.slice(start), ...items.slice(0, start)];
 }
 
 function appendBounded<T>(

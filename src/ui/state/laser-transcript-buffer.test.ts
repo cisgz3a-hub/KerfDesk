@@ -61,12 +61,30 @@ describe('laser transcript buffer (ADR-333)', () => {
     const refs: TranscriptBufferRefs = {};
     for (let i = 0; i < TRANSCRIPT_MAX + 50; i += 1) bufferTranscriptEntry(refs, entry(i), `l${i}`);
 
+    expect(refs.bufferedTranscript).toHaveLength(TRANSCRIPT_MAX);
+    expect(refs.bufferedLog).toHaveLength(LOG_MAX);
+
     const patch = publishTranscriptPatch(refs, EMPTY);
 
     expect(patch.transcript).toHaveLength(TRANSCRIPT_MAX);
+    expect(patch.transcript[0]?.id).toBe(50);
     expect(patch.transcript.at(-1)?.id).toBe(TRANSCRIPT_MAX + 49);
     expect(patch.log).toHaveLength(LOG_MAX);
+    expect(patch.log[0]).toBe(`l${TRANSCRIPT_MAX + 50 - LOG_MAX}`);
     expect(patch.log.at(-1)).toBe(`l${TRANSCRIPT_MAX + 49}`);
+  });
+
+  it('requests publication after 250 ms of job-only traffic and resets the deadline', () => {
+    const refs: TranscriptBufferRefs = {};
+    expect(bufferTranscriptEntry(refs, { ...entry(1), at: 1_000 })).toBe(false);
+    expect(bufferTranscriptEntry(refs, { ...entry(2), at: 1_249 })).toBe(false);
+    expect(bufferTranscriptEntry(refs, { ...entry(3), at: 1_250 })).toBe(true);
+    const published = publishTranscriptPatch(refs, EMPTY);
+    expect(published.transcript.map((item) => item.id)).toEqual([1, 2, 3]);
+    expect(bufferTranscriptEntry(refs, { ...entry(4), at: 1_251 })).toBe(false);
+    expect(publishTranscriptPatch(refs, published).transcript.map((item) => item.id)).toEqual([
+      1, 2, 3, 4,
+    ]);
   });
 
   it('records an entry with no log line, for an outbound chunk the log never shows', () => {

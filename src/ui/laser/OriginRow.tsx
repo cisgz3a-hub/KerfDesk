@@ -134,6 +134,7 @@ export function OriginRow(props: {
   // have no origin vocabulary at all — the whole row disappears.
   if (wcs === 'none') return null;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
+  // Match the guide for Release motors: Zero Z alone does not dismiss it.
   const hasCustomXy = workOriginActive || hasCustomXyOrigin(wcoCache);
   const persistentOrUnknown =
     workOriginSource === 'g54-persistent' || workOriginSource === 'unknown';
@@ -174,7 +175,7 @@ export function OriginRow(props: {
         </button>
         <GoToWorkZeroButton busy={busy} hasCustom={hasCustom} />
         <ReleaseMotorsButton
-          show={canSleep && (homingEnabled || hasCustom)}
+          show={canSleep && (homingEnabled || hasCustomXy)}
           busy={busy}
           onRelease={onRelease}
         />

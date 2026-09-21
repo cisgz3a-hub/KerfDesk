@@ -10,6 +10,7 @@ import {
   type DeviceProfile,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
+import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
 import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
 import { ImportExportPanel } from '../MachineSetupImportExport';
@@ -196,7 +197,9 @@ function AdvancedConnection(props: {
         {props.state.draft.streamingMode === 'char-counted' ? (
           <RxWindowRow state={props.state} update={props.update} />
         ) : null}
-        <HostedStreamingRow state={props.state} update={props.update} />
+        {isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) ? (
+          <HostedStreamingRow state={props.state} update={props.update} />
+        ) : null}
         <p style={mutedStyle}>{guide.streamingExplanation}</p>
       </div>
     </details>

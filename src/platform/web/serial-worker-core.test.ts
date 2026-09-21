@@ -57,6 +57,11 @@ function streamingJob(rxBufferBytes = 11): StreamerState {
   return step(createStreamer('G1 X1.000\nG1 X2.000\nG1 X3.000\n', { rxBufferBytes })).state;
 }
 
+function arm(h: Harness): void {
+  h.core.handle({ kind: 'prepare-arm', id: 1 });
+  h.core.handle({ kind: 'arm', id: 1, streamer: streamingJob() });
+}
+
 function lines(posted: ReadonlyArray<SerialWorkerResponse>): ReadonlyArray<string> {
   return posted.flatMap((message) => (message.kind === 'line' ? [message.line] : []));
 }
@@ -84,7 +89,7 @@ describe('serial worker core (ADR-334)', () => {
 
   it('refills from an acknowledgement once armed, and still forwards the line', async () => {
     const h = harness();
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
+    arm(h);
 
     h.push('ok\n');
     await flush();
@@ -96,7 +101,7 @@ describe('serial worker core (ADR-334)', () => {
 
   it('keeps refilling across a burst of acknowledgements, in order', async () => {
     const h = harness();
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
+    arm(h);
 
     h.push('ok\nok\n');
     await flush();
@@ -108,11 +113,11 @@ describe('serial worker core (ADR-334)', () => {
   it('acknowledges the handover in both directions and stops writing once released', async () => {
     const h = harness();
 
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
-    expect(h.posted.at(-1)).toEqual({ kind: 'armed' });
+    arm(h);
+    expect(h.posted.at(-1)).toEqual({ kind: 'armed', id: 1 });
 
-    h.core.handle({ kind: 'release' });
-    expect(h.posted.at(-1)).toEqual({ kind: 'released' });
+    h.core.handle({ kind: 'release', id: 2 });
+    expect(h.posted.at(-1)).toEqual({ kind: 'released', id: 2 });
     expect(h.core.armedStreamer()).toBeNull();
 
     h.push('ok\n');
@@ -122,13 +127,24 @@ describe('serial worker core (ADR-334)', () => {
 
   it('stops refilling when the stream turns terminal', async () => {
     const h = harness();
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
+    arm(h);
 
     h.push('error:20\n');
     await flush();
 
     expect(h.written).toEqual([]);
     expect(h.core.armedStreamer()?.status).toBe('errored');
+  });
+
+  it('retires the old queue when a reset is written, before its banner arrives', async () => {
+    const h = harness();
+    arm(h);
+    h.core.handle({ kind: 'write', id: 3, data: '\x18' });
+    h.push('ok\n');
+    await flush();
+    expect(h.written).toEqual(['\x18']);
+    expect(h.core.armedStreamer()).toBeNull();
+    expect(h.posted).toContainEqual({ kind: 'refill-stopped' });
   });
 
   it('acknowledges a main-thread write and reports its failure against the same id', async () => {
@@ -147,7 +163,7 @@ describe('serial worker core (ADR-334)', () => {
 
   it('reports a failed refill separately, for the containment the main thread owns', async () => {
     const h = harness();
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
+    arm(h);
     h.failWrites();
 
     h.push('ok\n');
@@ -155,6 +171,10 @@ describe('serial worker core (ADR-334)', () => {
 
     expect(h.posted).toContainEqual({ kind: 'stream-write-error', message: 'port went away' });
     expect(lines(h.posted)).toEqual(['ok']);
+    expect(h.core.armedStreamer()).toBeNull();
+    h.push('ok\n');
+    await flush();
+    expect(h.posted.filter((message) => message.kind === 'stream-write-error')).toHaveLength(1);
   });
 
   it('reports the port closing when the read stream ends', async () => {
@@ -168,7 +188,7 @@ describe('serial worker core (ADR-334)', () => {
 
   it('releases the stream locks on close, so the owner can close the port', async () => {
     const h = harness();
-    h.core.handle({ kind: 'arm', streamer: streamingJob() });
+    arm(h);
 
     h.core.handle({ kind: 'close' });
     await flush();

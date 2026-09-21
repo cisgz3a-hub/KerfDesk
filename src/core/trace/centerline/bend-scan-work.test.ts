@@ -3,7 +3,8 @@
 // long, and a dense traced contour is thousands of points: the scan used to
 // rotate the whole ring to centre each candidate and slice two legs out of it
 // to measure them, which made one closed contour quadratic in its own length.
-// Both are now index walks, so a candidate costs its own window.
+// The tangent legs now use index walks. One full-ring rotation still remains
+// per admitted candidate, so the closed scan can still be quadratic.
 
 import { describe, expect, it, vi } from 'vitest';
 import type { Vec2 } from '../../scene';
@@ -43,11 +44,12 @@ function referenceTrimArc(points: ReadonlyArray<Vec2>, end: 'head' | 'tail', arc
 }
 
 describe('bend scan work', () => {
-  it('copies nothing while scanning a closed chain that it rebuilds nowhere', () => {
+  it('avoids slice and reverse copies while scanning an unchanged closed chain', () => {
     const ring = zigzagRing(600);
     // An empty distance field reports no ink anywhere, so every candidate is
-    // rejected and no chain is rebuilt. The scan must then copy nothing at
-    // all: measured on this ring before the rewrite, rotating the ring per
+    // rejected and no chain is rebuilt. This measures the removed slice and
+    // reverse calls, not all allocations: rotateRing still copies each ring
+    // manually. Before the rewrite, rotating the ring per
     // candidate and slicing two legs out of it cost 5,394 slices and 2,098
     // reversals for 600 points — nine array copies per point of the chain.
     const slice = vi.spyOn(Array.prototype, 'slice');

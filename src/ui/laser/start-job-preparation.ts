@@ -11,6 +11,7 @@ import {
 } from '../job-placement';
 import {
   canvasJobTimingPlan,
+  controllerDwellUsesSeconds,
   DWELL_EVIDENCE_UNAVAILABLE_REASON,
 } from '../state/canvas-job-timing-plan';
 import {
@@ -89,6 +90,17 @@ export function okPreparation(
     prepared,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
+  const metrics = buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
+    gcode,
+    ...(jobTimingPlan.kind === 'ok'
+      ? { timeline: jobTimingPlan.plan }
+      : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
+        ? { unavailableReason: jobTimingPlan.reason }
+        : {}),
+    ...(jobTimingPlan.evidence.initialPosition === null
+      ? {}
+      : { initialPosition: jobTimingPlan.evidence.initialPosition }),
+  });
   return {
     ok: true,
     gcode,
@@ -100,22 +112,37 @@ export function okPreparation(
     // program with the estimator's own assumptions, as it was before the two
     // shared one baseline - an offline or dense job keeps its time. The one
     // exception is unproven dwell units on a connected controller.
-    metrics: buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
-      gcode,
-      ...(jobTimingPlan.kind === 'ok'
-        ? { timeline: jobTimingPlan.plan }
-        : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
-          ? { unavailableReason: jobTimingPlan.reason }
-          : {}),
-      ...(jobTimingPlan.evidence.initialPosition === null
-        ? {}
-        : { initialPosition: jobTimingPlan.evidence.initialPosition }),
-    }),
+    metrics: withVerifiedDwellEstimate(metrics, machine),
     ...(preflightMotionOffset === undefined ? {} : { preflightMotionOffset }),
     canvasPlan,
     jobTimingPlan,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
     ...(toolPlan.length === 0 ? {} : { cncToolPlan: toolPlan }),
+  };
+}
+
+function withVerifiedDwellEstimate(
+  metrics: ReturnType<typeof buildPreparedJobMetrics>,
+  machine: MachineStartSnapshot,
+): ReturnType<typeof buildPreparedJobMetrics> {
+  // Line/segment budgets and missing position can end the live-plan path
+  // before it inspects dwell. Reuse the fallback's measured dwell, without
+  // parsing the program again or treating offline estimates as live evidence.
+  const connected = machine.connected ?? machine.statusReport !== null;
+  if (
+    !connected ||
+    (metrics.duration.breakdown.dwellSeconds ?? 0) <= 0 ||
+    controllerDwellUsesSeconds(machine.activeControllerKind, machine.detectedControllerKind)
+  ) {
+    return metrics;
+  }
+  return {
+    ...metrics,
+    duration: {
+      totalSeconds: 0,
+      breakdown: { cutSeconds: 0, travelSeconds: 0 },
+      unavailableReason: DWELL_EVIDENCE_UNAVAILABLE_REASON,
+    },
   };
 }
 

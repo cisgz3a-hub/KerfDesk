@@ -73,6 +73,32 @@ afterEach(() => {
 // The laser six-step shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
+  it('offers worker streaming only for GRBL-family controllers and keeps its saved preference', async () => {
+    const view = await renderWizard();
+    const workerOption = () =>
+      view.host.querySelector<HTMLInputElement>(
+        'input[aria-label="Read the serial port and refill the job stream in a worker"]',
+      );
+    try {
+      await act(async () => button(view.host, 'Next').click());
+      const option = workerOption();
+      if (option === null) throw new Error('GRBL worker option missing');
+      await act(async () => option.click());
+      expect(workerOption()?.checked).toBe(true);
+
+      for (const controllerKind of ['marlin', 'smoothieware']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()).toBeNull();
+      }
+      for (const controllerKind of ['grblhal', 'fluidnc', 'grbl-v1.1']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()?.checked).toBe(true);
+      }
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('connects only after using the selected controller and baud', async () => {
     const originalConnect = useLaserStore.getState().connect;
     const connect = vi.fn(async () => undefined);

@@ -293,13 +293,9 @@ function trySharpenClosed(
 ): BendResult | null {
   const mid = Math.floor(pts.length / 2);
   const shift = (i - mid + pts.length) % pts.length;
-  // The rotation exists only to centre the candidate so the open-chain gates
-  // have chain on both sides of it. When the ring already provides that where
-  // the candidate lies, those gates read the very same points unrotated, so a
-  // REJECTION can be decided without building an array — and the scan asks
-  // once per vertex, which is what made a dense closed contour quadratic in
-  // its own length. An accepted candidate still goes through the rotation, so
-  // the chain returned here is the one the old path returned, unchanged.
+  // Centre the candidate so the open-chain gates retain their exact boundary
+  // rules. This still copies one whole ring per admitted candidate; only the
+  // tangent legs below are read by index without copies.
   return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm);
 }
 

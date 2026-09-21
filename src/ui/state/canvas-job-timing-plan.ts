@@ -91,9 +91,7 @@ export function canvasJobTimingPlan(
   if (
     result.kind === 'ok' &&
     result.plan.dwellSeconds > 0 &&
-    (context.detectedControllerKind == null ||
-      usesMillisecondDwellP(context.activeControllerKind) ||
-      usesMillisecondDwellP(context.detectedControllerKind))
+    !controllerDwellUsesSeconds(context.activeControllerKind, context.detectedControllerKind)
   ) {
     return {
       kind: 'unavailable',
@@ -102,6 +100,19 @@ export function canvasJobTimingPlan(
     };
   }
   return { ...result, evidence };
+}
+
+/** Shared by the exact countdown and estimates which fall back without one. */
+export function controllerDwellUsesSeconds(
+  active: ControllerKind | null | undefined,
+  detected: ControllerKind | null | undefined,
+): boolean {
+  return (
+    active != null &&
+    detected != null &&
+    !usesMillisecondDwellP(active) &&
+    !usesMillisecondDwellP(detected)
+  );
 }
 
 export function validatedCanvasJobTimingPlan(
