@@ -17,7 +17,10 @@ let liveConnection: FakeConnection | null = null;
 
 function makeConnection(
   writes: string[],
-  options: { readonly autoResetBanner?: boolean } = {},
+  options: {
+    readonly autoResetBanner?: boolean;
+    readonly statusReply?: () => string | null;
+  } = {},
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
@@ -25,6 +28,11 @@ function makeConnection(
   const connection: FakeConnection = {
     write: async (data) => {
       writes.push(data);
+      const statusReply = data === '?' ? options.statusReply?.() : null;
+      if (statusReply != null) {
+        // Like the real reader, deliver the response after the poll callback.
+        void Promise.resolve().then(() => connection.emitLine(statusReply));
+      }
       if (data === '\x18' && options.autoResetBanner !== false) {
         setTimeout(() => connection.emitLine('Grbl 1.1f'), 0);
       }
@@ -111,6 +119,58 @@ afterEach(async () => {
 });
 
 describe('active stream transport heartbeat', () => {
+  it('queries a responsive controller before resetting after the browser delayed polling', async () => {
+    const writes: string[] = [];
+    let readerReady = false;
+    const connection = makeConnection(writes, {
+      statusReply: () => (readerReady ? '<Run|MPos:1.000,0.000,0.000|FS:1000,100>' : null),
+    });
+    liveConnection = connection;
+    await connectReady(connection);
+    await startTestLaserJob(
+      ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
+    );
+    await vi.advanceTimersByTimeAsync(250);
+    writes.length = 0;
+
+    // No timer callback or serial reader task ran during this scheduling gap.
+    // The next poll callback gets to run before a controller reply is read.
+    vi.setSystemTime(Date.now() + 60_000);
+    readerReady = true;
+    await vi.advanceTimersByTimeAsync(250);
+    await flush();
+
+    expect(writes).toContain('?');
+    expect(writes).not.toContain('\x18');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    expect(useLaserStore.getState().connection.kind).toBe('connected');
+    expect(useLaserStore.getState().statusReport?.state).toBe('Run');
+  });
+
+  it('still resets a silent controller after the bounded scheduling-gap probe', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    liveConnection = connection;
+    await connectReady(connection);
+    await startTestLaserJob(
+      ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
+    );
+    await vi.advanceTimersByTimeAsync(250);
+    writes.length = 0;
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(writes).toContain('?');
+    expect(writes).not.toContain('\x18');
+
+    await vi.advanceTimersByTimeAsync(ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS);
+    await flush();
+    expect(writes).toContain('\x18');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(writes).toContain('M5\n');
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+  });
+
   it('freezes the job and requests fail-dark reset when fresh status stops', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);

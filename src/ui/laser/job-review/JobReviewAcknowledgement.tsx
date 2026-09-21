@@ -61,9 +61,14 @@ function AcknowledgementBanner(props: {
       <strong>{props.heading}</strong>
       <p style={ackPromptStyle}>{props.prompt}</p>
       <p style={ackFootnoteStyle}>
-        Pressing {props.purpose === 'frame' ? 'Accept & Frame' : 'Start job'} records this
-        confirmation for the current controller session and the exact program shown above — the same
-        acknowledgement the previous confirmation dialog recorded.
+        Pressing{' '}
+        {props.purpose === 'frame'
+          ? 'Accept & Frame'
+          : props.purpose === 'laser-second-pass'
+            ? 'Start second pass'
+            : 'Start job'}{' '}
+        records this confirmation for the current controller session and the exact program shown
+        above — the same acknowledgement the previous confirmation dialog recorded.
       </p>
     </section>
   );

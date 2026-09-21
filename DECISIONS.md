@@ -21476,3 +21476,73 @@ project changed, without an explicit way to acknowledge it.
 confirmed defects, functional checks, browser layouts and limitations. Source and simulated
 controller evidence do not qualify physical controller or material behaviour. Implementation is
 local until separately reviewed and published.
+
+---
+
+## ADR-341 - Painted laser passes derive from sealed execution, with independent Frame and recovery (2026-09-22)
+
+### Context
+
+The Falcon operator lost an image/fill job after Chrome was minimised and the controller
+disconnected. The former recovery path refused costly background compilation. A restart-line
+picker solves restarting the remainder, but does not repeat only selected areas after completion.
+The operator requested a detailed audit and a paintbrush/eraser workflow with local power changes.
+
+### Decision
+
+1. Keep interrupted-job restart and painted second passes separate. The former selects an
+   original movement boundary and remainder. The latter selects areas of a retained completed
+   execution, following an independently verified retained ancestor where available.
+2. Derive painted output from sealed G-code in original work millimetres. Do not crop the raster,
+   recompile the live artwork, re-anchor at the current head, or trust diagnostic canvas points.
+   Brush strokes are unions of round capsules. Analytic intersections partition each burn segment
+   once; the latest covering paint/erase stroke determines its selected power. Original repeated
+   source passes remain, but mask overlap cannot create additional exposure.
+3. Multiply saved S values per stroke and cap at the saved profile maximum. Preserve original
+   feed, beam mode, grayscale, scan corrections and retained dark runways. Omit entirely unselected
+   sweeps. Position with the beam off. Reject source semantics the transformer cannot reproduce
+   rather than silently dropping commands or approximating unsupported curves.
+4. Validate source integrity and canonical emitter lineage, prepare selected output, and requalify
+   the live approach in a cancellable worker. Displayed geometry uses the same source coordinate
+   transform as pointer input. A worker proof binds the exact source, selection, bytes and metrics;
+   Frame does not synchronously repeat expensive raster compilation.
+5. Use a dedicated immutable `laser-second-pass` Frame context. Completing Frame authorizes the
+   exact derived bytes; Start owns its one Job Review. The review cannot edit/recompile unrelated
+   live artwork. Source-only operation metrics are replaced by selected-program facts. Edits revoke
+   the workbench's own permit, while fresh machine/session/origin checks still run at handoff.
+6. Reuse ordinary Start's durable intent and post-accept archive. Seal an ordered second-pass chain
+   containing source run/fingerprint, preceding resume transforms and selection; subsequent recovery
+   appends its resume transform after those stages. Re-emission must reproduce the exact archived
+   bytes. No completed-receipt/live-canvas equality gate is added to a reviewed retained-history job.
+7. Preserve attempted-run ownership when a first transport write rejects after a potentially sent
+   prefix, including when close callbacks already cleared live state. Fail-dark containment remains.
+   A rejected pre-wire authorization can clean up; an uncertain write cannot restore an older offer
+   as if nothing happened. Apply the distinction to ordinary, manual laser, laser recovery and CNC
+   recovery handoffs. Defer normal progress persistence while a post-accept archive is still pending.
+8. Pack point-heavy motion archives based on sampled-point count as well as block count. This fixes
+   arc-rich archives without raising the existing per-artifact or retained-history budgets.
+9. Retain brush drafts separately for the 20 most recently edited exact source runs/fingerprints.
+   Saving a different job cannot replace another job's draft. Storage failure preserves earlier
+   bytes and is disclosed. Pack preview paths and index their bounds for zoom culling; display-only
+   opacity batching never changes emitted coordinates or power.
+10. Offer **Job complete → Darken selected areas…** after the local run has physically settled
+    and its matching verified completion receipt is available. This transient notification is
+    independent of recovery and never comes from receipt hydration alone. Dismissal preserves
+    manual access to the archive. An App-shell host owns both the offer and editor so collapsed
+    Machine controls cannot hide them. Defer presentation behind another modal, retain the exact
+    offered run despite an older history selection, and invalidate superseded completion events
+    and pending archive reads. Preserve the original focus target across the successive dialogs.
+    No prompt choice starts machine motion; the second pass still requires its own Frame/Start.
+
+### Evidence and limits
+
+Focused geometry tests use independent distance and modal/exposure oracles, actual prepared Falcon
+images, native fills/curved vectors, mirrored origins and dense raster input. Browser tests cover
+painting, click highlights, erasing, power changes, draft reopening, exact Frame invalidation,
+immutable review, disconnect and exact derived recovery. Fault injection reproduces diagnostic
+coordinate tampering, partial first-write failure and archive-size failures before their fixes.
+The audit record is `docs/audits/2026-09-22-laser-recovery-second-pass.md`.
+
+Acknowledged commands are not measured material progress. Material position, restored work zero,
+power response and minimised Chrome/Falcon streaming still require physical qualification. These
+changes do not establish the cause of the reported immediate minimisation pause.

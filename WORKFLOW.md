@@ -1590,6 +1590,97 @@ authorization, Frame proof, controller command, or safety boundary.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
+#### Laser restart selection and browser scheduling (2026-09-21)
+
+- **Review recovery** offers a zoomable preview of the archived laser route. Click a burn
+  movement to select its original G-code line; the highlighted movement and entry circle show
+  the actual boundary. Clicking, zooming, closing and cancelling send no machine commands.
+  Final Start repositions with the beam off, then replays that movement and the remaining job.
+  The selected line is recorded in the new recovery run, which can itself be recovered after
+  another interruption. Numeric line selection remains available.
+- The automatic suggestion is acknowledged transport progress, not a measured physical stop.
+  Buffered commands may be ahead of the engraving. Inspect the material and select an earlier
+  movement or scan line if necessary; overlapping engraving may become darker. Coincident
+  passes require checking the selected line number. The picker selects the beginning of a
+  movement, not an arbitrary point inside it, and does not isolate an area for a second pass.
+- **Start from line… → Choose restart point…** prepares the current project and opens the
+  same route picker when a saved exact artifact is unavailable. This manual path requires the
+  original work zero and preserves its existing disclosure that it creates no recovery record.
+  Costly image/fill preparation runs in the background for both manual and fingerprint-based
+  recovery; worker failure is retryable and never falls back to blocking the canvas.
+- Recovery preserves the saved scope and resolved placement. It uses its separate source,
+  live-controller qualification and final handoff checks; a lost ordinary Frame permit after
+  reconnect does not require framing the interrupted job again. Ordinary Start remains governed
+  by the exact completed Frame contract.
+- The clickable saved-job preview derives its movements from the verified G-code, machine
+  profile and historical position observation. Stored preview geometry never authorizes a
+  selected restart line; historical observations are used only to draw the preview.
+- Dense image/fill routes use a lossless packed archive representation for motion coordinates
+  and source-line mapping. The saved G-code, project and prepared raster output remain exact;
+  opening the selected recovery preview restores its complete route. This avoids large
+  object-per-point overhead without raising the existing artifact or history limits. Jobs that
+  still exceed those limits retain the explicit warning that recovery capture is unavailable.
+- An active-stream watchdog that resumes after a long scheduler gap issues one fresh status
+  query opportunity before declaring the link silent. Repeated delays cannot indefinitely
+  extend an unanswered query; normal two-second silence still requests fail-dark containment.
+  This prevents a demonstrated false disconnect and does not establish that a particular
+  browser, USB adapter or controller keeps streaming while minimised.
+
+#### Painted second passes (2026-09-22, ADR-341)
+
+- After a settled laser completion and successful archive capture, **Job complete** asks
+  **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
+  that exact saved job in the paintbrush/eraser editor, or **Done** to finish. No motion is
+  started by this choice. The prompt also works with the Machine panel collapsed, waits
+  behind another open dialog, and appears once for that completion. Reloading saved history,
+  an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
+- **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
+  The completed-run selector also offers older retained completions. When a completed run
+  was a recovery or a painted pass, the preview follows its independently verified retained
+  ancestor so the original full engraving is available where that archive still exists.
+  The current artwork document is never replaced or recompiled by this workflow.
+  Recovery remains a separate **Interrupted job saved** workflow for continuing a stopped run;
+  a selected-area second pass repeats chosen parts of an already completed engraving.
+- Use **Paintbrush**, set its diameter in millimetres and paint areas to repeat. **Eraser**
+  removes areas; **Hand**, Alt-drag and wheel zoom support detailed marking. Several strokes
+  can have different power. Select a painted stroke to edit its power, delete individual
+  strokes, or use Undo/Redo and Clear areas. The most recent stroke wins in overlaps. A
+  painted overlap never adds an extra pass; any deliberate repeated passes in the source
+  program remain repeated inside the mask.
+- **Power (% of original)** is a multiplier of every saved S value, preserving grayscale:
+  100% repeats the source power and 150% multiplies it by 1.5. Values that exceed the saved
+  profile's maximum S are capped and disclosed. Speed, beam mode, scan direction, scan
+  offsets, pixel-width correction and useful unpowered runways remain as emitted originally.
+  The mask does not crop/reprocess the source image or restart its dithering.
+- **Preview second pass** compiles off the UI thread. Its coloured burn paths show the
+  actual selected output; faint paths show the saved engraving for context. The painted
+  mask is a selection, not a physical prediction of material darkness. Entire unselected
+  sweeps are omitted. Intersecting sweeps can traverse unpainted areas with S0 to retain
+  their run-in/run-out motion; all repositioning commands turn the beam off.
+- **Frame second pass** traces the exact derived motion bounds and returns to its captured
+  position. **Start second pass** opens one immutable Job Review with current controller
+  facts, selected-pass metrics and acknowledgements. Editing the painted output invalidates
+  that Frame. Closing the workbench revokes only its own permit. Frame and Start are explicit
+  machine actions; painting, erasing, zooming and previewing move nothing.
+- Keep the workpiece and work origin unchanged from the saved engraving. Source placement
+  is fixed, including jobs originally started from Current Position; a later parked head
+  cannot re-anchor the painted pass. Fresh controller evidence qualifies the approach and
+  live preview. Saved observations never qualify the current machine.
+- Each accepted painted pass gets a new run identity, durable Start intent, exact archive
+  and recovery tracking. Ordered source-resume and paint transforms are bound into its
+  provenance. A disconnect can therefore resume the derived pass without regenerating the
+  full original job. Uncertain first writes keep the attempted run, even if the transport
+  closes before reporting the write failure; the old offer is not silently restored.
+- Painted drafts for the 20 most recently edited sources are retained locally, keyed to each
+  exact run and fingerprint. Storage failure is disclosed and preserves prior saved drafts.
+  Drafts and bounded execution history are different: history
+  still retains at most 20 terminal runs within 100 MiB, with its existing protected slots.
+- Supported inputs are the generated flat XY laser image, fill and vector programs. Native
+  external arcs, coordinate-changing commands, Z/rotary motion, dwell and stationary M3
+  exposure cannot yet be transformed faithfully and produce a specific preparation error.
+  No physical result, browser-minimisation behaviour or Falcon qualification follows from
+  the software tests alone.
+
 While a job streams, the app owns an immutable exact execution artifact in
 IndexedDB plus a small `activeRun` slot keyed by a unique run ID. Progress is
 updated every 25 acknowledgements and at state transitions. Interruption moves

@@ -22,6 +22,11 @@ import type { CncToolPlanEntry } from '../cnc-tool-plan';
 import type { WorkCoordinateOffset } from '../origin-actions';
 import type { WorkZZeroEvidence } from '../work-z-zero-evidence';
 import {
+  archiveCanvasMotionPlan,
+  isArchivedCanvasMotionPlan,
+  type ArchivedCanvasMotionPlan,
+} from './execution-artifact-canvas';
+import {
   isExecutionProvenance,
   type ExecutionProvenance,
   type ExecutionProvenanceV2,
@@ -30,6 +35,7 @@ import {
   assertExecutionArtifactSizeWithinBudget,
   measureExecutionArtifactBytesWithinBudget,
 } from './execution-artifact-size';
+import { isLaserSecondPassChain, type LaserSecondPassChain } from './laser-second-pass-lineage';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
@@ -100,7 +106,8 @@ export type ExecutionArtifactV1 = {
   /** Ordered, deterministic resume transforms applied after emitting `prepared`.
    * Absent for ordinary starts and CNC recovery jobs. */
   readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
-  readonly canvasPlan: CanvasMotionPlan;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
+  readonly canvasPlan: ArchivedCanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncRecoveryManifest?: CncRecoveryEventManifest | undefined;
   // Operator's machine-specific air-cut/scrap-test qualification record for a
@@ -139,6 +146,7 @@ type CreateExecutionArtifactBase = {
   readonly gcode: string;
   readonly prepared: PreparedExecutionOutput;
   readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
   readonly canvasPlan: CanvasMotionPlan;
@@ -166,7 +174,8 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
   );
 
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
-  assertExecutionArtifactSizeWithinBudget(args, 0, true);
+  const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
+  assertExecutionArtifactSizeWithinBudget({ ...args, canvasPlan }, 0, true);
   const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);
   const device = prepared.project.device;
@@ -193,7 +202,10 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     executionSignature: args.canvasPlan.retentionKey,
     prepared,
     ...(args.laserResumeChain === undefined ? {} : { laserResumeChain: args.laserResumeChain }),
-    canvasPlan: args.canvasPlan,
+    ...(args.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: args.laserSecondPassChain }),
+    canvasPlan,
     ...(args.cncToolPlan === undefined ? {} : { cncToolPlan: args.cncToolPlan }),
     ...(cncRecoveryManifest === undefined ? {} : { cncRecoveryManifest }),
     ...(args.recoveryQualification === undefined
@@ -242,9 +254,17 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
   if (!isRecord(value)) return false;
   if (!hasExecutionHeader(value) || !hasExecutionPayload(value)) return false;
   if (!hasValidLaserResumeChain(value)) return false;
+  if (
+    value['laserSecondPassChain'] !== undefined &&
+    (value['machineKind'] !== 'laser' || !isLaserSecondPassChain(value['laserSecondPassChain']))
+  ) {
+    return false;
+  }
   const gcode = value['gcode'];
   const expected = fingerprintGcode(gcode);
   if (!fingerprintsMatch(value['fingerprint'], expected)) return false;
+  if (!isArchivedCanvasMotionPlan(value['canvasPlan'], expected.lines, value['sendableLines']))
+    return false;
   return value['sendableLines'] === countSendableLines(gcode);
 }
 

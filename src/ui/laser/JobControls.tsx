@@ -21,6 +21,7 @@ import { OverrideControls } from './OverrideControls';
 import { AccessoryResetControls } from './AccessoryResetControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
+import { SecondPassControl } from './second-pass/SecondPassControl';
 import { StartFromLineControl } from './StartFromLineControl';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
 import { StartBlockerNotice } from './StartBlockerNotice';
@@ -136,6 +137,7 @@ export function JobControls(props: Props): JSX.Element {
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
+      <SecondPassControl busy={controlsBusy} machineKind={machineKind} />
       <CollapsibleRailSection
         label="History & recovery"
         title="View stored runs, export a previous execution, or restart an interrupted job."

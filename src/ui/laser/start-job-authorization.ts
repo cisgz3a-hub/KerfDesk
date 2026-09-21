@@ -52,7 +52,7 @@ export function currentLaserForAuthorizedStartNow(
   ) {
     return { ok: false, refusal: { kind: 'completed-receipt-changed' } };
   }
-  if (currentReplayExecutionSignature() !== args.expectedExecutionSignature) {
+  if (!startExecutionInputsMatch(args)) {
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
@@ -74,6 +74,15 @@ export function currentLaserForAuthorizedStartNow(
         'Controller or machine setup changed while Start was being prepared. Review the current setup and press Start again.',
     },
   };
+}
+
+function startExecutionInputsMatch(args: CurrentStartAuthorizationArgs): boolean {
+  const candidate = args.framedRunClaim?.permit.candidate;
+  if (candidate?.authorizationContext !== 'laser-second-pass') {
+    return currentReplayExecutionSignature() === args.expectedExecutionSignature;
+  }
+  const source = candidate.preparedStart.laserSecondPassChain?.at(-1);
+  return source !== undefined && candidate.executionSignature === args.expectedExecutionSignature;
 }
 
 export function controllerStartPreparationStillCurrent(

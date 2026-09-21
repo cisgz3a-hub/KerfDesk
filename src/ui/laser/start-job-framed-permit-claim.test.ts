@@ -362,7 +362,7 @@ describe('ordinary framed Start permit claim', () => {
       // already created the streamer and handed the exact bytes to transport.
       useLaserStore.setState({ streamer: null, activeRunId: null });
 
-      const recovery = prepareRecoverySource();
+      const recovery = await prepareRecoverySource();
       const replay = await prepareCurrentStartJob(
         useStore.getState(),
         useLaserStore.getState(),

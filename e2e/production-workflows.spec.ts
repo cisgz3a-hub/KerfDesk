@@ -3,7 +3,13 @@ import {
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
-import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
+import {
+  expect,
+  test,
+  type KerfDeskFixture,
+  type Locator,
+  type Page,
+} from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -662,10 +668,55 @@ test('keeps the finished route and confirms it only after the stream settles Idl
     .toBeGreaterThan(0);
 });
 
+test('offers a selected-area second pass after completion with the Machine panel collapsed', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Wait for the responsive panel replacement before selecting its controls.
+  await expect(
+    page.getByRole('region', { name: 'Workspace side panels', exact: true }),
+  ).toHaveAttribute('data-layout', 'spacious');
+  await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
+  const focusReturn = page.getByRole('button', { name: 'Open...', exact: true });
+  await focusReturn.focus();
+  await drainHeldSerialWrites(page, kerfdesk, baselineLines);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  await expect(complete).toContainText('Would you like to darken selected areas?');
+  await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
+  await dismissNotifications(page);
+  await complete.screenshot({ path: testInfo.outputPath('completed-job-second-pass-offer.png') });
+  const beforeOpening = serialWrites(await kerfdesk.events());
+  await complete.getByRole('button', { name: 'Darken selected areas…' }).click();
+  const workbench = page.getByRole('dialog', { name: 'Paint a second pass', exact: true });
+  await expect(
+    workbench.getByRole('img', {
+      name: 'Paint second-pass areas on the saved engraving',
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  expect(serialWrites(await kerfdesk.events()).slice(beforeOpening.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await workbench.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(complete).toHaveCount(0);
+  await expect(focusReturn).toBeFocused();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expect(complete).toHaveCount(0);
+});
+
 test('preserves an interrupted laser checkpoint after a cable disconnect', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
@@ -683,6 +734,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
 
   const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
   await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toHaveCount(0);
   await recovery.getByText('Interrupted job saved', { exact: true }).click();
   await expect(recovery.locator('p').filter({ hasText: 'Recorded cause:' })).toContainText(
     /connection|disconnect|USB/i,
@@ -709,6 +761,21 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).toContainText(
     'Reviewing or closing this saved job does not change the current canvas',
   );
+  const restartCanvas = review.getByRole('img', { name: /^Laser recovery canvas:/ });
+  await expect(restartCanvas).toBeVisible();
+  await selectRecoveryMovement(restartCanvas);
+  const selectedLine = await review
+    .getByTestId('selected-recovery-movement')
+    .getAttribute('data-raw-line');
+  if (selectedLine === null) throw new Error('Expected the selected original G-code line.');
+  await expect(review.getByRole('spinbutton', { name: 'Restart from G-code line' })).toHaveValue(
+    selectedLine,
+  );
+  const beforeZoom = await restartCanvas.getAttribute('viewBox');
+  if (beforeZoom === null) throw new Error('Expected the saved route viewport.');
+  await review.getByRole('button', { name: 'Zoom in recovery canvas' }).click();
+  await expect(restartCanvas).not.toHaveAttribute('viewBox', beforeZoom);
+  await review.screenshot({ path: testInfo.outputPath('saved-laser-restart-preview.png') });
   await review.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(review).not.toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
@@ -719,6 +786,278 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
     .toBeGreaterThan(savedBeforeReview);
   expect(await savedProject(kerfdesk)).toEqual(currentProject);
   expect(serialWriteBytes(await kerfdesk.events())).toEqual(writesBeforeReview);
+
+  // Resume the sealed job after reconnect, without framing the edited canvas.
+  await kerfdesk.setAutoAcknowledge(true);
+  await connectAndHome(page, kerfdesk);
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await selectRecoveryMovement(review.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  await kerfdesk.setAutoAcknowledge(false);
+  const queriesBeforeResume = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === 0x3f,
+  ).length;
+  await review.getByRole('button', { name: 'Start supervised recovery', exact: true }).click();
+  await expect
+    .poll(
+      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
+    )
+    .toBeGreaterThan(queriesBeforeResume);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(review).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await kerfdesk.acknowledgeSerial(1);
+  await kerfdesk.disconnectSerial();
+  await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  if (!(await recovery.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
+    await recovery.getByText('Interrupted job saved', { exact: true }).click();
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await expect(review).toContainText('Exact job artifact saved');
+  await expect(review.getByRole('img', { name: /^Laser recovery canvas:/ })).toBeVisible();
+  await review.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+});
+
+test('prepares a large image restart preview and starts only the selected remainder', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  const workerUrls: string[] = [];
+  page.on('worker', (worker) => workerUrls.push(worker.url()));
+  await selectAll(page);
+  await runMenuCommand(page, 'Edit', 'Delete');
+  await kerfdesk.setOpenFiles([
+    { name: 'restart-image.png', kind: 'png-fixture', width: 600, height: 600 },
+  ]);
+  await (await toolbarCommand(page, 'Import...')).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('60');
+  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await fillAndCommit(page, 'Selection width', '20');
+  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await fillAndCommit(page, 'Selection height', '20');
+  await connectAndHome(page, kerfdesk);
+  await dismissNotifications(page);
+  const alerts: string[] = [];
+  page.on('dialog', (dialog) => {
+    alerts.push(dialog.message());
+    void dialog.accept();
+  });
+  await page.getByText('History & recovery', { exact: true }).click();
+  await page.getByText('Start from line…', { exact: true }).click();
+  const beforePreview = serialWrites(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'Choose laser restart point' });
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  expect(workerUrls.some((url) => url.includes('output-preparation-worker'))).toBe(true);
+  expect(serialWrites(await kerfdesk.events()).slice(beforePreview.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  expect(Number(await preview.getByLabel('Restart from G-code line').inputValue())).toBeGreaterThan(
+    50,
+  );
+  await preview.screenshot({ path: testInfo.outputPath('image-restart-preview.png') });
+  await preview.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(serialWrites(await kerfdesk.events())).not.toContain('resume preamble');
+
+  await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
+  await kerfdesk.setAutoAcknowledge(false);
+  const queriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
+    (byte) => byte === 0x3f,
+  ).length;
+  await preview.getByRole('button', { name: 'Start selected remainder', exact: true }).click();
+  await expect
+    .poll(
+      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
+    )
+    .toBeGreaterThan(queriesBefore);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(preview).not.toBeVisible();
+  expect(
+    alerts.some((message) => message.includes('Background recovery compilation is not available')),
+  ).toBe(false);
+  expect(alerts.some((message) => message.includes('Review resume from requested line'))).toBe(
+    true,
+  );
+  await kerfdesk.disconnectSerial();
+});
+
+async function selectRecoveryMovement(
+  canvas: import('@playwright/test').Locator,
+  halfway = false,
+): Promise<void> {
+  const path = await canvas.locator('path').first().getAttribute('d');
+  const segments = Array.from((path ?? '').matchAll(/M([^,]+),([^L]+)L([^,]+),([^M]+)/g));
+  const segment = segments[halfway ? Math.floor(segments.length / 2) : 0];
+  if (segment === undefined) throw new Error('Expected a displayed recovery movement.');
+  const [left = NaN, top = NaN, width = NaN, height = NaN] = (
+    (await canvas.getAttribute('viewBox')) ?? ''
+  )
+    .split(' ')
+    .map(Number);
+  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0)
+    throw new Error('Expected a finite recovery viewport.');
+  const box = await canvas.boundingBox();
+  if (box === null) throw new Error('Expected visible recovery canvas.');
+  const x = (Number(segment[1]) + Number(segment[3])) / 2;
+  const y = (Number(segment[2]) + Number(segment[4])) / 2;
+  await canvas.click({
+    position: {
+      x: ((x - left) / width) * box.width,
+      y: ((y - top) / height) * box.height,
+    },
+  });
+}
+
+test('paints, erases, adjusts and recovers a second pass from a completed image', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('dialog', (dialog) => {
+    errors.push(dialog.message());
+    void dialog.accept();
+  });
+  await selectAll(page);
+  await runMenuCommand(page, 'Edit', 'Delete');
+  await kerfdesk.setOpenFiles([
+    { name: 'painted-image.png', kind: 'png-fixture', width: 120, height: 120 },
+  ]);
+  await (await toolbarCommand(page, 'Import...')).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('12');
+  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await fillAndCommit(page, 'Selection width', '20');
+  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await fillAndCommit(page, 'Selection height', '20');
+  await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await expect(page.getByTestId('canvas-motion-probe')).toHaveAttribute(
+    'data-lifecycle',
+    'finished',
+    { timeout: 30_000 },
+  );
+  const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  await expect(complete).toContainText('Would you like to darken selected areas?');
+  await complete.getByRole('button', { name: 'Done', exact: true }).click();
+  await dismissNotifications(page);
+  const paintButton = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
+  await expect(paintButton).toBeEnabled();
+  await selectAll(page);
+  await fillAndCommit(page, 'Selection X position', '47');
+  const beforePainting = serialWrites(await kerfdesk.events());
+  await paintButton.click();
+  const workbench = page.getByRole('dialog', { name: 'Paint a second pass', exact: true });
+  const canvas = workbench.getByRole('img', {
+    name: 'Paint second-pass areas on the saved engraving',
+  });
+  await expect(canvas).toBeVisible();
+  await workbench.getByLabel('Brush diameter (mm)').fill('8');
+  await workbench.getByLabel('Paint power (% of original)').fill('150');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Expected the painted engraving canvas.');
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(
+    workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      canvas
+        .locator('canvas')
+        .nth(1)
+        .evaluate(
+          (node: HTMLCanvasElement) =>
+            node
+              .getContext('2d')
+              ?.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1)
+              .data[3] ?? 0,
+        ),
+    )
+    .toBeGreaterThan(0);
+  await workbench.getByRole('button', { name: 'Eraser', exact: true }).click();
+  await workbench.getByLabel('Brush diameter (mm)').fill('2');
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      canvas
+        .locator('canvas')
+        .nth(1)
+        .evaluate(
+          (node: HTMLCanvasElement) =>
+            node
+              .getContext('2d')
+              ?.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1)
+              .data[3] ?? 255,
+        ),
+    )
+    .toBe(0);
+  await workbench.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).not.toBeVisible();
+  await workbench.getByRole('button', { name: 'Redo', exact: true }).click();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  expect(serialWrites(await kerfdesk.events()).slice(beforePainting.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await expect(page.getByText(/Job recovery tracking hit an unexpected error/)).toHaveCount(0);
+  await workbench.screenshot({ path: testInfo.outputPath('painted-image-second-pass.png') });
+  await workbench.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+  await paintButton.click();
+  await expect(
+    workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }),
+  ).toBeVisible();
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).toBeVisible();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Frame second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }).click();
+  await workbench.getByLabel('Selected stroke power (% of original)').fill('125');
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeDisabled();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Frame second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeEnabled();
+  await kerfdesk.setAutoAcknowledge(false);
+  await workbench.getByRole('button', { name: 'Start second pass', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Review painted second pass' });
+  await expect(review).toBeVisible();
+  await expect(review.getByRole('spinbutton')).toHaveCount(0);
+  await confirmJobReview(
+    page,
+    kerfdesk,
+    review.getByRole('button', { name: 'Start second pass', exact: true }),
+  );
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await kerfdesk.acknowledgeSerial(1);
+  await kerfdesk.disconnectSerial();
+  const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
+  await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await recovery.getByText('Interrupted job saved', { exact: true }).click();
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Review interrupted laser job' })).toContainText(
+    'Exact job artifact saved',
+  );
+  await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
 });
 
 test('uses jog speed for XY buttons and return to work zero without hijacking canvas arrows', async ({
@@ -773,20 +1112,59 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
 
 // ADR-224: every Start now opens the Job Review dialog; its single Start
 // button is the acknowledgement that absorbed the old native confirms.
-async function confirmJobReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+async function confirmJobReview(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  startButton: Locator = page
+    .getByRole('dialog', { name: 'Review job before starting' })
+    .getByRole('button', { name: 'Start job' }),
+): Promise<void> {
+  const before = await reviewStartBoundary(page);
   const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
     (byte) => byte === 0x3f,
   ).length;
-  await page
-    .getByRole('dialog', { name: 'Review job before starting' })
-    .getByRole('button', { name: 'Start job' })
-    .click();
+  await startButton.click();
   await expect
     .poll(
       async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
     )
     .toBeGreaterThan(statusQueriesBefore);
+  // The fixture replies synchronously inside the query write. Start requires
+  // a later report, after that write resolves. Ignore earlier periodic queries
+  // during handoff, and also allow a reply that already started this new stream.
+  await expect
+    .poll(async () => {
+      const current = await reviewStartBoundary(page);
+      return current.streamerEpoch !== before.streamerEpoch || current.awaitingFreshReport;
+    })
+    .toBe(true);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+}
+
+async function reviewStartBoundary(page: Page): Promise<{
+  streamerEpoch: number;
+  awaitingFreshReport: boolean;
+}> {
+  return page.evaluate(async () => {
+    const moduleUrl = '/src/ui/state/laser-store.ts';
+    const { useLaserStore } = (await import(moduleUrl)) as {
+      useLaserStore: {
+        getState: () => {
+          streamerEpoch: number;
+          controllerOperation: { kind: string; phase?: string } | null;
+          pendingTransportWrites?: number;
+        };
+      };
+    };
+    const state = useLaserStore.getState();
+    return {
+      streamerEpoch: state.streamerEpoch,
+      awaitingFreshReport:
+        state.controllerOperation?.kind === 'start-arming' &&
+        state.controllerOperation.phase === 'live-status' &&
+        (state.pendingTransportWrites ?? 0) === 0,
+    };
+  });
 }
 
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {

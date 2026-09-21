@@ -10,8 +10,9 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
-import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
+import { buildCanvasMotionPlan, mapControllerPointToScene } from '../state/canvas-motion-plan';
 import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 
 // React DOM's test renderer reads this conventional global. The optional
@@ -86,6 +87,9 @@ describe('LaserRecoveryReviewDialog', () => {
     expect(onStart).toHaveBeenCalledWith(capsule);
     expect(button('Starting supervised recovery...').disabled).toBe(true);
     expect(button('Close').disabled).toBe(true);
+    expect(host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.disabled).toBe(
+      true,
+    );
 
     await act(async () => {
       resolveFirst?.(false);
@@ -104,12 +108,97 @@ describe('LaserRecoveryReviewDialog', () => {
     expect(onStart).toHaveBeenCalledTimes(2);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('zooms and selects the exact saved movement without starting, then submits that line explicitly', async () => {
+    const capsule = exactCapsule();
+    const before = structuredClone(capsule);
+    const onStart = vi.fn(async () => true);
+    renderDialog(capsule, vi.fn(), onStart);
+    const svg = recoveryCanvas();
+    const initialView = svg.getAttribute('viewBox');
+    act(() =>
+      host?.querySelector<HTMLButtonElement>('[aria-label="Zoom in recovery canvas"]')?.click(),
+    );
+    expect(svg.getAttribute('viewBox')).not.toBe(initialView);
+    const rawLine = clickFirstBurn(svg, capsule);
+    expect(host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.value).toBe(
+      String(rawLine),
+    );
+    expect(
+      host
+        ?.querySelector('[data-testid="selected-recovery-movement"]')
+        ?.getAttribute('data-raw-line'),
+    ).toBe(String(rawLine));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(capsule).toEqual(before);
+    await act(async () => button('Start supervised recovery').click());
+    expect(onStart).toHaveBeenCalledWith(capsule, rawLine);
+  });
+
+  it('allows legacy manual line selection and resets to the automatic estimate without starting', async () => {
+    const capsule = legacyCapsule();
+    const onStart = vi.fn(async () => false);
+    renderDialog(capsule, vi.fn(), onStart);
+    setRestartLine('4');
+    expect(onStart).not.toHaveBeenCalled();
+    expect(host?.textContent).toContain('Recovery replays line 4 and every later line');
+    await act(async () => button('Start supervised recovery').click());
+    expect(onStart).toHaveBeenLastCalledWith(capsule, 4);
+    act(() => button('Use transport estimate').click());
+    await act(async () => button('Start supervised recovery').click());
+    expect(onStart).toHaveBeenLastCalledWith(capsule);
+  });
 });
+
+function recoveryCanvas(): SVGSVGElement {
+  const svg = host?.querySelector('svg[aria-label^="Laser recovery canvas"]');
+  if (!(svg instanceof SVGSVGElement)) throw new Error('Expected restart canvas.');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 640,
+    height: 320,
+    right: 640,
+    bottom: 320,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  return svg;
+}
+
+function clickFirstBurn(svg: SVGSVGElement, capsule: RecoveryCapsule): number {
+  if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
+  const plan = executionArtifactCanvasPlan(capsule.artifact);
+  const block = plan.manifest.blocks.find((item) => item.kind === 'process');
+  const first = block?.points[0];
+  const last = block?.points.at(-1);
+  if (block === undefined || first === undefined || last === undefined)
+    throw new Error('Expected burn motion.');
+  const point = mapControllerPointToScene(
+    { x: (first.x + last.x) / 2, y: (first.y + last.y) / 2, z: 0 },
+    plan,
+  );
+  const [x = 0, y = 0, width = 1, height = 1] = (svg.getAttribute('viewBox') ?? '')
+    .split(' ')
+    .map(Number);
+  const event = {
+    bubbles: true,
+    button: 0,
+    clientX: ((point.x - x) / width) * 640,
+    clientY: ((point.y - y) / height) * 320,
+  };
+  act(() => {
+    svg.dispatchEvent(new MouseEvent('pointerdown', event));
+    svg.dispatchEvent(new MouseEvent('pointerup', event));
+  });
+  return block.rawLineIndex + 1;
+}
 
 function renderDialog(
   capsule: RecoveryCapsule,
   onClose: () => void,
-  onStart: (capsule: RecoveryCapsule) => Promise<boolean>,
+  onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>,
 ): void {
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -120,6 +209,15 @@ function renderDialog(
     ),
   );
   unmount = () => root.unmount();
+}
+
+function setRestartLine(value: string): void {
+  const input = host?.querySelector<HTMLInputElement>('#laser-recovery-start-line');
+  if (input === null || input === undefined) throw new Error('Expected restart line input.');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 function button(label: string): HTMLButtonElement {

@@ -19,11 +19,13 @@ import {
   type LegacyCheckpointStorage,
 } from '../state/recovery/testing';
 import * as executionProvenance from '../state/recovery/execution-provenance';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import { resetStore } from '../state/test-helpers';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
+import { buildLaserResumeProgram } from './laser-resume-program';
 import { runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
@@ -218,6 +220,54 @@ describe('exact laser recovery activation', () => {
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
   });
 
+  it('restarts at the chosen movement and preserves that selection through another disconnect', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
+    const movement = executionArtifactCanvasPlan(capsule.artifact).manifest.blocks.find(
+      (block) => block.kind === 'process',
+    );
+    if (movement === undefined) throw new Error('Expected a burn movement.');
+    const fromLine = movement.rawLineIndex + 1;
+    const expected = buildLaserResumeProgram(capsule.artifact.gcode, fromLine);
+    if (expected.kind !== 'ok') throw new Error(expected.reason);
+    const startJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ startJob, frameVerification: null, framedRun: null });
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository, { fromLine })).toBe(true);
+
+    expect(startJob).toHaveBeenCalledWith(expected.lines.join('\n'), expect.anything());
+    const firstRun = repository.getSnapshot().activeRun;
+    if (firstRun === null) throw new Error('Expected tracked recovery.');
+    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine }]);
+    expect(firstRun.artifact.provenance).toMatchObject({
+      workflow: { requestedFromLine: fromLine, effectiveFromLine: fromLine },
+    });
+    await repository.interruptRun(firstRun.runId, 0, {
+      kind: 'disconnect',
+      message: 'Another interruption after choosing a canvas movement.',
+    });
+    const interrupted = repository.getSnapshot().recoveryCapsule;
+    if (interrupted === null) throw new Error('Expected another recovery offer.');
+    expect(await runLaserRecoveryCapsuleFlow(interrupted, repository)).toBe(true);
+    expect(repository.getSnapshot().activeRun?.artifact.laserResumeChain).toHaveLength(2);
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 1_000_000])(
+    'rejects invalid selected line %s without consuming the saved run',
+    async (fromLine) => {
+      const repository = recoveryHarness();
+      const capsule = await interruptedCapsule(repository);
+      const startJob = vi.fn(async () => undefined);
+      useLaserStore.setState({ startJob });
+
+      expect(await runLaserRecoveryCapsuleFlow(capsule, repository, { fromLine })).toBe(false);
+      expect(startJob).not.toHaveBeenCalled();
+      expect(repository.getSnapshot().recoveryCapsule).toMatchObject({ runId: capsule.runId });
+      expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
+    },
+  );
+
   it('refuses WCO drift at the final wire boundary and releases the capsule for retry', async () => {
     const repository = recoveryHarness();
     const capsule = await interruptedCapsule(repository);
@@ -236,6 +286,28 @@ describe('exact laser recovery activation', () => {
     expect(jobAwareAlert).toHaveBeenCalledWith(
       expect.stringContaining('No recovery G-code was sent'),
     );
+  });
+
+  it('does not adopt a changed controller origin while the recovery claim awaits storage', async () => {
+    const repository = recoveryHarness();
+    const capsule = await interruptedCapsule(repository);
+    const claim = repository.claimRecovery.bind(repository);
+    vi.spyOn(repository, 'claimRecovery').mockImplementation(async (args) => {
+      useLaserStore.setState({ wcoCache: { x: 12, y: 0, z: 0 } });
+      return claim(args);
+    });
+    let transmitted = false;
+    useLaserStore.setState({
+      startJob: vi.fn(async (_gcode: string, options?: StartJobOptions) => {
+        options?.assertFinalStartAuthorized?.();
+        transmitted = true;
+      }),
+    });
+
+    expect(await runLaserRecoveryCapsuleFlow(capsule, repository)).toBe(false);
+    expect(transmitted).toBe(false);
+    expect(repository.getSnapshot().recoveryCapsule?.runId).toBe(capsule.runId);
+    expect(repository.getSnapshot().recoveryCapsule?.claim).toBeUndefined();
   });
 
   it('retries claim release before cleanup and remains retryable when staged discard fails', async () => {

@@ -64,6 +64,7 @@ import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
+import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 
 export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
@@ -90,6 +91,7 @@ export type StartJobPreparation =
       // The RESOLVED origin this compile used (undefined = Absolute). The
       // checkpoint stores it so resume reproduces identical bytes (R1).
       readonly jobOrigin?: JobOriginPlacement;
+      readonly laserSecondPassChain?: LaserSecondPassChain;
     }
   | {
       readonly ok: false;

@@ -6,6 +6,7 @@ import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
 import {
   createArchivedControllerObservation,
   createExecutionArtifact,
@@ -58,7 +59,7 @@ export async function streamCncRecoveryProgram(
   claimedCapsule: RecoveryCapsule,
   repository: RecoveryRepository,
 ): Promise<boolean> {
-  const laser = useLaserStore.getState();
+  const laser = planned.source.controllerSnapshot;
   const recoveryRunId = createRunId();
   const initialPosition = reportedWorkPositionMm(
     laser,
@@ -242,10 +243,10 @@ async function resolveFailedRecoveryAttempt(
   error: unknown,
   repository: RecoveryRepository,
 ): Promise<void> {
-  const state = useLaserStore.getState();
   const attemptId = claimedCapsule.claim?.attemptId ?? '';
   const message = error instanceof Error ? error.message : String(error);
-  if (state.streamer === null || state.activeRunId !== recoveryRunId) {
+  const attemptedAckedLines = attemptedRunAcknowledgements(error, recoveryRunId);
+  if (attemptedAckedLines === null) {
     const cleanup = await cleanupRejectedRecoveryAttempt({
       repository,
       sourceRunId: claimedCapsule.runId,
@@ -267,7 +268,7 @@ async function resolveFailedRecoveryAttempt(
     recoveryRunId,
   });
   if (activated.ok && activated.value) {
-    await repository.interruptRun(recoveryRunId, state.streamer.completed, {
+    await repository.interruptRun(recoveryRunId, attemptedAckedLines, {
       kind: 'write-failed',
       message,
     });
@@ -277,6 +278,12 @@ async function resolveFailedRecoveryAttempt(
   jobAwareAlert(
     `CNC recovery transmission became uncertain:\n\n${message}\n\nUse the physical E-stop if unsafe, then inspect and requalify the machine.`,
   );
+}
+
+function attemptedRunAcknowledgements(error: unknown, runId: string): number | null {
+  if (isJobStartTransmissionError(error) && error.runId === runId) return error.ackedLines;
+  const state = useLaserStore.getState();
+  return state.activeRunId === runId ? (state.streamer?.completed ?? null) : null;
 }
 
 function createAttemptId(): string {

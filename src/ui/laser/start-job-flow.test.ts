@@ -14,6 +14,7 @@ import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { RecoveryRepository } from '../state/recovery';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import { sha256Utf8 } from '../state/recovery/execution-provenance';
 import {
   MemoryRecoveryGenerationStore,
@@ -309,7 +310,7 @@ describe('isolated execution recovery ownership', () => {
       gcode: interruptedGcode,
       prepared: template.prepared,
       outputScope: template.outputScope,
-      canvasPlan: template.canvasPlan,
+      canvasPlan: executionArtifactCanvasPlan(template),
       controllerSettings: template.archivedControllerObservation.settings,
       createdAtIso: '2026-07-15T11:00:00.000Z',
     });

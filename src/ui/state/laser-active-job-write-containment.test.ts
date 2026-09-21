@@ -182,7 +182,7 @@ describe('active-job transport write containment', () => {
     expect(connection.resetSnapshots).toEqual([]);
   });
 
-  it('cancels ownership before resetting and quarantining an initial Start write rejection', async () => {
+  it('freezes output while retaining the uncertain run before resetting an initial Start rejection', async () => {
     const writes: string[] = [];
     let rejectInitial = false;
     const behavior: ConnectionBehavior = {
@@ -199,7 +199,12 @@ describe('active-job transport write containment', () => {
       startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', {
         runId: 'run-first-write-reject',
       }),
-    ).rejects.toThrow('job transport rejected');
+    ).rejects.toMatchObject({
+      name: 'JobStartTransmissionError',
+      message: 'job transport rejected',
+      runId: 'run-first-write-reject',
+      ackedLines: 0,
+    });
     await flush();
 
     expect(connection.resetSnapshots).toEqual([{ status: 'cancelled', inFlight: 0, queued: 0 }]);
@@ -213,7 +218,9 @@ describe('active-job transport write containment', () => {
       safetyNotice: { kind: 'write-failed', action: 'start' },
     });
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
-    expect(useLaserStore.getState().activeRunId).toBeNull();
+    // A rejected promise does not prove zero output reached the controller.
+    // Keep this attempt attributable until its durable recovery owner settles.
+    expect(useLaserStore.getState().activeRunId).toBe('run-first-write-reject');
   });
 
   it('joins operator Disconnect to one reset when an ack-triggered refill write rejects', async () => {

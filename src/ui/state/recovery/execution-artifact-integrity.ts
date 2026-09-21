@@ -13,6 +13,7 @@ import {
   isExecutionProvenance,
   sha256Utf8,
 } from './execution-provenance';
+import { laserSecondPassChainsEqual } from './laser-second-pass-lineage';
 
 /** Expensive cryptographic verification for immutable execution artifacts.
  * The synchronous artifact guard validates shape/fingerprint first; this
@@ -129,9 +130,20 @@ function workflowMatchesArtifact(artifact: ExecutionArtifactV1): boolean {
   const workflow = provenance.workflow;
   switch (workflow.kind) {
     case 'ordinary-start':
-      return ordinaryWorkflowMatchesArtifact(artifact);
+      return (
+        artifact.laserSecondPassChain === undefined && ordinaryWorkflowMatchesArtifact(artifact)
+      );
+    case 'laser-second-pass':
+      return (
+        artifact.machineKind === 'laser' &&
+        laserSecondPassChainsEqual(artifact.laserSecondPassChain, workflow.stages) &&
+        ordinaryWorkflowMatchesArtifact(artifact)
+      );
     case 'laser-recovery':
-      return laserRecoveryWorkflowMatchesArtifact(artifact, workflow.requestedFromLine);
+      return (
+        laserSecondPassChainsEqual(artifact.laserSecondPassChain, workflow.laserSecondPassChain) &&
+        laserRecoveryWorkflowMatchesArtifact(artifact, workflow.requestedFromLine)
+      );
     case 'cnc-supervised-recovery':
       return cncWorkflowMatchesArtifact(artifact, workflow.qualificationId);
     case 'cnc-pass-recovery':

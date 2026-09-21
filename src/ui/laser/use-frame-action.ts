@@ -106,6 +106,24 @@ export async function dispatchTransientReviewedFrame(
     : null;
 }
 
+/** Immutable derived laser jobs use the ordinary dialog-free Frame, then the
+ * ordinary Start-time review, without replacing the operator's open canvas. */
+export async function dispatchLaserSecondPassFrame(
+  bundle: ReviewedStartBundle,
+  outputScope: OutputScope,
+): Promise<FramedRunPermit | null> {
+  const accepted = await dispatchPreparedFrame(bundle, {
+    authorizationContext: 'laser-second-pass',
+    outputScope,
+  });
+  const permit = useLaserStore.getState().framedRun;
+  return accepted &&
+    permit?.candidate.authorizationContext === 'laser-second-pass' &&
+    permit.candidate.preparedStart === bundle.prepared
+    ? permit
+    : null;
+}
+
 async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   if (!(await requireFrameControllerQueue())) return null;
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
@@ -152,7 +170,7 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
 
 type PreparedFrameDispatchOptions = {
   readonly review?: FramedRunReviewEvidence;
-  readonly authorizationContext?: 'transient-camera';
+  readonly authorizationContext?: FramedRunCandidate['authorizationContext'];
   readonly outputScope?: OutputScope;
 };
 
@@ -319,9 +337,9 @@ async function prepareFrameLaser(
 function reviewedFrameIsCurrent(
   bundle: ReviewedStartBundle,
   currentLaser: ReturnType<typeof useLaserStore.getState>,
-  authorizationContext: 'transient-camera' | undefined,
+  authorizationContext: FramedRunCandidate['authorizationContext'],
 ): boolean {
-  const transientProject = authorizationContext === 'transient-camera';
+  const transientProject = authorizationContext !== undefined;
   return (
     (transientProject ||
       currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey) &&

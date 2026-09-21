@@ -16,15 +16,66 @@ function observation(sequence: number, sessionEpoch = 1) {
 describe('detectActiveStreamHeartbeatLoss', () => {
   it('faults after an active stream misses the heartbeat window', () => {
     const first = detectActiveStreamHeartbeatLoss(streamingJob(), observation(4), null, 1_000);
-    const fault = detectActiveStreamHeartbeatLoss(
+    const beforeDeadline = detectActiveStreamHeartbeatLoss(
       streamingJob(),
       observation(4),
       first.probe,
+      1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS - 250,
+    );
+    const fault = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      beforeDeadline.probe,
       1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS,
     );
 
     expect(first.lost).toBe(false);
     expect(fault.lost).toBe(true);
+  });
+
+  it('allows one new query window after the host itself stopped polling', () => {
+    const first = detectActiveStreamHeartbeatLoss(streamingJob(), observation(4), null, 1_000);
+    const resumed = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      first.probe,
+      61_000,
+    );
+    const beforeDeadline = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      resumed.probe,
+      61_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS - 250,
+    );
+    const fault = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      beforeDeadline.probe,
+      61_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS,
+    );
+
+    expect(resumed.lost).toBe(false);
+    expect(beforeDeadline.lost).toBe(false);
+    expect(fault.lost).toBe(true);
+  });
+
+  it('does not renew that query window across repeated delayed ticks with no status reply', () => {
+    const first = detectActiveStreamHeartbeatLoss(streamingJob(), observation(4), null, 1_000);
+    const resumed = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      first.probe,
+      61_000,
+    );
+    const nextDelayedTick = detectActiveStreamHeartbeatLoss(
+      streamingJob(),
+      observation(4),
+      resumed.probe,
+      121_000,
+    );
+
+    expect(resumed.lost).toBe(false);
+    expect(nextDelayedTick.lost).toBe(true);
   });
 
   it('restarts the window for every fresh same-session status report', () => {
@@ -51,10 +102,16 @@ describe('detectActiveStreamHeartbeatLoss', () => {
   it('continues monitoring after all lines are acknowledged but motion may still be finishing', () => {
     const done = { ...streamingJob(), status: 'done' as const };
     const first = detectActiveStreamHeartbeatLoss(done, observation(4), null, 1_000);
-    const fault = detectActiveStreamHeartbeatLoss(
+    const beforeDeadline = detectActiveStreamHeartbeatLoss(
       done,
       observation(4),
       first.probe,
+      1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS - 250,
+    );
+    const fault = detectActiveStreamHeartbeatLoss(
+      done,
+      observation(4),
+      beforeDeadline.probe,
       1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS,
     );
 

@@ -3,7 +3,7 @@
 // $$ settings that matter before a job ($32, $30, travel, homing, units).
 // Live store reads — a disconnect or alarm while reviewing shows here.
 
-import type { MachineKind } from '../../../core/scene';
+import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import {
@@ -22,8 +22,9 @@ import { JobReviewFactRow } from './JobReviewFactRow';
 
 export function JobReviewControllerSection(props: {
   readonly machineKind: MachineKind;
+  readonly project?: Project;
 }): JSX.Element {
-  const args = useControllerReviewArgs(props.machineKind);
+  const args = useControllerReviewArgs(props.machineKind, props.project);
   const facts = buildControllerReviewFacts(args);
   return (
     <details style={detailsStyle}>
@@ -55,7 +56,10 @@ export function JobReviewControllerSection(props: {
   );
 }
 
-function useControllerReviewArgs(machineKind: MachineKind): ControllerReviewArgs {
+function useControllerReviewArgs(
+  machineKind: MachineKind,
+  project?: Project,
+): ControllerReviewArgs {
   const isConnected = useLaserStore((s) => s.connection.kind === 'connected');
   const statusReport = useLaserStore((s) => s.statusReport);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -81,8 +85,8 @@ function useControllerReviewArgs(machineKind: MachineKind): ControllerReviewArgs
     controllerSettings,
     activeWcs,
     overrides,
-    profileMaxPowerS,
-    profileBedWidth,
-    profileBedHeight,
+    profileMaxPowerS: project?.device.maxPowerS ?? profileMaxPowerS,
+    profileBedWidth: project?.device.bedWidth ?? profileBedWidth,
+    profileBedHeight: project?.device.bedHeight ?? profileBedHeight,
   };
 }

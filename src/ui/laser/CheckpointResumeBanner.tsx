@@ -65,7 +65,13 @@ export function CheckpointResumeBanner(props: {
         <LaserRecoveryReviewDialog
           capsule={capsule}
           onClose={() => setReviewOpen(false)}
-          onStart={(saved) => runLaserRecoveryCapsuleFlow(saved, repository)}
+          onStart={(saved, fromLine) =>
+            runLaserRecoveryCapsuleFlow(
+              saved,
+              repository,
+              fromLine === undefined ? {} : { fromLine },
+            )
+          }
         />
       ) : null}
     </>

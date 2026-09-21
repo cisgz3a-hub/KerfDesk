@@ -30,6 +30,8 @@ import { JobReviewStats } from './JobReviewStats';
 import { JobReviewStockCard } from './JobReviewStockCard';
 import { JobReviewWarnings } from './JobReviewWarnings';
 import { useJobReviewRebuildTrigger } from './use-job-review-rebuild';
+import { useLaserStore } from '../../state/laser-store';
+import type { JobReviewModel } from './job-review-model';
 
 export function JobReviewDialog(): JSX.Element | null {
   const state = useJobReviewStore((s) => s.state);
@@ -62,23 +64,8 @@ function OpenJobReview(props: {
       ) : null}
       <JobReviewWarnings warnings={model.warnings} />
       {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
-      <JobReviewStockCard />
-      <JobReviewLayersTable
-        machineKind={model.machineKind}
-        effectiveOperations={model.effectiveOperations}
-      />
-      {model.machineKind === 'laser' ? (
-        <JobReviewSettingsApproval onApprove={requestReviewRebuild} />
-      ) : null}
-      <section aria-label="Before you start" style={sectionStyle}>
-        <h3 style={sectionHeadingStyle}>Before you start</h3>
-        <JobReviewControllerSection machineKind={model.machineKind} />
-        <JobReviewMachineSection
-          machineKind={model.machineKind}
-          toolPlanLabels={model.toolPlanLabels}
-          outputQualityFacts={model.outputQualityFacts}
-        />
-      </section>
+      <ReviewArtwork model={model} purpose={purpose} onApprove={requestReviewRebuild} />
+      <ReviewMachineFacts model={model} purpose={purpose} />
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />
       <div style={footerBarStyle}>
         <span
@@ -103,6 +90,56 @@ function OpenJobReview(props: {
         </Button>
       </div>
     </Dialog>
+  );
+}
+
+function ReviewArtwork(props: {
+  model: JobReviewModel;
+  purpose: JobReviewPurpose;
+  onApprove: () => void;
+}): JSX.Element {
+  if (props.purpose === 'laser-second-pass')
+    return (
+      <p>
+        The painted areas and their power are fixed to the completed Frame. Cancel to change them in
+        the second-pass canvas, then Frame the changed pass.
+      </p>
+    );
+  return (
+    <>
+      <JobReviewStockCard />
+      <JobReviewLayersTable
+        machineKind={props.model.machineKind}
+        effectiveOperations={props.model.effectiveOperations}
+      />
+      {props.model.machineKind === 'laser' ? (
+        <JobReviewSettingsApproval onApprove={props.onApprove} />
+      ) : null}
+    </>
+  );
+}
+
+function ReviewMachineFacts({
+  model,
+  purpose,
+}: {
+  model: JobReviewModel;
+  purpose: JobReviewPurpose;
+}): JSX.Element {
+  const frozenProject = useLaserStore((s) => s.framedRun?.candidate.project);
+  const context =
+    purpose === 'laser-second-pass' && frozenProject ? { project: frozenProject } : {};
+  return (
+    <section aria-label="Before you start" style={sectionStyle}>
+      <h3 style={sectionHeadingStyle}>Before you start</h3>
+      <JobReviewControllerSection machineKind={model.machineKind} {...context} />
+      <JobReviewMachineSection
+        machineKind={model.machineKind}
+        toolPlanLabels={model.toolPlanLabels}
+        outputQualityFacts={model.outputQualityFacts}
+        {...context}
+      />
+    </section>
   );
 }
 
@@ -157,6 +194,14 @@ type JobReviewCopy = {
 };
 
 function reviewCopy(purpose: JobReviewPurpose): JobReviewCopy {
+  if (purpose === 'laser-second-pass')
+    return {
+      dialogTitle: 'Review painted second pass',
+      preparingTitle: 'Checking the framed second pass and current controller.',
+      cancelTitle: 'Return to the painted areas without starting.',
+      confirmTitle: 'Run the exact painted pass that completed Frame.',
+      confirmLabel: 'Start second pass',
+    };
   if (purpose === 'frame') {
     return {
       dialogTitle: 'Review job before framing',

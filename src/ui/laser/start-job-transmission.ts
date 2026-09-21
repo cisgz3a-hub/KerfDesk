@@ -25,6 +25,7 @@ import {
 } from './start-job-authorization-reporting';
 import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
+import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
 
 export type PreparedStartArgs = {
   readonly outputScope: OutputScope;
@@ -48,7 +49,7 @@ export async function transmitPreparedStart(input: {
   readonly handoffArmed: boolean;
   readonly authorizationArgs: CurrentStartAuthorizationArgs;
   readonly authorization: Extract<StartAuthorization, { readonly ok: true }>;
-}): Promise<void> {
+}): Promise<boolean> {
   let { handoffArmed } = input;
   let boundaryRefusal: StartAuthorizationRefusal | null = null;
   const assertion = finalStartAssertion(input.authorizationArgs, (refusal) => {
@@ -72,8 +73,19 @@ export async function transmitPreparedStart(input: {
     // Start and motion. The handoff armed before the wire already carries the
     // operator-facing truth if this never completes.
     await archiveAcceptedFreshRun(input.args, input.runId);
+    return true;
   } catch (error) {
     if (!startAccepted) advancement.cancel();
+    if (isJobStartTransmissionError(error) && error.runId === input.runId) {
+      // A rejected write can still have delivered a prefix. The pending intent
+      // belongs to this attempted program until its exact archive takes over.
+      handoffArmed = false;
+      await archiveAcceptedFreshRun(input.args, input.runId);
+      await input.args.repository.interruptRun(input.runId, error.ackedLines, {
+        kind: 'write-failed',
+        message: error.message,
+      });
+    }
     if (handoffArmed) await input.args.repository.cancelPendingStart(input.runId);
     if (boundaryRefusal !== null) {
       await reportStartAuthorizationRefusal(
@@ -81,11 +93,12 @@ export async function transmitPreparedStart(input: {
         input.args.completedReceipt,
         input.args.repository,
       );
-      return;
+      return false;
     }
     const message = error instanceof Error ? error.message : String(error);
     reportStartBlockers([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
+    return false;
   }
 }
 

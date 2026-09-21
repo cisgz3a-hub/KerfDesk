@@ -16,6 +16,7 @@ import type { JobReviewModel } from '../laser/job-review/job-review-model';
 import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
+import type { LaserSecondPassChain } from './recovery/laser-second-pass-lineage';
 
 /** The exact executable bundle carried through Frame. Ordinary permits review
  * it at Start; transient-camera candidates may carry prior review evidence. */
@@ -30,6 +31,7 @@ export type PreparedStartProgram = {
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
 };
 
 /** Review evidence confirmed in the Job Review dialog. An ordinary Frame
@@ -67,7 +69,7 @@ export type FramedRunCandidate = {
   /** Transient calibration jobs own immutable prepared bytes outside the open
    * canvas. Their permit must follow that project rather than the unrelated
    * live-project execution signature. */
-  readonly authorizationContext?: 'transient-camera';
+  readonly authorizationContext?: 'transient-camera' | 'laser-second-pass';
 };
 
 export type FramedRunControllerSnapshot = {

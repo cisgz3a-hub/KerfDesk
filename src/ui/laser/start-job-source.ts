@@ -7,7 +7,11 @@ import type { PreparedOutput } from '../../io/gcode';
 import { currentOutputScope, useStore } from '../state';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
-import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import {
+  rebuildCanvasPlanForGcode,
+  reportedWorkPositionMm,
+  type CanvasMotionPlan,
+} from '../state/canvas-motion-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -24,6 +28,7 @@ import {
   type StartJobPreparation,
 } from './start-job-readiness';
 import { prepareStartJobFromPrepared } from './start-job-readiness-prepared';
+import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { recoveryArtifactPreparedOutput } from './recovery-artifact-binding';
 import {
   outputPreparationShouldRunOffThread,
@@ -42,8 +47,12 @@ export type PreparedRecoverySource = {
   readonly canvasPlan: CanvasMotionPlan;
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly warnings: ReadonlyArray<string>;
+  /** Controller evidence that qualified this source, retained across every
+   * asynchronous review/staging step until the final wire authorization. */
+  readonly controllerSnapshot: ReturnType<typeof useLaserStore.getState>;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly laserResumeChain: NonNullable<ExecutionArtifactV1['laserResumeChain']>;
+  readonly laserSecondPassChain?: ExecutionArtifactV1['laserSecondPassChain'];
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
 };
@@ -159,15 +168,24 @@ function hasVariableText(project: Project): boolean {
   );
 }
 
-export function prepareRecoverySource(overrides?: {
+export async function prepareRecoverySource(overrides?: {
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
-}): PreparedRecoverySource | null {
-  if (!requireFreshControllerQualification()) return null;
+}): Promise<PreparedRecoverySource | null> {
+  const laser = useLaserStore.getState();
+  if (!requireFreshControllerQualification(laser)) return null;
   const app = useStore.getState();
   return prepareRecoveryProjectSource(
-    app.project,
-    app.jobPlacement,
+    app,
+    laser,
+    // An absent archived origin means Absolute, regardless of the live
+    // placement controls. Manual start-from-line still uses those controls.
+    overrides === undefined
+      ? app.jobPlacement
+      : {
+          startFrom: overrides.jobOrigin?.startFrom ?? 'absolute',
+          anchor: overrides.jobOrigin?.anchor ?? 'front-left',
+        },
     overrides?.outputScope ?? currentOutputScope(app),
     overrides?.jobOrigin,
   );
@@ -203,6 +221,7 @@ export function prepareArchivedRecoverySource(
     jobPlacementForArchivedArtifact(artifact),
     artifact.outputScope,
     artifact.jobOrigin,
+    false,
   );
   if (!qualified.ok) {
     const lines = qualified.messages.map((message) => `• ${message}`).join('\n');
@@ -213,10 +232,25 @@ export function prepareArchivedRecoverySource(
     project,
     gcode: artifact.gcode,
     prepared: recoveredPrepared,
-    canvasPlan: artifact.canvasPlan,
+    // Diagnostic archived canvas metadata is not sealed. Reuse the qualified
+    // prepared plan's canonical profile/placement, then bind any resume or
+    // second-pass lineage to the exact saved bytes before runtime reuse.
+    canvasPlan:
+      qualified.gcode === artifact.gcode
+        ? qualified.canvasPlan
+        : rebuildCanvasPlanForGcode(
+            qualified.canvasPlan,
+            artifact.gcode,
+            reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true) ??
+              undefined,
+          ),
     warnings: qualified.warnings,
+    controllerSnapshot: laser,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     laserResumeChain: artifact.laserResumeChain ?? [],
+    ...(artifact.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: artifact.laserSecondPassChain }),
     ...(qualified.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: qualified.preflightMotionOffset }),
@@ -239,39 +273,67 @@ function requireFreshControllerQualification(
   return false;
 }
 
-function prepareRecoveryProjectSource(
-  project: Project,
+async function prepareRecoveryProjectSource(
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
   jobPlacement: JobPlacementSettings,
   outputScope: OutputScope,
   resolvedJobOrigin?: JobOriginPlacement,
-): PreparedRecoverySource | null {
-  if (outputPreparationShouldRunOffThread(project, outputScope)) {
-    jobAwareAlert(
-      'Cannot resume job:\n\nBackground recovery compilation is not available in this flow. Reopen the project and use Frame, then Start, to prepare the job without blocking the canvas.',
-    );
+): Promise<PreparedRecoverySource | null> {
+  const { project } = app;
+  const machine = machineSnapshot(project, laser, useCameraStore.getState());
+  let prepared: StartJobPreparation;
+  try {
+    prepared = outputPreparationShouldRunOffThread(project, outputScope)
+      ? await prepareCurrentStartInBackground({
+          app,
+          project,
+          laser,
+          machine,
+          jobPlacement,
+          outputScope,
+          ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
+          // Recovery authorizes its own exact source and supervised re-entry.
+          // Its source must not require a new ordinary-Start Frame permit.
+          requireFrame: false,
+          registration: undefined,
+          // Re-evaluating variables/registration would alter checkpoint bytes.
+          useSnapshot: false,
+        })
+      : prepareStartJob(
+          project,
+          laser.controllerSettings,
+          machine,
+          jobPlacement,
+          outputScope,
+          resolvedJobOrigin,
+          false,
+        );
+  } catch (error) {
+    const message = isOutputPreparationAbort(error)
+      ? 'Recovery preparation was cancelled. Try again with the current job.'
+      : outputPreparationFailure(error).message;
+    jobAwareAlert(`Cannot resume job:\n\n${message}`);
     return null;
   }
-  const laser = useLaserStore.getState();
-  const camera = useCameraStore.getState();
-  const prepared = prepareStartJob(
-    project,
-    laser.controllerSettings,
-    machineSnapshot(project, laser, camera),
-    jobPlacement,
-    outputScope,
-    resolvedJobOrigin,
-  );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot resume job:\n\n${lines}`);
     return null;
   }
+  const currentLaser = useLaserStore.getState();
+  if (!controllerStartPreparationStillCurrent(laser, currentLaser)) {
+    jobAwareAlert(`Cannot resume job:\n\n${STALE_START_PREPARATION_MESSAGE}`);
+    return null;
+  }
+  if (!requireFreshControllerQualification(currentLaser)) return null;
   return {
     project,
     gcode: prepared.gcode,
     canvasPlan: prepared.canvasPlan,
     prepared: prepared.prepared,
     warnings: prepared.warnings,
+    controllerSnapshot: laser,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     laserResumeChain: [],
     ...(prepared.preflightMotionOffset === undefined
