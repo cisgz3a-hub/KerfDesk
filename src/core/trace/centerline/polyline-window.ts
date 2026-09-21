@@ -4,22 +4,42 @@
 import type { Vec2 } from '../../scene';
 import { radiusAt } from './distance-field';
 
+/**
+ * Where the kept part of a polyline range begins or ends once `arc` length is
+ * trimmed off one end. For `'tail'` the result is the exclusive END of what
+ * survives; for `'head'` it is the inclusive START. Always leaves at least the
+ * far endpoint outside the cut.
+ *
+ * The walk is bounded by `arc`, so this costs the trimmed arc and nothing per
+ * point of the range behind it. The bend sharpener asks it once per candidate
+ * vertex on chains thousands of points long.
+ */
+export function arcTrimIndex(
+  points: ReadonlyArray<Vec2>,
+  first: number,
+  last: number,
+  end: 'head' | 'tail',
+  arc: number,
+): number {
+  let cum = 0;
+  let cut = end === 'head' ? first + 1 : last;
+  for (let step = 1; step <= last - first; step += 1) {
+    const a = points[end === 'head' ? first + step - 1 : last - step + 1];
+    const b = points[end === 'head' ? first + step : last - step];
+    if (a === undefined || b === undefined) break;
+    cum += Math.hypot(a.x - b.x, a.y - b.y);
+    cut = end === 'head' ? first + step : last - step + 1;
+    if (cum > arc) break;
+  }
+  return cut;
+}
+
 /** Drop points within `arc` length of the given end. Always keeps at least
  *  the far endpoint. */
 export function trimArc(points: ReadonlyArray<Vec2>, end: 'head' | 'tail', arc: number): Vec2[] {
-  const pts = end === 'head' ? [...points].reverse() : [...points];
-  let cum = 0;
-  let keep = pts.length - 1;
-  for (let i = pts.length - 1; i > 0; i -= 1) {
-    const a = pts[i];
-    const b = pts[i - 1];
-    if (a === undefined || b === undefined) break;
-    cum += Math.hypot(a.x - b.x, a.y - b.y);
-    keep = i;
-    if (cum > arc) break;
-  }
-  const trimmed = pts.slice(0, keep);
-  return end === 'head' ? trimmed.reverse() : trimmed;
+  if (points.length === 0) return [];
+  const cut = arcTrimIndex(points, 0, points.length - 1, end, arc);
+  return end === 'head' ? points.slice(cut) : points.slice(0, cut);
 }
 
 /** Closest point to `p` on segment a→b. */

@@ -20989,3 +20989,66 @@ trace is progressing rather than stuck, and the tracer's cost on dense ink (19 s
 at 1000 px) is itself unaddressed — both are open. The budget now rests on a measured property of
 the generators rather than on total runtime: a pipeline that stopped yielding for 30 s would read
 as silence, correctly but unhelpfully, and the worst case measured has a ninefold margin.
+
+## ADR-337 - The bend scan reads the chain by index instead of copying it (2026-09-21)
+
+**Status:** Accepted. A pure performance change: the traced geometry is byte-identical, verified
+across a corpus rather than argued.
+
+### Context
+
+Tracing dense line art is slow, and the cost does not grow smoothly with the image. The same
+rosette drawing at 300 px traces in 3.0 s, at 424 px in 13.4 s, at 600 px in 10.6 s and at 848 px
+in 5.2 s. The middle sizes are the slow ones because `finishLoopSteps` runs the bend sharpener
+only for chains between `SHARPEN_MIN_CHAIN_POINTS` and `SHARPEN_MAX_CHAIN_POINTS`: a drawing whose
+contours land inside that window pays for it, and one whose contours are longer skips it entirely.
+
+Inside that window the scan was quadratic in the chain's own length. It visits every vertex, and
+for each candidate it:
+
+- rotated the WHOLE ring (`[...pts.slice(shift), ...pts.slice(0, shift)]`) to centre the
+  candidate — three arrays, every point copied twice; and
+- sliced two legs out of the rotated copy and trimmed each with `trimArc`, which copied the
+  points, reversed them, sliced, and reversed back — four more passes per leg.
+
+Measured on a 600-point ring that accepts no bend at all: **5,394 `slice` calls and 2,098
+reversals**, nine array copies per point of the chain, to decide nothing.
+
+### Decision
+
+1. `arcTrimIndex` replaces `trimArc` in the scan: it walks the arc being trimmed and returns the
+   index where the kept range begins or ends, touching nothing behind the cut. `trimArc` remains
+   for the seam-repair caller as a one-slice wrapper over it.
+2. `attemptBend` addresses the legs as ranges of the chain. `bendVertexAt` and the wedge gate read
+   the four points they need by index, and only an ACCEPTED bend materializes a chain.
+3. The ring rotation is one allocation and one pass instead of three arrays and two copies.
+
+An earlier version also skipped the rotation entirely for candidates with chain on both sides,
+probing the unrotated array first. Isolated at the heaviest size it was worth 3%, against forty
+lines of reach-bound reasoning in geometry code where a wrong bound changes output silently. It
+was dropped.
+
+### Verification and limits
+
+A corpus of five shapes — star, gear, bars, blobs, rosettes — across all five presets is traced
+before and after and every emitted coordinate hashed: **25 of 25 identical**, with the same path
+and point counts. Wall-clock on this machine drifts by up to 2x between runs, so timings are the
+minimum of three alternating rounds:
+
+| corpus | before | after | |
+| --- | --- | --- | --- |
+| 25 traces at 300 px | 8,716 ms | 7,507 ms | 1.16x |
+| Line Art + Smooth at 424 px (the heavy regime) | 7,167 ms | 5,578 ms | **1.28x** |
+
+`bend-scan-work.test.ts` pins the work rather than the clock: scanning a 600-point closed chain
+that rebuilds nothing must copy nothing, and `trimArc` must not reverse a 4,000-point chain to
+drop 5 px off one end. Both fail against the previous implementation with the counts above, and a
+reference implementation of the old `trimArc` pins the rewrite's output shape for shapes and arcs
+including the degenerate ones.
+
+This does not make dense tracing fast. After the change a 2,000 px drawing still takes minutes,
+and the profile that remains is broad — no single stage above 27%, with the scan's own gates, the
+contour box index, the detail detector and the membership tests all in the same range. The regime
+cliff is unchanged: a drawing whose chains fall inside the sharpener's window still pays for it,
+and one just outside still skips it. Making the scan proportional to its window rather than to the
+chain would need a ring view with modular indexing through every gate, which is its own decision.
