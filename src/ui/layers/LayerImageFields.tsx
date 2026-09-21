@@ -10,29 +10,9 @@ import { DITHER_ALGORITHMS, type Layer, type LayerOperationSettings } from '../.
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 
-const fieldRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  minHeight: 28,
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-  width: 96,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
-
-const fieldValueStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-  flex: 1,
-};
-
-const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
+const inputStyle: React.CSSProperties = { width: 88, minWidth: 0 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
-const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
+const ditherSelectStyle: React.CSSProperties = { flex: 1, minWidth: 0, width: '100%' };
 
 export function LayerImageFields(props: {
   readonly layer: Layer;
@@ -55,16 +35,19 @@ export function LayerImageFields(props: {
   };
   return (
     <>
+      <p className="lf-laser-help">
+        Dither creates a pattern of dots. Grayscale varies the laser power with image brightness.
+      </p>
       <FieldRow label="Dither">
         <DitherSelect {...controlProps} />
       </FieldRow>
       {!props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale' ? (
-        <FieldRow label="Min Power">
+        <FieldRow label="Minimum power">
           <MinPowerInput {...controlProps} maxPower={minPowerMax} />
           <span style={unitStyle}>%</span>
         </FieldRow>
       ) : null}
-      <FieldRow label="Line Interval">
+      <FieldRow label="Line interval">
         <LineIntervalInput {...controlProps} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
@@ -72,17 +55,20 @@ export function LayerImageFields(props: {
         <DpiInput {...controlProps} />
         <span style={unitStyle}>dpi</span>
       </FieldRow>
-      <FieldRow label="Dot Width">
+      <p className="lf-laser-help">
+        Line interval and DPI describe the same scan density. Changing one updates the other.
+      </p>
+      <FieldRow label="Dot width">
         <DotWidthCorrectionInput {...controlProps} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
-      <FieldRow label="Negative">
+      <FieldRow label="Invert brightness">
         <NegativeImageCheckbox {...controlProps} />
       </FieldRow>
-      <FieldRow label="Bidirectional">
+      <FieldRow label="Scan both ways">
         <BidirectionalImageCheckbox {...controlProps} />
       </FieldRow>
-      <FieldRow label="Pass-through">
+      <FieldRow label="Use original pixels">
         <PassThroughCheckbox {...controlProps} />
       </FieldRow>
     </>
@@ -94,10 +80,10 @@ function FieldRow(props: {
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <div style={fieldRowStyle}>
-      <span style={fieldLabelStyle}>{props.label}</span>
-      <div style={fieldValueStyle}>{props.children}</div>
-    </div>
+    <label className="lf-laser-field">
+      <span className="lf-laser-field__label">{props.label}</span>
+      <span className="lf-laser-field__value">{props.children}</span>
+    </label>
   );
 }
 

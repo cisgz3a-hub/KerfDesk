@@ -5,14 +5,25 @@ import { useStore } from '../state';
 import type { ArtworkNumberingState } from '../state/artwork-run-order-ui';
 import { useUiStore } from '../state/ui-store';
 import { canvasTheme } from '../theme/canvas-theme';
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { ArtworkRunOrderList } from './ArtworkRunOrderList';
 import { ArtworkRunOrderToolbar } from './ArtworkRunOrderToolbar';
 import { artworkRunOrderRows, type ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
+import './artwork-run-order.css';
 
 export function ArtworkRunOrderPanel(): JSX.Element {
   const controller = useRunOrderController();
   if (controller.rows.length === 0) {
-    return <p style={emptyStyle}>Import or draw artwork to create the first numbered run unit.</p>;
+    return (
+      <section className="lf-run-order-empty" aria-label="Run order getting started">
+        <span className="lf-run-order-empty-number" aria-hidden="true">
+          1 → 2 → 3
+        </span>
+        <strong>Choose what runs first</strong>
+        <p>Import or draw artwork, then arrange it here. Each run has a number you can change.</p>
+        <TutorialButton tutorialId="operations" label="Run order tutorial" />
+      </section>
+    );
   }
   return <ArtworkRunOrderContent controller={controller} />;
 }
@@ -74,10 +85,11 @@ function ArtworkRunOrderContent(props: {
 }): JSX.Element {
   const controller = props.controller;
   return (
-    <div style={panelStyle}>
-      <p style={introStyle}>
-        Set exact run numbers. Clicking a row or its canvas artwork isolates that job visually.
-      </p>
+    <div className="lf-run-order">
+      <div className="lf-run-order-intro">
+        <strong>Choose what runs first</strong>
+        <p>Change a run number, or use Number on canvas to click your preferred order.</p>
+      </div>
       <ArtworkRunOrderToolbar
         search={controller.search}
         total={controller.rows.length}
@@ -94,24 +106,43 @@ function ArtworkRunOrderContent(props: {
         onSearch={controller.setSearch}
         onJumpPosition={controller.setJumpPosition}
         onJump={controller.jumpToRow}
-        onStartNumbering={controller.startCanvasNumbering}
+        onStartNumbering={() => {
+          controller.setSearch('');
+          controller.startCanvasNumbering();
+        }}
         onUndoNumbering={controller.undoCanvasNumbering}
         onDoneNumbering={controller.finishCanvasNumbering}
         onCancelNumbering={controller.cancelCanvasNumbering}
       />
       {controller.machineKind === 'cnc' ? (
-        <p style={cncNoteStyle}>
-          Requested numbers are shown with the exact effective CNC steps. Clearing, profile safety,
-          and contiguous tool sections remain authoritative.
+        <p className="lf-run-order-note">
+          <strong>CNC follows cutting stages.</strong> Clearing runs before profiles, with cuts
+          grouped by tool within each stage. Each card shows its actual CNC steps.
         </p>
       ) : null}
+      <div className="lf-run-order-list-heading">
+        <strong>Run sequence</strong>
+        <span role="status">
+          {controller.search.trim().length > 0
+            ? `${controller.filteredRows.length} of ${controller.rows.length} runs`
+            : `${controller.rows.length} ${controller.rows.length === 1 ? 'run' : 'runs'}`}
+        </span>
+      </div>
       {controller.filteredRows.length === 0 ? (
-        <p style={emptyStyle}>No run units match “{controller.search}”.</p>
+        <div className="lf-run-order-empty">
+          <strong>No matching artwork</strong>
+          <p>Try an artwork name, operation or setting.</p>
+          <button type="button" className="lf-btn" onClick={() => controller.setSearch('')}>
+            Show all runs
+          </button>
+        </div>
       ) : (
         <ArtworkRunOrderList
           rows={controller.filteredRows}
+          total={controller.rows.length}
           activeKey={controller.activeRow?.key ?? null}
           machineKind={controller.machineKind}
+          numberingActive={controller.numbering.kind === 'active'}
           reveal={controller.reveal}
           onFocus={controller.focusRowAndReveal}
           onMove={(row, position) => {
@@ -239,24 +270,3 @@ function filterRows(
       .includes(needle),
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  minHeight: 0,
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-};
-const introStyle: React.CSSProperties = { margin: 0, fontSize: 12 };
-const cncNoteStyle: React.CSSProperties = {
-  margin: 0,
-  padding: '6px 8px',
-  borderRadius: 4,
-  color: 'var(--lf-text-muted)',
-  background: 'var(--lf-bg-2)',
-  fontSize: 11,
-};
-const emptyStyle: React.CSSProperties = {
-  color: 'var(--lf-text-muted)',
-  fontStyle: 'italic',
-};

@@ -66,7 +66,7 @@ describe('ArtworkRunOrderPanel', () => {
     const host = await renderPanel();
 
     expect(host.querySelectorAll('article[aria-label^="Run "]')).toHaveLength(1);
-    expect(host.textContent).toContain('One shared run unit');
+    expect(host.textContent).toContain('Shared by 2 artworks');
     expect(host.textContent).toContain('Johann + 1 more');
   });
 
@@ -75,7 +75,7 @@ describe('ArtworkRunOrderPanel', () => {
     useStore.getState().selectObject(null);
     const host = await renderPanel();
 
-    expect(host.textContent).toContain('50 run units');
+    expect(host.textContent).toContain('50 runs');
     const renderedRows = host.querySelectorAll('article[aria-label^="Run "]');
     expect(renderedRows.length).toBeGreaterThan(0);
     expect(renderedRows.length).toBeLessThan(50);
@@ -87,6 +87,67 @@ describe('ArtworkRunOrderPanel', () => {
       nextPosition: 1,
     });
     expect(useStore.getState().pendingUndo).not.toBeNull();
+  });
+
+  it('keeps original run numbers while searching and recovers from no matches', async () => {
+    importArtwork('Johann');
+    importArtwork('Box');
+    const host = await renderPanel();
+    const input = host.querySelector('input[type="search"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Search input missing');
+    await act(async () => {
+      input.value = 'Box';
+      Simulate.change(input);
+    });
+    expect(host.querySelectorAll('article')).toHaveLength(1);
+    expect(rowByLabel(host, 'Run 2: Box')).not.toBeNull();
+    expect(host.textContent).toContain('1 of 2 runs');
+    await act(async () => {
+      input.value = 'No matching name';
+      Simulate.change(input);
+    });
+    expect(host.textContent).toContain('No matching artwork');
+    await act(async () => buttonByText(host, 'Show all runs').click());
+    expect(host.querySelectorAll('article')).toHaveLength(2);
+    expect(input.value).toBe('');
+  });
+
+  it('reveals all runs and keeps edits out of an active numbering session', async () => {
+    importArtwork('A');
+    importArtwork('B');
+    const host = await renderPanel();
+    const input = host.querySelector('input[type="search"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Search input missing');
+    await act(async () => {
+      input.value = 'B';
+      Simulate.change(input);
+    });
+    await act(async () => buttonByText(host, 'Number on canvas').click());
+    expect(host.querySelectorAll('article')).toHaveLength(2);
+    expect(host.textContent).toContain('0 of 2 assigned');
+    expect(buttonByText(host, 'Undo last').disabled).toBe(true);
+    for (const input of host.querySelectorAll<HTMLInputElement>('article input')) {
+      expect(input.disabled).toBe(true);
+    }
+    expect(buttonByText(host, 'Edit settings').disabled).toBe(true);
+    await act(async () => buttonByText(host, 'Cancel').click());
+    expect(buttonByText(host, 'Edit settings').disabled).toBe(false);
+  });
+
+  it('offers a keyboard-accessible show action and opens settings for that run', async () => {
+    importArtwork('Johann');
+    importArtwork('Box');
+    useStore.getState().selectObject(null);
+    useUiStore.getState().setCutsLayersView('run-order');
+    const host = await renderPanel();
+    const show = host.querySelector<HTMLButtonElement>('button[aria-label="Show Box on canvas"]');
+    if (show === null) throw new Error('Show artwork button missing');
+    await act(async () => show.click());
+    expect(useStore.getState().selectedObjectId).toBe('Box');
+    const box = rowByLabel(host, 'Run 2: Box');
+    await act(async () => buttonByText(box, 'Edit settings').click());
+    expect(useUiStore.getState().cutsLayersView).toBe('layers');
+    expect(useStore.getState().selectedObjectId).toBe('Box');
   });
 
   it('undoes within numbering, commits Done once, and restores Cancel', async () => {

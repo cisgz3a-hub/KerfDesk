@@ -23,15 +23,15 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Map the source into the stock',
         instruction:
-          'Set Width and Depth in Relief properties. For a height map, inspect Polarity and the available tone or mask controls. Open View 3D to check which areas rise and which areas are removed.',
+          'Open the Artwork tab and set Width and Depth in Relief properties. For a height map, inspect Polarity and the available tone or mask controls. Open View 3D to check which areas rise and which areas are removed.',
         focus: 'Width · Depth · View 3D',
         result: 'The source has physical dimensions and a visible depth range below the stock top.',
       },
       {
         title: 'Choose roughing or finishing',
         instruction:
-          'Inspect the relief operation and choose Relief roughing or Relief finishing as appropriate. Use Startup Setup → Tool Plan to assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
-        focus: 'Relief operation and Tool Plan',
+          'Open the Operation tab and choose Relief roughing or Relief finishing as appropriate. In Tool & material, assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
+        focus: 'Relief operation and Tool & material',
         result: 'The toolpath uses the chosen cutters and the spacing for that stage of the carve.',
       },
       {
@@ -64,14 +64,14 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'A CNC profile operation → Tabs → Edit positions',
+    location: 'A CNC profile operation → Holding tabs → Edit positions',
     prerequisites: 'A CNC profile with one unlocked vector object selected for position editing.',
     visual: 'tabs',
     steps: [
       {
         title: 'Enable holding tabs',
         instruction:
-          'Select a profile operation and enable Tabs. Think of each tab as a short bridge left near the bottom of the cut to support the part.',
+          'Select a profile operation, open Holding tabs and enable Tabs. Think of each tab as a short bridge left near the bottom of the cut to support the part.',
         focus: 'Tabs',
         result: 'The deepest passes will rise over tab regions instead of cutting them fully away.',
       },
@@ -117,14 +117,15 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'CNC Startup Setup → Bit library, Default bit and Tool Plan',
+    location:
+      'Artwork / Operations → Settings → Operation → Tool & material; Startup Setup → Bit library',
     prerequisites: 'CNC mode and the specifications of the cutters you intend to use.',
     visual: 'library',
     steps: [
       {
         title: 'Identify the cutter geometry',
         instruction:
-          'Open CNC Startup Setup and inspect the Bit library. Use Show picture to recognise the cutter family. Choose the matching bit, or add a custom bit with its name, kind, diameter and actual flute count.',
+          'In Tool & material, use Show picture to recognise the cutter family. Choose the matching bit, or open Add another bit to browse the catalog or add a custom bit with its name, kind, diameter and actual flute count. The same library is available in Startup Setup.',
         focus: 'Bit library',
         result:
           'The picture explains the cutter shape; its actual specifications define the geometry the planner uses.',
@@ -140,8 +141,8 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Assign default and operation bits',
         instruction:
-          'Choose Default bit for operations that follow the main cutter. In Tool Plan, expand an operation to assign its Primary bit and any V-carve floor clearing, Pocket roughing or Relief finishing bit.',
-        focus: 'Default bit · Tool Plan',
+          'In Artwork / Operations → Settings → Operation → Tool & material, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit. Use job default bit removes an operation override. Change the job default in Startup Setup.',
+        focus: 'Tool & material · Bit',
         result:
           'Each operation has a visible cutter assignment, including any separate clearing stage.',
         visual: 'layers',
@@ -149,8 +150,8 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Save and inspect the plan',
         instruction:
-          'Review the setup and choose Save CNC startup setup. Return to the operation, inspect its cutting values and preview any tool changes before running.',
-        focus: 'Save CNC startup setup',
+          'Operation choices update immediately and are saved with the project. If editing inside Startup Setup instead, choose Save machine setup to apply its draft. Inspect the operation cutting values and preview any tool changes before running.',
+        focus: 'Operation settings and preview',
         result:
           'The job uses the saved bit assignments and shows their effect in the generated route.',
         visual: 'preview',

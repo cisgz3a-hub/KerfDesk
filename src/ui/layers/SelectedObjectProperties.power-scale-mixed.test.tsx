@@ -82,7 +82,7 @@ describe('SelectedObjectProperties mixed power scale', () => {
     const root = createRoot(host);
     await act(async () => root.render(<SelectedObjectProperties />));
     try {
-      expect(host.textContent).toContain('Effective artwork override');
+      expect(host.textContent).toContain('This artwork has its own settings.');
       const spacing = host.querySelector('input[aria-label="Hatch spacing for selected objects"]');
       const bidirectional = host.querySelector(
         'input[aria-label="Bidirectional fill for selected objects"]',

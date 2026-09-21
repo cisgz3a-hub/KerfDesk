@@ -1,5 +1,6 @@
 import type { CncLayerSettings, Layer } from '../../core/scene';
 import { NumberField } from './CncLayerPrimitives';
+import { RailSection } from '../kit';
 
 export function CncInlayFields(props: {
   readonly layer: Layer;
@@ -9,7 +10,13 @@ export function CncInlayFields(props: {
   if (props.settings.cutType !== 'inlay-pair') return null;
   const pocketDepthMm = props.settings.inlayPocketDepthMm ?? Math.min(3, props.settings.depthMm);
   return (
-    <>
+    <RailSection
+      label="Inlay fit"
+      hint="Set the pocket depth, space between matching edges and layout of the mirrored insert."
+    >
+      <p className="lf-cnc-settings-hint">
+        Set the matching pocket depth and the gap between pocket and insert edges.
+      </p>
       <NumberField
         layer={props.layer}
         label="Pocket depth"
@@ -18,7 +25,7 @@ export function CncInlayFields(props: {
         min={0.05}
         max={200}
         step={0.25}
-        title="Depth of the female inlay pocket. The insert profile uses the Cut depth above."
+        title="Depth of the female inlay pocket. The insert profile uses Insert depth above."
         onCommit={(inlayPocketDepthMm) => props.onCommit({ inlayPocketDepthMm })}
       />
       <NumberField
@@ -43,6 +50,6 @@ export function CncInlayFields(props: {
         title="Gap between the original pocket and the automatically mirrored insert."
         onCommit={(inlayPairSpacingMm) => props.onCommit({ inlayPairSpacingMm })}
       />
-    </>
+    </RailSection>
   );
 }

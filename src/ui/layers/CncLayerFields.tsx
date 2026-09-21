@@ -4,13 +4,13 @@
 // setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
 // .lf2 persistence come for free.
 //
-// Startup-owned material, cutter, stock, and machine values are shown
-// read-only. Operation fields (cut type, depth, feeds, spindle, tabs) lead the
-// card. The always-visible Advanced section
-// follows with feed helpers, stepover, pocket fill, and cut-type tails.
+// Operation material and cutter choices stay beside their cutting settings.
+// Cut depth and feeds lead the editor; named disclosures organise the remaining
+// controls without unmounting inputs or discarding their in-progress edits.
 // Shared row/input controls live in CncLayerPrimitives; the advanced group in
 // CncLayerAdvancedFields.
 
+import { useState } from 'react';
 import {
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -25,18 +25,22 @@ import { CncCoreCutFields, CncLayerAdvancedGroup } from './CncLayerAdvancedField
 import { CncTabFields } from './CncTabFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { CncOpenPathNote } from './CncOpenPathNote';
-import { CncRetractPassesField } from './CncRetractPassesField';
 import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { CncSetupReferenceFields } from './CncSetupReferenceFields';
+import { CncOperationToolFields } from './CncOperationToolFields';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { cncOperationTutorial } from './operation-tutorial';
+import './cnc-operation-settings.css';
 
 export function CncLayerFields(props: {
   readonly layer: Layer;
   readonly onSettingsChange?: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const { layer } = props;
+  // A new material or primary tool replaces feed drafts even when its recipe
+  // produces the same canonical numbers. Secondary tool choices leave them alone.
+  const [assignmentRevision, setAssignmentRevision] = useState(0);
   const setLayerParam = useStore((s) => s.setLayerParam);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const machine = useStore((s) => s.project.machine);
@@ -54,12 +58,65 @@ export function CncLayerFields(props: {
     commitSettings(withManualCncFeedPatch(settings, patch));
 
   return (
-    <>
-      <CncSetupReferenceFields settings={settings} hasReliefObjects={hasReliefObjects} />
-      <TutorialButton
-        tutorialId={cncOperationTutorial(settings.cutType)}
-        label="Cut type tutorial"
+    <div className="lf-cnc-settings">
+      <CncOperationToolFields
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommitSettings={(next, replaceFeedDrafts) => {
+          if (replaceFeedDrafts) setAssignmentRevision((revision) => revision + 1);
+          commitSettings(next);
+        }}
       />
+      <CncCutDepthSection
+        layer={layer}
+        settings={settings}
+        stockThicknessMm={stockThicknessMm}
+        hasReliefObjects={hasReliefObjects}
+        onCommit={commit}
+      />
+      <CncCoreCutFields
+        key={JSON.stringify([
+          settings.materialKey ?? null,
+          settings.toolId ?? null,
+          assignmentRevision,
+        ])}
+        layer={layer}
+        settings={settings}
+        maxFeed={maxFeed}
+        spindleMaxRpm={spindleMaxRpm}
+        onCommit={commit}
+      />
+      {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      <CncLayerAdvancedGroup
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
+      <CncSetupReferenceFields />
+    </div>
+  );
+}
+
+function CncCutDepthSection(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly stockThicknessMm: number;
+  readonly hasReliefObjects: boolean;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  const { layer, settings, stockThicknessMm, hasReliefObjects, onCommit: commit } = props;
+  return (
+    <section className="lf-cnc-settings-card" aria-label="Cut & depth">
+      <div className="lf-cnc-settings-heading">
+        <h4>Cut &amp; depth</h4>
+        <TutorialButton
+          tutorialId={cncOperationTutorial(settings.cutType)}
+          label="Cut type tutorial"
+        />
+      </div>
       <Row label="Cut type">
         <select
           value={settings.cutType}
@@ -75,6 +132,7 @@ export function CncLayerFields(props: {
           ))}
         </select>
       </Row>
+      <p className="lf-cnc-settings-hint">{cutTypeHint(settings.cutType)}</p>
       <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
       <CncOpenPathNote layer={layer} settings={settings} />
       {/*
@@ -88,29 +146,19 @@ export function CncLayerFields(props: {
         on the preparation worker instead of the render thread. CncOpenPathNote
         above stays: it only flattens contours, it never builds the ladder.
       */}
+      {hasReliefObjects ? (
+        <p className="lf-cnc-settings-hint" role="note">
+          Relief depth comes from the selected relief artwork. Cut depth here applies to vector
+          shapes only.
+        </p>
+      ) : null}
       <CutDepthField
         layer={layer}
         settings={settings}
         stockThicknessMm={stockThicknessMm}
         onCommit={commit}
       />
-      <CncCoreCutFields
-        layer={layer}
-        settings={settings}
-        maxFeed={maxFeed}
-        spindleMaxRpm={spindleMaxRpm}
-        onCommit={commit}
-      />
-      {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
-      <CncRetractPassesField layer={layer} settings={settings} onCommit={commit} />
-      <CncLayerAdvancedGroup
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
-    </>
+    </section>
   );
 }
 
@@ -121,6 +169,29 @@ function cutTypePatch(settings: CncLayerSettings, cutType: CncCutType): Partial<
       ? { vCarveFlatDepthEnabled: false }
       : {}),
   };
+}
+
+function cutTypeHint(cutType: CncCutType): string {
+  switch (cutType) {
+    case 'profile-outside':
+      return 'Cut around the outside edge to keep the shape at its drawn size.';
+    case 'profile-inside':
+      return 'Cut inside an opening, allowing for the width of the bit.';
+    case 'profile-on-path':
+    case 'engrave':
+      return 'Follow the drawn line with the centre of the bit.';
+    case 'pocket':
+      return 'Remove the material inside closed shapes to the chosen depth.';
+    case 'v-carve':
+      return 'Use an angled bit to carve depth that follows the artwork width.';
+    case 'inlay-pair':
+      return 'Create a matching pocket and mirrored insert from this artwork.';
+    case 'drill':
+      return 'Drill at shape centres, removing material in depth increments.';
+    case 'relief-rough':
+    case 'relief-finish':
+      return 'Machine the relief using its artwork depth and the assigned cutter.';
+  }
 }
 
 // Cut depth + a one-click stock-depth action. Calling exact stock thickness a

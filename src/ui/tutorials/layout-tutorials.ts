@@ -163,7 +163,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Inspect the artwork settings',
         instruction:
-          'Select an object and open Settings. Find its named operation. Laser operations use Line, Fill or Image; CNC operations use their cut type and depth.',
+          'Select an object and open Settings → Operation. Laser operations use Line, Fill or Image; CNC operations use their cut type and depth. The Artwork tab holds size, shape, image adjustments and path tools.',
         focus: 'Selected artwork operation',
         result: 'You can see the settings that belong to this artwork.',
       },
@@ -177,14 +177,14 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Separate visibility from output',
         instruction:
-          'Show controls whether the operation is drawn on the workspace. Output controls whether it is included in Preview and machine output. Check both deliberately.',
-        focus: 'Show and Output',
+          'Show on canvas controls whether the operation is drawn on the workspace. Include in output controls whether it is included in Preview and machine output. Both affect every artwork using a shared operation.',
+        focus: 'Show on canvas · Include in output',
         result: 'The enabled output matches the parts you intend to manufacture.',
       },
       {
         title: 'Review the sequence',
         instruction:
-          'Open Run order and inspect the artwork sequence. Open Preview to check the resulting paths after changing operation settings or order.',
+          'Open Run order and inspect the numbered artwork sequence. Search or jump to a number in longer jobs; Edit settings returns to that artwork. Open Preview to check the resulting paths after changing settings or order.',
         focus: 'Run order → Preview',
         result: 'You can review the planned output as a sequence of operations.',
         visual: 'preview',

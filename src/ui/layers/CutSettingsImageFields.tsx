@@ -21,8 +21,11 @@ export function CutSettingsImageFields(props: {
 }): JSX.Element {
   const maxPower = props.deferArtworkBounds ? 100 : (props.maxPower ?? props.layer.power);
   return (
-    <fieldset className="lf-fieldset">
-      <legend className="lf-legend">Image</legend>
+    <fieldset className="lf-fieldset lf-cut-settings-group">
+      <legend className="lf-legend">Image detail</legend>
+      <p className="lf-laser-help">
+        Dither creates a pattern of dots. Grayscale varies the laser power with image brightness.
+      </p>
       <Field label="Dither">
         <select
           name="ditherAlgorithm"
@@ -49,6 +52,9 @@ export function CutSettingsImageFields(props: {
         linesPerMm={props.imageLinesPerMm}
         onChange={props.onImageLinesPerMmChange}
       />
+      <p className="lf-laser-help">
+        Line interval and DPI describe the same scan density. Changing one updates the other.
+      </p>
       <Field label="Dot Width">
         <NumberInput
           name="dotWidthCorrectionMm"
@@ -61,30 +67,48 @@ export function CutSettingsImageFields(props: {
         <span className="lf-field-unit">mm</span>
       </Field>
       <ImageCheckboxField
-        label="Negative"
+        label="Invert brightness"
         name="negativeImage"
         checked={props.layer.negativeImage}
         title="Invert image brightness before engraving this layer."
       />
       <ImageCheckboxField
-        label="Bidirectional"
+        label="Scan both ways"
         name="imageBidirectional"
         checked={props.layer.imageBidirectional}
         title="Alternate raster rows in both directions. Turn off for scan-offset diagnosis."
       />
-      <ImageCheckboxField
-        label="Expert override"
-        name="allowUncalibratedBidirectionalScan"
-        checked={props.layer.allowUncalibratedBidirectionalScan === true}
-        title="Allow uncalibrated bidirectional scanning, which can double or blur edges. Profiles requiring verified offsets still use one-way scanning while a saved table is marked pending."
-      />
-      <ImageCheckboxField
-        label="Pass-through"
-        name="passThrough"
-        checked={props.layer.passThrough}
-        title="Use the image pixels as-is and skip KerfDesk image processing."
-      />
+      <ImageExtraFields layer={props.layer} />
     </fieldset>
+  );
+}
+
+function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {
+  return (
+    <details className="lf-cut-settings-disclosure">
+      <summary>Image &amp; calibration extras</summary>
+      <div className="lf-cut-settings-disclosure__body">
+        <ImageCheckboxField
+          label="Allow uncalibrated scans"
+          name="allowUncalibratedBidirectionalScan"
+          checked={props.layer.allowUncalibratedBidirectionalScan === true}
+          title="Allow uncalibrated bidirectional scanning, which can double or blur edges. Profiles requiring verified offsets still use one-way scanning while a saved table is marked pending."
+        />
+        <p className="lf-laser-help">
+          Uncalibrated scans can produce doubled or blurred edges. Some profiles still use one-way
+          scanning while calibration is pending.
+        </p>
+        <ImageCheckboxField
+          label="Use original pixels"
+          name="passThrough"
+          checked={props.layer.passThrough}
+          title="Use the image pixels as-is and skip KerfDesk image processing."
+        />
+        <p className="lf-laser-help">
+          Pass-through skips image adjustments and uses the original pixels.
+        </p>
+      </div>
+    </details>
   );
 }
 

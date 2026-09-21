@@ -11,9 +11,11 @@ export function Row(props: {
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <div style={rowStyle}>
+    <div className="lf-cnc-setting-row" style={rowStyle}>
       {props.label.length > 0 ? <span style={labelStyle}>{props.label}</span> : null}
-      <div style={valueStyle}>{props.children}</div>
+      <div className="lf-cnc-setting-value" style={valueStyle}>
+        {props.children}
+      </div>
     </div>
   );
 }

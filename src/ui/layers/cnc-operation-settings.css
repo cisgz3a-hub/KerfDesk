@@ -1,0 +1,159 @@
+.lf-cnc-settings {
+  --lf-setup-reference-columns: minmax(58px, 0.6fr) minmax(0, 1.4fr) auto;
+  --lf-setup-reference-white-space: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.lf-cnc-settings .lf-setup-reference-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.lf-cnc-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 10px;
+  background: var(--lf-bg-1);
+}
+
+.lf-cnc-settings-card > h4,
+.lf-cnc-settings-heading > h4 {
+  margin: 0;
+  color: var(--lf-text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.lf-cnc-settings-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lf-cnc-settings-hint {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lf-cnc-settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-cnc-tool-field,
+.lf-cnc-tool-field > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lf-cnc-tool-field > label > span {
+  color: var(--lf-text-muted);
+  font-size: 12px;
+}
+
+.lf-cnc-tool-field > label > select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+}
+
+.lf-cnc-settings .lf-section {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+}
+
+.lf-cnc-settings .lf-section > summary {
+  min-height: 38px;
+  padding: 8px 10px;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 7px;
+}
+
+.lf-cnc-settings .lf-section > summary:hover {
+  background: var(--lf-bg-2);
+}
+
+.lf-cnc-settings .lf-section > summary:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 2px;
+}
+
+.lf-cnc-settings .lf-section[open] > summary {
+  color: var(--lf-accent-fg);
+  border-bottom: 1px solid var(--lf-border);
+  border-radius: 7px 7px 0 0;
+}
+
+.lf-cnc-settings .lf-section-badge {
+  flex-shrink: 0;
+  max-width: 50%;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--lf-bg-2);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: right;
+}
+
+.lf-cnc-settings .lf-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.lf-cnc-settings .lf-cnc-setting-row {
+  min-width: 0;
+  gap: 6px 8px;
+}
+
+.lf-cnc-settings .lf-cnc-setting-value > input:not([type='checkbox']),
+.lf-cnc-settings .lf-cnc-setting-value > select {
+  min-height: 32px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.lf-cnc-settings button,
+.lf-cnc-settings select,
+.lf-cnc-settings input {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.lf-cnc-settings button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.lf-cnc-settings .lf-section-body > label > select {
+  width: 100%;
+  min-width: 0;
+}

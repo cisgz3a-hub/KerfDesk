@@ -1,28 +1,20 @@
-// CutsLayersPanel — WORKFLOW.md F-A7 implementation.
-//
-// One vertical card per Layer (one unique stroke color). Per-card
-// controls live in LayerRow.tsx; this file owns the panel chrome
-// (heading, empty state, scroll behaviour).
-//
-// Cards stack vertically — the panel uses its full height rather
-// than cramming settings horizontally into a 7-column table. Each
-// card carries its own colour swatch + Mode + Show/Output toggles
-// in a header strip, then power / speed / passes / mode-specific
-// fields as field rows below.
-
-import { machineKindOf } from '../../core/scene';
+// The artwork inspector is the primary editor. The operation list is a
+// secondary management surface; it must never push the active settings away.
+import { useState } from 'react';
+import { machineKindOf, type Layer } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
+import { Icon } from '../kit';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
-import { type CutsLayersView, useUiStore } from '../state/ui-store';
+import { useUiStore } from '../state/ui-store';
+import { TutorialButton } from '../tutorials/TutorialButton';
+import { ArtworkPanelTabs } from './ArtworkPanelTabs';
 import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
-import { DogboneRow } from './DogboneRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
-import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
-import { SelectedReliefProperties } from './SelectedReliefProperties';
 import './cuts-layers-panel.css';
+import './artwork-inspector.css';
 
 export function CutsLayersPanel(): JSX.Element {
   const panelVisible = useUiStore((s) => s.railPanelVisibility.layers);
@@ -31,8 +23,6 @@ export function CutsLayersPanel(): JSX.Element {
   const setView = useUiStore((s) => s.setCutsLayersView);
   const layers = useStore((s) => s.project.scene.layers);
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
-  // The Material Library stores laser presets (power/speed); it hides in CNC
-  // mode where those numbers have no meaning.
   const showMaterialLibrary = machineKind === 'laser';
   const activeView =
     !showMaterialLibrary && requestedView === 'materials' ? 'layers' : requestedView;
@@ -49,7 +39,6 @@ export function CutsLayersPanel(): JSX.Element {
     <aside
       aria-label="Artwork / Operations panel"
       className="lf-rail lf-pane-form lf-artwork-panel"
-      style={panelStyle}
     >
       <RailPanelHeading
         title="Artwork / Operations"
@@ -57,12 +46,18 @@ export function CutsLayersPanel(): JSX.Element {
         onCollapse={() => togglePanel('layers')}
       />
       <MachineModeToggle />
-      <ViewTabs active={activeView} showMaterials={showMaterialLibrary} onSelect={setView} />
+      <ArtworkPanelTabs
+        active={activeView}
+        showMaterials={showMaterialLibrary}
+        onSelect={setView}
+      />
       <div
+        key={activeView}
         id={`cuts-layers-${activeView}-panel`}
         role="tabpanel"
+        tabIndex={0}
         aria-labelledby={`cuts-layers-${activeView}-tab`}
-        style={viewContentStyle}
+        className="lf-artwork-view-content"
       >
         {activeView === 'materials' ? (
           <MaterialLibraryPanel />
@@ -76,134 +71,74 @@ export function CutsLayersPanel(): JSX.Element {
   );
 }
 
-function ViewTabs(props: {
-  readonly active: CutsLayersView;
-  readonly showMaterials: boolean;
-  readonly onSelect: (view: CutsLayersView) => void;
-}): JSX.Element {
-  return (
-    <div
-      role="tablist"
-      aria-label="Artwork panel view"
-      style={{
-        ...viewTabsStyle,
-        gridTemplateColumns: `repeat(${props.showMaterials ? 3 : 2}, minmax(0, 1fr))`,
-      }}
-    >
-      <ViewTab
-        view="layers"
-        label="Settings"
-        selected={props.active === 'layers'}
-        onSelect={props.onSelect}
-      />
-      <ViewTab
-        view="run-order"
-        label="Run order"
-        selected={props.active === 'run-order'}
-        onSelect={props.onSelect}
-      />
-      {props.showMaterials ? (
-        <ViewTab
-          view="materials"
-          label="Materials"
-          selected={props.active === 'materials'}
-          onSelect={props.onSelect}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ViewTab(props: {
-  readonly view: CutsLayersView;
-  readonly label: string;
-  readonly selected: boolean;
-  readonly onSelect: (view: CutsLayersView) => void;
-}): JSX.Element {
-  return (
-    <button
-      id={`cuts-layers-${props.view}-tab`}
-      type="button"
-      role="tab"
-      aria-controls={`cuts-layers-${props.view}-panel`}
-      aria-selected={props.selected}
-      title={`Show ${props.label.toLowerCase()}`}
-      className="lf-btn lf-btn--ghost lf-artwork-view-tab"
-      onClick={() => props.onSelect(props.view)}
-    >
-      {props.label}
-    </button>
-  );
-}
-
-function LayersView(props: {
-  readonly layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'];
-}): JSX.Element {
+function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
   return (
     <>
-      <LayerList layers={props.layers} />
+      {layers.length === 0 ? <EmptyArtwork /> : null}
       <SelectedObjectProperties />
-      <OffsetPathsRow />
-      <DogboneRow />
-      <SelectedReliefProperties />
+      {layers.length > 0 ? <OperationList layers={layers} /> : null}
     </>
   );
 }
 
-function LayerList(props: {
-  readonly layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'];
-}): JSX.Element {
-  const { layers } = props;
-  return layers.length === 0 ? (
-    <p style={hintStyle}>Import or draw artwork to create its first operation.</p>
-  ) : (
-    <div style={listStyle}>
-      {layers.map((layer, index) => (
-        <LayerRow
-          key={layer.id}
-          layer={layer}
-          canMoveUp={index > 0}
-          canMoveDown={index < layers.length - 1}
-        />
-      ))}
-    </div>
+function EmptyArtwork(): JSX.Element {
+  return (
+    <section className="lf-artwork-empty" aria-label="Start with artwork">
+      <div className="lf-artwork-empty__illustration" aria-hidden="true">
+        <Icon name="square" size={32} />
+        <Icon name="arrow-right" size={20} />
+        <Icon name="sliders" size={32} />
+      </div>
+      <h3>Your artwork starts here</h3>
+      <p>Import or draw artwork to create its first operation.</p>
+      <p className="lf-artwork-hint">Then choose how to cut, engrave or carve it.</p>
+      <TutorialButton tutorialId="operations" label="See how operations work" />
+    </section>
   );
 }
 
-// Surface chrome (background, border, scrollbars, text color) comes from
-// .lf-rail; this constant keeps only the rail's layout.
-const panelStyle: React.CSSProperties = {
-  padding: '12px',
-  // Card layout means we don't need 500 px of horizontal room any more.
-  // 320 px holds a clean two-column field-row layout (label + control)
-  // and leaves plenty of width for the Laser panel on 1280-class monitors.
-  width: '100%',
-  height: '100%',
-  boxSizing: 'border-box',
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-};
-// Layers remains the default working page; reusable preset management is a
-// sibling page so an empty library cannot push the active job controls down.
-const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', lineHeight: 1.5 };
-const listStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  flexShrink: 0,
-  marginBottom: 12,
-};
-const viewTabsStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 4,
-  margin: '10px 0 14px',
-  paddingBottom: 0,
-  borderBottom: '1px solid var(--lf-border)',
-};
-const viewContentStyle: React.CSSProperties = {
-  minHeight: 0,
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  overflowY: 'auto',
-};
+function OperationList({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.Element {
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLocaleLowerCase();
+  const entries = layers
+    .map((layer, index) => ({ layer, index }))
+    .filter(({ layer }) => layer.name.toLocaleLowerCase().includes(query));
+  return (
+    <details className="lf-artwork-disclosure lf-operation-list">
+      <summary>
+        <Icon name="layers" size={18} />
+        <span>
+          <strong>All operations</strong>
+          <small>Drawing colour, visibility and order</small>
+        </span>
+        <span className="lf-artwork-count">{layers.length}</span>
+        <Icon name="chevron-down" size={16} />
+      </summary>
+      <div className="lf-artwork-disclosure__body">
+        <p className="lf-artwork-hint">
+          Select a drawing colour below. Use Run order to arrange the artwork in your job.
+        </p>
+        {layers.length > 4 || search !== '' ? (
+          <input
+            type="search"
+            aria-label="Find an operation"
+            placeholder="Find an operation…"
+            value={search}
+            onChange={(event) => setSearch(event.currentTarget.value)}
+          />
+        ) : null}
+        {entries.map(({ layer, index }) => (
+          <LayerRow
+            key={layer.id}
+            layer={layer}
+            canMoveUp={index > 0}
+            canMoveDown={index < layers.length - 1}
+          />
+        ))}
+        {entries.length === 0 ? (
+          <p className="lf-artwork-hint">No matching operations. Try another name.</p>
+        ) : null}
+      </div>
+    </details>
+  );
+}

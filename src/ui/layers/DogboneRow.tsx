@@ -35,10 +35,16 @@ export function DogboneRow(): JSX.Element | null {
   ];
   if (!selectionCanWeld(project, selectedIds)) return null;
   return (
-    <section aria-label="Dogbone corners" style={sectionStyle}>
-      <span style={labelStyle}>Dogbone</span>
-      <span style={controlStyle}>
+    <section aria-label="Dogbone corners" className="lf-artwork-tool">
+      <div className="lf-artwork-tool__heading">
+        <h4>Corner relief · dogbones</h4>
         <TutorialButton tutorialId="dogbone" compact label="Dogbone corners" />
+      </div>
+      <p className="lf-artwork-hint">
+        Add clearance to inside corners so square parts can fit around a round bit’s cut.
+      </p>
+      <label className="lf-artwork-tool__field">
+        <span>Bit diameter</span>
         <ClearableNumberField
           ariaLabel="Dogbone bit diameter"
           title="Bit diameter used to size the corner overcut circles."
@@ -50,6 +56,8 @@ export function DogboneRow(): JSX.Element | null {
           style={inputStyle}
         />
         <span style={unitStyle}>mm</span>
+      </label>
+      <div className="lf-artwork-tool__actions">
         <button
           type="button"
           onClick={() => dogboneSelection(bitMm)}
@@ -57,26 +65,10 @@ export function DogboneRow(): JSX.Element | null {
         >
           Relieve corners
         </button>
-      </span>
+      </div>
     </section>
   );
 }
 
-const sectionStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '100px 1fr',
-  alignItems: 'center',
-  gap: 8,
-  marginTop: 6,
-};
-const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
-// Wrap so the "Relieve corners" button drops to the next line instead of
-// clipping off the right edge when the panel is narrow.
-const controlStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 6,
-};
 const inputStyle: React.CSSProperties = { width: 64, boxSizing: 'border-box' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

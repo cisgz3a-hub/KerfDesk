@@ -92,14 +92,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
-    location: 'Main workspace → selected vector controls → Offset',
+    location: 'Artwork / Operations → Settings → Artwork → Offset outlines',
     prerequisites: 'One or more unlocked, closed vector shapes selected in the main workspace.',
     visual: 'offset',
     steps: [
       {
         title: 'Select a closed outline',
         instruction:
-          'Select the vector shape in the main workspace. The Offset controls appear for eligible closed vector selections; images, locked objects and open paths are not the same input.',
+          'Select the vector shape in the main workspace and open the Artwork tab in Settings. Offset outlines appears for eligible closed vector selections; images, locked objects and open paths are not the same input.',
         focus: 'Selected closed vector',
         result: 'The selected boundary is the reference from which the offset is measured.',
         visual: 'select',
@@ -107,8 +107,8 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the distance and direction',
         instruction:
-          'Enter a positive Offset distance in millimetres. Choose Outward to expand the boundary or Inward to shrink it. Inspect narrow sections where an inward offset can remove the available space.',
-        focus: 'Distance · Outward / Inward',
+          'Enter a positive Distance in millimetres. Choose Outward copy to expand the boundary or Inward copy to shrink it. Inspect narrow sections where an inward offset can remove the available space.',
+        focus: 'Distance · Outward copy / Inward copy',
         result:
           'A new offset object is created and selected while the original remains on the canvas.',
       },
@@ -131,7 +131,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 2,
-    location: 'Main workspace → selected vector controls → Dogbone',
+    location: 'Artwork / Operations → Settings → Artwork → Corner relief · dogbones',
     prerequisites: 'CNC mode, an unlocked closed vector and the diameter of the intended cutter.',
     visual: 'dogbone',
     steps: [
@@ -146,7 +146,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Use the actual cutter diameter',
         instruction:
-          'Check Dogbone bit diameter against the cutter you intend to use, then choose Relieve corners. The tool adds relief at qualifying sharp internal corners of the selected outline.',
+          'In the Artwork tab, find Corner relief · dogbones. Check Bit diameter against the cutter you intend to use, then choose Relieve corners. The tool adds relief at qualifying sharp internal corners of the selected outline.',
         focus: 'Bit diameter → Relieve corners',
         result: 'The selected geometry changes in place to include corner overcuts.',
       },
