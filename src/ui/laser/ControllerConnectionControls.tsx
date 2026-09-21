@@ -5,6 +5,7 @@ import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { ConnectionBar } from './ConnectionBar';
+import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 
@@ -51,6 +52,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <DeviceSetupControls />
+      <ConnectedMachineProfile />
       <ConnectionBar
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}

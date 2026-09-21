@@ -55,7 +55,7 @@ test('Machine Setup commits converted calibration once and restores it on reopen
   await openDiagnostics(page);
   await enterLightBurnMeasurement(page);
   await page.getByRole('button', { name: 'Apply measured offsets', exact: true }).click();
-  await page.getByRole('button', { name: 'Go to step 6: Review & save', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await page.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await openDiagnostics(page);
   await expect(page.getByLabel('Measured speed 1', { exact: true })).toHaveValue('3000');
@@ -77,9 +77,8 @@ test('Machine Setup commits converted calibration once and restores it on reopen
 async function openDiagnostics(page: Page): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Go to step 2: Essentials', exact: true }).click();
+  await page.getByText('Accessories and calibration', { exact: true }).click();
   await page.getByText('Raster scan-offset calibration', { exact: true }).click();
   await page.getByText('Raster Diagnostics and assisted conversion', { exact: true }).click();
   await expect(

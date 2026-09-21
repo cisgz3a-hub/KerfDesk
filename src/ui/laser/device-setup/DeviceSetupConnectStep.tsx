@@ -1,6 +1,5 @@
-// Step 3: connect with the driver and baud chosen on the Choose your machine
-// step, then run the controller's read-only identity/settings commands. No
-// firmware writes occur here.
+// Optional Machine-stage connection, using the selected driver and baud.
+// Identity/settings reads do not move the machine or write its configuration.
 
 import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';

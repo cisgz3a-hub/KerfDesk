@@ -182,7 +182,7 @@ function cncMachine(): CncMachineConfig {
 }
 
 async function saveStartup(host: HTMLElement): Promise<void> {
-  await act(async () => stepButton(host, 7, 'Review & save').click());
+  await act(async () => stepButton(host, 3, 'Review & save').click());
   await act(async () => button(host, 'Save CNC startup setup').click());
 }
 

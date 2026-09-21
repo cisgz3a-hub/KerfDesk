@@ -20,15 +20,18 @@ type DeviceRowsProps = {
   readonly update: (patch: Partial<DeviceProfile>) => void;
   /** Default preserves the GRBL-specific labels used by the legacy panels. */
   readonly grblLabels?: boolean;
+  /** Setup uses plain labels; exact firmware references stay in accessible help. */
+  readonly plainLabels?: boolean;
 };
 
 // GRBL $30/$31 power range + $32 laser mode — the machine-reported beam scale.
 export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   const grblLabels = props.grblLabels ?? true;
+  const labels = powerRowLabels(grblLabels, props.plainLabels === true);
   return (
     <>
-      <Row label={grblLabels ? '$30 (max S)' : 'Maximum S'}>
+      <Row label={labels.max}>
         <ClearableNumberField
           min={1}
           max={MAX_POWER_S}
@@ -44,7 +47,7 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           }
         />
       </Row>
-      <Row label={grblLabels ? '$31 (min S ref)' : 'Controller min S'}>
+      <Row label={labels.min}>
         <ClearableNumberField
           min={0}
           max={MAX_POWER_S}
@@ -56,7 +59,7 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
           title="Saved reference for the minimum S value used by the controller's PWM mapping. Generated job S values scale from zero to Maximum S; this field does not set a minimum emitted S."
         />
       </Row>
-      <Row label={grblLabels ? '$32 laser mode' : 'Laser mode'}>
+      <Row label={labels.mode}>
         <label
           style={inlineLabelStyle}
           title="Record the laser-mode setting expected on the controller. Profile edits do not write firmware settings."
@@ -77,6 +80,12 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
       </Row>
     </>
   );
+}
+
+function powerRowLabels(grbl: boolean, plain: boolean): { max: string; min: string; mode: string } {
+  if (plain) return { max: 'Full-power S', min: 'Minimum S', mode: 'Laser mode' };
+  if (grbl) return { max: '$30 (max S)', min: '$31 (min S ref)', mode: '$32 laser mode' };
+  return { max: 'Maximum S', min: 'Controller min S', mode: 'Laser mode' };
 }
 
 // Air-assist coolant command (M7/M8/none) wired to the controller output.

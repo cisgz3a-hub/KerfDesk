@@ -1722,7 +1722,7 @@ clone/hash runs after the first controller bytes are accepted.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; its CNC-facing job page is labeled **Startup Setup**. Old `MachineSetupDialog`
+Setup** button; CNC **Startup Setup** links open the same flow. Old `MachineSetupDialog`
 callers and deep links from read-only Artwork references resolve to the same global flow rather than
 a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
 current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
@@ -1740,64 +1740,66 @@ Machine output-kind metadata describes the researched configuration and supplies
 - Catalogue updates apply when the operator loads a researched preset. Existing imported/custom
   dimensions, wiring and controller settings are not silently replaced with new catalogue defaults.
 
-The six machine pages remain ordered as ADR-240 defined. A draft whose active output is CNC inserts
-one **Startup Setup** (`cnc-setup`) page between Confirm settings and Options, so CNC has seven visible pages and
-laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page composition):
+Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026-09-21).
+The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
+machine setup** requires valid configuration; review cards link back to the relevant fields.
+Connecting a controller is optional, so a complete setup can be saved offline.
 
-1. **Machine type** — Laser only / CNC only / Laser + CNC, and for hybrids the active mode after
-   Save. Nothing else competes with this choice.
-2. **Choose your machine** — for laser-capable machines the reviewed-profile catalog renders
-   always-open at the top with a text filter (a CNC-only capability sees the built-in CNC preset
-   instead); a detected-firmware match sorts its cards first and shows the match reasons
-   (generic `$$` values never claim hardware identity, so "Possible match" is the ceiling).
-   Below it: CNC preset, controller family, baud, output dialect, advanced streaming, and
-   import/export. Controller selection precedes serial connection; picking a card applies the
-   whole profile to the draft and nothing else.
+1. **Machine** — choose **Laser only**, **CNC only**, or **Laser + CNC** from capability cards;
+   hybrids also choose the active mode after Save. Laser-capable machines see up to two compact
+   profile previews, keeping the selected catalog profile in view. Search or **Browse all N
+   profiles** opens the rest of the catalog. CNC-capable machines also have CNC presets. Selecting
+   a profile copies it into the draft. Detected matches are prioritised among the remaining profiles
+   and explain their evidence under **Profile details**, but generic `$$` values never establish
+   hardware identity: "Possible match" remains the ceiling. Controller family, baud, output dialect,
+   and advanced streaming remain available in **Controller and connection settings**. **Import or
+   export a machine profile** is a separate disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
-   controller choice unchanged. Their controller notes and sources stay visible beside the
-   selected preset. Onefinity entries explicitly require an external controller/postprocessor
-   integration and do not claim compatible KerfDesk output.
-3. **Connect & detect** — connect with the reviewed driver/baud, run that controller family's
-   read-only identity/settings commands, and optionally **Use detected values** (Ruida correctly
-   presents file-only behavior). This page only observes and copies; it edits no field directly.
+   controller choice unchanged. Controller notes and sources remain visible beside the selected
+   preset. Onefinity entries require an external controller/postprocessor integration and do not
+   claim compatible KerfDesk output.
+   Optional **Connect and detect** uses the selected driver/baud and that controller family's
+   read-only identity/settings commands. **Use detected values** explicitly copies supported
+   values into the draft; detection never applies them automatically. Ruida remains file-only.
    CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
-   the separate **Use S maximum as spindle RPM** option and a reported CNC mode; otherwise the
-   spindle ceiling stays unchanged. Configured travel is not measured usable travel.
-4. **Confirm settings** — name, usable bed, max/frame feed, origin, homing policy, and the laser
-   output contract (S range/air/Fire) on one flat page. CNC machine-output and current-job settings
-   live together on the next page instead of being split across this page and Material & Bit.
-   Laser `$31` records the minimum S input used by the controller's PWM mapping; it is not a minimum
-   S emitted by jobs.
-   The laser-mode checkbox records the expected firmware state. Saving these profile fields does
-   not write controller settings.
-5. **Startup Setup** (`cnc-setup`, CNC active only) — three plainly labeled sections on one page:
-   **Machine limits** owns safe Z, spindle maximum, spin-up delay, coolant, and park;
-   **Current job** owns project material, default/active bit, stock dimensions/origin, and tiling;
-   **Tool Plan** owns each operation's material and primary/secondary cutter assignments, including
-   an explicit reset to the current-job default. Material browsing remains non-mutating until the
-   existing **Apply [material] preset** or **Use manual feeds** action updates the draft. Manage bits
-   and saved CNC profiles remain reachable from this page without creating another settings owner.
-6. **Options & calibration** — no-go zones, Z/probe metadata, planner/ETA calibration, and the
-   laser-only scan-offset + optional controlled laser-off seek feed, auto-focus, rotary, and
-   camera-status groups (hidden for CNC-only machines). Every group is collapsed by default and
-   its summary row shows its live one-line state (zone counts, configured/not-configured,
-   calibration pending) without opening it; no group nests another collapsible. The auto-focus
-   deep-link opens its section explicitly.
-7. **Review & save** — firmware comparison first (controller-specific configuration location and
-   write policy; GRBL/grblHAL can queue common per-setting writes only after read + backup
-   acknowledgement; FluidNC, Marlin, Smoothieware, and Ruida never receive numeric GRBL setup
-   writes; queuing is draft-only and Cancel sends nothing), then the software-consistency cards and
-   the separate physical commissioning checklist. The flow says software is internally consistent,
-   never "ready to cut."
+   **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
+   unchanged. Configured travel is not measured usable travel.
+2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
+   applicable laser output or CNC machine limits. Laser `$31` records the minimum S input in the
+   controller's PWM mapping, not a minimum S emitted by jobs. The laser-mode checkbox describes
+   the expected firmware state; saving these profile fields does not write controller settings.
+   CNC **Machine limits** retains safe Z, spindle maximum, spin-up delay, coolant, and park, including
+   when a hybrid machine's active mode is Laser. The optional **CNC job setup** section appears only
+   while CNC is active. It contains **Current job** material, default/active bit, stock
+   dimensions/origin and tiling, plus **Tool Plan** material and primary/secondary cutter assignments
+   for each operation. Overrides can be reset explicitly to the current-job default.
+   Material browsing remains non-mutating until **Apply [material] preset** or **Use manual feeds**
+   updates the draft. Manage bits and saved CNC profiles remain reachable in this section.
+   Optional **Accessories and calibration** contains no-go zones, Z/probe metadata, planner/ETA,
+   and laser-only scan offset, controlled laser-off seek feed, auto-focus, rotary, and camera
+   status. Collapsed summaries describe the saved or draft state; section links open the relevant
+   controls directly, including the existing auto-focus link.
+3. **Review & save** — compact summary cards show the draft values with **Edit** routes back to
+   their controls. A separate pre-run checklist explains physical commissioning. Optional
+   **Controller settings** contains firmware comparison and the write queue. GRBL/grblHAL can queue
+   common per-setting writes only after a read, backup acknowledgement, and individual confirmation;
+   FluidNC, Marlin, Smoothieware, and Ruida never receive numeric GRBL setup writes. Queuing remains
+   draft-only and Cancel sends nothing. Saving confirms the software configuration; physical
+   clearance and readiness to cut still need real-machine checks.
+
+Existing `capability`, `identify`, `connect`, `confirm`, `cnc-setup`, `options`, and `review` links
+remain valid section targets. They open the containing stage and relevant disclosure instead of
+adding more visible stages. CNC setup values retain one writable owner in this draft; Artwork
+settings and Job Review keep their existing read-only setup references.
 
 #### Success — connected controller answers its read commands
 
 1. Detected identity remains a separate observation. It never silently replaces the operator's
    selected profile/controller contract; a mismatch is explicit and must be resolved deliberately.
-2. Supported numeric readback values can be copied into the draft with **Use detected values**; in
-   CNC mode `$30` routes to the spindle ceiling rather than laser-power fields. The live project
-   remains unchanged.
-3. On the last step, **Save machine setup** commits device, workspace, machine config, current-job
+2. Supported numeric readback values can be copied into the draft with **Use detected values**.
+   Using `$30` as the CNC spindle ceiling requires the explicit option and reported CNC mode
+   described above. The live project remains unchanged.
+3. On the last stage, **Save machine setup** commits device, workspace, machine config, current-job
    material/bit/stock/tiling, the operation material/tool plan, job placement, CNC cache, and
    existing spindle-ceiling effects through one store action and one undo entry. **Cancel** leaves
    the live project, dirty state, undo/redo history, and controller unchanged. Only after Save does
@@ -1805,8 +1807,9 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 
 #### Success — configure CNC defaults before artwork exists
 
-1. Open **Machine > Machine Setup > Startup Setup**, choose current-job material, default bit, and
-   stock, explicitly Apply the material preset in the draft, then Save machine setup.
+1. Open **Machine > Machine Setup > Essentials > CNC job setup**, choose current-job
+   material, default bit, and stock, explicitly Apply the material preset in the draft, then review
+   and Save machine setup. Existing **Startup Setup** links open the relevant section directly.
 2. Import or place artwork. Its new operation inherits those committed defaults without opening a
    dialog or presenting another Material/Bit selector.
 3. Artwork settings shows the resolved setup values as read-only references and exposes only the
@@ -1815,7 +1818,8 @@ laser-only setup remains six (ADR-306 supersedes ADR-240's fixed six-page compos
 #### Edge — legacy mixed-material or multi-tool project
 
 1. Existing per-operation material and cutter ids load unchanged and appear as explicit overrides
-   in **Startup Setup > Tool Plan**. Nothing silently flattens them to the current-job defaults.
+   in **Essentials > CNC job setup > Tool Plan**. Nothing silently flattens them to the current-job
+   defaults.
 2. Saving without changing those assignments preserves project serialization and compiled output.
    Resetting an override to the job default is a deliberate draft edit.
 
@@ -2883,9 +2887,10 @@ last updated.
 4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
    halve it), apply measured points, and mark the profile pending or verified truthfully. Legacy
    statusless tables remain active with provenance warnings until the operator records a state.
-   The assisted editor is under **Machine Setup → Options & calibration → Raster scan-offset
-   calibration → Raster Diagnostics and assisted conversion**. Select native full-gap/mm/min or
-   LightBurn Line Shift/mm/s explicitly; conversion previews canonical values and preserves sign.
+   The assisted editor is under **Machine Setup → Essentials → Accessories and calibration → Raster
+   scan-offset calibration → Raster Diagnostics and assisted conversion**. Select native
+   full-gap/mm/min or LightBurn Line Shift/mm/s explicitly; conversion previews canonical values and
+   preserves sign.
    Apply and provenance actions edit the setup draft only. **Save machine setup** commits one
    undoable change; Cancel discards it. Save before generating a verification coupon. Collapsing
    diagnostics preserves typed values; replacing the project, head, controller, bed constraints,
@@ -2915,9 +2920,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 
 #### Success
 1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
-2. No bottom Material & Bit card appears. **Machine > Machine Setup > Startup Setup** is the single
-   writable route for machine limits, current-job material/default bit/stock, and Tool Plan. It does
-   not open automatically merely because CNC mode or artwork was selected.
+2. No bottom Material & Bit card appears. **Machine > Machine Setup > Essentials** is the single
+   writable route for machine limits and **CNC job setup** material/default bit/stock and Tool Plan.
+   Existing Startup Setup links open the relevant section directly. It does not open automatically
+   merely because CNC mode or artwork was selected.
 3. Artwork rows swap laser fields for CNC operation fields. Setup-owned values are read-only
    references there; activating one explains the value and deep-links to its exact Startup Setup
    field. The compact canvas **Stock** chip is also read-only: it expands to the saved dimensions
@@ -4197,9 +4203,9 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Connect & detect** shows the detected values. **Use detected values** copies
-   the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup draft;
-   **Save machine setup** commits them, then the difference clears.
+   **Machine Setup > Machine > Connect and detect** shows the detected values. **Use detected
+   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
+   draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
    in laser mode it is a PWM scale and is not relabeled as RPM.
 

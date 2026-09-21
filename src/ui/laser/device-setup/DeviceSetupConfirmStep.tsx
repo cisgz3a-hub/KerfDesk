@@ -1,4 +1,4 @@
-// Step 4 (Confirm settings, first section): establish the software
+// Essentials: establish the software
 // coordinate model used by the workspace, bounds checks, framing, jogging,
 // and output transforms.
 
@@ -14,21 +14,17 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
     state.draft.controllerKind ?? 'grbl-v1.1',
     state.draft.controllerCommandSet,
   );
-  const sourceText = state.controllerRead
-    ? 'Controller observations remain separate until you explicitly choose Use detected values.'
-    : 'No controller values were imported, so confirm each value from the machine manual.';
+  const sourceText = state.detectedApplied
+    ? 'Using the controller values you applied. Check them against your machine.'
+    : 'Check these values against your machine or its manual.';
   return (
-    <section style={sectionStyle}>
+    <section className="lf-setup-fields" style={sectionStyle}>
       <div style={calloutStyle}>
         <strong>Work area and coordinates</strong>
-        <span>
-          These values drive the canvas size, bounds checks, origin transforms, jog direction,
-          framing feed, and every generated job. {sourceText}
-        </span>
+        <span>{sourceText}</span>
       </div>
       <NameRow device={state.draft} update={update} />
       <BedRows device={state.draft} update={update} />
-      <FeedRows device={state.draft} update={update} />
       <OriginCornerRow device={state.draft} update={update} />
       <Row label="Homing">
         <label style={inlineStyle}>
@@ -58,9 +54,21 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
         ) : null}
       </Row>
       <p style={warningStyle}>
-        Do not enable homing until the physical switches, axis direction, and homing corner have
-        been checked with a hand on the emergency stop. Saving this setup does not run Home.
+        Enable Home only after checking your switches and homing direction. Saving does not run
+        Home.
       </p>
+      <details className="lf-setup-disclosure lf-setup-disclosure--nested">
+        <summary title="Adjust the output feed limit and framing speed for this machine.">
+          <span>Travel speeds</span>
+          <small>{state.draft.maxFeed} mm/min output limit</small>
+        </summary>
+        <div className="lf-setup-disclosure-body">
+          <FeedRows device={state.draft} update={update} />
+          <p className="lf-setup-muted">
+            Output speed limits generated jobs. Frame speed is a separate request.
+          </p>
+        </div>
+      </details>
     </section>
   );
 }

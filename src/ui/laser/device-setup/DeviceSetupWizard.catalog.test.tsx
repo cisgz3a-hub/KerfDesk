@@ -1,5 +1,5 @@
-// Catalog-facing wizard behavior: the six-step shell, the always-visible
-// searchable profile catalog, and verbatim profile application (ADR-240).
+// Catalog-facing wizard behavior: the three-stage shell, the searchable
+// profile catalog, and verbatim profile application.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -31,19 +31,16 @@ afterEach(() => {
 });
 
 describe('DeviceSetupWizard catalog', () => {
-  it('opens with the machine-type choice and shows one six-step setup sequence', async () => {
+  it('opens machine type and searchable profiles together in a three-stage setup', async () => {
     const view = await renderWizard();
     try {
-      expect(view.host.textContent).toContain('Step 1 of 6 — Machine type');
-      expect(view.host.textContent).toContain('What kind of machine is this?');
+      expect(view.host.textContent).toContain('Step 1 of 3');
+      expect(view.host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
       expect(view.host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
       expect(
         view.host.querySelectorAll('nav[aria-label="Machine Setup steps"] button'),
-      ).toHaveLength(6);
-      await act(async () => button(view.host, 'Next').click());
-      expect(view.host.textContent).toContain('Step 2 of 6 — Choose your machine');
-      // The catalog is always visible — no collapsed section hides it (ADR-240).
-      expect(view.host.textContent).toContain('Use Creality Falcon A1 Pro (vendor command set)');
+      ).toHaveLength(3);
+      expect(view.host.querySelectorAll('.lf-setup-profile')).toHaveLength(2);
       expect(view.host.querySelector('input[aria-label="Search machine profiles"]')).toBeInstanceOf(
         HTMLInputElement,
       );
@@ -56,19 +53,30 @@ describe('DeviceSetupWizard catalog', () => {
   it('filters the profile catalog by search text', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
       const search = input(view.host, 'Search machine profiles');
       await act(async () => {
         search.value = 'sculpfun';
         Simulate.change(search);
       });
-      expect(view.host.textContent).toContain('Use Sculpfun S30');
-      expect(view.host.textContent).not.toContain('Use Ortur Laser Master 3');
+      expect(view.host.textContent).toContain('Sculpfun S30');
+      expect(view.host.textContent).not.toContain('Ortur Laser Master 3');
       await act(async () => {
         search.value = 'no such machine';
         Simulate.change(search);
       });
       expect(view.host.textContent).toContain('No profile matches');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('shows the complete catalog on request', async () => {
+    const view = await renderWizard();
+    try {
+      expect(view.host.querySelectorAll('.lf-setup-profile')).toHaveLength(2);
+      await act(async () => button(view.host, 'Browse all').click());
+      expect(view.host.querySelectorAll('.lf-setup-profile').length).toBeGreaterThan(2);
+      expect(button(view.host, 'Use Ortur Laser Master 3')).toBeInstanceOf(HTMLButtonElement);
     } finally {
       await view.unmount();
     }
@@ -83,11 +91,14 @@ describe('DeviceSetupWizard catalog', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      const search = input(view.host, 'Search machine profiles');
+      await act(async () => {
+        search.value = 'Creality Falcon A1 Pro';
+        Simulate.change(search);
+      });
       await act(async () => button(view.host, 'Use Creality Falcon A1 Pro').click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
+      await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('358');
       expect(input(view.host, 'Bed height (mm)').value).toBe('268');
       expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
@@ -143,8 +154,10 @@ function input(host: HTMLElement, ariaLabel: string): HTMLInputElement {
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const match = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(label),
+  const match = [...host.querySelectorAll('button')].find(
+    (candidate) =>
+      candidate.textContent?.includes(label) ||
+      candidate.getAttribute('aria-label')?.includes(label),
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;

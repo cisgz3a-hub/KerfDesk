@@ -51,13 +51,12 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   });
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Go to step 5: Options & calibration', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Go to step 2: Essentials', exact: true }).click();
+  await page.getByText('Accessories and calibration', { exact: true }).click();
   await page.getByText('Planner and time estimate', { exact: true }).click();
   await fillAndCommit(page, 'Estimated cut time scale', '1.18');
   await fillAndCommit(page, 'Estimated travel time scale', '1.07');
-  await page.getByRole('button', { name: 'Go to step 6: Review & save', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await page.getByRole('button', { name: 'Save machine setup', exact: true }).click();
 
   await (await toolbarCommand(page, 'Preview')).click();
@@ -374,15 +373,13 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
-  await expect(setup).toContainText('Step 1 of 6');
-  await setup.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(setup).toContainText('Step 1 of 3');
+  await setup.getByText('Controller and connection settings', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
-  // The reviewed-profile catalog is always visible on the profile step for
-  // laser-capable machines (ADR-240).
+  await setup.getByLabel('Search machine profiles').fill('Creality Falcon A1 Pro');
   await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
-  for (let step = 0; step < 4; step += 1) {
-    await page.getByRole('button', { name: 'Next', exact: true }).click();
-  }
+  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
   const finishBox = await page.getByRole('button', { name: 'Save machine setup' }).boundingBox();
   expect(finishBox).not.toBeNull();
@@ -413,21 +410,22 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
 
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
-  await setup.getByRole('button', { name: 'Next', exact: true }).click();
+  await setup.getByText('Controller and connection settings', { exact: true }).click();
   await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
 
   // A firmware mismatch informs on the card but never disables it — the
   // catalog stays guard-free (rule 7); detection is advisory only.
+  await setup.getByLabel('Search machine profiles').fill('Generic Marlin laser');
   const marlinCard = page.locator('article').filter({ hasText: 'Generic Marlin laser 300' });
   await expect(marlinCard).toContainText('Profile controller is marlin, but detected grbl-v1.1.');
   await expect(
     marlinCard.getByRole('button', { name: 'Use Generic Marlin laser 300×200' }),
   ).toBeEnabled();
 
+  await setup.getByLabel('Search machine profiles').fill('xTool D1 Pro');
   await page.getByRole('button', { name: 'Use xTool D1 Pro (20 W)', exact: true }).click();
-  for (let step = 0; step < 4; step += 1) {
-    await setup.getByRole('button', { name: 'Next', exact: true }).click();
-  }
+  await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
+  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
   await (await toolbarCommand(page, 'Save As...')).click();
 

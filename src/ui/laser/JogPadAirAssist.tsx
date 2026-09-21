@@ -40,9 +40,7 @@ export function JogPadAirAssist(): JSX.Element {
   };
   const openAirOutputSetup = (): void => {
     setNoticeOpen(false);
-    // The air-assist output row lives on the Machine step, which the wizard
-    // renders together with the Confirm step.
-    openMachineSetup({ kind: 'step', step: 'confirm' });
+    openMachineSetup({ kind: 'step', step: 'confirm', highlight: 'air-assist' });
   };
   return (
     <>

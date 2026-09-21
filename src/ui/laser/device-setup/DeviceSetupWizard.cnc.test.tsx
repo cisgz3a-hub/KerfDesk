@@ -7,6 +7,7 @@ import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { openSetupDisclosure } from './device-setup-test-helpers';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -55,17 +56,15 @@ describe('DeviceSetupWizard router commit', () => {
     });
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await openSetupDisclosure(view.host, 'Connect and detect');
       await act(async () => input(view.host, 'Use S maximum as spindle RPM').click());
       await act(async () => button(view.host, 'Use detected values').click());
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
+      await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('750');
-      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
       expect(input(view.host, 'Spindle maximum').value).toBe('24000');
-      expect(view.host.textContent).not.toContain('Laser output and accessories');
+      expect(view.host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
 
-      await advanceUntil(view.host, 'Step 7 of 7 — Review & save');
+      await act(async () => button(view.host, 'Review setup').click());
       await act(async () => button(view.host, 'Save CNC startup setup').click());
 
       const state = useStore.getState();
@@ -103,13 +102,11 @@ describe('DeviceSetupWizard router commit', () => {
           lastSettingsReadAt: null,
         });
       });
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await openSetupDisclosure(view.host, 'Connect and detect');
       expect(view.host.textContent).toContain('No mapped values have been read');
       expect(view.host.textContent).not.toContain('Use detected values');
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
-      expect(view.host.textContent).toContain('No controller values were imported');
-      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
+      await act(async () => button(view.host, 'Check essentials').click());
+      expect(input(view.host, 'Bed width (mm)').value).not.toBe('750');
       expect(input(view.host, 'Spindle maximum').value).toBe('12000');
     } finally {
       await view.unmount();
@@ -139,14 +136,6 @@ async function renderWizard(): Promise<{
       host.remove();
     },
   };
-}
-
-async function advanceUntil(host: HTMLElement, text: string): Promise<void> {
-  for (let guard = 0; guard < 8; guard += 1) {
-    if (host.textContent?.includes(text) === true) return;
-    await act(async () => button(host, 'Next').click());
-  }
-  throw new Error(`did not reach: ${text}`);
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {
