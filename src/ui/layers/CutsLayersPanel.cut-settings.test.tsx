@@ -52,7 +52,7 @@ describe('selected artwork cut settings', () => {
     }
   });
 
-  it('stages advanced settings and applies them only after OK', async () => {
+  it('stages advanced settings and applies them only after Apply settings', async () => {
     arrangeArtwork();
     const panel = await renderPanel();
     try {
@@ -67,7 +67,7 @@ describe('selected artwork cut settings', () => {
       });
       expect(operation().power).toBe(30);
 
-      await clickButton(panel.host, 'OK');
+      await clickButton(panel.host, 'Apply settings');
 
       expect(operation()).toMatchObject({ power: 42, speed: 1777 });
     } finally {
@@ -86,7 +86,7 @@ describe('selected artwork cut settings', () => {
       const speed = requireInput(panel.host, 'input[aria-label="Cut settings speed"]');
       expect(speed.max).toBe('1200');
       expect(speed.value).toBe('1200');
-      await clickButton(panel.host, 'OK');
+      await clickButton(panel.host, 'Apply settings');
       expect(operation().speed).toBe(1200);
     } finally {
       await panel.unmount();
@@ -146,7 +146,7 @@ describe('selected artwork cut settings', () => {
       await openAdvancedSettings(panel.host);
       const fillStyle = requireSelect(panel.host, 'select[name="fillStyle"]');
       fillStyle.value = 'offset';
-      await clickButton(panel.host, 'OK');
+      await clickButton(panel.host, 'Apply settings');
       expect(operation().fillStyle).toBe('offset');
     } finally {
       await panel.unmount();

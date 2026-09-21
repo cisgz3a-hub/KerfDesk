@@ -58,30 +58,28 @@ async function renderFields(
 }
 
 describe('CNC layer clarity', () => {
-  it('shows setup-owned material and bit read-only before operation fields', async () => {
+  it('offers operation material and bit choices before cutting values', async () => {
     installCnc();
     const view = await renderFields();
     try {
       const selectLabels = [...view.host.querySelectorAll('select')].map((select) =>
         select.getAttribute('aria-label'),
       );
-      expect(selectLabels.slice(0, 2)).toEqual([
+      expect(selectLabels.slice(0, 4)).toEqual([
+        'Material for #000000',
+        'Bit for #000000',
         'Cut type for #000000',
-        // ADR-218: the line-art side qualifies the cut type, so it sits
-        // directly under it (default cut type is profile-outside → shown).
         'Traced edges for #000000',
       ]);
-      expect(view.host.querySelector('select[aria-label="Material for #000000"]')).toBeNull();
-      expect(view.host.querySelector('select[aria-label="Bit for #000000"]')).toBeNull();
-      expect(view.host.querySelector('button[aria-label^="Material: Manual"]')).not.toBeNull();
-      expect(view.host.querySelector('button[aria-label^="Bit:"]')).not.toBeNull();
+      expect(view.host.querySelector('button[aria-label^="Material:"]')).toBeNull();
+      expect(view.host.querySelector('button[aria-label^="Bit:"]')).toBeNull();
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
     }
   });
 
-  it('keeps V-carve Detail in the always-visible Advanced section', async () => {
+  it('opens the named V-carve detail group so cutter guidance is visible', async () => {
     const layer: Layer = {
       ...LAYER,
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
@@ -89,12 +87,45 @@ describe('CNC layer clarity', () => {
     installCnc(layer);
     const view = await renderFields(layer);
     try {
-      const section = view.host.querySelector('section[aria-label="Advanced cut settings"]');
-      expect(section?.textContent).toContain('Advanced');
+      const detail = view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`);
+      const section = detail?.closest('details');
+      expect(section?.querySelector('summary')?.textContent).toBe('V-carve detail');
+      expect(section?.open).toBe(true);
+      expect(view.host.querySelector('section[aria-label="Advanced cut settings"]')).toBeNull();
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('shows the machine RPM ceiling immediately above the requested artwork spindle speed', async () => {
+    installCnc();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        machine: {
+          ...DEFAULT_CNC_MACHINE_CONFIG,
+          params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, spindleMaxRpm: 9000 },
+        },
+      },
+    }));
+    const view = await renderFields();
+    try {
+      const references = view.host.querySelectorAll('button[aria-label^="Machine maximum:"]');
+      expect(references).toHaveLength(1);
+      const reference = references[0];
+      const spindle = view.host.querySelector<HTMLInputElement>(
+        'input[aria-label="Artwork spindle speed for #000000"]',
+      );
+      expect(reference?.getAttribute('aria-label')).toContain('9,000 RPM');
+      expect(reference?.closest('details')).toBeNull();
+      expect(spindle?.max).toBe('9000');
+      expect(spindle?.value).toBe(String(DEFAULT_CNC_LAYER_SETTINGS.spindleRpm));
       expect(
-        view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`),
-      ).not.toBeNull();
-      expect(view.host.querySelector('input[aria-label="Show advanced cut settings"]')).toBeNull();
+        spindle
+          ?.closest('.lf-cnc-setting-row')
+          ?.previousElementSibling?.contains(reference ?? null),
+      ).toBe(true);
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
@@ -140,7 +171,7 @@ describe('CNC layer clarity', () => {
     try {
       const alert = view.host.querySelector('[role="alert"]');
       expect(alert?.textContent).toContain('V-carve needs a V-bit or modeled angled engraving bit');
-      expect(alert?.textContent).toContain('Startup Setup tool plan');
+      expect(alert?.textContent).toContain('Tool & material');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

@@ -18,12 +18,25 @@ import {
   mount,
 } from './control-audit-test-support';
 
+async function openDisclosure(host: HTMLElement, label: string): Promise<void> {
+  const summary = [...host.querySelectorAll('summary')].find(
+    (element) =>
+      element.getAttribute('aria-label') === label || element.textContent?.trim().startsWith(label),
+  );
+  const details = summary?.closest('details');
+  if (summary === undefined || details === null || details === undefined)
+    throw new Error(`Missing disclosure: ${label}`);
+  if (!details.open) await click(summary);
+  expect(details.open).toBe(true);
+}
+
 describe('artwork control audit: operations', () => {
   it('changes card visibility and output independently and opens More disclosure', async () => {
     arrangeTwo();
     const id = layer().id;
     const name = layer().name;
     const host = await mount(<CutsLayersPanel />);
+    await openDisclosure(host, 'All operations');
     const card = host.querySelector<HTMLElement>(`section[aria-label="Operation ${name}"]`)!;
     await click(button(card, `Hide operation ${name}`));
     expect(layer().visible).toBe(false);
@@ -61,6 +74,9 @@ describe('artwork control audit: operations', () => {
     const second = layer(1);
     useStore.getState().setLayerParam(first.id, { power: 64, speed: 987 });
     const host = await mount(<CutsLayersPanel />);
+    await openDisclosure(host, 'All operations');
+    await openDisclosure(host, `More controls for ${first.name}`);
+    await openDisclosure(host, `More controls for ${second.name}`);
     expect(button(host, `Move ${first.name} up`).disabled).toBe(true);
     expect(button(host, `Move ${second.name} down`).disabled).toBe(true);
     expect(button(host, `Paste settings to ${second.color}`).disabled).toBe(true);
@@ -79,6 +95,8 @@ describe('artwork control audit: operations', () => {
     arrangeTwo();
     const target = layer();
     const host = await mount(<CutsLayersPanel />);
+    await openDisclosure(host, 'All operations');
+    await openDisclosure(host, `More controls for ${target.name}`);
     await click(button(host, `Delete operation ${target.name}`));
     expect(useStore.getState().project.scene.layers.map((item) => item.id)).not.toContain(
       target.id,
@@ -126,7 +144,7 @@ describe('artwork control audit: operations', () => {
     expect(layer().subLayers[0]?.enabled).toBe(false);
     await click(button(host, `Edit ${sub.label} for ${layer().color}`));
     await change(input(host, 'input[aria-label="Cut settings power"]'), '57');
-    await click(button(host, 'OK'));
+    await click(button(host, 'Apply settings'));
     expect(layer().subLayers[0]?.settings.power).toBe(57);
     expect(layer().power).toBe(30);
     await click(button(host, `Delete ${sub.label} for ${layer().color}`));

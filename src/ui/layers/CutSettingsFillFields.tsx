@@ -14,8 +14,11 @@ export function CutSettingsFillFields(props: {
   const [fillCrossHatch, setFillCrossHatch] = useState(props.layer.fillCrossHatch);
   const [fillOverscanMm, setFillOverscanMm] = useState(props.layer.fillOverscanMm);
   return (
-    <fieldset className="lf-fieldset">
-      <legend className="lf-legend">Fill</legend>
+    <fieldset className="lf-fieldset lf-cut-settings-group">
+      <legend className="lf-legend">Fill detail</legend>
+      <p className="lf-laser-help">
+        Choose a pattern, then adjust the spacing and direction of the engraved lines.
+      </p>
       <CutSettingsFillDirectionPreview angleDeg={hatchAngleDeg} crossHatch={fillCrossHatch} />
       <Field label="Style">
         <select
@@ -51,12 +54,32 @@ export function CutSettingsFillFields(props: {
         lineIntervalMm={props.lineIntervalMm}
         onChange={props.onLineIntervalMmChange}
       />
+      <p className="lf-laser-help">
+        Line interval and lines per inch describe the same density. Closer lines create a denser
+        fill.
+      </p>
       <FillOverscanField
         fillStyle={fillStyle}
         value={fillOverscanMm}
         onChange={setFillOverscanMm}
       />
-      <Field label="Bidirectional">
+      <FillScanDirectionFields
+        layer={props.layer}
+        crossHatch={fillCrossHatch}
+        onCrossHatchChange={setFillCrossHatch}
+      />
+    </fieldset>
+  );
+}
+
+function FillScanDirectionFields(props: {
+  readonly layer: Layer;
+  readonly crossHatch: boolean;
+  readonly onCrossHatchChange: (enabled: boolean) => void;
+}): JSX.Element {
+  return (
+    <>
+      <Field label="Scan both ways">
         <input
           name="fillBidirectional"
           type="checkbox"
@@ -65,19 +88,30 @@ export function CutSettingsFillFields(props: {
           title="Scan fill lines in both directions to reduce travel time."
         />
       </Field>
-      <ExpertOverrideField enabled={props.layer.allowUncalibratedBidirectionalScan === true} />
-      <Field label="Cross-Hatch">
+      <Field label="Cross-hatch">
         <input
           name="fillCrossHatch"
           type="checkbox"
           className="lf-checkbox"
-          checked={fillCrossHatch}
-          onChange={(event) => setFillCrossHatch(event.currentTarget.checked)}
+          checked={props.crossHatch}
+          onChange={(event) => props.onCrossHatchChange(event.currentTarget.checked)}
           aria-label="Cut settings cross-hatch"
           title="Add a second fill pass at 90 degrees for denser engraving."
         />
       </Field>
-    </fieldset>
+      <details className="lf-cut-settings-disclosure">
+        <summary title="Show the override for bidirectional scanning without calibrated offsets">
+          Calibration override
+        </summary>
+        <div className="lf-cut-settings-disclosure__body">
+          <p className="lf-laser-help">
+            Allow bidirectional scanning without calibrated offsets. Edges may appear doubled or
+            blurred.
+          </p>
+          <ExpertOverrideField enabled={props.layer.allowUncalibratedBidirectionalScan === true} />
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -106,7 +140,7 @@ function FillOverscanField(props: {
 
 function ExpertOverrideField(props: { readonly enabled: boolean }): JSX.Element {
   return (
-    <Field label="Expert override">
+    <Field label="Allow uncalibrated scans">
       <input
         name="allowUncalibratedBidirectionalScan"
         type="checkbox"

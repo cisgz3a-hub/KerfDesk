@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   artworkOperationName,
   isRegistrationBox,
@@ -8,8 +8,12 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { ArtworkEditorTabs, type ArtworkEditorView } from './ArtworkEditorTabs';
+import { DogboneRow } from './DogboneRow';
+import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedOperationInspector } from './SelectedOperationInspector';
+import { SelectedReliefProperties } from './SelectedReliefProperties';
 import { SelectedSourceReimportControl } from './SelectedSourceReimportControl';
 import {
   isParametricShapeObject,
@@ -50,10 +54,6 @@ export function SelectedObjectProperties(): JSX.Element | null {
   if (context === null) return null;
   return (
     <ArtworkPropertiesInspector
-      key={JSON.stringify([
-        context.primaryObject.id,
-        ...context.objects.map((object) => object.id),
-      ])}
       artwork={artwork}
       layers={layers}
       context={context}
@@ -64,22 +64,45 @@ export function SelectedObjectProperties(): JSX.Element | null {
   );
 }
 
-function ArtworkPropertiesInspector(props: {
+type ArtworkPropertiesInspectorProps = {
   readonly artwork: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
   readonly context: ArtworkInspectorContext;
   readonly isCncMachine: boolean;
   readonly onChooseArtwork: (id: string) => void;
   readonly setShapeSpec: ReturnType<typeof useStore.getState>['setShapeSpec'];
-}): JSX.Element {
+};
+
+function ArtworkPropertiesInspector(props: ArtworkPropertiesInspectorProps): JSX.Element {
   const { context } = props;
-  const parametricShape = singleParametricShape(context.objects);
-  const rasterImage = rasterImageForObject(context.primaryObject);
+  const [editorView, setEditorView] = useState<ArtworkEditorView>('operation');
+  const editorId = useId();
+  const contextKey = JSON.stringify([
+    context.primaryObject.id,
+    ...context.objects.map((object) => object.id),
+  ]);
   return (
     <section
       aria-label={context.selectionActive ? 'Selected object properties' : 'Artwork properties'}
-      style={sectionStyle}
+      className="lf-artwork-inspector"
     >
+      <header className="lf-artwork-context">
+        <div>
+          <span className="lf-artwork-eyebrow">{artworkInspectorHeading(context)}</span>
+          <strong
+            title={
+              context.objects.length > 1
+                ? `${context.objects.length} artworks selected`
+                : artworkOperationName(context.primaryObject)
+            }
+          >
+            {context.objects.length > 1
+              ? 'Edit the selection together'
+              : artworkOperationName(context.primaryObject)}
+          </strong>
+        </div>
+        <ArtworkEditorTabs id={editorId} active={editorView} onSelect={setEditorView} />
+      </header>
       {context.selectionActive ? null : (
         <ArtworkTargetChooser
           artwork={props.artwork}
@@ -88,11 +111,47 @@ function ArtworkPropertiesInspector(props: {
           onChange={props.onChooseArtwork}
         />
       )}
-      <SelectedOperationInspector
-        objects={context.objects}
-        selectionActive={context.selectionActive}
-      />
-      <h3 style={headingStyle}>{artworkInspectorHeading(context)}</h3>
+      <div
+        id={`${editorId}-artwork-panel`}
+        role="tabpanel"
+        aria-labelledby={`${editorId}-artwork-tab`}
+        hidden={editorView !== 'artwork'}
+        className="lf-artwork-editor-pane lf-artwork-adjustments"
+      >
+        <ArtworkAdjustmentFields key={contextKey} {...props} />
+        <div className="lf-artwork-disclosure__body">
+          <OffsetPathsRow />
+          <DogboneRow />
+          <SelectedReliefProperties />
+          {!context.selectionActive ? (
+            <p className="lf-artwork-hint">Select artwork on the canvas to use path tools.</p>
+          ) : null}
+        </div>
+      </div>
+      <div
+        id={`${editorId}-operation-panel`}
+        role="tabpanel"
+        aria-labelledby={`${editorId}-operation-tab`}
+        hidden={editorView !== 'operation'}
+        className="lf-artwork-editor-pane"
+      >
+        <SelectedOperationInspector
+          key={contextKey}
+          objects={context.objects}
+          selectionActive={context.selectionActive}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.Element {
+  const { context } = props;
+  const parametricShape = singleParametricShape(context.objects);
+  const rasterImage = rasterImageForObject(context.primaryObject);
+  return (
+    <div className="lf-artwork-disclosure__body">
+      <h3 className="lf-operation-inspector__heading">Artwork adjustments</h3>
       {parametricShape === null ? null : (
         <SelectedShapeGeometryFields
           object={parametricShape}
@@ -100,7 +159,12 @@ function ArtworkPropertiesInspector(props: {
         />
       )}
       {props.isCncMachine ? null : (
-        <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
+        <>
+          <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
+          <p className="lf-artwork-hint">
+            100% uses the operation’s power. Reduce it to lower power for only this artwork.
+          </p>
+        </>
       )}
       <SelectedSourceReimportControl
         object={
@@ -108,7 +172,7 @@ function ArtworkPropertiesInspector(props: {
         }
       />
       {props.isCncMachine ? null : <SelectedImageAdjustments image={rasterImage} />}
-    </section>
+    </div>
   );
 }
 
@@ -150,8 +214,8 @@ function ArtworkTargetChooser(props: {
 }): JSX.Element {
   const options = artworkOptions(props.artwork, props.layers);
   return (
-    <div style={targetChooserStyle}>
-      <p style={targetHintStyle}>Nothing selected on canvas. Settings remain editable here.</p>
+    <div className="lf-artwork-target">
+      <p className="lf-artwork-hint">Nothing selected on canvas. You can keep editing here.</p>
       {options.length > 1 ? (
         <label style={rowStyle}>
           <span style={labelStyle}>Artwork</span>
@@ -300,24 +364,6 @@ function clampPowerScale(value: number): number {
   return Math.max(MIN_POWER_SCALE_PERCENT, Math.min(MAX_POWER_SCALE_PERCENT, value));
 }
 
-const sectionStyle: React.CSSProperties = {
-  borderTop: '1px solid var(--lf-border)',
-  marginTop: 12,
-  paddingTop: 10,
-};
-const headingStyle: React.CSSProperties = {
-  fontSize: 'var(--lf-text-sm)',
-  fontWeight: 500,
-  textTransform: 'uppercase',
-  color: 'var(--lf-text-muted)',
-  margin: '0 0 12px 0',
-};
-const targetChooserStyle: React.CSSProperties = { marginBottom: 8 };
-const targetHintStyle: React.CSSProperties = {
-  margin: '0 0 8px 0',
-  color: 'var(--lf-text-muted)',
-  fontSize: 12,
-};
 const rowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '100px 1fr',

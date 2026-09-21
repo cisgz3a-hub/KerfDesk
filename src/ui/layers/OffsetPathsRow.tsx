@@ -27,10 +27,14 @@ export function OffsetPathsRow(): JSX.Element | null {
   // Same eligibility as Weld: unlocked, closed-contour vector selection.
   if (!selectionCanWeld(project, selectedIds)) return null;
   return (
-    <section aria-label="Offset paths" style={sectionStyle}>
-      <span style={labelStyle}>Offset</span>
-      <span style={controlStyle}>
+    <section aria-label="Offset paths" className="lf-artwork-tool">
+      <div className="lf-artwork-tool__heading">
+        <h4>Offset outlines</h4>
         <TutorialButton tutorialId="offset" compact label="Offset paths" />
+      </div>
+      <p className="lf-artwork-hint">Keep the original and add a larger or smaller outline.</p>
+      <label className="lf-artwork-tool__field">
+        <span>Distance</span>
         <ClearableNumberField
           ariaLabel="Offset distance"
           title="Distance in millimeters between the shape and its offset copy."
@@ -42,42 +46,26 @@ export function OffsetPathsRow(): JSX.Element | null {
           style={inputStyle}
         />
         <span style={unitStyle}>mm</span>
+      </label>
+      <div className="lf-artwork-tool__actions">
         <button
           type="button"
           onClick={() => offsetSelection(distanceMm)}
           title="Add a new path outside the selected shapes at this distance."
         >
-          Outward
+          Outward copy
         </button>
         <button
           type="button"
           onClick={() => offsetSelection(-distanceMm)}
           title="Add a new path inside the selected shapes at this distance."
         >
-          Inward
+          Inward copy
         </button>
-      </span>
+      </div>
     </section>
   );
 }
 
-const sectionStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '100px 1fr',
-  alignItems: 'center',
-  gap: 8,
-  borderTop: '1px solid var(--lf-border)',
-  marginTop: 8,
-  paddingTop: 8,
-};
-const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
-// Wrap so the Outward/Inward buttons drop to the next line instead of clipping
-// off the right edge when the panel is narrow.
-const controlStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 6,
-};
 const inputStyle: React.CSSProperties = { width: 64, boxSizing: 'border-box' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

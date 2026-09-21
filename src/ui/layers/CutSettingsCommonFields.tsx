@@ -1,6 +1,7 @@
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
+import { LaserProcessField } from './LaserProcessField';
 
 export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
@@ -16,35 +17,37 @@ export function CutSettingsCommonFields(props: {
   const speedMax = props.maxFeed === undefined ? {} : { max: props.maxFeed };
   return (
     <>
-      <Field label="Mode">
-        <select
-          name="mode"
-          className="lf-select"
-          value={props.mode}
-          onChange={(event) => props.onModeChange(parseMode(event.target.value))}
-          aria-label="Cut settings mode"
-          title="Choose whether this layer cuts outlines, fills closed shapes, or raster engraves images."
-          autoFocus
-        >
-          <option value="line">Line</option>
-          <option value="fill">Fill</option>
-          <option value="image">Image</option>
-        </select>
-      </Field>
-      <Field label="Power">
-        <PowerInput value={props.layer.power} onChange={props.onPowerChange} />
-        <span className="lf-field-unit">%</span>
-      </Field>
+      <LaserProcessField
+        name="mode"
+        mode={props.mode}
+        ariaLabel="Cut settings mode"
+        onChange={props.onModeChange}
+        autoFocus
+      />
+      <fieldset className="lf-fieldset lf-cut-settings-group">
+        <legend className="lf-legend">Essential settings</legend>
+        <Field label="Power">
+          <PowerInput value={props.layer.power} onChange={props.onPowerChange} />
+          <span className="lf-field-unit">%</span>
+        </Field>
+        <Field label="Speed">
+          <NumberInput name="speed" value={speedValue} min={1} label="speed" {...speedMax} />
+          <span className="lf-field-unit">mm/min</span>
+        </Field>
+        <Field label="Passes">
+          <NumberInput name="passes" value={props.layer.passes} min={1} step={1} label="passes" />
+        </Field>
+      </fieldset>
       {props.mode !== 'image' ? (
-        <CutPowerModeField controllerKind={controllerKind} layer={props.layer} />
+        <details className="lf-cut-settings-disclosure">
+          <summary title="Show how the controller applies laser power during motion">
+            Power behaviour
+          </summary>
+          <div className="lf-cut-settings-disclosure__body">
+            <CutPowerModeField controllerKind={controllerKind} layer={props.layer} />
+          </div>
+        </details>
       ) : null}
-      <Field label="Speed">
-        <NumberInput name="speed" value={speedValue} min={1} label="speed" {...speedMax} />
-        <span className="lf-field-unit">mm/min</span>
-      </Field>
-      <Field label="Passes">
-        <NumberInput name="passes" value={props.layer.passes} min={1} step={1} label="passes" />
-      </Field>
       {props.operationMembershipEditable !== false ? (
         <MembershipFields layer={props.layer} />
       ) : null}
@@ -55,26 +58,31 @@ export function CutSettingsCommonFields(props: {
 
 function MembershipFields(props: { readonly layer: Layer }): JSX.Element {
   return (
-    <>
-      <Field label="Visible">
-        <input
-          name="visible"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.visible}
-          title="Show or hide this layer on the workspace without changing output."
-        />
-      </Field>
-      <Field label="Output">
-        <input
-          name="output"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.output}
-          title="Include or exclude this layer when previewing, framing, exporting, or starting jobs."
-        />
-      </Field>
-    </>
+    <details className="lf-cut-settings-disclosure">
+      <summary title="Show controls for workspace visibility and job output">
+        Visibility &amp; output
+      </summary>
+      <div className="lf-cut-settings-disclosure__body">
+        <Field label="Show on workspace">
+          <input
+            name="visible"
+            type="checkbox"
+            className="lf-checkbox"
+            defaultChecked={props.layer.visible}
+            title="Show or hide this layer on the workspace without changing output."
+          />
+        </Field>
+        <Field label="Include in output">
+          <input
+            name="output"
+            type="checkbox"
+            className="lf-checkbox"
+            defaultChecked={props.layer.output}
+            title="Include or exclude this layer when previewing, framing, exporting, or starting jobs."
+          />
+        </Field>
+      </div>
+    </details>
   );
 }
 
@@ -99,7 +107,9 @@ function PowerInput(props: {
 
 function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
   return (
-    <>
+    <fieldset className="lf-fieldset lf-cut-settings-group">
+      <legend className="lf-legend">Line detail</legend>
+      <p className="lf-laser-help">Refine the cut path and leave bridges to hold parts in place.</p>
       <Field label="Contour entry">
         <NumberInput
           name="fillOverscanMm"
@@ -124,57 +134,64 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
-      <fieldset
-        className="lf-fieldset"
-        title="Leave small uncut bridges on closed Line cuts so parts stay attached until you remove them."
-      >
-        <legend>Tabs / Bridges</legend>
-        <Field label="Enable">
-          <input
-            name="tabsEnabled"
-            type="checkbox"
-            className="lf-checkbox"
-            defaultChecked={props.layer.tabsEnabled}
-            aria-label="Cut settings enable tabs"
-            title="Enable automatic bridge gaps on closed Line cuts."
-          />
-        </Field>
-        <Field label="Size">
-          <NumberInput
-            name="tabSizeMm"
-            value={props.layer.tabSizeMm}
-            min={0.01}
-            max={100}
-            step={0.01}
-            label="tab size"
-            title="Set the length of each uncut bridge gap in millimeters."
-          />
-          <span className="lf-field-unit">mm</span>
-        </Field>
-        <Field label="Count">
-          <NumberInput
-            name="tabsPerShape"
-            value={props.layer.tabsPerShape}
-            min={1}
-            max={100}
-            step={1}
-            label="tabs per shape"
-            title="Set how many evenly spaced bridge gaps to add to each closed outer contour."
-          />
-        </Field>
-        <Field label="Holes">
-          <input
-            name="tabSkipInnerShapes"
-            type="checkbox"
-            className="lf-checkbox"
-            defaultChecked={props.layer.tabSkipInnerShapes}
-            aria-label="Cut settings skip inner tabs"
-            title="Leave inner contours and holes whole instead of adding tabs to them."
-          />
-          <span className="lf-field-help">Skip inner shapes</span>
-        </Field>
-      </fieldset>
-    </>
+      <LineBridgeFields layer={props.layer} />
+    </fieldset>
+  );
+}
+
+function LineBridgeFields(props: { readonly layer: Layer }): JSX.Element {
+  return (
+    <fieldset
+      className="lf-fieldset"
+      title="Leave small uncut bridges on closed Line cuts so parts stay attached until you remove them."
+    >
+      <legend>Tabs / Bridges</legend>
+      <p className="lf-laser-help">Small uncut gaps keep parts attached to the sheet.</p>
+      <Field label="Enable">
+        <input
+          name="tabsEnabled"
+          type="checkbox"
+          className="lf-checkbox"
+          defaultChecked={props.layer.tabsEnabled}
+          aria-label="Cut settings enable tabs"
+          title="Enable automatic bridge gaps on closed Line cuts."
+        />
+      </Field>
+      <Field label="Size">
+        <NumberInput
+          name="tabSizeMm"
+          value={props.layer.tabSizeMm}
+          min={0.01}
+          max={100}
+          step={0.01}
+          label="tab size"
+          title="Set the length of each uncut bridge gap in millimeters."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
+      <Field label="Count">
+        <NumberInput
+          name="tabsPerShape"
+          value={props.layer.tabsPerShape}
+          min={1}
+          max={100}
+          step={1}
+          label="tabs per shape"
+          title="Set how many evenly spaced bridge gaps to add to each closed outer contour."
+        />
+      </Field>
+      <Field label="Holes">
+        <input
+          name="tabSkipInnerShapes"
+          type="checkbox"
+          className="lf-checkbox"
+          defaultChecked={props.layer.tabSkipInnerShapes}
+          aria-label="Cut settings skip inner tabs"
+          title="Leave inner contours and holes whole instead of adding tabs to them."
+        />
+        <span className="lf-field-help">Skip inner shapes</span>
+      </Field>
+    </fieldset>
   );
 }
 
@@ -212,11 +229,6 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
-}
-
-function parseMode(value: string): LayerMode {
-  if (value === 'fill' || value === 'image') return value;
-  return 'line';
 }
 
 const controlStyle: React.CSSProperties = {

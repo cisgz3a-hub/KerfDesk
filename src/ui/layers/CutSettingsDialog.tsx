@@ -12,6 +12,7 @@ import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
 import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
 import { laserOperationTutorial } from './operation-tutorial';
+import './laser-operation-settings.css';
 
 type CutSettingsDialogProps = {
   readonly layer: Layer;
@@ -50,14 +51,16 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       as="form"
       onSubmit={onSubmit}
       size="md"
+      panelClassName="lf-cut-settings-dialog"
     >
       {/* Keyed on the layer's own settings: the fields are uncontrolled drafts
-          that read `defaultValue` once, and OK submits whatever the DOM holds.
+          that read `defaultValue` once, and Apply submits whatever the DOM holds.
           "Reset to Default" rewrites the layer in the store while the dialog is
           open, so without this remount the boxes kept the pre-reset numbers and
-          OK wrote them straight back — silently undoing the reset. Typing never
+          Apply wrote them straight back — silently undoing the reset. Typing never
           changes the stored layer, so an in-progress edit is never remounted. */}
       <div
+        className="lf-cut-settings-content"
         onChangeCapture={(event) => {
           const field = cutSettingField(event.target);
           if (field !== undefined) changedFields.current.set(field.name, field.control);
@@ -76,7 +79,7 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
-          OK
+          Apply settings
         </Button>
       </DialogActions>
     </Dialog>
@@ -161,24 +164,21 @@ function hasDefaultHandlers(
 
 function Header({ layer, mode }: { readonly layer: Layer; readonly mode: LayerMode }): JSX.Element {
   return (
-    <header style={headerStyle}>
+    <header className="lf-cut-settings-header">
       {/* The swatch background is scene data (the layer color), inline by
           the ADR-047 dynamic-styles policy. */}
       <span style={{ ...swatchStyle, background: layer.color }} />
-      <div>
-        <div
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-        >
+      <div className="lf-cut-settings-header__text">
+        <div className="lf-cut-settings-header__title">
           <h2 className="lf-dialog-title">Cut Settings</h2>
           <TutorialButton tutorialId={laserOperationTutorial(mode)} />
         </div>
-        <p className="lf-subheading">{layer.color}</p>
+        <p className="lf-subheading">{layer.name} · Fine-tune this laser operation</p>
       </div>
     </header>
   );
 }
 
-const headerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10 };
 const swatchStyle: React.CSSProperties = {
   width: 18,
   height: 18,

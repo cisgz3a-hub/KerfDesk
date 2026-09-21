@@ -359,20 +359,34 @@ Identical to the format-specific import flows except:
   does not change selected-only output, canvas handles, grouping, or machine order.
 - In CNC mode, Artwork settings owns operation cutting behavior: cut type, cut/insert depth,
   depth per pass, feed, plunge, **Artwork spindle speed**, tabs, and specialist CAM controls.
-  Startup-owned material, resolved cutter, stock, machine maximum RPM, spin-up, coolant, safe Z,
-  and park values appear only as muted read-only references. A reference remains keyboard-focusable;
+  **Tool & material** offers direct per-operation material and primary/secondary cutter choices.
+  Stock, machine maximum RPM, spin-up, coolant, safe Z and park remain read-only references.
+  A reference remains keyboard-focusable;
   activating it explains its scope and offers a direct **Edit in Startup Setup** route to the exact
   field. It is not a disabled input and does not add a confirmation before editing.
 - Importing, placing, or selecting artwork never opens Startup Setup and never asks for material or
-  bit again. New CNC operations inherit the committed current-job defaults. Mixed material/tool
-  assignments remain explicit in **Startup Setup > Tool Plan** rather than becoming a second set of
-  writable controls in Artwork settings.
+  bit before editing. New CNC operations inherit the committed current-job defaults. Direct choices
+  in **Tool & material** and **Startup Setup > Tool Plan** use the same persisted operation bindings.
+  Changing an operation's assignments leaves job defaults and unrelated operations unchanged.
 - The inspector renders only one detailed settings context at a time. A real multi-selection keeps
   the existing combined/common-operation workflow; unselected artworks are switched through the
   **Artwork** selector rather than expanding one settings card per shape.
-- A compact ordered operation list follows the inspector. Each row shows automatic colour, name,
+- **Operation** and **Artwork** tabs inside Settings separate cutting settings from size, shape,
+  image adjustments and path tools. Operation opens first; switching tabs keeps the editors mounted
+  so in-progress numeric edits and undo reconciliation are retained. Both levels of tabs support
+  arrow keys, Home and End, with one tab stop per tab list.
+- Laser settings explain **Line**, **Fill** and **Image**, then show power, speed and passes
+  together. Named sections reveal the applicable line, fill or image options. **Advanced cut
+  settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
+  **Cancel** leaves the operation unchanged.
+- CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
+  sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
+  machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
+  group keeps its numeric editors mounted and does not change any cutting setting.
+- **All operations**, a compact expandable list, follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
-  inside an artwork; artwork run priority is the top-level machine sequence.
+  inside an artwork; artwork run priority is the top-level machine sequence. Jobs with more than
+  four operations also offer a name filter; filtering never changes operation order.
 - The sibling **Run order** view is the canonical top-level sequence manager. It uses direct
   one-based numbers rather than First/Earlier/Later/Last controls and supports search,
   jump-to-number, and a virtualized list for large jobs. This order is independent of canvas
@@ -396,9 +410,13 @@ Identical to the format-specific import flows except:
   both Cut and Insert meanings shows the reason bulk depth is unavailable instead of a disabled or
   partially applied control; **Use one operation** remains an explicit alternative.
 - **Add operation** binds a second ordinary operation to the selected artwork. It appears in the
-  same ordered list and can be renamed, reordered, shown/hidden, or output-enabled like any other.
+  same ordered list and opens immediately in the operation editor. It can be renamed, reordered,
+  shown/hidden, or output-enabled like any other.
   Editing the new operation does not change the artwork's existing operations. The retained artwork
   inspector also displays and edits that artwork's effective overrides when canvas selection is empty.
+- **Show on canvas** and **Include in output** remain operation-wide controls. A shared operation
+  explicitly shows how many artworks those controls affect, including when the selected artwork
+  has independent cutting-setting overrides. An excluded operation is labelled as excluded.
 - Artwork intentionally sharing one operation compiles as one machining unit so fill holes,
   overlaps, Island Fill clustering, pockets, and inlays retain compound-geometry semantics. Use
   **Make unique** before ordering one member independently.
@@ -1821,9 +1839,9 @@ settings and Job Review keep their existing read-only setup references.
    material, default bit, and stock, explicitly Apply the material preset in the draft, then review
    and Save machine setup. Existing **Startup Setup** links open the relevant section directly.
 2. Import or place artwork. Its new operation inherits those committed defaults without opening a
-   dialog or presenting another Material/Bit selector.
-3. Artwork settings shows the resolved setup values as read-only references and exposes only the
-   operation cutting values for editing.
+   dialog or requiring a Material/Bit choice.
+3. Artwork settings lets the operator change this operation's material, bit and cutting values
+   directly. Stock and machine limits remain read-only references to Startup Setup.
 
 #### Edge — legacy mixed-material or multi-tool project
 
@@ -2930,12 +2948,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 
 #### Success
 1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
-2. No bottom Material & Bit card appears. **Machine > Machine Setup > Essentials** is the single
-   writable route for machine limits and **CNC job setup** material/default bit/stock and Tool Plan.
+2. No bottom Material & Bit card appears. **Machine > Machine Setup > Essentials** owns machine
+   limits and **CNC job setup** material/default bit/stock. Its Tool Plan and Artwork's **Tool &
+   material** edit the same per-operation material and cutter assignments.
    Existing Startup Setup links open the relevant section directly. It does not open automatically
    merely because CNC mode or artwork was selected.
-3. Artwork rows swap laser fields for CNC operation fields. Setup-owned values are read-only
-   references there; activating one explains the value and deep-links to its exact Startup Setup
+3. Artwork rows swap laser fields for CNC operation fields, including direct material and bit
+   selectors. Machine and stock values remain read-only references; activating one explains the
+   value and deep-links to its exact Startup Setup
    field. The compact canvas **Stock** chip is also read-only: it expands to the saved dimensions
    and origin, contains no inputs, and routes **Edit in Startup Setup** to the exact stock fields.
    Saving Startup Setup is one undoable project edit and `.lf2` round-trips the same machine, stock,
@@ -2962,7 +2982,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. User selects artwork, then picks a CNC operation: Outside / Inside / On path, Pocket,
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
 2. Cut type, depth, depth-per-pass, feed, plunge, and **Artwork spindle speed** accept typed values;
-   project material, resolved bit, and **Machine maximum** remain read-only references beside them.
+   **Tool & material** provides operation material and cutter selectors. **Machine maximum** remains
+   a read-only reference beside the editable spindle speed.
    Pocket additionally shows stepover %, profile cut types show the tabs
    group (enabled, height, width, count). Outline and Engrave operations show
    a **Line art** selector (inner / outer / both, default inner): a traced
@@ -2973,8 +2994,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    engraves first, then profiles inner-before-outer).
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
-5. To change an operation's material or cutter assignment, use **Startup Setup > Tool Plan**. The
-   Artwork reference routes there directly; it does not expose a duplicate select.
+5. Change an operation's material or cutter directly in **Tool & material**, or through the same
+   saved bindings in **Startup Setup > Tool Plan**. A material choice applies starting cutting values
+   to this operation; Manual keeps the current numbers. A bit change refreshes only material-recipe
+   feeds and preserves manual numbers. **Use job default bit** removes the primary-tool override.
+   Applicable clearing, pocket roughing and relief finishing bits appear with the primary choice.
 
 #### Warning — depth exceeds stock
 1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
@@ -3933,9 +3957,9 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Every CNC Artwork settings card has a **Feeds calculator**. Its material, resolved cutter,
-   diameter, and flute evidence come read-only from Startup Setup; RPM comes from the editable
-   Artwork spindle speed. To change a calculation input owned by setup, its reference deep-links
-   to Current job or Tool Plan instead of presenting another selector. The row shows the live
+   diameter and flute evidence reflect the operation's **Tool & material** choices; RPM comes from
+   the editable Artwork spindle speed. The calculator displays these inputs read-only; change the
+   material or bit above, and edit cutter metadata in the bit library. The row shows the live
    result — feed = RPM × flutes × chipload, plunge as a material
    percentage, depth-per-pass as a fraction of bit diameter.
 2. **Apply to artwork** writes feed / plunge / depth-per-pass / spindle in
@@ -3950,9 +3974,10 @@ and lifts the command's CNC-only gate.)*
    120 mm/min plunge, 12000 RPM, and 0.75 mm/pass rather than the generic result.
 
 #### Error — none (inputs are bounded)
-1. Tiny results floor at 50 mm/min feed / 0.1 mm per pass rather than emitting zeros. When no
-   material recipe or usable flute evidence is assigned, the calculator names the missing Startup
-   Setup input and routes there; it does not invent a value.
+1. Tiny results floor at 50 mm/min feed / 0.1 mm per pass rather than emitting zeros. **Manual**
+   leaves Apply unavailable until a material is chosen in **Tool & material**; the calculator does
+   not silently substitute the job stock's material. Flute count uses cutter metadata or saved
+   recipe evidence, falling back to the displayed two-flute assumption when both are absent.
 
 #### Empty
 1. The row renders only in CNC mode (laser layers have no feeds).
@@ -3964,7 +3989,7 @@ and lifts the command's CNC-only gate.)*
 2. For a V-bit or engraving bit, the calculator shows the exact stored
    diameter and included angle and states that the diameter band is used while
    included angle and depth-dependent cutting engagement are not modeled. Apply remains available
-   when Startup Setup provides the required material and flute evidence; the numeric result is unchanged;
+   when the operation provides the required material and flute evidence; the numeric result is unchanged;
    the operator is directed to the cutter maker's data and a scrap test.
 
 ### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
@@ -4155,13 +4180,15 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-306
 
 #### Success
-1. **Startup Setup > Tool Plan** has a grouped material assignment for each operation (Use job
+1. **Artwork settings > Tool & material** and **Startup Setup > Tool Plan** share a grouped material
+   assignment for each operation (Use job
    material / Manual + common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
    Applying an override fills that operation's feed, plunge, and depth-per-pass in the setup draft
    from the chipload engine, using its resolved bit and flute evidence. A named wood keeps its
    species identity but uses its researched family starting model; a recognized machine starter
    and live limits can lower those automatic values. Cut type, depth, cutter assignment, and tabs
-   stay put. **Save machine setup** commits the complete draft as one undoable edit.
+   stay put. Artwork choices commit directly to the operation through the existing undoable edit;
+   in Startup Setup, **Save machine setup** commits the complete draft as one undoable edit.
 2. The choice and automatic-source provenance are remembered on the layer and
    round-trip in the .lf2 file; they are display-only and do not change compiled
    output beyond the persisted numeric settings themselves.
@@ -4175,8 +4202,9 @@ and lifts the command's CNC-only gate.)*
    rather than emitting zeros, same as the advanced Feeds calculator.
 
 #### Empty
-1. Tool Plan renders only when CNC is active. "Manual" clears the operation material and automatic
-   provenance in the draft while leaving current numeric values untouched for hand-tuning.
+1. Operation material choices render only when CNC is active. "Manual" clears the operation
+   material and automatic provenance while leaving current numeric values untouched for hand-tuning.
+   Inside Startup Setup, that edit remains in the draft until Save.
 
 #### Edge — full flute/RPM control
 1. A bit without stored flute evidence starts from the displayed two-flute assumption. Set the
@@ -4184,30 +4212,30 @@ and lifts the command's CNC-only gate.)*
    **Artwork spindle speed**. The flute count accepts every positive whole number without an
    artificial upper cap. The Artwork calculator reads both and does not duplicate either input.
 
-### F-CNC32. Edit operation values beside read-only setup references — ADR-111 #4 / ADR-306
+### F-CNC32. Edit grouped operation settings — ADR-111 #4 / ADR-306 amendment
 
 #### Success
-1. CNC Artwork settings lead with a compact **Setup references** group: project/effective material,
-   resolved bit, stock summary, and machine output contract. These values are muted, read-only,
-   keyboard-focusable controls that explain their scope and deep-link to Startup Setup.
+1. CNC Artwork settings lead with **Tool & material** for direct operation material and cutter
+   choices. Stock and machine references remain muted, keyboard-focusable controls that explain
+   their scope and deep-link to Startup Setup.
 2. The editable core follows with Cut type, Cut depth, Depth per pass, Feed, Plunge,
    **Artwork spindle speed**, and Tabs. **Machine maximum** is shown adjacent to Artwork spindle
-   speed so an RPM ceiling cannot be confused with the requested operation speed. A labeled **Advanced**
-   section immediately follows with helpers and specialist controls (presets,
-   calculator, stepover, pocket fill, and cut-type tails). It is always visible.
+   speed so an RPM ceiling cannot be confused with the requested operation speed. Named expandable
+   sections follow for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator
+   and machine references. Only applicable cut-type sections appear.
 3. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
    sets the exact measured thickness without silently adding spoilboard
    overcut; any verified overcut remains an explicit operator edit.
 
 #### Error — none (presentation only)
-1. The Advanced heading groups specialist controls without changing values.
+1. Opening or closing a settings group does not change cutting values.
 
 #### Empty
-1. The Advanced section appears only for a selected CNC operation.
+1. CNC setting groups appear only for the inspected CNC operation.
 
 #### Edge — long specialist sections remain available
-1. The panel scrolls normally when a cut type exposes many specialist fields;
-   no setting is hidden behind a separate visibility state.
+1. The panel scrolls normally when a cut type exposes many specialist fields. Collapsed groups keep
+   their editors mounted so pending numeric edits and undo reconciliation survive navigation.
 
 ### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
 
@@ -4285,7 +4313,7 @@ and lifts the command's CNC-only gate.)*
    leaves current feeds untouched for hand-tuning.
 
 #### Edge — per-operation override and other object types
-1. An operation's explicit **Tool Plan** material assignment (F-CNC31) overrides the project
+1. An operation's explicit **Tool & material** / **Tool Plan** assignment (F-CNC31) overrides the project
    material. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
    operations, and generated box operations use the same new-operation resolver.
 

@@ -9,7 +9,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     machine: 'cnc',
     minutes: 3,
     location: 'Select vector artwork → Cut type',
-    prerequisites: 'CNC mode, vector artwork, and the intended stock and bit in Startup Setup.',
+    prerequisites: 'CNC mode, vector artwork, measured stock, and the intended bit assigned.',
     visual: 'profile',
     steps: [
       {
@@ -29,13 +29,13 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Inspect the part and its support',
         instruction:
-          'For a cut-out part, configure Tabs if needed. Open Preview and inspect the side of the line, pass depths and any Profile leads before moving to Frame and Start.',
+          'For a cut-out part, open Holding tabs and configure the bridges if needed. Open Preview and inspect the side of the line, pass depths and any Profile leads before moving to Frame and Start.',
         focus: 'Preview cutter clearance',
         result: 'The preview distinguishes the original shape from the offset tool route.',
         visual: 'preview',
       },
     ],
-    tip: 'The selected bit diameter affects the offset. Correct the bit in Startup Setup before compensating by resizing the artwork.',
+    tip: 'The selected bit diameter affects the offset. Choose the correct bit in Tool & material before compensating by resizing the artwork.',
     keywords: ['cnc', 'profile', 'outside', 'inside', 'on path', 'contour', 'depth', 'leads'],
     related: ['tool-library', 'cnc-tabs', 'preview', 'cnc-probe', 'frame-start'],
   },
@@ -47,7 +47,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     machine: 'cnc',
     minutes: 3,
     location: 'Select closed artwork → Cut type: Pocket (clear inside)',
-    prerequisites: 'CNC mode, a closed boundary, and a cutter and stock defined in Startup Setup.',
+    prerequisites: 'CNC mode, a closed boundary, measured stock, and the intended cutter assigned.',
     visual: 'pocket',
     steps: [
       {
@@ -60,7 +60,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose depth and fill method',
         instruction:
-          'Set Cut depth and Depth per pass. Under Advanced, compare Offset rings, Raster sweeps and Adaptive clearing in Fill method. Use the controls shown for the selected method.',
+          'Set Cut depth and Depth per pass. Open Clearing strategy to compare Offset rings, Raster sweeps and Adaptive clearing in Fill method. Use the controls shown for the selected method.',
         focus: 'Fill method',
         result: 'The clearing route changes while the intended pocket boundary remains the same.',
       },
@@ -73,7 +73,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'Pocket roughing can use a separate bit assigned in Startup Setup → Tool Plan. Inspect the resulting tool changes before running.',
+    tip: 'Pocket roughing can use a separate bit assigned in Tool & material. Inspect the resulting tool changes before running.',
     keywords: [
       'pocket',
       'clear',
@@ -108,7 +108,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Match the bit and depth',
         instruction:
-          'Check the assigned bit in the Startup Setup references. Enter Cut depth, Depth per pass, Feed, Plunge and Artwork spindle speed for your setup.',
+          'Choose the bit in Tool & material. Enter Cut depth, Depth per pass, Feed, Plunge and Artwork spindle speed for your setup.',
         focus: 'Bit and Cut depth',
         result: 'The groove depth and cutter shape together determine the resulting mark.',
       },
@@ -148,7 +148,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the real angled cutter',
         instruction:
-          'In Startup Setup, select the intended bit and verify its diameter, angle and any tip diameter. Select the artwork and choose V-carve (angled bit).',
+          'Select the artwork, choose the intended bit in Tool & material and choose V-carve (angled bit). Verify the cutter diameter, angle and any tip diameter against its bit-library entry.',
         focus: 'Bit geometry',
         result: 'The planned depth reflects the selected cutter geometry.',
       },
@@ -163,7 +163,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Plan any separate clearing bit',
         instruction:
-          'For flat-floor work, use Startup Setup → Tool Plan → V-carve floor clearing when you want another bit to clear the core. Review its operation values and any tool changes.',
+          'For flat-floor work, choose a Floor clearing bit in Tool & material when you want another bit to clear the core. Review its operation values and any tool changes.',
         focus: 'V-carve floor clearing',
         result: 'The clearing work and angled finishing work have explicit cutter assignments.',
         visual: 'layers',

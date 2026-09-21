@@ -34,7 +34,7 @@ function install4040Cnc(): void {
 
 async function render(
   onCommitSettings: (settings: CncLayerSettings) => void,
-  settings: CncLayerSettings = DEFAULT_CNC_LAYER_SETTINGS,
+  settings: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, materialKey: 'plywood-mdf' },
 ): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -54,7 +54,7 @@ async function apply(host: HTMLElement): Promise<void> {
 }
 
 describe('FeedsCalculatorRow', () => {
-  it('follows the read-only Startup material when it changes while mounted', async () => {
+  it('follows the operation material when it changes while mounted', async () => {
     install4040Cnc();
     const onCommitSettings = vi.fn();
     const host = document.createElement('div');
@@ -82,8 +82,7 @@ describe('FeedsCalculatorRow', () => {
       });
       expect(host.querySelector('select[aria-label="Chipload material"]')).toBeNull();
       expect(
-        host.querySelector('output[aria-label="Chipload material from Startup Setup"]')
-          ?.textContent,
+        host.querySelector('output[aria-label="Material for feeds calculator"]')?.textContent,
       ).toBe('Acrylic');
       await apply(host);
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
@@ -105,11 +104,11 @@ describe('FeedsCalculatorRow', () => {
     try {
       expect(host.querySelector('select[aria-label="Chipload material"]')).toBeNull();
       expect(
-        host.querySelector('output[aria-label="Chipload material from Startup Setup"]')
-          ?.textContent,
+        host.querySelector('output[aria-label="Material for feeds calculator"]')?.textContent,
       ).toBe('Hardwood (general)');
       expect(
-        host.querySelector('output[aria-label="Bit flute count from Startup Setup"]')?.textContent,
+        host.querySelector('output[aria-label="Bit flute count for feeds calculator"]')
+          ?.textContent,
       ).toBe('3');
       await apply(host);
       const next = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings;
@@ -174,7 +173,8 @@ describe('FeedsCalculatorRow', () => {
         useStore.getState().updateCncMachine({ toolId });
       });
       expect(
-        host.querySelector('output[aria-label="Bit flute count from Startup Setup"]')?.textContent,
+        host.querySelector('output[aria-label="Bit flute count for feeds calculator"]')
+          ?.textContent,
       ).toBe('1');
       expect(host.querySelector('select[aria-label="Bit flute count"]')).toBeNull();
       await apply(host);
@@ -192,7 +192,7 @@ describe('FeedsCalculatorRow', () => {
     const { host, root } = await render(vi.fn());
     try {
       const fluteOutput = host.querySelector(
-        'output[aria-label="Bit flute count from Startup Setup"]',
+        'output[aria-label="Bit flute count for feeds calculator"]',
       );
       expect(fluteOutput?.textContent).toBe('2');
       expect(host.querySelector('select[aria-label="Bit flute count"]')).toBeNull();
@@ -233,6 +233,7 @@ describe('FeedsCalculatorRow', () => {
     const onCommitSettings = vi.fn();
     const { host, root } = await render(onCommitSettings, {
       ...DEFAULT_CNC_LAYER_SETTINGS,
+      materialKey: 'plywood-mdf',
       toolId: 'vb-90',
     });
     try {

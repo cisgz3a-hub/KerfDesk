@@ -1,27 +1,21 @@
-// CncLayerAdvancedFields — the advanced portion of the CNC layer card: the
-// feeds helpers (preset picker + chip-load calculator — FeedHelperRows),
-// stepover / pocket fill, and the cut-type-specific tails (relief rows,
-// v-carve options, H.9 motion polish — CutTypeSections). The core per-cut
-// numbers (depth-per-pass / feed / plunge / spindle) live in CncCoreCutFields,
-// which the parent renders in the always-visible core group. Extracted
-// from CncLayerFields to keep that file under the size cap and so the
-// specialist controls remain grouped under one always-visible heading.
+// CNC operation essentials and purpose-labelled refinements. Native
+// disclosures keep the existing controls mounted while reducing visual noise.
 
 import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { RailSection } from '../kit';
 import { CncFinishAllowanceField } from './CncFinishAllowanceField';
-import { CncProfileLeadFields } from './CncProfileLeadFields';
-import { HelicalEntryRows, MotionPolishRows, ReliefLayerRows } from './CncLayerToolFields';
+import { ReliefLayerRows } from './CncLayerToolFields';
 import { CncFeedPresetRows } from './CncFeedPresetRows';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
+import { CncEntryFields } from './CncEntryFields';
 import { SetupOwnedValueRow } from './SetupOwnedValueRow';
 
-// The whole advanced field set. Tabs is NOT here — it moved to the core group.
 export function CncLayerAdvancedGroup(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -30,41 +24,55 @@ export function CncLayerAdvancedGroup(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
-    <section aria-label="Advanced cut settings" style={advancedSectionStyle}>
-      <h4 className="lf-subhead">Advanced</h4>
+    <div className="lf-cnc-settings-fields" role="group" aria-label="Cut refinements">
+      <ClearingFields {...props} />
+      <CncInlayFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <CutTypeSections {...props} />
       <FeedHelperRows
         layer={props.layer}
         settings={props.settings}
         onCommit={props.onCommit}
         onCommitSettings={props.onCommitSettings}
       />
-      <StepoverField
-        layer={props.layer}
-        settings={props.settings}
-        hasReliefObjects={props.hasReliefObjects}
-        onCommit={props.onCommit}
-      />
-      <PocketFillRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      <AdaptivePocketFields
-        layer={props.layer}
-        settings={props.settings}
-        onCommit={props.onCommit}
-      />
-      <CncInlayFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      <CutTypeSections
-        layer={props.layer}
-        settings={props.settings}
-        hasReliefObjects={props.hasReliefObjects}
-        onCommit={props.onCommit}
-        onCommitSettings={props.onCommitSettings}
-      />
-    </section>
+    </div>
   );
 }
 
-// The core per-cut parameters lead the card: the numbers every CNC cut needs.
-// Depth-per-pass / feed / plunge / spindle remain separate from the labeled
-// Advanced helper and specialist section that follows.
+function ClearingFields(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly hasReliefObjects: boolean;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element | null {
+  const { settings, hasReliefObjects } = props;
+  const vCarveClearing =
+    settings.cutType === 'v-carve' &&
+    (settings.vCarveFlatDepthEnabled ?? true) &&
+    settings.vClearToolId !== undefined;
+  if (
+    settings.cutType !== 'pocket' &&
+    settings.cutType !== 'inlay-pair' &&
+    !vCarveClearing &&
+    !hasReliefObjects
+  ) {
+    return null;
+  }
+  return (
+    <RailSection
+      label="Clearing strategy"
+      hint="Choose the spacing and pattern used to remove material inside an area."
+    >
+      <p className="lf-cnc-settings-hint">
+        Stepover is the spacing between neighbouring passes, as a percentage of the bit diameter.
+      </p>
+      <PocketFillRow layer={props.layer} settings={settings} onCommit={props.onCommit} />
+      <StepoverField {...props} />
+      <AdaptivePocketFields layer={props.layer} settings={settings} onCommit={props.onCommit} />
+    </RailSection>
+  );
+}
+
+// The core per-cut parameters always remain visible.
 export function CncCoreCutFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -74,7 +82,11 @@ export function CncCoreCutFields(props: {
 }): JSX.Element {
   const { layer, settings, maxFeed, spindleMaxRpm, onCommit } = props;
   return (
-    <>
+    <section className="lf-cnc-settings-card" aria-label="Feeds & passes">
+      <h4>Feeds &amp; passes</h4>
+      <p className="lf-cnc-settings-hint">
+        Feed moves across the material. Plunge moves down into it.
+      </p>
       <NumberField
         layer={layer}
         label="Depth per pass"
@@ -125,13 +137,10 @@ export function CncCoreCutFields(props: {
         title="Requested spindle running speed for this artwork operation. Machine maximum is shown above and is edited in Startup Setup."
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
-    </>
+    </section>
   );
 }
 
-// The feeds HELPERS (preset picker + chip-load calculator) stay grouped under
-// Advanced because they assist with the core numbers rather than being cut
-// parameters themselves. The section itself remains visible at all times.
 function FeedHelperRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -140,7 +149,19 @@ function FeedHelperRows(props: {
 }): JSX.Element {
   return (
     <>
-      <CncFeedPresetRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <RailSection
+        label="Saved feeds"
+        hint="Save or reuse feed, plunge, spindle, depth per pass and stepover settings."
+      >
+        <p className="lf-cnc-settings-hint">
+          Reuse a tested set of feeds and speeds, or save these values for next time.
+        </p>
+        <CncFeedPresetRows
+          layer={props.layer}
+          settings={props.settings}
+          onCommit={props.onCommit}
+        />
+      </RailSection>
       <FeedsCalculatorRow
         layer={props.layer}
         settings={props.settings}
@@ -199,8 +220,7 @@ function stepoverDescription(hasReliefObjects: boolean, vCarveClearing: boolean)
     : 'Pocket clearing spacing as a percentage of the bit diameter.';
 }
 
-// The cut-type-specific tails (relief rows, v-carve options, H.9 polish,
-// tabs), grouped so the parent stays under the function-size cap.
+// Only show refinements that apply to the current cut type or artwork.
 export function CutTypeSections(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -208,43 +228,45 @@ export function CutTypeSections(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
-  const { layer, settings, onCommit, onCommitSettings } = props;
-  const isProfile = settings.cutType.startsWith('profile');
-  const showPolish =
-    isProfile ||
-    settings.cutType === 'pocket' ||
-    settings.cutType === 'engrave' ||
-    settings.cutType === 'v-carve';
+  const { layer, settings, onCommit } = props;
+  const offsetProfile =
+    settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
   return (
     <>
-      <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
-      <CncProfileLeadFields layer={layer} settings={settings} onCommit={onCommit} />
+      {offsetProfile ? (
+        <RailSection
+          label="Wall finish"
+          badge={(settings.finishAllowanceMm ?? 0) > 0 ? 'Finish pass' : 'No allowance'}
+          hint="Leave material during roughing, then remove it in a final pass along the wall."
+        >
+          <p className="lf-cnc-settings-hint">
+            Leave a small allowance for a final full-depth wall pass. Zero uses no separate finish
+            pass.
+          </p>
+          <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
+        </RailSection>
+      ) : null}
       {props.hasReliefObjects ? (
-        <ReliefLayerRows layer={layer} settings={settings} onCommit={onCommit} />
+        <RailSection
+          label="Relief finish"
+          hint="Review relief depth ownership and control the spacing of the finishing passes."
+        >
+          <ReliefLayerRows layer={layer} settings={settings} onCommit={onCommit} />
+        </RailSection>
       ) : null}
       {settings.cutType === 'v-carve' ? (
-        <VCarveFields layer={layer} settings={settings} onCommit={onCommit} />
+        <RailSection
+          label="V-carve detail"
+          hint="Set boundary sampling detail and review whether the assigned cutter suits V-carving."
+          open
+        >
+          <p className="lf-cnc-settings-hint">
+            Zero uses automatic detail. Smaller values can add detail and increase preparation time.
+          </p>
+          <VCarveFields layer={layer} settings={settings} onCommit={onCommit} />
+        </RailSection>
       ) : null}
-      {settings.cutType === 'pocket' ? (
-        <>
-          {settings.pocketStrategy !== 'adaptive' ? (
-            <HelicalEntryRows
-              layer={layer}
-              settings={settings}
-              onCommit={onCommit}
-              onCommitSettings={onCommitSettings}
-            />
-          ) : null}
-        </>
-      ) : null}
-      {showPolish ? (
-        <MotionPolishRows
-          layer={layer}
-          settings={settings}
-          onCommit={onCommit}
-          onCommitSettings={onCommitSettings}
-        />
-      ) : null}
+      <CncEntryFields {...props} />
     </>
   );
 }
@@ -278,8 +300,8 @@ function VCarveFields(props: {
       />
       {!activeToolIsCompatible ? (
         <div style={vbitWarningStyle} role="alert">
-          V-carve needs a V-bit or modeled angled engraving bit — assign one in the Startup Setup
-          tool plan. Unsupported selections may use legacy 60° fallback geometry where compatible.
+          V-carve needs a V-bit or modeled angled engraving bit. Choose one in Tool &amp; material
+          above. Unsupported selections may use legacy 60° fallback geometry where compatible.
         </div>
       ) : null}
     </>
@@ -290,11 +312,4 @@ const vbitWarningStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-danger-fg)',
   padding: '2px 0 2px 4px',
-};
-
-const advancedSectionStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 4,
-  minWidth: 0,
 };

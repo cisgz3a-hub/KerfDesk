@@ -15,6 +15,12 @@ import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
+import {
+  OperationContextActions,
+  OperationNameInput,
+  OperationSelect,
+  OperationToggles,
+} from './OperationInspectorControls';
 
 export function SelectedOperationInspector(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -35,10 +41,11 @@ export function SelectedOperationInspector(props: {
 
   if (context.common.length === 0) {
     return (
-      <section aria-label="Multiple artwork operations" style={inspectorStyle}>
-        <h3 style={headingStyle}>Multiple operations</h3>
-        <p style={hintStyle}>
-          {props.objects.length} selected artworks currently keep independent settings.
+      <section aria-label="Multiple artwork operations" className="lf-operation-inspector">
+        <h3 className="lf-operation-inspector__heading">Multiple operations</h3>
+        <p className="lf-artwork-hint">
+          These {props.objects.length} artworks have separate settings. Keep them independent or
+          choose one operation to share.
         </p>
         {machineKind === 'cnc' ? (
           <CncSelectionDepthField objects={props.objects} operations={context.candidates} />
@@ -52,7 +59,7 @@ export function SelectedOperationInspector(props: {
           type="button"
           title="Assign one shared operation and its settings to every selected artwork"
           onClick={() => assignOperation(objectIds, active.id)}
-          style={primaryButtonStyle}
+          className="lf-btn"
         >
           Use one operation for selection
         </button>
@@ -96,23 +103,20 @@ function SelectedOperationEditor(props: {
   return (
     <section
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
-      style={inspectorStyle}
+      className="lf-operation-inspector"
     >
-      <div style={titleRowStyle}>
-        <span style={{ ...swatchStyle, background: props.active.color }} />
-        <OperationNameInput
-          operationId={props.active.id}
-          name={props.active.name}
-          onRename={renameOperation}
-        />
-      </div>
-      {props.candidates.length > 1 ? (
-        <OperationSelect
-          operations={props.candidates}
-          value={props.active.id}
-          onChange={props.onSelect}
-        />
+      <OperationIdentity
+        operation={props.active}
+        candidates={props.candidates}
+        onRename={renameOperation}
+        onSelect={props.onSelect}
+      />
+      {affected > 1 && !(overrideEditing && props.machineKind === 'laser') ? (
+        <p className="lf-artwork-hint">
+          Shared by {affected} artworks. Edits apply to all of them.
+        </p>
       ) : null}
+      <OperationToggles operation={props.active} affected={affected} />
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
@@ -130,14 +134,15 @@ function SelectedOperationEditor(props: {
       <OperationContextActions
         affected={affected}
         selectedUsingActive={activeObjects.length}
-        onMakeUnique={() => makeUnique(objectIds, props.active.id)}
-        onAdd={() => addOperation(objectIds)}
+        overrideEditing={overrideEditing && props.machineKind === 'laser'}
+        onMakeUnique={() =>
+          inspectCreatedOperation(() => makeUnique(objectIds, props.active.id), props.onSelect)
+        }
+        onAdd={() => inspectCreatedOperation(() => addOperation(objectIds), props.onSelect)}
       />
-      <OperationToggles operation={props.active} />
-      {overrideEditing && !hasMixedFields(mixedFields) ? (
-        <p style={advisoryStyle}>
-          Effective artwork override — these values drive the editor, preview, Job Review, and
-          emitted operation facts for the selected artwork.
+      {props.machineKind === 'laser' && overrideEditing && !hasMixedFields(mixedFields) ? (
+        <p className="lf-artwork-hint">
+          This artwork has its own settings. The values shown here are used for its output.
         </p>
       ) : null}
       <CompatibilityNote
@@ -147,6 +152,45 @@ function SelectedOperationEditor(props: {
       />
     </section>
   );
+}
+
+function OperationIdentity(props: {
+  readonly operation: Layer;
+  readonly candidates: ReadonlyArray<Layer>;
+  readonly onRename: (id: string, name: string) => void;
+  readonly onSelect: (id: string) => void;
+}): JSX.Element {
+  return (
+    <>
+      <div className="lf-operation-identity">
+        <span className="lf-operation-swatch" style={{ background: props.operation.color }} />
+        <label>
+          <span className="lf-artwork-eyebrow">Operation name</span>
+          <OperationNameInput
+            operationId={props.operation.id}
+            name={props.operation.name}
+            onRename={props.onRename}
+          />
+        </label>
+      </div>
+      {props.candidates.length > 1 ? (
+        <OperationSelect
+          operations={props.candidates}
+          value={props.operation.id}
+          onChange={props.onSelect}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function inspectCreatedOperation(create: () => void, onSelect: (id: string) => void): void {
+  const existingIds = new Set(useStore.getState().project.scene.layers.map((layer) => layer.id));
+  create();
+  const added = useStore
+    .getState()
+    .project.scene.layers.find((layer) => !existingIds.has(layer.id));
+  if (added !== undefined) onSelect(added.id);
 }
 
 function selectedOperationSettings(operation: Layer, objects: ReadonlyArray<SceneObject>) {
@@ -163,119 +207,6 @@ function selectedOperationSettings(operation: Layer, objects: ReadonlyArray<Scen
     // participate in cancelling a draft parsed against an older store state.
     reconcileKey: JSON.stringify(settings.map(captureLayerOperationSettings)),
   };
-}
-
-function OperationContextActions(props: {
-  readonly affected: number;
-  readonly selectedUsingActive: number;
-  readonly onMakeUnique: () => void;
-  readonly onAdd: () => void;
-}): JSX.Element {
-  return (
-    <div style={contextRowStyle}>
-      <span>
-        Affects {props.affected} artwork{props.affected === 1 ? '' : 's'}
-      </span>
-      {props.affected > props.selectedUsingActive ? (
-        <button
-          type="button"
-          title="Give only the selected artwork a copy of these operation settings"
-          onClick={props.onMakeUnique}
-        >
-          Make unique
-        </button>
-      ) : null}
-      <button
-        type="button"
-        title="Add another process operation to the selected artwork"
-        onClick={props.onAdd}
-      >
-        Add operation
-      </button>
-    </div>
-  );
-}
-
-function OperationToggles(props: { readonly operation: Layer }): JSX.Element {
-  const setLayerParam = useStore((state) => state.setLayerParam);
-  // "Show" / "Output" — the same two words LightBurn's Cuts/Layers palette
-  // uses, and the same ones the layer card below shows for these exact two
-  // fields. They read as one control named once, not two settings.
-  return (
-    <div style={toggleRowStyle}>
-      <label title="Show or hide this operation on the workspace">
-        <input
-          type="checkbox"
-          checked={props.operation.visible}
-          aria-label={`Show ${props.operation.name}`}
-          title="Show or hide this operation on the workspace"
-          onChange={(event) => setLayerParam(props.operation.id, { visible: event.target.checked })}
-        />{' '}
-        Show
-      </label>
-      <label title="Include this operation in preview and machine output">
-        <input
-          type="checkbox"
-          checked={props.operation.output}
-          aria-label={`Output ${props.operation.name}`}
-          title="Include this operation in preview and machine output"
-          onChange={(event) => setLayerParam(props.operation.id, { output: event.target.checked })}
-        />{' '}
-        Output
-      </label>
-    </div>
-  );
-}
-
-// The box is uncontrolled so typing is never fought mid-edit; the key remounts
-// it whenever the stored name changes. A rename the store REJECTS (blank or
-// whitespace) leaves that name identical, so the key alone left the emptied box
-// standing while the operation still had its old name. The attempt counter
-// remounts on every blur, snapping the display back to the stored truth.
-function OperationNameInput(props: {
-  readonly operationId: string;
-  readonly name: string;
-  readonly onRename: (operationId: string, name: string) => void;
-}): JSX.Element {
-  const [attempt, setAttempt] = useState(0);
-  return (
-    <input
-      key={`${props.operationId}:${props.name}:${attempt}`}
-      defaultValue={props.name}
-      aria-label="Operation name"
-      title="Name this process operation"
-      style={nameInputStyle}
-      onBlur={(event) => {
-        const typed = event.currentTarget.value;
-        setAttempt((value) => value + 1);
-        props.onRename(props.operationId, typed);
-      }}
-    />
-  );
-}
-
-function OperationSelect(props: {
-  readonly operations: ReadonlyArray<Layer>;
-  readonly value: string;
-  readonly onChange: (id: string) => void;
-}): JSX.Element {
-  return (
-    <label style={fieldRowStyle}>
-      <span>Operation</span>
-      <select
-        aria-label="Operation to inspect"
-        title="Choose which operation settings to inspect"
-        value={props.value}
-        onChange={(event) => props.onChange(event.target.value)}
-      >
-        {props.operations.map((operation) => (
-          <option key={operation.id} value={operation.id}>
-            {operation.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
 }
 
 function CompatibilityNote(props: {
@@ -328,37 +259,6 @@ function selectionOperationContext(
   };
 }
 
-const inspectorStyle: React.CSSProperties = {
-  marginBottom: 10,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-};
-const headingStyle: React.CSSProperties = { margin: 0, fontSize: 14 };
-const hintStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-muted)' };
-const titleRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
-const swatchStyle: React.CSSProperties = { width: 18, height: 18, borderRadius: 4, flexShrink: 0 };
-const nameInputStyle: React.CSSProperties = { minWidth: 0, flex: 1, fontWeight: 600 };
-const contextRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-  alignItems: 'center',
-  fontSize: 12,
-};
-const toggleRowStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 12,
-  fontSize: 12,
-};
-const primaryButtonStyle: React.CSSProperties = { minHeight: 34 };
-const fieldRowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '100px 1fr',
-  gap: 8,
-  alignItems: 'center',
-};
 const advisoryStyle: React.CSSProperties = {
   margin: 0,
   color: 'var(--lf-warning-fg)',

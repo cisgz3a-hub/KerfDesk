@@ -33,6 +33,41 @@ describe('ArtworkRunOrderList', () => {
     await act(async () => root.unmount());
     host.remove();
   });
+
+  it('shows matching rows when a scrolled list becomes shorter', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const renderRows = (rows: ReadonlyArray<ArtworkRunOrderRowModel>) => (
+      <ArtworkRunOrderList
+        rows={rows}
+        total={1000}
+        activeKey={null}
+        machineKind="laser"
+        reveal={null}
+        onFocus={() => undefined}
+        onMove={() => undefined}
+        onEditSettings={() => undefined}
+      />
+    );
+    try {
+      await act(async () =>
+        root.render(renderRows(Array.from({ length: 1000 }, (_, i) => row(i + 1)))),
+      );
+      const list = host.querySelector<HTMLDivElement>('[aria-label="Artwork run order list"]');
+      if (list === null) throw new Error('Run order list missing');
+      await act(async () => {
+        list.scrollTop = 150000;
+        Simulate.scroll(list);
+      });
+      await act(async () => root.render(renderRows([row(900)])));
+      expect(host.querySelector('article[aria-label="Run 900: Job 900"]')).not.toBeNull();
+      expect(host.querySelectorAll('article')).toHaveLength(1);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('ArtworkRunOrderRow position box', () => {
@@ -76,6 +111,61 @@ describe('ArtworkRunOrderRow position box', () => {
     } finally {
       await act(async () => root.unmount());
       host.remove();
+    }
+  });
+
+  it('keeps actual CNC steps visible and distinguishes unavailable steps from output off', async () => {
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const renderRow = (model: ArtworkRunOrderRowModel) => (
+      <ArtworkRunOrderRow
+        row={model}
+        active={false}
+        machineKind="cnc"
+        onFocus={() => undefined}
+        onMove={() => undefined}
+        onEditSettings={() => undefined}
+      />
+    );
+    try {
+      await act(async () =>
+        root.render(renderRow({ ...row(1), effectiveSteps: [2, 3, 4, 7, 9, 10] })),
+      );
+      expect(host.textContent).toContain('Actual CNC steps: 2–4, 7, 9–10');
+      await act(async () => root.render(renderRow({ ...row(1), effectiveSteps: [] })));
+      expect(host.textContent).toContain('Output on · Output steps are unavailable');
+      await act(async () => root.render(renderRow({ ...row(1), output: false })));
+      expect(host.textContent).toContain('Output off · This artwork will not run');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('focuses artwork through its button without moving its run position', async () => {
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const onFocus = vi.fn();
+    const onMove = vi.fn();
+    try {
+      await act(async () =>
+        root.render(
+          <ArtworkRunOrderRow
+            row={row(3)}
+            active={false}
+            machineKind="laser"
+            onFocus={onFocus}
+            onMove={onMove}
+            onEditSettings={() => undefined}
+          />,
+        ),
+      );
+      const show = host.querySelector<HTMLButtonElement>('button[aria-label="Select Job 3"]');
+      if (show === null) throw new Error('Show artwork button missing');
+      await act(async () => show.click());
+      expect(onFocus).toHaveBeenCalledTimes(1);
+      expect(onMove).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
     }
   });
 });

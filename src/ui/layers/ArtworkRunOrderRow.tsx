@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import type { ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
 
-// Uncontrolled so typing is never fought mid-edit, re-seeded from its key. The
-// attempt counter is in that key so the box re-seeds on every blur, not only
-// when the position changes: a move the store refuses (blank, 0, or a number
-// that clamps to the order it already has) left the typed text standing over a
-// row still at its old run number.
+// Re-seed after every move attempt, including a move that the store refuses.
+// The input stays uncontrolled so typing is never fought mid-edit.
 function RunPositionInput(props: {
   readonly rowKey: string;
   readonly position: number;
   readonly name: string;
+  readonly disabled: boolean;
+  readonly total?: number;
   readonly onMove: (position: number) => void;
 }): JSX.Element {
   const [moveAttempt, setMoveAttempt] = useState(0);
@@ -18,15 +17,21 @@ function RunPositionInput(props: {
       key={`${props.rowKey}:${props.position}:${moveAttempt}`}
       type="number"
       min={1}
+      max={props.total}
       step={1}
       defaultValue={props.position}
+      disabled={props.disabled}
       aria-label={`Run position for ${props.name}`}
-      title="Enter the exact run number"
-      style={positionInputStyle}
+      title={
+        props.disabled
+          ? 'Finish or cancel canvas numbering to change this run number'
+          : 'Enter a run number, then press Enter or leave this field to move it'
+      }
+      className="lf-run-order-position-input"
       onBlur={(event) => {
         const typed = Number(event.currentTarget.value);
         setMoveAttempt((value) => value + 1);
-        props.onMove(typed);
+        if (!props.disabled) props.onMove(typed);
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();
@@ -35,73 +40,84 @@ function RunPositionInput(props: {
   );
 }
 
-export function ArtworkRunOrderRow(props: {
+type ArtworkRunOrderRowProps = {
   readonly row: ArtworkRunOrderRowModel;
   readonly active: boolean;
   readonly machineKind: 'laser' | 'cnc';
+  readonly total?: number;
+  readonly numberingActive?: boolean;
   readonly onFocus: () => void;
   readonly onMove: (position: number) => void;
   readonly onEditSettings: () => void;
-}): JSX.Element {
+};
+
+export function ArtworkRunOrderRow(props: ArtworkRunOrderRowProps): JSX.Element {
   const accent = props.row.colors[0] ?? 'var(--lf-accent)';
+  const numberingActive = props.numberingActive ?? false;
   return (
     <article
       aria-label={`Run ${props.row.position}: ${props.row.name}`}
       aria-current={props.active ? 'true' : undefined}
-      style={{
-        ...rowStyle,
-        borderLeftColor: props.active ? accent : 'transparent',
-        background: props.active ? 'var(--lf-accent-wash)' : 'var(--lf-bg-1)',
-      }}
+      className={`lf-run-order-card${props.active ? ' lf-run-order-card--active' : ''}`}
+      style={{ borderLeftColor: accent }}
       onClick={props.onFocus}
     >
-      <div style={headingStyle}>
-        <label style={positionLabelStyle} onClick={stopPropagation}>
-          <span>Run</span>
+      <div className="lf-run-order-card-heading">
+        <span className="lf-run-order-badge" aria-label={`Run number ${props.row.position}`}>
+          <span aria-hidden="true">#</span>
+          {props.row.position}
+        </span>
+        <button
+          type="button"
+          className="lf-run-order-identity"
+          title={`Select ${props.row.name} on the canvas`}
+          aria-label={`Select ${props.row.name}`}
+          aria-pressed={props.active}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onFocus();
+          }}
+        >
+          <strong>{props.row.name}</strong>
+          <span>
+            {props.row.kindLabel} · {props.row.dimensions}
+          </span>
+        </button>
+      </div>
+      <div
+        className="lf-run-order-summary"
+        tabIndex={0}
+        aria-label={`Settings summary for ${props.row.name}`}
+      >
+        <strong>{props.row.operationSummary}</strong>
+        <span>{props.row.settingsSummary}</span>
+        {props.row.shared ? <span>Shared by {props.row.objectIds.length} artworks</span> : null}
+      </div>
+      <div className="lf-run-order-effective" tabIndex={0}>
+        {effectiveOrderText(props.row.effectiveSteps, props.machineKind, props.row.output)}
+      </div>
+      <div className="lf-run-order-card-actions" onClick={stopPropagation}>
+        <label className="lf-run-order-position">
+          <span>Move to</span>
           <RunPositionInput
             rowKey={props.row.key}
             position={props.row.position}
             name={props.row.name}
+            disabled={numberingActive}
+            {...(props.total === undefined ? {} : { total: props.total })}
             onMove={props.onMove}
           />
         </label>
-        <div style={identityStyle}>
-          <RunSelectionButton
-            name={props.row.name}
-            active={props.active}
-            onSelect={props.onFocus}
-          />
-          <span style={mutedStyle}>
-            {props.row.kindLabel} · {props.row.dimensions}
-          </span>
-        </div>
-        <div aria-label="Operation colors" style={swatchesStyle}>
-          {props.row.colors.slice(0, 4).map((color) => (
-            <span key={color} title={color} style={{ ...swatchStyle, background: color }} />
-          ))}
-        </div>
-      </div>
-      <div style={detailsStyle}>
-        <span title={props.row.operationSummary}>{props.row.operationSummary}</span>
-        <span title={props.row.settingsSummary} style={mutedStyle}>
-          {props.row.settingsSummary}
-        </span>
-        <span style={effectiveStyle}>
-          {effectiveOrderText(props.row.effectiveSteps, props.machineKind, props.row.output)}
-        </span>
-      </div>
-      <div style={footerStyle}>
-        <span style={statusStyle}>
-          {props.row.shared ? 'One shared run unit' : props.row.output ? 'Output on' : 'Output off'}
-        </span>
         <button
           type="button"
-          title={`Edit settings for ${props.row.name}`}
+          title={
+            numberingActive
+              ? 'Finish or cancel canvas numbering to edit settings'
+              : `Edit settings for ${props.row.name}`
+          }
           className="lf-btn lf-btn--ghost"
-          onClick={(event) => {
-            event.stopPropagation();
-            props.onEditSettings();
-          }}
+          disabled={numberingActive}
+          onClick={props.onEditSettings}
         >
           Edit settings
         </button>
@@ -110,111 +126,37 @@ export function ArtworkRunOrderRow(props: {
   );
 }
 
-function RunSelectionButton(props: {
-  readonly name: string;
-  readonly active: boolean;
-  readonly onSelect: () => void;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      title={`Select ${props.name} on the canvas`}
-      aria-label={`Select ${props.name}`}
-      aria-pressed={props.active}
-      style={nameStyle}
-      onClick={(event) => {
-        event.stopPropagation();
-        props.onSelect();
-      }}
-    >
-      {props.name}
-    </button>
-  );
-}
-
 function effectiveOrderText(
   steps: ReadonlyArray<number>,
   machineKind: 'laser' | 'cnc',
   output: boolean,
 ): string {
-  if (!output || steps.length === 0) return 'Not present in machine output';
-  const label = steps.length === 1 ? `${steps[0]}` : steps.join(', ');
+  if (!output) return 'Output off · This artwork will not run';
+  if (steps.length === 0) return 'Output on · Output steps are unavailable';
+  const label = stepRanges(steps);
   return machineKind === 'cnc'
-    ? `Effective CNC step${steps.length === 1 ? '' : 's'}: ${label}`
+    ? `Actual CNC step${steps.length === 1 ? '' : 's'}: ${label}`
     : `Laser output step${steps.length === 1 ? '' : 's'}: ${label}`;
+}
+
+// Preserve every effective output step while keeping consecutive runs readable.
+function stepRanges(steps: ReadonlyArray<number>): string {
+  const ranges: string[] = [];
+  for (let index = 0; index < steps.length; index += 1) {
+    const first = steps[index];
+    if (first === undefined) continue;
+    let last = first;
+    let next = steps[index + 1];
+    while (next !== undefined && next === last + 1) {
+      index += 1;
+      last = next;
+      next = steps[index + 1];
+    }
+    ranges.push(last === first ? `${first}` : `${first}–${last}`);
+  }
+  return ranges.join(', ');
 }
 
 function stopPropagation(event: React.MouseEvent): void {
   event.stopPropagation();
 }
-
-const rowStyle: React.CSSProperties = {
-  height: 144,
-  boxSizing: 'border-box',
-  border: '1px solid var(--lf-border)',
-  borderLeft: '4px solid transparent',
-  borderRadius: 6,
-  padding: 9,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 7,
-  cursor: 'pointer',
-  overflow: 'hidden',
-};
-const headingStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
-const positionLabelStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-  fontSize: 11,
-  fontWeight: 700,
-};
-const positionInputStyle: React.CSSProperties = { width: 54, minHeight: 30, fontWeight: 700 };
-const identityStyle: React.CSSProperties = {
-  minWidth: 0,
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-};
-const nameStyle: React.CSSProperties = {
-  border: 0,
-  background: 'transparent',
-  color: 'inherit',
-  font: 'inherit',
-  fontWeight: 700,
-  textAlign: 'left',
-  padding: '2px 0',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-const mutedStyle: React.CSSProperties = {
-  color: 'var(--lf-text-muted)',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-const swatchesStyle: React.CSSProperties = { display: 'flex', alignItems: 'center' };
-const swatchStyle: React.CSSProperties = {
-  width: 14,
-  height: 24,
-  border: '1px solid var(--lf-border-strong)',
-  marginLeft: -3,
-};
-const detailsStyle: React.CSSProperties = {
-  minWidth: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-  fontSize: 11,
-};
-const effectiveStyle: React.CSSProperties = { color: 'var(--lf-accent-fg)', fontWeight: 650 };
-const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 8,
-  marginTop: 'auto',
-};
-const statusStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-muted)' };

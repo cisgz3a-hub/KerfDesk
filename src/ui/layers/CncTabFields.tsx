@@ -4,9 +4,9 @@ import { useUiStore } from '../state/ui-store';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { CncTabPositionControls } from './CncTabPositionControls';
 import { TutorialButton } from '../tutorials/TutorialButton';
+import { RailSection } from '../kit';
 
-// Holding tabs stay with the core profile controls so part retention remains
-// prominent before the Advanced helper and specialist section.
+// The collapsed summary keeps the tab state visible beside the cut essentials.
 export function CncTabFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
@@ -15,8 +15,13 @@ export function CncTabFields(props: {
   const { layer, settings, onCommit } = props;
   const manualProfile = settings.cutType.startsWith('profile');
   return (
-    <>
-      <Row label="Tabs">
+    <RailSection
+      label="Holding tabs"
+      badge={settings.tabsEnabled ? `${settings.tabsPerShape} per shape` : 'Off'}
+      hint="Leave small bridges to hold cut-out parts in the stock."
+    >
+      <p className="lf-cnc-settings-hint">Small bridges keep cut-out parts attached.</p>
+      <Row label="Use tabs">
         <input
           type="checkbox"
           checked={settings.tabsEnabled}
@@ -78,7 +83,7 @@ export function CncTabFields(props: {
           <CncTabPositionControls layer={layer} settings={settings} />
         </>
       ) : null}
-    </>
+    </RailSection>
   );
 }
 
