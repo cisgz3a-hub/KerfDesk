@@ -1,0 +1,86 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 5,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 4,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790007528020,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine Setup raster calibration production entrypoint"],
+          "fullName": "Machine Setup raster calibration production entrypoint retains unapplied measurements and convention when diagnostics is collapsed and reopened",
+          "status": "passed",
+          "title": "retains unapplied measurements and convention when diagnostics is collapsed and reopened",
+          "duration": 425.0249999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine Setup raster calibration production entrypoint"],
+          "fullName": "Machine Setup raster calibration production entrypoint exposes diagnostics and conversion without changing the live profile on Apply or Cancel",
+          "status": "skipped",
+          "title": "exposes diagnostics and conversion without changing the live profile on Apply or Cancel",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine Setup raster calibration production entrypoint"],
+          "fullName": "Machine Setup raster calibration production entrypoint saves the converted table and provenance once through final Save, with Undo",
+          "status": "skipped",
+          "title": "saves the converted table and provenance once through final Save, with Undo",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine Setup raster calibration production entrypoint"],
+          "fullName": "Machine Setup raster calibration production entrypoint replaces the entire setup draft when the document changes via new",
+          "status": "skipped",
+          "title": "replaces the entire setup draft when the document changes via new",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine Setup raster calibration production entrypoint"],
+          "fullName": "Machine Setup raster calibration production entrypoint replaces the entire setup draft when the document changes via open",
+          "status": "skipped",
+          "title": "replaces the entire setup draft when the document changes via open",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007548142,
+      "endTime": 1790007548567.025,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/MachineSetupRasterCalibration.test.tsx"
+    }
+  ]
+}

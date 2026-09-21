@@ -4,7 +4,7 @@
 // mirroring the right-side panels. Toggle state shows via aria-pressed (the
 // lf-btn pressed fill); the active name lives on each IconButton.
 
-import { useRef } from 'react';
+import { Fragment, useRef } from 'react';
 import libraryIcon from 'lucide-static/icons/library.svg?raw';
 import studioIcon from 'lucide-static/icons/shapes.svg?raw';
 
@@ -24,9 +24,9 @@ type Tool = {
 
 const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'select' }, helpKey: 'select', icon: 'cursor' },
-  { mode: { kind: 'text' }, helpKey: 'text', icon: 'text' },
   { mode: { kind: 'node' }, helpKey: 'node', icon: 'nodes' },
   { mode: { kind: 'measure' }, helpKey: 'measure', icon: 'ruler' },
+  { mode: { kind: 'text' }, helpKey: 'text', icon: 'text' },
   { mode: { kind: 'draw', shape: 'rect' }, helpKey: 'rect', icon: 'square' },
   { mode: { kind: 'draw', shape: 'ellipse' }, helpKey: 'ellipse', icon: 'circle' },
   { mode: { kind: 'draw', shape: 'polygon' }, helpKey: 'polygon', icon: 'pentagon' },
@@ -50,21 +50,32 @@ export function ToolStrip(): JSX.Element {
         label={activeTool === undefined ? 'Drawing tools' : TOOL_HELP[activeTool.helpKey].label}
       />
       {TOOLS.map((tool) => (
-        <IconButton
-          key={tool.helpKey}
-          icon={tool.icon}
-          label={TOOL_HELP[tool.helpKey].label}
-          title={TOOL_HELP[tool.helpKey].tooltip}
-          helpId={toolHelpId(tool.helpKey)}
-          {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
-          onClick={() => {
-            if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
-            else setToolMode(tool.mode);
-          }}
-          pressed={isActive(toolMode, tool.mode)}
-        />
+        <Fragment key={tool.helpKey}>
+          {tool.helpKey === 'select' || tool.helpKey === 'text' ? (
+            <span className="lf-toolstrip__caption" aria-hidden="true">
+              {tool.helpKey === 'select' ? 'Edit' : 'Draw'}
+            </span>
+          ) : null}
+          {tool.helpKey === 'position-laser' ? (
+            <span className="lf-toolstrip__divider" aria-hidden="true" />
+          ) : null}
+          <IconButton
+            icon={tool.icon}
+            label={TOOL_HELP[tool.helpKey].label}
+            title={TOOL_HELP[tool.helpKey].tooltip}
+            helpId={toolHelpId(tool.helpKey)}
+            {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
+            onClick={() => {
+              if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
+              else setToolMode(tool.mode);
+            }}
+            pressed={isActive(toolMode, tool.mode)}
+          />
+          {tool.helpKey === 'measure' && toolMode.kind === 'node' ? (
+            <NodeCommandBar nodeToolButtonRef={nodeToolButtonRef} />
+          ) : null}
+        </Fragment>
       ))}
-      {toolMode.kind === 'node' ? <NodeCommandBar nodeToolButtonRef={nodeToolButtonRef} /> : null}
       <span className="lf-toolstrip__divider" aria-hidden="true" />
       <button
         type="button"

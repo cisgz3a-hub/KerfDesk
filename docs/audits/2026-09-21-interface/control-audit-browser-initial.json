@@ -1,0 +1,188 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\LaserForge\\ui-audit-20260921\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/button-audit-regressions.spec.ts",
+      "--reporter=list,json"
+    ],
+    "configFile": "D:\\LaserForge\\ui-audit-20260921\\playwright.config.ts",
+    "rootDir": "D:/LaserForge/ui-audit-20260921/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/LaserForge/ui-audit-20260921/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/LaserForge/ui-audit-20260921/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "D:\\LaserForge\\ui-audit-20260921\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "button-audit-regressions.spec.ts",
+      "file": "button-audit-regressions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "material wizard Back preserves changed settings and details through final Save",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6722,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T15:56:59.145Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7053412716320e978fed-9b4ce5d4fe2ac7dffd19",
+          "file": "button-audit-regressions.spec.ts",
+          "line": 13,
+          "column": 1
+        },
+        {
+          "title": "Image Studio stack-edge buttons stay inert and become available at the correct layer",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 17978,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\nExpected: disabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\nExpected: disabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\u001b[22m\n\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\button-audit-regressions.spec.ts:57:20",
+                    "location": {
+                      "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\button-audit-regressions.spec.ts",
+                      "column": 20,
+                      "line": 57
+                    },
+                    "snippet": "  55 |   const down = layers.getByTitle('Move the active layer down', { exact: true });\n  56 |   const merge = layers.getByTitle('Merge the active layer into the one below it', { exact: true });\n> 57 |   await expect(up).toBeDisabled();\n     |                    ^\n  58 |   await expect(down).toBeDisabled();\n  59 |   await expect(merge).toBeDisabled();\n  60 |   await layers.getByTitle('Add a transparent layer above the active one', { exact: true }).click();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\button-audit-regressions.spec.ts",
+                        "column": 20,
+                        "line": 57
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\nExpected: disabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /Image Studio/ }).getByRole('region', { name: 'Layers panel', exact: true }).getByTitle('Move the active layer up', { exact: true })\u001b[22m\n\n\n  55 |   const down = layers.getByTitle('Move the active layer down', { exact: true });\n  56 |   const merge = layers.getByTitle('Merge the active layer into the one below it', { exact: true });\n> 57 |   await expect(up).toBeDisabled();\n     |                    ^\n  58 |   await expect(down).toBeDisabled();\n  59 |   await expect(merge).toBeDisabled();\n  60 |   await layers.getByTitle('Add a transparent layer above the active one', { exact: true }).click();\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\button-audit-regressions.spec.ts:57:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T15:57:06.435Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\test-results\\button-audit-regressions-I-15717-ilable-at-the-correct-layer\\test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\test-results\\button-audit-regressions-I-15717-ilable-at-the-correct-layer\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\test-results\\button-audit-regressions-I-15717-ilable-at-the-correct-layer\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\button-audit-regressions.spec.ts",
+                    "column": 20,
+                    "line": 57
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "7053412716320e978fed-4234b40b223d15fc2a0c",
+          "file": "button-audit-regressions.spec.ts",
+          "line": 46,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-21T15:56:58.237Z",
+    "duration": 27392.325,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

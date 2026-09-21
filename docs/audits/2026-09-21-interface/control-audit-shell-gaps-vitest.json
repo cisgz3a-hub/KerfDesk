@@ -1,0 +1,160 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 3,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 12,
+  "numPassedTests": 12,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790004936409,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Show project toolpath removes only the imported display slot",
+          "status": "passed",
+          "title": "Show project toolpath removes only the imported display slot",
+          "duration": 53.68510000000242,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Retry Abort retries a failed close request and resolves only after the mocked stop succeeds",
+          "status": "passed",
+          "title": "Retry Abort retries a failed close request and resolves only after the mocked stop succeeds",
+          "duration": 15.10109999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes G-code Cancel closes without choosing or writing a destination",
+          "status": "passed",
+          "title": "G-code Cancel closes without choosing or writing a destination",
+          "duration": 52.436399999998685,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes rail collapse and expand change the visible surface and retain contextual help",
+          "status": "passed",
+          "title": "rail collapse and expand change the visible surface and retain contextual help",
+          "duration": 17.926900000002206,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes a disabled rail collapse remains inert and explains why",
+          "status": "passed",
+          "title": "a disabled rail collapse remains inert and explains why",
+          "duration": 5.353100000000268,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Try again remounts recovered content and Copy diagnostic writes the local error payload",
+          "status": "passed",
+          "title": "Try again remounts recovered content and Copy diagnostic writes the local error payload",
+          "duration": 32.52140000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Keyboard Shortcuts Close removes its dialog and releases modal ownership",
+          "status": "passed",
+          "title": "Keyboard Shortcuts Close removes its dialog and releases modal ownership",
+          "duration": 87.66510000000198,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Grid and Circular array modes submit their own settings, including rotation",
+          "status": "passed",
+          "title": "Grid and Circular array modes submit their own settings, including rotation",
+          "duration": 60.96769999999742,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Quick Nest Outline and rotation controls submit the chosen method without side effects on Cancel",
+          "status": "passed",
+          "title": "Quick Nest Outline and rotation controls submit the chosen method without side effects on Cancel",
+          "duration": 35.103900000001886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Project Notes Cancel discards the draft and never applies it",
+          "status": "passed",
+          "title": "Project Notes Cancel discards the draft and never applies it",
+          "duration": 24.125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions contour repair Cancel leaves the project intact and an ineligible Apply stays inert",
+          "status": "passed",
+          "title": "contour repair Cancel leaves the project intact and an ineligible Apply stays inert",
+          "duration": 17.58520000000135,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Undo History Close dispatches once and empty Undo/Redo cannot dispatch",
+          "status": "passed",
+          "title": "Undo History Close dispatches once and empty Undo/Redo cannot dispatch",
+          "duration": 12.686600000000908,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004959653,
+      "endTime": 1790004960068.6865,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/interface-control-outcomes.test.tsx"
+    }
+  ]
+}

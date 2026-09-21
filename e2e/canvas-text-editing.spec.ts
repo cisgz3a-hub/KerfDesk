@@ -19,7 +19,7 @@ async function snapshot(page: Page) {
 }
 
 async function addText(page: Page, content: string) {
-  await page.getByRole('button', { name: 'Text...', exact: true }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Add or edit text' })).toHaveCount(0);
   await page
     .getByLabel('KerfDesk workspace', { exact: true })

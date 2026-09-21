@@ -1,0 +1,148 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 3,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 9,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005303644,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "cancels corner collection, retries failed alignment and saves a four-click homography to the device",
+          "status": "passed",
+          "title": "cancels corner collection, retries failed alignment and saves a four-click homography to the device",
+          "duration": 65.9414999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005342129,
+      "endTime": 1790005342194.9414,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/camera/NetworkCameraView.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "opens the camera lesson, persists the larger panel preference and closes the panel",
+          "status": "passed",
+          "title": "opens the camera lesson, persists the larger panel preference and closes the panel",
+          "duration": 95.07760000000053,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "starts USB through the adapter, reports denial, starts a fake stream, opens calibration and stops it",
+          "status": "passed",
+          "title": "starts USB through the adapter, reports denial, starts a fake stream, opens calibration and stops it",
+          "duration": 57.26879999999801,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "opens RTSP details and connects the entered URL through a fake bridge before stopping",
+          "status": "passed",
+          "title": "opens RTSP details and connects the entered URL through a fake bridge before stopping",
+          "duration": 25.247800000001007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "dispatches machine discovery, activates the found camera and disables an already active source",
+          "status": "passed",
+          "title": "dispatches machine discovery, activates the found camera and disables an already active source",
+          "duration": 12.742699999998877,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "opens Diagnostics, gates idle capture and reports both readable pixels and capture failure",
+          "status": "passed",
+          "title": "opens Diagnostics, gates idle capture and reports both readable pixels and capture failure",
+          "duration": 8.584500000000844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "gates idle snapshot, passes the live source and platform to save, and dispatches size changes",
+          "status": "passed",
+          "title": "gates idle snapshot, passes the live source and platform to save, and dispatches size changes",
+          "duration": 7.037099999997736,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005334778,
+      "endTime": 1790005334984.037,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/camera/panel/CameraPanel.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "adds, selects, assigns, reorders and deletes carve layers with correct edge availability",
+          "status": "passed",
+          "title": "adds, selects, assigns, reorders and deletes carve layers with correct edge availability",
+          "duration": 150.8144999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "sets through depth from stock, toggles V-carve flat depth, and opens the matching lessons",
+          "status": "passed",
+          "title": "sets through depth from stock, toggles V-carve flat depth, and opens the matching lessons",
+          "duration": 32.188500000000204,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005339071,
+      "endTime": 1790005339254.1885,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/design-studio/layers/DesignLayers.audit.test.tsx"
+    }
+  ]
+}

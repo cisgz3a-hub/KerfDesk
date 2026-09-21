@@ -154,7 +154,7 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
-  await page.getByRole('button', { name: 'Text...', exact: true }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await page
     .getByLabel('KerfDesk workspace', { exact: true })
     .click({ position: { x: 150, y: 200 } });

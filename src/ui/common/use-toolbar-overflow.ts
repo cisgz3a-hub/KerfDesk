@@ -17,18 +17,32 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
 ];
 
 const PRIMARY_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
-  ['file.new', 'file.open', 'file.save'],
-  ['tools.add-text', 'tools.trace-image', 'tools.edit-image'],
+  ['file.open', 'file.import', 'file.save'],
+  ['tools.trace-image', 'tools.edit-image'],
+  ['window.toggle-preview'],
 ];
 const PRIMARY_IDS = PRIMARY_GROUPS.flat();
 const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
   'tools.edit-image',
   'tools.trace-image',
-  'tools.add-text',
-  'file.new',
   'file.open',
   'file.save',
+  'window.toggle-preview',
+  'file.import',
 ];
+
+function primaryCommandIds(commands: ReadonlyArray<AppCommand>): ReadonlyArray<CommandId> {
+  // The registry already knows whether the selection is an image. Image
+  // actions stay one click away in that context, and remain in More otherwise.
+  const imageSelected = commands.some(
+    (command) => command.id === 'tools.trace-image' && command.enabled,
+  );
+  return PRIMARY_IDS.filter(
+    (id) =>
+      (imageSelected || (id !== 'tools.trace-image' && id !== 'tools.edit-image')) &&
+      commands.some((command) => command.id === id),
+  );
+}
 
 export function toolbarGroups(
   commands: ReadonlyArray<AppCommand>,
@@ -82,11 +96,14 @@ export function useToolbarOverflow(commands: ReadonlyArray<AppCommand>): {
     };
   }, [commands]);
   const registered = toolbarGroups(commands).flat();
+  const primaryIds = primaryCommandIds(commands);
+  const isPrimary = (command: AppCommand): boolean =>
+    visible.includes(command.id) && primaryIds.includes(command.id);
   return {
     containerRef,
     measureRef,
-    primary: registered.filter((command) => visible.includes(command.id)),
-    overflow: registered.filter((command) => !visible.includes(command.id)),
+    primary: registered.filter(isPrimary),
+    overflow: registered.filter((command) => !isPrimary(command)),
   };
 }
 
@@ -96,7 +113,7 @@ function fittingCommands(
   available: number,
   moreWidth: number,
 ): ReadonlyArray<CommandId> {
-  let visible = PRIMARY_IDS.filter((id) => commands.some((command) => command.id === id));
+  let visible = primaryCommandIds(commands);
   const registered = toolbarGroups(commands).flat();
   for (const candidate of OVERFLOW_PRIORITY) {
     const groupCount = PRIMARY_GROUPS.filter((group) =>

@@ -66,9 +66,11 @@ export function ArtworkRunOrderRow(props: {
           />
         </label>
         <div style={identityStyle}>
-          <strong title={props.row.name} style={nameStyle}>
-            {props.row.name}
-          </strong>
+          <RunSelectionButton
+            name={props.row.name}
+            active={props.active}
+            onSelect={props.onFocus}
+          />
           <span style={mutedStyle}>
             {props.row.kindLabel} · {props.row.dimensions}
           </span>
@@ -105,6 +107,28 @@ export function ArtworkRunOrderRow(props: {
         </button>
       </div>
     </article>
+  );
+}
+
+function RunSelectionButton(props: {
+  readonly name: string;
+  readonly active: boolean;
+  readonly onSelect: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      title={`Select ${props.name} on the canvas`}
+      aria-label={`Select ${props.name}`}
+      aria-pressed={props.active}
+      style={nameStyle}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onSelect();
+      }}
+    >
+      {props.name}
+    </button>
   );
 }
 
@@ -153,6 +177,14 @@ const identityStyle: React.CSSProperties = {
   flexDirection: 'column',
 };
 const nameStyle: React.CSSProperties = {
+  border: 0,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  fontWeight: 700,
+  textAlign: 'left',
+  padding: '2px 0',
+  cursor: 'pointer',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',

@@ -25,12 +25,12 @@ describe('Toolbar icon presentation', () => {
     }
   });
 
-  it('uses a Lucide icon and hides the label for familiar file commands', async () => {
-    const view = await renderToolbar(command('file.new', 'New'));
+  it('shows a readable action label alongside the primary file icon', async () => {
+    const view = await renderToolbar(command('file.open', 'Open...'));
     try {
-      const button = view.host.querySelector('button[aria-label="New"]');
+      const button = view.host.querySelector('button[aria-label="Open..."]');
       expect(button?.querySelector('.lf-toolbar-icon svg')).not.toBeNull();
-      expect(button?.querySelector('.lf-toolbar-command-label')).toBeNull();
+      expect(button?.querySelector('.lf-toolbar-command-label')?.textContent).toBe('Open');
     } finally {
       await view.unmount();
     }

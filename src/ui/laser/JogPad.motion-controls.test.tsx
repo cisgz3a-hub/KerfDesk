@@ -64,6 +64,47 @@ afterEach(() => {
 });
 
 describe('JogPad motion controls', () => {
+  it('audit all eight direction buttons request their signed step and ignore clicks while disabled', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({ origin: 'front-left', maxFeed: 6000 });
+    useJogControlPreferences.setState({ stepMm: 10, requestedFeedMmPerMin: 1000 });
+    const { host, rerender, unmount } = await renderJogPad();
+    const cases = [
+      ['↖', { dx: -10, dy: 10, feed: 1000 }],
+      ['↑', { dy: 10, feed: 1000 }],
+      ['↗', { dx: 10, dy: 10, feed: 1000 }],
+      ['←', { dx: -10, feed: 1000 }],
+      ['→', { dx: 10, feed: 1000 }],
+      ['↙', { dx: -10, dy: -10, feed: 1000 }],
+      ['↓', { dy: -10, feed: 1000 }],
+      ['↘', { dx: 10, dy: -10, feed: 1000 }],
+    ] as const;
+    try {
+      for (const [glyph, vector] of cases) {
+        const button = [...host.querySelectorAll('button')].find(
+          (item) => item.textContent === glyph,
+        );
+        expect(button, glyph).toBeDefined();
+        jog.mockClear();
+        await act(async () => button!.click());
+        expect(jog).toHaveBeenCalledExactlyOnceWith(vector);
+      }
+      jog.mockClear();
+      await rerender(true);
+      for (const [glyph] of cases) {
+        const button = [...host.querySelectorAll('button')].find(
+          (item) => item.textContent === glyph,
+        )!;
+        expect(button.disabled).toBe(true);
+        await act(async () => button.click());
+      }
+      expect(jog).not.toHaveBeenCalled();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('uses the selected XY jog speed and clamps presets to the device maximum', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });

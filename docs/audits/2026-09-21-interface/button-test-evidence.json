@@ -1,0 +1,238 @@
+{
+  "scope": "Independent button-audit runs only. Root-owned machine, shell, workspace, browser and build checks are documented separately.",
+  "method": "Latest result per source file, full assertion name and repeated-name ordinal. Repeated parameterised names remain distinct.",
+  "runs": [
+    {
+      "file": "functional-tests.json",
+      "testFiles": 125,
+      "assertions": 906,
+      "passed": 900,
+      "failed": 6,
+      "success": false
+    },
+    {
+      "file": "functional-rerun.json",
+      "testFiles": 8,
+      "assertions": 36,
+      "passed": 36,
+      "failed": 0,
+      "success": true
+    },
+    {
+      "file": "remaining-functional-tests.json",
+      "testFiles": 84,
+      "assertions": 464,
+      "passed": 464,
+      "failed": 0,
+      "success": true
+    },
+    {
+      "file": "audit-regressions.json",
+      "testFiles": 3,
+      "assertions": 46,
+      "passed": 46,
+      "failed": 0,
+      "success": true
+    }
+  ],
+  "distinctAssertions": 1413,
+  "latestPassed": 1412,
+  "retainedFailures": [
+    {
+      "file": "src/ui/commands/CommandShell.test.tsx",
+      "area": "commands",
+      "name": "CommandShell canvas text activation arms canvas typing from the toolbar without opening the old text dialog",
+      "occurrence": 1,
+      "status": "failed",
+      "reportFile": "functional-tests.json"
+    }
+  ],
+  "externalResolution": "The retained old CommandShell Text-toolbar locator failure is resolved by the separately documented workspace.md targeted rerun. It is not rewritten as a pass in these raw audit logs.",
+  "areas": [
+    {
+      "area": "app",
+      "sourceRecords": 14,
+      "testedFiles": 6,
+      "distinctAssertions": 33,
+      "latestPassed": 33,
+      "retainedFailures": []
+    },
+    {
+      "area": "box",
+      "sourceRecords": 8,
+      "testedFiles": 5,
+      "distinctAssertions": 37,
+      "latestPassed": 37,
+      "retainedFailures": []
+    },
+    {
+      "area": "calibration",
+      "sourceRecords": 6,
+      "testedFiles": 4,
+      "distinctAssertions": 14,
+      "latestPassed": 14,
+      "retainedFailures": []
+    },
+    {
+      "area": "camera",
+      "sourceRecords": 49,
+      "testedFiles": 6,
+      "distinctAssertions": 17,
+      "latestPassed": 17,
+      "retainedFailures": []
+    },
+    {
+      "area": "cnc-viewer3d",
+      "sourceRecords": 3,
+      "testedFiles": 2,
+      "distinctAssertions": 15,
+      "latestPassed": 15,
+      "retainedFailures": []
+    },
+    {
+      "area": "commands",
+      "sourceRecords": 31,
+      "testedFiles": 37,
+      "distinctAssertions": 209,
+      "latestPassed": 208,
+      "retainedFailures": [
+        {
+          "file": "src/ui/commands/CommandShell.test.tsx",
+          "area": "commands",
+          "name": "CommandShell canvas text activation arms canvas typing from the toolbar without opening the old text dialog",
+          "occurrence": 1,
+          "status": "failed",
+          "reportFile": "functional-tests.json"
+        }
+      ]
+    },
+    {
+      "area": "common",
+      "sourceRecords": 28,
+      "testedFiles": 0,
+      "distinctAssertions": 0,
+      "latestPassed": 0,
+      "retainedFailures": []
+    },
+    {
+      "area": "design-studio",
+      "sourceRecords": 40,
+      "testedFiles": 29,
+      "distinctAssertions": 293,
+      "latestPassed": 293,
+      "retainedFailures": []
+    },
+    {
+      "area": "gcode-inspector",
+      "sourceRecords": 21,
+      "testedFiles": 6,
+      "distinctAssertions": 26,
+      "latestPassed": 26,
+      "retainedFailures": []
+    },
+    {
+      "area": "image-editor",
+      "sourceRecords": 64,
+      "testedFiles": 45,
+      "distinctAssertions": 314,
+      "latestPassed": 314,
+      "retainedFailures": []
+    },
+    {
+      "area": "kit",
+      "sourceRecords": 5,
+      "testedFiles": 3,
+      "distinctAssertions": 16,
+      "latestPassed": 16,
+      "retainedFailures": []
+    },
+    {
+      "area": "laser",
+      "sourceRecords": 269,
+      "testedFiles": 0,
+      "distinctAssertions": 0,
+      "latestPassed": 0,
+      "retainedFailures": []
+    },
+    {
+      "area": "layers",
+      "sourceRecords": 92,
+      "testedFiles": 32,
+      "distinctAssertions": 195,
+      "latestPassed": 195,
+      "retainedFailures": []
+    },
+    {
+      "area": "library",
+      "sourceRecords": 15,
+      "testedFiles": 7,
+      "distinctAssertions": 45,
+      "latestPassed": 45,
+      "retainedFailures": []
+    },
+    {
+      "area": "machine",
+      "sourceRecords": 12,
+      "testedFiles": 7,
+      "distinctAssertions": 44,
+      "latestPassed": 44,
+      "retainedFailures": []
+    },
+    {
+      "area": "material-library",
+      "sourceRecords": 24,
+      "testedFiles": 4,
+      "distinctAssertions": 24,
+      "latestPassed": 24,
+      "retainedFailures": []
+    },
+    {
+      "area": "raster",
+      "sourceRecords": 9,
+      "testedFiles": 3,
+      "distinctAssertions": 18,
+      "latestPassed": 18,
+      "retainedFailures": []
+    },
+    {
+      "area": "relief-viewer",
+      "sourceRecords": 2,
+      "testedFiles": 1,
+      "distinctAssertions": 1,
+      "latestPassed": 1,
+      "retainedFailures": []
+    },
+    {
+      "area": "text",
+      "sourceRecords": 29,
+      "testedFiles": 8,
+      "distinctAssertions": 40,
+      "latestPassed": 40,
+      "retainedFailures": []
+    },
+    {
+      "area": "trace",
+      "sourceRecords": 19,
+      "testedFiles": 1,
+      "distinctAssertions": 8,
+      "latestPassed": 8,
+      "retainedFailures": []
+    },
+    {
+      "area": "tutorials",
+      "sourceRecords": 17,
+      "testedFiles": 5,
+      "distinctAssertions": 64,
+      "latestPassed": 64,
+      "retainedFailures": []
+    },
+    {
+      "area": "workspace",
+      "sourceRecords": 48,
+      "testedFiles": 0,
+      "distinctAssertions": 0,
+      "latestPassed": 0,
+      "retainedFailures": []
+    }
+  ]
+}

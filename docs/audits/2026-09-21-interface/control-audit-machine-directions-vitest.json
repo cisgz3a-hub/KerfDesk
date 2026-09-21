@@ -1,0 +1,196 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 16,
+  "numPassedTests": 3,
+  "numFailedTests": 0,
+  "numPendingTests": 13,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790007348917,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls audit all eight direction buttons request their signed step and ignore clicks while disabled",
+          "status": "passed",
+          "title": "audit all eight direction buttons request their signed step and ignore clicks while disabled",
+          "duration": 103.18600000000151,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls uses the selected XY jog speed and clamps presets to the device maximum",
+          "status": "skipped",
+          "title": "uses the selected XY jog speed and clamps presets to the device maximum",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls supports diagonal step jogging with both machine axes",
+          "status": "skipped",
+          "title": "supports diagonal step jogging with both machine axes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls does not jog the machine on bare arrow keys — they nudge the canvas object (F104)",
+          "status": "skipped",
+          "title": "does not jog the machine on bare arrow keys — they nudge the canvas object (F104)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls holds toward the machine boundary and cancels on pointer release",
+          "status": "skipped",
+          "title": "holds toward the machine boundary and cancels on pointer release",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls does not cancel an active hold merely because live machine state re-renders the pad",
+          "status": "skipped",
+          "title": "does not cancel an active hold merely because live machine state re-renders the pad",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls does not start a hold or release step after the pad becomes disabled mid-press",
+          "status": "skipped",
+          "title": "does not start a hold or release step after the pad becomes disabled mid-press",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls does not start a continuous jog on firmware without a jog-cancel (holding steps once)",
+          "status": "skipped",
+          "title": "does not start a continuous jog on firmware without a jog-cancel (holding steps once)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls cancels an active hold when the app window loses focus",
+          "status": "skipped",
+          "title": "cancels an active hold when the app window loses focus",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JogPad motion controls"],
+          "fullName": "JogPad motion controls cancels an active hold when the jog panel unmounts",
+          "status": "skipped",
+          "title": "cancels an active hold when the jog panel unmounts",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007376294,
+      "endTime": 1790007376397.186,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/JogPad.motion-controls.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls audit every cnc override button requests its exact realtime byte",
+          "status": "passed",
+          "title": "audit every cnc override button requests its exact realtime byte",
+          "duration": 94.59079999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls audit every laser override button requests its exact realtime byte",
+          "status": "passed",
+          "title": "audit every laser override button requests its exact realtime byte",
+          "duration": 19.97149999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls shows cached Ov percentages, or dashes before the first Ov frame",
+          "status": "skipped",
+          "title": "shows cached Ov percentages, or dashes before the first Ov frame",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls notes Feed also scales plunge on a CNC job, but never on a laser job",
+          "status": "skipped",
+          "title": "notes Feed also scales plunge on a CNC job, but never on a laser job",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls fires the exact realtime byte per cnc button",
+          "status": "skipped",
+          "title": "fires the exact realtime byte per cnc button",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OverrideControls"],
+          "fullName": "OverrideControls fires the exact realtime byte per laser button",
+          "status": "skipped",
+          "title": "fires the exact realtime byte per laser button",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007380874,
+      "endTime": 1790007380987.9714,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/OverrideControls.test.tsx"
+    }
+  ]
+}

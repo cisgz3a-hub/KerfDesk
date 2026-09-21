@@ -1,0 +1,451 @@
+{
+  "numTotalTestSuites": 11,
+  "numPassedTestSuites": 11,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 42,
+  "numPassedTests": 6,
+  "numFailedTests": 0,
+  "numPendingTests": 36,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005776226,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Show project toolpath removes only the imported display slot",
+          "status": "skipped",
+          "title": "Show project toolpath removes only the imported display slot",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Retry Abort retries a failed close request and resolves only after the mocked stop succeeds",
+          "status": "skipped",
+          "title": "Retry Abort retries a failed close request and resolves only after the mocked stop succeeds",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes G-code Cancel closes without choosing or writing a destination",
+          "status": "passed",
+          "title": "G-code Cancel closes without choosing or writing a destination",
+          "duration": 132.41890000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes rail collapse and expand change the visible surface and retain contextual help",
+          "status": "skipped",
+          "title": "rail collapse and expand change the visible surface and retain contextual help",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes a disabled rail collapse remains inert and explains why",
+          "status": "skipped",
+          "title": "a disabled rail collapse remains inert and explains why",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Try again remounts recovered content and Copy diagnostic writes the local error payload",
+          "status": "skipped",
+          "title": "Try again remounts recovered content and Copy diagnostic writes the local error payload",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual shell control outcomes"],
+          "fullName": "individual shell control outcomes Keyboard Shortcuts Close removes its dialog and releases modal ownership",
+          "status": "skipped",
+          "title": "Keyboard Shortcuts Close removes its dialog and releases modal ownership",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Grid and Circular array modes submit their own settings, including rotation",
+          "status": "skipped",
+          "title": "Grid and Circular array modes submit their own settings, including rotation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Quick Nest Outline and rotation controls submit the chosen method without side effects on Cancel",
+          "status": "skipped",
+          "title": "Quick Nest Outline and rotation controls submit the chosen method without side effects on Cancel",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Project Notes Cancel discards the draft and never applies it",
+          "status": "skipped",
+          "title": "Project Notes Cancel discards the draft and never applies it",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions contour repair Cancel leaves the project intact and an ineligible Apply stays inert",
+          "status": "skipped",
+          "title": "contour repair Cancel leaves the project intact and an ineligible Apply stays inert",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual editing dialog actions"],
+          "fullName": "individual editing dialog actions Undo History Close dispatches once and empty Undo/Redo cannot dispatch",
+          "status": "skipped",
+          "title": "Undo History Close dispatches once and empty Undo/Redo cannot dispatch",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005795509,
+      "endTime": 1790005795641.419,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/app/interface-control-outcomes.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar shows empty-workspace commands in a vertical dropdown without selection-only actions",
+          "status": "skipped",
+          "title": "shows empty-workspace commands in a vertical dropdown without selection-only actions",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar runs enabled quick-bar commands through the command object and closes",
+          "status": "skipped",
+          "title": "runs enabled quick-bar commands through the command object and closes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar shows Fill Selection in the selected-object dropdown",
+          "status": "skipped",
+          "title": "shows Fill Selection in the selected-object dropdown",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar keeps disabled command buttons inert",
+          "status": "skipped",
+          "title": "keeps disabled command buttons inert",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar expands context More actions inside the vertical dropdown and excludes laser machine commands",
+          "status": "passed",
+          "title": "expands context More actions inside the vertical dropdown and excludes laser machine commands",
+          "duration": 103.55220000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar clamps the floating surface inside the viewport",
+          "status": "skipped",
+          "title": "clamps the floating surface inside the viewport",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["WorkspaceContextBar"],
+          "fullName": "WorkspaceContextBar runs a More action exactly once and dismisses both menu levels",
+          "status": "passed",
+          "title": "runs a More action exactly once and dismisses both menu levels",
+          "duration": 26.46160000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005797958,
+      "endTime": 1790005798088.4617,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/WorkspaceContextBar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["RegistrationJigArtworkSizeControls"],
+          "fullName": "RegistrationJigArtworkSizeControls keeps the other dimension unchanged while aspect ratio is unlocked",
+          "status": "passed",
+          "title": "keeps the other dimension unchanged while aspect ratio is unlocked",
+          "duration": 72.70010000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005801745,
+      "endTime": 1790005801817.7002,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/RegistrationJigArtworkSizeControls.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes select selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "select selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes node selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "node selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes measure selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "measure selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes text selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "text selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes rect selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "rect selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes ellipse selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "ellipse selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes polygon selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "polygon selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes star selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "star selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes polyline selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "polyline selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes position-laser selects exactly its tool mode without changing artwork",
+          "status": "skipped",
+          "title": "position-laser selects exactly its tool mode without changing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Open Design Studio creates a resumable session",
+          "status": "skipped",
+          "title": "Open Design Studio creates a resumable session",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Smooth updates the selected handles with undoable geometry",
+          "status": "skipped",
+          "title": "Smooth updates the selected handles with undoable geometry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Corner updates the selected handles with undoable geometry",
+          "status": "skipped",
+          "title": "Corner updates the selected handles with undoable geometry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Curve and Line convert the outgoing segment and explain their unavailable states",
+          "status": "passed",
+          "title": "Curve and Line convert the outgoing segment and explain their unavailable states",
+          "duration": 95.8122999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawing palette individual outcomes"],
+          "fullName": "drawing palette individual outcomes Start reorders a closed path and Break opens it at the selected node",
+          "status": "passed",
+          "title": "Start reorders a closed path and Break opens it at the selected node",
+          "duration": 37.22739999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Zoom in/out and both fit-to-bed entry points change only the view",
+          "status": "skipped",
+          "title": "Zoom in/out and both fit-to-bed entry points change only the view",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Fit to selection zooms to actual selected artwork",
+          "status": "skipped",
+          "title": "Fit to selection zooms to actual selected artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes aspect lock makes width edits scale height proportionally",
+          "status": "skipped",
+          "title": "aspect lock makes width edits scale height proportionally",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes Play, Pause, Restart and both pass buttons change the scrubber as labelled",
+          "status": "skipped",
+          "title": "Play, Pause, Restart and both pass buttons change the scrubber as labelled",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["viewport and preview individual outcomes"],
+          "fullName": "viewport and preview individual outcomes preview travel toggle, tutorial and 3D entry dispatch without changing the route",
+          "status": "skipped",
+          "title": "preview travel toggle, tutorial and 3D entry dispatch without changing the route",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig remaining actions"],
+          "fullName": "registration jig remaining actions air assist updates the outline operation and Advanced settings opens that operation",
+          "status": "skipped",
+          "title": "air assist updates the outline operation and Advanced settings opens that operation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["registration jig remaining actions"],
+          "fullName": "registration jig remaining actions Remove outline preserves artwork, tutorial opens the jig lesson, and Close only hides the panel",
+          "status": "skipped",
+          "title": "Remove outline preserves artwork, tutorial opens the jig lesson, and Close only hides the panel",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005789787,
+      "endTime": 1790005789921.2273,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/WorkspaceButtons.audit.test.tsx"
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 6,
+  "numFailedTests": 3,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790004405303,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit arms every displayed tool and announces exactly the active tool",
+          "status": "passed",
+          "title": "arms every displayed tool and announces exactly the active tool",
+          "duration": 319.80539999999746,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit opens both colour pickers, commits foreground, cancels background, swaps and resets colours",
+          "status": "passed",
+          "title": "opens both colour pickers, commits foreground, cancels background, swaps and resets colours",
+          "duration": 157.77290000000357,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit chooses each paint swatch and opens its contextual lesson",
+          "status": "passed",
+          "title": "chooses each paint swatch and opens its contextual lesson",
+          "duration": 19.711100000000442,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit switches both gradient shapes and wand contiguity through the options bar",
+          "status": "passed",
+          "title": "switches both gradient shapes and wand contiguity through the options bar",
+          "duration": 29.651400000002468,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit disables empty crop actions, cancels the box, and commits actual pixel dimensions",
+          "status": "passed",
+          "title": "disables empty crop actions, cancels the box, and commits actual pixel dimensions",
+          "duration": 14.4346000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio control-by-control audit"],
+          "fullName": "Image Studio control-by-control audit sets all selection modes and gates pixel actions until a selection exists",
+          "status": "passed",
+          "title": "sets all selection modes and gates pixel actions until a selection exists",
+          "duration": 26.239800000003015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004438596,
+      "endTime": 1790004439164.2397,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "gates stack-edge actions and adds, reorders, duplicates, deletes and merges actual layers",
+          "status": "failed",
+          "title": "gates stack-edge actions and adds, reorders, duplicates, deletes and merges actual layers",
+          "duration": 197.33219999999983,
+          "failureMessages": [
+            "AssertionError: expected false to be true // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorLayers.audit.test.tsx:21:38\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "selects paint layers, toggles visibility, and opens the layers lesson",
+          "status": "failed",
+          "title": "selects paint layers, toggles visibility, and opens the layers lesson",
+          "duration": 47.51540000000023,
+          "failureMessages": [
+            "Error: Control missing: Image layers\n    at control (D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:27:22)\n    at D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:32:25\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at clickControl (D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:32:9)\n    at D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorLayers.audit.test.tsx:54:9\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "jumps backward and forward through actual image pixels from History rows",
+          "status": "failed",
+          "title": "jumps backward and forward through actual image pixels from History rows",
+          "duration": 24.989199999999983,
+          "failureMessages": [
+            "Error: Control missing: Image history\n    at control (D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:27:22)\n    at D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:32:25\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at clickControl (D:/LaserForge/ui-audit-20260921/src/ui/image-editor/control-audit-test-support.tsx:32:9)\n    at D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorLayers.audit.test.tsx:70:9\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004444551,
+      "endTime": 1790004444820.9893,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorLayers.audit.test.tsx"
+    }
+  ]
+}

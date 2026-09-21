@@ -30,6 +30,7 @@ export function LayersPanel(): JSX.Element | null {
   const [dragId, setDragId] = useState<string | null>(null);
   if (session === null) return null;
   const active = session.layers.find((layer) => layer.id === session.activeLayerId);
+  const activeIndex = session.layers.findIndex((layer) => layer.id === session.activeLayerId);
   // Top of the stack renders first (Photoshop reading order).
   const rows = [...session.layers].reverse();
   const stackIndexOfRow = (rowIndex: number): number => session.layers.length - 1 - rowIndex;
@@ -41,7 +42,11 @@ export function LayersPanel(): JSX.Element | null {
         <strong style={headerStyle}>Layers</strong>
         <TutorialButton tutorialId="image-layers" compact label="Image layers" />
       </div>
-      <LayerActions canMerge={session.layers.length > 1} />
+      <LayerActions
+        canMoveUp={activeIndex >= 0 && activeIndex < session.layers.length - 1}
+        canMoveDown={activeIndex > 0}
+        canDelete={active !== undefined && session.layers.length > 1}
+      />
       {active === undefined ? null : <ActiveLayerControls active={active} />}
       <div style={listStyle}>
         {rows.map((layer, rowIndex) => (
@@ -137,7 +142,11 @@ function LayerThumbnail(props: {
   );
 }
 
-function LayerActions(props: { readonly canMerge: boolean }): JSX.Element {
+function LayerActions(props: {
+  readonly canMoveUp: boolean;
+  readonly canMoveDown: boolean;
+  readonly canDelete: boolean;
+}): JSX.Element {
   return (
     <div style={actionsStyle}>
       <button
@@ -163,6 +172,7 @@ function LayerActions(props: { readonly canMerge: boolean }): JSX.Element {
         className="lf-btn"
         style={actionStyle}
         onClick={() => updateSession((s) => moveActiveLayer(s, 1))}
+        disabled={!props.canMoveUp}
         title="Move the active layer up"
       >
         ↑
@@ -172,6 +182,7 @@ function LayerActions(props: { readonly canMerge: boolean }): JSX.Element {
         className="lf-btn"
         style={actionStyle}
         onClick={() => updateSession((s) => moveActiveLayer(s, -1))}
+        disabled={!props.canMoveDown}
         title="Move the active layer down"
       >
         ↓
@@ -181,7 +192,7 @@ function LayerActions(props: { readonly canMerge: boolean }): JSX.Element {
         className="lf-btn"
         style={actionStyle}
         onClick={() => updateSession((s) => mergeActiveLayerDown(s))}
-        disabled={!props.canMerge}
+        disabled={!props.canMoveDown}
         title="Merge the active layer into the one below it"
       >
         ⤓
@@ -191,7 +202,7 @@ function LayerActions(props: { readonly canMerge: boolean }): JSX.Element {
         className="lf-btn"
         style={actionStyle}
         onClick={() => updateSession((s) => removeActiveLayer(s))}
-        disabled={!props.canMerge}
+        disabled={!props.canDelete}
         title="Delete the active layer (the last layer always stays)"
       >
         🗑

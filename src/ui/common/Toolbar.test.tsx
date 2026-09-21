@@ -179,8 +179,11 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
       });
 
       const name = host.querySelector('[aria-label="Current project"]');
-      expect(name?.textContent).toBe('Welcome sign.kerf');
+      expect(name?.querySelector('.lf-toolbar-project-title')?.textContent).toBe(
+        'Welcome sign.kerf',
+      );
       expect(name?.getAttribute('title')).toContain('unsaved changes');
+      expect(name?.querySelector('[aria-label="Unsaved changes"]')).not.toBeNull();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -306,17 +309,20 @@ describe('Toolbar separators', () => {
     invoke: vi.fn(),
   });
 
-  it('renders separators only between non-empty file and creation groups', async () => {
+  it('renders separators only between non-empty file and preview groups', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
     try {
       await act(async () => {
         root = createRoot(host);
-        // File and creation commands remain separate without empty groups.
+        // File and preview commands remain separate without empty groups.
         root.render(
           <Toolbar
-            commands={[command('file.new', 'New'), command('tools.add-text', 'Text...')]}
+            commands={[
+              command('file.open', 'Open...'),
+              command('window.toggle-preview', 'Preview'),
+            ]}
             machineKind="laser"
           />,
         );
@@ -337,7 +343,7 @@ describe('Toolbar separators', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<Toolbar commands={[command('file.new', 'New')]} machineKind="laser" />);
+        root.render(<Toolbar commands={[command('file.open', 'Open...')]} machineKind="laser" />);
       });
 
       const separators = [...host.querySelectorAll('[role="separator"]')];
@@ -355,18 +361,18 @@ describe('Toolbar separators', () => {
 
 describe('Toolbar command buttons', () => {
   it('runs toolbar clicks through the command registry command object', async () => {
-    const onNew = vi.fn();
+    const onOpen = vi.fn();
     const host = document.createElement('div');
     document.body.appendChild(host);
     const commands: ReadonlyArray<AppCommand> = [
       {
-        id: 'file.new',
+        id: 'file.open',
         family: 'file',
-        label: 'New',
-        title: 'New project',
-        shortcut: 'Ctrl+N',
+        label: 'Open...',
+        title: 'Open project',
+        shortcut: 'Ctrl+O',
         enabled: true,
-        invoke: onNew,
+        invoke: onOpen,
       },
     ];
     let root: Root | null = null;
@@ -376,13 +382,13 @@ describe('Toolbar command buttons', () => {
         root.render(<Toolbar commands={commands} machineKind="laser" />);
       });
 
-      const button = host.querySelector('button[aria-label="New"]');
-      if (!(button instanceof HTMLButtonElement)) throw new Error('New button missing');
+      const button = host.querySelector('button[aria-label="Open..."]');
+      if (!(button instanceof HTMLButtonElement)) throw new Error('Open button missing');
       await act(async () => {
         button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(onNew).toHaveBeenCalled();
+      expect(onOpen).toHaveBeenCalled();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -390,18 +396,18 @@ describe('Toolbar command buttons', () => {
   });
 
   it('marks toolbar command buttons with stable help ids', async () => {
-    const onNew = vi.fn();
+    const onOpen = vi.fn();
     const host = document.createElement('div');
     document.body.appendChild(host);
     const commands: ReadonlyArray<AppCommand> = [
       {
-        id: 'file.new',
+        id: 'file.open',
         family: 'file',
-        label: 'New',
-        title: 'Create a new blank project.',
-        shortcut: 'Ctrl+N',
+        label: 'Open...',
+        title: 'Open an existing project.',
+        shortcut: 'Ctrl+O',
         enabled: true,
-        invoke: onNew,
+        invoke: onOpen,
       },
     ];
     let root: Root | null = null;
@@ -411,8 +417,8 @@ describe('Toolbar command buttons', () => {
         root.render(<Toolbar commands={commands} machineKind="laser" />);
       });
 
-      const button = host.querySelector('button[data-help-id="command:file.new"]');
-      expect(button?.getAttribute('title')).toBe('Create a new blank project. (Ctrl+N)');
+      const button = host.querySelector('button[data-help-id="command:file.open"]');
+      expect(button?.getAttribute('title')).toBe('Open an existing project. (Ctrl+O)');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

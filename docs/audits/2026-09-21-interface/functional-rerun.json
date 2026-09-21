@@ -1,0 +1,463 @@
+{
+  "numTotalTestSuites": 17,
+  "numPassedTestSuites": 17,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 36,
+  "numPassedTests": 36,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790001901391,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["image mask commands"],
+          "fullName": "image mask commands enables Apply Mask to Image only when one image and one closed mask are selected",
+          "status": "passed",
+          "title": "enables Apply Mask to Image only when one image and one closed mask are selected",
+          "duration": 10.768100000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["image mask commands"],
+          "fullName": "image mask commands enables Remove Image Mask only when the selected image has a mask",
+          "status": "passed",
+          "title": "enables Remove Image Mask only when the selected image has a mask",
+          "duration": 3.5640999999998257,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["image mask commands"],
+          "fullName": "image mask commands enables Crop Image only when the selected image has a mask to bake",
+          "status": "passed",
+          "title": "enables Crop Image only when the selected image has a mask to bake",
+          "duration": 3.4216999999998734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001999947,
+      "endTime": 1790001999965.4216,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/command-image-mask.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Image Studio operation menus"],
+          "fullName": "Image Studio operation menus opens at either end with arrow keys, moves focus, and dismisses with Escape",
+          "status": "passed",
+          "title": "opens at either end with arrow keys, moves focus, and dismisses with Escape",
+          "duration": 89.63679999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio operation menus"],
+          "fullName": "Image Studio operation menus hands the selected image operation to its dialog and keeps a usable focus return target",
+          "status": "passed",
+          "title": "hands the selected image operation to its dialog and keeps a usable focus return target",
+          "duration": 29.19329999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio operation menus"],
+          "fullName": "Image Studio operation menus dismisses on Tab before focus moves to the next studio control",
+          "status": "passed",
+          "title": "dismisses on Tab before focus moves to the next studio control",
+          "duration": 17.38799999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio operation menus"],
+          "fullName": "Image Studio operation menus explains why image operations cannot run during an unfinished transform",
+          "status": "passed",
+          "title": "explains why image operations cannot run during an unfinished transform",
+          "duration": 19.671299999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790002004461,
+      "endTime": 1790002004616.6714,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorAdjustMenus.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability wraps the session actions instead of clipping them at narrow width or high zoom",
+          "status": "passed",
+          "title": "wraps the session actions instead of clipping them at narrow width or high zoom",
+          "duration": 68.33410000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability scrolls the tool rail and gives the two-dimensional color pad keyboard control",
+          "status": "passed",
+          "title": "scrolls the tool rail and gives the two-dimensional color pad keyboard control",
+          "duration": 236.87389999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability traps and restores focus in the production Resize dialog",
+          "status": "passed",
+          "title": "traps and restores focus in the production Resize dialog",
+          "duration": 37.467499999998836,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability lets the production Resize Cancel button keep native Enter semantics",
+          "status": "passed",
+          "title": "lets the production Resize Cancel button keep native Enter semantics",
+          "duration": 18.235599999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability closes a blank Resize draft on Enter using the last valid size",
+          "status": "passed",
+          "title": "closes a blank Resize draft on Enter using the last valid size",
+          "duration": 14.72689999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability traps and restores focus in the production Text dialog",
+          "status": "passed",
+          "title": "traps and restores focus in the production Text dialog",
+          "duration": 31.338399999998728,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability keeps a blank Text size draft visible until it is reconciled",
+          "status": "passed",
+          "title": "keeps a blank Text size draft visible until it is reconciled",
+          "duration": 23.413300000000163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability announces exact Text raster failures inside the open dialog",
+          "status": "passed",
+          "title": "announces exact Text raster failures inside the open dialog",
+          "duration": 14.2591999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability traps and restores focus in the production Color Picker dialog",
+          "status": "passed",
+          "title": "traps and restores focus in the production Color Picker dialog",
+          "duration": 19.779200000000856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Image Studio reachability"],
+          "fullName": "Image Studio reachability lets the production Color Picker Cancel button keep native Enter semantics",
+          "status": "passed",
+          "title": "lets the production Color Picker Cancel button keep native Enter semantics",
+          "duration": 13.918299999999363,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001997453,
+      "endTime": 1790001997931.9182,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/ImageStudioAccessibility.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["library stroke provenance through vector actions"],
+          "fullName": "library stroke provenance through vector actions keeps Apple V-carve motion after Convert to Path",
+          "status": "passed",
+          "title": "keeps Apple V-carve motion after Convert to Path",
+          "duration": 948.3671999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["library stroke provenance through vector actions"],
+          "fullName": "library stroke provenance through vector actions keeps Apple V-carve motion after Break Apart",
+          "status": "passed",
+          "title": "keeps Apple V-carve motion after Break Apart",
+          "duration": 523.9076000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001978537,
+      "endTime": 1790001980009.9077,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/library/library-stroke-provenance-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["design-library V-carve compilation"],
+          "fullName": "design-library V-carve compilation preserves the pinned round-stroke width for every bundled Tabler asset",
+          "status": "passed",
+          "title": "preserves the pinned round-stroke width for every bundled Tabler asset",
+          "duration": 657.2932999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["design-library V-carve compilation"],
+          "fullName": "design-library V-carve compilation emits V-carve motion for the bundled Apple artwork",
+          "status": "passed",
+          "title": "emits V-carve motion for the bundled Apple artwork",
+          "duration": 843.7567000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["design-library V-carve compilation"],
+          "fullName": "design-library V-carve compilation keeps visible Tabler strokes when a decorative descendant is stroke none",
+          "status": "passed",
+          "title": "keeps visible Tabler strokes when a decorative descendant is stroke none",
+          "duration": 5.512900000001537,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["design-library V-carve compilation"],
+          "fullName": "design-library V-carve compilation keeps the Apple centerlines for engrave and materializes closed regions only for V-carve",
+          "status": "passed",
+          "title": "keeps the Apple centerlines for engrave and materializes closed regions only for V-carve",
+          "duration": 13.333999999995285,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001968946,
+      "endTime": 1790001970466.334,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/library/library-vcarve-compilation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ArtworkRunOrderList"],
+          "fullName": "ArtworkRunOrderList renders a bounded window for a 1000-job project",
+          "status": "passed",
+          "title": "renders a bounded window for a 1000-job project",
+          "duration": 142.74139999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderRow position box"],
+          "fullName": "ArtworkRunOrderRow position box snaps back to the real run position when the move is refused",
+          "status": "passed",
+          "title": "snaps back to the real run position when the move is refused",
+          "duration": 26.029999999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "offers a focusable run selection action without invoking settings or double-selecting",
+          "status": "passed",
+          "title": "offers a focusable run selection action without invoking settings or double-selecting",
+          "duration": 26.707299999999805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790002006023,
+      "endTime": 1790002006218.7073,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkRunOrderList.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage keeps stable, unique lesson IDs with complete reader metadata and meaningful steps",
+          "status": "passed",
+          "title": "keeps stable, unique lesson IDs with complete reader metadata and meaningful steps",
+          "duration": 482.7504000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage maps every real command deliberately and resolves every non-null command lesson",
+          "status": "passed",
+          "title": "maps every real command deliberately and resolves every non-null command lesson",
+          "duration": 36.52169999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage resolves related lessons and operation-specific help targets",
+          "status": "passed",
+          "title": "resolves related lessons and operation-specific help targets",
+          "duration": 12.536000000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage resolves static tutorial props, direct links and dynamic help-table targets in source",
+          "status": "passed",
+          "title": "resolves static tutorial props, direct links and dynamic help-table targets in source",
+          "duration": 7951.266599999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage gives every shipped Design Studio tool a specific help-table entry",
+          "status": "passed",
+          "title": "gives every shipped Design Studio tool a specific help-table entry",
+          "duration": 37.22739999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage renders every referenced visual in all stages without an unknown scene fallback",
+          "status": "passed",
+          "title": "renders every referenced visual in all stages without an unknown scene fallback",
+          "duration": 4289.078699999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial catalog coverage"],
+          "fullName": "tutorial catalog coverage keeps lesson data, example scenes and learning state outside project/controller authority",
+          "status": "passed",
+          "title": "keeps lesson data, example scenes and learning state outside project/controller authority",
+          "duration": 182.20260000000053,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001911872,
+      "endTime": 1790001924869.2026,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/tutorial-catalog.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["simulateDesignCarve"],
+          "fullName": "simulateDesignCarve carves a two-bit design with each section stamped by its own bit",
+          "status": "passed",
+          "title": "carves a two-bit design with each section stamped by its own bit",
+          "duration": 920.3366999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["simulateDesignCarve"],
+          "fullName": "simulateDesignCarve reports a laser project as unsimulatable, without throwing",
+          "status": "passed",
+          "title": "reports a laser project as unsimulatable, without throwing",
+          "duration": 1.0061000000005151,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["simulateDesignCarve"],
+          "fullName": "simulateDesignCarve reports an all-construction sketch as empty",
+          "status": "passed",
+          "title": "reports an all-construction sketch as empty",
+          "duration": 0.8368000000000393,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790001984344,
+      "endTime": 1790001985266.837,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/design-studio/preview3d/design-simulate.test.ts"
+    }
+  ]
+}

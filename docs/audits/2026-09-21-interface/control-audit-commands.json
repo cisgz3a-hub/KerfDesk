@@ -1,0 +1,1390 @@
+{
+  "scope": "Every registered CommandId clicked through the application menu",
+  "counts": {
+    "verified-boundary": 89,
+    "intentionally-unavailable": 1,
+    "verified-behaviour": 1
+  },
+  "commands": [
+    {
+      "id": "file.new",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "newProject",
+        "guard": "start a new project"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.new' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.open",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "openProject"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.open' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.save",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "saveProject"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.save' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.save-as",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "saveProjectAs"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.save-as' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.import",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "importArtwork"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.import' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.import-svg",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "importSvg"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.import-svg' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.import-dxf",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "importDxf"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.import-dxf' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.import-image",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "importImage"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.import-image' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.import-height-map",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "importHeightMap"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.import-height-map' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.save-gcode",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "saveGcode"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.save-gcode' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.open-gcode",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "openGcodePreview"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.open-gcode' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "file.inspect-gcode",
+      "family": "file",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "inspectCurrentGcode"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'file.inspect-gcode' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.undo",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "undo"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.undo' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.redo",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "redo"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.redo' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.select-all",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "selectAll"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.select-all' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.copy",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "copySelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.copy' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.cut",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "cutSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.cut' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.paste",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "pasteClipboard"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.paste' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.group",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "groupSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.group' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.ungroup",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "ungroupSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.ungroup' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.lock-selection",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "lockSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.lock-selection' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.unlock-all",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "unlockAllObjects"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.unlock-all' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.duplicate",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "duplicateSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.duplicate' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.delete",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "deleteSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.delete' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "edit.clear-selection",
+      "family": "edit",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "clearSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'edit.clear-selection' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.measure",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "measureTool"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.measure' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.add-text",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "addText"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.add-text' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.registration-jig",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleRegistrationPanel"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.registration-jig' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.place-board",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleBoardCapturePanel"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.place-board' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.camera",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleCameraPanel"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.camera' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.box-generator",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "boxGenerator"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.box-generator' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.box-fit-test",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "boxFitTest"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.box-fit-test' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.material-test",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "materialTest",
+        "guard": "create a material test"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.material-test' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.interval-test",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "intervalTest",
+        "guard": "create an interval test"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.interval-test' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.scan-offset-test",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "scanOffsetTest",
+        "guard": "create a scan offset test"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.scan-offset-test' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.focus-test",
+      "family": "tools",
+      "disposition": "intentionally-unavailable",
+      "expected": {
+        "special": "unavailable"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.focus-test' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Focus Test remains disabled with its explicit unimplemented-generator reason and never dispatches."
+    },
+    {
+      "id": "tools.optimization-settings",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "optimizationSettings"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.optimization-settings' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.rotary-setup",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "rotarySetup"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.rotary-setup' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.print-and-cut",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "printAndCut"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.print-and-cut' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.labs",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "labsSettings"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.labs' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.adjust-image",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "adjustImage"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.adjust-image' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.edit-image",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "editImage"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.edit-image' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.apply-image-mask",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "applyImageMask"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.apply-image-mask' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.crop-image",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "cropImage"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.crop-image' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.remove-image-mask",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "removeImageMask"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.remove-image-mask' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.save-processed-bitmap",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "saveProcessedBitmap"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.save-processed-bitmap' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.trace-image",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "traceImage"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.trace-image' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.retrace-original",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "retraceOriginal"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.retrace-original' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.multi-file-trace",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "multiFileTrace"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.multi-file-trace' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.convert-to-path",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "convertSelectionToPath"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.convert-to-path' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.weld",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "weldSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.weld' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.subtract",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "subtractSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.subtract' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.intersect",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "intersectSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.intersect' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.exclude",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "excludeSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.exclude' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.convert-to-bitmap",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "convertToBitmap"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.convert-to-bitmap' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.fill-selection",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "fillSelectionSeparately"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.fill-selection' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.close-open-fill-contours",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "closeSelectedOpenFillContours"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.close-open-fill-contours' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "tools.close-fill-contours-with-tolerance",
+      "family": "tools",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "reviewCloseOpenFillContours"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'tools.close-fill-contours-with-tolera…' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-left",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["left"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-left' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-center-x",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["center-x"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-center-x' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-right",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["right"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-right' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-top",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["top"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-top' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-center-y",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["center-y"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-center-y' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-bottom",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["bottom"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-bottom' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.align-centers",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "alignSelection",
+        "args": ["centers"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.align-centers' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.distribute-horizontal-centers",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "distributeSelection",
+        "args": ["horizontal-centers"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.distribute-horizontal-centers' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.distribute-horizontal-spacing",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "distributeSelection",
+        "args": ["horizontal-spacing"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.distribute-horizontal-spacing' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.distribute-vertical-centers",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "distributeSelection",
+        "args": ["vertical-centers"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.distribute-vertical-centers' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.distribute-vertical-spacing",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "distributeSelection",
+        "args": ["vertical-spacing"]
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.distribute-vertical-spacing' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.break-apart",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "breakApartSelection"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.break-apart' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.array",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "createArray"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.array' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.quick-nest",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "quickNest"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.quick-nest' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.flip-horizontal",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "flipHorizontal"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.flip-horizontal' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "arrange.flip-vertical",
+      "family": "arrange",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "flipVertical"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'arrange.flip-vertical' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "laser.connect",
+      "family": "laser",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "connectLaser"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'laser.connect' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "laser.disconnect",
+      "family": "laser",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "disconnectLaser"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'laser.disconnect' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "laser.home",
+      "family": "laser",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "homeLaser"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'laser.home' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.toggle-preview",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "togglePreview"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.toggle-preview' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.toggle-layers-panel",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleLayersPanel"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.toggle-layers-panel' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.toggle-machine-panel",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleMachinePanel"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.toggle-machine-panel' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.toggle-side-panels",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "toggleSidePanels"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.toggle-side-panels' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.reset-layout",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "resetWorkspaceLayout"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.reset-layout' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.fit-view",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "resetView"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.fit-view' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.project-notes",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "projectNotes"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.project-notes' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "window.undo-history",
+      "family": "window",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "undoHistory"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'window.undo-history' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "help.about",
+      "family": "help",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "showAbout"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.about' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "help.tutorials",
+      "family": "help",
+      "disposition": "verified-behaviour",
+      "expected": {
+        "special": "tutorials"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.tutorials' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual tutorial store opens the library; menu closes."
+    },
+    {
+      "id": "help.connection",
+      "family": "help",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "showConnectionHelp"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.connection' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "help.safety",
+      "family": "help",
+      "disposition": "verified-boundary",
+      "expected": {
+        "callback": "showSafety"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.safety' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "help.report-bug",
+      "family": "help",
+      "disposition": "verified-boundary",
+      "expected": {
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/issues/new/choose"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.report-bug' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    },
+    {
+      "id": "help.discussions",
+      "family": "help",
+      "disposition": "verified-boundary",
+      "expected": {
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/discussions"
+      },
+      "evidence": {
+        "file": "src/ui/commands/AppMenuBar.control-audit.test.tsx",
+        "test": "every registered application menu action 'help.discussions' clicks through the menu to the expected outcome",
+        "report": "docs/audits/2026-09-21-interface/control-audit-menu-vitest.json",
+        "result": "passed"
+      },
+      "boundary": "Actual menu and registry dispatch. Expected callbacks, arguments, dirty guard and URL are independent test expectations; context callbacks and external navigation are mocked. Downstream geometry, persistence and machine effects require their own cases in the control matrices."
+    }
+  ]
+}

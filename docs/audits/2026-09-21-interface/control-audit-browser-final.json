@@ -1,0 +1,116 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\LaserForge\\ui-audit-20260921\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/button-audit-regressions.spec.ts",
+      "--grep",
+      "Image Studio",
+      "--reporter=list,json"
+    ],
+    "configFile": "D:\\LaserForge\\ui-audit-20260921\\playwright.config.ts",
+    "rootDir": "D:/LaserForge/ui-audit-20260921/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/LaserForge/ui-audit-20260921/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/LaserForge/ui-audit-20260921/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["list"], ["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "D:\\LaserForge\\ui-audit-20260921\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "button-audit-regressions.spec.ts",
+      "file": "button-audit-regressions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Image Studio stack-edge buttons stay inert and become available at the correct layer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15312,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T16:03:10.774Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7053412716320e978fed-4234b40b223d15fc2a0c",
+          "file": "button-audit-regressions.spec.ts",
+          "line": 55,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-21T16:03:09.250Z",
+    "duration": 41802.433,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

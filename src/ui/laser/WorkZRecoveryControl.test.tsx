@@ -76,6 +76,17 @@ afterEach(async () => {
 });
 
 describe('WorkZRecoveryControl', () => {
+  it('audit setup-reuse disclosure toggles without requesting controller recovery', async () => {
+    const recover = setCncState();
+    const rendered = await renderControl();
+    const details = rendered.querySelector('details')!;
+    const summary = details.querySelector('summary')!;
+    await act(async () => summary.click());
+    expect(details.open).toBe(true);
+    await act(async () => summary.click());
+    expect(details.open).toBe(false);
+    expect(recover).not.toHaveBeenCalled();
+  });
   it('puts the renamed action in a collapsed advanced setup-reuse disclosure', async () => {
     const recover = setCncState();
     const rendered = await renderControl();

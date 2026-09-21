@@ -21146,3 +21146,40 @@ contour box index, the detail detector and the membership tests all in the same 
 cliff is unchanged: a drawing whose chains fall inside the sharpener's window still pays for it,
 and one just outside still skips it. Making the scan proportional to its window rather than to the
 chain would need a ring view with modular indexing through every gate, which is its own decision.
+
+## ADR-339 - Task-focused controls and explicit completed-run dismissal
+
+**Date:** 2026-09-21
+**Status:** Accepted for implementation; local software and browser verification recorded in the interface audit.
+
+### Context
+
+The operator found the interface too crowded and requested an audit of buttons, a more professional
+layout, and a way to clear a finished job. The machine panel mixed frequent positioning with
+occasional configuration and recovery. A successful run retained its completed preview until the
+project changed, without an explicit way to acknowledge it.
+
+### Decision
+
+- Keep Open, Import, Save and Preview in the primary toolbar. Image tools appear there when an
+  image is selected and space permits. Preserve every other registered toolbar command in More
+  and its existing menu/shortcut route; use the same dispatch and enabled-state definitions.
+- Group the drawing palette into Edit and Draw. In the machine panel, keep positioning and origin
+  together and reveal homing/focus, maintenance and history through named disclosures. Keep
+  active recovery notices visible, Frame/Start in their existing dock, and Live Motion as the
+  sole Pause/Resume/Continue/Abort surface. Contextual tutorials remain accessible.
+- Add Job complete / Done only after the current run has both a finished lifecycle and completed
+  timing, with no unsettled stream, active operation or retained controller fault. Check identity
+  and current state again at click time. Done changes only the completed `liveCanvasRun` display.
+- Retain artwork, undo history, the compiled/reviewed plan, machine coordinates, Frame evidence,
+  replay receipt and execution archive. Do not send a controller command or delete the project.
+  Acknowledging completion does not operate motors, disconnect, reset, or start another job.
+- Preserve the governing Frame-first contract of ADRs 228, 230, 232 and 237. This is a presentation
+  change, not a new machine qualification or authorization model.
+
+### Evidence
+
+[Interface audit](docs/audits/2026-09-21-interface/README.md) records the control inventory,
+confirmed defects, functional checks, browser layouts and limitations. Source and simulated
+controller evidence do not qualify physical controller or material behaviour. Implementation is
+local until separately reviewed and published.

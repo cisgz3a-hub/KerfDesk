@@ -1,0 +1,119 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 7,
+  "numPassedTests": 7,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790007316922,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "cancels corner collection, retries failed alignment and saves a four-click homography to the device",
+          "status": "passed",
+          "title": "cancels corner collection, retries failed alignment and saves a four-click homography to the device",
+          "duration": 246.3787000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007356939,
+      "endTime": 1790007357185.3787,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/camera/NetworkCameraView.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "status": "passed",
+          "title": "font picker opens, chooses every built-in and the embedded font, then closes each time",
+          "duration": 2398.886999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "status": "passed",
+          "title": "font Import opens the native picker boundary and sends the selected file to the import callback",
+          "duration": 18.755099999994854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "symbol disclosure expands and each accent button inserts its own character",
+          "status": "passed",
+          "title": "symbol disclosure expands and each accent button inserts its own character",
+          "duration": 30.796900000001187,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "status": "passed",
+          "title": "formatting radio, weld, path enable/reverse and variable toggles update the actual text draft",
+          "duration": 266.3417000000045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "status": "passed",
+          "title": "canvas text Done and Cancel invoke separate owners and variable field inserts retain exact template tokens",
+          "duration": 38.14229999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Add Text Cancel closes without editing the project",
+          "status": "passed",
+          "title": "Add Text Cancel closes without editing the project",
+          "duration": 48.88090000000375,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790007348280,
+      "endTime": 1790007351081.8809,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/text/TextControls.audit.test.tsx"
+    }
+  ]
+}

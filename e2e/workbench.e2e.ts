@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
+import { expandMachineUtilities } from './fixtures/workspace-ui';
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#ff0000"/></svg>';
@@ -211,6 +212,7 @@ baseTest('unconfigured auto-focus opens its setup section directly', async ({ pa
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('tab', { name: 'Machine' }).click();
+  await expandMachineUtilities(page);
 
   await page.getByRole('button', { name: 'Set up auto-focus', exact: true }).click();
 
@@ -778,6 +780,7 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');

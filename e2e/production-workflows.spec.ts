@@ -1,4 +1,8 @@
-import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  expandMachineUtilities,
+  selectWorkspacePanel,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -193,6 +197,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect
     .poll(async () =>
@@ -277,7 +282,7 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   page,
   kerfdesk,
 }) => {
-  await page.getByRole('button', { name: 'Text...' }).click();
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
   await page
     .getByLabel('KerfDesk workspace', { exact: true })
     .click({ position: { x: 150, y: 200 } });
@@ -829,6 +834,7 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');

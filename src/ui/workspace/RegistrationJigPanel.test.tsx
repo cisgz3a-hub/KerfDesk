@@ -100,6 +100,9 @@ describe('RegistrationJigPanel', () => {
 
     expect(buttonByLabel('▾ How to use').getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('Put one object inside each burned outline.');
+    click('▾ How to use');
+    expect(buttonByLabel('▸ How to use').getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('Put one object inside each burned outline.');
   });
 
   it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
@@ -357,6 +360,31 @@ describe('RegistrationJigPanel', () => {
     expect(container.textContent).toContain('all 5 JIG outlines');
     click('Artwork only');
     expect(container.textContent).toContain('all ARTWORK copies');
+  });
+
+  it('Replace outline applies edited dimensions while preserving the existing artwork', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    addArt();
+    const artwork = useStore
+      .getState()
+      .project.scene.objects.find((object) => !isRegistrationBox(object));
+    render();
+    const width = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Registration box width"]',
+    );
+    if (width === null) throw new Error('Missing outline width');
+    setInputValue(width, '100');
+    click('Replace outline');
+    const boxes = findRegistrationBoxes(useStore.getState().project.scene);
+    expect(boxes).toHaveLength(1);
+    const box = boxes[0];
+    if (box === undefined) throw new Error('Missing replaced outline');
+    const bounds = transformedBBox(box);
+    expect(bounds.maxX - bounds.minX).toBeCloseTo(100);
+    expect(bounds.maxY - bounds.minY).toBeCloseTo(40);
+    expect(
+      useStore.getState().project.scene.objects.find((object) => !isRegistrationBox(object)),
+    ).toBe(artwork);
   });
 
   it('reopens an existing rectangular set with its rows, columns, and spacing', () => {

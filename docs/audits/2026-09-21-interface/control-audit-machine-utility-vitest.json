@@ -1,0 +1,217 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 17,
+  "numPassedTests": 12,
+  "numFailedTests": 1,
+  "numPendingTests": 4,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005740367,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Connect dispatches only when disconnected and remains inert while connecting",
+          "status": "skipped",
+          "title": "Connect dispatches only when disconnected and remains inert while connecting",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "status": "passed",
+          "title": "Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "duration": 40.156200000000354,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "status": "skipped",
+          "title": "Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "status": "skipped",
+          "title": "Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Release motors requires confirmation and does not release while streaming",
+          "status": "skipped",
+          "title": "Release motors requires confirmation and does not release while streaming",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005756563,
+      "endTime": 1790005756603.1562,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineRunControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit rail disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "rail disclosure opens and closes without changing the project",
+          "duration": 34.77820000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit device profile disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "device profile disclosure opens and closes without changing the project",
+          "duration": 64.46919999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit execution archive disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "execution archive disclosure opens and closes without changing the project",
+          "duration": 5.89049999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit controller backup disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "controller backup disclosure opens and closes without changing the project",
+          "duration": 11.226399999999558,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit probe disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "probe disclosure opens and closes without changing the project",
+          "duration": 12.50039999999899,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser recovery disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "laser recovery disclosure opens and closes without changing the project",
+          "duration": 4.917100000000573,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit CNC recovery guidance disclosure opens and closes without changing the project",
+          "status": "passed",
+          "title": "CNC recovery guidance disclosure opens and closes without changing the project",
+          "duration": 2.5628000000015163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "status": "passed",
+          "title": "laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "duration": 17.854699999999866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "status": "passed",
+          "title": "detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "duration": 20.051899999998568,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "status": "passed",
+          "title": "Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "duration": 7.48489999999947,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "status": "failed",
+          "title": "all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "duration": 13.332299999998213,
+          "failureMessages": [
+            "AssertionError: expected 'front-left' to be 'back-left' // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineUtilityControls.audit.test.tsx:103:80\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "status": "passed",
+          "title": "Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "duration": 23.21520000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005753250,
+      "endTime": 1790005753468.215,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineUtilityControls.audit.test.tsx"
+    }
+  ]
+}

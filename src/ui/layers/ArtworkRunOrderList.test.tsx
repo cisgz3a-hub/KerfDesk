@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ArtworkRunOrderList } from './ArtworkRunOrderList';
 import { ArtworkRunOrderRow } from './ArtworkRunOrderRow';
 import type { ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
@@ -78,6 +78,39 @@ describe('ArtworkRunOrderRow position box', () => {
       host.remove();
     }
   });
+});
+
+it('offers a focusable run selection action without invoking settings or double-selecting', async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const select = vi.fn();
+  const edit = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ArtworkRunOrderRow
+          row={row(3)}
+          active={false}
+          machineKind="laser"
+          onFocus={select}
+          onMove={() => undefined}
+          onEditSettings={edit}
+        />,
+      ),
+    );
+    const button = host.querySelector<HTMLButtonElement>('button[aria-label="Select Job 3"]');
+    if (button === null) throw new Error('Keyboard run selection control missing');
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => button.click());
+    expect(select).toHaveBeenCalledOnce();
+    expect(edit).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
 });
 
 function row(position: number): ArtworkRunOrderRowModel {

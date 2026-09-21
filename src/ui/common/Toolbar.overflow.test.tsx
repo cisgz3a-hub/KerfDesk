@@ -19,6 +19,52 @@ afterEach(async () => {
 });
 
 describe('Toolbar overflow interactions', () => {
+  it('prioritises the file-to-preview workflow and reveals image actions with an image selection', async () => {
+    const fresh = command('file.new', 'New');
+    const trace = command('tools.trace-image', 'Trace Image...', {
+      enabled: false,
+      disabledReason: 'Select an image first.',
+    });
+    const commands = [
+      fresh,
+      command('file.open', 'Open...'),
+      command('file.import', 'Import...'),
+      command('file.save', 'Save'),
+      command('window.toggle-preview', 'Preview', { active: false }),
+      command('tools.add-text', 'Text...'),
+      trace,
+      command('tools.edit-image', 'Image Studio...'),
+    ];
+    await render(commands);
+    expect(
+      [...(host?.querySelectorAll('button[data-help-id]') ?? [])].map((item) =>
+        item.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Open...', 'Import...', 'Save', 'Preview']);
+    await act(async () => button('More commands').click());
+    expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
+    expect(button('Trace Image...').disabled).toBe(true);
+    expect(button('Image Studio...').closest('[role="menu"]')).not.toBeNull();
+    await act(async () => button('New').click());
+    expect(fresh.invoke).toHaveBeenCalledOnce();
+
+    const withImage = commands.map((item) =>
+      item.id === 'tools.trace-image' ? { ...item, enabled: true } : item,
+    );
+    await act(async () => root?.render(<Toolbar commands={withImage} machineKind="laser" />));
+    expect(host?.querySelector('button[aria-label="Trace Image..."]')).not.toBeNull();
+    expect(host?.querySelector('button[aria-label="Image Studio..."]')).not.toBeNull();
+    await act(async () => button('Trace Image...').click());
+    expect(trace.invoke).toHaveBeenCalledOnce();
+
+    await act(async () => root?.render(<Toolbar commands={commands} machineKind="laser" />));
+    expect(host?.querySelector('button[aria-label="Trace Image..."]')).toBeNull();
+    await act(async () => button('More commands').click());
+    expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
+    expect(button('Trace Image...').disabled).toBe(true);
+    await press('Escape');
+  });
+
   it('keeps extra commands reachable with registry help, shortcuts, disabled state and dispatch', async () => {
     const save = command('file.save-gcode', 'Save G-code...', { shortcut: 'Ctrl+Shift+E' });
     const camera = command('tools.camera', 'Camera', {
@@ -68,7 +114,7 @@ describe('Toolbar overflow interactions', () => {
     ];
     await render(commands);
     expect(host?.querySelector('button[aria-label="Image Studio..."]')).not.toBeNull();
-    available = 260;
+    available = 200;
     await act(async () => window.dispatchEvent(new Event('resize')));
     expect(host?.querySelector('button[aria-label="Image Studio..."]')).toBeNull();
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).toBeNull();

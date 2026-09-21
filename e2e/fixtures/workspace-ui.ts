@@ -1,5 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
 
+/** Occasional setup actions now live behind a named disclosure in the Machine panel. */
+export async function expandMachineUtilities(page: Page): Promise<void> {
+  const summary = page.locator('.lf-machine-rail summary').filter({
+    hasText: /^Homing & (focus|maintenance)$/,
+  });
+  if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
+}
+
 export function applicationHeader(page: Page): Locator {
   return page.getByRole('banner').filter({
     has: page.getByRole('menubar', { name: 'Application menu', exact: true }),
