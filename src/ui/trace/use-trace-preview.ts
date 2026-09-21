@@ -86,6 +86,7 @@ export function useTracePreview(
 ): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
   const decodedRef = useRef<DecodedPreviewImage | null>(null);
+  const cancellationRef = useRef<AbortController | null>(null);
   // Monotonic token. Each effect run captures its token; on completion
   // it bails if the latest token has advanced — stops slow traces
   // from clobbering a newer "ready" result.
@@ -122,9 +123,11 @@ export function useTracePreview(
       boundaryModeRef,
       sourceGridRef,
       setState,
+      cancellationRef,
     });
     return () => {
       tokenRef.current += 1;
+      cancelPendingPreview(cancellationRef);
     };
     // Read request settings through stable refs. A preset switch is handled
     // below without decoding the same file again.
@@ -138,7 +141,7 @@ export function useTracePreview(
     // Decode-time verdict — never re-scan the pixels on an options nudge.
     const sourceHasTransparency = decoded.hasTransparency;
     setState({ kind: 'tracing', sourceHasTransparency });
-    const timer = window.setTimeout(() => {
+    return schedulePreviewTrace(() => {
       if (tokenRef.current !== myToken) return;
       if (settledToken.current === myToken) return;
       startPreviewTrace({
@@ -151,11 +154,9 @@ export function useTracePreview(
         sourceHasTransparency,
         isCurrent: () => tokenRef.current === myToken && settledToken.current !== myToken,
         setState,
+        cancellationRef,
       });
-    }, DEBOUNCE_MS);
-    return () => {
-      window.clearTimeout(timer);
-    };
+    }, cancellationRef);
   }, [
     file,
     options,
@@ -174,6 +175,23 @@ function useLatest<T>(value: T): MutableRefObject<T> {
   const ref = useRef(value);
   ref.current = value;
   return ref;
+}
+
+function schedulePreviewTrace(
+  start: () => void,
+  cancellationRef: MutableRefObject<AbortController | null>,
+): () => void {
+  const timer = window.setTimeout(start, DEBOUNCE_MS);
+  return () => {
+    window.clearTimeout(timer);
+    cancelPendingPreview(cancellationRef);
+  };
+}
+
+function cancelPendingPreview(cancellationRef: MutableRefObject<AbortController | null>): void {
+  // Decode and debounce may replace the request after the effect was mounted.
+  // Cleanup cancels the latest request owned by this hook, not a captured one.
+  cancellationRef.current?.abort();
 }
 
 function beginPreviewDecode(
@@ -203,6 +221,7 @@ async function decodePreviewFile(args: {
   readonly boundaryModeRef: MutableRefObject<BoundaryMode>;
   readonly sourceGridRef: MutableRefObject<TraceGrid | null>;
   readonly setState: Dispatch<SetStateAction<TracePreviewState>>;
+  readonly cancellationRef: MutableRefObject<AbortController | null>;
 }): Promise<void> {
   const { file, myToken, decodedRef, tokenRef, settledToken, setState } = args;
   const isCurrent = (): boolean => tokenRef.current === myToken && settledToken.current !== myToken;
@@ -230,6 +249,7 @@ async function decodePreviewFile(args: {
       sourceHasTransparency,
       isCurrent,
       setState,
+      cancellationRef: args.cancellationRef,
     });
   } catch (err) {
     if (!isCurrent()) return;
@@ -247,15 +267,22 @@ function startPreviewTrace(args: {
   readonly sourceHasTransparency: boolean;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
+  readonly cancellationRef: MutableRefObject<AbortController | null>;
 }): void {
+  cancelPendingPreview(args.cancellationRef);
+  const cancellation = new AbortController();
+  args.cancellationRef.current = cancellation;
   void runTrace({
     ...args,
+    signal: cancellation.signal,
     request: {
       file: args.file,
       options: args.options,
       boundary: args.boundary,
       boundaryMode: args.boundaryMode,
     },
+  }).finally(() => {
+    if (args.cancellationRef.current === cancellation) args.cancellationRef.current = null;
   });
 }
 
@@ -269,6 +296,7 @@ export function runTrace(args: {
   readonly request?: TracePreparationRequest;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
+  readonly signal?: AbortSignal;
 }): Promise<void> {
   // Trace is async — runs in the Worker if available, otherwise inline. A slow
   // trace can resolve AFTER a newer one has started; isCurrent() re-checks the
@@ -282,6 +310,7 @@ export function runTrace(args: {
         args.options,
         workingBoundary,
         args.boundaryMode ?? 'crop',
+        args.signal,
       );
       const { paths, width, height } = result;
       if (!args.isCurrent()) return;
