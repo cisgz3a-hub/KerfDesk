@@ -1,15 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, type Project } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
+import { setAppThemePreference } from '../theme/app-theme';
 import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawObjectsFaint } from './draw-preview';
 import { drawScene } from './draw-scene';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  setAppThemePreference('light');
+  vi.unstubAllGlobals();
+});
 
+// ADR-339: dark is the application's own preference, so the drawing tests
+// drive it the way the operator does rather than by faking the desktop.
 function setDark(dark: boolean): void {
-  vi.stubGlobal('matchMedia', () => ({ matches: dark }));
+  setAppThemePreference(dark ? 'dark' : 'light');
 }
 
 function recordingContext() {

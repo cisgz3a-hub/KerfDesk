@@ -3,7 +3,7 @@ import type { AppCommand, CommandId } from '../commands/command-registry';
 
 export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.new', 'file.open', 'file.save', 'file.save-as'],
-  ['file.import'],
+  ['file.import', 'file.import-image'],
   [
     'tools.add-text',
     'tools.registration-jig',
@@ -16,14 +16,19 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['window.toggle-preview', 'file.inspect-gcode'],
 ];
 
+// Import Image takes the slot Image Studio used to hold: getting a picture ONTO
+// the bed is the step every image job starts with, while the Studio is where you
+// go once one is already there. The Studio stays a click away in More, and sits
+// with the other image tools under the Tools menu.
 const PRIMARY_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
-  ['file.open', 'file.import', 'file.save'],
-  ['tools.trace-image', 'tools.edit-image'],
+  ['file.open', 'file.import', 'file.import-image', 'file.save'],
+  ['tools.trace-image'],
   ['window.toggle-preview'],
 ];
 const PRIMARY_IDS = PRIMARY_GROUPS.flat();
+// Dropped into More in this order as the toolbar narrows.
 const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
-  'tools.edit-image',
+  'file.import-image',
   'tools.trace-image',
   'file.open',
   'file.save',
@@ -32,14 +37,13 @@ const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
 ];
 
 function primaryCommandIds(commands: ReadonlyArray<AppCommand>): ReadonlyArray<CommandId> {
-  // The registry already knows whether the selection is an image. Image
-  // actions stay one click away in that context, and remain in More otherwise.
+  // Trace is useful beside a selected image. Image Studio stays in More.
   const imageSelected = commands.some(
     (command) => command.id === 'tools.trace-image' && command.enabled,
   );
   return PRIMARY_IDS.filter(
     (id) =>
-      (imageSelected || (id !== 'tools.trace-image' && id !== 'tools.edit-image')) &&
+      (imageSelected || id !== 'tools.trace-image') &&
       commands.some((command) => command.id === id),
   );
 }

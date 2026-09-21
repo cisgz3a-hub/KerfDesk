@@ -29,6 +29,7 @@ describe('Toolbar overflow interactions', () => {
       fresh,
       command('file.open', 'Open...'),
       command('file.import', 'Import...'),
+      command('file.import-image', 'Import Image...'),
       command('file.save', 'Save'),
       command('window.toggle-preview', 'Preview', { active: false }),
       command('tools.add-text', 'Text...'),
@@ -40,7 +41,7 @@ describe('Toolbar overflow interactions', () => {
       [...(host?.querySelectorAll('button[data-help-id]') ?? [])].map((item) =>
         item.getAttribute('aria-label'),
       ),
-    ).toEqual(['Open...', 'Import...', 'Save', 'Preview']);
+    ).toEqual(['Open...', 'Import...', 'Import Image...', 'Save', 'Preview']);
     await act(async () => button('More commands').click());
     expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
     expect(button('Trace Image...').disabled).toBe(true);
@@ -53,7 +54,7 @@ describe('Toolbar overflow interactions', () => {
     );
     await act(async () => root?.render(<Toolbar commands={withImage} machineKind="laser" />));
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).not.toBeNull();
-    expect(host?.querySelector('button[aria-label="Image Studio..."]')).not.toBeNull();
+    expect(host?.querySelector('button[aria-label="Image Studio..."]')).toBeNull();
     await act(async () => button('Trace Image...').click());
     expect(trace.invoke).toHaveBeenCalledOnce();
 
@@ -98,7 +99,8 @@ describe('Toolbar overflow interactions', () => {
         ? available
         : this.hasAttribute('data-measure-more')
           ? 70
-          : this.dataset['measureCommand']?.startsWith('tools.')
+          : this.dataset['measureCommand']?.startsWith('tools.') ||
+              this.dataset['measureCommand'] === 'file.import-image'
             ? 100
             : 32;
       return DOMRect.fromRect({ width, height: 30 });
@@ -107,18 +109,22 @@ describe('Toolbar overflow interactions', () => {
       command('file.new', 'New'),
       command('file.save', 'Save'),
       command('file.import', 'Import...'),
+      command('file.import-image', 'Import Image...'),
       command('tools.add-text', 'Text...'),
       command('tools.trace-image', 'Trace Image...'),
       command('tools.edit-image', 'Image Studio...'),
       command('tools.camera', 'Camera'),
     ];
     await render(commands);
-    expect(host?.querySelector('button[aria-label="Image Studio..."]')).not.toBeNull();
+    expect(host?.querySelector('button[aria-label="Import Image..."]')).not.toBeNull();
+    // Image Studio is never a primary button now, at any width.
+    expect(host?.querySelector('button[aria-label="Image Studio..."]')).toBeNull();
     available = 200;
     await act(async () => window.dispatchEvent(new Event('resize')));
-    expect(host?.querySelector('button[aria-label="Image Studio..."]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Import Image..."]')).toBeNull();
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).toBeNull();
     await act(async () => button('More commands').click());
+    expect(button('Import Image...').closest('[role="menu"]')).not.toBeNull();
     expect(button('Image Studio...').closest('[role="menu"]')).not.toBeNull();
     expect(button('Trace Image...').closest('[role="menu"]')).not.toBeNull();
     expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
@@ -129,7 +135,7 @@ describe('Toolbar overflow interactions', () => {
     );
     available = 800;
     await act(async () => window.dispatchEvent(new Event('resize')));
-    expect(host?.querySelector('button[aria-label="Image Studio..."]')).not.toBeNull();
+    expect(host?.querySelector('button[aria-label="Import Image..."]')).not.toBeNull();
   });
 
   it('supports keyboard opening, skips disabled commands, and restores focus on Escape', async () => {

@@ -1,8 +1,11 @@
 // Main-thread scheduler for idle canvas markers. Only the latest project is
 // useful, so a new request terminates an in-flight worker instead of queueing
-// seconds of stale V-carve plans behind it.
+// stale plans. Like Preview/ETA and autosave, this worker compiles a complete
+// project and must reserve their shared memory lane before construction or
+// cloning. Every terminal response retires its heap before releasing the lane.
 
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { reserveWorkerMemory } from '../worker-memory-lane';
 import type { IdleCanvasMotionPlanRequest } from './idle-canvas-motion-plan';
 import type {
   IdleCanvasMotionWorkerRequest,
@@ -17,9 +20,11 @@ type Pending = {
   readonly id: number;
   readonly resolve: (plan: CanvasMotionPlan | null) => void;
   readonly reject: (error: Error) => void;
+  worker: Worker | null;
+  cancelReservation: (() => void) | null;
+  releaseReservation: (() => void) | null;
 };
 
-let workerInstance: Worker | null = null;
 let pending: Pending | null = null;
 let nextRequestId = 0;
 
@@ -38,24 +43,39 @@ export function isIdleCanvasMotionSuperseded(error: unknown): boolean {
 export function prepareIdleCanvasMotionPlanOffThread(
   request: IdleCanvasMotionPlanRequest,
 ): Promise<CanvasMotionPlan | null> | null {
-  supersedePending();
-  const worker = ensureWorker();
-  if (worker === null) return null;
+  if (typeof Worker === 'undefined') {
+    supersedePending();
+    return null;
+  }
   nextRequestId += 1;
   const id = nextRequestId;
-  const promise = new Promise<CanvasMotionPlan | null>((resolve, reject) => {
-    pending = { id, resolve, reject };
+  return new Promise<CanvasMotionPlan | null>((resolve, reject) => {
+    const active: Pending = {
+      id,
+      resolve,
+      reject,
+      worker: null,
+      cancelReservation: null,
+      releaseReservation: null,
+    };
+    const stale = pending;
+    // Install the new owner before releasing the previous reservation. Its
+    // release can synchronously start another client that requests newer work.
+    pending = active;
+    if (stale !== null) retireSuperseded(stale);
+    if (pending !== active) return;
+    active.cancelReservation = reserveWorkerMemory((release) => {
+      if (pending !== active) {
+        release();
+        return;
+      }
+      active.releaseReservation = release;
+      startWorker(active, request);
+    });
+    // A free grant may fail or finish before reserve returns. Its token is
+    // local to this request and must never release a replacement's lane.
+    if (pending !== active) active.cancelReservation();
   });
-  const message: IdleCanvasMotionWorkerRequest = { id, request };
-  try {
-    worker.postMessage(message);
-  } catch (error) {
-    const active = pending;
-    pending = null;
-    retireWorker();
-    active?.reject(error instanceof Error ? error : new Error(String(error)));
-  }
-  return promise;
 }
 
 export function cancelIdleCanvasMotionPlanOffThread(): void {
@@ -64,63 +84,78 @@ export function cancelIdleCanvasMotionPlanOffThread(): void {
 
 export function resetIdleCanvasMotionWorkerForTests(): void {
   supersedePending();
-  retireWorker();
   nextRequestId = 0;
 }
 
-function ensureWorker(): Worker | null {
-  if (workerInstance !== null) return workerInstance;
-  if (typeof Worker === 'undefined') return null;
+function startWorker(active: Pending, request: IdleCanvasMotionPlanRequest): void {
   try {
     const created = new Worker(new URL('./idle-canvas-motion-worker.ts', import.meta.url), {
       type: 'module',
     });
+    active.worker = created;
     connectCanvasCompilationMainBridge(created);
     created.onmessage = (event: MessageEvent<IdleCanvasMotionWorkerResponse>): void => {
-      if (workerInstance !== created) return;
-      handleMessage(event.data);
+      if (pending !== active || active.worker !== created) return;
+      handleMessage(active, event.data);
     };
     created.onerror = (): void => {
-      if (workerInstance !== created) return;
-      const active = pending;
-      pending = null;
-      retireWorker();
-      active?.reject(new Error('idle canvas motion worker errored'));
+      failRequest(active, new Error('idle canvas motion worker errored'));
     };
     created.onmessageerror = (): void => {
-      if (workerInstance !== created) return;
-      const active = pending;
-      pending = null;
-      retireWorker();
-      active?.reject(new Error('idle canvas motion worker response was not cloneable'));
+      failRequest(active, new Error('idle canvas motion worker response was not cloneable'));
     };
-    workerInstance = created;
-    return created;
-  } catch {
-    return null;
+    const message: IdleCanvasMotionWorkerRequest = { id: active.id, request };
+    created.postMessage(message);
+  } catch (error) {
+    failRequest(active, error instanceof Error ? error : new Error(String(error)));
   }
 }
 
-function handleMessage(response: IdleCanvasMotionWorkerResponse): void {
-  const active = pending;
-  if (active === null || active.id !== response.id) return;
+function handleMessage(active: Pending, response: IdleCanvasMotionWorkerResponse): void {
+  if (pending !== active || active.id !== response.id) return;
   pending = null;
+  retireWorker(active);
   if (response.kind === 'error') active.reject(new Error(response.message));
   else active.resolve(response.plan);
+}
+
+function failRequest(active: Pending, error: Error): void {
+  if (pending !== active) return;
+  pending = null;
+  retireWorker(active);
+  active.reject(error);
 }
 
 function supersedePending(): void {
   const active = pending;
   if (active === null) return;
   pending = null;
-  retireWorker();
+  retireSuperseded(active);
+}
+
+function retireSuperseded(active: Pending): void {
+  retireWorker(active);
   active.reject(new IdleCanvasMotionSupersededError());
 }
 
-function retireWorker(): void {
-  if (workerInstance === null) return;
-  const retired = workerInstance;
-  workerInstance = null;
-  retireCanvasCompilationMainBridge(retired);
-  retired.terminate();
+function retireWorker(active: Pending): void {
+  const retired = active.worker;
+  active.worker = null;
+  const release = active.releaseReservation ?? active.cancelReservation;
+  active.releaseReservation = null;
+  active.cancelReservation = null;
+  try {
+    if (retired !== null) {
+      retired.onmessage = null;
+      retired.onerror = null;
+      retired.onmessageerror = null;
+      try {
+        retireCanvasCompilationMainBridge(retired);
+      } finally {
+        retired.terminate();
+      }
+    }
+  } finally {
+    release?.();
+  }
 }

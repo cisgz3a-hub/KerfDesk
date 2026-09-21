@@ -22,6 +22,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     toggleMachinePanel: vi.fn(),
     toggleSidePanels: vi.fn(),
     resetWorkspaceLayout: vi.fn(),
+    appTheme: 'light' as const,
+    setAppTheme: vi.fn(),
     canUndo: false,
     canRedo: false,
     hasSelection: false,

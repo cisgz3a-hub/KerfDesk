@@ -113,7 +113,7 @@ test('overflow commands and all nine anchors remain reachable on a short laptop'
 test('short dark workspace keeps the tool rail scrollable and machine modes accessible', async ({
   page,
 }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await useThemePreference(page, 'dark');
   await page.setViewportSize({ width: 1024, height: 500 });
   await page.goto('/');
   const designStudio = page.getByRole('button', { name: 'Open Design Studio', exact: true });
@@ -129,9 +129,22 @@ test('short dark workspace keeps the tool rail scrollable and machine modes acce
   await expectNoPageOverflow(page);
 });
 
-test('dark canvas and open layout menu follow the theme, including live theme changes', async ({
-  page,
-}) => {
+// ADR-339: the desktop no longer decides the theme. A dark-mode machine must
+// still open light, and Window > Appearance is the only route to dark.
+test('opens light on a dark desktop, and Window > Appearance reaches dark', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/');
+  const canvas = page.getByLabel('KerfDesk workspace', { exact: true });
+  await expect.poll(() => bedBrightness(canvas)).toBeGreaterThan(190);
+  await chooseAppearance(page, 'Dark');
+  await expect.poll(() => bedBrightness(canvas)).toBeLessThan(90);
+  await chooseAppearance(page, 'Light');
+  await expect.poll(() => bedBrightness(canvas)).toBeGreaterThan(190);
+});
+
+test('Match System follows the desktop, including live theme changes', async ({ page }) => {
+  await useThemePreference(page, 'system');
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/');
@@ -141,12 +154,35 @@ test('dark canvas and open layout menu follow the theme, including live theme ch
   const menu = page.getByRole('menu', { name: 'Workspace layout options' });
   await expectWithinViewport(page, menu);
   const background = await menu.evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(background).toBe('rgb(32, 36, 43)');
+  expect(background).toBe('rgb(37, 35, 32)');
   await expect(menu.getByRole('menuitemradio', { name: 'Auto layout' })).toBeChecked();
   await page.keyboard.press('Escape');
   await page.emulateMedia({ colorScheme: 'light' });
   await expect.poll(() => bedBrightness(canvas)).toBeGreaterThan(190);
 });
+
+// Seeded before the first navigation, the way a returning operator's stored
+// choice arrives. The checkmark glyph beside a chosen item is aria-hidden, so
+// these accessible names stay exactly 'Light' / 'Dark' / 'Match System'.
+async function useThemePreference(
+  page: Page,
+  preference: 'light' | 'dark' | 'system',
+): Promise<void> {
+  await page.addInitScript((value) => {
+    try {
+      localStorage.setItem('kerfdesk.theme.v1', value);
+    } catch {
+      // Storage denied: light stands, and the assertions will say so.
+    }
+  }, preference);
+}
+
+async function chooseAppearance(page: Page, name: string): Promise<void> {
+  // Choosing closes the menu, but Escape first keeps this safe to call twice.
+  await page.keyboard.press('Escape');
+  await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
+  await page.getByRole('menuitemcheckbox', { name, exact: true }).click();
+}
 
 async function chooseLayout(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Workspace layout', exact: true }).click();

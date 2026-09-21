@@ -3,6 +3,13 @@
 Date: 2026-09-21. Worktree: `D:\LaserForge\ui-audit-20260921`. Branch: `codex/ui-audit-20260921`.
 Starting commit: `377e692baf26a9f66ba3877f157213095c54b92f`, freshly fetched `origin/main`.
 
+**PR integration, 2026-09-22:** the branch subsequently integrated main at
+`6c7a5b1ea6fb19c9ac57d4a361ec571edc0887d1`. The original 805-control/91-command
+matrices remain dated audit snapshots. [The integration supplement](pr-integration.md)
+accounts for the additional Appearance controls and tests all 94 current commands.
+The integrated toolbar preserves Import Image and keeps Image Studio in More. The interface
+decision is now ADR-340; main's Appearance decision retains ADR-339.
+
 ## Result
 
 **Follow-up completed 2026-09-22:** [the button-by-button functional audit](control-audit.md)
@@ -35,13 +42,13 @@ findings below distinguish source review, automated checks, browser interaction 
 - [Completed-job lifecycle and preservation checks](completion.md).
 - [Final integration verification and exact commands](verification.md).
 - [Reproducible catalogue generator](inventory-buttons.mjs).
-- Governing rationale: ADR-339 in `DECISIONS.md`; operator guidance in `WORKFLOW.md`.
+- Governing rationale: ADR-340 in `DECISIONS.md`; operator guidance in `WORKFLOW.md`.
 
 ## What changed
 
 | Area | Result |
 | --- | --- |
-| Primary toolbar | Readable Open, Import, Save and Preview actions; selected images bring Trace image and Image Studio into the row when space permits. More retains every secondary toolbar command. |
+| Primary toolbar | Readable Open, Import, Import Image, Save and Preview actions when space permits; selected images bring Trace image into the row. Image Studio stays in More, which retains every secondary toolbar command. |
 | Project identity | Project name and an unsaved-change indicator, without adding another action row. |
 | Drawing palette | Quiet Edit/Draw groups, consistent target sizes and retained tools, shortcuts and tutorials. |
 | Positioning | Jogging and origin retain their existing handlers. Compact contextual lessons replace oversized lesson buttons. Manual Air OFF is a smaller neutral card; setup explanations and switching behaviour remain. |

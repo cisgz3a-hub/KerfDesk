@@ -87,6 +87,10 @@ export const COMMAND_TUTORIALS: Readonly<Record<CommandId, string | null>> = {
   'window.fit-view': 'workspace',
   'window.project-notes': 'project-notes',
   'window.undo-history': 'projects',
+  // Appearance is self-evident from the menu labels; no tutorial earns a slot.
+  'window.theme-light': null,
+  'window.theme-dark': null,
+  'window.theme-system': null,
   'help.about': null,
   'help.tutorials': null,
   'help.connection': 'connection',

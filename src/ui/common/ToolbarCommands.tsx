@@ -180,7 +180,8 @@ function primaryLabel(command: AppCommand): string {
   if (command.id === 'file.import') return 'Import';
   if (command.id === 'tools.add-text') return 'Text';
   if (command.id === 'tools.trace-image') return 'Trace image';
-  if (command.id === 'tools.edit-image') return 'Image Studio';
+  // Image Studio is no longer a primary button; in More it keeps its full label.
+  if (command.id === 'file.import-image') return 'Import image';
   return command.label;
 }
 

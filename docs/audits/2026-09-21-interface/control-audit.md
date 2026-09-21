@@ -2,6 +2,11 @@
 
 Completed 2026-09-22 in `D:\LaserForge\ui-audit-20260921`, branch `codex/ui-audit-20260921`.
 
+This report preserves the audit snapshot before integration with main at `6c7a5b1e`.
+[The PR integration supplement](pr-integration.md) covers the subsequently added Appearance
+controls, all 94 current commands, and the integrated toolbar. The baseline records and digest
+below are retained so their evidence remains reproducible.
+
 All **805 baseline control definitions/component calls** across **22 UI areas** are accounted for, plus **91 registered commands** clicked through their actual menu rows. This is a control-level audit with exact outcomes and evidence, rather than an inference from nearby passing test files. A reusable button can appear in multiple records, and one mapped definition can produce many visible buttons.
 
 | Disposition | Control records | Meaning |

@@ -101,6 +101,7 @@ const TOOLBAR_COMMANDS: ReadonlyArray<readonly [AppCommand['id'], string]> = [
   ['file.save', 'Save'],
   ['file.save-as', 'Save As...'],
   ['file.import', 'Import...'],
+  ['file.import-image', 'Import Image...'],
   ['tools.add-text', 'Text...'],
   ['tools.registration-jig', 'Registration Jig'],
   ['tools.camera', 'Camera'],

@@ -5,7 +5,7 @@ Scope: the shared toolbar and left drawing palette on the isolated checkout base
 ## Changes
 
 - The primary toolbar now names the main file-to-preview actions: **Open**, **Import**, **Save**, and **Preview**. The previous row repeated the drawing palette's Text tool and foregrounded image actions even when no image was selected.
-- **Trace image** and **Image Studio** appear beside the file actions when the command registry reports an eligible image selection and there is room. Image Studio's existing import-and-edit entry remains available in **More** without a selection.
+- **Trace image** appears beside the file actions when the command registry reports an eligible image selection and there is room. After integrating PR #825, **Import image** retains its primary-toolbar entry and **Image Studio** stays in **More**, including its existing import-and-edit entry without a selection.
 - **More** and the existing application menus retain New, Save As, Text, Registration Jig, Camera, Place Board, Box Generator, bitmap conversion, Save G-code, and G-code inspection. Responsive overflow continues to move actions into More without duplicating commands.
 - Quiet button backgrounds, a restrained Import accent, readable action names, a project caption and an unsaved-change dot clarify the toolbar. **Learn**, layout choice, keyboard shortcuts and the conditional installation offer remain accessible.
 - At 640 px the toolbar keeps utilities and primary commands on one row, using measured overflow for the commands that no longer fit. The two-row layout now begins at 520 px. Buttons retain 36 px height; narrower chrome uses less padding to recover canvas space.
@@ -34,4 +34,4 @@ These changes do not alter command handlers, file formats, drawing geometry, con
 
 ## Integration notes
 
-`WORKFLOW.md` now records the current toolbar, drawing-palette and text-entry routes: Preview is a primary action with an overflow fallback, and Text is directly available in the drawing palette or through More. ADR-339 records the final UI and completed-job behaviour. Final browser, build and formatting results are in [verification.md](verification.md).
+`WORKFLOW.md` now records the current toolbar, drawing-palette and text-entry routes: Preview is a primary action with an overflow fallback, and Text is directly available in the drawing palette or through More. ADR-340 records the final UI and completed-job behaviour. Final browser, build and formatting results are in [verification.md](verification.md).
