@@ -26,7 +26,7 @@ export const useTutorialStore = create<TutorialState>((set) => ({
             trail: state.tutorialId === null ? [] : [...state.trail, state.tutorialId],
           },
     ),
-  closeTutorial: () => set({ isOpen: false, trail: [] }),
+  closeTutorial: () => set({ isOpen: false, tutorialId: null, trail: [] }),
   goBack: () =>
     set((state) => {
       const previous = state.trail.at(-1);

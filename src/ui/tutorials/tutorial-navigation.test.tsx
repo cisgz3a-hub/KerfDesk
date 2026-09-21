@@ -160,4 +160,24 @@ describe('walking the catalog', () => {
     },
     SLOW,
   );
+
+  it(
+    'starts fresh when a different contextual lesson opens after Close',
+    async () => {
+      await openAt('first-project');
+      await click(element<HTMLButtonElement>('button[aria-label="Close tutorials"]'));
+      expect(document.querySelector('.lf-learn')).toBeNull();
+
+      await act(async () => useTutorialStore.getState().openTutorial('origin'));
+      await settle();
+      expect(element('.lf-learn-lesson-heading h1').textContent).toBe(lesson('origin').title);
+      expect(element('.lf-learn-reader-top button').textContent).toContain('All tutorials');
+
+      await press('Escape');
+      expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+      await press('Escape');
+      expect(document.querySelector('.lf-learn')).toBeNull();
+    },
+    SLOW,
+  );
 });
