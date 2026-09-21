@@ -1,0 +1,1405 @@
+{
+  "numTotalTestSuites": 11,
+  "numPassedTestSuites": 11,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 132,
+  "numPassedTests": 132,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790012249560,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "opens help for the draft cut mode without submitting or losing edits, and follows a store reset",
+          "status": "passed",
+          "title": "opens help for the draft cut mode without submitting or losing edits, and follows a store reset",
+          "duration": 324.2311999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012284946,
+      "endTime": 1790012285270.2312,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/CutSettingsDialog.tutorial.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app writes every UI path with one separator, so the catalog reads as one voice",
+          "status": "passed",
+          "title": "writes every UI path with one separator, so the catalog reads as one voice",
+          "duration": 1.7205000000000155,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app names a real menu whenever a location opens with a menu path",
+          "status": "passed",
+          "title": "names a real menu whenever a location opens with a menu path",
+          "duration": 0.37829999999996744,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app never offers a lesson as its own next step",
+          "status": "passed",
+          "title": "never offers a lesson as its own next step",
+          "duration": 0.1977000000000544,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app stops a lesson template from giving many tools the same three steps",
+          "status": "passed",
+          "title": "stops a lesson template from giving many tools the same three steps",
+          "duration": 0.5156000000000631,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app keeps the shortcut lesson in step with the shortcut table it describes",
+          "status": "passed",
+          "title": "keeps the shortcut lesson in step with the shortcut table it describes",
+          "duration": 0.5936000000000377,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["lesson fidelity against the shipped app"],
+          "fullName": "lesson fidelity against the shipped app does not promise a keyboard Start that skips the Frame gate",
+          "status": "passed",
+          "title": "does not promise a keyboard Start that skips the Frame gate",
+          "duration": 0.1655999999999267,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012282268,
+      "endTime": 1790012282271.5935,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/tutorial-fidelity.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["walking the catalog"],
+          "fullName": "walking the catalog steps a lesson with the arrow keys and remembers where it stopped",
+          "status": "passed",
+          "title": "steps a lesson with the arrow keys and remembers where it stopped",
+          "duration": 1276.9522000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["walking the catalog"],
+          "fullName": "walking the catalog walks back out of a lesson opened from \"Learn next\", one level per Escape",
+          "status": "passed",
+          "title": "walks back out of a lesson opened from \"Learn next\", one level per Escape",
+          "duration": 226.53769999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["walking the catalog"],
+          "fullName": "walking the catalog offers the half-read lesson as the library’s next action",
+          "status": "passed",
+          "title": "offers the half-read lesson as the library’s next action",
+          "duration": 111.67140000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["walking the catalog"],
+          "fullName": "walking the catalog starts fresh when a different contextual lesson opens after Close",
+          "status": "passed",
+          "title": "starts fresh when a different contextual lesson opens after Close",
+          "duration": 181.66710000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012279753,
+      "endTime": 1790012281550.667,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/tutorial-navigation.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'first-project' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'first-project' card and contextual button open the named lesson without editing the project",
+          "duration": 255.46089999999822,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'projects' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'projects' card and contextual button open the named lesson without editing the project",
+          "duration": 78.08060000000114,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'import' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'import' card and contextual button open the named lesson without editing the project",
+          "duration": 78.05659999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'workspace' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'workspace' card and contextual button open the named lesson without editing the project",
+          "duration": 51.09850000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'shortcuts' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'shortcuts' card and contextual button open the named lesson without editing the project",
+          "duration": 47.26440000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-library' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'design-library' card and contextual button open the named lesson without editing the project",
+          "duration": 37.27220000000307,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'project-notes' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'project-notes' card and contextual button open the named lesson without editing the project",
+          "duration": 32.894499999998516,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'select' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'select' card and contextual button open the named lesson without editing the project",
+          "duration": 39.07890000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'rectangle' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'rectangle' card and contextual button open the named lesson without editing the project",
+          "duration": 43.83259999999791,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'ellipse' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'ellipse' card and contextual button open the named lesson without editing the project",
+          "duration": 63.94550000000163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'polygon' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'polygon' card and contextual button open the named lesson without editing the project",
+          "duration": 30.713999999999942,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'star' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'star' card and contextual button open the named lesson without editing the project",
+          "duration": 36.77730000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'polyline' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'polyline' card and contextual button open the named lesson without editing the project",
+          "duration": 32.277099999999336,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'nodes' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'nodes' card and contextual button open the named lesson without editing the project",
+          "duration": 33.890800000001036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'measure' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'measure' card and contextual button open the named lesson without editing the project",
+          "duration": 34.47109999999884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'text' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'text' card and contextual button open the named lesson without editing the project",
+          "duration": 27.842499999998836,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'text-layout' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'text-layout' card and contextual button open the named lesson without editing the project",
+          "duration": 25.92699999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'variable-text' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'variable-text' card and contextual button open the named lesson without editing the project",
+          "duration": 33.30069999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-studio' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'design-studio' card and contextual button open the named lesson without editing the project",
+          "duration": 45.296299999998155,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-precision' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'design-precision' card and contextual button open the named lesson without editing the project",
+          "duration": 35.855600000002596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-edit' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'design-edit' card and contextual button open the named lesson without editing the project",
+          "duration": 27.480600000002596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-line' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-line' card and contextual button open the named lesson without editing the project",
+          "duration": 28.33389999999781,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-path' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-path' card and contextual button open the named lesson without editing the project",
+          "duration": 29.580299999997806,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-rectangle' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-rectangle' card and contextual button open the named lesson without editing the project",
+          "duration": 29.60399999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-circle' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-circle' card and contextual button open the named lesson without editing the project",
+          "duration": 29.424299999998766,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-arc' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-arc' card and contextual button open the named lesson without editing the project",
+          "duration": 27.486300000000483,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-fillet' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-fillet' card and contextual button open the named lesson without editing the project",
+          "duration": 31.598799999999756,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-chamfer' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'studio-chamfer' card and contextual button open the named lesson without editing the project",
+          "duration": 30.626899999999296,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-studio' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-studio' card and contextual button open the named lesson without editing the project",
+          "duration": 48.3682000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-adjust' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-adjust' card and contextual button open the named lesson without editing the project",
+          "duration": 29.10870000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-mask' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-mask' card and contextual button open the named lesson without editing the project",
+          "duration": 50.83250000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'trace' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'trace' card and contextual button open the named lesson without editing the project",
+          "duration": 54.46450000000186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'trace-batch' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'trace-batch' card and contextual button open the named lesson without editing the project",
+          "duration": 43.10250000000087,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-paint' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-paint' card and contextual button open the named lesson without editing the project",
+          "duration": 27.914700000001176,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-select' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-select' card and contextual button open the named lesson without editing the project",
+          "duration": 25.556700000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-fill' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-fill' card and contextual button open the named lesson without editing the project",
+          "duration": 26.174999999999272,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-retouch' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-retouch' card and contextual button open the named lesson without editing the project",
+          "duration": 27.543299999997544,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-crop' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-crop' card and contextual button open the named lesson without editing the project",
+          "duration": 26.407200000001467,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-layers' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-layers' card and contextual button open the named lesson without editing the project",
+          "duration": 28.333600000001752,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-transform' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-transform' card and contextual button open the named lesson without editing the project",
+          "duration": 29.48909999999887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-text' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-text' card and contextual button open the named lesson without editing the project",
+          "duration": 33.51690000000235,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-tone' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'image-tone' card and contextual button open the named lesson without editing the project",
+          "duration": 35.4558999999972,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'weld' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'weld' card and contextual button open the named lesson without editing the project",
+          "duration": 39.96730000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'subtract' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'subtract' card and contextual button open the named lesson without editing the project",
+          "duration": 24.411299999999756,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'intersect' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'intersect' card and contextual button open the named lesson without editing the project",
+          "duration": 24.916000000001077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'exclude' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'exclude' card and contextual button open the named lesson without editing the project",
+          "duration": 31.475099999999657,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'convert' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'convert' card and contextual button open the named lesson without editing the project",
+          "duration": 25.98449999999866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'align' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'align' card and contextual button open the named lesson without editing the project",
+          "duration": 33.052999999999884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'distribute' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'distribute' card and contextual button open the named lesson without editing the project",
+          "duration": 29.925300000002608,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'array' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'array' card and contextual button open the named lesson without editing the project",
+          "duration": 32.88349999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'nest' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'nest' card and contextual button open the named lesson without editing the project",
+          "duration": 28.02089999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'operations' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'operations' card and contextual button open the named lesson without editing the project",
+          "duration": 34.496500000001106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-cut' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'laser-cut' card and contextual button open the named lesson without editing the project",
+          "duration": 30.172899999997753,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-fill' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'laser-fill' card and contextual button open the named lesson without editing the project",
+          "duration": 27.392700000000332,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-image' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'laser-image' card and contextual button open the named lesson without editing the project",
+          "duration": 24.613799999999173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'materials' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'materials' card and contextual button open the named lesson without editing the project",
+          "duration": 47.04429999999775,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-profile' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-profile' card and contextual button open the named lesson without editing the project",
+          "duration": 28.18869999999879,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-pocket' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-pocket' card and contextual button open the named lesson without editing the project",
+          "duration": 25.8762999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-engrave' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-engrave' card and contextual button open the named lesson without editing the project",
+          "duration": 26.819500000001426,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-vcarve' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-vcarve' card and contextual button open the named lesson without editing the project",
+          "duration": 23.934900000000198,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-drill' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-drill' card and contextual button open the named lesson without editing the project",
+          "duration": 27.782500000001164,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-relief' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-relief' card and contextual button open the named lesson without editing the project",
+          "duration": 26.39140000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-tabs' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-tabs' card and contextual button open the named lesson without editing the project",
+          "duration": 25.5653999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'tool-library' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'tool-library' card and contextual button open the named lesson without editing the project",
+          "duration": 28.656699999999546,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-inlay' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-inlay' card and contextual button open the named lesson without editing the project",
+          "duration": 25.76429999999891,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-probe' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-probe' card and contextual button open the named lesson without editing the project",
+          "duration": 26.64509999999791,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-surfacing' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-surfacing' card and contextual button open the named lesson without editing the project",
+          "duration": 25.509900000000926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'machine-setup' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'machine-setup' card and contextual button open the named lesson without editing the project",
+          "duration": 35.776700000002165,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'connection' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'connection' card and contextual button open the named lesson without editing the project",
+          "duration": 25.46140000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'jog' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'jog' card and contextual button open the named lesson without editing the project",
+          "duration": 22.90020000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'origin' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'origin' card and contextual button open the named lesson without editing the project",
+          "duration": 24.16400000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'frame-start' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'frame-start' card and contextual button open the named lesson without editing the project",
+          "duration": 22.50210000000152,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'preview' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'preview' card and contextual button open the named lesson without editing the project",
+          "duration": 16.431100000001607,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'gcode' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'gcode' card and contextual button open the named lesson without editing the project",
+          "duration": 33.17309999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'console' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'console' card and contextual button open the named lesson without editing the project",
+          "duration": 30.894099999997707,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'macros' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'macros' card and contextual button open the named lesson without editing the project",
+          "duration": 25.86119999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'recovery' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'recovery' card and contextual button open the named lesson without editing the project",
+          "duration": 26.9984000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'box' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'box' card and contextual button open the named lesson without editing the project",
+          "duration": 23.049300000002404,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'box-fit' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'box-fit' card and contextual button open the named lesson without editing the project",
+          "duration": 28.801500000001397,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'material-test' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'material-test' card and contextual button open the named lesson without editing the project",
+          "duration": 43.613900000000285,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'interval-test' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'interval-test' card and contextual button open the named lesson without editing the project",
+          "duration": 27.88420000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'scan-offset' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'scan-offset' card and contextual button open the named lesson without editing the project",
+          "duration": 24.260800000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'focus-test' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'focus-test' card and contextual button open the named lesson without editing the project",
+          "duration": 26.921800000000076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'camera' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'camera' card and contextual button open the named lesson without editing the project",
+          "duration": 30.257000000001426,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'registration' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'registration' card and contextual button open the named lesson without editing the project",
+          "duration": 30.322700000000623,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'board' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'board' card and contextual button open the named lesson without editing the project",
+          "duration": 39.31920000000173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'rotary' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'rotary' card and contextual button open the named lesson without editing the project",
+          "duration": 23.305700000000797,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'print-cut' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'print-cut' card and contextual button open the named lesson without editing the project",
+          "duration": 30.089700000000448,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'optimization' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'optimization' card and contextual button open the named lesson without editing the project",
+          "duration": 29.521700000001147,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'labs' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'labs' card and contextual button open the named lesson without editing the project",
+          "duration": 28.28679999999804,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'offset' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'offset' card and contextual button open the named lesson without editing the project",
+          "duration": 24.002199999998993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'dogbone' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'dogbone' card and contextual button open the named lesson without editing the project",
+          "duration": 33.11159999999654,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-tiling' card and contextual button open the named lesson without editing the project",
+          "status": "passed",
+          "title": "'cnc-tiling' card and contextual button open the named lesson without editing the project",
+          "duration": 27.947700000000623,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes the learning brand and first-project shortcut switch to their intended views",
+          "status": "passed",
+          "title": "the learning brand and first-project shortcut switch to their intended views",
+          "duration": 130.49359999999797,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes the other-machine link and every category show the exact matching lessons without editing the project",
+          "status": "passed",
+          "title": "the other-machine link and every category show the exact matching lessons without editing the project",
+          "duration": 249.63709999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes every opening-path button opens its named lesson and Back returns to the library",
+          "status": "passed",
+          "title": "every opening-path button opens its named lesson and Back returns to the library",
+          "duration": 602.199700000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes the primary Start skips completed opening lessons and disappears after the opening path is complete",
+          "status": "passed",
+          "title": "the primary Start skips completed opening lessons and disappears after the opening path is complete",
+          "duration": 187.24889999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes the related-lesson Back button restores its parent and then the library without editing the project",
+          "status": "passed",
+          "title": "the related-lesson Back button restores its parent and then the library without editing the project",
+          "duration": 175.2422000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes step-list and related-lesson buttons select the requested content",
+          "status": "passed",
+          "title": "step-list and related-lesson buttons select the requested content",
+          "duration": 38.42699999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes example stage selection and playback pause, advance and stop at Result",
+          "status": "passed",
+          "title": "example stage selection and playback pause, advance and stop at Result",
+          "duration": 30.32930000000124,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012267290,
+      "endTime": 1790012271951.3293,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow opens the contextual lesson, navigates, restarts and records completion in the library",
+          "status": "passed",
+          "title": "opens the contextual lesson, navigates, restarts and records completion in the library",
+          "duration": 547.7822000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow resumes saved progress after closing and safely clamps a saved step from an older lesson",
+          "status": "passed",
+          "title": "resumes saved progress after closing and safely clamps a saved step from an older lesson",
+          "duration": 420.0563000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow combines search, category and machine filters and resets all three after no results",
+          "status": "passed",
+          "title": "combines search, category and machine filters and resets all three after no results",
+          "duration": 534.3887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow keeps a nested dialog draft and project intact and restores its tutorial opener on Escape",
+          "status": "passed",
+          "title": "keeps a nested dialog draft and project intact and restores its tutorial opener on Escape",
+          "duration": 413.9862000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow returns to Help after opening the tutorial library through its ordinary menu command",
+          "status": "passed",
+          "title": "returns to Help after opening the tutorial library through its ordinary menu command",
+          "duration": 170.0055999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["TutorialHost learning flow"],
+          "fullName": "TutorialHost learning flow makes a disabled command lesson usable without running that command or losing menu focus",
+          "status": "passed",
+          "title": "makes a disabled command lesson usable without running that command or losing menu focus",
+          "duration": 182.27810000000045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012274418,
+      "endTime": 1790012276687.278,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialHost.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader mounts no images while closed or browsing, and only the selected lesson picture when open",
+          "status": "passed",
+          "title": "mounts no images while closed or browsing, and only the selected lesson picture when open",
+          "duration": 171.7319,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader maps the four registration instructions to outline, outline, placement and engraving",
+          "status": "passed",
+          "title": "maps the four registration instructions to outline, outline, placement and engraving",
+          "duration": 26.885099999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader falls back to SVG after failure while keeping instructions and navigation usable",
+          "status": "passed",
+          "title": "falls back to SVG after failure while keeping instructions and navigation usable",
+          "duration": 18.340000000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader retries a failed picture with one Show picture click and can switch views afterwards",
+          "status": "passed",
+          "title": "retries a failed picture with one Show picture click and can switch views afterwards",
+          "duration": 13.455799999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal registration step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal registration step inside its picture frames",
+          "duration": 16.021099999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-cut step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-cut step inside its picture frames",
+          "duration": 17.488800000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-fill step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-fill step inside its picture frames",
+          "duration": 11.792500000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal laser-image step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal laser-image step inside its picture frames",
+          "duration": 13.222200000000157,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-pocket step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-pocket step inside its picture frames",
+          "duration": 10.379300000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-vcarve step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-vcarve step inside its picture frames",
+          "duration": 12.21589999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal box step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal box step inside its picture frames",
+          "duration": 12.174199999999928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-profile step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-profile step inside its picture frames",
+          "duration": 11.552899999999681,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader keeps every normal cnc-tabs step inside its picture frames",
+          "status": "passed",
+          "title": "keeps every normal cnc-tabs step inside its picture frames",
+          "duration": 12.111100000000079,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader clamps stale saved progress to the last written step and its mapped picture",
+          "status": "passed",
+          "title": "clamps stale saved progress to the last written step and its mapped picture",
+          "duration": 5.301800000000185,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["tutorial pictures in the real reader"],
+          "fullName": "tutorial pictures in the real reader does not mutate project, history or active tool through picture controls and failure recovery",
+          "status": "passed",
+          "title": "does not mutate project, history or active tool through picture controls and failure recovery",
+          "duration": 41.422000000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012278457,
+      "endTime": 1790012278851.422,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialPhoto.test.tsx"
+    }
+  ]
+}

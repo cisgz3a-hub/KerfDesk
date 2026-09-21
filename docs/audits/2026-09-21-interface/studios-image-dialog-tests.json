@@ -1,0 +1,230 @@
+{
+  "numTotalTestSuites": 1,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 19,
+  "numPassedTests": 19,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005827062,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'brightness-contrast' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'brightness-contrast' to its actual dialog or instant image operation",
+          "duration": 81.77379999999903,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'levels' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'levels' to its actual dialog or instant image operation",
+          "duration": 20.177199999998265,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'curves' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'curves' to its actual dialog or instant image operation",
+          "duration": 18.157000000001062,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'threshold' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'threshold' to its actual dialog or instant image operation",
+          "duration": 20.112599999998565,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'posterize' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'posterize' to its actual dialog or instant image operation",
+          "duration": 18.171699999998964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'invert' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'invert' to its actual dialog or instant image operation",
+          "duration": 14.4992000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'desaturate' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'desaturate' to its actual dialog or instant image operation",
+          "duration": 20.1179000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'gaussian-blur' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'gaussian-blur' to its actual dialog or instant image operation",
+          "duration": 11.460499999999229,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'unsharp-mask' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'unsharp-mask' to its actual dialog or instant image operation",
+          "duration": 11.769800000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'high-pass' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'high-pass' to its actual dialog or instant image operation",
+          "duration": 12.401899999998932,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'median' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'median' to its actual dialog or instant image operation",
+          "duration": 10.047300000000178,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'halftone' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'halftone' to its actual dialog or instant image operation",
+          "duration": 7.918700000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "menu routes 'line-screen' to its actual dialog or instant image operation",
+          "status": "passed",
+          "title": "menu routes 'line-screen' to its actual dialog or instant image operation",
+          "duration": 7.124299999999494,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Image menu routes both resize kinds, Text opens its dialog and backdrop dismisses a menu",
+          "status": "passed",
+          "title": "Image menu routes both resize kinds, Text opens its dialog and backdrop dismisses a menu",
+          "duration": 20.218299999998635,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "adjustment Preview changes preview availability without committing image pixels",
+          "status": "passed",
+          "title": "adjustment Preview changes preview availability without committing image pixels",
+          "duration": 25.05959999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "resizes pixels with aspect lock and commits each of the nine canvas anchors",
+          "status": "passed",
+          "title": "resizes pixels with aspect lock and commits each of the nine canvas anchors",
+          "duration": 58.95890000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "all five Modify buttons dispatch their precise operation and radius into the real selection store",
+          "status": "passed",
+          "title": "all five Modify buttons dispatch their precise operation and radius into the real selection store",
+          "duration": 10.48030000000108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "text Cancel preserves layers and OK creates one named layer from the rasterizer boundary",
+          "status": "passed",
+          "title": "text Cancel preserves layers and OK creates one named layer from the rasterizer boundary",
+          "duration": 44.69220000000132,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "top bar dispatches each session action and prevents empty or in-flight operations",
+          "status": "passed",
+          "title": "top bar dispatches each session action and prevents empty or in-flight operations",
+          "duration": 19.86609999999928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005842124,
+      "endTime": 1790005842557.8662,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/image-editor/EditorDialogs.audit.test.tsx"
+    }
+  ]
+}

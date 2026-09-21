@@ -1,0 +1,2560 @@
+{
+  "metadata": {
+    "date": "2026-09-21",
+    "scope": ["layers", "material-library", "library", "box", "kit"],
+    "baseline": "buttons.json",
+    "baselineHead": "377e692baf26a9f66ba3877f157213095c54b92f",
+    "count": 144,
+    "counts": {
+      "defect-fixed": 1,
+      "intentionally-unavailable": 6,
+      "not-action-control": 3,
+      "verified-behaviour": 115,
+      "verified-boundary": 19
+    },
+    "limitations": [
+      "Rows cover baseline source definitions and call sites; parameterized controls list exercised instances and do not claim every runtime state or instance was clicked.",
+      "Per-control assertions are local software evidence. They do not establish controller, laser/spindle/air, material, or hardware behavior.",
+      "Callback/picker/worker/decoder/WebGL boundaries are described individually; verified-boundary is not an end-to-end native claim.",
+      "Legacy unmounted components and non-action inventory containers are counted explicitly, not silently reported as working UI controls."
+    ]
+  },
+  "controls": [
+    {
+      "id": "src/ui/box/BoxFitTestDialog.tsx:115:9",
+      "label": "Cancel",
+      "expectedOutcome": "Cancel the fit-coupon dialog without generating parts.",
+      "availability": "Open fit-test dialog.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxControls.audit.test.tsx",
+          "test": "artwork control audit: box secondary controls cancels the fit-test dialog without generating a coupon",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxFitTestDialog.tsx:116:9",
+      "label": "Generate",
+      "expectedOutcome": "Generate validated fit-coupon parts and persist the draft.",
+      "availability": "Disabled until core validation returns generated geometry; invalid native/direct submit produces no callback.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxFitTestDialog.test.tsx",
+          "test": "fit coupon relief validation preserves blank CNC text and prevents native or direct submission until diameter is valid",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case. Native submit validity, saved draft boundary, and generated geometry are asserted; no cut or assembly test.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxGenerationStatus.tsx:21:7",
+      "label": "Cancel preview generation",
+      "expectedOutcome": "Cancel the active preview request and leave Generate disabled.",
+      "availability": "Cancel during pending; Retry only after cancelled or failed.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxGeneratorDialog.worker.test.tsx",
+          "test": "BoxGeneratorDialog background generation cancels active preview work and retries immediately on the warm worker",
+          "result": "passed",
+          "boundary": "Manual worker fixture receives production requests; actual client/hook cancellation and retry state are asserted. No native Worker scheduling is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxGenerationStatus.tsx:23:7",
+      "label": "Retry preview generation",
+      "expectedOutcome": "Retry a cancelled/failed preview with a new request ID.",
+      "availability": "Cancel during pending; Retry only after cancelled or failed.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxGeneratorDialog.worker.test.tsx",
+          "test": "BoxGeneratorDialog background generation cancels active preview work and retries immediately on the warm worker",
+          "result": "passed",
+          "boundary": "Manual worker fixture receives production requests; actual client/hook cancellation and retry state are asserted. No native Worker scheduling is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxGeneratorDialog.tsx:87:9",
+      "label": "Cancel",
+      "expectedOutcome": "Retire pending preview work and close without inserting.",
+      "availability": "Open box dialog.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxGeneratorDialog.worker.test.tsx",
+          "test": "BoxGeneratorDialog background generation drops pending work before dialog Cancel closes without insertion",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxGeneratorDialog.tsx:88:9",
+      "label": "Generate",
+      "expectedOutcome": "Deliver the current validated six-panel geometry to insertion callback.",
+      "availability": "Disabled until the current draft has matching generated geometry.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxGeneratorDialog.worker.test.tsx",
+          "test": "BoxGeneratorDialog background generation enables Generate only after matching worker geometry is ready",
+          "result": "passed",
+          "boundary": "Manual worker fixture executes production box geometry; generated callback matches direct geometry. Workspace insertion/material fit is not claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/box/BoxGeneratorPreview.tsx:18:9",
+      "label": "Flat",
+      "expectedOutcome": "Select the Flat preview and clear Assembled pressed state.",
+      "availability": "Both views available in the open box dialog, including pending/no snapshot.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxControls.audit.test.tsx",
+          "test": "artwork control audit: box secondary controls changes from Flat to Assembled and back with truthful pressed states",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Additional existing worker case verifies an assembled canvas for generated geometry; no visual or physical fit claim."
+    },
+    {
+      "id": "src/ui/box/BoxGeneratorPreview.tsx:21:9",
+      "label": "Assembled",
+      "expectedOutcome": "Select the Assembled preview and clear Flat pressed state.",
+      "availability": "Both views available in the open box dialog, including pending/no snapshot.",
+      "evidence": [
+        {
+          "file": "src/ui/box/BoxControls.audit.test.tsx",
+          "test": "artwork control audit: box secondary controls changes from Flat to Assembled and back with truthful pressed states",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Additional existing worker case verifies an assembled canvas for generated geometry; no visual or physical fit claim."
+    },
+    {
+      "id": "src/ui/kit/Button.tsx:35:5",
+      "label": "{children}",
+      "expectedOutcome": "Dispatch enabled action; suppress disabled action; default to non-submit.",
+      "availability": "Reusable native button, availability controlled by caller.",
+      "evidence": [
+        {
+          "file": "src/ui/kit/KitControls.audit.test.tsx",
+          "test": "artwork control audit: shared kit controls dispatches enabled buttons once suppresses disabled ones and does not submit by default",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/kit/Dialog.tsx:52:9",
+      "label": "TutorialButton",
+      "expectedOutcome": "Open contextual tutorial without closing, submitting, or resetting the draft.",
+      "availability": "Dialog supplies tutorialId.",
+      "evidence": [
+        {
+          "file": "src/ui/kit/Dialog.test.tsx",
+          "test": "kit Dialog opens the contextual lesson without submitting or resetting the open form",
+          "result": "passed",
+          "boundary": "Actual tutorial store target and retained form draft asserted; submit/close spies remain untouched. Project/history invariance is not asserted in this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/kit/IconButton.tsx:32:5",
+      "label": "props.label",
+      "expectedOutcome": "Dispatch labelled icon action; suppress it when disabled; never implicitly submit.",
+      "availability": "Reusable native icon button, availability controlled by caller.",
+      "evidence": [
+        {
+          "file": "src/ui/kit/KitControls.audit.test.tsx",
+          "test": "artwork control audit: shared kit controls dispatches enabled buttons once suppresses disabled ones and does not submit by default",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/kit/RailSection.tsx:22:7",
+      "label": "{props.label} {props.badge === undefined ? null : <span className=\"lf-section-badge\">{props.badge}</span>}",
+      "expectedOutcome": "Toggle the section disclosure open and closed.",
+      "availability": "Section mounted; native details/summary.",
+      "evidence": [
+        {
+          "file": "src/ui/kit/KitControls.audit.test.tsx",
+          "test": "artwork control audit: shared kit controls opens and closes a disclosure and opens its actual contextual lesson",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/kit/RailSection.tsx:29:13",
+      "label": "TutorialButton",
+      "expectedOutcome": "Open the lesson supplied by the section.",
+      "availability": "tutorialId supplied; route inside disclosed section.",
+      "evidence": [
+        {
+          "file": "src/ui/kit/KitControls.audit.test.tsx",
+          "test": "artwork control audit: shared kit controls opens and closes a disclosure and opens its actual contextual lesson",
+          "result": "passed",
+          "boundary": "Actual details disclosure and named tutorial store target asserted. Reader content is tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/AddLayerControls.tsx:33:7",
+      "label": "Add layer",
+      "expectedOutcome": "Create a manual layer with chosen colour and make it active.",
+      "availability": "No current production mount; standalone legacy form.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations creates and assigns through the legacy standalone controls with no-selection guard",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderRow.tsx:48:5",
+      "label": "`Run ${props.row.position}: ${props.row.name}`",
+      "expectedOutcome": "Focus and select the clicked run unit.",
+      "availability": "Visible run row.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderPanel.test.tsx",
+          "test": "ArtworkRunOrderPanel focuses a run unit and moves it by exact number",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderRow.tsx:59:9",
+      "label": "Run",
+      "expectedOutcome": "Label the numeric run input and stop row-selection propagation.",
+      "availability": "Run row label; not a separate action button.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderRow.tsx",
+          "test": "Source inspection: label around RunPositionInput only calls stopPropagation",
+          "result": "inspected",
+          "boundary": "Inventory false positive; numeric-input editing is outside the baseline button record."
+        }
+      ],
+      "disposition": "not-action-control",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderRow.tsx:69:11",
+      "label": "RunSelectionButton",
+      "expectedOutcome": "Select the run artwork through the focusable native button.",
+      "availability": "Visible run row; selected state reflected with aria-pressed.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderRow.tsx:97:9",
+      "label": "Edit settings",
+      "expectedOutcome": "Select the row artwork and switch to its Settings panel.",
+      "availability": "Visible run row.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderRow.tsx:119:5",
+      "label": "`Select ${props.name}`",
+      "expectedOutcome": "Select the run artwork through the focusable native button.",
+      "availability": "Visible run row; selected state reflected with aria-pressed.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:41:9",
+      "label": "Undo last",
+      "expectedOutcome": "Undo the latest canvas number assignment within the active interaction.",
+      "availability": "Canvas numbering active; Undo disabled until an assignment exists.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderPanel.test.tsx",
+          "test": "ArtworkRunOrderPanel undoes within numbering, commits Done once, and restores Cancel",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:49:9",
+      "label": "Done",
+      "expectedOutcome": "Finish numbering and commit its order changes as one undoable step.",
+      "availability": "Canvas numbering active; Undo disabled until an assignment exists.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderPanel.test.tsx",
+          "test": "ArtworkRunOrderPanel undoes within numbering, commits Done once, and restores Cancel",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:57:9",
+      "label": "Cancel",
+      "expectedOutcome": "Cancel numbering and restore its original artwork order.",
+      "availability": "Canvas numbering active; Undo disabled until an assignment exists.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderPanel.test.tsx",
+          "test": "ArtworkRunOrderPanel undoes within numbering, commits Done once, and restores Cancel",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:84:7",
+      "label": "Run order tutorial",
+      "expectedOutcome": "Open the operations/run-order lesson.",
+      "availability": "At least one run unit and numbering idle.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the run order lesson from its toolbar",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:95:9",
+      "label": "Number on canvas",
+      "expectedOutcome": "Start one undoable canvas numbering interaction at position one.",
+      "availability": "Run-order panel with run units, numbering idle.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkRunOrderPanel.test.tsx",
+          "test": "ArtworkRunOrderPanel virtualizes a 50-job list and starts one canvas-numbering interaction",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/ArtworkRunOrderToolbar.tsx:119:9",
+      "label": "Go",
+      "expectedOutcome": "Reveal and select the requested run number, clearing search.",
+      "availability": "Numbering idle; a valid existing run is required to act.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/AssignSelectionButton.tsx:10:5",
+      "label": "`Assign selection to ${layer.color}`",
+      "expectedOutcome": "Assign selected artwork to the target operation.",
+      "availability": "No current production mount; disabled with no selection.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations creates and assigns through the legacy standalone controls with no-selection guard",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/CncFeedPresetRows.tsx:52:9",
+      "label": "`Save feeds preset for ${props.layer.color}`",
+      "expectedOutcome": "Create a saved CNC feeds preset with the entered name.",
+      "availability": "CNC feed helpers; disabled for blank/whitespace name.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncFeedPresetRows.test.tsx",
+          "test": "CncFeedPresetRows shows an honest empty state and disables saving until a name exists",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncLayerFields.tsx:59:7",
+      "label": "Cut type tutorial",
+      "expectedOutcome": "Open the lesson corresponding to the current CNC cut type.",
+      "availability": "CNC operation inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the CNC profile-outside cut type lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the CNC pocket cut type lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the CNC v-carve cut type lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncLayerFields.tsx:141:11",
+      "label": "`Flat depth for ${props.layer.color}`",
+      "expectedOutcome": "Switch V-carve from flowing depth to an explicit flat floor.",
+      "availability": "V-carve operation only.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.clarity.test.tsx",
+          "test": "CNC layer clarity defaults new V-carves to flowing depth and makes a flat floor explicit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncLayerFields.tsx:189:11",
+      "label": "Set to stock thickness ( {props.stockThicknessMm} mm)",
+      "expectedOutcome": "Set exact cut depth to measured Startup stock thickness.",
+      "availability": "Profile/inlay depth field; explicit operator action.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.test.tsx",
+          "test": "CncLayerFields always-visible Advanced section the stock-thickness button sets exact measured stock depth without hidden overcut",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncLayerToolFields.tsx:146:9",
+      "label": "`Helical entry for ${props.layer.color}`",
+      "expectedOutcome": "Enable helix entry, clearing ramp entry while preserving the Startup roughing tool.",
+      "availability": "Pocket operation.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.test.tsx",
+          "test": "CncLayerFields always-visible Advanced section enables pocket helical entry without replacing the Startup roughing bit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncProfileLeadFields.tsx:69:11",
+      "label": "Use cutter radius ( {props.toolRadius} mm)",
+      "expectedOutcome": "Remove custom lead radius/length so the resolved cutter radius applies.",
+      "availability": "Inside/outside profile with leads enabled and explicit radius present.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings removes custom profile lead radius and switches retract off in actual operation state",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncRetractPassesField.tsx:24:7",
+      "label": "`Retract between passes for ${props.layer.color}`",
+      "expectedOutcome": "Store retract-between-passes off/on for applicable cuts.",
+      "availability": "Cuts whose pass motion uses this setting; hidden for pocket.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings removes custom profile lead radius and switches retract off in actual operation state",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncTabFields.tsx:20:9",
+      "label": "`Holding tabs for ${layer.color}`",
+      "expectedOutcome": "Toggle holding tabs and disarm only the matching editor when disabled.",
+      "availability": "Profile/inlay tab settings.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.tabs.test.tsx",
+          "test": "CNC tab settings and canvas editor disables the matching editor while preserving dragged positions across re-enable",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncTabFields.tsx:30:9",
+      "label": "Holding tabs",
+      "expectedOutcome": "Open the CNC holding-tabs lesson.",
+      "availability": "Tab fields visible.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the holding tabs lesson from the profile fields",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncTabPositionControls.tsx:44:7",
+      "label": "Edit positions",
+      "expectedOutcome": "Seed saved tab anchors and enter canvas tab-position editing for the target operation.",
+      "availability": "Tabs enabled; Edit requires one editable matching profile object; reset route when manual positions exist.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.test.tsx",
+          "test": "CncLayerFields always-visible Advanced section seeds editable tab handles for one selected profile object and can reset them",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CncTabPositionControls.tsx:62:9",
+      "label": "Reset automatic",
+      "expectedOutcome": "Remove saved manual tab anchors and return to automatic placement and Select mode.",
+      "availability": "Tabs enabled; Edit requires one editable matching profile object; reset route when manual positions exist.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CncLayerFields.test.tsx",
+          "test": "CncLayerFields always-visible Advanced section seeds editable tab handles for one selected profile object and can reset them",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsCommonFields.tsx:60:9",
+      "label": "Show or hide this layer on the workspace without changing output.",
+      "expectedOutcome": "Stage workspace visibility and commit it only on OK.",
+      "availability": "Advanced dialog; membership only when editable, bridge fields only Line.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsCommonFields.tsx:69:9",
+      "label": "Include or exclude this layer when previewing, framing, exporting, or starting jobs.",
+      "expectedOutcome": "Stage output inclusion and commit it only on OK.",
+      "availability": "Advanced dialog; membership only when editable, bridge fields only Line.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsCommonFields.tsx:133:11",
+      "label": "Cut settings enable tabs",
+      "expectedOutcome": "Stage enabled line-cut bridges and commit only on OK.",
+      "availability": "Advanced dialog; membership only when editable, bridge fields only Line.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsCommonFields.tsx:166:11",
+      "label": "Cut settings skip inner tabs",
+      "expectedOutcome": "Stage skipping bridges on inner contours and commit only on OK.",
+      "availability": "Advanced dialog; membership only when editable, bridge fields only Line.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDefaultActions.tsx:12:7",
+      "label": "Make Default",
+      "expectedOutcome": "Save current stored operation settings as this colour default without applying staged edits.",
+      "availability": "Advanced settings with all three default handlers; absent for selected-object override editing.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings makes color and global defaults and resets the live dialog from the saved color default",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDefaultActions.tsx:19:7",
+      "label": "Reset to Default",
+      "expectedOutcome": "Reset the stored operation and open form to its saved colour default.",
+      "availability": "Advanced settings with all three default handlers; absent for selected-object override editing.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings makes color and global defaults and resets the live dialog from the saved color default",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDefaultActions.tsx:26:7",
+      "label": "Make Default for All",
+      "expectedOutcome": "Save current stored operation settings as the default for all colours.",
+      "availability": "Advanced settings with all three default handlers; absent for selected-object override editing.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings makes color and global defaults and resets the live dialog from the saved color default",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDialog.tsx:77:9",
+      "label": "Cancel",
+      "expectedOutcome": "Cancel the dialog without committing staged edits.",
+      "availability": "Open advanced cut settings.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.cut-settings.test.tsx",
+          "test": "selected artwork cut settings cancels staged settings without changing the operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDialog.tsx:78:9",
+      "label": "OK",
+      "expectedOutcome": "Commit staged settings to the owning operation and close.",
+      "availability": "Valid advanced cut-settings form.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.cut-settings.test.tsx",
+          "test": "selected artwork cut settings stages advanced settings and applies them only after OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsDialog.tsx:173:11",
+      "label": "TutorialButton",
+      "expectedOutcome": "Open the lesson for the draft operation mode while preserving unsaved fields.",
+      "availability": "Open advanced dialog.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutSettingsDialog.tutorial.test.tsx",
+          "test": "opens help for the draft cut mode without submitting or losing edits, and follows a store reset",
+          "result": "passed",
+          "boundary": "Actual lesson target, retained draft mode/power and Escape focus return asserted. Apply/Cancel are callback spies verified untouched; project/history invariance is not asserted in this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsFillFields.tsx:60:9",
+      "label": "Scan fill lines in both directions to reduce travel time.",
+      "expectedOutcome": "Stage alternating bidirectional fill scanning and commit on OK.",
+      "availability": "Fill details only.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every fill advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsFillFields.tsx:70:9",
+      "label": "Cut settings cross-hatch",
+      "expectedOutcome": "Stage a perpendicular cross-hatch fill pass and commit on OK.",
+      "availability": "Fill details only.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every fill advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsFillFields.tsx:110:7",
+      "label": "Allow uncalibrated bidirectional scanning, which can double or blur edges. Profiles requiring verified offsets still use one-way scanning while a saved table is marked pending.",
+      "expectedOutcome": "Stage the explicit uncalibrated bidirectional override and commit on OK.",
+      "availability": "Fill details only.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every fill advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutSettingsImageFields.tsx:205:7",
+      "label": "props.title",
+      "expectedOutcome": "Stage each generated image checkbox: negative, bidirectional, expert override and pass-through; commit on OK.",
+      "availability": "Image details only; generic renderer instantiated for each named flag.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits every image advanced checkbox only on OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutsLayersPanel.tsx:61:7",
+      "label": "{activeView === 'materials' ? ( <MaterialLibraryPanel /> ) : activeView === 'run-order' ? ( <ArtworkRunOrderPanel /> ) : ( <LayersView layers={layers} /> )}",
+      "expectedOutcome": "Group and label the current panel content or tab list.",
+      "availability": "Layout/accessibility container; not independently activated.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.tsx",
+          "test": "Source inspection: role=tabpanel or role=tablist div has no action handler",
+          "result": "inspected",
+          "boundary": "Source-inventory false positive."
+        }
+      ],
+      "disposition": "not-action-control",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutsLayersPanel.tsx:85:5",
+      "label": "Artwork panel view",
+      "expectedOutcome": "Group and label the current panel content or tab list.",
+      "availability": "Layout/accessibility container; not independently activated.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.tsx",
+          "test": "Source inspection: role=tabpanel or role=tablist div has no action handler",
+          "result": "inspected",
+          "boundary": "Source-inventory false positive."
+        }
+      ],
+      "disposition": "not-action-control",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/CutsLayersPanel.tsx:124:5",
+      "label": "{props.label}",
+      "expectedOutcome": "Select Run order or Materials and expose the corresponding panel.",
+      "availability": "Materials only Laser; Settings and Run order in both modes.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.tabs.test.tsx",
+          "test": "CutsLayersPanel tabs keeps material management out of the default layer workflow",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        },
+        {
+          "file": "src/ui/layers/CutsLayersPanel.tabs.test.tsx",
+          "test": "CutsLayersPanel tabs opens the numeric run-order manager for laser and CNC projects",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        },
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "The shared tab definition is exercised through Materials and Run order. Return to Settings is asserted through Edit settings; the Settings-tab dynamic instance is source-inspected, not separately clicked in these cases."
+    },
+    {
+      "id": "src/ui/layers/DeleteLayerButton.tsx:7:5",
+      "label": "`Delete operation ${layer.name}`",
+      "expectedOutcome": "Delete the operation and only artwork orphaned by that removal; support Undo.",
+      "availability": "Operation management disclosure.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations deletes only the chosen operation and its orphan artwork",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/DogboneRow.tsx:41:9",
+      "label": "Dogbone corners",
+      "expectedOutcome": "Open the dogbone lesson.",
+      "availability": "CNC and eligible closed unlocked vector selection.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the offset and dogbone lessons beside eligible geometry tools",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/DogboneRow.tsx:53:9",
+      "label": "Relieve corners",
+      "expectedOutcome": "Relieve eligible selected corners in place with the chosen cutter diameter and preserve Undo.",
+      "availability": "CNC and eligible closed unlocked vector selection.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities relieves CNC square corners in place and restores the original with Undo",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/FeedsCalculatorRow.tsx:73:7",
+      "label": "Apply to layer",
+      "expectedOutcome": "Apply the calculated machine-aware feed/plunge/depth recipe with provenance.",
+      "availability": "CNC feed calculator with a valid applicable recipe; disabled when not applicable.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/FeedsCalculatorRow.test.tsx",
+          "test": "FeedsCalculatorRow applies the central 4040-aware material recipe with provenance",
+          "result": "passed",
+          "boundary": "Actual DOM activation and production handler; callback arguments asserted using a test spy. Parent project insertion/native execution is outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": "Recipe callback fields are asserted; emitted CNC toolpaths and physical chip load are outside this case."
+    },
+    {
+      "id": "src/ui/layers/LayerImageFields.tsx:300:5",
+      "label": "`Negative image for ${labelContext}`",
+      "expectedOutcome": "Toggle negative engraving on the selected operation.",
+      "availability": "Image process in the selection inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits the image Negative image inline toggle to the selected operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerImageFields.tsx:319:5",
+      "label": "`Bidirectional image scan for ${labelContext}`",
+      "expectedOutcome": "Toggle bidirectional raster scanning on the selected operation.",
+      "availability": "Image process in the selection inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits the image Bidirectional image scan inline toggle to the selected operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerImageFields.tsx:338:5",
+      "label": "`Pass-through image for ${labelContext}`",
+      "expectedOutcome": "Toggle pass-through raster processing on the selected operation.",
+      "availability": "Image process in the selection inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits the image Pass-through image inline toggle to the selected operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerOrderControls.tsx:26:7",
+      "label": "`Move ${props.layer.name} up`",
+      "expectedOutcome": "Move the targeted operation one place up; disable at the first position.",
+      "availability": "Operation management disclosure; disabled at the corresponding end.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerOrderControls.tsx:36:7",
+      "label": "`Move ${props.layer.name} down`",
+      "expectedOutcome": "Move the targeted operation one place down; disable at the final position.",
+      "availability": "Operation management disclosure; disabled at the corresponding end.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:43:7",
+      "label": "`${props.layer.visible ? 'Hide' : 'Show'} operation ${props.layer.name}`",
+      "expectedOutcome": "Toggle this operation workspace visibility from the card eye button.",
+      "availability": "Operation card; management contains the secondary checkbox controls.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:66:7",
+      "label": "`More controls for ${props.layer.name}`",
+      "expectedOutcome": "Expand/collapse the operation management disclosure.",
+      "availability": "Operation card; management contains the secondary checkbox controls.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:79:13",
+      "label": "`Show ${props.layer.name}`",
+      "expectedOutcome": "Set this operation workspace visibility from the Show checkbox.",
+      "availability": "Operation card; management contains the secondary checkbox controls.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:89:13",
+      "label": "`Output ${props.layer.name}`",
+      "expectedOutcome": "Set this operation output inclusion independently from visibility.",
+      "availability": "Operation card; management contains the secondary checkbox controls.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:100:11",
+      "label": "SelectLayerObjectsButton",
+      "expectedOutcome": "Select all artwork intentionally sharing the operation.",
+      "availability": "Operation management disclosure.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.test.tsx",
+          "test": "Artwork Operations panel selects all artwork intentionally sharing an operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:102:11",
+      "label": "DeleteLayerButton",
+      "expectedOutcome": "Delete this operation and artwork with no other operation.",
+      "availability": "Operation management disclosure.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations deletes only the chosen operation and its orphan artwork",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRow.tsx:117:5",
+      "label": "`Activate operation ${props.layer.name}`",
+      "expectedOutcome": "Make the operation the active drawing operation and expose the active cue.",
+      "availability": "Visible operation card.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/LayerRow.accessibility.test.tsx",
+          "test": "LayerRow activation accessibility uses a native keyboard-operable button and exposes a visible active cue",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerRowFields.tsx:145:5",
+      "label": "`Bidirectional fill for ${targetAriaContext(layer, operationTarget)}`",
+      "expectedOutcome": "Toggle selected operation bidirectional fill.",
+      "availability": "Fill process in selected operation fields or reused operation settings.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutFlags.audit.test.tsx",
+          "test": "artwork control audit: cut settings commits the fill Bidirectional fill inline toggle to the selected operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerSettingsClipboardButtons.tsx:10:7",
+      "label": "`Copy settings from ${layer.color}`",
+      "expectedOutcome": "Copy this operation settings into the internal settings clipboard.",
+      "availability": "Management disclosure; Paste disabled until the settings clipboard exists.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerSettingsClipboardButtons.tsx:18:7",
+      "label": "`Paste settings to ${layer.color}`",
+      "expectedOutcome": "Paste settings onto this operation while retaining its identity; disable without a clipboard.",
+      "availability": "Management disclosure; Paste disabled until the settings clipboard exists.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/LayerSubLayers.tsx:60:9",
+      "label": "`Add sub-layer for ${layer.color}`",
+      "expectedOutcome": "Add an enabled sub-layer to the target operation.",
+      "availability": "No current production mount; legacy sub-layer list.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/LayerSubLayers.tsx:88:7",
+      "label": "`Enable ${subLayer.label} for ${layer.color}`",
+      "expectedOutcome": "Toggle the sub-layer output-enabled flag.",
+      "availability": "No current production mount; legacy sub-layer list.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/LayerSubLayers.tsx:102:7",
+      "label": "`Edit ${subLayer.label} for ${layer.color}`",
+      "expectedOutcome": "Open the targeted sub-layer settings; OK updates only its settings.",
+      "availability": "No current production mount; legacy sub-layer list.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/LayerSubLayers.tsx:110:7",
+      "label": "`Delete ${subLayer.label} for ${layer.color}`",
+      "expectedOutcome": "Delete only the targeted sub-layer.",
+      "availability": "No current production mount; legacy sub-layer list.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "intentionally-unavailable",
+      "notes": "Legacy standalone component has no production mount in current source. Its action is tested in isolation; current UI uses first-class artwork operations."
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryPanel.tsx:53:9",
+      "label": "Create new material library",
+      "expectedOutcome": "Create a blank library named for the active device.",
+      "availability": "No active library.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.test.tsx",
+          "test": "MaterialLibraryPanel creates a blank device-scoped material library from the panel",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryPanel.tsx:61:11",
+      "label": "Create starter material library for the selected device",
+      "expectedOutcome": "Create the active machine catalogue starter library.",
+      "availability": "No active library and a starter catalogue exists for the profile.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.test.tsx",
+          "test": "MaterialLibraryPanel creates a starter material library from the selected machine profile catalog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryPanel.tsx:157:7",
+      "label": "Refresh linked material preset",
+      "expectedOutcome": "Copy the current linked preset revision onto its operation and update revision truth.",
+      "availability": "Linked binding exists; disabled when its source preset/library is missing.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.management.test.tsx",
+          "test": "MaterialLibraryPanel preset management surfaces stale linked revision truth and refreshes it explicitly",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryPanel.tsx:235:9",
+      "label": "Material library",
+      "expectedOutcome": "Open the materials lesson.",
+      "availability": "Material Library panel in Laser mode.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the material library lesson from the panel and the preset wizard",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryPanel.tsx:237:7",
+      "label": "SavedLibrariesButton",
+      "expectedOutcome": "Open Saved Libraries from the material panel header.",
+      "availability": "Material Library panel in Laser mode.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Shared SavedLibrariesButton is mounted directly in the case; this exact parent call site is source-inspected. The real dialog/state path is exercised."
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryRecipeControls.tsx:25:9",
+      "label": "Apply selected material preset to layer",
+      "expectedOutcome": "Apply the selected preset snapshot to the target layer without creating a live link.",
+      "availability": "A target layer and preset exist; unsupported recipe remains available with warning.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.test.tsx",
+          "test": "MaterialLibraryPanel assigns a selected preset to the selected target layer",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryRecipeControls.tsx:35:9",
+      "label": "Link selected material preset to layer",
+      "expectedOutcome": "Apply and link the selected preset with library/preset/revision identity.",
+      "availability": "A target layer and preset exist.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management links the selected preset with its source revision to the target operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/MaterialLibraryRecipeControls.tsx:45:9",
+      "label": "Delete selected material preset",
+      "expectedOutcome": "Delete only the selected preset after confirmation; cancellation retains it.",
+      "availability": "Preset exists; no layer needed.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.management.test.tsx",
+          "test": "MaterialLibraryPanel preset management deletes a selected material preset after confirmation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        },
+        {
+          "file": "src/ui/layers/MaterialLibraryPanel.management.test.tsx",
+          "test": "MaterialLibraryPanel preset management keeps a selected material preset when delete confirmation is cancelled",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "window.confirm is stubbed for both outcomes; actual library mutation is asserted."
+    },
+    {
+      "id": "src/ui/layers/OffsetPathsRow.tsx:33:9",
+      "label": "Offset paths",
+      "expectedOutcome": "Open the offset-path lesson.",
+      "availability": "Eligible closed unlocked vector selection.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the offset and dogbone lessons beside eligible geometry tools",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/OffsetPathsRow.tsx:45:9",
+      "label": "Outward",
+      "expectedOutcome": "Create an outward offset copy while preserving its source.",
+      "availability": "Eligible closed unlocked vector selection; positive distance.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities creates the Outward one-millimeter offset while retaining its source",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/OffsetPathsRow.tsx:52:9",
+      "label": "Inward",
+      "expectedOutcome": "Create an inward offset copy while preserving its source.",
+      "availability": "Eligible closed unlocked vector selection; positive distance.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities creates the Inward one-millimeter offset while retaining its source",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectLayerObjectsButton.tsx:7:5",
+      "label": "`Select all artwork using ${layer.name}`",
+      "expectedOutcome": "Select every artwork sharing the operation.",
+      "availability": "Operation management disclosure.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.test.tsx",
+          "test": "Artwork Operations panel selects all artwork intentionally sharing an operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedImageAdjustments.tsx:15:7",
+      "label": "EditImageButton",
+      "expectedOutcome": "Open Image Studio with the selected raster as the session owner.",
+      "availability": "A single selected raster.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities opens Image Studio on the selected image using a stub pixel decoder",
+          "result": "passed",
+          "boundary": "Actual button, editor lifecycle and owned session; raster pixel decoder stub supplies a small buffer. Browser image decoding and editor rendering are separately tested.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedImageAdjustments.tsx:52:5",
+      "label": "Edit Image…",
+      "expectedOutcome": "Open Image Studio with the selected raster as the session owner.",
+      "availability": "A single selected raster.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities opens Image Studio on the selected image using a stub pixel decoder",
+          "result": "passed",
+          "boundary": "Actual button, editor lifecycle and owned session; raster pixel decoder stub supplies a small buffer. Browser image decoding and editor rendering are separately tested.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedLaserOperationFields.tsx:16:5",
+      "label": "Process tutorial",
+      "expectedOutcome": "Open the lesson for the selected laser process.",
+      "availability": "Laser operation inspector; mixed mode routes to operations.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the selected line process lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the selected fill process lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the selected image process lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedLaserOperationFields.tsx:67:9",
+      "label": "Air assist for selected operation",
+      "expectedOutcome": "Toggle stored job air intent for this operation.",
+      "availability": "Laser operation inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.cut-settings.test.tsx",
+          "test": "selected artwork cut settings updates job air assist on the selected artwork operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Only operation state; no live air output or controller command is claimed."
+    },
+    {
+      "id": "src/ui/layers/SelectedLaserOperationFields.tsx:76:7",
+      "label": "Advanced cut settings",
+      "expectedOutcome": "Open the staged advanced cut-settings dialog.",
+      "availability": "Laser operation inspector; disabled while settings launcher is blocked by an interaction.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.cut-settings.test.tsx",
+          "test": "selected artwork cut settings stages advanced settings and applies them only after OK",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedOperationInspector.tsx:51:9",
+      "label": "Use one operation for selection",
+      "expectedOutcome": "Assign the chosen common operation to every selected artwork.",
+      "availability": "Multi-selection has no common operation.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.test.tsx",
+          "test": "Artwork Operations panel offers and applies one unified operation for a multi-selection",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedOperationInspector.tsx:180:9",
+      "label": "Make unique",
+      "expectedOutcome": "Give selected members a unique operation while preserving unselected members.",
+      "availability": "Operation also affects unselected artwork.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.test.tsx",
+          "test": "Artwork Operations panel makes one member of a shared operation unique",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedOperationInspector.tsx:188:7",
+      "label": "Add operation",
+      "expectedOutcome": "Add a first-class extra operation to selected artwork.",
+      "availability": "Selected artwork with an operation.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/CutsLayersPanel.test.tsx",
+          "test": "Artwork Operations panel adds a second first-class operation without a Sub-layers box",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedOperationInspector.tsx:207:9",
+      "label": "`Show ${props.operation.name}`",
+      "expectedOutcome": "Set the inspected operation workspace visibility independently from other operations.",
+      "availability": "Operation inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes selected inspector Show and Output on the owning operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedOperationInspector.tsx:217:9",
+      "label": "`Output ${props.operation.name}`",
+      "expectedOutcome": "Set the inspected operation output inclusion independently from other operations.",
+      "availability": "Operation inspector.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations changes selected inspector Show and Output on the owning operation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedReliefProperties.tsx:38:7",
+      "label": "Relief",
+      "expectedOutcome": "Open the relief lesson.",
+      "availability": "CNC and exactly one relief selected.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the selected relief lesson",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedReliefProperties.tsx:67:7",
+      "label": "View 3D…",
+      "expectedOutcome": "Open the actual 3D relief viewer; report worker/rendering unavailability clearly.",
+      "availability": "CNC and exactly one relief selected.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities opens the actual relief viewer and reports its unavailable worker boundary",
+          "result": "passed",
+          "boundary": "Actual viewer dialog and unavailable-worker fallback in jsdom; 3D rendering needs browser Worker/WebGL and is not qualified by this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SelectedSourceReimportControl.tsx:20:7",
+      "label": "Re-import selected source…",
+      "expectedOutcome": "Replace only the selected source-aware SVG/DXF object, retaining identity.",
+      "availability": "Platform exists and one imported SVG/DXF without library provenance is supplied.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ArtworkUtilities.audit.test.tsx",
+          "test": "artwork control audit: utilities reimports selected SVG into its existing identity through a stub file picker",
+          "result": "passed",
+          "boundary": "Native file picker is a stub supplying fixture content; actual parser and store mutation are exercised. No operating-system picker or disk read is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": "SVG successful button path exercised. DXF path and asynchronous ownership races require the separate app import suite; this row does not claim every format was clicked."
+    },
+    {
+      "id": "src/ui/layers/SetupOwnedValueRow.tsx:19:7",
+      "label": "`${props.label}: ${props.value}. Managed in Startup Setup.`",
+      "expectedOutcome": "Disclose who owns a read-only Startup value.",
+      "availability": "Setup reference row.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/SetupOwnedValueRow.test.tsx",
+          "test": "SetupOwnedValueRow explains a read-only value and requests its exact Startup Setup field",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SetupOwnedValueRow.tsx:38:13",
+      "label": "Close",
+      "expectedOutcome": "Close the explanation without editing setup/project state.",
+      "availability": "Explanation open.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/OperationControls.audit.test.tsx",
+          "test": "artwork control audit: operations closes the setup explanation without opening a setup editor or mutating the project",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/layers/SetupOwnedValueRow.tsx:45:13",
+      "label": "Edit in Startup Setup",
+      "expectedOutcome": "Close explanation and request the exact Startup Setup field.",
+      "availability": "Explanation open.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/SetupOwnedValueRow.test.tsx",
+          "test": "SetupOwnedValueRow explains a read-only value and requests its exact Startup Setup field",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Setup dialog store request asserted. Native hardware settings are not written."
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:50:9",
+      "label": "All designs",
+      "expectedOutcome": "Select All designs and remove the category restriction.",
+      "availability": "Open Design Library; collection with entries.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:57:11",
+      "label": "category",
+      "expectedOutcome": "Select this populated collection and display its matching designs.",
+      "availability": "Open Design Library; collection with entries.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:77:5",
+      "label": "{props.label} {props.count}",
+      "expectedOutcome": "Activate the named collection filter through the shared native collection button.",
+      "availability": "Open Design Library; collection with entries.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:115:11",
+      "label": "Clear search",
+      "expectedOutcome": "Clear the search query and restore matching results.",
+      "availability": "Search query nonempty.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:124:9",
+      "label": "activeCount === 0 ? 'Filters' : `Filters, ${activeCount} active`",
+      "expectedOutcome": "Expand/collapse the filter controls.",
+      "availability": "Open Design Library.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryControls.tsx:198:7",
+      "label": "Clear all filters",
+      "expectedOutcome": "Reset all collection/query/facet filters.",
+      "availability": "Filter panel expanded.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDetails.tsx:43:7",
+      "label": "ReturnToResultsButton",
+      "expectedOutcome": "Return focus to the selected design card without inserting artwork.",
+      "availability": "A detail entry is selected; back route visible in narrow layout.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation returns focus from details to the selected card without inserting artwork",
+          "result": "passed",
+          "boundary": "Actual DOM focus/navigation handler; jsdom scrollIntoView stub records request, so real scrolling/layout is not claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDetails.tsx:79:9",
+      "label": "{props.addingId === entry.id ? 'Adding to canvas...' : 'Add to canvas'}",
+      "expectedOutcome": "Insert the exact selected design with provenance and close on success.",
+      "availability": "Detail selected; disabled while any add is in flight.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog selects a card without inserting, then adds from exact provenance details",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDetails.tsx:122:5",
+      "label": "← Back to designs",
+      "expectedOutcome": "Return focus to the selected design card without inserting artwork.",
+      "availability": "A detail entry is selected; back route visible in narrow layout.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation returns focus from details to the selected card without inserting artwork",
+          "result": "passed",
+          "boundary": "Actual DOM focus/navigation handler; jsdom scrollIntoView stub records request, so real scrolling/layout is not claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDetails.tsx:158:9",
+      "label": "View source",
+      "expectedOutcome": "Expose the selected asset source URL as a native new-tab link.",
+      "availability": "Web platform and URL present; links intentionally omitted on Electron.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation exposes exact source and license destinations as native new-tab links",
+          "result": "passed",
+          "boundary": "Actual native anchor href/target/rel verified; external site navigation is intentionally not performed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        },
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog keeps exact provenance URLs readable when desktop security blocks external windows",
+          "result": "passed",
+          "boundary": "Electron platform flag fixture verifies text remains and links are absent.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDetails.tsx:163:9",
+      "label": "License terms",
+      "expectedOutcome": "Expose the selected asset license URL as a native new-tab link.",
+      "availability": "Web platform and URL present; links intentionally omitted on Electron.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryControls.audit.test.tsx",
+          "test": "artwork control audit: design library navigation exposes exact source and license destinations as native new-tab links",
+          "result": "passed",
+          "boundary": "Actual native anchor href/target/rel verified; external site navigation is intentionally not performed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-new-controls-second.json"
+        },
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog keeps exact provenance URLs readable when desktop security blocks external windows",
+          "result": "passed",
+          "boundary": "Electron platform flag fixture verifies text remains and links are absent.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryDialog.tsx:62:9",
+      "label": "Close Design Library",
+      "expectedOutcome": "Close the Library and retire pending insertion ownership.",
+      "availability": "Open Design Library.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog silently abandons a deferred insertion after Close button closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryGrid.tsx:51:7",
+      "label": "`View details for ${entry.title}${sourceSuffix}`",
+      "expectedOutcome": "Show exact design details without inserting.",
+      "availability": "Visible design card.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog selects a card without inserting, then adds from exact provenance details",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryGrid.tsx:74:7",
+      "label": "props.adding ? `Adding ${entry.title}${sourceSuffix} to canvas` : `Add ${entry.title}${sourceSuffix} to canvas`",
+      "expectedOutcome": "Insert the exact visible card design via its separate quick action.",
+      "availability": "Visible design card; disabled during insertion.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog adds the exact visible design from the separate quick action",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/library/DesignLibraryGrid.tsx:101:7",
+      "label": "Clear filters",
+      "expectedOutcome": "Clear an empty-result query/filter and restore results.",
+      "availability": "No matching designs.",
+      "evidence": [
+        {
+          "file": "src/ui/library/DesignLibraryDialog.test.tsx",
+          "test": "DesignLibraryDialog keeps a zero-result query visible and recovers through Clear filters",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesButton.tsx:12:7",
+      "label": "Open saved libraries",
+      "expectedOutcome": "Open the actual Saved Libraries modal.",
+      "availability": "Reusable materials header entry point.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesDialog.tsx:56:9",
+      "label": "New library",
+      "expectedOutcome": "Create and activate a new blank device-named library.",
+      "availability": "Open Saved Libraries modal.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesDialog.tsx:64:9",
+      "label": "Import library",
+      "expectedOutcome": "Import selected native library content into the saved collection.",
+      "availability": "Open Saved Libraries modal; picker cancellation leaves state intact.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog imports a library from a file",
+          "result": "passed",
+          "boundary": "Native file picker is a stub supplying fixture content; actual parser and store mutation are exercised. No operating-system picker or disk read is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesDialog.tsx:73:9",
+      "label": "ClbImportButton",
+      "expectedOutcome": "Import CLB content and convert its units into a stored preset library.",
+      "availability": "Open Saved Libraries modal.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "result": "passed",
+          "boundary": "Native file picker is a stub supplying fixture content; actual parser and store mutation are exercised. No operating-system picker or disk read is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesDialog.tsx:101:9",
+      "label": "Close",
+      "expectedOutcome": "Close Saved Libraries modal.",
+      "availability": "Open Saved Libraries modal.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibrariesDialog.tsx:113:5",
+      "label": "Import LightBurn CLB",
+      "expectedOutcome": "Import CLB content and convert its units into a stored preset library.",
+      "availability": "Open Saved Libraries modal.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "result": "passed",
+          "boundary": "Native file picker is a stub supplying fixture content; actual parser and store mutation are exercised. No operating-system picker or disk read is claimed.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:71:9",
+      "label": "`Save name for ${props.summary.name}`",
+      "expectedOutcome": "Save the typed nonempty library name and leave rename mode.",
+      "availability": "Saved library row; Save appears only while renaming.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog renames a library inline",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:79:9",
+      "label": "`Cancel renaming ${props.summary.name}`",
+      "expectedOutcome": "Cancel rename and retain the original library name.",
+      "availability": "Rename row open.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:110:9",
+      "label": "`Open ${summary.name}`",
+      "expectedOutcome": "Activate the selected saved library and close management.",
+      "availability": "Inactive saved library; active library Open disabled.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog opens an inactive library and closes the page",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        },
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:119:9",
+      "label": "`Rename ${summary.name}`",
+      "expectedOutcome": "Enter inline rename mode seeded with the current library name.",
+      "availability": "Saved library row; Save appears only while renaming.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog renames a library inline",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:126:9",
+      "label": "`Duplicate ${summary.name}`",
+      "expectedOutcome": "Duplicate the selected library under a new identity without changing the active library.",
+      "availability": "Saved library row.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog duplicates a library into the list",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:133:9",
+      "label": "`Export ${summary.name}`",
+      "expectedOutcome": "Serialize the chosen library to the selected save target.",
+      "availability": "Saved library row.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog exports the active library to a file",
+          "result": "passed",
+          "boundary": "Actual serializer and write payload are asserted through a stub SaveTarget. OS save dialog, filesystem durability, and inactive-library export are outside this case.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-boundary",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/SavedLibraryRow.tsx:140:9",
+      "label": "`Delete ${summary.name}`",
+      "expectedOutcome": "Delete the chosen library only after confirmation.",
+      "availability": "Saved library row.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog deletes a library after confirmation",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        },
+        {
+          "file": "src/ui/material-library/SavedLibrariesDialog.test.tsx",
+          "test": "SavedLibrariesDialog keeps a library when delete is cancelled",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-existing-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": "Confirmation is stubbed for both outcomes; collection mutation is real."
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizard.tsx:84:11",
+      "label": "TutorialButton",
+      "expectedOutcome": "Open the materials lesson without committing the wizard.",
+      "availability": "Open create/edit wizard.",
+      "evidence": [
+        {
+          "file": "src/ui/layers/ContextualLessons.audit.test.tsx",
+          "test": "artwork control audit: contextual lesson bindings opens the material library lesson from the panel and the preset wizard",
+          "result": "passed",
+          "boundary": "Actual enclosing component trigger opens the named tutorial store entry and preserves project/history. Reader delivery is separately tested by the shared tutorial audit.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizard.tsx:98:11",
+      "label": "Back",
+      "expectedOutcome": "Return to the previous step while retaining parsed settings/details; leave the saved library untouched.",
+      "availability": "Step two through four.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management preserves settings and detail edits when Back is followed by Next",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/material-library/wizard/MaterialPresetWizard.back-boundary.test.tsx",
+          "test": "material preset Back data boundary normalizes invalid numeric drafts locally and Cancel retains the exact saved preset",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-review-boundary-tests.json"
+        }
+      ],
+      "disposition": "defect-fixed",
+      "notes": "Initial case failed (Power67 returned as30). Back now captures current settings/details before changing steps; regression retains valid power, air, tabs and final saved recipe. Invalid numeric text uses the existing Next normalization: out-of-range power clamps, blank speed restores its prior value; Cancel preserves the exact saved preset. Initial failure recorded in artwork-new-controls-initial.json."
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizard.tsx:100:9",
+      "label": "Cancel",
+      "expectedOutcome": "Cancel editing and keep the original saved recipe unchanged.",
+      "availability": "Open wizard.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizard.tsx:101:9",
+      "label": "{state.step === 'review' ? 'Save' : 'Next'}",
+      "expectedOutcome": "Advance valid steps and save one recipe only on final Save.",
+      "availability": "Next disabled until identity valid; native form validity applies.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        },
+        {
+          "file": "src/ui/material-library/wizard/MaterialPresetWizard.test.tsx",
+          "test": "MaterialPresetWizard keeps the Next button disabled until the identity step is valid",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizardLauncher.tsx:19:9",
+      "label": "New material preset",
+      "expectedOutcome": "Open a new empty preset draft.",
+      "availability": "New with active library; Edit disabled without selected preset.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/MaterialPresetWizardLauncher.tsx:29:9",
+      "label": "Edit selected material preset",
+      "expectedOutcome": "Open the selected preset identity and recipe for editing; disable with no selection.",
+      "availability": "New with active library; Edit disabled without selected preset.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/WizardCutSettingsStep.tsx:48:9",
+      "label": "Recipe uses air assist",
+      "expectedOutcome": "Stage recipe air intent and retain it in the saved preset.",
+      "availability": "Wizard settings step.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/WizardDetailsStep.tsx:61:9",
+      "label": "Enable tabs",
+      "expectedOutcome": "Stage line bridges enabled and persist that intent on final Save.",
+      "availability": "Wizard details for Line mode.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/WizardDetailsStep.tsx:91:9",
+      "label": "Skip inner shapes",
+      "expectedOutcome": "Stage skipping bridge gaps on inner shapes and persist it on final Save.",
+      "availability": "Wizard details for Line mode.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/WizardIdentityStep.tsx:53:9",
+      "label": "Has thickness",
+      "expectedOutcome": "Select thickness grouping and reveal the retained thickness input.",
+      "availability": "Wizard identity step.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    },
+    {
+      "id": "src/ui/material-library/wizard/WizardIdentityStep.tsx:64:9",
+      "label": "Surface, no thickness",
+      "expectedOutcome": "Select surface grouping, reveal retained title, and save title without thickness.",
+      "availability": "Wizard identity step.",
+      "evidence": [
+        {
+          "file": "src/ui/material-library/MaterialControls.audit.test.tsx",
+          "test": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "result": "passed",
+          "boundary": "DOM click through real React handlers and actual in-memory project/UI state; no controller or physical output.",
+          "report": "docs/audits/2026-09-21-interface/artwork-final-gap-tests.json"
+        }
+      ],
+      "disposition": "verified-behaviour",
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "completedDate": "2026-09-22",
+  "worktree": "D:\\LaserForge\\ui-audit-20260921",
+  "sourceHead": "377e692baf26a9f66ba3877f157213095c54b92f",
+  "baselineSourceDigest": "8f5e258f3e7949843c05b7660e08060bb5a479e70615177c15a40d757c11d217",
+  "currentSourceDigest": "e886c12cb5eb8f9163de8d49a247ddd79a4d1a1e73233285647458595776e5d3",
+  "controlDefinitionsAndCalls": 805,
+  "commands": 91,
+  "counts": {
+    "defect-fixed": 9,
+    "intentionally-unavailable": 6,
+    "not-action-control": 7,
+    "verified-behaviour": 421,
+    "verified-boundary": 362
+  },
+  "byArea": {
+    "app": 14,
+    "box": 8,
+    "calibration": 6,
+    "camera": 49,
+    "cnc-viewer3d": 3,
+    "commands": 31,
+    "common": 28,
+    "design-studio": 40,
+    "gcode-inspector": 21,
+    "image-editor": 64,
+    "kit": 5,
+    "laser": 269,
+    "layers": 92,
+    "library": 15,
+    "machine": 12,
+    "material-library": 24,
+    "raster": 9,
+    "relief-viewer": 2,
+    "text": 29,
+    "trace": 19,
+    "tutorials": 17,
+    "workspace": 48
+  },
+  "limits": [
+    "A source definition or reusable call is not the same as a unique visible button. Dynamic families and shared-component boundaries are identified per row.",
+    "Verified-behaviour means the stated software behavior in the cited case passed. It does not imply every conditional state, machine firmware, imported file or external environment was tested.",
+    "Verified-boundary means only the stated callback, adapter, shared-component, simulator or availability boundary was exercised; native/physical outcomes remain unqualified.",
+    "No real machine, laser/spindle, homing, probing, cutting, native installer, live camera or deployment was operated."
+  ]
+}

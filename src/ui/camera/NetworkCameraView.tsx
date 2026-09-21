@@ -116,6 +116,9 @@ export function NetworkCameraView(props: {
             Re-align
           </button>
         </div>
+        <span style={hintStyle}>
+          Use this camera, then Update still. Turn Overlay on if the image is hidden.
+        </span>
       </div>
     );
   }
@@ -186,9 +189,9 @@ function SaveAlignmentButton(props: {
           },
         })
       }
-      title="Save this alignment to the device and show the camera on the workspace canvas."
+      title="Save this alignment to the device. Use this camera, choose Update still, and turn Overlay on if hidden."
     >
-      {isCurrent ? 'Saved to device' : 'Save & show on canvas'}
+      {isCurrent ? 'Alignment saved' : 'Save alignment'}
     </button>
   );
 }

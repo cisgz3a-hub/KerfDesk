@@ -56,9 +56,18 @@ function ToolbarProjectName(): JSX.Element {
     <span
       className="lf-toolbar-project-name"
       title={dirty ? `${name} (unsaved changes)` : name}
+      role="group"
       aria-label="Current project"
     >
-      {name}
+      <span className="lf-toolbar-project-caption" aria-hidden="true">
+        Project
+      </span>
+      <span className="lf-toolbar-project-title">
+        {name}
+        {dirty ? (
+          <span className="lf-toolbar-project-dirty" role="img" aria-label="Unsaved changes" />
+        ) : null}
+      </span>
     </span>
   );
 }

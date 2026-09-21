@@ -1,0 +1,286 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 26,
+  "numPassedTests": 3,
+  "numFailedTests": 0,
+  "numPendingTests": 23,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006316457,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel prompts to create an outline when no jig exists",
+          "status": "skipped",
+          "title": "prompts to create an outline when no jig exists",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel keeps How to use collapsed until the operator opens it",
+          "status": "passed",
+          "title": "keeps How to use collapsed until the operator opens it",
+          "duration": 84.21469999999863,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked",
+          "status": "skipped",
+          "title": "flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel keeps Artwork only disabled until actual artwork exists",
+          "status": "skipped",
+          "title": "keeps Artwork only disabled until actual artwork exists",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel auto-selects Artwork only when creating a box around existing artwork",
+          "status": "skipped",
+          "title": "auto-selects Artwork only when creating a box around existing artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel edits the registration outline operation instead of leaving generic defaults hidden",
+          "status": "skipped",
+          "title": "edits the registration outline operation instead of leaving generic defaults hidden",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel offers a circle outline for round blanks",
+          "status": "skipped",
+          "title": "offers a circle outline for round blanks",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel moves when the header is dragged",
+          "status": "skipped",
+          "title": "moves when the header is dragged",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel moves with arrow keys when the drag handle is focused",
+          "status": "skipped",
+          "title": "moves with arrow keys when the drag handle is focused",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel locks the box via the Lock box checkbox",
+          "status": "skipped",
+          "title": "locks the box via the Lock box checkbox",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel disables unlock and Replace and warns for a captured board (CAM-04)",
+          "status": "skipped",
+          "title": "disables unlock and Replace and warns for a captured board (CAM-04)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel leaves unlock and Replace enabled for a jig outline (CAM-04)",
+          "status": "skipped",
+          "title": "leaves unlock and Replace enabled for a jig outline (CAM-04)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel creates five jigs, copies selected artwork to all, and toggles both runs set-wide",
+          "status": "skipped",
+          "title": "creates five jigs, copies selected artwork to all, and toggles both runs set-wide",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel reopens an existing rectangular set with its rows, columns, and spacing",
+          "status": "skipped",
+          "title": "reopens an existing rectangular set with its rows, columns, and spacing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RegistrationJigPanel"],
+          "fullName": "RegistrationJigPanel refreshes saved grid geometry when a project opens while the panel is already mounted",
+          "status": "skipped",
+          "title": "refreshes saved grid geometry when a project opens while the panel is already mounted",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006329344,
+      "endTime": 1790006329428.2146,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/RegistrationJigPanel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip teaches the selected drawing tool without changing the tool or artwork",
+          "status": "skipped",
+          "title": "teaches the selected drawing tool without changing the tool or artwork",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms text placement directly and shows the active text tool",
+          "status": "skipped",
+          "title": "arms text placement directly and shows the active text tool",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip uses help topics for drawing tool hover explanations",
+          "status": "skipped",
+          "title": "uses help topics for drawing tool hover explanations",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip toggles an already-active draw tool back to Select mode",
+          "status": "skipped",
+          "title": "toggles an already-active draw tool back to Select mode",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms node edit mode without toggling normal Select transforms",
+          "status": "skipped",
+          "title": "arms node edit mode without toggling normal Select transforms",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms the Measure tool from the tool strip",
+          "status": "skipped",
+          "title": "arms the Measure tool from the tool strip",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip shows curve-node actions and converts the selected segment",
+          "status": "skipped",
+          "title": "shows curve-node actions and converts the selected segment",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip keeps Join available for two anchors and returns focus to Edit nodes after success",
+          "status": "passed",
+          "title": "keeps Join available for two anchors and returns focus to Edit nodes after success",
+          "duration": 71.8109999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip does not turn unsupported interior anchors into a narrower disabled-state guard",
+          "status": "passed",
+          "title": "does not turn unsupported interior anchors into a narrower disabled-state guard",
+          "duration": 20.737500000000182,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip arms the Star tool from the tool strip",
+          "status": "skipped",
+          "title": "arms the Star tool from the tool strip",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ToolStrip"],
+          "fullName": "ToolStrip opens the design library from the tool strip",
+          "status": "skipped",
+          "title": "opens the design library from the tool strip",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006332784,
+      "endTime": 1790006332876.7375,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/workspace/ToolStrip.test.tsx"
+    }
+  ]
+}

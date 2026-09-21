@@ -38,10 +38,15 @@ describe('Machine Setup raster calibration production entrypoint', () => {
       const details = summary?.parentElement;
       if (!(details instanceof HTMLDetailsElement)) throw new Error('Expected disclosure');
       await act(async () => {
-        details.open = false;
-        Simulate.toggle(details);
+        summary!.click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
-      await expandDiagnostics(view.host);
+      expect(details.open).toBe(false);
+      await act(async () => {
+        summary!.click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(details.open).toBe(true);
       expect(field(view.host, 'Measured offset 1').value).toBe('0.123');
       expect(field(view.host, 'Scan-offset input convention').value).toBe(
         'lightburn-half-both-directions',

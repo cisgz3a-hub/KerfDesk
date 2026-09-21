@@ -1,0 +1,272 @@
+{
+  "numTotalTestSuites": 4,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 23,
+  "numPassedTests": 10,
+  "numFailedTests": 2,
+  "numPendingTests": 11,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005889716,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit rail disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "rail disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit device profile disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "device profile disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit execution archive disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "execution archive disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit controller backup disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "controller backup disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit probe disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "probe disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser recovery disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "laser recovery disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit CNC recovery guidance disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "CNC recovery guidance disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "status": "skipped",
+          "title": "laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "status": "skipped",
+          "title": "detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "status": "skipped",
+          "title": "Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "status": "passed",
+          "title": "all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "duration": 110.27739999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "status": "skipped",
+          "title": "Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005909609,
+      "endTime": 1790005909719.2773,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineUtilityControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Machine Setup launcher opens the globally owned setup at the capability step",
+          "status": "passed",
+          "title": "Machine Setup launcher opens the globally owned setup at the capability step",
+          "duration": 38.76059999999961,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit saved profile Delete removes only the selected library entry without changing the project",
+          "status": "passed",
+          "title": "saved profile Delete removes only the selected library entry without changing the project",
+          "duration": 29.26879999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit tiling enable creates the default draft and disable clears only that optional draft value",
+          "status": "passed",
+          "title": "tiling enable creates the default draft and disable clears only that optional draft value",
+          "duration": 28.476700000001074,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit rotary attachment and reverse toggles return independent draft patches",
+          "status": "passed",
+          "title": "rotary attachment and reverse toggles return independent draft patches",
+          "duration": 16.822399999999107,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "status": "passed",
+          "title": "homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "duration": 21.28099999999904,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "status": "passed",
+          "title": "Identify disclosures toggle and worker streaming records a draft-only preference",
+          "duration": 61.21839999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit each Options disclosure opens and closes without editing the draft",
+          "status": "passed",
+          "title": "each Options disclosure opens and closes without editing the draft",
+          "duration": 56.20000000000073,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "status": "passed",
+          "title": "review Edit buttons navigate to their exact setup owner without committing",
+          "duration": 20.592200000000958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "status": "failed",
+          "title": "CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "duration": 163.38860000000022,
+          "failureMessages": [
+            "TypeError: Cannot read properties of undefined (reading 'click')\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx:121:22\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx:121:5\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Reconnect uses the selected controller and command disclosure changes only visibility",
+          "status": "passed",
+          "title": "Reconnect uses the selected controller and command disclosure changes only visibility",
+          "duration": 11.488600000000588,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "status": "failed",
+          "title": "CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "duration": 8.070200000000114,
+          "failureMessages": [
+            "AssertionError: expected false to be true // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx:138:54\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005905240,
+      "endTime": 1790005905696.0703,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"
+    }
+  ]
+}

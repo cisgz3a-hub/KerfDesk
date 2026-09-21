@@ -45,6 +45,18 @@ afterEach(() => {
 });
 
 describe('CheckpointResumeBanner', () => {
+  it('audit recovery disclosure opens and closes without changing its saved capsule', async () => {
+    const repository = await interruptedRepository();
+    const before = repository.getSnapshot();
+    render(repository);
+    const details = host!.querySelector('details')!;
+    const summary = details.querySelector('summary')!;
+    act(() => summary.click());
+    expect(details.open).toBe(true);
+    act(() => summary.click());
+    expect(details.open).toBe(false);
+    expect(repository.getSnapshot()).toBe(before);
+  });
   it('shows an isolated, collapsed recovery card without a Start blocker', async () => {
     const repository = await interruptedRepository();
     render(repository);

@@ -1,0 +1,475 @@
+{
+  "numTotalTestSuites": 12,
+  "numPassedTestSuites": 12,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 39,
+  "numPassedTests": 39,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005447670,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management links the selected preset with its source revision to the target operation",
+          "status": "passed",
+          "title": "links the selected preset with its source revision to the target operation",
+          "duration": 114.88130000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "status": "passed",
+          "title": "opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "duration": 80.06880000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "status": "passed",
+          "title": "imports CLB through the button and stores parsed units using a stub file picker",
+          "duration": 33.29669999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "status": "passed",
+          "title": "launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "duration": 143.02039999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management preserves settings and detail edits when Back is followed by Next",
+          "status": "passed",
+          "title": "preserves settings and detail edits when Back is followed by Next",
+          "duration": 115.97940000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005474295,
+      "endTime": 1790005474781.9795,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/material-library/MaterialControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "status": "passed",
+          "title": "jumps to a numbered run selects through its native button and opens its settings",
+          "duration": 171.6244000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities creates the Outward one-millimeter offset while retaining its source",
+          "status": "passed",
+          "title": "creates the Outward one-millimeter offset while retaining its source",
+          "duration": 31.12120000000141,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities creates the Inward one-millimeter offset while retaining its source",
+          "status": "passed",
+          "title": "creates the Inward one-millimeter offset while retaining its source",
+          "duration": 10.464499999998225,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities relieves CNC square corners in place and restores the original with Undo",
+          "status": "passed",
+          "title": "relieves CNC square corners in place and restores the original with Undo",
+          "duration": 15.992099999999482,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities reimports selected SVG into its existing identity through a stub file picker",
+          "status": "passed",
+          "title": "reimports selected SVG into its existing identity through a stub file picker",
+          "duration": 35.47229999999763,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities opens Image Studio on the selected image using a stub pixel decoder",
+          "status": "passed",
+          "title": "opens Image Studio on the selected image using a stub pixel decoder",
+          "duration": 17.01009999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities opens the actual relief viewer and reports its unavailable worker boundary",
+          "status": "passed",
+          "title": "opens the actual relief viewer and reports its unavailable worker boundary",
+          "duration": 68.21630000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005468946,
+      "endTime": 1790005469296.2163,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the run order lesson from its toolbar",
+          "status": "passed",
+          "title": "opens the run order lesson from its toolbar",
+          "duration": 182.14260000000104,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the selected line process lesson",
+          "status": "passed",
+          "title": "opens the selected line process lesson",
+          "duration": 111.88360000000102,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the selected fill process lesson",
+          "status": "passed",
+          "title": "opens the selected fill process lesson",
+          "duration": 85.88119999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the selected image process lesson",
+          "status": "passed",
+          "title": "opens the selected image process lesson",
+          "duration": 75.99380000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the CNC profile-outside cut type lesson",
+          "status": "passed",
+          "title": "opens the CNC profile-outside cut type lesson",
+          "duration": 129.2551000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the CNC pocket cut type lesson",
+          "status": "passed",
+          "title": "opens the CNC pocket cut type lesson",
+          "duration": 48.97450000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the CNC v-carve cut type lesson",
+          "status": "passed",
+          "title": "opens the CNC v-carve cut type lesson",
+          "duration": 60.087499999999636,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the holding tabs lesson from the profile fields",
+          "status": "passed",
+          "title": "opens the holding tabs lesson from the profile fields",
+          "duration": 45.618899999999485,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the material library lesson from the panel and the preset wizard",
+          "status": "passed",
+          "title": "opens the material library lesson from the panel and the preset wizard",
+          "duration": 52.72609999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the offset and dogbone lessons beside eligible geometry tools",
+          "status": "passed",
+          "title": "opens the offset and dogbone lessons beside eligible geometry tools",
+          "duration": 86.11309999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: contextual lesson bindings"],
+          "fullName": "artwork control audit: contextual lesson bindings opens the selected relief lesson",
+          "status": "passed",
+          "title": "opens the selected relief lesson",
+          "duration": 20.219200000001365,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005489246,
+      "endTime": 1790005490145.2192,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/ContextualLessons.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every line advanced checkbox only on OK",
+          "duration": 300.0019999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every fill advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every fill advanced checkbox only on OK",
+          "duration": 188.48530000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every image advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every image advanced checkbox only on OK",
+          "duration": 162.09810000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the fill Bidirectional fill inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the fill Bidirectional fill inline toggle to the selected operation",
+          "duration": 58.96639999999934,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Negative image inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Negative image inline toggle to the selected operation",
+          "duration": 45.959100000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Bidirectional image scan inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Bidirectional image scan inline toggle to the selected operation",
+          "duration": 51.713699999999335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Pass-through image inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Pass-through image inline toggle to the selected operation",
+          "duration": 42.96970000000056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings makes color and global defaults and resets the live dialog from the saved color default",
+          "status": "passed",
+          "title": "makes color and global defaults and resets the live dialog from the saved color default",
+          "duration": 158.73970000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings removes custom profile lead radius and switches retract off in actual operation state",
+          "status": "passed",
+          "title": "removes custom profile lead radius and switches retract off in actual operation state",
+          "duration": 90.60329999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005496099,
+      "endTime": 1790005497199.6033,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/CutFlags.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every line recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every line recipe setting through native Next/Save",
+          "duration": 195.1872999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every fill recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every fill recipe setting through native Next/Save",
+          "duration": 79.67380000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every image recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every image recipe setting through native Next/Save",
+          "duration": 55.826600000000326,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips saves toggled air from true, reopens it, and applies it to a layer",
+          "status": "passed",
+          "title": "saves toggled air from true, reopens it, and applies it to a layer",
+          "duration": 95.39620000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips saves toggled air from false, reopens it, and applies it to a layer",
+          "status": "passed",
+          "title": "saves toggled air from false, reopens it, and applies it to a layer",
+          "duration": 79.1911999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005479523,
+      "endTime": 1790005480029.1912,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/material-library/wizard/MaterialPresetWizard.roundtrip.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["MaterialPresetWizard"],
+          "fullName": "MaterialPresetWizard creates a preset by walking every step",
+          "status": "passed",
+          "title": "creates a preset by walking every step",
+          "duration": 210.04820000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialPresetWizard"],
+          "fullName": "MaterialPresetWizard keeps the Next button disabled until the identity step is valid",
+          "status": "passed",
+          "title": "keeps the Next button disabled until the identity step is valid",
+          "duration": 26.142299999999523,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005501862,
+      "endTime": 1790005502099.1423,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/material-library/wizard/MaterialPresetWizard.test.tsx"
+    }
+  ]
+}

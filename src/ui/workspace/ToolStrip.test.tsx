@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useUiStore } from '../state/ui-store';
 import { useStore } from '../state/store';
+import { useToastStore } from '../state/toast-store';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { ToolStrip } from './ToolStrip';
 import { useTutorialStore } from '../tutorials/tutorial-store';
@@ -210,6 +211,11 @@ describe('ToolStrip', () => {
 
     expect(h.querySelector('button[aria-label="Join"]')).toBeNull();
     expect(document.activeElement).toBe(node);
+    const joined = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    const curve = joined.paths[0]?.curves?.[0];
+    expect(curve).toMatchObject({ closed: true, start: { x: 0, y: 0 } });
+    expect(curve?.segments.at(-1)?.to).toEqual({ x: 0, y: 0 });
+    expect(useStore.getState().undoStack.at(-1)?.scene.objects[0]).toBe(object);
   });
 
   it('does not turn unsupported interior anchors into a narrower disabled-state guard', async () => {
@@ -252,6 +258,9 @@ describe('ToolStrip', () => {
     await act(async () => join?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(useStore.getState().selectedPathNodes).toEqual(refs);
     expect(h.querySelector<HTMLButtonElement>('button[aria-label="Join"]')?.disabled).toBe(false);
+    expect(useStore.getState().project.scene.objects[0]).toBe(object);
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'warning' });
+    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/endpoint/i);
   });
 
   it('arms the Star tool from the tool strip', async () => {

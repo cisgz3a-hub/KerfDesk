@@ -1,0 +1,149 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 12,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 11,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006892496,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "status": "passed",
+          "title": "audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "duration": 45.94419999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Machine Setup launcher opens the globally owned setup at the capability step",
+          "status": "skipped",
+          "title": "Machine Setup launcher opens the globally owned setup at the capability step",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit saved profile Delete removes only the selected library entry without changing the project",
+          "status": "skipped",
+          "title": "saved profile Delete removes only the selected library entry without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit tiling enable creates the default draft and disable clears only that optional draft value",
+          "status": "skipped",
+          "title": "tiling enable creates the default draft and disable clears only that optional draft value",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit rotary attachment and reverse toggles return independent draft patches",
+          "status": "skipped",
+          "title": "rotary attachment and reverse toggles return independent draft patches",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "status": "skipped",
+          "title": "homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "status": "skipped",
+          "title": "Identify disclosures toggle and worker streaming records a draft-only preference",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit each Options disclosure opens and closes without editing the draft",
+          "status": "skipped",
+          "title": "each Options disclosure opens and closes without editing the draft",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "status": "skipped",
+          "title": "review Edit buttons navigate to their exact setup owner without committing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "status": "skipped",
+          "title": "CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Reconnect uses the selected controller and command disclosure changes only visibility",
+          "status": "skipped",
+          "title": "Reconnect uses the selected controller and command disclosure changes only visibility",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "status": "skipped",
+          "title": "CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006903889,
+      "endTime": 1790006903934.944,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"
+    }
+  ]
+}

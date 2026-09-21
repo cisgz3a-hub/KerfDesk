@@ -1,0 +1,202 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 14,
+  "numPassedTests": 12,
+  "numFailedTests": 2,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005018865,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "status": "passed",
+          "title": "changes card visibility and output independently and opens More disclosure",
+          "duration": 151.09580000000278,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations changes selected inspector Show and Output on the owning operation",
+          "status": "passed",
+          "title": "changes selected inspector Show and Output on the owning operation",
+          "duration": 45.62569999999687,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "status": "passed",
+          "title": "moves both directions with truthful end guards and pastes copied settings",
+          "duration": 44.14190000000235,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations deletes only the chosen operation and its orphan artwork",
+          "status": "passed",
+          "title": "deletes only the chosen operation and its orphan artwork",
+          "duration": 41.549699999999575,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations creates and assigns through the legacy standalone controls with no-selection guard",
+          "status": "passed",
+          "title": "creates and assigns through the legacy standalone controls with no-selection guard",
+          "duration": 12.296800000000076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "status": "passed",
+          "title": "adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "duration": 44.84570000000167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations closes the setup explanation without opening a setup editor or mutating the project",
+          "status": "passed",
+          "title": "closes the setup explanation without opening a setup editor or mutating the project",
+          "duration": 5.004400000001624,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005040956,
+      "endTime": 1790005041301.0044,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/OperationControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "status": "passed",
+          "title": "filters a collection returns to All designs and clears search and all facets",
+          "duration": 1245.5886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation returns focus from details to the selected card without inserting artwork",
+          "status": "passed",
+          "title": "returns focus from details to the selected card without inserting artwork",
+          "duration": 267.22509999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation exposes exact source and license destinations as native new-tab links",
+          "status": "passed",
+          "title": "exposes exact source and license destinations as native new-tab links",
+          "duration": 142.0573999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005049388,
+      "endTime": 1790005051044.0574,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/library/DesignLibraryControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "status": "failed",
+          "title": "opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "duration": 91.05399999999963,
+          "failureMessages": [
+            "Error: Missing button: Cancel rename for Original\n    at button (D:/LaserForge/ui-audit-20260921/src/ui/layers/control-audit-test-support.tsx:30:22)\n    at D:/LaserForge/ui-audit-20260921/src/ui/material-library/MaterialControls.audit.test.tsx:16:17\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "status": "passed",
+          "title": "imports CLB through the button and stores parsed units using a stub file picker",
+          "duration": 23.71289999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "status": "passed",
+          "title": "launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "duration": 129.14919999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management preserves settings and detail edits when Back is followed by Next",
+          "status": "failed",
+          "title": "preserves settings and detail edits when Back is followed by Next",
+          "duration": 52.390100000000075,
+          "failureMessages": [
+            "AssertionError: expected '30' to be '67' // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/material-library/MaterialControls.audit.test.tsx:85:60\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005044233,
+      "endTime": 1790005044529.3901,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/material-library/MaterialControls.audit.test.tsx"
+    }
+  ]
+}

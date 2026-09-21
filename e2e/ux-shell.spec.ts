@@ -11,12 +11,12 @@ test.describe('workspace shell acceptance', () => {
   test('supports keyboard focus and disclosure controls at laptop size', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 700 });
 
-    const newButton = page.getByRole('button', { name: 'New', exact: true });
     const openButton = page.getByRole('button', { name: 'Open...', exact: true });
-    await newButton.focus();
+    const importButton = page.getByRole('button', { name: 'Import...', exact: true });
+    await openButton.focus();
     await page.keyboard.press('Tab');
-    await expect(openButton).toBeFocused();
-    await expectFocusRing(openButton);
+    await expect(importButton).toBeFocused();
+    await expectFocusRing(importButton);
 
     const collapseLayers = page.getByRole('button', {
       name: 'Collapse Artwork / Operations panel',
@@ -233,7 +233,7 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
 }
 
 async function expectUsableToolbarRows(page: Page): Promise<void> {
-  // Below 700px utilities have their own row; neither group may wrap or clip.
+  // Below 520px utilities have their own row; neither group may wrap or clip.
   for (const selector of ['.lf-toolbar-command-groups', '.lf-toolbar-utilities']) {
     const row = page.getByLabel('Toolbar', { exact: true }).locator(selector);
     const geometry = await row.evaluate((node) => ({

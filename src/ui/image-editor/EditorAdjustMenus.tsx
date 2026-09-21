@@ -3,11 +3,13 @@
 // and Filter menus reduced to one level each. Picking an entry opens its
 // dialog (or commits instantly for parameterless ones like Invert).
 
-import { useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { movePopoverFocus } from '../common/AnchoredPopover';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import { ADJUSTMENTS, type AdjustmentSpec } from './editor-adjustments';
 import { useResizeDialogStore } from './resize-dialog-store';
 import { useTextDialogStore } from './text-dialog-store';
+import { useImageEditorStore } from './image-editor-store';
 
 type MenuItem = {
   readonly key: string;
@@ -20,6 +22,10 @@ type MenuItem = {
 export function EditorAdjustMenus(): JSX.Element {
   const openAdjust = useAdjustDialogStore((s) => s.open);
   const openResize = useResizeDialogStore((s) => s.open);
+  const transforming = useImageEditorStore((s) => s.transform !== null);
+  const disabledReason = transforming
+    ? 'Finish or cancel Free Transform first (Enter / Esc).'
+    : undefined;
   const imageItems: readonly MenuItem[] = [
     {
       key: 'image-size',
@@ -39,9 +45,17 @@ export function EditorAdjustMenus(): JSX.Element {
   const openText = useTextDialogStore((s) => s.open);
   return (
     <span style={menusStyle}>
-      <MenuButton label="Image" items={imageItems} />
-      <MenuButton label="Adjust" items={catalogItems('adjust', openAdjust)} />
-      <MenuButton label="Filter" items={catalogItems('filter', openAdjust)} />
+      <MenuButton label="Image" items={imageItems} disabledReason={disabledReason} />
+      <MenuButton
+        label="Adjust"
+        items={catalogItems('adjust', openAdjust)}
+        disabledReason={disabledReason}
+      />
+      <MenuButton
+        label="Filter"
+        items={catalogItems('filter', openAdjust)}
+        disabledReason={disabledReason}
+      />
       <button
         type="button"
         className="lf-btn lf-btn--ghost"
@@ -73,33 +87,62 @@ function catalogItems(
 function MenuButton(props: {
   readonly label: string;
   readonly items: readonly MenuItem[];
+  readonly disabledReason: string | undefined;
 }): JSX.Element {
-  const [isOpen, setIsOpen] = useState(false);
+  const menu = useOperationMenu(props.disabledReason);
+  const menuId = useId();
   return (
     <span style={anchorStyle}>
       <button
+        ref={menu.triggerRef}
         type="button"
         className="lf-btn lf-btn--ghost"
-        onClick={() => setIsOpen((open) => !open)}
+        disabled={props.disabledReason !== undefined}
+        onClick={menu.toggle}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          event.stopPropagation();
+          menu.openAt(event.key === 'ArrowUp' ? 'last' : 'first');
+        }}
         aria-haspopup="menu"
-        aria-expanded={isOpen}
-        title={`${props.label} menu — image operations for the Studio document`}
+        aria-expanded={menu.isOpen}
+        aria-controls={menu.isOpen ? menuId : undefined}
+        title={
+          props.disabledReason ?? `${props.label} menu — image operations for the Studio document`
+        }
       >
         {props.label} ▾
       </button>
-      {isOpen ? (
+      {menu.isOpen ? (
         <>
-          <div style={catcherStyle} onClick={() => setIsOpen(false)} aria-hidden="true" />
-          <div role="menu" aria-label={`${props.label} menu`} style={listStyle}>
+          <div style={catcherStyle} onClick={menu.close} aria-hidden="true" />
+          <div
+            ref={menu.menuRef}
+            id={menuId}
+            role="menu"
+            aria-label={`${props.label} menu`}
+            style={listStyle}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' || event.key === 'Tab') {
+                if (event.key === 'Escape') event.preventDefault();
+                event.stopPropagation();
+                menu.close();
+                return;
+              }
+              movePopoverFocus(event);
+            }}
+          >
             {props.items.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 role="menuitem"
+                tabIndex={-1}
                 style={itemStyle}
                 className="lf-btn lf-btn--ghost"
                 onClick={() => {
-                  setIsOpen(false);
+                  menu.close();
                   item.pick();
                 }}
                 title={item.title}
@@ -113,6 +156,40 @@ function MenuButton(props: {
       ) : null}
     </span>
   );
+}
+
+function useOperationMenu(disabledReason: string | undefined) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [initialFocus, setInitialFocus] = useState<'first' | 'last'>('first');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    if (disabledReason !== undefined) {
+      setIsOpen(false);
+      return;
+    }
+    const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+    const index = initialFocus === 'last' ? (items?.length ?? 1) - 1 : 0;
+    items?.[index]?.focus();
+  }, [isOpen, initialFocus, disabledReason]);
+  return {
+    isOpen,
+    triggerRef,
+    menuRef,
+    close: (): void => {
+      triggerRef.current?.focus();
+      setIsOpen(false);
+    },
+    toggle: (): void => {
+      setInitialFocus('first');
+      setIsOpen((open) => !open);
+    },
+    openAt: (edge: 'first' | 'last'): void => {
+      setInitialFocus(edge);
+      setIsOpen(true);
+    },
+  };
 }
 
 const menusStyle: React.CSSProperties = { display: 'inline-flex', gap: 4 };
@@ -132,6 +209,8 @@ const listStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   minWidth: 220,
+  maxHeight: 'min(420px, 60vh)',
+  overflowY: 'auto',
   padding: 4,
   borderRadius: 6,
   border: '1px solid var(--lf-border)',

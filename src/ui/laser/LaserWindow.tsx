@@ -99,8 +99,8 @@ export function LaserWindow({
         )}
       />
       <ProbePanel />
-      <CncUtilitiesPanel />
       <JobControls
+        setupExtras={<CncUtilitiesPanel />}
         dockedJobActions={dockedJobActions}
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onConfigureAutofocus={() =>

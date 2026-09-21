@@ -4,7 +4,7 @@
   flex-direction: column;
   align-items: center;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: 3px;
   width: 50px;
   min-height: 0;
   padding: 8px 5px;
@@ -17,6 +17,7 @@
   flex: 0 0 auto;
   width: 36px;
   height: 36px;
+  border-radius: 6px;
 }
 
 .lf-toolstrip > button > svg,
@@ -30,7 +31,23 @@
 }
 
 .lf-toolstrip > .lf-btn:not([aria-pressed='true']):not(:hover) {
-  background: var(--lf-bg-0);
+  background: transparent;
+  border-color: transparent;
+}
+
+.lf-toolstrip > .lf-tutorial-button:not(:hover) {
+  border-color: transparent;
+  background: transparent;
+}
+
+.lf-toolstrip__caption {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--lf-text-muted);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .lf-toolstrip__divider {

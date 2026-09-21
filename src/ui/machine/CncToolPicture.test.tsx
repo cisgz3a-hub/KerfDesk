@@ -38,6 +38,57 @@ async function togglePicture(open: boolean, container: ParentNode = host): Promi
 }
 
 describe('CncToolPicture', () => {
+  it('audit catalog manufacturer source disclosures open and close without changing tools', async () => {
+    const onAdd = vi.fn();
+    const project = useStore.getState().project;
+    const library = useStore.getState().cncLibrary;
+    await act(async () => root.render(<CncBitCatalogPanel customTools={[]} onAdd={onAdd} />));
+    const summaries = [
+      ...host.querySelectorAll<HTMLElement>(
+        'summary[title="Show the primary manufacturer source URL."]',
+      ),
+    ];
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const summary of summaries) {
+      const details = summary.parentElement as HTMLDetailsElement;
+      expect(details.open).toBe(false);
+      act(() => summary.click());
+      expect(details.open).toBe(true);
+      expect(details.querySelector('code')?.textContent).toMatch(/^https:\/\//);
+      act(() => summary.click());
+      expect(details.open).toBe(false);
+    }
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(useStore.getState().project).toBe(project);
+    expect(useStore.getState().cncLibrary).toBe(library);
+  });
+
+  it('audit picture summary clicks mount and hide the selected photo without changing the project', async () => {
+    const project = useStore.getState().project;
+    await act(async () =>
+      root.render(<CncToolPicture tool={{ kind: 'end-mill', family: 'upcut' }} />),
+    );
+    const details = host.querySelector<HTMLDetailsElement>('[data-cnc-tool-picture]')!;
+    const summary = details.querySelector('summary')!;
+    expect(details.open).toBe(false);
+    expect(host.querySelector('img')).toBeNull();
+    await act(async () => {
+      summary.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(details.open).toBe(true);
+    expect(host.querySelector('img')?.getAttribute('src')).toContain(
+      BIT_PHOTO_ASSETS['bit-upcut'].small.file,
+    );
+    await act(async () => {
+      summary.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(details.open).toBe(false);
+    expect(host.querySelector('img')).toBeNull();
+    expect(useStore.getState().project).toBe(project);
+  });
+
   it('mounts only the requested photo, unmounts on close, and leaves project and tool state intact', async () => {
     const project = useStore.getState().project;
     const library = useStore.getState().cncLibrary;

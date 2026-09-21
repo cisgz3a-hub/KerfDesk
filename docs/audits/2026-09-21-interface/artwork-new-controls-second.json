@@ -1,0 +1,444 @@
+{
+  "numTotalTestSuites": 14,
+  "numPassedTestSuites": 10,
+  "numFailedTestSuites": 4,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 34,
+  "numPassedTests": 29,
+  "numFailedTests": 5,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005286823,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: box secondary controls"],
+          "fullName": "artwork control audit: box secondary controls cancels the fit-test dialog without generating a coupon",
+          "status": "passed",
+          "title": "cancels the fit-test dialog without generating a coupon",
+          "duration": 68.23700000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: box secondary controls"],
+          "fullName": "artwork control audit: box secondary controls changes from Flat to Assembled and back with truthful pressed states",
+          "status": "passed",
+          "title": "changes from Flat to Assembled and back with truthful pressed states",
+          "duration": 15.083400000000438,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005335774,
+      "endTime": 1790005335857.0835,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/box/BoxControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: shared kit controls"],
+          "fullName": "artwork control audit: shared kit controls dispatches enabled buttons once suppresses disabled ones and does not submit by default",
+          "status": "passed",
+          "title": "dispatches enabled buttons once suppresses disabled ones and does not submit by default",
+          "duration": 44.23409999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: shared kit controls"],
+          "fullName": "artwork control audit: shared kit controls opens and closes a disclosure and opens its actual contextual lesson",
+          "status": "passed",
+          "title": "opens and closes a disclosure and opens its actual contextual lesson",
+          "duration": 17.971999999999753,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005331497,
+      "endTime": 1790005331559.972,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/kit/KitControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation filters a collection returns to All designs and clears search and all facets",
+          "status": "passed",
+          "title": "filters a collection returns to All designs and clears search and all facets",
+          "duration": 384.2395999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation returns focus from details to the selected card without inserting artwork",
+          "status": "passed",
+          "title": "returns focus from details to the selected card without inserting artwork",
+          "duration": 110.89419999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: design library navigation"],
+          "fullName": "artwork control audit: design library navigation exposes exact source and license destinations as native new-tab links",
+          "status": "passed",
+          "title": "exposes exact source and license destinations as native new-tab links",
+          "duration": 56.20880000000034,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005322049,
+      "endTime": 1790005322601.2087,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/library/DesignLibraryControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities jumps to a numbered run selects through its native button and opens its settings",
+          "status": "passed",
+          "title": "jumps to a numbered run selects through its native button and opens its settings",
+          "duration": 139.38930000000255,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities creates the Outward one-millimeter offset while retaining its source",
+          "status": "failed",
+          "title": "creates the Outward one-millimeter offset while retaining its source",
+          "duration": 43.8820999999989,
+          "failureMessages": [
+            "AssertionError: expected { minX: 189, minY: 189, …(2) } to deeply equal { minX: -1, minY: -1, maxX: 21, …(1) }\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx:41:32\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities creates the Inward one-millimeter offset while retaining its source",
+          "status": "failed",
+          "title": "creates the Inward one-millimeter offset while retaining its source",
+          "duration": 17.346999999997934,
+          "failureMessages": [
+            "AssertionError: expected { minX: 191, minY: 191, …(2) } to deeply equal { Object (minX, minY, ...) }\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx:41:32\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities relieves CNC square corners into new geometry without removing the original",
+          "status": "failed",
+          "title": "relieves CNC square corners into new geometry without removing the original",
+          "duration": 17.056899999999587,
+          "failureMessages": [
+            "AssertionError: expected [ { …(7) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx:49:21\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities reimports selected SVG into its existing identity through a stub file picker",
+          "status": "passed",
+          "title": "reimports selected SVG into its existing identity through a stub file picker",
+          "duration": 22.027799999999843,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities opens Image Studio on the selected image using a stub pixel decoder",
+          "status": "failed",
+          "title": "opens Image Studio on the selected image using a stub pixel decoder",
+          "duration": 10.737100000002101,
+          "failureMessages": [
+            "AssertionError: expected undefined to be 'raster' // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx:76:67\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: utilities"],
+          "fullName": "artwork control audit: utilities opens the actual relief viewer and reports its unavailable worker boundary",
+          "status": "passed",
+          "title": "opens the actual relief viewer and reports its unavailable worker boundary",
+          "duration": 45.25660000000062,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005304540,
+      "endTime": 1790005304836.2566,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/ArtworkUtilities.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every line advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every line advanced checkbox only on OK",
+          "duration": 238.1237000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every fill advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every fill advanced checkbox only on OK",
+          "duration": 100.94620000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits every image advanced checkbox only on OK",
+          "status": "passed",
+          "title": "commits every image advanced checkbox only on OK",
+          "duration": 83.73299999999927,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the fill Bidirectional fill inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the fill Bidirectional fill inline toggle to the selected operation",
+          "duration": 37.24150000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Negative image inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Negative image inline toggle to the selected operation",
+          "duration": 38.26390000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Bidirectional image scan inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Bidirectional image scan inline toggle to the selected operation",
+          "duration": 41.490200000000186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings commits the image Pass-through image inline toggle to the selected operation",
+          "status": "passed",
+          "title": "commits the image Pass-through image inline toggle to the selected operation",
+          "duration": 41.69890000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings makes color and global defaults and resets the live dialog from the saved color default",
+          "status": "passed",
+          "title": "makes color and global defaults and resets the live dialog from the saved color default",
+          "duration": 95.09549999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: cut settings"],
+          "fullName": "artwork control audit: cut settings removes custom profile lead radius and switches retract off in actual operation state",
+          "status": "failed",
+          "title": "removes custom profile lead radius and switches retract off in actual operation state",
+          "duration": 78.61809999999969,
+          "failureMessages": [
+            "TypeError: Cannot read properties of undefined (reading 'click')\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/control-audit-test-support.tsx:45:98\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at click (D:/LaserForge/ui-audit-20260921/src/ui/layers/control-audit-test-support.tsx:45:74)\n    at D:/LaserForge/ui-audit-20260921/src/ui/layers/CutFlags.audit.test.tsx:64:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005316962,
+      "endTime": 1790005317717.6182,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/CutFlags.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations changes card visibility and output independently and opens More disclosure",
+          "status": "passed",
+          "title": "changes card visibility and output independently and opens More disclosure",
+          "duration": 232.53769999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations changes selected inspector Show and Output on the owning operation",
+          "status": "passed",
+          "title": "changes selected inspector Show and Output on the owning operation",
+          "duration": 124.54839999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations moves both directions with truthful end guards and pastes copied settings",
+          "status": "passed",
+          "title": "moves both directions with truthful end guards and pastes copied settings",
+          "duration": 78.0655999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations deletes only the chosen operation and its orphan artwork",
+          "status": "passed",
+          "title": "deletes only the chosen operation and its orphan artwork",
+          "duration": 51.80320000000029,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations creates and assigns through the legacy standalone controls with no-selection guard",
+          "status": "passed",
+          "title": "creates and assigns through the legacy standalone controls with no-selection guard",
+          "duration": 14.863400000000183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "status": "passed",
+          "title": "adds disables edits and deletes a legacy sub-layer without changing primary settings",
+          "duration": 72.46509999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: operations"],
+          "fullName": "artwork control audit: operations closes the setup explanation without opening a setup editor or mutating the project",
+          "status": "passed",
+          "title": "closes the setup explanation without opening a setup editor or mutating the project",
+          "duration": 8.535800000000563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005327387,
+      "endTime": 1790005327970.536,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/layers/OperationControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "status": "passed",
+          "title": "opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "duration": 125.01670000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "status": "passed",
+          "title": "imports CLB through the button and stores parsed units using a stub file picker",
+          "duration": 28.18289999999979,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "status": "passed",
+          "title": "launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "duration": 151.5634,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management preserves settings and detail edits when Back is followed by Next",
+          "status": "passed",
+          "title": "preserves settings and detail edits when Back is followed by Next",
+          "duration": 96.52160000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005308937,
+      "endTime": 1790005309338.5215,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/material-library/MaterialControls.audit.test.tsx"
+    }
+  ]
+}

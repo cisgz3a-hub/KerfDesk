@@ -1,0 +1,250 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 4,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 19,
+  "numPassedTests": 18,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790009166717,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens homing configuration while disconnected instead of silently doing nothing",
+          "status": "passed",
+          "title": "opens homing configuration while disconnected instead of silently doing nothing",
+          "duration": 1092.9743999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens the autofocus page with its field highlighted",
+          "status": "passed",
+          "title": "opens the autofocus page with its field highlighted",
+          "duration": 363.04039999999804,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks still refuses setup edits during an active Frame",
+          "status": "passed",
+          "title": "still refuses setup edits during an active Frame",
+          "duration": 85.03849999999875,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790009239643,
+      "endTime": 1790009241185.0386,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/JobControls.setup-navigation.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["three-stage Machine Setup integration audit"],
+          "fullName": "three-stage Machine Setup integration audit stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "status": "passed",
+          "title": "stepper and footer retain a draft through Back, save once, and cancel later edits without controller calls",
+          "duration": 1583.9852,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["three-stage Machine Setup integration audit"],
+          "fullName": "three-stage Machine Setup integration audit all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "status": "passed",
+          "title": "all new stage and review disclosures open and close without changing the hybrid draft or live project",
+          "duration": 967.2144000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["three-stage Machine Setup integration audit"],
+          "fullName": "three-stage Machine Setup integration audit all machine capability and active-toolhead radios update only the real setup reducer",
+          "status": "failed",
+          "title": "all machine capability and active-toolhead radios update only the real setup reducer",
+          "duration": 40.77379999999903,
+          "failureMessages": [
+            "TypeError: Cannot read properties of null (reading 'click')\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineSetupStages.audit.test.tsx:171:23\n    at act (D:\\LaserForge\\ui-audit-20260921\\node_modules\\.pnpm\\react@18.3.1\\node_modules\\react\\cjs\\react.development.js:2512:16)\n    at D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineSetupStages.audit.test.tsx:171:7\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["three-stage Machine Setup integration audit"],
+          "fullName": "three-stage Machine Setup integration audit Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile",
+          "status": "passed",
+          "title": "Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile",
+          "duration": 121.33349999999882,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790009219322,
+      "endTime": 1790009222039.3335,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineSetupStages.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "status": "passed",
+          "title": "audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "duration": 158.73010000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Machine Setup launcher opens the globally owned setup at the capability step",
+          "status": "passed",
+          "title": "Machine Setup launcher opens the globally owned setup at the capability step",
+          "duration": 33.06640000000334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit saved profile Delete removes only the selected library entry without changing the project",
+          "status": "passed",
+          "title": "saved profile Delete removes only the selected library entry without changing the project",
+          "duration": 91.77939999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit tiling enable creates the default draft and disable clears only that optional draft value",
+          "status": "passed",
+          "title": "tiling enable creates the default draft and disable clears only that optional draft value",
+          "duration": 100.19170000000304,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit rotary attachment and reverse toggles return independent draft patches",
+          "status": "passed",
+          "title": "rotary attachment and reverse toggles return independent draft patches",
+          "duration": 43.774399999994785,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "status": "passed",
+          "title": "homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "duration": 61.321600000002945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "status": "passed",
+          "title": "Identify disclosures toggle and worker streaming records a draft-only preference",
+          "duration": 76.25690000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit each Options disclosure opens and closes without editing the draft",
+          "status": "passed",
+          "title": "each Options disclosure opens and closes without editing the draft",
+          "duration": 156.12630000000354,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "status": "passed",
+          "title": "review Edit buttons navigate to their exact setup owner without committing",
+          "duration": 75.72690000000148,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "status": "passed",
+          "title": "CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "duration": 522.4595000000045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Reconnect uses the selected controller and command disclosure changes only visibility",
+          "status": "passed",
+          "title": "Reconnect uses the selected controller and command disclosure changes only visibility",
+          "duration": 32.959100000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "status": "passed",
+          "title": "CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "duration": 61.12840000000142,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790009210609,
+      "endTime": 1790009212023.1284,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"
+    }
+  ]
+}

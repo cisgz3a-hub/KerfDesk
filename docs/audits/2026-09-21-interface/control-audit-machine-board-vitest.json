@@ -1,0 +1,130 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 9,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005115129,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit array toggles between fill and explicit grid and refuses clicks while unavailable",
+          "status": "passed",
+          "title": "array toggles between fill and explicit grid and refuses clicks while unavailable",
+          "duration": 54.20679999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit rectangle placement dispatches each distinct anchor, fit, array, recapture and removal",
+          "status": "passed",
+          "title": "rectangle placement dispatches each distinct anchor, fit, array, recapture and removal",
+          "duration": 18.86319999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit circle placement centers artwork, recaptures and removes only when the session is free",
+          "status": "passed",
+          "title": "circle placement centers artwork, recaptures and removes only when the session is free",
+          "duration": 13.39639999999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit shape choices send their typed shape and session-disabled clicks do nothing",
+          "status": "passed",
+          "title": "shape choices send their typed shape and session-disabled clicks do nothing",
+          "duration": 3.602999999999156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit rectangle capture Undo and Start over use their distinct callbacks and lock during a session operation",
+          "status": "passed",
+          "title": "rectangle capture Undo and Start over use their distinct callbacks and lock during a session operation",
+          "duration": 7.178100000000995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit circle rim-fit capture, undo, reset and method choices preserve their typed meaning",
+          "status": "passed",
+          "title": "circle rim-fit capture, undo, reset and method choices preserve their typed meaning",
+          "duration": 5.66110000000117,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit circle marked-center capture, undo, reset and method choices preserve their typed meaning",
+          "status": "passed",
+          "title": "circle marked-center capture, undo, reset and method choices preserve their typed meaning",
+          "duration": 6.499900000000707,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit verification target, accept, adjust, update and all cancel states dispatch exactly their handlers",
+          "status": "passed",
+          "title": "verification target, accept, adjust, update and all cancel states dispatch exactly their handlers",
+          "duration": 16.879100000000108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Board control audit"],
+          "fullName": "Board control audit each fine step button persists its distinct distance without requesting motion",
+          "status": "passed",
+          "title": "each fine step button persists its distinct distance without requesting motion",
+          "duration": 19.977600000000166,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005126858,
+      "endTime": 1790005127004.9775,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/board-capture/BoardControls.audit.test.tsx"
+    }
+  ]
+}

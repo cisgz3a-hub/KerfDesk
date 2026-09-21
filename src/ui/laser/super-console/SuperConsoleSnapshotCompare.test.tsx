@@ -28,6 +28,38 @@ afterEach(() => {
 });
 
 describe('SuperConsoleSnapshotCompare', () => {
+  it('audit comparison disclosure equivalent filter and each Clear affect only their selected snapshot', async () => {
+    const pickFilesForOpen = vi
+      .fn<PlatformAdapter['pickFilesForOpen']>()
+      .mockResolvedValue([{ name: 'same.json', text: async () => snapshotText('same', '250') }]);
+    const { host, unmount } = await renderCompare(makePlatform({ pickFilesForOpen }));
+    try {
+      const details = host.querySelector('details')!;
+      const summary = details.querySelector('summary')!;
+      const initial = details.open;
+      await act(async () => summary.click());
+      expect(details.open).toBe(!initial);
+      await clickButton(host, 'Load A');
+      await clickButton(host, 'Load B');
+      const equivalent = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+      expect(equivalent.checked).toBe(false);
+      await act(async () => equivalent.click());
+      expect(equivalent.checked).toBe(true);
+      expect(host.textContent).toContain('$120');
+      const clears = [...host.querySelectorAll('button')].filter(
+        (button) => button.textContent === 'Clear',
+      );
+      expect(clears).toHaveLength(2);
+      await act(async () => clears[0]!.click());
+      expect(clears[0]!.disabled).toBe(true);
+      expect(clears[1]!.disabled).toBe(false);
+      await act(async () => clears[1]!.click());
+      expect(clears[1]!.disabled).toBe(true);
+      expect(host.querySelector('table')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
   it('exports the current readback with an operator machine label', async () => {
     const write = vi.fn(async (_data: string | Blob) => undefined);
     const platform = makePlatform({

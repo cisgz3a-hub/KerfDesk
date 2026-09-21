@@ -67,8 +67,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   useJogPadShortcuts(disabled, focusReady, sendFocus);
 
   return (
-    <div style={containerStyle}>
-      <TutorialButton tutorialId="jog" label="Jogging tutorial" />
+    <div className="lf-jog-panel" style={containerStyle}>
+      <div className="lf-machine-section-heading">
+        <span>Position the head</span>
+        <TutorialButton tutorialId="jog" compact label="Jogging" />
+      </div>
       <JogSettingsRow
         disabled={disabled}
         step={step}
@@ -77,7 +80,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         onStep={setStep}
         onFeed={setSelectedFeed}
       />
-      <div style={jogRowStyle}>
+      <div className="lf-jog-controls" style={jogRowStyle}>
         <JogArrowGrid
           disabled={disabled}
           stepMm={step}
@@ -120,7 +123,7 @@ const jogRowStyle: React.CSSProperties = {
   // the fixed-width rail when the panel is dragged toward its minimum width; the
   // arrow pad keeps its 116px min so the jog buttons never clip.
   gridTemplateColumns: 'minmax(116px, 1fr) minmax(0, 104px)',
-  gridTemplateAreas: '"arrows air" "warning warning"',
+  gridTemplateAreas: '"arrows air" "arrows fire" "warning warning"',
   alignItems: 'stretch',
   gap: 8,
 };

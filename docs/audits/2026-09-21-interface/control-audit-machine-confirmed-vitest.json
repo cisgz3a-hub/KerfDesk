@@ -1,0 +1,308 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 27,
+  "numPassedTests": 7,
+  "numFailedTests": 0,
+  "numPendingTests": 20,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006407828,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard audit retained position radio is carried into the explicitly started pass review",
+          "status": "passed",
+          "title": "audit retained position radio is carried into the explicitly started pass review",
+          "duration": 147.54629999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard audit Close exits a ready pass review without dispatching recovery",
+          "status": "skipped",
+          "title": "audit Close exits a ready pass review without dispatching recovery",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard shows extraction guidance and preselects the computed default boundary",
+          "status": "skipped",
+          "title": "shows extraction guidance and preselects the computed default boundary",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard keeps Start disabled until the operator explicitly picks a position option",
+          "status": "skipped",
+          "title": "keeps Start disabled until the operator explicitly picks a position option",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard starts the flow with the completed review and closes on success",
+          "status": "skipped",
+          "title": "starts the flow with the completed review and closes on success",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard warns inline when a later pass than the default is selected",
+          "status": "skipped",
+          "title": "warns inline when a later pass than the default is selected",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard offers retained position only with session-continuity evidence",
+          "status": "skipped",
+          "title": "offers retained position only with session-continuity evidence",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard disables retained position and explains why after a controller reboot",
+          "status": "skipped",
+          "title": "disables retained position and explains why after a controller reboot",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard opens the advanced runway wizard on request",
+          "status": "skipped",
+          "title": "opens the advanced runway wizard on request",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006425178,
+      "endTime": 1790006425325.5464,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CncPassRecoveryWizard.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Connect dispatches only when disconnected and remains inert while connecting",
+          "status": "passed",
+          "title": "Connect dispatches only when disconnected and remains inert while connecting",
+          "duration": 54.73149999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "status": "passed",
+          "title": "Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "duration": 15.807200000000194,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "status": "passed",
+          "title": "Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "duration": 35.371599999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "status": "passed",
+          "title": "Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "duration": 21.47900000000027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Release motors requires confirmation and does not release while streaming",
+          "status": "passed",
+          "title": "Release motors requires confirmation and does not release while streaming",
+          "duration": 13.247800000000097,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006429048,
+      "endTime": 1790006429189.2478,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineRunControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit audit selected-only and selected-origin toggles persist their distinct output scope fields",
+          "status": "passed",
+          "title": "audit selected-only and selected-origin toggles persist their distinct output scope fields",
+          "duration": 70.16659999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit rail disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "rail disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit device profile disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "device profile disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit execution archive disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "execution archive disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit controller backup disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "controller backup disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit probe disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "probe disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser recovery disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "laser recovery disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit CNC recovery guidance disclosure opens and closes without changing the project",
+          "status": "skipped",
+          "title": "CNC recovery guidance disclosure opens and closes without changing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "status": "skipped",
+          "title": "laser Resume from line sends the selected line, stays inert while busy, and is absent for CNC",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "status": "skipped",
+          "title": "detected settings Apply changes safe profile fields and Dismiss clears the offer only",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "status": "skipped",
+          "title": "Zero Z dispatches only the CNC zero callback and is inert when controls are disabled",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "status": "skipped",
+          "title": "all nine job-origin buttons persist their exact anchor and remain inert while streaming",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine utility control audit"],
+          "fullName": "Machine utility control audit Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "status": "skipped",
+          "title": "Reset measurements restores saved offsets and legacy Mark verified records explicit provenance",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006420304,
+      "endTime": 1790006420374.1665,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineUtilityControls.audit.test.tsx"
+    }
+  ]
+}

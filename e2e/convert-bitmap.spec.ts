@@ -1,5 +1,6 @@
 import type { RasterImage } from '../src/core/scene';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
+import { toolbarCommand } from './fixtures/workspace-ui';
 
 declare global {
   interface Window {
@@ -45,11 +46,7 @@ test.beforeEach(async ({ page, kerfdesk }) => {
   });
   await page.goto('/');
   await kerfdesk.setOpenFiles([{ name: 'overlap.svg', text: overlappingSvg }]);
-  await page.getByRole('button', { name: 'More commands', exact: true }).click();
-  await page
-    .getByRole('menu', { name: 'More commands', exact: true })
-    .getByRole('menuitem', { name: 'Import...', exact: true })
-    .click();
+  await (await toolbarCommand(page, 'Import...')).click();
   await expectBitmapAvailable(page);
 });
 

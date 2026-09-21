@@ -1,0 +1,104 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 7,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 6,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790004957397,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit interval Cancel calls only cancellation without generating a job",
+          "status": "skipped",
+          "title": "interval Cancel calls only cancellation without generating a job",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit material Cancel calls only cancellation without generating a job",
+          "status": "skipped",
+          "title": "material Cancel calls only cancellation without generating a job",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit scan offset Cancel calls only cancellation without generating a job",
+          "status": "skipped",
+          "title": "scan offset Cancel calls only cancellation without generating a job",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Print and Cut captures each target, applies the reviewed pair, disables and cancels independently",
+          "status": "passed",
+          "title": "Print and Cut captures each target, applies the reviewed pair, disables and cancels independently",
+          "duration": 113.37609999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit rotary type and reverse toggles are saved only by Apply and Cancel does not apply a draft",
+          "status": "skipped",
+          "title": "rotary type and reverse toggles are saved only by Apply and Cancel does not apply a draft",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Cut Planner edits inside-first, applies that value by button and cancels without applying again",
+          "status": "skipped",
+          "title": "Cut Planner edits inside-first, applies that value by button and cancels without applying again",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine dialog control audit"],
+          "fullName": "Machine dialog control audit Labs toggles each remaining feature, persists them, resets all, and Done closes",
+          "status": "skipped",
+          "title": "Labs toggles each remaining feature, persists them, resets all, and Done closes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790004960906,
+      "endTime": 1790004961019.3762,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineDialogControls.audit.test.tsx"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // The guided create/edit material preset wizard (ADR-093, F-ML2). A draft-commit
 // Dialog: identity -> cut settings -> details -> review, committing to the active
 // library only on the final Save. Settings/details are uncontrolled and read
-// from FormData on each Next (reusing the layer cut-settings reader); identity is
+// from FormData on Back and Next (reusing the layer cut-settings reader); identity is
 // controlled in the reducer so Back/Next preserve it.
 
 import { TutorialButton } from '../../tutorials/TutorialButton';
@@ -66,6 +66,13 @@ export function MaterialPresetWizard(props: {
   };
 
   const nextDisabled = state.step === 'identity' && !identityComplete(state.identity);
+  const handleBack = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    const form = event.currentTarget.form;
+    if (form !== null && (state.step === 'settings' || state.step === 'details')) {
+      dispatch({ kind: 'set-recipe', recipe: readRecipeFromForm(form, state.recipe, state.step) });
+    }
+    dispatch({ kind: 'back' });
+  };
   return (
     <Dialog
       onClose={props.onClose}
@@ -94,9 +101,7 @@ export function MaterialPresetWizard(props: {
         onIdentityChange={(identity) => dispatch({ kind: 'set-identity', identity })}
       />
       <DialogActions>
-        {state.step === 'identity' ? null : (
-          <Button onClick={() => dispatch({ kind: 'back' })}>Back</Button>
-        )}
+        {state.step === 'identity' ? null : <Button onClick={handleBack}>Back</Button>}
         <Button onClick={props.onClose}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={nextDisabled}>
           {state.step === 'review' ? 'Save' : 'Next'}

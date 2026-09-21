@@ -1,0 +1,907 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 96,
+  "numPassedTests": 0,
+  "numFailedTests": 1,
+  "numPendingTests": 95,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790012090922,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'first-project' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'first-project' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'projects' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'projects' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'import' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'import' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'workspace' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'workspace' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'shortcuts' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'shortcuts' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-library' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'design-library' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'project-notes' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'project-notes' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'select' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'select' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'rectangle' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'rectangle' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'ellipse' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'ellipse' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'polygon' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'polygon' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'star' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'star' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'polyline' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'polyline' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'nodes' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'nodes' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'measure' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'measure' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'text' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'text' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'text-layout' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'text-layout' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'variable-text' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'variable-text' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-studio' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'design-studio' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-precision' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'design-precision' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'design-edit' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'design-edit' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-line' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-line' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-path' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-path' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-rectangle' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-rectangle' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-circle' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-circle' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-arc' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-arc' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-fillet' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-fillet' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'studio-chamfer' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'studio-chamfer' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-studio' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-studio' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-adjust' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-adjust' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-mask' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-mask' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'trace' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'trace' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'trace-batch' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'trace-batch' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-paint' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-paint' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-select' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-select' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-fill' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-fill' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-retouch' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-retouch' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-crop' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-crop' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-layers' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-layers' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-transform' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-transform' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-text' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-text' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'image-tone' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'image-tone' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'weld' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'weld' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'subtract' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'subtract' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'intersect' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'intersect' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'exclude' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'exclude' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'convert' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'convert' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'align' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'align' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'distribute' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'distribute' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'array' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'array' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'nest' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'nest' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'operations' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'operations' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-cut' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'laser-cut' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-fill' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'laser-fill' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'laser-image' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'laser-image' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'materials' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'materials' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-profile' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-profile' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-pocket' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-pocket' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-engrave' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-engrave' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-vcarve' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-vcarve' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-drill' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-drill' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-relief' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-relief' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-tabs' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-tabs' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'tool-library' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'tool-library' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-inlay' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-inlay' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-probe' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-probe' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-surfacing' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-surfacing' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'machine-setup' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'machine-setup' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'connection' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'connection' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'jog' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'jog' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'origin' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'origin' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'frame-start' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'frame-start' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'preview' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'preview' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'gcode' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'gcode' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'console' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'console' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'macros' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'macros' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'recovery' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'recovery' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'box' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'box' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'box-fit' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'box-fit' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'material-test' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'material-test' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'interval-test' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'interval-test' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'scan-offset' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'scan-offset' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'focus-test' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'focus-test' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'camera' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'camera' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'registration' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'registration' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'board' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'board' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'rotary' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'rotary' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'print-cut' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'print-cut' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'optimization' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'optimization' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'labs' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'labs' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'offset' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'offset' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'dogbone' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'dogbone' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes 'cnc-tiling' card and contextual button open the named lesson without editing the project",
+          "status": "skipped",
+          "title": "'cnc-tiling' card and contextual button open the named lesson without editing the project",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes the learning brand and first-project shortcut switch to their intended views",
+          "status": "failed",
+          "title": "the learning brand and first-project shortcut switch to their intended views",
+          "duration": 461.4886000000006,
+          "failureMessages": [
+            "Error: Missing first project shortcut\n    at D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialControls.audit.test.tsx:117:43\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes step-list and related-lesson buttons select the requested content",
+          "status": "skipped",
+          "title": "step-list and related-lesson buttons select the requested content",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["individual tutorial control outcomes"],
+          "fullName": "individual tutorial control outcomes example stage selection and playback pause, advance and stop at Result",
+          "status": "skipped",
+          "title": "example stage selection and playback pause, advance and stop at Result",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012108983,
+      "endTime": 1790012109444.4885,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/tutorials/TutorialControls.audit.test.tsx"
+    }
+  ]
+}

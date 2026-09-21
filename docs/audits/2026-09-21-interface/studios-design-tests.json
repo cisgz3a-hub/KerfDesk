@@ -1,0 +1,121 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 1,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 7,
+  "numPassedTests": 6,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005121604,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "arms all eight shipped tools and opens the lesson specific to each tool",
+          "status": "passed",
+          "title": "arms all eight shipped tools and opens the lesson specific to each tool",
+          "duration": 137.22029999999904,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "top bar restores geometry with Undo and Redo, changes each view toggle, and requests Fit",
+          "status": "passed",
+          "title": "top bar restores geometry with Undo and Redo, changes each view toggle, and requests Fit",
+          "duration": 52.75770000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "top bar Apply writes project artwork once, Apply and Close updates it, and Close only stashes",
+          "status": "passed",
+          "title": "top bar Apply writes project artwork once, Apply and Close updates it, and Close only stashes",
+          "duration": 30.974299999999857,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "precision inspector duplicates with offset, toggles construction and deletes the selected shape",
+          "status": "passed",
+          "title": "precision inspector duplicates with offset, toggles construction and deletes the selected shape",
+          "duration": 33.60349999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "3D toolbar dispatches each preset and tier, gates absent simulation, and requests simulation",
+          "status": "passed",
+          "title": "3D toolbar dispatches each preset and tier, gates absent simulation, and requests simulation",
+          "duration": 10.2507999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005132723,
+      "endTime": 1790005132988.2507,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/design-studio/DesignControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "adds, selects, assigns, reorders and deletes carve layers with correct edge availability",
+          "status": "passed",
+          "title": "adds, selects, assigns, reorders and deletes carve layers with correct edge availability",
+          "duration": 208.4960000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "sets through depth from stock, toggles V-carve flat depth, and opens the matching lessons",
+          "status": "failed",
+          "title": "sets through depth from stock, toggles V-carve flat depth, and opens the matching lessons",
+          "duration": 53.840799999999945,
+          "failureMessages": [
+            "AssertionError: expected 'cnc-vcarve' to be 'cnc-v-carve' // Object.is equality\n    at D:/LaserForge/ui-audit-20260921/src/ui/design-studio/layers/DesignLayers.audit.test.tsx:59:50\n    at file:///D:/LaserForge/ui-audit-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790005137926,
+      "endTime": 1790005138187.8408,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/design-studio/layers/DesignLayers.audit.test.tsx"
+    }
+  ]
+}

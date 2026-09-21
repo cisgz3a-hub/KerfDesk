@@ -1,0 +1,1486 @@
+{
+  "numTotalTestSuites": 34,
+  "numPassedTestSuites": 34,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 132,
+  "numPassedTests": 132,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790012931850,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after GRBL reboot and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after GRBL reboot and an ACK in the same chunk",
+          "duration": 12.21979999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after grblHAL reboot and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after grblHAL reboot and an ACK in the same chunk",
+          "duration": 1.6722999999997228,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after FluidNC reboot and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after FluidNC reboot and an ACK in the same chunk",
+          "duration": 1.2416000000002896,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after foreign controller reboot and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after foreign controller reboot and an ACK in the same chunk",
+          "duration": 1.1644000000001142,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after MPG takeover and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after MPG takeover and an ACK in the same chunk",
+          "duration": 2.8332000000000335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after Alarm status and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after Alarm status and an ACK in the same chunk",
+          "duration": 1.2098000000000866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation sends no further motion after Sleep status and an ACK in the same chunk",
+          "status": "passed",
+          "title": "sends no further motion after Sleep status and an ACK in the same chunk",
+          "duration": 0.9052000000001499,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["worker refill and real store invalidation"],
+          "fullName": "worker refill and real store invalidation continues once per ACK after a benign Run status in the same chunk",
+          "status": "passed",
+          "title": "continues once per ACK after a benign Run status in the same chunk",
+          "duration": 1.1426000000001295,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012985435,
+      "endTime": 1790012985457.1426,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/__fixtures__/worker-stream-invalidation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "status": "passed",
+          "title": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "duration": 294.35260000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013001153,
+      "endTime": 1790013001447.3525,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CompletedJobNotice.simulator.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement clears only the finished display, retaining artwork, replay, archive and Frame state",
+          "status": "passed",
+          "title": "clears only the finished display, retaining artwork, replay, archive and Frame state",
+          "duration": 338.65780000000086,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement stays dismissed after remount and offers Done for the next completed run",
+          "status": "passed",
+          "title": "stays dismissed after remount and offers Done for the next completed run",
+          "duration": 25.183100000000195,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a streaming stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a streaming stream",
+          "duration": 24.948599999999715,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a paused stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a paused stream",
+          "duration": 21.16939999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a tool-change stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a tool-change stream",
+          "duration": 17.03639999999905,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a done stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a done stream",
+          "duration": 21.460399999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a errored stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a errored stream",
+          "duration": 16.329499999999825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a running run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a running run even if a stale completion badge is present",
+          "duration": 8.335799999998926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a paused run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a paused run even if a stale completion badge is present",
+          "duration": 6.22439999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a tool-change run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a tool-change run even if a stale completion badge is present",
+          "duration": 9.77639999999883,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a errored run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a errored run even if a stale completion badge is present",
+          "duration": 5.512899999999718,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a stopped run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a stopped run even if a stale completion badge is present",
+          "duration": 7.260399999999208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a disconnected run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a disconnected run even if a stale completion badge is present",
+          "duration": 4.515799999999217,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during settle marker",
+          "status": "passed",
+          "title": "retains status during settle marker",
+          "duration": 3.7942999999995664,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during stable Idle wait",
+          "status": "passed",
+          "title": "retains status during stable Idle wait",
+          "duration": 4.54189999999835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during controller error",
+          "status": "passed",
+          "title": "retains status during controller error",
+          "duration": 4.80580000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during alarm",
+          "status": "passed",
+          "title": "retains status during alarm",
+          "duration": 6.975800000000163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during failed completion write",
+          "status": "passed",
+          "title": "retains status during failed completion write",
+          "duration": 6.0275000000001455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during safety notice",
+          "status": "passed",
+          "title": "retains status during safety notice",
+          "duration": 6.732099999999264,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during autofocus",
+          "status": "passed",
+          "title": "retains status during autofocus",
+          "duration": 10.286700000000565,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during probe",
+          "status": "passed",
+          "title": "retains status during probe",
+          "duration": 5.584100000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during fire",
+          "status": "passed",
+          "title": "retains status during fire",
+          "duration": 4.122199999999793,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during jog motion",
+          "status": "passed",
+          "title": "retains status during jog motion",
+          "duration": 6.450800000000527,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during Frame motion",
+          "status": "passed",
+          "title": "retains status during Frame motion",
+          "duration": 4.043600000000879,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during pause transition",
+          "status": "passed",
+          "title": "retains status during pause transition",
+          "duration": 3.1436000000012427,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during unknown status",
+          "status": "passed",
+          "title": "retains status during unknown status",
+          "duration": 2.9315000000005966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not treat a finished route with an unsettled countdown as completion",
+          "status": "passed",
+          "title": "does not treat a finished route with an unsettled countdown as completion",
+          "duration": 3.5069000000003143,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement rechecks run identity so a stale Done cannot dismiss a newer completed run",
+          "status": "passed",
+          "title": "rechecks run identity so a stale Done cannot dismiss a newer completed run",
+          "duration": 4.38760000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement accepts trailing status updates to the same completed run",
+          "status": "passed",
+          "title": "accepts trailing status updates to the same completed run",
+          "duration": 3.110500000000684,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012979634,
+      "endTime": 1790012980223.1106,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CompletedJobNotice.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens homing configuration while disconnected instead of silently doing nothing",
+          "status": "passed",
+          "title": "opens homing configuration while disconnected instead of silently doing nothing",
+          "duration": 597.7137000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens the autofocus page with its field highlighted",
+          "status": "passed",
+          "title": "opens the autofocus page with its field highlighted",
+          "duration": 405.15090000000055,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks still refuses setup edits during an active Frame",
+          "status": "passed",
+          "title": "still refuses setup edits during an active Frame",
+          "duration": 81.60200000000077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012994685,
+      "endTime": 1790012995770.602,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/JobControls.setup-navigation.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Connect dispatches only when disconnected and remains inert while connecting",
+          "status": "passed",
+          "title": "Connect dispatches only when disconnected and remains inert while connecting",
+          "duration": 151.84580000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "status": "passed",
+          "title": "Home and configured Auto-focus invoke their store actions and remain inert while busy",
+          "duration": 52.4083999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "status": "passed",
+          "title": "Pause, Resume and Abort dispatch the matching action in their corresponding lifecycle states",
+          "duration": 162.8742000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "status": "passed",
+          "title": "Reset origin and Clear persistent origin call separate store actions with persistent confirmation",
+          "duration": 53.00849999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine run control audit"],
+          "fullName": "Machine run control audit Release motors requires confirmation and does not release while streaming",
+          "status": "passed",
+          "title": "Release motors requires confirmation and does not release while streaming",
+          "duration": 92.87800000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013004827,
+      "endTime": 1790013005340.878,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineRunControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls handles retired origin requests without success, placement changes or an unhandled rejection",
+          "status": "passed",
+          "title": "handles retired origin requests without success, placement changes or an unhandled rejection",
+          "duration": 33.19259999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls shows advanced persistent controls and disables transient reset for known G54 origin",
+          "status": "passed",
+          "title": "shows advanced persistent controls and disables transient reset for known G54 origin",
+          "duration": 5.116800000000239,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls confirms before setting persistent G54 origin",
+          "status": "passed",
+          "title": "confirms before setting persistent G54 origin",
+          "duration": 6.261500000000069,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables persistent origin controls until the machine is Idle",
+          "status": "passed",
+          "title": "disables persistent origin controls until the machine is Idle",
+          "duration": 3.6582000000003063,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls returns to the known work zero with a beam-off jog",
+          "status": "passed",
+          "title": "returns to the known work zero with a beam-off jog",
+          "duration": 5.086499999999887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables return-to-zero until the origin position is known and Idle",
+          "status": "passed",
+          "title": "disables return-to-zero until the origin position is known and Idle",
+          "duration": 3.2741000000000895,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability offers Release motors on a no-homing machine once an origin is settled",
+          "status": "passed",
+          "title": "offers Release motors on a no-homing machine once an origin is settled",
+          "duration": 3.1073999999998705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability leaves Release motors to the Position job card when no origin is settled",
+          "status": "passed",
+          "title": "leaves Release motors to the Position job card when no origin is settled",
+          "duration": 2.989400000000387,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability keeps Release motors on the row for a homing-enabled machine with no origin",
+          "status": "passed",
+          "title": "keeps Release motors on the row for a homing-enabled machine with no origin",
+          "duration": 3.2134000000000924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) upgrades Absolute Coordinates to User Origin once an origin exists",
+          "status": "passed",
+          "title": "upgrades Absolute Coordinates to User Origin once an origin exists",
+          "duration": 6.195099999999911,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Verified Origin selection",
+          "status": "passed",
+          "title": "keeps an explicit Verified Origin selection",
+          "duration": 2.900000000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Current Position selection",
+          "status": "passed",
+          "title": "keeps an explicit Current Position selection",
+          "duration": 2.7056000000002314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) pulses for Verified Origin with no origin on a no-homing machine",
+          "status": "passed",
+          "title": "pulses for Verified Origin with no origin on a no-homing machine",
+          "duration": 2.6141999999999825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "status": "passed",
+          "title": "keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "duration": 2.153099999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stops pulsing once an XY origin exists",
+          "status": "passed",
+          "title": "stops pulsing once an XY origin exists",
+          "duration": 2.252599999999802,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stays quiet for Current Position, which reads the live head",
+          "status": "passed",
+          "title": "stays quiet for Current Position, which reads the live head",
+          "duration": 2.1765000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012970461,
+      "endTime": 1790012970548.1765,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/OriginRow.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Release motors is offered by exactly one surface"],
+          "fullName": "Release motors is offered by exactly one surface offers one control after a Z-only touch-off with no XY origin",
+          "status": "passed",
+          "title": "offers one control after a Z-only touch-off with no XY origin",
+          "duration": 40.934200000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Release motors is offered by exactly one surface"],
+          "fullName": "Release motors is offered by exactly one surface offers one control with no origin at all",
+          "status": "passed",
+          "title": "offers one control with no origin at all",
+          "duration": 5.518399999999929,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Release motors is offered by exactly one surface"],
+          "fullName": "Release motors is offered by exactly one surface offers one control once an XY origin is settled",
+          "status": "passed",
+          "title": "offers one control once an XY origin is settled",
+          "duration": 3.7379000000000815,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013011777,
+      "endTime": 1790013011827.7378,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/release-motors-complementarity.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for short program",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for short program",
+          "duration": 15.432800000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for line budget exceeded",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for line budget exceeded",
+          "duration": 593.0457000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for no reported position",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for no reported position",
+          "duration": 3.2927999999997155,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for connected before the first report",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for connected before the first report",
+          "duration": 1.8195999999998094,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for no active controller identity",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for no active controller identity",
+          "duration": 1.6067000000002736,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps the estimate unavailable for millisecond controller above the line budget",
+          "status": "passed",
+          "title": "keeps the estimate unavailable for millisecond controller above the line budget",
+          "duration": 523.4667000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps a large-job estimate when dwell units are proven",
+          "status": "passed",
+          "title": "keeps a large-job estimate when dwell units are proven",
+          "duration": 837.7865999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty keeps offline estimates using profile assumptions",
+          "status": "passed",
+          "title": "keeps offline estimates using profile assumptions",
+          "duration": 4.297799999999825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared estimates preserve connected dwell uncertainty"],
+          "fullName": "prepared estimates preserve connected dwell uncertainty does not discard a connected fallback estimate without dwell",
+          "status": "passed",
+          "title": "does not discard a connected fallback estimate without dwell",
+          "duration": 4.282100000000355,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013006992,
+      "endTime": 1790013008978.282,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/start-job-preparation-dwell.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Review and Start timing handoff"],
+          "fullName": "Review and Start timing handoff uses one calibrated emitted clock with physical approach and added dwell",
+          "status": "passed",
+          "title": "uses one calibrated emitted clock with physical approach and added dwell",
+          "duration": 11.849299999999857,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013013680,
+      "endTime": 1790013013691.8494,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/start-job-preparation-timing.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["hosted refill helpers (ADR-334)"],
+          "fullName": "hosted refill helpers (ADR-334) treats a transport without hosting as this side writing refills",
+          "status": "passed",
+          "title": "treats a transport without hosting as this side writing refills",
+          "duration": 2.0341000000003078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["hosted refill helpers (ADR-334)"],
+          "fullName": "hosted refill helpers (ADR-334) hands over only a stream that is actually streaming",
+          "status": "passed",
+          "title": "hands over only a stream that is actually streaming",
+          "duration": 0.9632000000001426,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanceStream with the refill handed over (ADR-334)"],
+          "fullName": "advanceStream with the refill handed over (ADR-334) advances its own accounting without writing the refill twice",
+          "status": "passed",
+          "title": "advances its own accounting without writing the refill twice",
+          "duration": 1.7150000000001455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanceStream with the refill handed over (ADR-334)"],
+          "fullName": "advanceStream with the refill handed over (ADR-334) writes the refill itself when the transport cannot host it",
+          "status": "passed",
+          "title": "writes the refill itself when the transport cannot host it",
+          "duration": 1.0950000000002547,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanceStream with the refill handed over (ADR-334)"],
+          "fullName": "advanceStream with the refill handed over (ADR-334) takes the refill back the moment the stream stops simply streaming",
+          "status": "passed",
+          "title": "takes the refill back the moment the stream stops simply streaming",
+          "duration": 0.8886000000002241,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["advanceStream with the refill handed over (ADR-334)"],
+          "fullName": "advanceStream with the refill handed over (ADR-334) takes it back when an error makes the stream terminal",
+          "status": "passed",
+          "title": "takes it back when an error makes the stream terminal",
+          "duration": 0.4634000000000924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012987648,
+      "endTime": 1790012987655.4634,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/state/laser-hosted-refill.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "status": "passed",
+          "title": "audit read-only checks dispatch identity and settings without firmware or motion writes",
+          "duration": 134.70759999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Machine Setup launcher opens the globally owned setup at the capability step",
+          "status": "passed",
+          "title": "Machine Setup launcher opens the globally owned setup at the capability step",
+          "duration": 27.782200000000103,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit saved profile Delete removes only the selected library entry without changing the project",
+          "status": "passed",
+          "title": "saved profile Delete removes only the selected library entry without changing the project",
+          "duration": 40.81939999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit tiling enable creates the default draft and disable clears only that optional draft value",
+          "status": "passed",
+          "title": "tiling enable creates the default draft and disable clears only that optional draft value",
+          "duration": 45.31989999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit rotary attachment and reverse toggles return independent draft patches",
+          "status": "passed",
+          "title": "rotary attachment and reverse toggles return independent draft patches",
+          "duration": 39.25630000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "status": "passed",
+          "title": "homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "duration": 49.89860000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "status": "passed",
+          "title": "Identify disclosures toggle and worker streaming records a draft-only preference",
+          "duration": 48.45939999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit each Options disclosure opens and closes without editing the draft",
+          "status": "passed",
+          "title": "each Options disclosure opens and closes without editing the draft",
+          "duration": 100.17340000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "status": "passed",
+          "title": "review Edit buttons navigate to their exact setup owner without committing",
+          "duration": 43.14890000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "status": "passed",
+          "title": "CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "duration": 370.02099999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Reconnect uses the selected controller and command disclosure changes only visibility",
+          "status": "passed",
+          "title": "Reconnect uses the selected controller and command disclosure changes only visibility",
+          "duration": 17.75689999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "status": "passed",
+          "title": "CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "duration": 22.769600000000082,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012966902,
+      "endTime": 1790012967843.7695,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard offers worker streaming only for GRBL-family controllers and keeps its saved preference",
+          "status": "passed",
+          "title": "offers worker streaming only for GRBL-family controllers and keeps its saved preference",
+          "duration": 415.47060000000056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard reaches Save in two advances for laser without connecting",
+          "status": "passed",
+          "title": "reaches Save in two advances for laser without connecting",
+          "duration": 262.02730000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard reaches Save in two advances for cnc without connecting",
+          "status": "passed",
+          "title": "reaches Save in two advances for cnc without connecting",
+          "duration": 502.0646000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard connects only after using the selected controller and baud",
+          "status": "passed",
+          "title": "connects only after using the selected controller and baud",
+          "duration": 68.35039999999935,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard keeps detected identity observational until the operator explicitly adopts it",
+          "status": "passed",
+          "title": "keeps detected identity observational until the operator explicitly adopts it",
+          "duration": 76.92569999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard disables serial connection when the platform does not support it",
+          "status": "passed",
+          "title": "disables serial connection when the platform does not support it",
+          "duration": 42.465800000001764,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard keeps all edits in a draft and discards them on cancel",
+          "status": "passed",
+          "title": "keeps all edits in a draft and discards them on cancel",
+          "duration": 53.401999999998225,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard lets an invalid work area reach Essentials and enables Save only after correction",
+          "status": "passed",
+          "title": "lets an invalid work area reach Essentials and enables Save only after correction",
+          "duration": 608.2129000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard atomically saves a laser profile and workspace at the end",
+          "status": "passed",
+          "title": "atomically saves a laser profile and workspace at the end",
+          "duration": 836.0532999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard shows CNC-only machine settings and commits them with the profile",
+          "status": "passed",
+          "title": "shows CNC-only machine settings and commits them with the profile",
+          "duration": 852.4919000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard saves a hybrid machine with both output contracts and one explicit active mode",
+          "status": "passed",
+          "title": "saves a hybrid machine with both output contracts and one explicit active mode",
+          "duration": 1228.8526999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard allows review of an unsupported CNC controller but keeps invalid setup unsaved",
+          "status": "passed",
+          "title": "allows review of an unsupported CNC controller but keeps invalid setup unsaved",
+          "duration": 335.25900000000183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard uses external configuration guidance for Marlin instead of firmware writes",
+          "status": "passed",
+          "title": "uses external configuration guidance for Marlin instead of firmware writes",
+          "duration": 142.03269999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard hides serial streaming and G-code controls for file-only Ruida setup",
+          "status": "passed",
+          "title": "hides serial streaming and G-code controls for file-only Ruida setup",
+          "duration": 54.08469999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard queues only confirmed common GRBL writes for final Save and keeps travel review-only",
+          "status": "passed",
+          "title": "queues only confirmed common GRBL writes for final Save and keeps travel review-only",
+          "duration": 279.1349000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012957948,
+      "endTime": 1790012963705.135,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupWizard.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff arms a fresh Start without a staged execution archive",
+          "status": "passed",
+          "title": "arms a fresh Start without a staged execution archive",
+          "duration": 3.2241999999998825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff refuses to arm over an existing pending Start or active run",
+          "status": "passed",
+          "title": "refuses to arm over an existing pending Start or active run",
+          "duration": 0.33370000000013533,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff reconciles an interrupted intent into a capsule that admits motion may have begun",
+          "status": "passed",
+          "title": "reconciles an interrupted intent into a capsule that admits motion may have begun",
+          "duration": 0.4994000000001506,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff still reports an artifact-backed handoff as an exact execution",
+          "status": "passed",
+          "title": "still reports an artifact-backed handoff as an exact execution",
+          "duration": 0.2396000000001095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff round-trips an armed intent through the persisted slot parser",
+          "status": "passed",
+          "title": "round-trips an armed intent through the persisted slot parser",
+          "duration": 1.029800000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff rejects a persisted intent whose length disagrees with the handoff",
+          "status": "passed",
+          "title": "rejects a persisted intent whose length disagrees with the handoff",
+          "duration": 0.35200000000008913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff rejects a malformed intent rather than reading it as a resumable run",
+          "status": "passed",
+          "title": "rejects a malformed intent rather than reading it as a resumable run",
+          "duration": 0.287900000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["start intent handoff"],
+          "fullName": "start intent handoff rejects an intent attached to a supervised recovery handoff",
+          "status": "passed",
+          "title": "rejects an intent attached to a supervised recovery handoff",
+          "duration": 0.2499000000000251,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012989354,
+      "endTime": 1790012989361.25,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/state/recovery/recovery-start-intent-handoff.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) recovers with an absent archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an absent archive and allows another ordinary Start",
+          "duration": 8.14260000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) recovers with an stand-in archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an stand-in archive and allows another ordinary Start",
+          "duration": 1.7028000000000247,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) recovers with an exact archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an exact archive and allows another ordinary Start",
+          "duration": 20.015600000000177,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) does not associate an existing archive for a different program with the intent",
+          "status": "passed",
+          "title": "does not associate an existing archive for a different program with the intent",
+          "duration": 10.294800000000123,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) does not trust an exact archive whose integrity check fails",
+          "status": "passed",
+          "title": "does not trust an exact archive whose integrity check fails",
+          "duration": 2.6457000000000335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) preserves a newer pending Start while reconciling an absent archive",
+          "status": "passed",
+          "title": "preserves a newer pending Start while reconciling an absent archive",
+          "duration": 4.815700000000106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (memory)"],
+          "fullName": "interrupted Start intent reconciliation (memory) preserves a newer pending Start while reconciling an exact archive",
+          "status": "passed",
+          "title": "preserves a newer pending Start while reconciling an exact archive",
+          "duration": 6.7478000000000975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) recovers with an absent archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an absent archive and allows another ordinary Start",
+          "duration": 19.965499999999793,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) recovers with an stand-in archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an stand-in archive and allows another ordinary Start",
+          "duration": 5.483700000000226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) recovers with an exact archive and allows another ordinary Start",
+          "status": "passed",
+          "title": "recovers with an exact archive and allows another ordinary Start",
+          "duration": 11.36279999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) does not associate an existing archive for a different program with the intent",
+          "status": "passed",
+          "title": "does not associate an existing archive for a different program with the intent",
+          "duration": 6.345899999999801,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) does not trust an exact archive whose integrity check fails",
+          "status": "passed",
+          "title": "does not trust an exact archive whose integrity check fails",
+          "duration": 7.825600000000122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) preserves a newer pending Start while reconciling an absent archive",
+          "status": "passed",
+          "title": "preserves a newer pending Start while reconciling an absent archive",
+          "duration": 5.184799999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["interrupted Start intent reconciliation (IndexedDB)"],
+          "fullName": "interrupted Start intent reconciliation (IndexedDB) preserves a newer pending Start while reconciling an exact archive",
+          "status": "passed",
+          "title": "preserves a newer pending Start while reconciling an exact archive",
+          "duration": 9.510199999999713,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790012982619,
+      "endTime": 1790012982740.5103,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/state/recovery/recovery-start-intent-reconciliation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["RecoveryTerminalCoordinator"],
+          "fullName": "RecoveryTerminalCoordinator reports deferred terminal persistence failure from activation",
+          "status": "passed",
+          "title": "reports deferred terminal persistence failure from activation",
+          "duration": 7.412799999999947,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["RecoveryTerminalCoordinator"],
+          "fullName": "RecoveryTerminalCoordinator reports a deferred terminal ownership conflict instead of masking it as activation success",
+          "status": "passed",
+          "title": "reports a deferred terminal ownership conflict instead of masking it as activation success",
+          "duration": 0.9325999999999794,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790013014598,
+      "endTime": 1790013014606.9326,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/state/recovery/recovery-terminal-coordinator.test.ts"
+    }
+  ]
+}

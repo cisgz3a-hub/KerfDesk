@@ -88,7 +88,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
   hides or disables a ready update action, and applying an update still requires an explicit click.
   Rapid repeated clicks share one update/reload attempt. If that attempt fails, a nonblocking error
   toast is shown and the still-visible action owns the next retry.
-- **Top command toolbar**: the command row measures its available width and moves commands into **More** as space runs out. Familiar commands retain accessible icon buttons; specialist commands keep their labels in the row or in More. Command names, shortcuts, tooltips, disabled reasons, and pressed states remain available. The command row does not need horizontal scrolling. At narrow widths, the utility controls may occupy a separate row.
+- **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order widens the same docked rail while the canvas remains on the left; it is not a modal or a third sidebar. Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
@@ -100,8 +100,10 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
-- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. It retains Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions retain readable labels and may widen the strip. Preview lives in More and the Window menu.
-- **Workspace colours**: panels, drawing bed, grid, rulers and controls follow the operating system's light/dark preference. Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
+- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
+- **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Compact tutorial buttons remain beside positioning, origin and Frame/Start.
+- **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains available when its existing receipt checks allow it. Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
+- **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
 - **Studio keyboard ownership**: native form and activation controls retain their browser keys. Focusable resize separators and sliders retain their arrow keys, and a Studio root never reuses a key already handled by a nested control.
@@ -1863,7 +1865,7 @@ settings and Job Review keep their existing read-only setup references.
 
 ### F-D1. Add text on the canvas (ADR-320)
 
-1. Choose **Text...** in the toolbar or Tools menu, choose **Text** in the drawing rail, or press
+1. Choose **Text...** in More or the Tools menu, choose **Text** in the drawing rail, or press
    **T** outside an editable field. Click blank canvas space to place the text at that scene
    position. Clicking visible, unlocked text with this tool edits it instead.
 2. Type directly in the canvas text box. **Enter** starts another line. The **Text formatting**
@@ -5601,8 +5603,10 @@ and lifts the command's CNC-only gate.)*
   feed. On a machine (network) camera the manual path is to click the four bed corners in the
   live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
   On the fourth click the homography solves and the feed warps to sit on the bed; the operator
-  presses "Save & show on canvas" (F-CAM3) to persist the calibration to the device profile,
-  then places artwork over the real material and adjusts overlay opacity. USB/RTSP cameras have
+  presses "Save alignment" (F-CAM3) to persist the calibration to the device profile, selects
+  "Use this camera", then "Update still" before placing artwork over the material and adjusting
+  overlay opacity. If the overlay was hidden, turn "Overlay on" to display it. Saving alignment
+  alone does not capture or display a frame. USB/RTSP cameras have
   no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
@@ -5653,10 +5657,11 @@ and lifts the command's CNC-only gate.)*
 
 ### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
 
-- **Success / overlay on canvas.** After aligning (F-CAM1), the operator presses
-  "Save & show on canvas": the alignment persists on the device profile
-  (undoable, survives reload) and the camera image appears on the workspace
-  under the artwork, tracking zoom and pan. The Camera panel's overlay row
+- **Success / overlay on canvas.** After aligning a network camera (F-CAM1), the operator presses
+  "Save alignment": the alignment persists on the device profile (undoable, survives reload).
+  "Use this camera" selects the source, and "Update still" captures the frame for the workspace.
+  Turn "Overlay on" if it was hidden. The image appears under the artwork, tracking zoom and pan.
+  The Camera panel's overlay row
   offers show/hide, a Fade slider, "Update still" (freeze the current frame —
   LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
 - **Material surface height.** Enter the material's top height above the bed. A lens-corrected

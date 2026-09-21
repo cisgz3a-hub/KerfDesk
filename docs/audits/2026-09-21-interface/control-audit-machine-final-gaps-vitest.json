@@ -1,0 +1,659 @@
+{
+  "numTotalTestSuites": 15,
+  "numPassedTestSuites": 15,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 59,
+  "numPassedTests": 25,
+  "numFailedTests": 0,
+  "numPendingTests": 34,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006169366,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "audit Cancel surfacing save aborts the active preparation and retires progress without committing a file",
+          "status": "passed",
+          "title": "audit Cancel surfacing save aborts the active preparation and retires progress without committing a file",
+          "duration": 52.258800000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006206316,
+      "endTime": 1790006206368.2588,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/machine/SurfacingCancel.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard audit Close exits a ready pass review without dispatching recovery",
+          "status": "passed",
+          "title": "audit Close exits a ready pass review without dispatching recovery",
+          "duration": 102.97050000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard shows extraction guidance and preselects the computed default boundary",
+          "status": "skipped",
+          "title": "shows extraction guidance and preselects the computed default boundary",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard keeps Start disabled until the operator explicitly picks a position option",
+          "status": "skipped",
+          "title": "keeps Start disabled until the operator explicitly picks a position option",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard starts the flow with the completed review and closes on success",
+          "status": "skipped",
+          "title": "starts the flow with the completed review and closes on success",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard warns inline when a later pass than the default is selected",
+          "status": "skipped",
+          "title": "warns inline when a later pass than the default is selected",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard offers retained position only with session-continuity evidence",
+          "status": "skipped",
+          "title": "offers retained position only with session-continuity evidence",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard disables retained position and explains why after a controller reboot",
+          "status": "skipped",
+          "title": "disables retained position and explains why after a controller reboot",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CncPassRecoveryWizard"],
+          "fullName": "CncPassRecoveryWizard opens the advanced runway wizard on request",
+          "status": "skipped",
+          "title": "opens the advanced runway wizard on request",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006193313,
+      "endTime": 1790006193415.9705,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CncPassRecoveryWizard.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit Cancel manual-air setup for none closes its notice without changing defaults or sending air",
+          "status": "passed",
+          "title": "Cancel manual-air setup for none closes its notice without changing defaults or sending air",
+          "duration": 47.6889000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit Cancel manual-air setup for M8 closes its notice without changing defaults or sending air",
+          "status": "passed",
+          "title": "Cancel manual-air setup for M8 closes its notice without changing defaults or sending air",
+          "duration": 9.814399999999296,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit macro Cancel discards the editor and native macro disclosure toggles without persisting a macro",
+          "status": "passed",
+          "title": "macro Cancel discards the editor and native macro disclosure toggles without persisting a macro",
+          "duration": 20.762499999999818,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit board panel Close clears only its visibility when no motion is active",
+          "status": "passed",
+          "title": "board panel Close clears only its visibility when no motion is active",
+          "duration": 17.88929999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit legacy guarded-write confirmation enables only the exact selected mocked setting write",
+          "status": "passed",
+          "title": "legacy guarded-write confirmation enables only the exact selected mocked setting write",
+          "duration": 25.233100000000377,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit LightBurn import stays in review until Apply and applies only the parsed profile",
+          "status": "passed",
+          "title": "LightBurn import stays in review until Apply and applies only the parsed profile",
+          "duration": 15.448899999999412,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit diagnostic category disclosures open and close without mutating controller readback",
+          "status": "passed",
+          "title": "diagnostic category disclosures open and close without mutating controller readback",
+          "duration": 21.305199999999786,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Machine boundary control audit"],
+          "fullName": "Machine boundary control audit alarm Home and explicit Unlock invoke separate mocked recovery actions",
+          "status": "passed",
+          "title": "alarm Home and explicit Unlock invoke separate mocked recovery actions",
+          "duration": 60.53070000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006198912,
+      "endTime": 1790006199130.5308,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/MachineBoundaryControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Tool Plan picture selection"],
+          "fullName": "Tool Plan picture selection audit operation disclosure opens and closes without changing tool assignments",
+          "status": "passed",
+          "title": "audit operation disclosure opens and closes without changing tool assignments",
+          "duration": 59.129900000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Tool Plan picture selection"],
+          "fullName": "Tool Plan picture selection opens only the selected primary picture, keeps the native value, and resolves job-default geometry",
+          "status": "skipped",
+          "title": "opens only the selected primary picture, keeps the native value, and resolves job-default geometry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Tool Plan picture selection"],
+          "fullName": "Tool Plan picture selection shows no secondary picture for an empty stage and removes the picture when the stage is cleared",
+          "status": "skipped",
+          "title": "shows no secondary picture for an empty stage and removes the picture when the stage is cleared",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Tool Plan picture selection"],
+          "fullName": "Tool Plan picture selection retries failed pictures after reopening or selecting another bit in the same family",
+          "status": "skipped",
+          "title": "retries failed pictures after reopening or selecting another bit in the same family",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Tool Plan picture selection"],
+          "fullName": "Tool Plan picture selection opens the picture when changing from inherited to explicit selection of the same bit",
+          "status": "skipped",
+          "title": "opens the picture when changing from inherited to explicit selection of the same bit",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006200782,
+      "endTime": 1790006200841.13,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupCncToolPlan.pictures.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Machine Setup launcher opens the globally owned setup at the capability step",
+          "status": "passed",
+          "title": "Machine Setup launcher opens the globally owned setup at the capability step",
+          "duration": 35.30619999999908,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit saved profile Delete removes only the selected library entry without changing the project",
+          "status": "passed",
+          "title": "saved profile Delete removes only the selected library entry without changing the project",
+          "duration": 27.696599999999307,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit tiling enable creates the default draft and disable clears only that optional draft value",
+          "status": "passed",
+          "title": "tiling enable creates the default draft and disable clears only that optional draft value",
+          "duration": 30.140199999999822,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit rotary attachment and reverse toggles return independent draft patches",
+          "status": "passed",
+          "title": "rotary attachment and reverse toggles return independent draft patches",
+          "duration": 11.128700000001118,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "status": "passed",
+          "title": "homing checkbox updates only the setup draft and stays disabled for a file-only controller",
+          "duration": 17.890400000000227,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Identify disclosures toggle and worker streaming records a draft-only preference",
+          "status": "passed",
+          "title": "Identify disclosures toggle and worker streaming records a draft-only preference",
+          "duration": 52.90740000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit each Options disclosure opens and closes without editing the draft",
+          "status": "passed",
+          "title": "each Options disclosure opens and closes without editing the draft",
+          "duration": 41.8104000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit review Edit buttons navigate to their exact setup owner without committing",
+          "status": "passed",
+          "title": "review Edit buttons navigate to their exact setup owner without committing",
+          "duration": 16.39810000000034,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "status": "passed",
+          "title": "CNC material Apply returns the selected material and explicit manual mode to the operation draft",
+          "duration": 130.32929999999942,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit Reconnect uses the selected controller and command disclosure changes only visibility",
+          "status": "passed",
+          "title": "Reconnect uses the selected controller and command disclosure changes only visibility",
+          "duration": 9.37960000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Setup control audit"],
+          "fullName": "Setup control audit CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "status": "passed",
+          "title": "CNC preset disclosure toggles and external references have explicit secure source destinations",
+          "duration": 8.79700000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006181542,
+      "endTime": 1790006181923.797,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/device-setup/DeviceSetupControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog audit Controller Machine and Warnings disclosures toggle without resolving review",
+          "status": "passed",
+          "title": "audit Controller Machine and Warnings disclosures toggle without resolving review",
+          "duration": 103.10709999999972,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog renders nothing while no review is pending",
+          "status": "skipped",
+          "title": "renders nothing while no review is pending",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog shows the full review and never wraps it in a form (Enter cannot start)",
+          "status": "skipped",
+          "title": "shows the full review and never wraps it in a form (Enter cannot start)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog commits an edited value to the main settings and approves an immediate rebuild",
+          "status": "skipped",
+          "title": "commits an edited value to the main settings and approves an immediate rebuild",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog opens the warning panel for mismatch identity evidence without disabling Start",
+          "status": "skipped",
+          "title": "opens the warning panel for mismatch identity evidence without disabling Start",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog opens the warning panel for unconfirmed identity evidence without disabling Start",
+          "status": "skipped",
+          "title": "opens the warning panel for unconfirmed identity evidence without disabling Start",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog routes Cancel, Start, and Escape to the review store signals",
+          "status": "skipped",
+          "title": "routes Cancel, Start, and Escape to the review store signals",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog uses framing-specific review, acknowledgement, action, and blocker copy",
+          "status": "skipped",
+          "title": "uses framing-specific review, acknowledgement, action, and blocker copy",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog disables Start while a re-prepare is in flight",
+          "status": "skipped",
+          "title": "disables Start while a re-prepare is in flight",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog opens with focus on the dialog surface, not on an editable field",
+          "status": "skipped",
+          "title": "opens with focus on the dialog surface, not on an editable field",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog requests an immediate rebuild when same-session $30/$32 evidence changes",
+          "status": "skipped",
+          "title": "requests an immediate rebuild when same-session $30/$32 evidence changes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog renders the CNC variant: attestation, machine facts, and the tool plan",
+          "status": "skipped",
+          "title": "renders the CNC variant: attestation, machine facts, and the tool plan",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog leaves CNC review for the editable Artwork settings owner",
+          "status": "skipped",
+          "title": "leaves CNC review for the editable Artwork settings owner",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog leaves CNC review for the Startup Setup owner",
+          "status": "skipped",
+          "title": "leaves CNC review for the Startup Setup owner",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog surfaces a rebuild refusal as a blocker and keeps Confirm inert",
+          "status": "skipped",
+          "title": "surfaces a rebuild refusal as a blocker and keeps Confirm inert",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobReviewDialog"],
+          "fullName": "JobReviewDialog offers an explicit busy-preparation retry without confirming or automatically replaying work",
+          "status": "skipped",
+          "title": "offers an explicit busy-preparation retry without confirming or automatically replaying work",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006189001,
+      "endTime": 1790006189104.1072,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/job-review/JobReviewDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog audit Follow latest toggles its preference without hiding or deleting transcript lines",
+          "status": "passed",
+          "title": "audit Follow latest toggles its preference without hiding or deleting transcript lines",
+          "duration": 167.04199999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog opens the dialog and shows the full transcript, beyond the docked 150-entry cap",
+          "status": "skipped",
+          "title": "opens the dialog and shows the full transcript, beyond the docked 150-entry cap",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog hides a group when its filter chip is unchecked",
+          "status": "skipped",
+          "title": "hides a group when its filter chip is unchecked",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog narrows the list with the search box",
+          "status": "skipped",
+          "title": "narrows the list with the search box",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog closes via the Close button",
+          "status": "skipped",
+          "title": "closes via the Close button",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog offers timestamped TSV for manual copy when clipboard access is unavailable",
+          "status": "skipped",
+          "title": "offers timestamped TSV for manual copy when clipboard access is unavailable",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleLauncher / SuperConsoleDialog"],
+          "fullName": "SuperConsoleLauncher / SuperConsoleDialog sends through the shared safe command deck and recalls successful history",
+          "status": "skipped",
+          "title": "sends through the shared safe command deck and recalls successful history",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006185206,
+      "endTime": 1790006185373.042,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/super-console/SuperConsoleDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["SuperConsoleSnapshotCompare"],
+          "fullName": "SuperConsoleSnapshotCompare audit comparison disclosure equivalent filter and each Clear affect only their selected snapshot",
+          "status": "passed",
+          "title": "audit comparison disclosure equivalent filter and each Clear affect only their selected snapshot",
+          "duration": 107.98489999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleSnapshotCompare"],
+          "fullName": "SuperConsoleSnapshotCompare exports the current readback with an operator machine label",
+          "status": "skipped",
+          "title": "exports the current readback with an operator machine label",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["SuperConsoleSnapshotCompare"],
+          "fullName": "SuperConsoleSnapshotCompare loads two files and compares axis values without a quality verdict",
+          "status": "skipped",
+          "title": "loads two files and compares axis values without a quality verdict",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790006203609,
+      "endTime": 1790006203716.9849,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/super-console/SuperConsoleSnapshotCompare.test.tsx"
+    }
+  ]
+}

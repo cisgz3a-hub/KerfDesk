@@ -175,6 +175,25 @@ function rezeroedRadio(): HTMLInputElement {
 }
 
 describe('CncPassRecoveryWizard', () => {
+  it('audit retained position radio is carried into the explicitly started pass review', async () => {
+    renderWizard(exactCapsule());
+    completeChecklist();
+    const retained = host?.querySelector<HTMLInputElement>('input[type="radio"]');
+    expect(retained?.disabled).toBe(false);
+    act(() => retained?.click());
+    expect(retained?.checked).toBe(true);
+    await act(async () => wizardButton('Start pass recovery').click());
+    expect(runCncPassRecoveryFlow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ position: { kind: 'retained-confirmed' } }),
+    );
+  });
+  it('audit Close exits a ready pass review without dispatching recovery', () => {
+    const { onClose } = renderWizard(exactCapsule());
+    act(() => wizardButton('Close').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(runCncPassRecoveryFlow).not.toHaveBeenCalled();
+  });
   it('shows extraction guidance and preselects the computed default boundary', () => {
     renderWizard(exactCapsule());
     expect(host?.textContent).toContain('The app lost the controller mid-job');
