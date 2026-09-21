@@ -34,7 +34,7 @@ function MachineStage(props: DeviceSetupStepProps): JSX.Element {
       <DeviceSetupMachineCapability {...props} />
       <DeviceSetupIdentifyStep {...props} />
       <details className="lf-setup-disclosure" open={props.state.step === 'connect'}>
-        <summary>
+        <summary title="Connect to the controller and optionally read its settings into this draft.">
           <span>Connect and detect</span>
           <small>{connected ? 'Connected' : 'Optional · you can do this later'}</small>
         </summary>
@@ -69,7 +69,7 @@ function EssentialsStage(props: DeviceSetupStagesProps): JSX.Element {
       </div>
       {props.state.machineKind === 'cnc' ? (
         <details className="lf-setup-disclosure" open={props.state.step === 'cnc-setup'}>
-          <summary>
+          <summary title="Set up CNC stock, material, cutting tools and the operation tool plan.">
             <span>CNC job setup</span>
             <small>Stock, material, bits and tool plan</small>
           </summary>
@@ -87,7 +87,7 @@ function EssentialsStage(props: DeviceSetupStagesProps): JSX.Element {
         </details>
       ) : null}
       <details className="lf-setup-disclosure" open={props.state.step === 'options'}>
-        <summary>
+        <summary title="Configure optional accessories, focus settings and calibration.">
           <span>Accessories and calibration</span>
           <small>Optional · keep your existing settings</small>
         </summary>

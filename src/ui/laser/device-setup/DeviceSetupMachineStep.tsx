@@ -56,7 +56,7 @@ function LaserMachineStep({
         className="lf-setup-disclosure lf-setup-disclosure--nested"
         open={highlight === 'air-assist'}
       >
-        <summary>
+        <summary title="Configure the air-assist relay and low-power test-fire controls.">
           <span>Air assist and test fire</span>
           <small>
             {state.draft.airAssistCommand} · Fire{' '}

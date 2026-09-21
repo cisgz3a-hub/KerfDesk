@@ -58,7 +58,7 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
         Home.
       </p>
       <details className="lf-setup-disclosure lf-setup-disclosure--nested">
-        <summary>
+        <summary title="Adjust the output feed limit and framing speed for this machine.">
           <span>Travel speeds</span>
           <small>{state.draft.maxFeed} mm/min output limit</small>
         </summary>

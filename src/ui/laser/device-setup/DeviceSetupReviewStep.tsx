@@ -93,7 +93,7 @@ function ControllerSettings({
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary>
+      <summary title="Compare controller settings with this draft and review optional writes for Save.">
         <span className="lf-setup-review-disclosure-title">
           Controller settings <span className="lf-setup-review-optional">Optional</span>
         </span>
@@ -120,7 +120,9 @@ function HardwareHandoff({
       <strong>Before your first run</strong>
       <p>Check the physical machine after saving. Software setup does not verify the hardware.</p>
       <details className="lf-setup-review-hardware-details">
-        <summary>Hardware commissioning checklist</summary>
+        <summary title="Review the physical checks to perform before your first machine run.">
+          Hardware commissioning checklist
+        </summary>
         <ul className="lf-setup-review-checklist">
           {hardwareChecklist(machineKinds).map((item) => (
             <li key={item}>

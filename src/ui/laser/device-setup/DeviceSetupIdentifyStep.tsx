@@ -35,7 +35,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
       ) : null}
       <DeviceSetupCncPreset state={state} dispatch={dispatch} />
       <details className="lf-setup-disclosure">
-        <summary>
+        <summary title="Choose the controller firmware, output dialect and serial connection settings.">
           <span>Controller and connection settings</span>
           <small>{guide.label} · change if needed</small>
         </summary>
