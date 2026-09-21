@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import console from 'node:console';
+import process from 'node:process';
 import ts from 'typescript';
 
 const base = 'docs/audits/2026-09-21-interface';
@@ -27,8 +28,17 @@ function visit(node) {
   ts.forEachChild(node, visit);
 }
 visit(source);
-if (Object.keys(expectations ?? {}).length !== inventory.length)
-  throw new Error('Independent command expectation count differs from the inventory');
+// The dated inventory is immutable. Later commands may have independent
+// expectations, but every command in this snapshot must still be accounted for.
+const baselineIds = new Set(inventory.map((command) => command.id));
+const missingExpectations = inventory
+  .filter((command) => !Object.hasOwn(expectations ?? {}, command.id))
+  .map((command) => command.id);
+if (missingExpectations.length > 0)
+  throw new Error(`Missing baseline command expectations: ${missingExpectations.join(', ')}`);
+const currentOnlyExpectationIds = Object.keys(expectations ?? {}).filter(
+  (id) => !baselineIds.has(id),
+);
 const report = `${base}/control-audit-menu-vitest.json`;
 const assertions = JSON.parse(fs.readFileSync(report, 'utf8')).testResults.flatMap(
   (suite) => suite.assertionResults,
@@ -77,23 +87,34 @@ const counts = Object.fromEntries(
     commands.filter((c) => c.disposition === key).length,
   ]),
 );
-fs.writeFileSync(
-  `${base}/control-audit-commands.json`,
-  JSON.stringify(
-    { scope: 'Every registered CommandId clicked through the application menu', counts, commands },
-    null,
-    2,
-  ) + '\n',
+// --check validates every dated row and its retained passing evidence without
+// replacing historical output while preparing an integration supplement.
+const checkOnly = process.argv.includes('--check');
+if (!checkOnly) {
+  fs.writeFileSync(
+    `${base}/control-audit-commands.json`,
+    JSON.stringify(
+      {
+        scope: 'Every registered CommandId clicked through the application menu',
+        counts,
+        commands,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  fs.writeFileSync(
+    `${base}/control-audit-commands.md`,
+    '# Registered command dispatch audit\n\nAll 91 registered commands were activated through their real menu rows. The 89 callback/navigation results are boundary checks, Learn changes the real tutorial store, and Focus Test is intentionally unavailable. This is not a claim of 91 hardware/native/geometry end-to-end tests. Independent per-command expectations live in the test source.\n\n| Command | Expected dispatch | Disposition |\n| --- | --- | --- |\n' +
+      commands
+        .map(
+          (c) =>
+            `| ${c.id} | ${c.expected.callback ?? c.expected.url ?? c.expected.special}${c.expected.args ? `(${c.expected.args.join(', ')})` : ''}${c.expected.guard ? `; confirm: ${c.expected.guard}` : ''} | ${c.disposition} |`,
+        )
+        .join('\n') +
+      '\n\nExact passing cases and raw report links are recorded in [JSON](control-audit-commands.json).\n',
+  );
+}
+console.log(
+  JSON.stringify({ commands: commands.length, counts, currentOnlyExpectationIds, checkOnly }),
 );
-fs.writeFileSync(
-  `${base}/control-audit-commands.md`,
-  '# Registered command dispatch audit\n\nAll 91 registered commands were activated through their real menu rows. The 89 callback/navigation results are boundary checks, Learn changes the real tutorial store, and Focus Test is intentionally unavailable. This is not a claim of 91 hardware/native/geometry end-to-end tests. Independent per-command expectations live in the test source.\n\n| Command | Expected dispatch | Disposition |\n| --- | --- | --- |\n' +
-    commands
-      .map(
-        (c) =>
-          `| ${c.id} | ${c.expected.callback ?? c.expected.url ?? c.expected.special}${c.expected.args ? `(${c.expected.args.join(', ')})` : ''}${c.expected.guard ? `; confirm: ${c.expected.guard}` : ''} | ${c.disposition} |`,
-      )
-      .join('\n') +
-    '\n\nExact passing cases and raw report links are recorded in [JSON](control-audit-commands.json).\n',
-);
-console.log(JSON.stringify({ commands: commands.length, counts }));

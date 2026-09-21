@@ -2,9 +2,9 @@
 
 Completed 2026-09-22 in `D:\LaserForge\ui-audit-20260921`, branch `codex/ui-audit-20260921`.
 
-This report preserves the audit snapshot before integration with main at `6c7a5b1e`.
+This report preserves the audit snapshot before integration with main through `9d72ba798`.
 [The PR integration supplement](pr-integration.md) covers the subsequently added Appearance
-controls, all 94 current commands, and the integrated toolbar. The baseline records and digest
+commands, machine-setup redesign, all 94 current commands, and the integrated toolbar. The baseline records and digest
 below are retained so their evidence remains reproducible.
 
 All **805 baseline control definitions/component calls** across **22 UI areas** are accounted for, plus **91 registered commands** clicked through their actual menu rows. This is a control-level audit with exact outcomes and evidence, rather than an inference from nearby passing test files. A reusable button can appear in multiple records, and one mapped definition can produce many visible buttons.
@@ -42,11 +42,17 @@ Initial failed reproductions and fixture failures remain in the raw JSON. The co
 
 No physical controller, homing/probing/firing/cutting, live camera or optical calibration, native OS installer/updater, or production deployment was exercised. Button dispatch is not proof of those external effects. Native file/clipboard/permission dialogs and renderer/camera/worker adapters use the boundaries named in each record. Exhaustive combinations of firmware, imports and application state are outside this audit.
 
-The changes are local and unmerged. The existing dirty primary checkout was preserved. The rebuilt preview is at http://127.0.0.1:57283/ on this machine.
+At audit completion the changes were local and unmerged; publication is tracked in the associated
+PR. The existing dirty primary checkout was preserved. The rebuilt preview is at
+http://127.0.0.1:57283/ on this machine.
 
 ## Reproduce the report
 
-Keep the baseline inventory: its IDs identify the audited records even where source lines moved. Regenerate the current scan into its separate destination, then the four area matrices, command matrix, and combined report. Each generator validates its evidence selectors.
+Keep the baseline inventory: its IDs identify the audited records even where source lines moved.
+To reproduce this dated report, use audit commit `2b67903c` and the commands below. Later main
+integration changed setup controls, so its scan belongs in `pr-integration-source`, as documented
+in the supplement; do not overwrite these historical snapshots from the integrated source.
+Each generator validates its evidence selectors.
 
 ```powershell
 node docs/audits/2026-09-21-interface/inventory-buttons.mjs docs/audits/2026-09-21-interface/current-source

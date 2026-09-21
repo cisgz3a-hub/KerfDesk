@@ -227,14 +227,21 @@ describe('Setup control audit', () => {
       machine: DEFAULT_CNC_MACHINE_CONFIG,
     });
     render(<DeviceSetupReviewStep state={state} dispatch={dispatch} operationDrafts={[]} />);
-    const edit = [...host.querySelectorAll('button')].filter((node) => node.textContent === 'Edit');
-    expect(edit).toHaveLength(5);
-    for (const item of edit) act(() => item.click());
-    expect(dispatch.mock.calls).toEqual(
-      [['identify'], ['confirm'], ['cnc-setup'], ['cnc-setup'], ['options']].map(([step]) => [
-        { kind: 'go', step },
-      ]),
-    );
+    const owners = [
+      ['Machine and connection', 'identify'],
+      ['Workspace and coordinates', 'confirm'],
+      ['CNC machine output', 'cnc-setup'],
+      ['Safety and optional features', 'options'],
+      ['CNC current job', 'cnc-setup'],
+    ] as const;
+    expect(host.querySelectorAll('button[aria-label^="Edit "]')).toHaveLength(owners.length);
+    for (const [label, step] of owners) {
+      const edit = host.querySelector<HTMLButtonElement>(`button[aria-label="Edit ${label}"]`);
+      expect(edit, label).not.toBeNull();
+      dispatch.mockClear();
+      act(() => edit!.click());
+      expect(dispatch).toHaveBeenCalledExactlyOnceWith({ kind: 'go', step });
+    }
   });
 
   it('CNC material Apply returns the selected material and explicit manual mode to the operation draft', () => {

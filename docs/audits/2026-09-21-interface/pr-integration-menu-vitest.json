@@ -1,0 +1,1730 @@
+{
+  "numTotalTestSuites": 25,
+  "numPassedTestSuites": 25,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 160,
+  "numPassedTests": 160,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790008665284,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation provides an icon and accessible name for every registered toolbar command",
+          "status": "passed",
+          "title": "provides an icon and accessible name for every registered toolbar command",
+          "duration": 104.03980000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation shows a readable action label alongside the primary file icon",
+          "status": "passed",
+          "title": "shows a readable action label alongside the primary file icon",
+          "duration": 8.575700000000325,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar icon presentation"],
+          "fullName": "Toolbar icon presentation keeps specialist labels available in More",
+          "status": "passed",
+          "title": "keeps specialist labels available in More",
+          "duration": 11.773899999999685,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008700609,
+      "endTime": 1790008700733.774,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.icons.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions prioritises the file-to-preview workflow and reveals image actions with an image selection",
+          "status": "passed",
+          "title": "prioritises the file-to-preview workflow and reveals image actions with an image selection",
+          "duration": 494.2033999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions keeps extra commands reachable with registry help, shortcuts, disabled state and dispatch",
+          "status": "passed",
+          "title": "keeps extra commands reachable with registry help, shortcuts, disabled state and dispatch",
+          "duration": 82.72150000000329,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions moves tools into More as available width shrinks and restores them as it grows",
+          "status": "passed",
+          "title": "moves tools into More as available width shrinks and restores them as it grows",
+          "duration": 115.37939999999799,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions supports keyboard opening, skips disabled commands, and restores focus on Escape",
+          "status": "passed",
+          "title": "supports keyboard opening, skips disabled commands, and restores focus on Escape",
+          "duration": 103.13630000000194,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions closes on outside pointer input without running a command or stealing focus",
+          "status": "passed",
+          "title": "closes on outside pointer input without running a command or stealing focus",
+          "duration": 51.67359999999826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar overflow interactions"],
+          "fullName": "Toolbar overflow interactions clamps the menu inside a short viewport and repositions on resize",
+          "status": "passed",
+          "title": "clamps the menu inside a short viewport and repositions on resize",
+          "duration": 53.7567999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008687627,
+      "endTime": 1790008688529.7568,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.overflow.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Toolbar Convert to Bitmap"],
+          "fullName": "Toolbar Convert to Bitmap opens the LightBurn-style options dialog and passes Render Type plus DPI",
+          "status": "passed",
+          "title": "opens the LightBurn-style options dialog and passes Render Type plus DPI",
+          "duration": 643.971800000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) shows the current project name alongside the toolbar utilities",
+          "status": "passed",
+          "title": "shows the current project name alongside the toolbar utilities",
+          "duration": 40.03110000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) shows the Install-app button once the browser offers a PWA install prompt",
+          "status": "passed",
+          "title": "shows the Install-app button once the browser offers a PWA install prompt",
+          "duration": 26.593399999997928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) lists every shipped shortcut family, including the late arrivals",
+          "status": "passed",
+          "title": "lists every shipped shortcut family, including the late arrivals",
+          "duration": 21.836200000001554,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) opens the Keyboard Shortcuts dialog from the toolbar button",
+          "status": "passed",
+          "title": "opens the Keyboard Shortcuts dialog from the toolbar button",
+          "duration": 102.81490000000122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar shortcut hint (audit M27/A.5)"],
+          "fullName": "Toolbar shortcut hint (audit M27/A.5) labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)",
+          "status": "passed",
+          "title": "labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)",
+          "duration": 19.984300000000076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar separators"],
+          "fullName": "Toolbar separators renders separators only between non-empty file and preview groups",
+          "status": "passed",
+          "title": "renders separators only between non-empty file and preview groups",
+          "duration": 26.503199999999197,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar separators"],
+          "fullName": "Toolbar separators renders no group separator and no double separator when only one group is visible",
+          "status": "passed",
+          "title": "renders no group separator and no double separator when only one group is visible",
+          "duration": 24.20499999999811,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar command buttons"],
+          "fullName": "Toolbar command buttons runs toolbar clicks through the command registry command object",
+          "status": "passed",
+          "title": "runs toolbar clicks through the command registry command object",
+          "duration": 23.112700000001496,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Toolbar command buttons"],
+          "fullName": "Toolbar command buttons marks toolbar command buttons with stable help ids",
+          "status": "passed",
+          "title": "marks toolbar command buttons with stable help ids",
+          "duration": 25.77230000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008697076,
+      "endTime": 1790008698031.7722,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/common/Toolbar.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action accounts for every registered command exactly once",
+          "status": "passed",
+          "title": "accounts for every registered command exactly once",
+          "duration": 19.098099999999704,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.new' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.new' clicks through the menu to the expected outcome",
+          "duration": 68.8092999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.open' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.open' clicks through the menu to the expected outcome",
+          "duration": 23.107400000000325,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.save' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.save' clicks through the menu to the expected outcome",
+          "duration": 17.828100000000177,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.save-as' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.save-as' clicks through the menu to the expected outcome",
+          "duration": 20.190399999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.import' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.import' clicks through the menu to the expected outcome",
+          "duration": 16.745699999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.import-svg' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.import-svg' clicks through the menu to the expected outcome",
+          "duration": 14.25019999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.import-dxf' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.import-dxf' clicks through the menu to the expected outcome",
+          "duration": 13.646400000000085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.import-image' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.import-image' clicks through the menu to the expected outcome",
+          "duration": 17.3438000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.import-height-map' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.import-height-map' clicks through the menu to the expected outcome",
+          "duration": 12.247699999999895,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.save-gcode' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.save-gcode' clicks through the menu to the expected outcome",
+          "duration": 12.589300000000094,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.open-gcode' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.open-gcode' clicks through the menu to the expected outcome",
+          "duration": 11.75630000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'file.inspect-gcode' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'file.inspect-gcode' clicks through the menu to the expected outcome",
+          "duration": 14.481999999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.undo' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.undo' clicks through the menu to the expected outcome",
+          "duration": 11.967000000000098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.redo' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.redo' clicks through the menu to the expected outcome",
+          "duration": 12.073100000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.select-all' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.select-all' clicks through the menu to the expected outcome",
+          "duration": 11.652799999999843,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.copy' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.copy' clicks through the menu to the expected outcome",
+          "duration": 16.960199999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.cut' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.cut' clicks through the menu to the expected outcome",
+          "duration": 11.580599999999777,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.paste' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.paste' clicks through the menu to the expected outcome",
+          "duration": 10.895899999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.group' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.group' clicks through the menu to the expected outcome",
+          "duration": 10.81880000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.ungroup' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.ungroup' clicks through the menu to the expected outcome",
+          "duration": 12.678699999999935,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.lock-selection' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.lock-selection' clicks through the menu to the expected outcome",
+          "duration": 12.847600000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.unlock-all' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.unlock-all' clicks through the menu to the expected outcome",
+          "duration": 11.680299999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.duplicate' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.duplicate' clicks through the menu to the expected outcome",
+          "duration": 12.579099999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.delete' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.delete' clicks through the menu to the expected outcome",
+          "duration": 23.032799999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'edit.clear-selection' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'edit.clear-selection' clicks through the menu to the expected outcome",
+          "duration": 16.45119999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.measure' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.measure' clicks through the menu to the expected outcome",
+          "duration": 37.5942,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.add-text' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.add-text' clicks through the menu to the expected outcome",
+          "duration": 29.644199999999728,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.registration-jig' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.registration-jig' clicks through the menu to the expected outcome",
+          "duration": 34.722299999999905,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.place-board' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.place-board' clicks through the menu to the expected outcome",
+          "duration": 37.9996000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.camera' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.camera' clicks through the menu to the expected outcome",
+          "duration": 25.41800000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.box-generator' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.box-generator' clicks through the menu to the expected outcome",
+          "duration": 18.876000000000204,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.box-fit-test' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.box-fit-test' clicks through the menu to the expected outcome",
+          "duration": 16.282399999999598,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.material-test' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.material-test' clicks through the menu to the expected outcome",
+          "duration": 26.778400000000147,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.interval-test' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.interval-test' clicks through the menu to the expected outcome",
+          "duration": 19.11329999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.scan-offset-test' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.scan-offset-test' clicks through the menu to the expected outcome",
+          "duration": 65.48770000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.focus-test' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.focus-test' clicks through the menu to the expected outcome",
+          "duration": 90.42630000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.optimization-settings' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.optimization-settings' clicks through the menu to the expected outcome",
+          "duration": 120.84169999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.rotary-setup' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.rotary-setup' clicks through the menu to the expected outcome",
+          "duration": 136.62829999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.print-and-cut' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.print-and-cut' clicks through the menu to the expected outcome",
+          "duration": 129.45359999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.labs' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.labs' clicks through the menu to the expected outcome",
+          "duration": 141.0032000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.adjust-image' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.adjust-image' clicks through the menu to the expected outcome",
+          "duration": 123.48019999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.edit-image' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.edit-image' clicks through the menu to the expected outcome",
+          "duration": 172.39339999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.apply-image-mask' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.apply-image-mask' clicks through the menu to the expected outcome",
+          "duration": 190.08239999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.crop-image' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.crop-image' clicks through the menu to the expected outcome",
+          "duration": 88.96650000000045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.remove-image-mask' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.remove-image-mask' clicks through the menu to the expected outcome",
+          "duration": 86.02869999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.save-processed-bitmap' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.save-processed-bitmap' clicks through the menu to the expected outcome",
+          "duration": 107.50540000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.trace-image' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.trace-image' clicks through the menu to the expected outcome",
+          "duration": 92.24069999999938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.retrace-original' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.retrace-original' clicks through the menu to the expected outcome",
+          "duration": 107.63709999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.multi-file-trace' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.multi-file-trace' clicks through the menu to the expected outcome",
+          "duration": 141.70829999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.convert-to-path' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.convert-to-path' clicks through the menu to the expected outcome",
+          "duration": 115.25450000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.weld' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.weld' clicks through the menu to the expected outcome",
+          "duration": 101.33510000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.subtract' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.subtract' clicks through the menu to the expected outcome",
+          "duration": 107.71000000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.intersect' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.intersect' clicks through the menu to the expected outcome",
+          "duration": 75.44790000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.exclude' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.exclude' clicks through the menu to the expected outcome",
+          "duration": 81.79109999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.convert-to-bitmap' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.convert-to-bitmap' clicks through the menu to the expected outcome",
+          "duration": 98.83489999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.fill-selection' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.fill-selection' clicks through the menu to the expected outcome",
+          "duration": 85.11129999999957,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.close-open-fill-contours' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.close-open-fill-contours' clicks through the menu to the expected outcome",
+          "duration": 102.13270000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'tools.close-fill-contours-with-tolera…' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'tools.close-fill-contours-with-tolera…' clicks through the menu to the expected outcome",
+          "duration": 110.64090000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-left' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-left' clicks through the menu to the expected outcome",
+          "duration": 68.86440000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-center-x' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-center-x' clicks through the menu to the expected outcome",
+          "duration": 64.08460000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-right' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-right' clicks through the menu to the expected outcome",
+          "duration": 64.29659999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-top' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-top' clicks through the menu to the expected outcome",
+          "duration": 74.07730000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-center-y' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-center-y' clicks through the menu to the expected outcome",
+          "duration": 48.78319999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-bottom' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-bottom' clicks through the menu to the expected outcome",
+          "duration": 88.13479999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.align-centers' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.align-centers' clicks through the menu to the expected outcome",
+          "duration": 64.78849999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.distribute-horizontal-centers' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.distribute-horizontal-centers' clicks through the menu to the expected outcome",
+          "duration": 63.05649999999969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.distribute-horizontal-spacing' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.distribute-horizontal-spacing' clicks through the menu to the expected outcome",
+          "duration": 56.77099999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.distribute-vertical-centers' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.distribute-vertical-centers' clicks through the menu to the expected outcome",
+          "duration": 89.79050000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.distribute-vertical-spacing' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.distribute-vertical-spacing' clicks through the menu to the expected outcome",
+          "duration": 52.310599999999795,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.break-apart' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.break-apart' clicks through the menu to the expected outcome",
+          "duration": 73.72189999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.array' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.array' clicks through the menu to the expected outcome",
+          "duration": 63.663800000000265,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.quick-nest' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.quick-nest' clicks through the menu to the expected outcome",
+          "duration": 75.05400000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.flip-horizontal' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.flip-horizontal' clicks through the menu to the expected outcome",
+          "duration": 53.3099000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'arrange.flip-vertical' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'arrange.flip-vertical' clicks through the menu to the expected outcome",
+          "duration": 60.95919999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'laser.connect' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'laser.connect' clicks through the menu to the expected outcome",
+          "duration": 58.78929999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'laser.disconnect' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'laser.disconnect' clicks through the menu to the expected outcome",
+          "duration": 29.650800000000345,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'laser.home' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'laser.home' clicks through the menu to the expected outcome",
+          "duration": 26.78229999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.toggle-preview' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.toggle-preview' clicks through the menu to the expected outcome",
+          "duration": 62.65760000000046,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.toggle-layers-panel' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.toggle-layers-panel' clicks through the menu to the expected outcome",
+          "duration": 43.46090000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.toggle-machine-panel' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.toggle-machine-panel' clicks through the menu to the expected outcome",
+          "duration": 39.38329999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.toggle-side-panels' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.toggle-side-panels' clicks through the menu to the expected outcome",
+          "duration": 49.97230000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.reset-layout' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.reset-layout' clicks through the menu to the expected outcome",
+          "duration": 57.33690000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.theme-light' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.theme-light' clicks through the menu to the expected outcome",
+          "duration": 52.14249999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.theme-dark' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.theme-dark' clicks through the menu to the expected outcome",
+          "duration": 43.71900000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.theme-system' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.theme-system' clicks through the menu to the expected outcome",
+          "duration": 36.5608000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.fit-view' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.fit-view' clicks through the menu to the expected outcome",
+          "duration": 41.04519999999957,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.project-notes' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.project-notes' clicks through the menu to the expected outcome",
+          "duration": 67.48239999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'window.undo-history' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'window.undo-history' clicks through the menu to the expected outcome",
+          "duration": 54.29610000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.about' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.about' clicks through the menu to the expected outcome",
+          "duration": 34.47099999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.tutorials' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.tutorials' clicks through the menu to the expected outcome",
+          "duration": 51.46600000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.connection' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.connection' clicks through the menu to the expected outcome",
+          "duration": 25.68459999999959,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.safety' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.safety' clicks through the menu to the expected outcome",
+          "duration": 29.856000000000677,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.report-bug' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.report-bug' clicks through the menu to the expected outcome",
+          "duration": 37.495600000000195,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["every registered application menu action"],
+          "fullName": "every registered application menu action 'help.discussions' clicks through the menu to the expected outcome",
+          "status": "passed",
+          "title": "'help.discussions' clicks through the menu to the expected outcome",
+          "duration": 26.76680000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008667767,
+      "endTime": 1790008673059.7668,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/AppMenuBar.control-audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CommandShell file boundaries"],
+          "fullName": "CommandShell file boundaries routes unified import and batch trace pickers through PlatformAdapter",
+          "status": "passed",
+          "title": "routes unified import and batch trace pickers through PlatformAdapter",
+          "duration": 426.0524999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008701598,
+      "endTime": 1790008702024.0525,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/CommandShell.file-boundary.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CommandShell canvas text activation"],
+          "fullName": "CommandShell canvas text activation arms canvas typing from More without opening the old text dialog",
+          "status": "passed",
+          "title": "arms canvas typing from More without opening the old text dialog",
+          "duration": 505.6921999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CommandShell node-mode Delete"],
+          "fullName": "CommandShell node-mode Delete Edit > Delete removes the selected path node without deleting its object",
+          "status": "passed",
+          "title": "Edit > Delete removes the selected path node without deleting its object",
+          "duration": 276.22520000000077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CommandShell node-mode Delete"],
+          "fullName": "CommandShell node-mode Delete workspace-context Delete uses the same node-mode behavior",
+          "status": "passed",
+          "title": "workspace-context Delete uses the same node-mode behavior",
+          "duration": 137.04290000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["CommandShell node-mode Delete"],
+          "fullName": "CommandShell node-mode Delete Edit > Delete retains ordinary whole-object deletion outside node mode",
+          "status": "passed",
+          "title": "Edit > Delete retains ordinary whole-object deletion outside node mode",
+          "duration": 164.40000000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008697071,
+      "endTime": 1790008698155.4,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/commands/CommandShell.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "status": "passed",
+          "title": "offers Done after the real store settles a simulated job and sends no command on dismissal",
+          "duration": 218.52970000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008703976,
+      "endTime": 1790008704194.5298,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CompletedJobNotice.simulator.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement clears only the finished display, retaining artwork, replay, archive and Frame state",
+          "status": "passed",
+          "title": "clears only the finished display, retaining artwork, replay, archive and Frame state",
+          "duration": 136.0354000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement stays dismissed after remount and offers Done for the next completed run",
+          "status": "passed",
+          "title": "stays dismissed after remount and offers Done for the next completed run",
+          "duration": 20.841499999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a streaming stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a streaming stream",
+          "duration": 17.66379999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a paused stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a paused stream",
+          "duration": 14.90769999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a tool-change stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a tool-change stream",
+          "duration": 14.328399999999874,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a done stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a done stream",
+          "duration": 13.6578999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains live controls and has no Done action for a errored stream",
+          "status": "passed",
+          "title": "retains live controls and has no Done action for a errored stream",
+          "duration": 13.564800000000105,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a running run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a running run even if a stale completion badge is present",
+          "duration": 4.079600000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a paused run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a paused run even if a stale completion badge is present",
+          "duration": 4.748300000000199,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a tool-change run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a tool-change run even if a stale completion badge is present",
+          "duration": 4.304299999999785,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a errored run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a errored run even if a stale completion badge is present",
+          "duration": 5.710500000000138,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a stopped run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a stopped run even if a stale completion badge is present",
+          "duration": 5.0304000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not dismiss a disconnected run even if a stale completion badge is present",
+          "status": "passed",
+          "title": "does not dismiss a disconnected run even if a stale completion badge is present",
+          "duration": 4.572599999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during settle marker",
+          "status": "passed",
+          "title": "retains status during settle marker",
+          "duration": 4.026499999999942,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during stable Idle wait",
+          "status": "passed",
+          "title": "retains status during stable Idle wait",
+          "duration": 2.991399999999885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during controller error",
+          "status": "passed",
+          "title": "retains status during controller error",
+          "duration": 3.073699999999917,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during alarm",
+          "status": "passed",
+          "title": "retains status during alarm",
+          "duration": 3.218499999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during failed completion write",
+          "status": "passed",
+          "title": "retains status during failed completion write",
+          "duration": 3.002600000000257,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during safety notice",
+          "status": "passed",
+          "title": "retains status during safety notice",
+          "duration": 3.3800999999998567,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during autofocus",
+          "status": "passed",
+          "title": "retains status during autofocus",
+          "duration": 3.587800000000243,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during probe",
+          "status": "passed",
+          "title": "retains status during probe",
+          "duration": 3.151800000000094,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during fire",
+          "status": "passed",
+          "title": "retains status during fire",
+          "duration": 3.4398999999998523,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during jog motion",
+          "status": "passed",
+          "title": "retains status during jog motion",
+          "duration": 3.7462000000000444,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during Frame motion",
+          "status": "passed",
+          "title": "retains status during Frame motion",
+          "duration": 3.265600000000177,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during pause transition",
+          "status": "passed",
+          "title": "retains status during pause transition",
+          "duration": 2.825800000000072,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement retains status during unknown status",
+          "status": "passed",
+          "title": "retains status during unknown status",
+          "duration": 3.4286999999999352,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement does not treat a finished route with an unsettled countdown as completion",
+          "status": "passed",
+          "title": "does not treat a finished route with an unsettled countdown as completion",
+          "duration": 4.009499999999662,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement rechecks run identity so a stale Done cannot dismiss a newer completed run",
+          "status": "passed",
+          "title": "rechecks run identity so a stale Done cannot dismiss a newer completed run",
+          "duration": 3.2546000000002095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["completed job acknowledgement"],
+          "fullName": "completed job acknowledgement accepts trailing status updates to the same completed run",
+          "status": "passed",
+          "title": "accepts trailing status updates to the same completed run",
+          "duration": 3.309400000000096,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008701124,
+      "endTime": 1790008701438.3093,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/CompletedJobNotice.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy shows pending Frame preparation and prevents duplicate run actions",
+          "status": "passed",
+          "title": "shows pending Frame preparation and prevents duplicate run actions",
+          "duration": 260.1713,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy orders the rail origin, then job actions, then placement, then the guide",
+          "status": "passed",
+          "title": "orders the rail origin, then job actions, then placement, then the guide",
+          "duration": 67.40320000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy leads the unframed job cluster with setup-and-Frame, Frame job, then Home",
+          "status": "passed",
+          "title": "leads the unframed job cluster with setup-and-Frame, Frame job, then Home",
+          "duration": 58.47049999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy keeps passive frame status with the job cluster while framing",
+          "status": "passed",
+          "title": "keeps passive frame status with the job cluster while framing",
+          "duration": 52.10620000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy keeps run actions out of the rail while placing safety detail with the job cluster",
+          "status": "passed",
+          "title": "keeps run actions out of the rail while placing safety detail with the job cluster",
+          "duration": 67.61369999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008697597,
+      "endTime": 1790008698102.6138,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/JobControls.layout.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens homing configuration while disconnected instead of silently doing nothing",
+          "status": "passed",
+          "title": "opens homing configuration while disconnected instead of silently doing nothing",
+          "duration": 188.66960000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks opens the autofocus page with its field highlighted",
+          "status": "passed",
+          "title": "opens the autofocus page with its field highlighted",
+          "duration": 55.53049999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machine setup navigation without parent callbacks"],
+          "fullName": "machine setup navigation without parent callbacks still refuses setup edits during an active Frame",
+          "status": "passed",
+          "title": "still refuses setup edits during an active Frame",
+          "duration": 49.84830000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008701653,
+      "endTime": 1790008701946.8484,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/JobControls.setup-navigation.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership shares one compilation and Frame across repeated calls, then allows a completed Frame retry",
+          "status": "passed",
+          "title": "shares one compilation and Frame across repeated calls, then allows a completed Frame retry",
+          "duration": 3657.6077000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership releases failed compilation ownership so a new Frame can prepare and succeed",
+          "status": "passed",
+          "title": "releases failed compilation ownership so a new Frame can prepare and succeed",
+          "duration": 1393.871500000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame preparation ownership"],
+          "fullName": "Frame preparation ownership releases stale compilation ownership and retries against the current edited job",
+          "status": "passed",
+          "title": "releases stale compilation ownership and retries against the current edited job",
+          "duration": 1198.3138000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790008692328,
+      "endTime": 1790008698578.3137,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/ui-audit-20260921/src/ui/laser/use-frame-action.single-flight.test.ts"
+    }
+  ]
+}

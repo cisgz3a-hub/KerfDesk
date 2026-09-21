@@ -3,8 +3,41 @@
 Date: 2026-09-21. Isolated worktree: `D:\LaserForge\ui-audit-20260921`.
 Branch: `codex/ui-audit-20260921`, based on `377e692baf26a9f66ba3877f157213095c54b92f`.
 
-The implementation is local and ready for review. It is not merged, deployed, packaged for desktop,
-or qualified on a physical machine. The primary checkout and its unrelated edits were preserved.
+The primary checkout and its unrelated edits were preserved. Publication status is tracked by the
+associated PR; the software evidence below does not qualify a physical machine or packaged desktop.
+
+## PR integration, 2026-09-22
+
+The branch integrated main through `9d72ba798faf3342efe0f808e1656924e3632b65`, including
+Appearance preferences, Import Image placement, Frame preparation fixes and the three-stage
+machine-setup redesign. The interface ADR was renumbered to 340 to retain main's ADR-339.
+[The integration supplement](pr-integration.md) separates the new controls from the historical
+805-record audit and records the current source inventory and targeted integration evidence.
+
+The first integration batch passed 160 cases across 11 files, including all 94 commands, toolbar
+placement, setup dispatch, completed-run acknowledgement and upstream single-flight Frame
+preparation (`pr-integration-menu-vitest.json`). This batch preceded the final machine-setup merge;
+its additional verification is recorded in the supplement. The older counts below retain their
+original source scope and must not be presented as newly executed checks of every inherited control.
+
+After the final main integration, the production build, browser-test typecheck, ADR uniqueness
+and file-size backstop passed. `pr-integration-browser.json` records 10/10 development-browser
+passes for the repaired workflows, Done, keyboard access and responsive shell. The rebuilt
+production preview passed 5/5 cases in `pr-integration-production-browser.json`: material wizard,
+Image Studio layers, routine machine controls, Light/Dark menu choices and stored Match System
+responding to live OS changes. The Match System menu dispatch itself is verified by the separate
+menu test. Repository-wide hosted release and browser gates are tracked on the PR.
+
+The final machine/setup integration aggregate passed 68/68 cases across nine suites, retaining
+links to each raw run. The fallback tests mount the actual setup host and verify homing and
+autofocus destinations without running hardware. The initial failures were fixture assumptions
+about Review-card order and a jsdom radio selector; named destinations and native input lookup
+retain the intended assertions. No production change was needed for that setup integration.
+Repository-wide ESLint passed on the integrated tree; the final new setup test files also passed
+their scoped lint check.
+The final full TypeScript check, including the three new/strengthened setup audit files, passed.
+Repository-wide formatting and `git diff --check` passed after evidence packaging. The primary
+checkout's complete tracked/untracked status matched its publication-start snapshot.
 
 ## Button-by-button follow-up, 2026-09-22
 

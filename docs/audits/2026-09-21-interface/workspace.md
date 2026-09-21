@@ -4,7 +4,7 @@ Scope: the shared toolbar and left drawing palette on the isolated checkout base
 
 ## Changes
 
-- The primary toolbar now names the main file-to-preview actions: **Open**, **Import**, **Save**, and **Preview**. The previous row repeated the drawing palette's Text tool and foregrounded image actions even when no image was selected.
+- The primary toolbar names the main file-to-preview actions: **Open**, **Import**, **Import image**, **Save**, and **Preview**, using overflow when needed. The previous row repeated the drawing palette's Text tool and foregrounded image actions even when no image was selected.
 - **Trace image** appears beside the file actions when the command registry reports an eligible image selection and there is room. After integrating PR #825, **Import image** retains its primary-toolbar entry and **Image Studio** stays in **More**, including its existing import-and-edit entry without a selection.
 - **More** and the existing application menus retain New, Save As, Text, Registration Jig, Camera, Place Board, Box Generator, bitmap conversion, Save G-code, and G-code inspection. Responsive overflow continues to move actions into More without duplicating commands.
 - Quiet button backgrounds, a restrained Import accent, readable action names, a project caption and an unsaved-change dot clarify the toolbar. **Learn**, layout choice, keyboard shortcuts and the conditional installation offer remain accessible.
@@ -17,7 +17,7 @@ These changes do not alter command handlers, file formats, drawing geometry, con
 
 | Surface | Actions | Reviewed path and evidence |
 | --- | --- | --- |
-| Primary toolbar and More | All 16 commands in `TOOLBAR_GROUPS` | Both surfaces use the same `AppCommand` object and `runCommand`; no local substitute handler. Existing icon/name coverage counts every registered command exactly once with More open. |
+| Primary toolbar and More | All 17 commands in `TOOLBAR_GROUPS` after PR #825 integration | Both surfaces use the same `AppCommand` object and `runCommand`; no local substitute handler. Existing icon/name coverage counts every registered command exactly once with More open. |
 | Responsive toolbar | Primary actions, selected-image actions, More | Measured widths, command eligibility, disabled reasons, checked/pressed state, keyboard movement and resize/dialog focus fallback are retained. A focused regression checks the empty-project workflow, image-selection transition, New dispatch from More, and disabled Trace dispatch. |
 | File entry points | Open, Import, Save, Save As and export commands | Existing platform/command integration tests are retained. The Import integration test now reaches the inline button; it still asserts the platform file picker boundary. This does not independently qualify operating-system file dialogs. |
 | Text entry points | Drawing-palette Text, More > Text, Tools menu, shortcut | The drawing palette and More command activate the same canvas text mode. The CommandShell test verifies that More activates text without opening the old dialog. Existing browser text-flow fixtures now enter through the persistent Text palette button. |

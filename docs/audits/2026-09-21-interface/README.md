@@ -4,9 +4,9 @@ Date: 2026-09-21. Worktree: `D:\LaserForge\ui-audit-20260921`. Branch: `codex/ui
 Starting commit: `377e692baf26a9f66ba3877f157213095c54b92f`, freshly fetched `origin/main`.
 
 **PR integration, 2026-09-22:** the branch subsequently integrated main at
-`6c7a5b1ea6fb19c9ac57d4a361ec571edc0887d1`. The original 805-control/91-command
+`9d72ba798faf3342efe0f808e1656924e3632b65`. The original 805-control/91-command
 matrices remain dated audit snapshots. [The integration supplement](pr-integration.md)
-accounts for the additional Appearance controls and tests all 94 current commands.
+accounts for the Appearance commands and machine-setup redesign, and tests all 94 current commands.
 The integrated toolbar preserves Import Image and keeps Image Studio in More. The interface
 decision is now ADR-340; main's Appearance decision retains ADR-339.
 
@@ -25,7 +25,8 @@ Chrome checks against the production bundle. Camera acquisition remains a mocked
 
 Implemented a calmer workspace and an explicit acknowledgement for successful jobs. Frequent
 actions stay prominent; occasional configuration, history and recovery use named entry points.
-The changes are local and have not been merged, deployed or hardware-qualified.
+At audit completion these changes were local; publication status is tracked by the associated PR.
+They have not been hardware-qualified.
 
 The audit catalogues **805 control definitions/calls and 91 registered commands across 22 UI areas**, traces their handlers,
 and exercises functional tests across the interface. It does **not** declare every possible control
