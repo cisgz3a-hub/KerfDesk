@@ -4,9 +4,12 @@ import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
+import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { openSetupDisclosure } from './device-setup-test-helpers';
+import type { DeviceSetupStep } from './device-setup-flow';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -23,6 +26,38 @@ afterEach(() => {
 });
 
 describe('DeviceSetupWizard step navigation', () => {
+  it.each<[DeviceSetupStep, string, number]>([
+    ['connect', 'Connect and detect', 1],
+    ['options', 'Accessories and calibration', 2],
+    ['cnc-setup', 'CNC job setup', 2],
+  ])(
+    'opens the legacy %s target in its stage with its disclosure expanded',
+    async (initialStep, title, stage) => {
+      if (initialStep === 'cnc-setup') useStore.getState().setMachineKind('cnc');
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const root = createRoot(host);
+      await act(async () => {
+        root.render(
+          <PlatformProvider adapter={mockPlatform()}>
+            <DeviceSetupWizard onClose={vi.fn()} initialStep={initialStep} />
+          </PlatformProvider>,
+        );
+      });
+      try {
+        expect(host.textContent).toContain(`Step ${stage} of 3`);
+        const summary = [...host.querySelectorAll('summary')].find((item) =>
+          item.textContent?.startsWith(title),
+        );
+        expect(summary?.parentElement).toBeInstanceOf(HTMLDetailsElement);
+        expect((summary?.parentElement as HTMLDetailsElement).open).toBe(true);
+      } finally {
+        await act(async () => root.unmount());
+        host.remove();
+      }
+    },
+  );
+
   it('opens any setup section directly and preserves unsaved draft edits', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -36,15 +71,14 @@ describe('DeviceSetupWizard step navigation', () => {
     });
 
     try {
-      await act(async () => stepButton(host, 2, 'Choose your machine').click());
+      await openSetupDisclosure(host, 'Controller and connection settings');
       await changeSelect(host, 'Controller firmware', 'marlin');
-      await act(async () => stepButton(host, 6, 'Review & save').click());
-      expect(host.textContent).toContain('Step 6 of 6 — Review & save');
-      expect(stepButton(host, 6, 'Review & save').getAttribute('aria-current')).toBe('step');
-      expect(stepButton(host, 6, 'Review & save').title).toBe('Open Review & save');
+      await act(async () => stepButton(host, 3, 'Review & save').click());
+      expect(host.textContent).toContain('Step 3 of 3');
+      expect(stepButton(host, 3, 'Review & save').getAttribute('aria-current')).toBe('step');
 
-      await act(async () => stepButton(host, 2, 'Choose your machine').click());
-      expect(host.textContent).toContain('Step 2 of 6 — Choose your machine');
+      await act(async () => stepButton(host, 1, 'Machine').click());
+      expect(host.textContent).toContain('Step 1 of 3');
       expect(select(host, 'Controller firmware').value).toBe('marlin');
     } finally {
       await act(async () => root.unmount());

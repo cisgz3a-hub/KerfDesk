@@ -242,7 +242,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-setup.launch': {
     label: 'Machine Setup',
     tooltip:
-      'Open the single step-by-step setup: machine type, profile and controller, connect and detect, confirm settings, options and calibration, then review and save.',
+      'Set up in three stages: Machine, Essentials, and Review & save. Connection, accessories, and calibration are optional.',
   },
   'laser.machine-setup.tab.overview': {
     label: 'Machine overview',
@@ -252,7 +252,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-setup.tab.catalog': {
     label: 'Profile catalog',
     tooltip:
-      'Choose a built-in GRBL machine profile or duplicate one before tuning machine-specific values.',
+      'Search machine profiles or browse the full catalog, then copy your selected profile into the setup draft.',
   },
   'laser.machine-setup.tab.controller': {
     label: 'Controller settings',
@@ -281,20 +281,20 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.device-setup.launch': {
     label: 'Machine Setup',
     tooltip:
-      'Configure machine type, profile, controller, coordinates, output, optional calibrations, and the guarded firmware review in one draft-based flow.',
+      'Choose your machine, check the essentials, then review and save one draft. You can configure the machine offline.',
   },
   'laser.device-setup.next': {
     label: 'Next step',
-    tooltip: 'Continue to the next step of Machine Setup.',
+    tooltip: 'Continue to the next stage. You can return to correct values before saving.',
   },
   'laser.device-setup.back': {
     label: 'Previous step',
-    tooltip: 'Return to the previous step of Machine Setup.',
+    tooltip: 'Return to the previous stage without losing draft changes.',
   },
   'laser.device-setup.finish': {
     label: 'Save machine setup',
     tooltip:
-      'Atomically save the reviewed software configuration, then write and verify any explicitly queued common firmware settings.',
+      'Save the complete reviewed draft together, then write and verify only the controller settings you explicitly queued.',
   },
   'laser.device-setup.cancel': {
     label: 'Cancel setup',
@@ -304,7 +304,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.device-setup.connect': {
     label: 'Connect controller',
     tooltip:
-      'Open the serial port with the controller family and baud chosen on the Choose your machine step.',
+      'Open the serial port using the controller family and baud selected on Machine. Connecting is optional during setup.',
   },
   'laser.device-setup.reread': {
     label: 'Run read-only checks',
