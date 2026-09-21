@@ -80,7 +80,7 @@ function expectPhase(picture: TutorialPhoto, phase: number): void {
 
 beforeEach(() => {
   localStorage.clear();
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   useUiStore.setState({ modalDepth: 0, toolMode: { kind: 'draw', shape: 'rect' } });
   useStore.setState({ project: createProject(), undoStack: [], redoStack: [], dirty: false });
 });
@@ -93,7 +93,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   localStorage.clear();
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   expect(useUiStore.getState().modalDepth).toBe(0);
   useUiStore.setState({ toolMode: { kind: 'select' } });
 });
@@ -122,14 +122,14 @@ describe('tutorial pictures in the real reader', () => {
     expect(image.src).not.toMatch(/^(?:data|blob):/u);
     expect(new URL(image.src).origin).toBe(location.origin);
 
-    await click(button('Return to the tutorial library'));
+    await click(button('Return to the tutorial library (Escape)'));
     expect(document.querySelectorAll('img')).toHaveLength(0);
     await open('laser-image');
     expect(document.querySelectorAll('img')).toHaveLength(1);
     expect(element<HTMLImageElement>('img').getAttribute('src')).toBe(
       tutorialPhotoUrl(photo('laser-image').asset.small.file),
     );
-    await click(button('Close tutorials and return to your work (Escape)'));
+    await click(button('Close tutorials and return to your work'));
     expect(document.querySelectorAll('img')).toHaveLength(0);
   });
 
@@ -238,8 +238,8 @@ describe('tutorial pictures in the real reader', () => {
       );
       await failImage();
       await click(element<HTMLButtonElement>('.lf-learn-photo-note button'));
-      await click(button('Return to the tutorial library'));
-      await click(button('Close tutorials and return to your work (Escape)'));
+      await click(button('Return to the tutorial library (Escape)'));
+      await click(button('Close tutorials and return to your work'));
       expect(changed).not.toHaveBeenCalled();
       expect(useStore.getState().project).toBe(before.project);
       expect(JSON.stringify(useStore.getState().project)).toBe(serialisedProject);

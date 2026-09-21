@@ -1,4 +1,4 @@
-import { searchTutorials, TUTORIALS } from './tutorial-catalog';
+import { searchTutorials } from './tutorial-catalog';
 import { useTutorialStore } from './tutorial-store';
 import type { TutorialProgress } from './tutorial-progress';
 import {
@@ -7,7 +7,7 @@ import {
   type TutorialCategory,
   type TutorialMachine,
 } from './tutorial-types';
-import { TutorialIllustration } from './TutorialIllustration';
+import { TutorialStart } from './TutorialStart';
 
 type LibraryProps = {
   readonly query: string;
@@ -19,14 +19,59 @@ type LibraryProps = {
   readonly progress: TutorialProgress;
 };
 
+const MACHINE_NAMES: Readonly<Record<TutorialMachine, string>> = {
+  all: 'All machines',
+  laser: 'Laser',
+  cnc: 'CNC router',
+};
+
 export function TutorialLibrary(props: LibraryProps): JSX.Element {
   const results = searchTutorials(props.query, props.category, props.machine);
-  const completed = TUTORIALS.filter(
-    (tutorial) => props.progress[tutorial.id]?.completed === true,
-  ).length;
+  // The same search with the machine filter released, so the list can say what
+  // it is hiding instead of quietly disagreeing with the progress count.
+  const everyMachine = searchTutorials(props.query, props.category, 'all');
+  const hidden = everyMachine.length - results.length;
+  const browsing = props.query !== '' || props.category !== 'All';
   return (
     <div className="lf-learn-library">
-      <LibraryHero completed={completed} />
+      {browsing ? null : <TutorialStart progress={props.progress} />}
+      <Filters {...props} />
+      <div className="lf-learn-results-heading">
+        <h2>{props.category === 'All' ? 'Every lesson' : props.category}</h2>
+        <span role="status">
+          {results.length} {results.length === 1 ? 'lesson' : 'lessons'}
+          {hidden > 0 ? (
+            <>
+              {' · '}
+              <button
+                type="button"
+                className="lf-learn-inline-link"
+                title="Include lessons for the other machine type"
+                onClick={() => props.setMachine('all')}
+              >
+                {hidden} more for other machines
+              </button>
+            </>
+          ) : null}
+        </span>
+      </div>
+      <div className="lf-learn-cards">
+        {results.map((tutorial) => (
+          <TutorialCard
+            key={tutorial.id}
+            tutorial={tutorial}
+            progress={props.progress[tutorial.id]}
+          />
+        ))}
+      </div>
+      {results.length === 0 ? <EmptyResults {...props} /> : null}
+    </div>
+  );
+}
+
+function Filters(props: LibraryProps): JSX.Element {
+  return (
+    <>
       <div className="lf-learn-filters">
         <label className="lf-learn-search">
           Find a tool or a task
@@ -45,9 +90,11 @@ export function TutorialLibrary(props: LibraryProps): JSX.Element {
             title="Filter tutorials by machine type"
             onChange={(event) => props.setMachine(event.target.value as TutorialMachine)}
           >
-            <option value="all">All machines</option>
-            <option value="laser">Laser</option>
-            <option value="cnc">CNC router</option>
+            {(['all', 'laser', 'cnc'] as const).map((kind) => (
+              <option key={kind} value={kind}>
+                {MACHINE_NAMES[kind]}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -64,23 +111,7 @@ export function TutorialLibrary(props: LibraryProps): JSX.Element {
           </button>
         ))}
       </div>
-      <div className="lf-learn-results-heading">
-        <h2>{props.category === 'All' ? 'Explore the tools' : props.category}</h2>
-        <span role="status">
-          {results.length} {results.length === 1 ? 'lesson' : 'lessons'}
-        </span>
-      </div>
-      <div className="lf-learn-cards">
-        {results.map((tutorial) => (
-          <TutorialCard
-            key={tutorial.id}
-            tutorial={tutorial}
-            progress={props.progress[tutorial.id]}
-          />
-        ))}
-      </div>
-      {results.length === 0 ? <EmptyResults {...props} /> : null}
-    </div>
+    </>
   );
 }
 
@@ -105,44 +136,17 @@ function EmptyResults(props: LibraryProps): JSX.Element {
   );
 }
 
-function LibraryHero(props: { readonly completed: number }): JSX.Element {
-  return (
-    <div className="lf-learn-hero">
-      <div>
-        <span className="lf-learn-eyebrow">YOUR WORKSHOP COMPANION</span>
-        <h1>See it. Try it. Make it.</h1>
-        <p>
-          Get to know each tool through clear, illustrated steps. Start with the basics or jump
-          straight to the feature you need.
-        </p>
-        <button
-          type="button"
-          className="lf-btn lf-btn--primary"
-          title="Start the first-project visual tutorial"
-          onClick={() => useTutorialStore.getState().openTutorial('first-project')}
-        >
-          Start your first project <span aria-hidden="true">→</span>
-        </button>
-        <span className="lf-learn-progress-count">
-          {props.completed} of {TUTORIALS.length} lessons completed
-        </span>
-      </div>
-      <div className="lf-learn-hero-art" aria-hidden="true">
-        <TutorialIllustration visual="workspace" phase={2} focus="From an idea to a reviewed job" />
-      </div>
-    </div>
-  );
-}
-
 function TutorialCard(props: {
   readonly tutorial: Tutorial;
   readonly progress: { readonly step: number; readonly completed: boolean } | undefined;
 }): JSX.Element {
   const { tutorial, progress } = props;
+  const done = progress?.completed === true;
   return (
     <button
       type="button"
       className="lf-learn-card"
+      data-done={done ? 'yes' : undefined}
       title={`Open tutorial: ${tutorial.title}`}
       onClick={() => useTutorialStore.getState().openTutorial(tutorial.id)}
     >
@@ -160,12 +164,12 @@ function TutorialCard(props: {
               ? 'Laser'
               : 'CNC router'}
         </span>
-        <span className={progress?.completed === true ? 'lf-learn-completed' : ''}>
-          {progress?.completed === true
+        <span className={done ? 'lf-learn-completed' : ''}>
+          {done
             ? '✓ Completed'
             : progress !== undefined
-              ? 'Continue →'
-              : `${tutorial.steps.length} visual steps →`}
+              ? `Continue · step ${progress.step + 1} of ${tutorial.steps.length} →`
+              : `${tutorial.steps.length} steps →`}
         </span>
       </span>
     </button>

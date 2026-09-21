@@ -21232,6 +21232,66 @@ cliff is unchanged: a drawing whose chains fall inside the sharpener's window st
 and one just outside still skips it. Making the scan proportional to its window rather than to the
 chain would need a ring view with modular indexing through every gate, which is its own decision.
 
+## ADR-324 Amendment - Lesson copy is checked against the shipped application, and Escape leaves one level (2026-09-21)
+
+**Status:** Accepted; amends the learning-surface navigation and lesson-authoring rules in ADR-324.
+Does not touch ADR-228/230/232/237: Frame remains the sole ordinary Start policy gate, and nothing
+here changes Frame, Start, review policy or output semantics.
+
+### Context
+
+ADR-324 requires lessons to carry "source-verified instructions" and backs that with catalog tests.
+Those tests verify **form**: that every id resolves, every referenced illustration renders in all
+three stages, every command maps deliberately, and that instructions clear a length floor of 20
+characters. None of that reads the application. A lesson could name a menu KerfDesk does not have
+and every assertion stayed green.
+
+It had. Auditing all 93 lessons against the running app found: the keyboard-shortcuts lesson
+enumerating five groups of a dialog that ships six — omitting the machine group that carries
+`Ctrl+Enter` Start and `Ctrl+.` Abort; a CNC surfacing lesson directing operators to
+`Machine → CNC Utilities → Surface spoilboard`, a menu path with no "Machine" menu (the family
+label follows the machine kind) and no "CNC Utilities" level, for what is a rail section; 54 UI
+paths written with `>` against 28 with `→`, splitting cleanly along machine-side and design-side
+authoring; one lesson offering itself as its own next step; and sixteen Studio lessons produced by
+two generators that gave all of them the same three step titles and the same boilerplate outcomes.
+
+Navigation had the matching problem. The surface reuses the shared dialog a11y hook, whose contract
+is that Escape closes the dialog. Applied to a surface that is two levels deep — a library of 93
+lessons, and a reader that invites you deeper through **Learn next** — one Escape discarded the
+whole session from any depth, and the reader offered no key to step at all.
+
+### Decision
+
+1. Lesson copy is checked against the application it describes. `tutorial-fidelity.test.ts` reads
+   the real shortcut table and the real menu-bar labels, and fails a lesson that invents a menu,
+   mixes path separators, offers itself as its own next step, or drifts from the shortcut dialog.
+   The shortcut lesson must also state that keyboard Start is the Start button's own flow, so copy
+   can never read as a route past the Frame gate.
+2. A lesson generator takes its step titles and outcomes per lesson. Shared step text is capped at
+   four lessons — enough for families that genuinely are one action with a different shape, not
+   enough for a template.
+3. Escape leaves one level: the lesson first, then the library, then the surface. A lesson reached
+   through **Learn next** returns to the lesson that offered it, at the step left behind, by way of
+   a back control that names that destination. Left and right arrows step within a lesson.
+   Modal registration, focus trapping and restoration to the opener are unchanged, and the
+   underlying dialog draft and project are still untouched throughout.
+4. The library opens on the starter path and one **Continue** action for the lesson in progress,
+   and states how many lessons the machine filter is holding back rather than showing a total that
+   contradicts the list beside it.
+
+### Consequences
+
+Lesson prose is now load-bearing on real application data: renaming a menu or changing the shortcut
+table fails the tutorial suite, which is the intended coupling. The navigation change is a
+deliberate departure from "Escape closes the dialog" for this surface only; three existing suites
+pressed Escape once expecting a full close and were updated to walk out level by level, asserting
+the intermediate state they previously skipped.
+
+Only lesson position, completion and the in-session trail are held; the trail is session state and
+is discarded on close. Nothing here validates that the lessons teach well — that remains usability
+work with representative users, distinct from these checks. Lesson illustrations remain abstract
+diagrams rather than pictures of the real interface, which is the largest outstanding gap in the
+"see it" half of the surface and is not addressed here.
 ---
 
 ## ADR-339 - KerfDesk opens light, and its chrome is warm neutral with a copper accent (2026-09-21)

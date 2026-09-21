@@ -8,7 +8,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 4,
-    location: 'Tools > Material Test',
+    location: 'Tools → Material Test',
     prerequisites:
       'Save the current project first: Generate replaces the canvas with the test grid.',
     visual: 'calibration',
@@ -55,7 +55,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 3,
-    location: 'Tools > Interval Test',
+    location: 'Tools → Interval Test',
     prerequisites:
       'Save your current project; Generate replaces the canvas with the interval swatches.',
     visual: 'interval-test',
@@ -95,7 +95,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
     machine: 'laser',
     minutes: 5,
     location:
-      'Tools > Scan Offset Test; Machine Setup > Essentials > Accessories and calibration > Raster scan-offset calibration',
+      'Tools → Scan Offset Test; Machine Setup → Essentials → Accessories and calibration → Raster scan-offset calibration',
     prerequisites: 'Save current artwork before generating a coupon; the test replaces the canvas.',
     visual: 'scan-offset',
     steps: [
@@ -152,7 +152,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
     machine: 'laser',
     minutes: 2,
     location:
-      'Tools > Focus Test (currently unavailable); machine controls > Focus / Z when supported',
+      'Tools → Focus Test (currently unavailable); machine controls → Focus / Z when supported',
     prerequisites: 'The machine manufacturer’s focusing instructions and any required gauge.',
     visual: 'machine',
     steps: [

@@ -9,7 +9,7 @@ export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 4,
-    location: 'Tools > Box Generator',
+    location: 'Tools → Box Generator',
     prerequisites: 'Measured material thickness and an idea of the box dimensions and lid style.',
     visual: 'box',
     steps: [
@@ -56,7 +56,7 @@ export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 3,
-    location: 'Tools > Box Fit Test',
+    location: 'Tools → Box Fit Test',
     prerequisites: 'A sample of the actual sheet material and a suitable cutting operation for it.',
     visual: 'box-fit',
     steps: [

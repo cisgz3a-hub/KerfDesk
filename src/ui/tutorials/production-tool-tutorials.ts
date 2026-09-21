@@ -8,7 +8,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'laser',
     minutes: 3,
-    location: 'Tools > Optimization Settings > Cut Planner',
+    location: 'Tools → Optimization Settings → Cut Planner',
     prerequisites: 'Several laser paths or operations so you can compare their processing order.',
     visual: 'preview',
     steps: [
@@ -54,7 +54,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'laser',
     minutes: 2,
-    location: 'Tools > Labs',
+    location: 'Tools → Labs',
     prerequisites:
       'Laser mode; read the intended machine and feature requirements before enabling a control.',
     visual: 'settings',
@@ -92,7 +92,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
-    location: 'Main workspace > selected vector controls > Offset',
+    location: 'Main workspace → selected vector controls → Offset',
     prerequisites: 'One or more unlocked, closed vector shapes selected in the main workspace.',
     visual: 'offset',
     steps: [
@@ -131,7 +131,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 2,
-    location: 'Main workspace > selected vector controls > Dogbone',
+    location: 'Main workspace → selected vector controls → Dogbone',
     prerequisites: 'CNC mode, an unlocked closed vector and the diameter of the intended cutter.',
     visual: 'dogbone',
     steps: [
@@ -171,7 +171,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'CNC startup setup > Tiling; File > Save G-code',
+    location: 'CNC Startup Setup → Tiling; File → Save G-code',
     prerequisites:
       'A CNC project and a physical plan for holding, indexing and referencing the stock.',
     visual: 'cnc-tiling',
@@ -197,7 +197,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
         title: 'Save the setup and export the files',
         examplePhase: 2,
         instruction:
-          'Save CNC startup setup, then use File > Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
+          'Save CNC startup setup, then use File → Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
         focus: 'Save setup → indexed files',
         result:
           'Each file contains the output for its own tile rather than one continuous machine run.',

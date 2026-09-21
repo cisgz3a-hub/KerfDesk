@@ -8,7 +8,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 5,
-    location: 'Tools > Camera',
+    location: 'Tools → Camera',
     prerequisites: 'A supported camera, a calibration board and a stable camera mounting position.',
     visual: 'camera',
     steps: [
@@ -55,7 +55,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'laser',
     minutes: 5,
-    location: 'Tools > Registration Jig',
+    location: 'Tools → Registration Jig',
     prerequisites:
       'A measured leather keychain blank, a secured piece of scrap wood, and artwork for the leather.',
     visual: 'jig',
@@ -121,7 +121,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Tools > Place Board',
+    location: 'Tools → Place Board',
     prerequisites:
       'A connected machine with a current position and the actual board secured in place.',
     visual: 'board',
@@ -170,7 +170,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'laser',
     minutes: 4,
-    location: 'Tools > Rotary Setup',
+    location: 'Tools → Rotary Setup',
     prerequisites:
       'A compatible rotary installation and verified setup measurements for the machine.',
     visual: 'rotary',
@@ -218,7 +218,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'laser',
     minutes: 4,
-    location: 'Tools > Labs > Print and Cut; Tools > Print and Cut',
+    location: 'Tools → Labs → Print and Cut; Tools → Print and Cut',
     prerequisites:
       'Print and Cut enabled in Labs, a homing-enabled absolute-position profile and two printed reference points.',
     visual: 'print-cut',

@@ -65,7 +65,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls > Connect, or Machine Setup > Machine > Connect and detect',
+    location: 'Machine controls → Connect, or Machine Setup → Machine → Connect and detect',
     prerequisites:
       'A supported serial controller and the appropriate machine profile. File-only profiles use export instead.',
     visual: 'machine',
@@ -114,7 +114,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls > Jog',
+    location: 'Machine controls → Jog',
     prerequisites:
       'For real movement, a connected controller in a state that accepts jogging and a clear motion area.',
     visual: 'machine',
@@ -154,7 +154,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Machine controls > Origin and Placement',
+    location: 'Machine controls → Origin and Placement',
     prerequisites:
       'Artwork at the intended size and a known workpiece reference. Available origin controls depend on the controller.',
     visual: 'origin',
