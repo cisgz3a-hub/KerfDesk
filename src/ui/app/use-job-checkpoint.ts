@@ -10,6 +10,7 @@ import { recoveryRepository, type RecoveryRepository, type RunId } from '../stat
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { useToastStore } from '../state/toast-store';
+import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
 import { checkpointInterruption } from './checkpoint-interruption';
 
 type StreamObservation = {
@@ -41,10 +42,18 @@ export function installJobCheckpointTracking(
   nowIso: () => string = () => new Date().toISOString(),
   repository: RecoveryRepository = recoveryRepository,
   reportTrackingFailure: TrackingFailureReporter = defaultTrackingFailureReporter,
+  onCompleted: (runId: RunId) => void = useLaserSecondPassUiStore.getState().offerCompletion,
 ): () => void {
-  const tracker = new JobCheckpointTracker(nowIso, repository, reportTrackingFailure);
+  let active = true;
+  const tracker = new JobCheckpointTracker(nowIso, repository, reportTrackingFailure, (runId) => {
+    if (active) onCompleted(runId);
+  });
   tracker.sync(useLaserStore.getState());
-  return useLaserStore.subscribe(tracker.sync);
+  const unsubscribe = useLaserStore.subscribe(tracker.sync);
+  return () => {
+    active = false;
+    unsubscribe();
+  };
 }
 
 function defaultTrackingFailureReporter(_error: unknown): void {
@@ -66,6 +75,7 @@ class JobCheckpointTracker {
     private readonly nowIso: () => string,
     private readonly repository: RecoveryRepository,
     reportTrackingFailure: TrackingFailureReporter,
+    private readonly onCompleted: (runId: RunId) => void,
   ) {
     this.reportQueueFailure = onceTrackingFailureReporter(reportTrackingFailure);
     this.queue = initialize(repository).catch(this.reportQueueFailure);
@@ -205,7 +215,14 @@ class JobCheckpointTracker {
           return;
         }
         clearInactiveRunOwnership(pending.runId);
-        if (this.pendingMissingTerminal === pending) this.pendingMissingTerminal = null;
+        if (this.pendingMissingTerminal === pending) {
+          this.pendingMissingTerminal = null;
+          // A later live run can supersede this terminal while persistence is
+          // awaiting. Only the still-owned completion may offer a second pass.
+          // Deferred archive activation can succeed before its receipt exists;
+          // the UI waits for the matching verified receipt before displaying it.
+          if (pending.kind === 'completed') this.onCompleted(pending.runId);
+        }
       } finally {
         if (this.queuedMissingTerminal === pending) this.queuedMissingTerminal = null;
       }

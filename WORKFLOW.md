@@ -1598,11 +1598,19 @@ authorization, Frame proof, controller command, or safety boundary.
 
 #### Painted second passes (2026-09-22, ADR-339)
 
-- After a settled laser completion, **Paint a second pass…** opens the retained saved job.
+- After a settled laser completion and successful archive capture, **Job complete** asks
+  **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
+  that exact saved job in the paintbrush/eraser editor, or **Done** to finish. No motion is
+  started by this choice. The prompt also works with the Machine panel collapsed, waits
+  behind another open dialog, and appears once for that completion. Reloading saved history,
+  an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
+- **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
   The completed-run selector also offers older retained completions. When a completed run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
+  Recovery remains a separate **Interrupted job saved** workflow for continuing a stopped run;
+  a selected-area second pass repeats chosen parts of an already completed engraving.
 - Use **Paintbrush**, set its diameter in millimetres and paint areas to repeat. **Eraser**
   removes areas; **Hand**, Alt-drag and wheel zoom support detailed marking. Several strokes
   can have different power. Select a painted stroke to edit its power, delete individual

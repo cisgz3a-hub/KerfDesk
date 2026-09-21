@@ -659,6 +659,47 @@ test('keeps the finished route and confirms it only after the stream settles Idl
     .toBeGreaterThan(0);
 });
 
+test('offers a selected-area second pass after completion with the Machine panel collapsed', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
+  const focusReturn = page.getByRole('button', { name: 'Open...', exact: true });
+  await focusReturn.focus();
+  await drainHeldSerialWrites(page, kerfdesk, baselineLines);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  await expect(complete).toContainText('Would you like to darken selected areas?');
+  await expect(page.getByLabel('Laser controls collapsed')).toBeVisible();
+  await dismissNotifications(page);
+  await complete.screenshot({ path: testInfo.outputPath('completed-job-second-pass-offer.png') });
+  const beforeOpening = serialWrites(await kerfdesk.events());
+  await complete.getByRole('button', { name: 'Darken selected areas…' }).click();
+  const workbench = page.getByRole('dialog', { name: 'Paint a second pass', exact: true });
+  await expect(
+    workbench.getByRole('img', {
+      name: 'Paint second-pass areas on the saved engraving',
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  expect(serialWrites(await kerfdesk.events()).slice(beforeOpening.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await workbench.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(complete).toHaveCount(0);
+  await expect(focusReturn).toBeFocused();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
+  await expect(complete).toHaveCount(0);
+});
+
 test('preserves an interrupted laser checkpoint after a cable disconnect', async ({
   page,
   kerfdesk,
@@ -680,6 +721,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
 
   const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
   await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toHaveCount(0);
   await recovery.getByText('Interrupted job saved', { exact: true }).click();
   await expect(recovery.locator('p').filter({ hasText: 'Recorded cause:' })).toContainText(
     /connection|disconnect|USB/i,
@@ -885,6 +927,9 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
     'finished',
     { timeout: 30_000 },
   );
+  const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  await expect(complete).toContainText('Would you like to darken selected areas?');
+  await complete.getByRole('button', { name: 'Done', exact: true }).click();
   await dismissNotifications(page);
   const paintButton = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
   await expect(paintButton).toBeEnabled();
@@ -994,6 +1039,7 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   await expect(page.getByRole('dialog', { name: 'Review interrupted laser job' })).toContainText(
     'Exact job artifact saved',
   );
+  await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

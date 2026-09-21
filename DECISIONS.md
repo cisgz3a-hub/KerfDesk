@@ -21193,6 +21193,14 @@ The operator requested a detailed audit and a paintbrush/eraser workflow with lo
    Saving a different job cannot replace another job's draft. Storage failure preserves earlier
    bytes and is disclosed. Pack preview paths and index their bounds for zoom culling; display-only
    opacity batching never changes emitted coordinates or power.
+10. Offer **Job complete → Darken selected areas…** after the local run has physically settled
+    and its matching verified completion receipt is available. This transient notification is
+    independent of recovery and never comes from receipt hydration alone. Dismissal preserves
+    manual access to the archive. An App-shell host owns both the offer and editor so collapsed
+    Machine controls cannot hide them. Defer presentation behind another modal, retain the exact
+    offered run despite an older history selection, and invalidate superseded completion events
+    and pending archive reads. Preserve the original focus target across the successive dialogs.
+    No prompt choice starts machine motion; the second pass still requires its own Frame/Start.
 
 ### Evidence and limits
 

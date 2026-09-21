@@ -100,6 +100,35 @@ second passes, and trace selection through emitted output, Frame, Start, persist
 | `pnpm lint`, final edited-file lint and hover-help contract | Passed. |
 | File-size, index-export and ADR-number gates; `git diff --check` | Passed. Soft file-size reporting remains advisory. |
 
+### Completion prompt follow-up
+
+The user clarified that recovery and selective second passes are separate experiences, and
+requested an automatic offer to darken selected areas once a job completes. **Job complete**
+now offers **Darken selected areas…** and **Done**. The manual completed-job selector remains.
+
+![Completion offer with the Machine panel collapsed](assets/laser-job-complete-second-pass-2026-09-22.png)
+
+The checkpoint observer publishes only a still-owned local completion after successful terminal
+tracking. The UI waits for its exact verified receipt, including delayed post-accept archive
+activation. Historical hydration, interrupted streams, and CNC completions do not produce the
+prompt. An App-shell host preserves access with the Machine panel collapsed and waits behind
+other modals. Both entry points use the same verified source and existing paint/erase workflow.
+
+Independent review found and regression tests reproduced two integration defects before their
+fixes: archive loading could open an older editor after a newer run began, and successive prompt,
+loading and editor dialogs lost the original focus target. Pending reads now cancel on new-run
+ownership; focus returns across the entire editor session without stealing from another modal.
+These changes do not alter machining bytes, power interpretation, recovery selection, or Frame.
+
+Follow-up verification: all 44 tests across seven focused suites passed, including 13 prompt/editor
+cases and eight completion-event cases. Three isolated-browser workflows passed: collapsed-panel
+completion offer, cable-disconnect recovery, and painting/erasing/power adjustment with interrupted
+second-pass recovery. A further browser run verified focus restoration through the actual editor,
+prompt dismissal and reload behaviour. Edited-file lint, TypeScript/E2E checks, formatting, and
+file-size/ADR/export gates passed. The production web build passed; existing bundle-size advisories
+remain. Earlier browser attempts reused an unrelated older dev server;
+the passing runs explicitly started this worktree's server on an isolated port.
+
 ## Physical and product limits
 
 Software tests and fake Web Serial establish the application contract, not physical burn fidelity.

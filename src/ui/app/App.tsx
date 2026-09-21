@@ -11,6 +11,7 @@ import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
+import { SecondPassHost } from '../laser/second-pass/SecondPassHost';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -95,6 +96,7 @@ export function App(): JSX.Element {
       <ConfirmSaveDialog />
       <SaveFilenamePanel />
       <JobReviewDialog />
+      <SecondPassHost />
       <MachineSetupDialogHost />
       <ImageEditorHost />
       <DesignStudioHost />
