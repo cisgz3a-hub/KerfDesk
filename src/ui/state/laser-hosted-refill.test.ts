@@ -22,8 +22,8 @@ function fakeRefill(): FakeRefill {
   const armed: StreamerState[] = [];
   return {
     isArmed: () => state.armed,
-    arm: async (streamer) => {
-      armed.push(streamer as StreamerState);
+    arm: async (readStreamer) => {
+      armed.push(readStreamer() as StreamerState);
       state.armed = true;
     },
     release: async () => {
@@ -62,7 +62,7 @@ describe('hosted refill helpers (ADR-334)', () => {
     expect(hostedRefillArmed({})).toBe(false);
 
     // Both calls are no-ops rather than throwing on the ordinary transport.
-    await armHostedRefill({}, streamingJob());
+    await armHostedRefill({}, streamingJob);
     await releaseHostedRefill({});
   });
 
@@ -70,12 +70,12 @@ describe('hosted refill helpers (ADR-334)', () => {
     const refill = fakeRefill();
     const refs = { connection: connectionWith(refill) };
 
-    await armHostedRefill(refs, null);
-    await armHostedRefill(refs, { ...streamingJob(), status: 'paused' });
+    await armHostedRefill(refs, () => null);
+    await armHostedRefill(refs, () => ({ ...streamingJob(), status: 'paused' }));
     expect(refill.armCalls()).toEqual([]);
 
     const streaming = streamingJob();
-    await armHostedRefill(refs, streaming);
+    await armHostedRefill(refs, () => streaming);
     expect(refill.armCalls()).toEqual([streaming]);
     expect(hostedRefillArmed(refs)).toBe(true);
   });

@@ -4,7 +4,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'machine-setup',
     title: 'Set up the machine and current job',
-    summary: 'Work through the setup wizard and distinguish machine values from operation values.',
+    summary: 'Choose a machine, check the essentials, then review and save one setup draft.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
@@ -14,31 +14,31 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     visual: 'machine',
     steps: [
       {
-        title: 'Choose the machine type and profile',
+        title: 'Choose your machine',
         instruction:
-          'Open the setup wizard. Use Machine type and Choose your machine to identify the machine and controller. Check the profile values against your own equipment.',
-        focus: 'Machine type · Choose your machine',
+          'On Machine, choose Laser only, CNC only or Laser + CNC. Use search or Browse all profiles to find a laser profile, or choose a CNC preset. Check Controller and connection settings. Connect and detect is optional; Use detected values copies supported readings into the draft. You can also set up offline.',
+        focus: 'Machine · profile · optional connection',
         result: 'The draft setup has the correct kind of machine and controller.',
       },
       {
-        title: 'Compare the machine values',
+        title: 'Check the essentials',
         instruction:
-          'Use Connect & detect when a supported live connection is available, then review Confirm settings. Inspect the work area, coordinate model and output settings rather than assuming a preset matches every machine.',
-        focus: 'Connect & detect · Confirm settings',
-        result: 'You can compare detected values with the settings being saved in the app.',
+          'On Essentials, check the work area, origin, homing and output or CNC machine limits against your equipment. You can move between all three stages while correcting values; any remaining errors must be fixed before Save.',
+        focus: 'Essentials · work area · output',
+        result: 'The draft describes the machine values you intend to save.',
         visual: 'settings',
       },
       {
-        title: 'Set the current job inputs',
+        title: 'Open the options you need',
         instruction:
-          'For CNC, use CNC Startup Setup to enter stock dimensions, Material, Default bit, Tool Plan and machine limits such as Safe Z. For laser, inspect the output, accessories and relevant calibration options.',
-        focus: 'Stock, tools and machine options',
+          'In Essentials, expand Accessories and calibration for the equipment you use. With CNC active, open CNC job setup for stock, Material, Default bit and Tool Plan. Choosing a material previews it; Apply material preset updates the draft. Artwork cutting values remain editable on the artwork.',
+        focus: 'Accessories · CNC stock and tools',
         result: 'The setup describes the material and equipment the operation settings refer to.',
       },
       {
-        title: 'Read the final save action',
+        title: 'Review and save',
         instruction:
-          'Open Review & save. Inspect any queued controller-setting changes and the save button wording. Save when the reviewed values match your intended setup; operation cutting values remain editable on the artwork.',
+          'On Review & save, inspect the summary cards and use Edit for corrections. Controller settings is optional; firmware changes need separate per-setting consent. Save commits the reviewed draft together. Cancel discards the draft and sends no queued settings. Read the pre-run checklist before using the machine.',
         focus: 'Review & save',
         result:
           'The reviewed setup is saved together, including controller writes only when the save action explicitly includes them.',
@@ -65,7 +65,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls > Connect, or setup > Connect & detect',
+    location: 'Machine controls → Connect, or Machine Setup → Machine → Connect and detect',
     prerequisites:
       'A supported serial controller and the appropriate machine profile. File-only profiles use export instead.',
     visual: 'machine',
@@ -114,7 +114,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls > Jog',
+    location: 'Machine controls → Jog',
     prerequisites:
       'For real movement, a connected controller in a state that accepts jogging and a clear motion area.',
     visual: 'machine',
@@ -154,7 +154,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Machine controls > Origin and Placement',
+    location: 'Machine controls → Origin and Placement',
     prerequisites:
       'Artwork at the intended size and a known workpiece reference. Available origin controls depend on the controller.',
     visual: 'origin',

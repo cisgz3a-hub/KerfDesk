@@ -123,13 +123,10 @@ export class AutosaveDurableService {
     return result;
   }
 
-  // A record this build cannot turn back into a project is not a backup — no
-  // version can restore it — so leaving it in place only guarantees that the
-  // "recovery storage could not be fully read" warning returns on every launch
-  // and that its dead bytes keep consuming the quota the working autosave
-  // needs. Retire it once the read has reported it. M15 still holds: a slot a
-  // live window owns is left alone, because that window's beforeunload write
-  // is a real backup even when this build cannot read its current contents.
+  // Retire the exact unreadable record the scan reported, after checking
+  // ownership. A current-window autosave may finish while the scan awaits
+  // IndexedDB or another session's lock; that newer backup must survive (M15).
+  // Foreign live or unverified windows retain their slots as before.
   private async retireUnreadable(
     slots: ReadonlyArray<AutosaveUnreadableSlot>,
     currentSessionId: string,
@@ -152,6 +149,8 @@ export class AutosaveDurableService {
 
   private async retireNow(slot: AutosaveUnreadableSlot): Promise<void> {
     if (slot.backend === 'local') {
+      // This comparison and removal are synchronous under the session owner.
+      if (localStorage.getItem(slot.storageKey) !== slot.raw) return;
       clearLocalAutosave({ storageKey: slot.storageKey });
       return;
     }
@@ -159,7 +158,7 @@ export class AutosaveDurableService {
     const result = await this.repository.clear({
       storageKey: slot.storageKey,
       sessionId: slot.sessionId,
-      expectedEpoch: await this.repository.readEpoch(slot.storageKey),
+      expectedEpoch: slot.epoch,
     });
     if (result.kind === 'committed') this.epochs.set(slot.storageKey, result.epoch);
   }

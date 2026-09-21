@@ -1,7 +1,5 @@
-// Step 2: choose which machine this is and how KerfDesk must communicate
-// with it. The reviewed-profile catalog leads (one click fills the draft,
-// ADR-240); connection deliberately comes on the next step so the first
-// serial open uses the reviewed driver and baud rate.
+// Machine identity and controller contract. Profile selection precedes the
+// optional connection, so the first serial open uses the selected driver/baud.
 
 import {
   GRBL_GCODE_DIALECTS,
@@ -10,6 +8,7 @@ import {
   type DeviceProfile,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
+import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
 import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
 import { ImportExportPanel } from '../MachineSetupImportExport';
@@ -32,40 +31,35 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
     <section style={sectionStyle}>
-      <SetupIntroduction />
       {deviceSetupSupportsMachineKind(state, 'laser') ? (
         <DeviceSetupProfilePicker state={state} dispatch={dispatch} />
       ) : null}
       <DeviceSetupCncPreset state={state} dispatch={dispatch} />
-      <ControllerContract
-        state={state}
-        controllerKind={controllerKind}
-        dispatch={dispatch}
-        update={update}
-      />
-      {deviceSetupSupportsMachineKind(state, 'cnc') && !driver.capabilities.cncJobs ? (
-        <p role="alert" style={warningStyle}>
-          {guide.label} is not a KerfDesk CNC streaming target. Choose GRBL, grblHAL, or FluidNC
-          before continuing with a CNC machine.
-        </p>
-      ) : null}
-      {driver.capabilities.transport === 'serial' ? (
-        <AdvancedConnection state={state} controllerKind={controllerKind} update={update} />
-      ) : null}
+      <details className="lf-setup-disclosure">
+        <summary title="Choose the controller firmware, output dialect and serial connection settings.">
+          <span>Controller and connection settings</span>
+          <small>{guide.label} · change if needed</small>
+        </summary>
+        <div className="lf-setup-disclosure-body">
+          <ControllerContract
+            state={state}
+            controllerKind={controllerKind}
+            dispatch={dispatch}
+            update={update}
+          />
+          {deviceSetupSupportsMachineKind(state, 'cnc') && !driver.capabilities.cncJobs ? (
+            <p role="alert" style={warningStyle}>
+              {guide.label} is not a KerfDesk CNC streaming target. Choose GRBL, grblHAL, or FluidNC
+              before continuing with a CNC machine.
+            </p>
+          ) : null}
+          {driver.capabilities.transport === 'serial' ? (
+            <AdvancedConnection state={state} controllerKind={controllerKind} update={update} />
+          ) : null}
+        </div>
+      </details>
       <ProfileImport state={state} dispatch={dispatch} />
     </section>
-  );
-}
-
-function SetupIntroduction(): JSX.Element {
-  return (
-    <div style={introStyle}>
-      <strong>Pick your machine before connecting.</strong>
-      <span>
-        One click on a reviewed profile fills the whole setup — or configure the controller identity
-        manually below. Connection comes on the next step, using exactly what you choose here.
-      </span>
-    </div>
   );
 }
 
@@ -85,7 +79,7 @@ function ControllerContract(props: {
   );
   const dialects = props.controllerKind === 'marlin' ? MARLIN_GCODE_DIALECTS : GRBL_GCODE_DIALECTS;
   return (
-    <div style={settingsStyle}>
+    <div className="lf-setup-fields" style={settingsStyle}>
       <Row label="Controller">
         <select
           aria-label="Controller firmware"
@@ -171,7 +165,7 @@ function AdvancedConnection(props: {
   );
   const pingPongOnly = props.controllerKind === 'marlin' || props.controllerKind === 'smoothieware';
   return (
-    <details style={detailsStyle}>
+    <details className="lf-setup-disclosure lf-setup-disclosure--nested">
       <summary
         style={summaryStyle}
         title="Show or hide controller streaming and receive-window settings."
@@ -196,7 +190,9 @@ function AdvancedConnection(props: {
         {props.state.draft.streamingMode === 'char-counted' ? (
           <RxWindowRow state={props.state} update={props.update} />
         ) : null}
-        <HostedStreamingRow state={props.state} update={props.update} />
+        {isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) ? (
+          <HostedStreamingRow state={props.state} update={props.update} />
+        ) : null}
         <p style={mutedStyle}>{guide.streamingExplanation}</p>
       </div>
     </details>
@@ -251,13 +247,12 @@ function HostedStreamingRow(props: {
 
 function ProfileImport({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   return (
-    <details style={detailsStyle}>
+    <details className="lf-setup-disclosure">
       <summary style={summaryStyle} title="Show or hide machine-profile import and export tools.">
         Import or export a machine profile
       </summary>
       <p style={mutedStyle}>
-        Imports are reviewed and loaded into this draft. Nothing changes in the project until the
-        final Save machine setup button.
+        Load a saved profile into this draft, or export your current choices.
       </p>
       <ImportExportPanel
         profile={machineSetupProfile(state)}
@@ -268,7 +263,6 @@ function ProfileImport({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
 }
 
 const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
-const introStyle: React.CSSProperties = { display: 'grid', gap: 4, fontSize: 12, lineHeight: 1.45 };
 const settingsStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const mutedInlineStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 11 };
 const warningStyle: React.CSSProperties = {
@@ -276,10 +270,5 @@ const warningStyle: React.CSSProperties = {
   color: 'var(--lf-warning-fg)',
   fontSize: 12,
   fontWeight: 600,
-};
-const detailsStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 8,
 };
 const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12, fontWeight: 600 };

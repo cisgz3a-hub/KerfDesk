@@ -4,7 +4,7 @@
 // forwards to something the repository already owns.
 
 import type { JobCheckpoint } from '../../../core/recovery';
-import type { RunId } from './execution-artifact';
+import type { RecoveryArtifactV1, RunId } from './execution-artifact';
 import { putStartIntentStandIn } from './recovery-legacy-insert';
 import { RecoveryStartHandoff } from './recovery-start-handoff';
 import type { RecoveryStorageBackend } from './recovery-backend';
@@ -21,7 +21,6 @@ export type StartHandoffHostDeps = {
   readonly getSnapshot: () => RecoveryRepositorySnapshot;
   readonly artifactStore: {
     readonly exact: (runId: RunId) => Promise<RecoveryRepositoryResult<StoredRecoveryArtifact>>;
-    readonly archived: (runId: RunId) => Promise<{ readonly ok: boolean }>;
   };
   readonly currentGeneration: () => number;
   readonly mutate: <T>(
@@ -43,10 +42,12 @@ export function createStartHandoff(deps: StartHandoffHostDeps): RecoveryStartHan
     exactArtifactRecord: (runId: RunId) => deps.artifactStore.exact(runId),
     mutate: deps.mutate,
     refresh: deps.refresh,
-    materializeIntentArtifact: (runId: RunId, intent: JobCheckpoint): Promise<boolean> =>
+    materializeIntentArtifact: (
+      runId: RunId,
+      intent: JobCheckpoint,
+    ): Promise<RecoveryArtifactV1['kind'] | null> =>
       putStartIntentStandIn({
         backend: deps.backend,
-        archived: (id: RunId) => deps.artifactStore.archived(id),
         generation: deps.currentGeneration(),
         nowIso: deps.nowIso,
         onFailure: (error) => deps.onFailure('materialize interrupted Start intent', error),

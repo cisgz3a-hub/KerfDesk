@@ -4,6 +4,8 @@ KerfDesk teaches features through an on-demand Learn library and contextual Tuto
 
 Each lesson includes its purpose, location, prerequisites, three or more actionable steps, an illustrated example, expected results, a practical tip and related lessons. Example playback is optional; Before, Action and Result can also be selected directly. Reduced-motion users receive static controls. Completion and the last visited step are saved on the current device when browser storage is available.
 
+The left and right arrow keys step through a lesson. Escape leaves one level at a time — the lesson first, then the library — so a reader who followed a **Learn next** suggestion returns to the lesson that offered it, at the step they left, instead of losing the session. The back control names that destination. The library leads with the opening path and a single **Continue** action for the lesson in progress; its result count states how many lessons the machine filter is holding back, and clears it in one click.
+
 ## Design rationale
 
 Use help at the moment someone needs it. Avoid compulsory first-run walkthroughs. Keep entry points visible and lessons easy to close and reopen. The working project and any open tool draft remain in place underneath the learning surface.
@@ -22,6 +24,8 @@ Pictures are separate responsive WebP files. The initial page and tutorial libra
 - Add command mappings to `command-tutorials.ts`. Its exhaustive `CommandId` record makes a new command choose a lesson deliberately. Studio/tool/process mappings are explicit in their owning components.
 - Use stable IDs. Search indexes titles, descriptions, actual instructions, locations and aliases. Keep related IDs resolvable.
 - The catalog tests verify reference integrity, contextual entry points and illustration rendering. Interaction tests cover project isolation, dialog nesting, progress storage and navigation.
+- Write UI paths as `Surface → Control`, using the label the application actually shows. `tutorial-fidelity.test.ts` reads the real menu labels and shortcut table, so a lesson that invents a menu, mixes separators, points **Learn next** at itself, or drifts from the shortcut dialog fails there rather than passing a length check.
+- A lesson generator must take its step titles and outcomes per lesson. Sixteen Studio lessons once shared one set of three, and read as a filled-in form; the fidelity test caps any shared step title or outcome at four lessons.
 
 Tutorial UI state is separate from project state and undo. The reader is lazy-loaded. Its portal is the topmost modal after editor dialogs, with focus restoration and shortcut isolation. The existing live-machine bar remains above the learning surface.
 

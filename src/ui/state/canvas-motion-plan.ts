@@ -2,11 +2,11 @@ import type { StatusQueryCapability } from '../../core/controllers';
 import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import {
-  buildToolpath,
   rotaryAppliesTo,
   type JobOriginPlacement,
   type JobPlacementSettings,
 } from '../../core/job';
+import { firstToolpathProcessPoint } from '../../core/job/first-process-point';
 import { computeFrameJobBounds } from '../../core/job/job-bounds';
 import {
   buildMotionManifest,
@@ -436,15 +436,13 @@ export function capabilityReason(capability: CanvasPlanCapability, rotary: boole
 function firstSurfaceProcessPoint(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
 ): Vec2 | null {
-  const toolpath = buildToolpath(prepared.job, {
+  return firstToolpathProcessPoint(prepared.job, {
     scanningOffsets: prepared.project.device.scanningOffsets,
     bedSizeMm: {
       widthMm: prepared.project.device.bedWidth,
       heightMm: prepared.project.device.bedHeight,
     },
   });
-  const step = toolpath.steps.find((candidate) => candidate.kind === 'cut');
-  return step?.kind === 'cut' ? (step.polyline[0] ?? null) : null;
 }
 
 function mapRelativeSurfacePoint(

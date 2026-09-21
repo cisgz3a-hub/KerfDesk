@@ -18,14 +18,15 @@ export type AutosaveDurableWarning =
   | 'corrupt-slot'
   | 'ownership-probe-failed';
 
-// A slot that held something but yielded no restorable project. No build can
-// turn these bytes back into a project, so the reader names them and the
-// service retires them instead of re-warning about them on every launch.
+// A slot this read could not restore. Retirement must compare its observed
+// bytes or epoch, because a successful write can replace it before cleanup.
 export type AutosaveUnreadableSlot = {
   readonly storageKey: string;
   readonly sessionId: string | undefined;
-  readonly backend: 'indexeddb' | 'local';
-};
+} & (
+  | { readonly backend: 'local'; readonly raw: string }
+  | { readonly backend: 'indexeddb'; readonly epoch: number }
+);
 
 export type AutosaveDurableReadResult = {
   readonly snapshot: AutosaveDurableSnapshot | null;
@@ -54,9 +55,10 @@ async function readCandidates(
   const local = readLocalAutosaveState();
   if (local.corrupt) warnings.push('corrupt-slot');
   if (local.failed) warnings.push('local-read-failed');
-  for (const storageKey of local.unreadableKeys) {
+  for (const { storageKey, raw } of local.unreadableSlots) {
     unreadable.push({
       storageKey,
+      raw,
       sessionId: autosaveSessionIdForStorageKey(storageKey),
       backend: 'local',
     });
@@ -76,6 +78,7 @@ async function readCandidates(
           storageKey: slot.storageKey,
           sessionId: slot.sessionId,
           backend: 'indexeddb',
+          epoch: slot.epoch,
         });
       }
     }

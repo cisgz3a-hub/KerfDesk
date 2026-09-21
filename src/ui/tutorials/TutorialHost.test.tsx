@@ -91,7 +91,7 @@ function expectStep(id: string, index: number): void {
 
 beforeEach(() => {
   localStorage.clear();
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   useUiStore.setState({ modalDepth: 0, toolMode: { kind: 'draw', shape: 'rect' } });
   useStore.setState({ project: createProject(), undoStack: [], redoStack: [], dirty: false });
 });
@@ -144,9 +144,12 @@ describe('TutorialHost learning flow', () => {
     });
 
     await escape();
+    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+    await escape();
+    expect(document.querySelector('.lf-learn')).toBeNull();
     await click(opener);
     expectStep('rectangle', tutorial.steps.length - 1);
-    await click(button('Return to the tutorial library'));
+    await click(button('Return to the tutorial library (Escape)'));
     const card = button(`Open tutorial: ${tutorial.title}`);
     expect(card.querySelector('.lf-learn-completed')?.textContent).toContain('Completed');
     expect(element('.lf-learn-progress-count').textContent).toContain('1 of');
@@ -169,12 +172,15 @@ describe('TutorialHost learning flow', () => {
     expectStep('rectangle', 1);
     await click(button('Read the next step'));
     await escape();
+    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+    await escape();
     expect(document.querySelector('.lf-learn')).toBeNull();
     expect(document.activeElement).toBe(opener);
     expect(useUiStore.getState().modalDepth).toBe(0);
     await click(opener);
     expectStep('rectangle', 2);
 
+    await escape();
     await escape();
     expect(document.activeElement).toBe(opener);
     localStorage.setItem(
@@ -254,8 +260,11 @@ describe('TutorialHost learning flow', () => {
     await click(button('Read the next step'));
     await click(button('Show the result illustration'));
     expect(button('Show the result illustration').getAttribute('aria-pressed')).toBe('true');
-    await click(button('Return to the tutorial library'));
+    await click(button('Return to the tutorial library (Escape)'));
     await click(button(`Open tutorial: ${lesson('text').title}`));
+    expect(useUiStore.getState().modalDepth).toBe(2);
+    await escape();
+    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
     expect(useUiStore.getState().modalDepth).toBe(2);
     await escape();
 
@@ -325,6 +334,7 @@ describe('TutorialHost learning flow', () => {
     expectStep('trace', 0);
     expect(invoke).not.toHaveBeenCalled();
     expect(summary.getAttribute('aria-expanded')).toBe('false');
+    await escape();
     await escape();
     expect(document.activeElement).toBe(summary);
     expect(useUiStore.getState().modalDepth).toBe(0);

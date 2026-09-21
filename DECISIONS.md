@@ -2843,6 +2843,12 @@ that is a separate LightBurn convention for vector user units and is unaffected.
 > **Amendment note (2026-09-19).** The light-only choice below is amended by the
 > theme-aware workspace palette at the end of this entry. The shared token
 > architecture remains in force; the workspace bed now follows the theme too.
+>
+> **Superseded in part by ADR-339 (2026-09-21).** That amendment's
+> operating-system following is reversed: the app opens LIGHT on every machine
+> and dark is an in-app preference. ADR-049's own "no toggle" ruling is reversed
+> with it, and the light palette below has been re-hued to warm neutrals with a
+> copper accent. The token architecture still stands.
 
 ### Context
 
@@ -2930,6 +2936,11 @@ A mounted root crash screen is revealed promptly; the existing bounded wait afte
 execution remains for a missing canvas. The loading screen adds no modal or operator action.
 
 ### Amendment (2026-09-19): theme-aware workspace palette
+
+> **Superseded in part by ADR-339.** The OS-following below is reversed, and the
+> blue palette it accepted is replaced by warm neutrals with a copper accent.
+> The theme-AWARE canvas this amendment introduced survives — only the thing
+> that *decides* the theme changed.
 
 The maintainer accepted the responsive workspace preview and its blue and soft
 grey palette. The application now uses light tokens by default and overrides
@@ -11409,6 +11420,29 @@ highest-value remaining motion fix now that Editable vectors is the default trac
 guided-steps and draft-commit decisions, ADR-210's capability contract, and the firmware write
 policy are unchanged)
 
+### Amendment — 2026-09-21: three visible stages
+
+The maintainer requested a shorter, clearer setup after reviewing the six-step layout. Both Laser
+and CNC now use **Machine → Essentials → Review & save**. **Machine** combines capability cards,
+the searchable catalog and **Controller and connection settings**, with optional **Connect and
+detect** and a separate **Import or export a machine profile** disclosure. The catalog begins with
+up to two compact previews, including the selected catalog profile; search or **Browse all N
+profiles** reveals the full list. **Essentials** groups work area, origin, homing and the applicable
+output/machine limits. **Accessories and calibration** is optional; **CNC job setup** appears only
+while CNC is active. Hybrids keep their CNC machine limits available while Laser is active.
+**Review & save** leads with compact summaries and Edit routes, then the physical pre-run checklist
+and optional **Controller settings**. CNC setting ownership remains as specified by ADR-306.
+
+Stage navigation is always available, including while a draft needs correction. Validation applies
+to the final Save, so operators can reach the field that needs attention without a Next gate.
+Connection remains optional and offline saving is supported. The existing section IDs remain valid
+for deep links, which open the containing stage and required disclosure.
+
+This amendment supersedes the original decision's page composition, optional-section placement and
+Next gates. It preserves capability/profile selection, explicit detected-value application, the
+single atomic draft and Save/Cancel boundary, per-setting firmware consent and verification, and all
+Frame/Start behavior. The original decision below records the previous layout.
+
 ### Context
 
 Maintainer direction (2026-07-21, in chat, with screenshots): Machine Setup is still too
@@ -17073,6 +17107,19 @@ no toolpath-resolution context.
 **Date:** 2026-08-09
 **Status:** Accepted; implemented and software/browser verified; controller and hardware qualification pending
 
+### Amendment — 2026-09-21: CNC setup within Essentials
+
+Machine Setup now has three visible stages under the ADR-240 amendment. CNC **Machine limits**
+appears in **Essentials**, including for a hybrid with Laser active. The current-job stock, material,
+default bit, tiling, and Tool Plan are available in its optional **CNC job setup** section only while
+CNC is active. Existing **Startup Setup** entry points and exact-field links open that stage and
+the relevant section. They do not add a fourth stage.
+
+This changes the placement described in Decision 1, not ownership: the setup draft remains the sole
+writable owner of these values. The machine-versus-current-job scopes, explicit material Apply,
+manual-value preservation, read-only Artwork/Job Review references, atomic Save/Cancel boundary,
+and firmware-write policy below remain unchanged.
+
 ### Context
 
 The maintainer rejected the repeated CNC setup questions shown around artwork. The current contract
@@ -20280,10 +20327,11 @@ not the problem — it is roughly 207 bytes per segment. The copies are.
 
 1. `planPreviewRouteEligible` holds every rule that decides whether a prepared job may carry the
    plan-backed preview authority: the existing current-position and ADR-243 streamed-raster
-   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_STEPS` keeps
+   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_SEGMENTS` keeps
    the legacy route. That constant is `MAX_COMPILED_MOTION_SEGMENTS`, the same 250,000 the
    operator is already shown as "Large program: … preparation, preview, and streaming may be
-   slow". Route steps never undercount the motion segments that raise that advisory.
+   slow". The budget counts each cut-polyline edge, plus at least one segment per step,
+   and stops counting once the limit is exceeded. A large contour cannot hide inside one step.
 2. `buildPreviewToolpathFromPrepared` asks the gate BEFORE mapping. Only the plan comparison
    keeps the freshly built machine route alive past that point, so when the gate declines, the
    machine array is consumed in place by `mapOwnedToolpathToScene` — the treatment streamed
@@ -20306,6 +20354,44 @@ prepares in 549 MB of renderer heap where a 330,976-segment one previously reach
 The preparation worker still holds the compiled Job alive for the length of the acknowledged
 chunk transfer, and a preview still costs one full route on each side of that boundary. Both
 remain open; neither is what exhausted the renderer here. No hardware was operated.
+
+### Amendment (2026-09-21) - Dense Sharp fills and repeated Frame requests
+
+The original-image follow-up found another allocation before the preview route exists. A
+1254 x 1254 owl traced with Sharp contains 14,389 contours and 494,902 vertices. Its default
+scanline Fill exhausted a 4 GB heap in the polygon union performed by `layer-fill`, before
+`compileJob` returned. The earlier statement that compilation was not the problem applied to
+the measured dragon/synthetic jobs; it did not cover this contour arrangement.
+
+A single even-odd path on a traced-image Scan Line operation now passes its transformed
+contours directly to the even-odd scanline sweep. The sweep already resolves holes, overlaps
+and crossings, so this case does not need a polygon arrangement. Contours are appended with
+iteration rather than an argument spread. Coincident scanline crossings cancel by parity,
+keeping touching ink in one continuous span. Multiple paths, non-zero winding, other artwork
+kinds, Island Fill and Offset Fill retain their existing normalization.
+
+This preserves the source fill region, not byte identity with the former polygon engine:
+the old union rounded boundaries to 1 micrometre and collapsed short edges before hatching.
+The direct sweep keeps source coordinates until the normal downstream representation rules.
+A regression pins a boundary just above a hatch row so this difference is explicit. No trace
+resolution, retained source vertices, hatch spacing, output size limit or refusal is added.
+
+Idle canvas marker workers now reserve the same memory lane as background preparation and
+retire on every terminal response before releasing it. Selecting the first process marker
+reads only the required contour/scanline/raster row/pass instead of allocating a full route.
+The marker selector is tested against the existing full route, including CNC precision and
+scan offsets; it does not change the emitted route.
+
+Ordinary Frame calls share one pending Promise through preparation and physical completion.
+Frame and Start show the preparation state and disable repeated button dispatch. Compilation
+failure and stale-job cancellation release ownership for a retry. Existing exact-job checks,
+Frame completion evidence, and the completed-Frame Start gate remain authoritative.
+
+Verification includes the original owl through Chrome Sharp tracing, committed geometry,
+filled Preview, scrubbing/playback and simulated-controller Frame; a 150,000-contour compiler
+regression; analytic fill-boundary tests; worker-lifetime/queue tests; and marker parity tests.
+See `docs/audits/2026-09-21-sharp-owl-verification.md` for measurements and limitations. No
+hardware was operated; browser evidence is not controller/material qualification.
 
 ## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
 
@@ -20484,7 +20570,7 @@ materializing it, so nothing could keep one packed.
    thin wrapper over it — and `PackedToolpathSteps` reads a route straight out of those buffers,
    one fresh step at a time. Per-vertex Z (`zs`) and the multi-tool `toolId` have no column, so
    `packToolpath` REFUSES such a route rather than dropping the fields, and it stays an array.
-3. Past `MAX_PLAN_PREVIEW_ROUTE_STEPS` — the same budget ADR-325 uses — a preview route that no
+3. Past `MAX_PLAN_PREVIEW_ROUTE_SEGMENTS` — the same budget ADR-325 uses — a preview route that no
    longer has a plan authority to compare against is mapped into scene space directly as buffers,
    consuming the machine array slot by slot as it goes. Below the budget nothing changes.
 4. A packed route crosses the ADR-244 boundary as one `packed` response whose buffers are
@@ -20730,11 +20816,11 @@ elsewhere and no record in the log.
    so both halves of the exchange fall under the console's existing "show stream" filter and the
    Super Console's Stream group. The tag comes from `streamOwnsTerminalAck`, a pure mirror of the
    ownership branch the ack ledger uses, pinned against it over a state matrix.
-2. Those entries, inbound and outbound, are appended to a buffer on the refs instead of the
-   store. The next line anyone waits on — a status report, an error, a banner, any console or
-   motion reply — publishes them ahead of itself in one update, in wire order. The status poll
-   runs at four a second while connected, so the transcript is never more than a quarter second
-   behind and stays complete. Every path that resets the transcript clears the buffer.
+2. Those entries, inbound and outbound, are held in bounded rings on the refs instead of the
+   store: at most 500 transcript entries and 200 log lines. A non-job line publishes them ahead
+   of itself in wire order. Job-only traffic also publishes on the first entry at least 250 ms
+   after the batch began, independently of status polling. Marlin suppresses queued status
+   queries during streaming. Every transcript reset clears both rings and their batch deadline.
 3. The transport counter is NOT deferred: Start's queue fence and the motion settlement read it.
 4. The live bar, the job rail and the console deck subscribe to the streamer by value, not by
    identity. Status is published immediately, since it flips a control or a heading; the line
@@ -20750,7 +20836,7 @@ elsewhere and no record in the log.
 
 Per-acknowledgement store updates drop from four to three, and the console's per-line work
 disappears: a burst of twelve acknowledgements now produces no render at all, then one. The
-transcript keeps every line and its millisecond timestamps, so it remains the tool for measuring
+transcript keeps its newest retained lines and their millisecond timestamps, so it remains the tool for measuring
 real acknowledgement latency on a machine. An operator whose machine stops on its own hold is
 told which state it is in and what will clear it, instead of reading `JOB RUNNING`.
 
@@ -20804,26 +20890,29 @@ streams can be handed to a worker after the operator has granted the port.
    — only while armed — writes the refill before forwarding the line that triggered it. It owns no
    judgement: what a status report means, whether an error is fatal, whether a pause is safe and
    when a job is over all stay on the main thread, which sees the same lines it always saw.
-3. Exactly one side writes refills, and ownership moves only through an acknowledged handshake.
-   The main thread keeps writing until the worker's `armed` arrives and keeps deferring until its
-   `released` does. Every store action that changes the stream's status takes the refill back
-   first. Hosting is armed once, after the first window is on the wire, and is not re-armed after
-   a pause or a tool change: a second handover point would need its own proof for a benefit that
-   only applies to the remainder of an interrupted job.
-4. Every wait on the worker is bounded, and a worker that stops answering loses the refill rather
-   than keeping it — better that this side writes than that nobody does. A failed refill out
-   there routes into the one containment path a failed refill here already uses.
-5. It is off by default, behind `workerHostedStreaming` on the device profile, offered in Machine
-   Setup as experimental and untested on hardware. A runtime that has no `Worker`, cannot start a
+3. Exactly one side writes refills. `prepare-arm` pauses inbound delivery and returns a `ready`
+   barrier after all earlier lines. The renderer processes those lines, captures the current
+   stream, and suppresses its own refill before sending `arm`. The worker adopts that snapshot
+   before resuming delivery. Correlated replies cannot revive a cancelled arm. Release keeps
+   renderer suppression until the worker's ordered `released` marker arrives. Hosting is armed
+   once, after the first window is on the wire, and is not re-armed after a pause or tool change.
+4. Every handshake is bounded. A silent worker is terminated and the transport closes; timeout
+   never returns write ownership to a renderer while the worker may still refill. Reboot banners,
+   MPG takeover, Alarm/Sleep reports, an outbound reset and a failed refill synchronously retire
+   the worker's old queue. An ordered marker lets the renderer process invalidation before it
+   resumes ownership. The main handlers still own the resulting machine state and notices.
+5. It is off by default, behind `workerHostedStreaming` on the device profile, offered for the
+   GRBL family in Machine Setup as experimental and untested on hardware. Marlin and Smoothieware
+   use the ordinary transport even if an older profile retains the flag. A runtime that has no `Worker`, cannot start a
    module worker, or refuses to transfer the streams keeps the main-thread transport silently:
    opting in cannot cost an operator their machine, and with the flag off the app is byte for byte
    the app it was.
 
 ### Consequences
 
-With the flag on, nothing the interface does can delay the wire: the renderer can block for a
-second and the controller still gets its refills. With it off — the default, and every automated
-test in this repository — the transport is unchanged.
+Once armed, the worker can refill while the renderer is busy. The initial handover still needs
+the renderer, and host scheduling is not a physical timing guarantee. With the flag off, the
+ordinary transport is unchanged.
 
 The cost is a second implementation of the write path and a handshake to keep it single-writer.
 That is the reason for the narrow split: the worker is a byte pipe plus one pure function, and
@@ -20836,19 +20925,17 @@ the `onAck` + `step` loop it replaces line for line, and it streams a 40-line jo
 against the firmware simulator with the machine ending where the program says. The worker's logic
 is driven through real `ReadableStream`/`WritableStream` objects: line forwarding and order across
 split chunks, refills only while armed, the handover acknowledgements, write acknowledgement and
-failure by id, and lock release on close. The renderer's half is driven through a fake bridge:
-the stream transfer, write resolution and rejection, subscriber isolation, that `isArmed` flips
-only on the worker's own acknowledgement in both directions, that a silent worker cannot hang
-Disconnect, and that an unsolicited close reads as a dropped cable. The store side is tested for
-not writing a refill while armed, writing it when the transport cannot host, and taking the
-refill back the moment the stream stops streaming.
+failure by id, and lock release on close. Controlled delivery between the real core and connection
+exercises acknowledgements crossing prepare/ready/arm/release, cancellation, and timeout closure.
+The actual store line handler also receives reboot, MPG, Alarm and Sleep immediately followed by
+an acknowledgement in the same chunk: the invalidated job must never refill. Selected-driver
+tests prove incompatible firmware families use the ordinary transport.
 
-NOT verified, anywhere: a real `Worker`. This repository's test environment has no worker, no
-`navigator.serial` and no transferable streams, and the in-app browser pane has no serial API
-either, so no test and no manual check in this project can execute the worker shell, the stream
-transfer, or the two halves talking to each other. There is no hardware evidence of any kind.
-That is why it ships off, why every failure path falls back to the main-thread transport, and why
-the Machine Setup control says so. Anyone enabling it should air-cut first.
+Browser qualification uses a real module Worker and transferable streams backed by a simulated
+port. This exercises the production shell and message boundary without opening a physical serial
+port. It does not qualify a USB adapter, controller or material job. Hosting remains off by
+default and marked experimental; failures after transfer close the connection rather than
+silently resuming a second writer.
 
 ---
 
@@ -21031,11 +21118,13 @@ those serve replay and forensics, which no crashed run is waiting on.
 2. The execution archive is built and stored **after** the controller has accepted the program,
    from `transmitPreparedStart`, and `activateFreshRun` then moves tracking from the pending
    intent to the active run exactly as before.
-3. Reconciliation of an intent-armed handoff materializes the fingerprint-only artifact the
-   intent stands for before writing the capsule, so the capsule never points at a run with no
-   artifact — which hydration would drop, turning the one case the operator most needs to hear
-   about into silence. The stand-in reuses the `legacy-fingerprint-only` shape and its
-   `legacy-checkpoint` origin; the name is historical, the shape is exactly right.
+3. Reconciliation reads the immutable same-generation artifact directly, without requiring
+   terminal execution history. If archive persistence completed before the crash, a matching
+   verified exact archive is reused. Otherwise reconciliation reuses or creates the intent's
+   fingerprint-only stand-in. The capsule preserves the actual backing kind and the transition
+   remains bound to the observed pending run and arm timestamp across storage awaits, so it
+   cannot replace a newer pending Start. The stand-in keeps the `legacy-fingerprint-only` shape
+   and `legacy-checkpoint` origin. No capsule points at an absent or mismatched artifact.
 4. An intent that does not parse, or whose sendable line count disagrees with the handoff it is
    attached to, fails the whole `pendingStart` record closed. Half a durable Start record is
    worse than none: it would report a program length nobody authorized.
@@ -21077,9 +21166,10 @@ change at the asynchronous boundary before the wire refuses the Start and leaves
 handoff behind, a permit revoked there refuses it, and a Start rejected at the wire awaits its
 cleanup before settling.
 
-NOT verified: no crash was actually staged. The reconciliation path is driven through its
-mutations and the slot parser, not by killing a real browser mid-Start, so the evidence is that
-the records are correct, not that a real interrupted session produces them. There is no hardware
+Audit regressions stage interruption before archive storage, after an exact archive, and after
+stand-in storage, then reopen both memory and IndexedDB repositories. They verify capsule kind,
+subsequent Start, integrity rejection and concurrent pending-Start replacement. IndexedDB uses
+the production backend over fake-indexeddb; no browser process was killed mid-Start. There is no hardware
 evidence of any kind — no machine is available to this project. The timings above are plain-node
 V8 measurements of the same modules, not browser profiles; the earlier figures quoted from a
 vitest/jsdom run overstated this traversal by about 6.5x and should not be compared against.
@@ -21134,8 +21224,9 @@ minimum of three alternating rounds:
 | 25 traces at 300 px | 8,716 ms | 7,507 ms | 1.16x |
 | Line Art + Smooth at 424 px (the heavy regime) | 7,167 ms | 5,578 ms | **1.28x** |
 
-`bend-scan-work.test.ts` pins the work rather than the clock: scanning a 600-point closed chain
-that rebuilds nothing must copy nothing, and `trimArc` must not reverse a 4,000-point chain to
+`bend-scan-work.test.ts` pins the measured work: scanning a 600-point closed chain avoids
+slice/reverse copies in leg probes; full-ring rotation still allocates and copies once per
+admitted candidate. `trimArc` must not reverse a 4,000-point chain to
 drop 5 px off one end. Both fail against the previous implementation with the counts above, and a
 reference implementation of the old `trimArc` pins the rewrite's output shape for shapes and arcs
 including the degenerate ones.
@@ -21147,7 +21238,181 @@ cliff is unchanged: a drawing whose chains fall inside the sharpener's window st
 and one just outside still skips it. Making the scan proportional to its window rather than to the
 chain would need a ring view with modular indexing through every gate, which is its own decision.
 
-## ADR-339 - Painted laser passes derive from sealed execution, with independent Frame and recovery (2026-09-22)
+## ADR-324 Amendment - Lesson copy is checked against the shipped application, and Escape leaves one level (2026-09-21)
+
+**Status:** Accepted; amends the learning-surface navigation and lesson-authoring rules in ADR-324.
+Does not touch ADR-228/230/232/237: Frame remains the sole ordinary Start policy gate, and nothing
+here changes Frame, Start, review policy or output semantics.
+
+### Context
+
+ADR-324 requires lessons to carry "source-verified instructions" and backs that with catalog tests.
+Those tests verify **form**: that every id resolves, every referenced illustration renders in all
+three stages, every command maps deliberately, and that instructions clear a length floor of 20
+characters. None of that reads the application. A lesson could name a menu KerfDesk does not have
+and every assertion stayed green.
+
+It had. Auditing all 93 lessons against the running app found: the keyboard-shortcuts lesson
+enumerating five groups of a dialog that ships six — omitting the machine group that carries
+`Ctrl+Enter` Start and `Ctrl+.` Abort; a CNC surfacing lesson directing operators to
+`Machine → CNC Utilities → Surface spoilboard`, a menu path with no "Machine" menu (the family
+label follows the machine kind) and no "CNC Utilities" level, for what is a rail section; 54 UI
+paths written with `>` against 28 with `→`, splitting cleanly along machine-side and design-side
+authoring; one lesson offering itself as its own next step; and sixteen Studio lessons produced by
+two generators that gave all of them the same three step titles and the same boilerplate outcomes.
+
+Navigation had the matching problem. The surface reuses the shared dialog a11y hook, whose contract
+is that Escape closes the dialog. Applied to a surface that is two levels deep — a library of 93
+lessons, and a reader that invites you deeper through **Learn next** — one Escape discarded the
+whole session from any depth, and the reader offered no key to step at all.
+
+### Decision
+
+1. Lesson copy is checked against the application it describes. `tutorial-fidelity.test.ts` reads
+   the real shortcut table and the real menu-bar labels, and fails a lesson that invents a menu,
+   mixes path separators, offers itself as its own next step, or drifts from the shortcut dialog.
+   The shortcut lesson must also state that keyboard Start is the Start button's own flow, so copy
+   can never read as a route past the Frame gate.
+2. A lesson generator takes its step titles and outcomes per lesson. Shared step text is capped at
+   four lessons — enough for families that genuinely are one action with a different shape, not
+   enough for a template.
+3. Escape leaves one level: the lesson first, then the library, then the surface. A lesson reached
+   through **Learn next** returns to the lesson that offered it, at the step left behind, by way of
+   a back control that names that destination. Left and right arrows step within a lesson.
+   Modal registration, focus trapping and restoration to the opener are unchanged, and the
+   underlying dialog draft and project are still untouched throughout.
+4. The library opens on the starter path and one **Continue** action for the lesson in progress,
+   and states how many lessons the machine filter is holding back rather than showing a total that
+   contradicts the list beside it.
+
+### Consequences
+
+Lesson prose is now load-bearing on real application data: renaming a menu or changing the shortcut
+table fails the tutorial suite, which is the intended coupling. The navigation change is a
+deliberate departure from "Escape closes the dialog" for this surface only; three existing suites
+pressed Escape once expecting a full close and were updated to walk out level by level, asserting
+the intermediate state they previously skipped.
+
+Only lesson position, completion and the in-session trail are held; the trail is session state and
+is discarded on close. Nothing here validates that the lessons teach well — that remains usability
+work with representative users, distinct from these checks. Lesson illustrations remain abstract
+diagrams rather than pictures of the real interface, which is the largest outstanding gap in the
+"see it" half of the surface and is not addressed here.
+---
+
+## ADR-339 - KerfDesk opens light, and its chrome is warm neutral with a copper accent (2026-09-21)
+
+**Status:** Accepted. | **Date:** 2026-09-21
+
+### Context
+
+ADR-049 established a single light chrome and said so explicitly: the dark values
+were *removed, not kept behind a toggle*, because "a second theme block would be
+dead complexity". Its **2026-09-19 amendment** then handed the decision to the
+operating system — chrome and workspace bed both followed `prefers-color-scheme`
+— and recorded that it "does not add a separate in-app theme preference".
+
+The consequence is what this decision answers: a maintainer whose desktop is in
+dark mode opens KerfDesk in dark, having never asked for it. The maintainer also
+judged the palette too blue, and that is not only the dark theme — the *light*
+theme was blue too: `#f5f7fa` bars, `#dce2ea` borders, `#253248` text and a
+`#3175d0` accent. Restoring light alone would not have addressed it.
+
+Two independent readers of `prefers-color-scheme` had grown up by then: the
+`@media` block in `tokens.css` (chrome) and `canvas-color-scheme.ts` (bed, grid,
+rulers, artwork ink, Design Studio). Nothing made them agree.
+
+### Decision
+
+**1 — The application owns the theme, not the desktop.** New
+`src/ui/theme/app-theme.ts` holds a three-value preference — `light` | `dark` |
+`system` — defaulting to **light**, persisted in `localStorage` under
+`kerfdesk.theme.v1`. It is a machine-local viewing preference, so it never
+enters the `.lf2` project (same rationale as the camera panel width). The module
+stamps the resolved theme onto `<html>` as `data-theme`; `tokens.css` keys its
+dark block off `:root[data-theme='dark']` rather than a media query, and
+`canvas-color-scheme.ts` becomes a thin adapter over the same module, so the two
+frames cannot resolve the theme differently. `main.tsx` stamps before the first
+render, so no frame paints in the wrong theme.
+
+This reverses the amendment's "no in-app theme preference", and also reverses
+ADR-049's original "no toggle": dark exists now, so it has to be reachable.
+**Window > Appearance** carries Light / Dark / Match System as a radio group.
+`system` still tracks the desktop live — that is the old behaviour, kept as an
+opt-in rather than as the default.
+
+**2 — Warm neutrals and a copper accent.** The greys lose their blue cast in
+both themes (light bars `#f1efec`, panels `#faf9f7`, borders `#ddd9d3`, text
+`#2b2823`; dark bars `#2e2b27`, panels `#252320`, text `#ece7df`). The accent is
+copper taken from the startup wordmark's `#c99a63`, deepened to **`#a85a2a`**:
+the brand tan carries only 3.6:1 against white and these fills hold small white
+labels, whereas `#a85a2a` is 5.02:1. `--lf-accent` is NOT re-declared in dark —
+lightening it there would drop button text below AA.
+
+**3 — The light surfaces are off-white, not pure white.** Panels sit at
+`#faf9f7` and bars at `#f1efec` so the chrome does not glare. The **bed stays
+`#ffffff`**: it stands for white material and ADR-049's WYSIWYG rationale is
+untouched, which also makes the work surface the brightest thing on screen.
+
+**4 — The canvas selection splits off the chrome accent.** `--lf-canvas-selection`
+(`#3175d0`) is a new token that no chrome uses. The bed already speaks a warm
+machine-state language — amber scorch, gold tab handles, safety red — so a
+copper selection box would read as one of them. `theme-sync.test.ts` pins the
+new token to `canvasTheme.selection` and adds a second test asserting
+`--lf-accent` is *not* the selection, so the split stays recorded rather than
+merely uncoupled.
+
+**5 — Hover wells follow the accent.** Five of the six `--lf-tint-info` uses in
+`tokens.css` were hover/active wells, sitting cool underneath a copper border;
+they move to `--lf-tint-accent`, which gets its own warm value instead of
+aliasing `--lf-tint-info`. `.lf-banner--info` keeps the cool tint, and so does
+the active-row well elsewhere, so "info" stays distinct from "warning".
+
+### Consequences
+
+- KerfDesk opens the same on every machine. An OS dark mode no longer changes
+  the app, and with JavaScript unavailable or not yet run the light palette
+  stands, which is the shipped look.
+- The burn scorch and ember ramp are **untouched**. Their values were set by a
+  measured ink/bed separation pass, and the reason to re-tune them — keeping the
+  UI accent from reading as machine state — is met by keeping the accent off the
+  bed entirely instead.
+- `public/404.html` moves onto the same neutrals and copper; it still carried
+  ADR-049's original `#f8fafc`/`#1976d2` blue.
+- The `#app-splash` charcoal/copper branding and the fixed-dark 3D viewport
+  background are unchanged; neither was theme-aware.
+- `prefers-color-scheme` now appears in exactly one place in `src/`.
+
+### Alternatives rejected
+
+- **Remove dark entirely**, restoring ADR-049's original shape: rejected by the
+  maintainer, who chose to keep dark reachable rather than delete it.
+- **Keep following the OS, with light merely as the fallback:** that is the
+  behaviour this decision exists to undo.
+- **A copper canvas selection**, so chrome and bed share one accent: rejected —
+  see decision 4. Moving the scorch out of copper's way instead would have meant
+  re-tuning a palette whose current values were perceptually measured.
+
+### Verification
+
+- Contrast computed, not eyeballed, before the values were written down: white
+  labels on `--lf-accent` 5.02:1; `--lf-accent-fg` 6.64:1 on panels; `text` /
+  `text-muted` / `text-faint` 12.79 / 5.03 / 4.53:1 against the *bars*, the
+  darkest chrome ground. `--lf-text-faint` had to be darkened from `#7a746b` to
+  `#726c63`, which fell to 4.03:1 once the surfaces were dulled.
+- `app-theme.test.ts` covers the light default over a dark desktop, the
+  `data-theme` stamp, persistence across a fresh module, `system` following the
+  desktop only when asked, subscriber notification and listener release, a junk
+  stored value, and a denied `localStorage`.
+- The two theme-aware drawing suites now drive the preference the way an
+  operator does instead of faking the desktop.
+- Verified live on the dev server, both themes: switching through
+  Window > Appearance repaints chrome and canvas together, and the choice
+  survives a reload.
+- **NOT verified:** no hardware — no machine is available to this project. This
+  change emits no G-code and touches no machine behaviour.
+
+## ADR-340 - Painted laser passes derive from sealed execution, with independent Frame and recovery (2026-09-22)
 
 ### Context
 

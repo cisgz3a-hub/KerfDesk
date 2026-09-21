@@ -1,4 +1,4 @@
-import type { ExecutionArtifactV1, RunId } from './execution-artifact';
+import type { ExecutionArtifactV1, RecoveryArtifactV1, RunId } from './execution-artifact';
 import type {
   PersistedRecoverySlots,
   RecoveryRepositoryResult,
@@ -34,8 +34,11 @@ type HandoffHost = {
   readonly refresh: () => Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>>;
   /** Materialize the fingerprint-only artifact an intent-armed handoff stands
    * for, so the capsule reconciliation writes has something to point at.
-   * Resolves false when the artifact could not be written. */
-  readonly materializeIntentArtifact: (runId: RunId, intent: JobCheckpoint) => Promise<boolean>;
+   * Returns the backing kind, including an archive written before a crash. */
+  readonly materializeIntentArtifact: (
+    runId: RunId,
+    intent: JobCheckpoint,
+  ) => Promise<RecoveryArtifactV1['kind'] | null>;
 };
 
 export class RecoveryStartHandoff {
@@ -136,17 +139,28 @@ export class RecoveryStartHandoff {
   }
 
   private async reconcileNow(): Promise<RecoveryRepositoryResult<boolean>> {
-    // An intent-armed handoff has no archive yet, so the capsule it becomes
-    // would reference a run with no artifact and be dropped on the next
-    // hydration — silence, exactly where the operator most needs to be told
-    // the machine may have moved. Write the fingerprint-only stand-in first.
+    // Recover either an archive already committed before the crash or an
+    // idempotent fingerprint-only stand-in. Bind the slot transition to the
+    // pending record observed before those storage awaits.
     const pending = this.host.getSnapshot().pendingStart;
-    if (pending?.intent !== undefined) {
-      const materialized = await this.host.materializeIntentArtifact(pending.runId, pending.intent);
-      if (!materialized) return ok(false);
-    }
-    return this.host.mutate('reconcile uncertain Start handoff', (slots) =>
-      reconcilePendingStartMutation(slots, this.host.nowIso()),
+    if (pending === null) return ok(false);
+    const artifactKind =
+      pending.intent === undefined
+        ? 'exact-execution'
+        : await this.host.materializeIntentArtifact(pending.runId, pending.intent);
+    if (artifactKind === null) return ok(false);
+    const reconciled = await this.host.mutate(
+      'reconcile uncertain Start handoff',
+      (slots) =>
+        reconcilePendingStartMutation(slots, this.host.nowIso(), { ...pending, artifactKind }),
+      pending.intent === undefined ? undefined : pending.runId,
     );
+    if (!reconciled.ok && reconciled.error === 'not-found') {
+      // A concurrent cancel/purge may have removed this backing record.
+      // Publish the current owner instead of leaving the stale intent visible.
+      const refreshed = await this.host.refresh();
+      return refreshed.ok ? ok(false) : refreshed;
+    }
+    return reconciled;
   }
 }

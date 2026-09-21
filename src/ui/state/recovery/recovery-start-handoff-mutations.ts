@@ -1,5 +1,5 @@
 import type { JobCheckpoint } from '../../../core/recovery';
-import type { ExecutionArtifactV1, RunId } from './execution-artifact';
+import type { ExecutionArtifactV1, RecoveryArtifactV1, RunId } from './execution-artifact';
 import type { PersistedRecoverySlots } from './recovery-model';
 import type { SlotMutation } from './recovery-slot-mutations';
 import { START_INTENT_INTERRUPTION_MESSAGE as START_HANDOFF_UNCERTAIN_MESSAGE } from './start-intent';
@@ -116,9 +116,20 @@ export function cancelPendingStartMutation(
 export function reconcilePendingStartMutation(
   slots: PersistedRecoverySlots,
   updatedAtIso: string,
+  backing?: {
+    readonly runId: RunId;
+    readonly armedAtIso: string;
+    readonly artifactKind: RecoveryArtifactV1['kind'];
+  },
 ): SlotMutation<boolean> {
   const pending = slots.pendingStart;
   if (pending === null) return unchanged(slots, false);
+  if (
+    backing !== undefined &&
+    (pending.runId !== backing.runId || pending.armedAtIso !== backing.armedAtIso)
+  ) {
+    return unchanged(slots, false);
+  }
   const revision = slots.revision + 1;
   return {
     slots: {
@@ -128,10 +139,11 @@ export function reconcilePendingStartMutation(
       pendingStart: null,
       recoveryCapsule: {
         runId: pending.runId,
-        // An intent-armed handoff is backed by the fingerprint-only stand-in
-        // the reconciler materializes, not by an execution archive that does
-        // not exist yet (ADR-337).
-        artifactKind: pending.intent === undefined ? 'exact-execution' : 'legacy-fingerprint-only',
+        // The archive may have committed before the app died. Hydration must
+        // use that exact kind, or the stand-in written when no archive exists.
+        artifactKind:
+          backing?.artifactKind ??
+          (pending.intent === undefined ? 'exact-execution' : 'legacy-fingerprint-only'),
         revision,
         ackedLines: 0,
         sendableLines: pending.sendableLines,

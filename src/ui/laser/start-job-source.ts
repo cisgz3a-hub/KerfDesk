@@ -349,6 +349,7 @@ function machineSnapshot(
   camera: ReturnType<typeof useCameraStore.getState>,
 ) {
   return {
+    connected: laser.connection.kind === 'connected',
     statusReport: laser.statusReport,
     alarmCode: laser.alarmCode,
     hasActiveStreamer: isActiveJob(laser.streamer),

@@ -8,7 +8,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Select vector artwork > Cut type',
+    location: 'Select vector artwork → Cut type',
     prerequisites: 'CNC mode, vector artwork, and the intended stock and bit in Startup Setup.',
     visual: 'profile',
     steps: [
@@ -46,7 +46,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Select closed artwork > Cut type: Pocket (clear inside)',
+    location: 'Select closed artwork → Cut type: Pocket (clear inside)',
     prerequisites: 'CNC mode, a closed boundary, and a cutter and stock defined in Startup Setup.',
     visual: 'pocket',
     steps: [
@@ -73,7 +73,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'Pocket roughing can use a separate bit assigned in Startup Setup > Tool Plan. Inspect the resulting tool changes before running.',
+    tip: 'Pocket roughing can use a separate bit assigned in Startup Setup → Tool Plan. Inspect the resulting tool changes before running.',
     keywords: [
       'pocket',
       'clear',
@@ -94,7 +94,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Select vector artwork > Cut type: Engrave (trace path)',
+    location: 'Select vector artwork → Cut type: Engrave (trace path)',
     prerequisites: 'CNC mode and a line or vector design with the intended engraving bit assigned.',
     visual: 'engrave',
     steps: [
@@ -141,7 +141,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'Select closed artwork > Cut type: V-carve (angled bit)',
+    location: 'Select closed artwork → Cut type: V-carve (angled bit)',
     prerequisites: 'CNC mode, closed lettering or artwork, and a correctly described angled bit.',
     visual: 'vcarve',
     steps: [
@@ -163,7 +163,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Plan any separate clearing bit',
         instruction:
-          'For flat-floor work, use Startup Setup > Tool Plan > V-carve floor clearing when you want another bit to clear the core. Review its operation values and any tool changes.',
+          'For flat-floor work, use Startup Setup → Tool Plan → V-carve floor clearing when you want another bit to clear the core. Review its operation values and any tool changes.',
         focus: 'V-carve floor clearing',
         result: 'The clearing work and angled finishing work have explicit cutter assignments.',
         visual: 'layers',
@@ -198,7 +198,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'Select closed shapes > Cut type: Drill (peck at centers)',
+    location: 'Select closed shapes → Cut type: Drill (peck at centers)',
     prerequisites:
       'CNC mode, closed shapes at the intended hole locations, and a suitable cutter setup.',
     visual: 'drill',

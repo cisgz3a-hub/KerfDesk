@@ -1,4 +1,5 @@
 import type { Project, RasterImage } from '../../core/scene';
+import type { AppThemePreference } from '../theme/app-theme';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import type { SelectedImageMaskPair } from './image-mask-command-state';
 
@@ -49,6 +50,8 @@ export type CommandDialogs = {
   readonly toggleMachinePanel: () => void;
   readonly toggleSidePanels: () => void;
   readonly resetWorkspaceLayout: () => void;
+  readonly appTheme: AppThemePreference;
+  readonly setAppTheme: (preference: AppThemePreference) => void;
   readonly printAndCutFeatureEnabled: boolean;
   readonly printAndCutProfileSupported: boolean;
   readonly printAndCut: () => void;

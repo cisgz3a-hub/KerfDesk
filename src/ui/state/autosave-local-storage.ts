@@ -31,15 +31,18 @@ export type LocalAutosaveReadResult = {
   readonly snapshots: AutosaveSnapshot[];
   readonly corrupt: boolean;
   readonly failed: boolean;
-  // The keys that held a record this build cannot turn back into a project.
-  // The caller retires them; see AutosaveDurableService.retireUnreadable.
-  readonly unreadableKeys: readonly string[];
+  // Keep the observed bytes so retirement cannot delete a newer write at this key.
+  readonly unreadableSlots: ReadonlyArray<{ readonly storageKey: string; readonly raw: string }>;
 };
 
 // Any addressable autosave slot: a snapshot, or a bare key a scan turned up.
 export type AutosaveStorageTarget = { readonly storageKey: string };
 
-type LocalReadDiagnostics = { corrupt: boolean; failed: boolean; unreadableKeys: string[] };
+type LocalReadDiagnostics = {
+  corrupt: boolean;
+  failed: boolean;
+  unreadableSlots: Array<{ readonly storageKey: string; readonly raw: string }>;
+};
 
 export function writeLocalAutosave(
   project: Project,
@@ -83,9 +86,9 @@ export function readLocalAutosaveSnapshots(): AutosaveSnapshot[] {
 
 export function readLocalAutosaveState(): LocalAutosaveReadResult {
   if (!localAutosaveAvailable()) {
-    return { snapshots: [], corrupt: false, failed: true, unreadableKeys: [] };
+    return { snapshots: [], corrupt: false, failed: true, unreadableSlots: [] };
   }
-  const diagnostics: LocalReadDiagnostics = { corrupt: false, failed: false, unreadableKeys: [] };
+  const diagnostics: LocalReadDiagnostics = { corrupt: false, failed: false, unreadableSlots: [] };
   const snapshots = localAutosaveCandidateKeys(diagnostics)
     .map((storageKey) => readAutosaveAtKey(storageKey, diagnostics))
     .filter((snapshot): snapshot is AutosaveSnapshot => snapshot !== null);
@@ -182,18 +185,18 @@ function readAutosaveAtKey(
   try {
     record = JSON.parse(raw);
   } catch {
-    return markUnreadable(state, storageKey);
+    return markUnreadable(state, storageKey, raw);
   }
   const snapshot =
     isAutosaveRecord(record) && recordMatchesStorageKey(record, storageKey)
       ? autosaveSnapshotFromRecord(record, storageKey)
       : null;
-  return snapshot === null ? markUnreadable(state, storageKey) : snapshot;
+  return snapshot === null ? markUnreadable(state, storageKey, raw) : snapshot;
 }
 
-function markUnreadable(state: LocalReadDiagnostics, storageKey: string): null {
+function markUnreadable(state: LocalReadDiagnostics, storageKey: string, raw: string): null {
   state.corrupt = true;
-  state.unreadableKeys.push(storageKey);
+  state.unreadableSlots.push({ storageKey, raw });
   return null;
 }
 

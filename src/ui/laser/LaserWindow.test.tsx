@@ -111,8 +111,8 @@ describe('LaserWindow autofocus busy controls', () => {
         button(host, 'Machine Setup').click();
       });
 
-      expect(host.textContent).toContain('Step 1 of 6');
-      expect(host.textContent).toContain('Machine capability');
+      expect(host.textContent).toContain('Step 1 of 3');
+      expect(host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
     } finally {
       await unmountRoot(root);
       host.remove();

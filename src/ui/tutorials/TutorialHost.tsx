@@ -17,8 +17,12 @@ function TutorialShell(): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const close = useTutorialStore((state) => state.closeTutorial);
   const open = useTutorialStore((state) => state.openTutorial);
+  const goBack = useTutorialStore((state) => state.goBack);
+  const inLesson = useTutorialStore((state) => state.tutorialId !== null);
   useRegisterModal();
-  useDialogA11y(ref, close, { initialFocus: 'surface' });
+  // Escape walks OUT one level — lesson to library, library to the workspace —
+  // rather than discarding the whole session from three levels deep.
+  useDialogA11y(ref, inLesson ? goBack : close, { initialFocus: 'surface' });
   return (
     <div
       className="lf-learn-backdrop"
@@ -42,11 +46,11 @@ function TutorialShell(): JSX.Element {
           <button
             type="button"
             className="lf-btn lf-btn--ghost"
-            title="Close tutorials and return to your work (Escape)"
+            title="Close tutorials and return to your work"
             aria-label="Close tutorials"
             onClick={close}
           >
-            Close <kbd>Esc</kbd>
+            Close{inLesson ? null : <kbd>Esc</kbd>}
           </button>
         </header>
         <Suspense

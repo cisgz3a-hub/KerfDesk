@@ -17,9 +17,13 @@ const FIXTURE_PATH = fileURLToPath(
 );
 const FIXTURE_BYTES = readFileSync(FIXTURE_PATH);
 const FIXTURE_SHA256 = 'e4b23a55c73c679b81889ac86a07efccd62039619b9758d63a96ca492032f846';
-// The product watchdog, now a SILENCE budget (ADR-336): a trace that keeps
-// heartbeating may exceed it. It stays the test's own ceiling for the dragon.
-const COMPUTE_BUDGET_MS = 30_000;
+// ADR-336 permits long work while the native worker keeps reporting progress.
+// CI's Sharp worker completed in 29.45 s with 103 heartbeats, then hit the old
+// 30 s compute-plus-render assertion. Check silence separately from completion
+// and rendering; the whole browser case still has a finite deadline.
+const WORKER_SILENCE_MS = 30_000;
+// The same trace took 157.5 s on the loaded Windows test host, with 480 beats.
+const TRACE_COMPLETION_MS = 180_000;
 // Mirrors HEARTBEAT_INTERVAL_MS in src/ui/trace/trace-worker.ts.
 const HEARTBEAT_INTERVAL_MS = 250;
 
@@ -32,6 +36,8 @@ interface TraceObservation {
   postedAt: number;
   startedAt: number | null;
   settledAt: number | null;
+  lastMessageAt: number;
+  longestSilenceMs: number;
   outcome: 'ok' | 'error' | null;
   // Heartbeats seen while this request computed. They prove the worker stayed
   // audible without ending the request, which is what keeps a long trace's
@@ -63,7 +69,7 @@ declare global {
 const nativeWorkers = new WeakMap<Page, { url: string; closed: boolean }[]>();
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(240_000);
   expect(createHash('sha256').update(FIXTURE_BYTES).digest('hex')).toBe(FIXTURE_SHA256);
   const observed: { url: string; closed: boolean }[] = [];
   nativeWorkers.set(page, observed);
@@ -83,8 +89,21 @@ test.beforeEach(async ({ page }) => {
   while (await notifications.count()) await notifications.first().click();
 });
 
-test.afterEach(async ({ page }, testInfo) => {
-  const probe = await page.evaluate(() => window.__centerlineWorkerProbe).catch(() => null);
+test.afterEach(async ({ page, kerfdesk }, testInfo) => {
+  // Geometry is compared in the test. Do not copy its tens of MB into every
+  // lifecycle attachment as well, especially when diagnosing a timeout.
+  const probe = await page
+    .evaluate(() => {
+      const current = window.__centerlineWorkerProbe;
+      return {
+        ...current,
+        requests: current.requests.map(({ geometryJson, ...request }) => ({
+          ...request,
+          geometryBytes: geometryJson?.length ?? 0,
+        })),
+      };
+    })
+    .catch(() => null);
   await testInfo.attach('centerline-worker-lifecycle.json', {
     body: JSON.stringify(
       {
@@ -101,6 +120,10 @@ test.afterEach(async ({ page }, testInfo) => {
       null,
       2,
     ),
+    contentType: 'application/json',
+  });
+  await testInfo.attach('browser-file-events.json', {
+    body: JSON.stringify(await kerfdesk.events().catch(() => [])),
     contentType: 'application/json',
   });
 });
@@ -128,21 +151,11 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
           (r) => JSON.stringify(r.options) === JSON.stringify(options) && r.startedAt !== null,
         ),
       preset,
-      { timeout: COMPUTE_BUDGET_MS },
+      { timeout: WORKER_SILENCE_MS },
     );
-    const remaining = await page.evaluate(
-      ({ budget, options }) => {
-        const request = window.__centerlineWorkerProbe.requests
-          .filter((r) => JSON.stringify(r.options) === JSON.stringify(options))
-          .at(-1);
-        if (request?.startedAt === null || request?.startedAt === undefined)
-          throw Error('No preset worker acknowledgement');
-        return Math.max(1, budget - (performance.now() - request.startedAt));
-      },
-      { budget: COMPUTE_BUDGET_MS, options: preset },
-    );
+    await waitForHealthyTrace(page, preset);
     const preview = dialog.locator('[aria-label="Trace preview (1254x1254 px)"]');
-    await expect(preview.locator('svg path').first()).toBeVisible({ timeout: remaining });
+    await expect(preview.locator('svg path').first()).toBeVisible({ timeout: 15_000 });
     await expect(dialog.getByText(/Preview failed:/)).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Show Points', exact: true })).toBeVisible();
     const request = (await observations(page))
@@ -156,11 +169,22 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     expect(request.polylines).toBeGreaterThan(0);
     expect(request.closedPolylines).toBeGreaterThan(0);
     expect(request.vertices).toBeGreaterThan(1);
-    expect(request.settledAt - request.startedAt).toBeLessThan(COMPUTE_BUDGET_MS);
+    expect(request.longestSilenceMs).toBeLessThan(WORKER_SILENCE_MS);
     // The real worker heartbeats from inside the trace, and only from there:
     // never faster than the interval, and audible at all once the trace has
     // run longer than one. This is what keeps its silence budget alive.
     const computeMs = request.settledAt - request.startedAt;
+    await testInfo.attach('dragon-trace-timing.json', {
+      body: JSON.stringify({
+        presetName,
+        computeMs,
+        longestSilenceMs: request.longestSilenceMs,
+        beats: request.beats,
+        polylines: request.polylines,
+        vertices: request.vertices,
+      }),
+      contentType: 'application/json',
+    });
     expect(request.beats).toBeLessThanOrEqual(Math.ceil(computeMs / HEARTBEAT_INTERVAL_MS) + 1);
     if (computeMs > 4 * HEARTBEAT_INTERVAL_MS) expect(request.beats).toBeGreaterThan(0);
     expect(request.ticksAtEnd - request.ticksAtStart).toBeGreaterThan(0);
@@ -189,10 +213,12 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
       request.closedPolylines,
     );
     await dialog.screenshot({ path: testInfo.outputPath('dragon-preset-preview.png') });
-    const beforeCommit = (await observations(page)).length;
+    const beforeCommit = await page.evaluate(() => window.__centerlineWorkerProbe.requests.length);
     await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
-    expect((await observations(page)).length).toBe(beforeCommit); // Commits the prepared preview, without tracing again.
+    expect(await page.evaluate(() => window.__centerlineWorkerProbe.requests.length)).toBe(
+      beforeCommit,
+    ); // Commits the prepared preview, without tracing again.
     const project = await saveProject(page, kerfdesk);
     const traced = project.scene.objects.find(
       (object) => object.kind === 'traced-image' && object.source === FIXTURE_NAME,
@@ -232,6 +258,48 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     });
   });
 }
+
+test('cancels an actively tracing Sharp dragon from the dialog without committing it', async ({
+  page,
+  kerfdesk,
+}) => {
+  await importDragon(page);
+  await page.getByRole('button', { name: 'Trace Image...', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Trace image' });
+  await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
+  await page.waitForFunction(
+    (options) =>
+      window.__centerlineWorkerProbe.requests.some(
+        (r) =>
+          JSON.stringify(r.options) === JSON.stringify(options) &&
+          r.beats > 0 &&
+          r.settledAt === null,
+      ),
+    TRACE_PRESETS.Sharp,
+    { timeout: WORKER_SILENCE_MS },
+  );
+  const active = (await observations(page)).at(-1);
+  if (active === undefined) throw Error('Missing active Sharp trace');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click({ timeout: 5_000 });
+  await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (owner) =>
+          window.__centerlineWorkerProbe.workers.find((worker) => worker.owner === owner)
+            ?.terminatedAt,
+        active.owner,
+      ),
+    )
+    .toEqual(expect.any(Number));
+  await expect.poll(() => nativeWorkers.get(page)?.[active.owner - 1]?.closed).toBe(true);
+  const project = await saveProject(page, kerfdesk);
+  expect(project.scene.objects).toHaveLength(2);
+  expect(project.scene.objects.some((object) => object.kind === 'traced-image')).toBe(false);
+  expect(
+    (await observations(page)).find((request) => request.id === active.id)?.outcome,
+  ).toBeNull();
+});
 
 test('superseding an active dragon trace terminates its real worker and completes the replacement', async ({
   page,
@@ -306,7 +374,7 @@ test('superseding an active dragon trace terminates its real worker and complete
   expect(old.outcome).toBeNull();
   expect(current.owner).not.toBe(old.owner);
   expect(current.outcome).toBe('ok');
-  expect(current.settledAt - current.startedAt).toBeLessThan(COMPUTE_BUDGET_MS);
+  expect(current.longestSilenceMs).toBeLessThan(WORKER_SILENCE_MS);
   const workers = await page.evaluate(() => window.__centerlineWorkerProbe.workers);
   expect(workers.find((worker) => worker.owner === old.owner)?.terminatedAt).toEqual(
     expect.any(Number),
@@ -349,6 +417,24 @@ function observations(page: Page): Promise<TraceObservation[]> {
   return page.evaluate(() => window.__centerlineWorkerProbe.requests);
 }
 
+async function waitForHealthyTrace(page: Page, options: TraceOptions): Promise<void> {
+  await page.waitForFunction(
+    ({ options: expected, silenceMs }) => {
+      const request = window.__centerlineWorkerProbe.requests
+        .filter((r) => JSON.stringify(r.options) === JSON.stringify(expected))
+        .at(-1);
+      if (request === undefined) throw Error('Missing real-worker trace');
+      if (request.outcome === 'error') throw Error(request.message ?? 'Trace worker failed');
+      if (request.outcome === 'ok') return true;
+      if (performance.now() - request.lastMessageAt >= silenceMs)
+        throw Error(`Trace worker went silent after ${request.beats} heartbeats`);
+      return false;
+    },
+    { options, silenceMs: WORKER_SILENCE_MS },
+    { timeout: TRACE_COMPLETION_MS, polling: 250 },
+  );
+}
+
 async function installWorkerProbe(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const probe: WorkerProbe = { requests: [], workers: [], ticks: 0 };
@@ -370,15 +456,21 @@ async function installWorkerProbe(page: Page): Promise<void> {
           const reply = event.data;
           const request = probe.requests.find((r) => r.owner === owner && r.id === reply.id);
           if (request === undefined) return;
+          const now = performance.now();
+          request.longestSilenceMs = Math.max(
+            request.longestSilenceMs,
+            now - request.lastMessageAt,
+          );
+          request.lastMessageAt = now;
           if (reply.kind === 'started') {
-            request.startedAt = performance.now();
+            request.startedAt = now;
             request.ticksAtStart = probe.ticks;
             window.dispatchEvent(new Event('centerline-worker-started'));
           } else if (reply.kind === 'progress') {
             // Still computing: the request is not settled by a heartbeat.
             request.beats++;
           } else {
-            request.settledAt = performance.now();
+            request.settledAt = now;
             request.ticksAtEnd = probe.ticks;
             request.outcome = reply.kind;
             if (reply.kind === 'error') request.message = reply.message;
@@ -398,15 +490,18 @@ async function installWorkerProbe(page: Page): Promise<void> {
           message: TraceWorkerRequest,
           transfer?: Transferable[] | StructuredSerializeOptions,
         ): void => {
+          const now = performance.now();
           probe.requests.push({
             owner,
             id: message.id,
             options: structuredClone(message.options),
             width: message.image.width,
             height: message.image.height,
-            postedAt: performance.now(),
+            postedAt: now,
             startedAt: null,
             settledAt: null,
+            lastMessageAt: now,
+            longestSilenceMs: 0,
             outcome: null,
             beats: 0,
             message: null,

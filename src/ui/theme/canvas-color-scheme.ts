@@ -1,26 +1,16 @@
-// Canvas2D needs explicit paints and redraws when the CSS colour scheme changes.
+// Canvas2D needs explicit paints and redraws when the colour scheme changes.
+//
+// The theme itself is NOT decided here — app-theme.ts owns the application's
+// light/dark choice and this module is a thin adapter onto it (ADR-339), so
+// the canvas and the CSS chrome can never resolve the theme differently.
+import { resolvedTheme, subscribeAppTheme } from './app-theme';
+
 export type CanvasColorScheme = 'light' | 'dark';
 
-let query: MediaQueryList | null = null;
-let matchMediaSource: Window['matchMedia'] | undefined;
-
-function colorSchemeQuery(): MediaQueryList | null {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
-  // Reuse the browser query on hot drawing paths; replacing the browser host
-  // (including a test host) must not retain an earlier host's preference.
-  if (matchMediaSource !== window.matchMedia) {
-    matchMediaSource = window.matchMedia;
-    query = window.matchMedia('(prefers-color-scheme: dark)');
-  }
-  return query;
-}
-
 export function getCanvasColorScheme(): CanvasColorScheme {
-  return colorSchemeQuery()?.matches === true ? 'dark' : 'light';
+  return resolvedTheme();
 }
 
 export function subscribeCanvasColorScheme(onChange: () => void): () => void {
-  const media = colorSchemeQuery();
-  media?.addEventListener('change', onChange);
-  return () => media?.removeEventListener('change', onChange);
+  return subscribeAppTheme(onChange);
 }

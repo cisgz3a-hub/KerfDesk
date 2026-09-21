@@ -1,14 +1,18 @@
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../../core/controllers/grbl';
-import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
-import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { mockPlatform, renderWizard } from './device-setup-wizard.test-support';
+import {
+  changeSetupInput as changeInput,
+  changeSetupSelect as changeSelect,
+  openSetupDisclosure,
+  setupInput as input,
+  setupSelect as select,
+} from './device-setup-test-helpers';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -24,39 +28,6 @@ const IDLE_STATUS = {
   spindle: 0,
 } as const;
 
-function mockPlatform(serialSupported = true): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) => []),
-    pickFileForSave: vi.fn(async (_request: FileSaveRequest) => null),
-    serial: { isSupported: () => serialSupported, requestPort: async () => null },
-  };
-}
-
-async function renderWizard(
-  onClose: () => void = () => undefined,
-  adapter: PlatformAdapter = mockPlatform(),
-): Promise<{ readonly host: HTMLDivElement; readonly unmount: () => Promise<void> }> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <PlatformProvider adapter={adapter}>
-        <DeviceSetupWizard onClose={onClose} />
-      </PlatformProvider>,
-    );
-  });
-  return {
-    host,
-    unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    },
-  };
-}
-
 afterEach(() => {
   resetStore();
   useLaserStore.setState({
@@ -70,18 +41,74 @@ afterEach(() => {
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
-// The laser six-step shell and searchable-catalog behavior are pinned in
+// The three-stage shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
+  it('offers worker streaming only for GRBL-family controllers and keeps its saved preference', async () => {
+    const view = await renderWizard();
+    const workerOption = () =>
+      view.host.querySelector<HTMLInputElement>(
+        'input[aria-label="Read the serial port and refill the job stream in a worker"]',
+      );
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Advanced connection and streaming');
+      const option = workerOption();
+      if (option === null) throw new Error('GRBL worker option missing');
+      await act(async () => option.click());
+      expect(workerOption()?.checked).toBe(true);
+
+      for (const controllerKind of ['marlin', 'smoothieware']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()).toBeNull();
+      }
+      for (const controllerKind of ['grblhal', 'fluidnc', 'grbl-v1.1']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()?.checked).toBe(true);
+      }
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it.each(['laser', 'cnc'] as const)(
+    'reaches Save in two advances for %s without connecting',
+    async (kind) => {
+      const originalConnect = useLaserStore.getState().connect;
+      const connect = vi.fn(async () => undefined);
+      useLaserStore.setState({ connect });
+      const view = await renderWizard(undefined, mockPlatform(false));
+      try {
+        if (kind === 'cnc') {
+          const cnc = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
+          if (!(cnc instanceof HTMLInputElement)) throw new Error('CNC radio missing');
+          await act(async () => cnc.click());
+        }
+        await act(async () => button(view.host, 'Check essentials').click());
+        expect(view.host.textContent).toContain('Step 2 of 3');
+        await act(async () => button(view.host, 'Review setup').click());
+        expect(view.host.textContent).toContain('Step 3 of 3');
+        expect(
+          button(view.host, kind === 'cnc' ? 'Save CNC startup setup' : 'Save machine setup')
+            .disabled,
+        ).toBe(false);
+        expect(connect).not.toHaveBeenCalled();
+      } finally {
+        await view.unmount();
+        useLaserStore.setState({ connect: originalConnect });
+      }
+    },
+  );
+
   it('connects only after using the selected controller and baud', async () => {
     const originalConnect = useLaserStore.getState().connect;
     const connect = vi.fn(async () => undefined);
     useLaserStore.setState({ connect });
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await openSetupDisclosure(view.host, 'Connect and detect');
       await act(async () => {
         button(view.host, 'Connect…').click();
         await Promise.resolve();
@@ -105,12 +132,11 @@ describe('DeviceSetupWizard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await openSetupDisclosure(view.host, 'Connect and detect');
       expect(view.host.textContent).toContain('Connection does not match the setup draft');
       await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
-      await act(async () => button(view.host, 'Back').click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
     } finally {
       await view.unmount();
@@ -120,8 +146,7 @@ describe('DeviceSetupWizard', () => {
   it('disables serial connection when the platform does not support it', async () => {
     const view = await renderWizard(undefined, mockPlatform(false));
     try {
-      await act(async () => button(view.host, 'Next').click());
-      await act(async () => button(view.host, 'Next').click());
+      await openSetupDisclosure(view.host, 'Connect and detect');
       expect(button(view.host, 'Connect…').disabled).toBe(true);
       expect(view.host.textContent).toContain('Web Serial is unavailable');
     } finally {
@@ -133,7 +158,7 @@ describe('DeviceSetupWizard', () => {
     const onClose = vi.fn();
     const view = await renderWizard(onClose);
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await act(async () => button(view.host, 'Cancel without saving').click());
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -144,12 +169,36 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
+  it('lets an invalid work area reach Essentials and enables Save only after correction', async () => {
+    const before = useStore.getState();
+    useStore.setState({
+      project: {
+        ...before.project,
+        device: { ...before.project.device, bedWidth: 0 },
+      },
+    });
+    const view = await renderWizard();
+    try {
+      expect(button(view.host, 'Check essentials').disabled).toBe(false);
+      await act(async () => button(view.host, 'Check essentials').click());
+      expect(input(view.host, 'Bed width (mm)').value).toBe('0');
+      expect(button(view.host, 'Review setup').disabled).toBe(false);
+      await act(async () => button(view.host, 'Review setup').click());
+      expect(button(view.host, 'Save machine setup').disabled).toBe(true);
+      await act(async () => button(view.host, 'Back').click());
+      await changeInput(view.host, 'Bed width (mm)', '510');
+      await act(async () => button(view.host, 'Review setup').click());
+      expect(button(view.host, 'Save machine setup').disabled).toBe(false);
+      expect(useStore.getState().project.device.bedWidth).toBe(0);
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('atomically saves a laser profile and workspace at the end', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
+      await act(async () => button(view.host, 'Check essentials').click());
       await changeInput(view.host, 'Device name', 'Beginner laser');
       await changeInput(view.host, 'Bed width (mm)', '510');
       await advanceToReview(view.host);
@@ -174,16 +223,13 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = radios.item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
       await changeSelect(view.host, 'Built-in CNC machine', 'genmitsu-3018');
       await act(async () => button(view.host, 'Load into draft').click());
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
-      await act(async () => button(view.host, 'Next').click()); // CNC Startup Setup
+      await act(async () => button(view.host, 'Check essentials').click());
       expect(view.host.textContent).toContain('CNC machine limits');
       expect(view.host.textContent).toContain('assumes an installed, powered Z axis');
       expect(view.host.textContent).toContain('Recorded Z travel is informational');
-      expect(view.host.textContent).not.toContain('Laser output and accessories');
+      expect(view.host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
       await changeInput(view.host, 'Safe Z', '9');
       await advanceToReview(view.host);
@@ -209,15 +255,29 @@ describe('DeviceSetupWizard', () => {
       const hybridRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(2);
       if (!(hybridRadio instanceof HTMLInputElement)) throw new Error('hybrid radio missing');
       await act(async () => hybridRadio.click());
-      expect(view.host.textContent).toContain('Active mode after Save');
-      expect(view.host.textContent).toContain('interchangeable laser and spindle toolheads');
+      expect(view.host.querySelectorAll('input[name="active-machine-kind"]')).toHaveLength(2);
 
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
-      // Hybrid saves with Laser active, so its retained CNC draft stays on Confirm.
-      expect(view.host.textContent).toContain('Laser output and accessories');
+      await act(async () => button(view.host, 'Check essentials').click());
+      // Hybrid saves with Laser active, retaining both output contracts in Essentials.
+      expect(input(view.host, 'GRBL $30 max power S')).toBeInstanceOf(HTMLInputElement);
       expect(view.host.textContent).toContain('CNC machine limits');
+      expect(view.host.querySelector('select[aria-label="Project material"]')).toBeNull();
+      expect(view.host.querySelectorAll('#machine-setup-cnc-safe-z')).toHaveLength(1);
+
+      await act(async () => button(view.host, 'Back').click());
+      const cncMode = view.host.querySelectorAll('input[name="active-machine-kind"]').item(1);
+      if (!(cncMode instanceof HTMLInputElement)) throw new Error('Active CNC mode missing');
+      await act(async () => cncMode.click());
+      await act(async () => button(view.host, 'Check essentials').click());
+      await openSetupDisclosure(view.host, 'CNC job setup');
+      expect(select(view.host, 'Project material')).toBeInstanceOf(HTMLSelectElement);
+
+      await act(async () => button(view.host, 'Back').click());
+      const laserMode = view.host.querySelectorAll('input[name="active-machine-kind"]').item(0);
+      if (!(laserMode instanceof HTMLInputElement)) throw new Error('Active Laser mode missing');
+      await act(async () => laserMode.click());
+      await act(async () => button(view.host, 'Check essentials').click());
+      expect(view.host.querySelector('select[aria-label="Project material"]')).toBeNull();
       await changeInput(view.host, 'Safe Z', '10');
       await advanceToReview(view.host);
       await act(async () => button(view.host, 'Save machine setup').click());
@@ -234,16 +294,19 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
-  it('blocks a controller that cannot run the selected CNC output contract', async () => {
+  it('allows review of an unsupported CNC controller but keeps invalid setup unsaved', async () => {
     const view = await renderWizard();
     try {
       const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
-      expect(button(view.host, 'Next').disabled).toBe(true);
+      expect(button(view.host, 'Check essentials').disabled).toBe(false);
+      await advanceToReview(view.host);
+      expect(button(view.host, 'Save CNC startup setup').disabled).toBe(true);
+      expect(view.host.textContent).toContain('cannot run KerfDesk CNC jobs');
     } finally {
       await view.unmount();
     }
@@ -252,9 +315,10 @@ describe('DeviceSetupWizard', () => {
   it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await advanceToReview(view.host);
+      await openSetupDisclosure(view.host, 'Controller settings');
       expect(view.host.textContent).toContain('Marlin configuration is not written from KerfDesk');
       expect(view.host.textContent).toContain('M503, M114, M400');
       expect(view.host.textContent).not.toContain('Write and verify');
@@ -266,13 +330,13 @@ describe('DeviceSetupWizard', () => {
   it('hides serial streaming and G-code controls for file-only Ruida setup', async () => {
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
       await changeSelect(view.host, 'Controller firmware', 'ruida');
       expect(view.host.textContent).toContain('File export');
       expect(view.host.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
       expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
       expect(view.host.querySelector('[aria-label="Streaming mode"]')).toBeNull();
-      await act(async () => button(view.host, 'Next').click());
+      await openSetupDisclosure(view.host, 'Connect and detect');
       expect(view.host.textContent).toContain('No live connection is used for this controller');
     } finally {
       await view.unmount();
@@ -298,6 +362,7 @@ describe('DeviceSetupWizard', () => {
     const view = await renderWizard();
     try {
       await advanceToReview(view.host);
+      await openSetupDisclosure(view.host, 'Controller settings');
       expect(view.host.textContent).toContain('Queue $30 for Save');
       expect(view.host.textContent).toContain('$130');
       expect(view.host.textContent).toContain('never batch-written');
@@ -339,44 +404,13 @@ describe('DeviceSetupWizard', () => {
 });
 
 async function advanceToReview(host: HTMLElement): Promise<void> {
-  while (
-    ![...host.querySelectorAll('button')].some(
-      (candidate) =>
-        candidate.textContent?.includes('Save machine setup') ||
-        candidate.textContent?.includes('Save CNC startup setup'),
-    )
-  ) {
-    await act(async () => button(host, 'Next').click());
+  for (const label of ['Check essentials', 'Review setup']) {
+    const next = [...host.querySelectorAll('button')].find((candidate) =>
+      candidate.textContent?.includes(label),
+    );
+    if (next !== undefined) await act(async () => next.click());
   }
-}
-
-async function changeSelect(host: HTMLElement, ariaLabel: string, value: string): Promise<void> {
-  const field = select(host, ariaLabel);
-  await act(async () => {
-    field.value = value;
-    Simulate.change(field);
-  });
-}
-
-function select(host: HTMLElement, ariaLabel: string): HTMLSelectElement {
-  const field = host.querySelector(`select[aria-label="${ariaLabel}"]`);
-  if (!(field instanceof HTMLSelectElement)) throw new Error(`Select missing: ${ariaLabel}`);
-  return field;
-}
-
-async function changeInput(host: HTMLElement, ariaLabel: string, value: string): Promise<void> {
-  const field = input(host, ariaLabel);
-  await act(async () => {
-    field.value = value;
-    Simulate.change(field);
-  });
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
-}
-
-function input(host: HTMLElement, ariaLabel: string): HTMLInputElement {
-  const field = host.querySelector(`input[aria-label="${ariaLabel}"]`);
-  if (!(field instanceof HTMLInputElement)) throw new Error(`Input missing: ${ariaLabel}`);
-  return field;
+  expect(host.textContent).toContain('Step 3 of 3');
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {

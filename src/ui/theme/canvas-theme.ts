@@ -12,7 +12,7 @@
 
 import { getCanvasColorScheme } from './canvas-color-scheme';
 
-export const DARK_CANVAS_BED = '#242930';
+export const DARK_CANVAS_BED = '#26231f';
 
 function themed(light: string, dark: string): string {
   return getCanvasColorScheme() === 'dark' ? dark : light;
@@ -26,13 +26,13 @@ export const canvasTheme = {
     return themed('#ffffff', DARK_CANVAS_BED);
   },
   get bedStroke() {
-    return themed('#a2afbf', '#65758b');
+    return themed('#aaa59d', '#7b7468');
   },
   get grid() {
-    return themed('#dce2ea', '#343b46');
+    return themed('#ddd9d3', '#3a352d');
   },
   get artworkInk() {
-    return themed('#1a1a1a', '#e0e7f2');
+    return themed('#1a1a1a', '#ece7df');
   },
   origin: '#cc0000',
   // Selection chrome (draw-scene)
@@ -59,19 +59,19 @@ export const canvasTheme = {
   stockStroke: 'rgba(160, 120, 70, 0.55)',
   // Rulers (draw-rulers)
   get rulerBackground() {
-    return themed('#f5f7fa', '#272c34');
+    return themed('#f1efec', '#2e2b27');
   },
   get rulerBorder() {
-    return themed('#dce2ea', '#3d4653');
+    return themed('#ddd9d3', '#464139');
   },
   get rulerText() {
-    return themed('#5f6f85', '#a0afc3');
+    return themed('#6b655c', '#b3aca1');
   },
   get rulerMajorTick() {
-    return themed('#5f6f85', '#a0afc3');
+    return themed('#6b655c', '#b3aca1');
   },
   get rulerMinorTick() {
-    return themed('#a2afbf', '#65758b');
+    return themed('#aaa59d', '#7b7468');
   },
   // Preview toolpath (draw-preview)
   previewTravel: '#bbbbbb',
@@ -89,22 +89,22 @@ export const canvasTheme = {
   // entities have no layer yet — they only acquire one at Apply — so they need
   // their own theme-aware ink. Construction guides remain muted.
   get designGeometry() {
-    return themed('#1a1a1a', '#e0e7f2');
+    return themed('#1a1a1a', '#ece7df');
   },
   get designConstruction() {
-    return themed('#9aa0a6', '#a0afc3');
+    return themed('#9a948b', '#b3aca1');
   },
   // Off-bed surround in the Design Studio. Deliberately a clear grey rather than
   // the main viewport: the Studio surround and bed are painted side by side,
   // so a clear boundary makes drawing off the sheet immediately visible.
   get designSurround() {
-    return themed('#dfe3e8', '#191d23');
+    return themed('#e0ddd7', '#1c1a18');
   },
   // Live-motion label (draw-canvas-motion). Both follow the bed: a hard-white
   // plate on the dark bed read as a sticker pasted over the work, and the
   // safety red that carries it needs lifting to stay legible on the dark plate.
   get motionLabelPlate() {
-    return themed('#ffffff', '#111820');
+    return themed('#ffffff', '#141210');
   },
   get motionLabelInk() {
     return themed('#dc2626', '#fca5a5');
@@ -126,12 +126,12 @@ export const canvasTheme = {
   },
   // Rapids are not work, so they recede instead of competing with the burn.
   get burnTravel() {
-    return themed('#94a3b8', '#64748b');
+    return themed('#9a948b', '#7b7468');
   },
   get burnPlanned() {
     // Slate at 0.28 was invisible against the dark bed, and both values are
     // pre-divided by the composite alpha so they land where they are specified.
-    return themed('rgba(71, 85, 105, 0.42)', 'rgba(148, 163, 184, 0.40)');
+    return themed('rgba(90, 84, 76, 0.42)', 'rgba(179, 172, 161, 0.40)');
   },
 } as const;
 

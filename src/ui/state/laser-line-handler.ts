@@ -204,9 +204,8 @@ function recordInboundLine(
 ): void {
   // A stream-owned `ok` is one of hundreds a second and its own source group is
   // hidden by default, so it is held on the refs and published with the next
-  // line anyone is waiting to see — the status poll, at worst a quarter second
-  // later (ADR-333). Everything else publishes immediately, carrying whatever
-  // was held back ahead of itself so wire order survives.
+  // non-job line or the next job entry after the batch deadline (ADR-333).
+  // Everything else publishes immediately, preserving wire order.
   const streamAck = cls.kind === 'ok' && hasUnsettledStreamAcks(state.streamer);
   const buffered = streamAck && streamOwnsTerminalAck(state);
   const entry = inboundTranscriptEntry(
@@ -217,8 +216,9 @@ function recordInboundLine(
     refs.driver.kind,
     buffered ? 'job' : 'controller',
   );
-  if (buffered) bufferTranscriptEntry(refs, entry, line);
-  else set(publishTranscriptPatch(refs, state, entry, line));
+  if (buffered) {
+    if (bufferTranscriptEntry(refs, entry, line)) set(publishTranscriptPatch(refs, state));
+  } else set(publishTranscriptPatch(refs, state, entry, line));
   if (refs.onLineArrived !== null) {
     const cb = refs.onLineArrived;
     refs.onLineArrived = null;

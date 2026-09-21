@@ -14,14 +14,15 @@ export async function traceImageRegion(
   image: RawImageData,
   requestedOptions: TraceOptions,
   boundary: TraceBoundary | null | undefined,
+  signal?: AbortSignal,
 ): Promise<TraceResult> {
   const options = resolveTraceSourceOptions(image, requestedOptions);
   const normalized = normalizeTraceBoundary(boundary, image.width, image.height);
   if (normalized === null) {
-    return traceImageWithFallback(image, options);
+    return traceImageWithFallback(image, options, signal);
   }
   const cropped = cropRawImageData(image, normalized);
-  const traced = await traceImageWithFallback(cropped, options);
+  const traced = await traceImageWithFallback(cropped, options, signal);
   return {
     ...traced,
     paths: offsetColoredPaths(traced.paths, normalized.x, normalized.y),

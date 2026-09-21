@@ -3,10 +3,10 @@ import type { JobOriginPlacement, Toolpath, ToolpathStep } from '../../core/job'
 import type { DeviceProfile } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
-import { MAX_COMPILED_MOTION_SEGMENTS } from '../../core/preflight/compiled-work';
 import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan';
 import { comparePreviewRoutesAtEmitPrecision } from './preview-route-parity';
 import { mapToolpathToScene } from './preview-scene-frame';
+import { previewRouteExceedsBudget } from './preview-route-budget';
 
 export {
   comparePreviewRoutesAtEmitPrecision,
@@ -36,20 +36,6 @@ type PreviewRouteSource = ExecutablePlanPreviewRoute['source'] | 'legacy-toolpat
 const executableRouteCache = new WeakMap<Toolpath, ExecutablePlanPreviewRoute>();
 
 /**
- * Route size past which a second, plan-backed preview authority is not built.
- *
- * Verifying one costs the whole emitted program and the v1 plan at once, then
- * retains a complete second route beside the legacy one for as long as the
- * preview lives — measured at roughly four times the memory of the legacy
- * route alone. A dense traced line drawing compiles to millions of fill spans,
- * and those copies, not the job itself, are what exhausted the renderer
- * ("Aw, Snap! Out of Memory") after a large trace. The line is the same
- * advisory program size the operator is already shown, read in route steps,
- * which never undercount the motion segments that raise it.
- */
-export const MAX_PLAN_PREVIEW_ROUTE_STEPS = MAX_COMPILED_MOTION_SEGMENTS;
-
-/**
  * Whether this prepared job may carry the plan-backed preview authority at
  * all. Deciding before the scene mapping lets a fallback consume the freshly
  * built machine route in place rather than retaining two complete routes.
@@ -57,7 +43,7 @@ export const MAX_PLAN_PREVIEW_ROUTE_STEPS = MAX_COMPILED_MOTION_SEGMENTS;
 export function planPreviewRouteEligible(args: {
   readonly prepared: PreparedSuccess;
   readonly jobOrigin?: JobOriginPlacement;
-  readonly routeStepCount: number;
+  readonly route: Toolpath;
 }): boolean {
   // v1 interprets the emitted program from an assumed work-origin start.
   // Current-position placement has a live runtime basis even when its numeric
@@ -74,7 +60,7 @@ export function planPreviewRouteEligible(args: {
   ) {
     return false;
   }
-  return args.routeStepCount <= MAX_PLAN_PREVIEW_ROUTE_STEPS;
+  return !previewRouteExceedsBudget(args.route);
 }
 
 /**
@@ -94,7 +80,7 @@ export function registerExecutablePlanPreviewRoute(args: {
     !planPreviewRouteEligible({
       prepared: args.prepared,
       ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
-      routeStepCount: args.legacyMachineToolpath.steps.length,
+      route: args.legacyMachineToolpath,
     })
   ) {
     return 'legacy-toolpath';

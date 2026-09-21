@@ -9,12 +9,23 @@
  * tokens; DYNAMIC styling (drag readout position, layer color swatches,
  * progress width, preview opacity) stays inline by policy.
  *
- * Theme: quiet blue chrome follows the operating system's light/dark mode.
- * The canvas viewport follows the same theme with display-only artwork ink —
- * its palette lives in canvas-theme.ts; the two shared values
- * (--lf-accent ↔ selection, --lf-danger ↔ out-of-bounds) are pinned by
- * theme-sync.test.ts. Keep component code on tokens so theme changes stay
- * centralized here.
+ * Theme: warm-neutral chrome with a copper accent drawn from the KerfDesk
+ * startup wordmark (ADR-339). The app opens LIGHT on every machine; dark is a
+ * deliberate choice, not an inherited one, so the dark palette is keyed off
+ * the `data-theme` attribute that app-theme.ts stamps on <html> rather than
+ * off `prefers-color-scheme`.
+ *
+ * The greys are warm rather than blue-tinted so they sit under copper without
+ * the two casts fighting; the canvas viewport follows the same theme with
+ * display-only artwork ink. Its palette lives in canvas-theme.ts, and the two
+ * values shared across that boundary (--lf-canvas-selection ↔ selection,
+ * --lf-danger ↔ out-of-bounds) are pinned by theme-sync.test.ts.
+ *
+ * NOTE the canvas selection stays BLUE while the chrome accent is copper —
+ * that split is deliberate, not drift. The bed already carries a warm
+ * machine-state language (amber scorch, gold tab handles, safety red), so a
+ * copper selection box would read as one of them. Keep component code on
+ * tokens so theme changes stay centralized here.
  *
  * Performance: flat colors only — no blur, no box-shadow on surfaces that
  * re-render at the 250 ms status poll; transitions are limited to
@@ -25,26 +36,28 @@
   color-scheme: var(--lf-color-scheme);
   /* Surfaces */
   --lf-color-scheme: light;
-  --lf-bg-0: #f5f7fa; /* bars: menubar, toolbar, statusbar */
-  --lf-bg-1: #ffffff; /* rails + dialog panels */
-  --lf-bg-2: #f5f7fa; /* cards, dropdown menus, hover wells */
-  --lf-bg-input: #ffffff; /* inputs, log scrollback */
-  --lf-bg-canvas: #f4f5f7;
-  --lf-bg-overlay: rgba(255, 255, 255, 0.96);
+  --lf-bg-0: #f1efec; /* bars: menubar, toolbar, statusbar */
+  --lf-bg-1: #faf9f7; /* rails + dialog panels */
+  --lf-bg-2: #f1efec; /* cards, dropdown menus, hover wells */
+  --lf-bg-input: #fdfcfb; /* inputs, log scrollback */
+  --lf-bg-canvas: #eceae6;
+  --lf-bg-overlay: rgba(250, 249, 247, 0.96);
   /* Fixed light artwork/material previews keep their text legible in either theme. */
-  --lf-material-surface-text: #5f6f85;
-  --lf-border: #dce2ea;
-  --lf-border-strong: #a2afbf;
+  --lf-material-surface-text: #6b655c;
+  --lf-border: #ddd9d3;
+  --lf-border-strong: #aaa59d;
 
-  /* Text */
-  --lf-text: #253248;
-  --lf-text-muted: #5f6f85;
-  --lf-text-faint: #64748b;
+  /* Text — warm near-black rather than blue-slate. */
+  --lf-text: #2b2823;
+  --lf-text-muted: #6b655c; /* 5.03:1 on the bars, the darkest chrome ground */
+  --lf-text-faint: #726c63; /* 4.53:1 on the bars, the darkest chrome ground */
 
-  /* Slightly deeper than the preview's #3478d4 so small white labels pass AA. */
-  --lf-accent: #3175d0;
-  --lf-accent-hover: #2967bb;
-  --lf-accent-active: #235aa5;
+  /* Copper, from the startup wordmark's #c99a63 but deepened: the brand tan
+   * carries only 3.6:1 against white, and these fills hold small white labels.
+   * #a85a2a is 5.02:1, so button text clears AA. */
+  --lf-accent: #a85a2a;
+  --lf-accent-hover: #924b22;
+  --lf-accent-active: #7c3f1c;
   /* Semantic fills (white text on these passes AA). */
   --lf-danger: #b43337;
   --lf-danger-hover: #9d2b30;
@@ -54,28 +67,39 @@
   /* Text/icons sitting ON one of the semantic fills above */
   --lf-on-fill: #ffffff;
 
-  /* Semantic text on light surfaces */
-  --lf-accent-fg: #2967bb;
+  /* Semantic text on light surfaces. Copper sits at 22° and warning at 42°,
+   * far enough apart that "accent" never reads as "caution". */
+  --lf-accent-fg: #8f4418;
   --lf-danger-fg: #a02c31;
   --lf-success-fg: #246b4b;
   --lf-warning-fg: #805117;
   --lf-trace-fg: #6a1b9a;
 
+  /* The canvas selection box, shared with canvas-theme.ts and pinned by
+   * theme-sync.test.ts. Deliberately NOT --lf-accent: the bed's own language
+   * is warm (scorch, tab handles, safety red), so selection stays cool to
+   * stay separable from machine state. No chrome uses this. */
+  --lf-canvas-selection: #3175d0;
+
   /* Tinted panel backgrounds behind semantic banners/wells */
-  --lf-tint-danger: #fff0f1;
-  --lf-tint-warning: #fff9ec;
-  --lf-tint-info: #eaf2ff;
-  --lf-tint-accent: var(--lf-tint-info);
-  --lf-tint-success: #edf7f1;
+  --lf-tint-danger: #faecec;
+  --lf-tint-warning: #faf2e4;
+  /* Info doubles as the active/selected row well, so it stays cool — a warm
+   * one here would be indistinguishable from the warning tint above. */
+  --lf-tint-info: #eaeff5;
+  /* Its own value rather than an alias of info: this is the chrome's copper
+   * well (toolbar toggles, layout select), where the accent should read. */
+  --lf-tint-accent: #f9efe6;
+  --lf-tint-success: #e9f3ed;
   --lf-tint-success-hover: #dcefe4;
   --lf-tint-success-active: #cee8d9;
   /* Faint accent wash (drag-import overlay fill) */
-  --lf-accent-wash: rgba(49, 117, 208, 0.08);
+  --lf-accent-wash: rgba(168, 90, 42, 0.08);
 
-  --lf-focus: #3175d0;
-  --lf-backdrop: rgba(37, 50, 72, 0.35);
+  --lf-focus: #a85a2a;
+  --lf-backdrop: rgba(38, 34, 30, 0.35);
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
-  --lf-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  --lf-shadow: 0 2px 8px rgba(28, 25, 21, 0.18);
 
   /* Type scale */
   --lf-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -103,36 +127,42 @@
   --lf-z-toast: 1100;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --lf-color-scheme: dark;
-    --lf-bg-0: #272c34;
-    --lf-bg-1: #20242b;
-    --lf-bg-2: #272c34;
-    --lf-bg-input: #20242b;
-    --lf-bg-canvas: #191d23;
-    --lf-bg-overlay: rgba(32, 36, 43, 0.96);
-    --lf-border: #3d4653;
-    --lf-border-strong: #65758b;
-    --lf-text: #e0e7f2;
-    --lf-text-muted: #a0afc3;
-    --lf-text-faint: #a0afc3;
-    --lf-accent-fg: #79b3ff;
-    --lf-danger-fg: #ff9da2;
-    --lf-success-fg: #80caa4;
-    --lf-warning-fg: #e9c183;
-    --lf-trace-fg: #d6a5f5;
-    --lf-tint-danger: #3f282e;
-    --lf-tint-warning: #3d3323;
-    --lf-tint-info: #243e61;
-    --lf-tint-success: #233b31;
-    --lf-tint-success-hover: #2c4b3c;
-    --lf-tint-success-active: #345b48;
-    --lf-accent-wash: rgba(121, 179, 255, 0.12);
-    --lf-focus: #79b3ff;
-    --lf-backdrop: rgba(10, 14, 21, 0.6);
-    --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  }
+/* Dark is opt-in, so it keys off the attribute app-theme.ts stamps on <html>
+ * rather than off `prefers-color-scheme` (ADR-339). With no JavaScript, or
+ * before it runs, the light palette above stands — which is the shipped look.
+ * --lf-accent is NOT re-declared: copper holds 5.02:1 with white labels on
+ * either ground, and lightening it here would drop button text below AA. */
+:root[data-theme='dark'] {
+  --lf-color-scheme: dark;
+  --lf-bg-0: #2e2b27;
+  --lf-bg-1: #252320;
+  --lf-bg-2: #2e2b27;
+  --lf-bg-input: #252320;
+  --lf-bg-canvas: #1c1a18;
+  --lf-bg-overlay: rgba(37, 35, 32, 0.96);
+  --lf-border: #464139;
+  --lf-border-strong: #7b7468;
+  --lf-text: #ece7df;
+  --lf-text-muted: #b3aca1;
+  --lf-text-faint: #b3aca1;
+  /* 7.2:1 on --lf-bg-1, and held at 26° so it stays separable from the
+   * warning tan below (42°) — the two were nearly the same colour otherwise. */
+  --lf-accent-fg: #e39a63;
+  --lf-danger-fg: #ff9da2;
+  --lf-success-fg: #80caa4;
+  --lf-warning-fg: #eac66f;
+  --lf-trace-fg: #d6a5f5;
+  --lf-tint-danger: #3b2725;
+  --lf-tint-warning: #3a3122;
+  --lf-tint-info: #2b3440;
+  --lf-tint-accent: #3d2f22;
+  --lf-tint-success: #233b31;
+  --lf-tint-success-hover: #2c4b3c;
+  --lf-tint-success-active: #345b48;
+  --lf-accent-wash: rgba(227, 154, 99, 0.12);
+  --lf-focus: #e39a63;
+  --lf-backdrop: rgba(12, 11, 9, 0.6);
+  --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 html,
@@ -172,7 +202,7 @@ body {
     border-color 80ms;
 }
 .lf-btn:hover:not(:disabled) {
-  background: var(--lf-tint-info);
+  background: var(--lf-tint-accent);
   border-color: var(--lf-accent);
 }
 .lf-btn:active:not(:disabled) {
@@ -216,7 +246,7 @@ body {
   border-color: transparent;
 }
 .lf-btn--ghost:hover:not(:disabled) {
-  background: var(--lf-tint-info);
+  background: var(--lf-tint-accent);
 }
 
 /* Light-green "go" actions (LightBurn's green-means-run): Frame and Start.
@@ -274,7 +304,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .lf-btn--attention:not(:disabled) {
     animation: none;
-    background: var(--lf-tint-info);
+    background: var(--lf-tint-accent);
     border-color: var(--lf-accent);
   }
 }
@@ -406,7 +436,7 @@ body {
     border-color 80ms;
 }
 .lf-pane-form button:not([class]):not(:where(.lf-dialog *)):hover:not(:disabled) {
-  background: var(--lf-tint-info);
+  background: var(--lf-tint-accent);
   border-color: var(--lf-accent);
 }
 .lf-pane-form button:not([class]):not(:where(.lf-dialog *)):active:not(:disabled) {
@@ -783,7 +813,7 @@ body {
   text-align: left;
 }
 .lf-menu-item:hover:not(:disabled) {
-  background: var(--lf-tint-info);
+  background: var(--lf-tint-accent);
   color: var(--lf-accent-fg);
 }
 .lf-menu-item:disabled {

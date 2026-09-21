@@ -180,7 +180,7 @@ async function runStartJob(
       // The first window is on the wire and accounted for, so the transport
       // may take the refill from here (ADR-334). A transport that cannot host
       // it, or a stream that is no longer simply streaming, is a no-op.
-      await armHostedRefill(context.refs, get().streamer);
+      await armHostedRefill(context.refs, () => get().streamer);
     } catch (error) {
       const state = get();
       const ackedLines =
