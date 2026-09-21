@@ -4,7 +4,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'image-studio',
     title: 'Edit pixels in Image Studio',
-    summary: 'Clean up or paint an image, then apply the result to the project.',
+    summary: 'Touch up a picture and save the changes to your project.',
     category: 'Images & tracing',
     machine: 'all',
     minutes: 3,
@@ -15,26 +15,26 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Open the image',
         instruction:
-          'Select a bitmap and open Image Studio. If no bitmap is selected, the command lets you import one. Zoom into the area you want to improve.',
+          'Select a picture and open Image Studio. If no picture is selected, choose one to import. Zoom in on the area you want to edit.',
         focus: 'Image Studio',
-        result: 'The image opens in a separate pixel-editing session.',
+        result: 'Your picture opens in Image Studio.',
       },
       {
-        title: 'Choose a local edit',
+        title: 'Edit the picture',
         instruction:
-          'Use Panels to show layers and history, then choose the layer to edit. Use Brush or Eraser for direct marks, a selection tool to isolate an area, or Adjust and Filter to change the active layer.',
+          'Use Panels to show the layers. Choose the layer to edit. Use Brush to paint or Eraser to remove marks.',
         focus: 'Tool → options → image',
-        result: 'The Studio previews your image edits before project output changes.',
+        result: 'You can see your changes in Image Studio.',
       },
       {
         title: 'Apply the result',
         instruction:
-          'Click Apply to update the project image, or Apply & Trace to update it and open Trace Image. Close returns to the workspace and keeps the editing session.',
+          'Click Apply to update the project picture. Use Apply & Trace if you want to trace it next. Click Close to return to the workspace.',
         focus: 'Apply or Apply & Trace',
-        result: 'Applied pixels are available to the project as one undo step.',
+        result: 'The project picture includes your applied changes.',
       },
     ],
-    tip: 'Closing the Studio keeps pending edits in its session. Apply is the action that commits them to the project image.',
+    tip: 'Close keeps your edits in Image Studio. Click Apply to use them in the project.',
     keywords: ['image', 'studio', 'edit', 'paint', 'filter', 'adjust', 'history'],
     related: ['image-paint', 'image-select', 'image-layers', 'trace'],
   },
@@ -78,7 +78,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'image-mask',
     title: 'Mask and crop an image',
-    summary: 'Show an image through a vector outline, with the option to bake the crop.',
+    summary: 'Use a shape to choose which part of a picture is visible.',
     category: 'Images & tracing',
     machine: 'all',
     minutes: 3,
@@ -89,33 +89,33 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Place the mask outline',
         instruction:
-          'Draw a closed shape over the area of the image you want to keep, such as a circle for a round photograph. Position the image and outline carefully.',
+          'Draw a closed shape over the part of the picture you want to keep. For example, use a circle for a round photo.',
         focus: 'Image plus closed outline',
-        result: 'The overlapping area defines the visible image region.',
+        result: 'The shape marks the part of the picture to keep.',
       },
       {
         title: 'Apply a reversible mask',
         instruction:
-          'Select the image and the closed vector shape together, then choose Apply Image Mask. Inspect the edge at a useful zoom.',
+          'Select the picture and shape together. Choose Apply Image Mask. Zoom in to check the edge.',
         focus: 'Apply Image Mask',
-        result: 'The image is clipped to the vector geometry without baking the original pixels.',
+        result: 'The picture appears inside the shape. The original pixels are kept.',
       },
       {
-        title: 'Keep, remove or bake it',
+        title: 'Keep the mask or crop',
         instruction:
-          'Select the masked image. Remove Image Mask restores the unmasked view. Crop Image bakes the mask into the pixels and trims the image bounds.',
+          'Select the masked picture. Remove Image Mask shows the full picture again. Crop Image applies the crop to the pixels.',
         focus: 'Remove mask or Crop Image',
-        result: 'You choose whether to retain an editable mask or a cropped bitmap.',
+        result: 'You can keep the mask or make a cropped picture.',
       },
     ],
-    tip: 'Save a project copy before baking if you may need the full source later. A mask outline is different from an Image Studio pixel selection.',
+    tip: 'Save a project copy before using Crop Image if you may need the full picture later.',
     keywords: ['mask', 'crop', 'image', 'clip', 'circle', 'photo'],
     related: ['rectangle', 'ellipse', 'image-crop'],
   },
   {
     id: 'trace',
     title: 'Turn an image into paths',
-    summary: 'Compare trace styles and make vector artwork from a bitmap.',
+    summary: 'Make editable outlines from a picture.',
     category: 'Images & tracing',
     machine: 'all',
     minutes: 4,
@@ -126,33 +126,33 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a trace style',
         instruction:
-          'Open Trace Image. Try Line Art for logos or drawings, Smooth for quieter curves, or Sharp for fine details. Centerline follows the middle of strokes; outline styles follow their edges.',
+          'Open Trace Image. Start with Line Art for a logo or drawing. Try Smooth for smoother outlines or Sharp to keep fine detail.',
         focus: 'Trace preset',
-        result: 'The preview shows the kind of geometry the selected style produces.',
+        result: 'The preview shows the traced outlines.',
       },
       {
         title: 'Refine the preview',
         instruction:
-          'Compare small holes and thin lines with the source. For Line Art, Smooth or Sharp, choose Detection → Manual brightness band when you need Cutoff and Threshold controls. Expand Curve finishing to adjust the outline; Centerline has no Curve finishing section.',
+          'Check small holes and thin lines in the preview. For Line Art, Smooth or Sharp, choose Detection → Manual brightness band to adjust Cutoff and Threshold.',
         focus: 'Refine detail',
-        result: 'The preview preserves useful features while reducing unwanted marks.',
+        result: 'You can check which details the trace keeps.',
       },
       {
-        title: 'Choose output and source retention',
+        title: 'Keep editable paths',
         instruction:
-          'Use Editable vectors for paths. Laser mode also offers Raster scan. Clear Delete image after trace if you want to keep the original for Re-trace Original later.',
-        focus: 'Result and Delete image after trace',
-        result: 'You decide both the output form and whether the source remains in the project.',
+          'In laser mode, choose Editable vectors; CNC already uses vectors. Clear Delete Image After trace to keep the picture for Re-trace Original later.',
+        focus: 'Result and Delete Image After trace',
+        result: 'The trace will be editable and the original picture will stay.',
       },
       {
         title: 'Create and inspect',
         instruction:
-          'Confirm the trace, then inspect it on the canvas and in Preview. Check that holes, outlines and operation settings match the intended result.',
+          'Click Trace. Check the outlines and holes on the canvas. Open Preview to check the paths and operation settings.',
         focus: 'Trace → inspect',
-        result: 'The traced artwork is available for editing and output.',
+        result: 'Your traced paths are ready to edit.',
       },
     ],
-    tip: 'Centerline and outline tracing make different paths. Use Centerline for single-stroke linework; inspect closed regions before using a fill or pocket.',
+    tip: 'Centerline follows the middle of each stroke. Other styles trace outlines. Check that regions are closed before using a fill or pocket.',
     keywords: ['trace', 'bitmap', 'vector', 'centerline', 'threshold', 'outline', 'retrace'],
     related: ['image-studio', 'nodes', 'trace-batch', 'laser-fill'],
   },

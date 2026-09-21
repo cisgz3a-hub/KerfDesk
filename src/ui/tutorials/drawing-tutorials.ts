@@ -24,21 +24,20 @@ function shapeLesson(shape: ShapeLesson): Tutorial {
     steps: [
       {
         title: 'Choose the shape',
-        instruction: `Choose ${shape.title} on the left drawing toolbar. Move the pointer to an empty area of the canvas.`,
+        instruction: `Choose ${shape.title} on the left toolbar. Find an empty area of the canvas.`,
         focus: shape.title,
-        result: 'The selected tool is highlighted and ready to draw.',
+        result: 'The tool is ready to draw.',
       },
       {
         title: 'Draw its outline',
         instruction: shape.gesture,
         focus: 'Drag, then release',
-        result:
-          'The new shape is selected. The workspace returns to Select so you can position it.',
+        result: 'The new shape is selected and ready to move.',
       },
       {
-        title: 'Give it exact dimensions',
+        title: 'Set the size',
         instruction: shape.properties,
-        focus: 'Artwork / Operations → Settings',
+        focus: 'Artwork / Operations → Settings → Artwork',
         result: shape.outcome,
       },
     ],
@@ -52,7 +51,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'select',
     title: 'Select, move and resize',
-    summary: 'Choose artwork and position it accurately on the bed.',
+    summary: 'Choose an object, move it and change its size.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 3,
@@ -63,26 +62,26 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Pick the artwork',
         instruction:
-          'Choose Select / transform, then click an object. Shift-click adds another object; dragging across empty canvas makes a selection box.',
+          'Choose Select / transform. Click an object to select it. Hold Shift while clicking to add another object.',
         focus: 'Click or Shift-click',
-        result: 'Selection handles identify the artwork you are about to change.',
+        result: 'Handles appear around the selected artwork.',
       },
       {
         title: 'Move the selection',
         instruction:
-          'Drag the centre arrows to move the selected artwork. Use the arrow keys for 1 mm nudges, or Shift plus an arrow for 10 mm.',
+          'Drag the centre arrows to move the artwork. Use the arrow keys to move it 1 mm at a time.',
         focus: 'Centre move handle',
-        result: 'The artwork moves without changing its shape or operation settings.',
+        result: 'The artwork moves to its new position.',
       },
       {
         title: 'Resize or turn it',
         instruction:
-          'Drag a corner size handle to resize proportionally; hold Shift to resize freely. Edge handles change one dimension. Use a rotation handle to turn, or the numeric transform fields for an exact position or size.',
+          'Drag a corner handle to change the size while keeping the proportions. Drag a rotation handle to turn the artwork.',
         focus: 'Size and rotation handles',
-        result: 'The selection fits the intended space on your material.',
+        result: 'The artwork has the size and angle you want.',
       },
     ],
-    tip: 'Alt-click cycles through overlapping objects. Undo with Ctrl+Z if you move the wrong item.',
+    tip: 'Use the numeric transform fields for an exact size or position. Ctrl+Z undoes the last change.',
     keywords: ['select', 'move', 'resize', 'rotate', 'group', 'duplicate', 'transform'],
     related: ['align', 'distribute', 'workspace'],
   },
@@ -91,49 +90,47 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     title: 'Draw rectangle',
     visual: 'rectangle',
     gesture:
-      'Press at one corner, drag to the opposite corner, then release. Hold Shift for a square. Hold Ctrl or Command to draw outwards from the centre.',
+      'Drag from one corner to the opposite corner. Release to finish. Hold Shift while dragging to make a square.',
     properties:
-      'Keep the rectangle selected. In Settings, enter Width and Height in millimetres. Increase Corner radius for a rounded rectangle.',
-    outcome: 'A precisely sized rectangle or rounded rectangle remains editable.',
-    tip: 'Corner radius cannot exceed half the shorter side. A rotated rectangle also shows its larger footprint on the bed.',
+      'Keep the rectangle selected. In Settings → Artwork, enter Width and Height. Increase Corner radius if you want rounded corners.',
+    outcome: 'A rectangle with the width and height you need.',
+    tip: 'Width and Height are in millimetres. Corner radius cannot exceed half the shorter side.',
   }),
   shapeLesson({
     id: 'ellipse',
     title: 'Draw ellipse',
     visual: 'ellipse',
     gesture:
-      'Drag across the area the ellipse should occupy. Hold Shift to make a circle, or Ctrl or Command to expand it around the starting point.',
+      'Drag across the space where you want the ellipse. Hold Shift to make a circle. Release to finish.',
     properties:
-      'Keep the ellipse selected and set Width and Height in Settings. Set both values equal when you need an exact circle.',
-    outcome: 'A smooth ellipse or circle has the required overall width and height.',
-    tip: 'For a 30 mm circle, set both width and height to 30 mm. These are full dimensions, not radii.',
+      'Keep the ellipse selected. In Settings → Artwork, enter Width and Height. Use the same value for both to make a circle.',
+    outcome: 'An oval or circle in the size you need.',
+    tip: 'For a 30 mm circle, set Width and Height to 30 mm.',
   }),
   shapeLesson({
     id: 'polygon',
     title: 'Draw polygon',
     visual: 'polygon',
-    gesture:
-      'Drag to size the polygon and release. The starting shape has six sides. Hold Shift while dragging to keep the polygon regular.',
+    gesture: 'Drag to draw a six-sided shape. Hold Shift to keep it regular. Release to finish.',
     properties:
-      'In Settings, change Sides to the number of edges you need, then adjust Radius. For example, use 3 sides for a triangle or 8 for an octagon.',
-    outcome: 'The outline updates to the chosen side count and size.',
+      'In Settings → Artwork, enter the number of Sides. Use 3 for a triangle or 8 for an octagon. Change Radius to set the size.',
+    outcome: 'A shape with the number of sides you need.',
     tip: 'The workspace Polygon tool is separate from Design Studio. Use the workspace tool for editable polygon side counts.',
   }),
   shapeLesson({
     id: 'star',
     title: 'Draw star',
     visual: 'star',
-    gesture:
-      'Drag to size a five-point star. Hold Shift while dragging for a regular star, then release.',
+    gesture: 'Drag to draw a five-point star. Hold Shift to keep it regular. Release to finish.',
     properties:
-      'In Settings, change Points and Outer radius. Adjust Inset to change the inner radius: a smaller percentage makes deeper gaps between the tips.',
-    outcome: 'The star keeps editable point-count and inset controls.',
+      'In Settings → Artwork, change Points and Outer radius. Lower Inset to make deeper gaps between the tips.',
+    outcome: 'A star with the points and size you choose.',
     tip: 'Try 5 points and 50% inset first. Very narrow tips may be difficult to manufacture at small sizes.',
   }),
   {
     id: 'polyline',
     title: 'Draw connected lines',
-    summary: 'Click points to make an open line or a closed custom outline.',
+    summary: 'Click to draw connected lines or a closed outline.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
@@ -143,24 +140,22 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     steps: [
       {
         title: 'Start the path',
-        instruction:
-          'Choose Draw polyline or press Ctrl+L. Click once to place the first point, then move towards the next corner.',
+        instruction: 'Choose Draw polyline. Click on the canvas to place the first point.',
         focus: 'First point',
         result: 'A live segment shows where the next line will go.',
       },
       {
         title: 'Add each corner',
-        instruction:
-          'Click for each new corner. Hold Shift to constrain the next segment to a 45-degree direction.',
+        instruction: 'Click each new corner. Hold Shift to keep the line in a 45-degree direction.',
         focus: 'Click the next point',
         result: 'Each click extends the connected path.',
       },
       {
         title: 'Choose open or closed',
         instruction:
-          'Press Enter or double-click to finish an open path. To make a closed outline, place at least three points and click near the first point.',
+          'Press Enter to finish an open path. For a closed outline, add at least three points and click near the first point.',
         focus: 'Finish or return to start',
-        result: 'The path is selected and ready for editing or an operation.',
+        result: 'Your path is selected and ready to use.',
       },
     ],
     tip: 'Use a closed outline when you want an enclosed fill or pocket. Escape cancels an unfinished path.',
@@ -170,7 +165,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'nodes',
     title: 'Edit path nodes',
-    summary: 'Change individual points and curves without moving the entire object.',
+    summary: 'Move the points that make up a line or curve.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 3,
@@ -180,35 +175,35 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     visual: 'nodes',
     steps: [
       {
-        title: 'Expose the points',
+        title: 'Show the points',
         instruction:
-          'Select the vector artwork and choose Edit nodes. Zoom in so the small nodes are easy to distinguish.',
+          'Select the artwork. Choose Edit nodes. Zoom in until you can see the individual points.',
         focus: 'Edit nodes',
-        result: 'The path points become visible for local editing.',
+        result: 'You can see the points along the path.',
       },
       {
         title: 'Reshape one area',
         instruction:
-          'Drag a node to reposition it. Shift-click nodes to select several, then drag a selected node to move them together. Curve handles change the bend between nodes.',
+          'Drag a point to move it. Drag a curve handle to change the bend. Shift-click points to select several at once.',
         focus: 'Node and curve handles',
         result: 'Only the selected part of the outline changes.',
       },
       {
-        title: 'Refine a curve',
+        title: 'Change a curve',
         instruction:
-          'For a selected curve node, use Smooth or Corner. Curve and Line change its outgoing segment; Break opens a closed curve, and Join connects two selected open curve endpoints.',
+          'Select a curve point. Choose Smooth or Corner to change how the lines meet. Choose Curve or Line to change the next section.',
         focus: 'Curve node actions',
-        result: 'You control both the contour and whether its ends connect.',
+        result: 'The path has the shape you want.',
       },
     ],
-    tip: 'Node actions appear for supported curve nodes. Undo if the contour loses a hole or closes across a gap you intended to keep.',
+    tip: 'These controls appear for supported curve points. Break opens a closed curve. Join connects two selected open curve ends.',
     keywords: ['nodes', 'bezier', 'smooth', 'corner', 'curve', 'join', 'break'],
     related: ['convert', 'polyline', 'trace'],
   },
   {
     id: 'measure',
     title: 'Measure distance and angle',
-    summary: 'Read a gap, diagonal or angle directly on the canvas.',
+    summary: 'Check a distance or angle on the canvas.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
@@ -219,23 +214,23 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the ruler',
         instruction:
-          'Select Measure or press Alt+M. Position the pointer at the first end of the distance.',
+          'Choose Measure. Move the pointer to the point where you want to start measuring.',
         focus: 'Measure',
         result: 'The next drag measures instead of moving artwork.',
       },
       {
         title: 'Drag between two points',
         instruction:
-          'Press at the first point and drag to the second. Hold Shift to constrain the measurement to 45-degree directions.',
+          'Drag from the first point to the second. Hold Shift to measure in a 45-degree direction.',
         focus: 'Start → end',
         result: 'A measurement line follows the pointer.',
       },
       {
         title: 'Read the dimensions',
         instruction:
-          'Read the distance in millimetres, dx and dy for horizontal and vertical differences, and the angle. Return to Select when finished.',
+          'Read the distance in millimetres and the angle. dx is the horizontal distance; dy is the vertical distance. Return to Select when finished.',
         focus: 'Distance · dx · dy · angle',
-        result: 'You know the spacing without adding cuttable geometry.',
+        result: 'You can check the gap without adding artwork.',
       },
     ],
     tip: 'Measure shows design dimensions. It does not measure the physical material or compensate for kerf.',

@@ -3,7 +3,7 @@ import { create } from 'zustand';
 type TutorialState = {
   readonly isOpen: boolean;
   readonly tutorialId: string | null;
-  /** Lessons opened before this one, so "Learn next" can be walked back. */
+  /** Lessons opened earlier in this session, so Escape can walk back one level. */
   readonly trail: readonly string[];
   readonly openTutorial: (id?: string) => void;
   readonly closeTutorial: () => void;

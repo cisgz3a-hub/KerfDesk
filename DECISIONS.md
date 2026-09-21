@@ -20316,6 +20316,12 @@ Use explicit stable lesson IDs, an exhaustive command mapping, source entry-poin
 
 The catalog and SVG illustrations are bundled and precached for offline use without new dependencies or video hosting. Optional photographs are cached after viewing; unvisited images or responsive sizes retain readable instructions and a diagram fallback offline. Packaged desktop builds include the local image files. Pictures and diagrams do not replace hardware qualification or usability testing. Current coverage, maintenance rules and research references live in `docs/tutorials/README.md`.
 
+### Simpler reading flow (2026-09-22 amendment)
+
+User feedback found too many controls and competing blocks of information. Replace the machine/category filters and card grid with one search field across all lessons and a folded list of topics. Show only one topic's lesson links at a time, keeping the chosen topic and search when returning from a lesson.
+
+Use one column with the current instruction, its matching static illustration and a short expected result. Back and Next stay visible below the scrollable reading area; Done closes the tutorial and restores the opener. Move location, prerequisites, tips and picture context under More help. Remove the separate picture stages, playback, restart, step-button list, related links and completion counters. Saved unfinished lessons resume; completed lessons open at the beginning. Keep all contextual entry points, deferred image loading, offline diagram fallback, keyboard access and project/draft isolation. This amendment replaces the earlier reader/filter presentation, without changing machine or output behaviour.
+
 ## ADR-325 - The plan-backed preview authority stops at the advisory program size (2026-09-20)
 
 **Status:** Accepted; amends the ADR-244 large-job preparation path and the second consumer

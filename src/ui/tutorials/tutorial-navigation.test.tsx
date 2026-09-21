@@ -1,7 +1,5 @@
-// Navigating the catalog: stepping with the keyboard, and walking back out of
-// lessons reached through "Learn next". Before this, arrows did nothing and
-// Escape threw away the whole session from any depth, so a reader who
-// followed one suggestion had no way back but the mouse.
+// Keyboard stepping, preserved reading progress, and one-level Escape navigation
+// remain available in the simplified tutorial reader.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -10,6 +8,7 @@ import { useUiStore } from '../state/ui-store';
 import { findTutorial } from './tutorial-catalog';
 import { readTutorialProgress } from './tutorial-progress';
 import { useTutorialStore } from './tutorial-store';
+import { TutorialButton } from './TutorialButton';
 import { TutorialHost } from './TutorialHost';
 
 (
@@ -50,21 +49,28 @@ async function openAt(id?: string): Promise<void> {
   document.body.appendChild(host);
   await act(async () => {
     root = createRoot(host as HTMLDivElement);
-    root.render(<TutorialHost />);
+    root.render(
+      <>
+        <TutorialButton {...(id === undefined ? {} : { tutorialId: id })} />
+        <TutorialHost />
+      </>,
+    );
   });
   await act(async () => {
-    useTutorialStore.getState().openTutorial(id);
+    const opener = element<HTMLButtonElement>('[data-tutorial-id]');
+    opener.focus();
+    opener.click();
   });
   await settle();
 }
 
-async function press(key: string): Promise<void> {
+async function press(key: string): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
   await act(async () => {
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
-    );
+    document.activeElement?.dispatchEvent(event);
   });
   await settle();
+  return event;
 }
 
 async function click(control: HTMLElement): Promise<void> {
@@ -83,6 +89,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root?.unmount());
+  expect(useUiStore.getState().modalDepth).toBe(0);
   host?.remove();
   host = null;
   root = null;
@@ -117,31 +124,32 @@ describe('walking the catalog', () => {
   );
 
   it(
-    'walks back out of a lesson opened from "Learn next", one level per Escape',
+    'walks back through same-session lessons, one level per Escape',
     async () => {
       const from = lesson('first-project');
       const next = lesson(from.related[0] ?? '');
       await openAt(from.id);
 
-      await click(
-        element<HTMLButtonElement>(`button[title="Open related tutorial: ${next.title}"]`),
-      );
-      expect(element('.lf-learn-lesson-heading h1').textContent).toBe(next.title);
-      // The back control names where it actually returns to, not just "library".
-      expect(element('.lf-learn-reader-top button').textContent).toContain(from.title);
+      // Integrations can still open another lesson during a session even though
+      // the reader no longer presents a separate set of related-lesson buttons.
+      await act(async () => useTutorialStore.getState().openTutorial(next.id));
+      await settle();
+      expect(element('h1.lf-learn-lesson-heading').textContent).toBe(next.title);
+      expect(useTutorialStore.getState().trail).toEqual([from.id]);
 
       await press('Escape');
-      expect(element('.lf-learn-lesson-heading h1').textContent).toBe(from.title);
+      expect(element('h1.lf-learn-lesson-heading').textContent).toBe(from.title);
       await press('Escape');
       expect(document.querySelector('.lf-learn-library')).not.toBeNull();
       await press('Escape');
       expect(document.querySelector('.lf-learn')).toBeNull();
+      expect(document.activeElement).toBe(element('[data-tutorial-id]'));
     },
     SLOW,
   );
 
   it(
-    'offers the half-read lesson as the library’s next action',
+    'resumes a half-read lesson when it is reopened from its topic',
     async () => {
       const started = lesson('import');
       localStorage.setItem(
@@ -149,10 +157,12 @@ describe('walking the catalog', () => {
         JSON.stringify({ [started.id]: { step: 1, completed: false } }),
       );
       await openAt();
-      const resume = element<HTMLButtonElement>(
-        `button[title="Open the lesson: ${started.title}"]`,
+      const summary = [...document.querySelectorAll<HTMLElement>('.lf-learn-topic > summary')].find(
+        (candidate) => candidate.textContent === started.category,
       );
-      expect(resume.textContent).toContain('Continue');
+      if (summary === undefined) throw new Error(`Missing topic ${started.category}`);
+      await click(summary);
+      const resume = element<HTMLButtonElement>(`button[title="Open tutorial: ${started.title}"]`);
 
       await click(resume);
       // Resuming lands on the saved step, not back at step one.
@@ -167,11 +177,15 @@ describe('walking the catalog', () => {
       await openAt('first-project');
       await click(element<HTMLButtonElement>('button[aria-label="Close tutorials"]'));
       expect(document.querySelector('.lf-learn')).toBeNull();
+      expect(document.activeElement).toBe(element('[data-tutorial-id]'));
 
       await act(async () => useTutorialStore.getState().openTutorial('origin'));
       await settle();
-      expect(element('.lf-learn-lesson-heading h1').textContent).toBe(lesson('origin').title);
-      expect(element('.lf-learn-reader-top button').textContent).toContain('All tutorials');
+      expect(element('h1.lf-learn-lesson-heading').textContent).toBe(lesson('origin').title);
+      expect(useTutorialStore.getState().trail).toEqual([]);
+      expect(element('button[title="Return to the tutorial library"]').textContent).toContain(
+        'All tutorials',
+      );
 
       await press('Escape');
       expect(document.querySelector('.lf-learn-library')).not.toBeNull();
@@ -180,4 +194,63 @@ describe('walking the catalog', () => {
     },
     SLOW,
   );
+
+  it('returns directly to the library and clears the same-session trail with All tutorials', async () => {
+    await openAt('first-project');
+    await act(async () => useTutorialStore.getState().openTutorial('import'));
+    await settle();
+    expect(useTutorialStore.getState().trail).toEqual(['first-project']);
+    await click(element('button[title="Return to the tutorial library"]'));
+    expect(useTutorialStore.getState()).toMatchObject({
+      isOpen: true,
+      tutorialId: null,
+      trail: [],
+    });
+    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+    await press('Escape');
+    expect(document.querySelector('.lf-learn')).toBeNull();
+    expect(document.activeElement).toBe(element('[data-tutorial-id]'));
+  });
+
+  it('closes directly from a nested lesson when Close is pressed', async () => {
+    await openAt('first-project');
+    await act(async () => useTutorialStore.getState().openTutorial('import'));
+    await settle();
+    await click(element('button[title="Close tutorials and return to your work"]'));
+    expect(useTutorialStore.getState()).toMatchObject({
+      isOpen: false,
+      tutorialId: null,
+      trail: [],
+    });
+    expect(document.querySelector('.lf-learn')).toBeNull();
+    expect(document.activeElement).toBe(element('[data-tutorial-id]'));
+  });
+
+  it('leaves arrow keys available to text entry and choice controls', async () => {
+    await openAt('first-project');
+    await press('ArrowRight');
+    const current = stepTitle();
+    const reader = element('.lf-learn-reader');
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    editable.tabIndex = 0;
+    // jsdom does not implement the browser's computed isContentEditable property.
+    Object.defineProperty(editable, 'isContentEditable', { value: true });
+    const controls = [
+      document.createElement('input'),
+      document.createElement('textarea'),
+      document.createElement('select'),
+      editable,
+    ];
+    for (const control of controls) {
+      reader.appendChild(control);
+      control.focus();
+      expect((await press('ArrowRight')).defaultPrevented).toBe(false);
+      expect(stepTitle()).toBe(current);
+      expect((await press('ArrowLeft')).defaultPrevented).toBe(false);
+      expect(stepTitle()).toBe(current);
+      control.remove();
+    }
+    expect(readTutorialProgress()['first-project']).toEqual({ step: 1, completed: false });
+  });
 });

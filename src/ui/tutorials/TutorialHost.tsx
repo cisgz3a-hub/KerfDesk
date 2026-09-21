@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useTutorialStore } from './tutorial-store';
-import { TutorialIcon } from './TutorialButton';
 import './tutorials.css';
 
 const TutorialCentre = lazy(() => import('./TutorialCentre'));
@@ -17,12 +16,10 @@ function TutorialShell(): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const close = useTutorialStore((state) => state.closeTutorial);
   const open = useTutorialStore((state) => state.openTutorial);
+  const tutorialId = useTutorialStore((state) => state.tutorialId);
   const goBack = useTutorialStore((state) => state.goBack);
-  const inLesson = useTutorialStore((state) => state.tutorialId !== null);
   useRegisterModal();
-  // Escape walks OUT one level — lesson to library, library to the workspace —
-  // rather than discarding the whole session from three levels deep.
-  useDialogA11y(ref, inLesson ? goBack : close, { initialFocus: 'surface' });
+  useDialogA11y(ref, tutorialId === null ? close : goBack, { initialFocus: 'surface' });
   return (
     <div
       className="lf-learn-backdrop"
@@ -34,15 +31,18 @@ function TutorialShell(): JSX.Element {
     >
       <section className="lf-learn">
         <header className="lf-learn-header">
-          <button
-            type="button"
-            className="lf-learn-brand"
-            title="Browse all visual tutorials"
-            onClick={() => open()}
-          >
-            <TutorialIcon /> KERFDESK <strong>LEARN</strong>
-          </button>
-          <span className="lf-learn-header-note">One tool. A few clear steps.</span>
+          {tutorialId === null ? (
+            <span className="lf-learn-brand">KerfDesk</span>
+          ) : (
+            <button
+              type="button"
+              className="lf-btn lf-btn--ghost"
+              title="Return to the tutorial library"
+              onClick={() => open()}
+            >
+              ← All tutorials
+            </button>
+          )}
           <button
             type="button"
             className="lf-btn lf-btn--ghost"
@@ -50,7 +50,7 @@ function TutorialShell(): JSX.Element {
             aria-label="Close tutorials"
             onClick={close}
           >
-            Close{inLesson ? null : <kbd>Esc</kbd>}
+            Close
           </button>
         </header>
         <Suspense
@@ -62,9 +62,6 @@ function TutorialShell(): JSX.Element {
         >
           <TutorialCentre />
         </Suspense>
-        <footer className="lf-learn-footer">
-          Illustrated examples · Your project stays as you left it
-        </footer>
       </section>
     </div>
   );

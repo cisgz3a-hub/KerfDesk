@@ -4,7 +4,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'align',
     title: 'Align artwork',
-    summary: 'Line up objects using a chosen reference object.',
+    summary: 'Line up edges or centre one design inside another.',
     category: 'Layout & production',
     machine: 'all',
     minutes: 2,
@@ -13,35 +13,35 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     visual: 'align',
     steps: [
       {
-        title: 'Choose the reference last',
+        title: 'Choose what to line up with',
         instruction:
-          'Select the objects you want to move, then Shift-click the reference object last. Its edge or centre will be the alignment target.',
+          'Select the objects to move. Shift-click the object you want to line up with last. This last object stays in place.',
         focus: 'Last selected = reference',
-        result: 'The selected group has a known alignment reference.',
+        result: 'The last object sets the alignment position.',
       },
       {
-        title: 'Choose an edge or centre',
+        title: 'Line up an edge',
         instruction:
-          'Open Arrange. Choose Align Left, Right, Top or Bottom for edges. Align Center X lines up vertical centres; Align Center Y lines up horizontal centres.',
+          'Open Arrange. Choose Align Left to line up the left edges. You can also align right, top or bottom edges.',
         focus: 'Arrange → Align',
-        result: 'Objects move onto the chosen reference line.',
+        result: 'The chosen edges line up.',
       },
       {
         title: 'Centre one design on another',
         instruction:
-          'To put a smaller design in the middle of a larger shape, select the smaller design first and the larger shape last, then choose Align Centers.',
+          'Select the smaller design first. Shift-click the larger shape last. Choose Arrange → Align Centers.',
         focus: 'Align Centers',
-        result: 'The centres overlap without resizing either object.',
+        result: 'The smaller design sits in the centre of the larger shape.',
       },
     ],
-    tip: 'Alignment uses object bounds. Irregular visible shapes may still need a small visual adjustment.',
+    tip: 'Alignment uses the box around each object. Irregular shapes may need a small adjustment by eye.',
     keywords: ['align', 'centre', 'center', 'left', 'right', 'top', 'bottom'],
     related: ['select', 'distribute', 'array'],
   },
   {
     id: 'distribute',
     title: 'Space objects evenly',
-    summary: 'Make an orderly row or column from three or more objects.',
+    summary: 'Give a row or column even gaps.',
     category: 'Layout & production',
     machine: 'all',
     minutes: 2,
@@ -50,35 +50,35 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     visual: 'distribute',
     steps: [
       {
-        title: 'Set the overall spread',
+        title: 'Place the two end objects',
         instruction:
-          'Position the outer objects where the row or column should begin and end. Select every object to distribute.',
+          'Move the two end objects where you want the row or column to start and finish. Select all the objects.',
         focus: 'First and last positions',
-        result: 'The selection establishes the available span.',
+        result: 'The end objects set the space to fill.',
       },
       {
-        title: 'Decide what should be equal',
+        title: 'Make the gaps equal',
         instruction:
-          'Choose Distribute H Centers or V Centers for equal centre distances. Choose H Spacing or V Spacing for equal gaps between object bounds.',
-        focus: 'Centres or gaps',
-        result: 'You select the spacing rule that suits the design.',
+          'For a row, choose Arrange → Distribute H Spacing. For a column, choose Distribute V Spacing.',
+        focus: 'Distribute H Spacing or Distribute V Spacing',
+        result: 'The gaps between the objects become equal.',
       },
       {
         title: 'Check the row',
         instruction:
-          'Inspect the new spacing. Use an alignment command if the objects should also share a baseline or centre line.',
+          'Check the gaps. Use an alignment command if you also want the objects on the same line.',
         focus: 'Equal intervals',
         result: 'The objects form a consistent row or column.',
       },
     ],
-    tip: 'For differently sized objects, equal gaps and equal centre distances produce different layouts.',
+    tip: 'Distribute H Centers and Distribute V Centers make the centre distances equal. Differently sized objects may then have different gaps.',
     keywords: ['distribute', 'spacing', 'gaps', 'row', 'column'],
     related: ['align', 'array'],
   },
   {
     id: 'array',
     title: 'Repeat artwork with an array',
-    summary: 'Create a grid, rotate copies around a point, or place them on a circle.',
+    summary: 'Repeat a design in rows and columns.',
     category: 'Layout & production',
     machine: 'all',
     minutes: 3,
@@ -87,28 +87,27 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     visual: 'array',
     steps: [
       {
-        title: 'Select the complete unit',
-        instruction:
-          'Select every object that belongs in one repeated design. Open Arrange → Array.',
+        title: 'Select the design to repeat',
+        instruction: 'Select all the objects in one copy of your design. Open Arrange → Array.',
         focus: 'Selection = one unit',
         result: 'The array repeats the complete selection.',
       },
       {
-        title: 'Choose a pattern',
+        title: 'Set rows and columns',
         instruction:
-          'Grid uses Rows, Columns and gaps between repeated units. Circular places units around a chosen centre and radius. Point Rotation turns them about the selection centre; Copies includes the original, with Total angle divided equally by that count.',
-        focus: 'Grid · Circular · Point Rotation',
-        result: 'The dialog defines the number and placement of copies.',
+          'Choose Grid. Enter Rows and Columns. Set Horizontal spacing and Vertical spacing for the gaps between copies.',
+        focus: 'Grid · Rows · Columns',
+        result: 'The grid size and gaps are set.',
       },
       {
         title: 'Create and inspect',
         instruction:
-          'Click Create array. Check the complete arrangement against the bed or board, including the spaces between adjacent designs.',
+          'Click Create array. Check that the copies fit the bed or board. Check the gaps between designs.',
         focus: 'Create array',
-        result: 'The repeated artwork is present on the canvas and can be edited.',
+        result: 'Your copies appear on the canvas.',
       },
     ],
-    tip: 'In Circular mode, Rotate copies turns each copy as it goes around the circle. Leave it off to keep the copies facing the same way.',
+    tip: 'Circular places copies on a circle. Point Rotation turns copies around the selection centre; its Copies count includes the original.',
     keywords: ['array', 'repeat', 'copies', 'grid', 'circular', 'rotation'],
     related: ['nest', 'align', 'operations'],
   },

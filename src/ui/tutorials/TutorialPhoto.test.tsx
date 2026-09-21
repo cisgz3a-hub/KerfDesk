@@ -59,6 +59,16 @@ async function click(control: HTMLElement): Promise<void> {
   await act(async () => control.click());
 }
 
+async function expandTopic(category: string): Promise<void> {
+  const section = [...document.querySelectorAll<HTMLDetailsElement>('.lf-learn-topic')].find(
+    (item) => item.querySelector('summary')?.textContent?.includes(category),
+  );
+  const summary = section?.querySelector('summary');
+  if (summary === undefined || summary === null)
+    throw new Error(`Missing tutorial topic: ${category}`);
+  if (section?.open !== true) await click(summary);
+}
+
 async function failImage(): Promise<void> {
   await act(async () => {
     element<HTMLImageElement>('img.lf-learn-photo').dispatchEvent(new Event('error'));
@@ -72,10 +82,6 @@ function expectPhase(picture: TutorialPhoto, phase: number): void {
   expect(phase).toBeLessThan(picture.frames.length);
   expect(translation).toBeCloseTo((-phase * 100) / picture.frames.length);
   expect(image.alt).toBe(picture.frames[phase]?.alt);
-  expect(element('.lf-learn-example figcaption').textContent).toBe(picture.frames[phase]?.caption);
-  expect(element('.lf-learn-example-heading').lastElementChild?.textContent).toBe(
-    picture.frames[phase]?.label,
-  );
 }
 
 beforeEach(() => {
@@ -103,7 +109,8 @@ describe('tutorial pictures in the real reader', () => {
     await mount();
     expect(document.querySelectorAll('img, picture, link[as="image"]')).toHaveLength(0);
     await open();
-    expect(document.querySelectorAll('.lf-learn-card').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.lf-learn-topic').length).toBeGreaterThan(0);
+    await expandTopic(lesson('registration').category);
     expect(document.querySelectorAll('img, picture, link[as="image"]')).toHaveLength(0);
 
     await click(button(`Open tutorial: ${lesson('registration').title}`));
@@ -122,7 +129,7 @@ describe('tutorial pictures in the real reader', () => {
     expect(image.src).not.toMatch(/^(?:data|blob):/u);
     expect(new URL(image.src).origin).toBe(location.origin);
 
-    await click(button('Return to the tutorial library (Escape)'));
+    await click(button('Return to the tutorial library'));
     expect(document.querySelectorAll('img')).toHaveLength(0);
     await open('laser-image');
     expect(document.querySelectorAll('img')).toHaveLength(1);
@@ -148,43 +155,41 @@ describe('tutorial pictures in the real reader', () => {
     expect(document.querySelector('button[title="Read the next step"]')).toBeNull();
     await click(button('Read the previous step'));
     expectPhase(picture, 1);
-    await click(button('Restart from step one'));
+    await click(button('Read the previous step'));
+    expectPhase(picture, 0);
+    await click(button('Read the previous step'));
     expectPhase(picture, 0);
     expect(button('Read the previous step').disabled).toBe(true);
   });
 
-  it('falls back to SVG after failure while keeping instructions and navigation usable', async () => {
+  it('falls back to SVG after failure and retries naturally on the next instruction', async () => {
     await mount();
     await open('registration');
     await failImage();
     expect(document.querySelector('img')).toBeNull();
     expect(element('.lf-learn-example svg[role="img"]')).toBeDefined();
-    expect(element('.lf-learn-step-detail p').textContent).toBe(
+    expect(element('.lf-learn-instruction').textContent).toBe(
       lesson('registration').steps[0].instruction,
     );
-    await click(button('Show the result illustration'));
-    expect(button('Show the result illustration').getAttribute('aria-pressed')).toBe('true');
     await click(button('Read the next step'));
     expect(element('.lf-learn-step-detail h2').textContent).toBe(
       lesson('registration').steps[1].title,
     );
+    expectPhase(photo('registration'), 0);
+    expect(document.querySelector('.lf-learn-example svg[role="img"]')).toBeNull();
     await click(button('Read the previous step'));
     expectPhase(photo('registration'), 0);
   });
 
-  it('retries a failed picture with one Show picture click and can switch views afterwards', async () => {
+  it('retries a failed picture when the lesson is reopened', async () => {
     await mount();
     await open('registration');
     await failImage();
-    const toggle = element<HTMLButtonElement>('.lf-learn-photo-note button');
-    expect(toggle.textContent).toBe('Show picture');
-    await click(toggle);
+    expect(document.querySelector('img')).toBeNull();
+    await click(button('Close tutorials and return to your work'));
+    await open('registration');
     expectPhase(photo('registration'), 0);
     expect(document.querySelector('.lf-learn-example svg[role="img"]')).toBeNull();
-    await click(element<HTMLButtonElement>('.lf-learn-photo-note button'));
-    expect(document.querySelector('img')).toBeNull();
-    await click(element<HTMLButtonElement>('.lf-learn-photo-note button'));
-    expectPhase(photo('registration'), 0);
   });
 
   it.each(Object.keys(TUTORIAL_PHOTOS))(
@@ -203,10 +208,9 @@ describe('tutorial pictures in the real reader', () => {
           tutorialPhotoUrl(picture.asset.small.file),
         );
       }
-      if (picture.frames.length === 1)
-        expect(document.querySelector('[aria-label="Example stages"]')).toBeNull();
-      await click(button('Mark this lesson complete on this device'));
-      expectPhase(picture, picture.frames.length - 1);
+      await click(button('Finish tutorial and return to your work'));
+      expect(document.querySelector('.lf-learn')).toBeNull();
+      expect(document.querySelector('img')).toBeNull();
     },
   );
 
@@ -223,7 +227,7 @@ describe('tutorial pictures in the real reader', () => {
     expectPhase(photo('registration'), 2);
   });
 
-  it('does not mutate project, history or active tool through picture controls and failure recovery', async () => {
+  it('does not mutate project, history or active tool through reading and picture recovery', async () => {
     const before = useStore.getState();
     const serialisedProject = JSON.stringify(before.project);
     const tool = useUiStore.getState().toolMode;
@@ -233,12 +237,10 @@ describe('tutorial pictures in the real reader', () => {
       await mount();
       await open('registration');
       await click(button('Read the next step'));
-      await click(
-        button(`Show the ${photo('registration').frames[2]?.label.toLowerCase()} illustration`),
-      );
       await failImage();
-      await click(element<HTMLButtonElement>('.lf-learn-photo-note button'));
-      await click(button('Return to the tutorial library (Escape)'));
+      await click(button('Read the next step'));
+      expectPhase(photo('registration'), 1);
+      await click(button('Return to the tutorial library'));
       await click(button('Close tutorials and return to your work'));
       expect(changed).not.toHaveBeenCalled();
       expect(useStore.getState().project).toBe(before.project);
