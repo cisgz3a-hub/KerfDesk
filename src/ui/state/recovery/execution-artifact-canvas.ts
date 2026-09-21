@@ -1,4 +1,5 @@
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
+import type { MotionManifest } from '../../../core/job/motion-manifest';
 import type { ExecutionArtifactV1 } from './execution-artifact';
 import {
   hasPackedMotionEncoding,
@@ -9,6 +10,7 @@ import {
 } from './packed-motion-manifest';
 
 const PACK_MANIFEST_MINIMUM_BLOCKS = 4_096;
+const PACK_MANIFEST_MINIMUM_POINTS = PACK_MANIFEST_MINIMUM_BLOCKS * 2;
 
 export type ArchivedCanvasMotionPlan =
   | CanvasMotionPlan
@@ -21,9 +23,20 @@ const hydratedPlans = new WeakMap<ArchivedCanvasMotionPlan, CanvasMotionPlan>();
 /** Archive every exact path point without object-per-point storage overhead. */
 export function archiveCanvasMotionPlan(plan: CanvasMotionPlan): ArchivedCanvasMotionPlan {
   // Minimal pre-existing fixtures and small legacy plans retain their shape.
-  if (plan.manifest === undefined || plan.manifest.blocks.length < PACK_MANIFEST_MINIMUM_BLOCKS)
-    return plan;
+  if (plan.manifest === undefined || !manifestNeedsCompaction(plan.manifest)) return plan;
   return { ...plan, manifest: packMotionManifest(plan.manifest) };
+}
+
+function manifestNeedsCompaction(manifest: MotionManifest): boolean {
+  if (manifest.blocks.length >= PACK_MANIFEST_MINIMUM_BLOCKS) return true;
+  // A G2/G3 source line can contain hundreds of sampled points. Count actual
+  // geometry as well as source movements, stopping as soon as it is large.
+  let points = 0;
+  for (const block of manifest.blocks) {
+    points += block.points.length;
+    if (points >= PACK_MANIFEST_MINIMUM_POINTS) return true;
+  }
+  return false;
 }
 
 /** Hydrate only the selected archive, keeping repository history compact and

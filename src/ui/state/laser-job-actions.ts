@@ -68,6 +68,7 @@ import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
+import { JobStartTransmissionError } from './laser-start-transmission-error';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -181,15 +182,13 @@ async function runStartJob(
       // it, or a stream that is no longer simply streaming, is a no-op.
       await armHostedRefill(context.refs, get().streamer);
     } catch (error) {
+      const state = get();
+      const ackedLines =
+        state.streamerEpoch === writeOwner.streamerEpoch ? (state.streamer?.completed ?? 0) : 0;
       containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
-      // The first transport write did not resolve as accepted, so the staged
-      // run must not replace an older recovery capsule. Keep the fail-dark
-      // errored streamer and safety notice, but release only this run's
-      // persistence ownership so the outer flow can discard its staging row.
-      set((state) => ({
-        activeRunId: state.activeRunId === options.runId ? null : state.activeRunId,
-      }));
-      throw error;
+      // A rejected write can already have delivered a prefix. Preserve the
+      // attempt independently of live state, which teardown may already clear.
+      throw new JobStartTransmissionError(error, options.runId ?? null, ackedLines);
     }
   } finally {
     set((state) => ({

@@ -17,6 +17,7 @@ import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgemen
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
+import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
 
 // Shared resume back half: build the re-entry program, confirm, suspend
 // checkpoint tracking (the resume run has its own numbering — ADR-118), and
@@ -84,14 +85,23 @@ export async function streamResumeFromRawLine(
     await recoveryRepository.noteUntrackedRunAccepted();
     return true;
   } catch (err) {
-    if (!finalAuthorizationPassed) {
+    if (isJobStartTransmissionError(err)) {
+      // Manual restarts have no sealed run to retain, but attempted output must
+      // still retire recovery records whose machine history is now obsolete.
+      await recoveryRepository.noteUntrackedRunAccepted();
+    } else if (!finalAuthorizationPassed) {
       restoreUnacceptedResumeCheckpoint(
         checkpointBeforeStart,
         checkpointMarkedAtIso,
         checkpointUpdate,
       );
     }
-    jobAwareAlert(`Could not resume job:\n\n${err instanceof Error ? err.message : String(err)}`);
+    const uncertainty = isJobStartTransmissionError(err)
+      ? '\n\nSome program bytes may have reached the controller. Inspect and requalify the machine before any further motion. The older recovery offer was retired.'
+      : '';
+    jobAwareAlert(
+      `Could not resume job:\n\n${err instanceof Error ? err.message : String(err)}${uncertainty}`,
+    );
     return false;
   }
 }

@@ -169,6 +169,7 @@ function PreviewZoomControls(props: {
         type="button"
         disabled={props.disabled}
         aria-label="Zoom in recovery canvas"
+        title="Magnify the saved route to choose a restart movement more precisely."
         onClick={() => props.setView(zoomRecoveryPreview(props.view, props.fit, 0.5))}
       >
         +
@@ -177,11 +178,17 @@ function PreviewZoomControls(props: {
         type="button"
         disabled={props.disabled}
         aria-label="Zoom out recovery canvas"
+        title="Show more of the saved route around the restart point."
         onClick={() => props.setView(zoomRecoveryPreview(props.view, props.fit, 2))}
       >
         −
       </button>
-      <button type="button" disabled={props.disabled} onClick={() => props.setView(props.fit)}>
+      <button
+        type="button"
+        disabled={props.disabled}
+        title="Fit the complete saved job in the recovery canvas."
+        onClick={() => props.setView(props.fit)}
+      >
         Fit saved job
       </button>
     </div>

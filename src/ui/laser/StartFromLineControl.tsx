@@ -71,14 +71,15 @@ export function StartFromLineControl(props: {
           {preparing ? 'Preparing recovery…' : 'Resume from line'}
         </button>
       </div>
-      <button type="button" disabled={blocked} onClick={() => void resume(true)}>
+      <button
+        type="button"
+        title="Open a zoomable preview to choose a restart movement without moving the machine."
+        disabled={blocked}
+        onClick={() => void resume(true)}
+      >
         Choose restart point…
       </button>
-      <p style={hintStyle}>
-        Requires the same work zero as the original run. The head moves to the recorded position
-        with the beam off, then the remaining laser program is replayed. This manual tool is not an
-        exact sealed replay and creates no execution-archive or recovery record.
-      </p>
+      <ManualRestartGuidance />
       {preview === null ? null : (
         <ManualLaserRestartDialog
           source={preview}
@@ -87,6 +88,16 @@ export function StartFromLineControl(props: {
         />
       )}
     </details>
+  );
+}
+
+function ManualRestartGuidance(): JSX.Element {
+  return (
+    <p style={hintStyle}>
+      Requires the same work zero as the original run. The head moves to the recorded position with
+      the beam off, then the remaining laser program is replayed. This manual tool is not an exact
+      sealed replay and creates no execution-archive or recovery record.
+    </p>
   );
 }
 

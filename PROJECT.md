@@ -375,11 +375,10 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 
 ### Future feature notes (uncommitted; capture-only)
 
-- **Laser area-only second pass** (requested 2026-09-21): after a completed engraving,
-  select a region in a zoomable canvas and repeat only that region to darken it. Keep its
-  placement tied to the original run and preview the actual emitted region. The interruption
-  restart picker replays the selected movement and the remainder; it does not yet clip output
-  to a selected area.
+- *(Laser area-only second pass promoted to implementation on 2026-09-22, ADR-339:
+  paint/erase regions of a retained completed engraving, edit each stroke's power, preview
+  the emitted pass, then Frame and Start in its original work coordinates. Interrupted-job
+  restart remains a separate movement-and-remainder workflow.)*
 
 These are user-requested or product-research items. Not yet scoped into a
 phase; tracked here so they don't get lost.

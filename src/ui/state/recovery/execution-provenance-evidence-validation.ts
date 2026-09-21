@@ -17,6 +17,7 @@ import {
   isSafeNonNegativeInteger,
 } from './execution-provenance-validation-helpers';
 import type { ExecutionWorkflowV2 } from './execution-workflow-evidence';
+import { isLaserSecondPassChain } from './laser-second-pass-lineage';
 
 export function hasValidLegacyReview(value: unknown): boolean {
   if (!hasValidReviewBase(value) || !isRecord(value)) return false;
@@ -257,6 +258,8 @@ function hasValidWorkflow(value: unknown): value is ExecutionWorkflowV2 {
   switch (value['kind']) {
     case 'ordinary-start':
       return isOptionalRunId(value['completedReplaySourceRunId']);
+    case 'laser-second-pass':
+      return isLaserSecondPassChain(value['stages']);
     case 'laser-recovery':
       return hasValidLaserRecoveryWorkflow(value);
     case 'cnc-supervised-recovery':
@@ -274,7 +277,9 @@ function hasValidLaserRecoveryWorkflow(value: Record<string, unknown>): boolean 
     isSafeNonNegativeInteger(value['sourceRevision']) &&
     isSafeNonNegativeInteger(value['sourceAckedLines']) &&
     isPositiveInteger(value['requestedFromLine']) &&
-    isPositiveInteger(value['effectiveFromLine'])
+    isPositiveInteger(value['effectiveFromLine']) &&
+    (value['laserSecondPassChain'] === undefined ||
+      isLaserSecondPassChain(value['laserSecondPassChain']))
   );
 }
 
@@ -333,6 +338,10 @@ function workflowMatchesReview(
   switch (workflow.kind) {
     case 'ordinary-start':
       return ordinaryWorkflowMatchesReview(acknowledgement, review);
+    case 'laser-second-pass':
+      return (
+        acknowledgement['kind'] !== 'cnc' && ordinaryWorkflowMatchesReview(acknowledgement, review)
+      );
     case 'laser-recovery':
       return laserWorkflowMatchesReview(acknowledgement, review);
     case 'cnc-supervised-recovery':

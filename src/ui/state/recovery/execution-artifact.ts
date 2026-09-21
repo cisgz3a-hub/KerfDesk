@@ -35,6 +35,7 @@ import {
   assertExecutionArtifactSizeWithinBudget,
   measureExecutionArtifactBytesWithinBudget,
 } from './execution-artifact-size';
+import { isLaserSecondPassChain, type LaserSecondPassChain } from './laser-second-pass-lineage';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
@@ -105,6 +106,7 @@ export type ExecutionArtifactV1 = {
   /** Ordered, deterministic resume transforms applied after emitting `prepared`.
    * Absent for ordinary starts and CNC recovery jobs. */
   readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly canvasPlan: ArchivedCanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncRecoveryManifest?: CncRecoveryEventManifest | undefined;
@@ -144,6 +146,7 @@ type CreateExecutionArtifactBase = {
   readonly gcode: string;
   readonly prepared: PreparedExecutionOutput;
   readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
   readonly canvasPlan: CanvasMotionPlan;
@@ -199,6 +202,9 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     executionSignature: args.canvasPlan.retentionKey,
     prepared,
     ...(args.laserResumeChain === undefined ? {} : { laserResumeChain: args.laserResumeChain }),
+    ...(args.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: args.laserSecondPassChain }),
     canvasPlan,
     ...(args.cncToolPlan === undefined ? {} : { cncToolPlan: args.cncToolPlan }),
     ...(cncRecoveryManifest === undefined ? {} : { cncRecoveryManifest }),
@@ -248,6 +254,12 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
   if (!isRecord(value)) return false;
   if (!hasExecutionHeader(value) || !hasExecutionPayload(value)) return false;
   if (!hasValidLaserResumeChain(value)) return false;
+  if (
+    value['laserSecondPassChain'] !== undefined &&
+    (value['machineKind'] !== 'laser' || !isLaserSecondPassChain(value['laserSecondPassChain']))
+  ) {
+    return false;
+  }
   const gcode = value['gcode'];
   const expected = fingerprintGcode(gcode);
   if (!fingerprintsMatch(value['fingerprint'], expected)) return false;

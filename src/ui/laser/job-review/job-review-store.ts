@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import type { JobReviewModel } from './job-review-model';
 
 export type JobReviewSignal = 'confirm' | 'cancel' | 'rebuild';
-export type JobReviewPurpose = 'start' | 'frame';
+export type JobReviewPurpose = 'start' | 'frame' | 'laser-second-pass';
 
 export type JobReviewState =
   | { readonly kind: 'idle' }

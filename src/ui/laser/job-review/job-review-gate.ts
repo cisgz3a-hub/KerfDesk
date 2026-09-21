@@ -10,7 +10,7 @@
 
 import type { JobCheckpoint } from '../../../core/recovery';
 import { streamingModeForController } from '../../../core/devices';
-import { machineKindOf } from '../../../core/scene';
+import { machineKindOf, type OutputScope } from '../../../core/scene';
 import { useStore } from '../../state';
 import { currentOutputScope } from '../../state/output-scope-state';
 import { useCameraStore } from '../../state/camera-store';
@@ -54,6 +54,7 @@ export type ReviewedStartBundle = {
   readonly laser: ReturnType<typeof useLaserStore.getState>;
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
+  readonly outputScope?: OutputScope;
   /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
    * after that selection, so they must retain the original named WCS fact. */
   readonly frameWcsNormalizationWarning?: string;
@@ -90,11 +91,11 @@ export async function runJobReviewGate(args: {
       // synchronously at this handoff boundary so approval can never bind to
       // stale bytes or stale live evidence.
       useJobReviewStore.getState().beginPrepare();
-      const rebuilt = await rebuildCurrentStart(
+      const rebuilt = await rebuildReviewedStart(
         args.checkpointToReplace,
         args.completedReceipt,
         purpose,
-        current.frameWcsNormalizationWarning,
+        current,
         args.onCompletedReplayChanged,
         owner.signal,
       );
@@ -158,7 +159,7 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
     prepared: bundle.prepared,
     laserModeStartSnapshot: bundle.laserModeStartSnapshot,
     overrides: bundle.laser.ovCache,
-    outputScope: currentOutputScope(bundle.app),
+    outputScope: bundle.outputScope ?? currentOutputScope(bundle.app),
     // The same window resolution the Start boundary applies, from the live
     // controller evidence at review time (ADR-331). Advisory only.
     streamThroughput: {
@@ -240,6 +241,14 @@ type RebuiltStart =
       readonly display?: ReviewedStartBundle;
     };
 
+function refreshFrozenReview(bundle: ReviewedStartBundle): RebuiltStart {
+  const laser = useLaserStore.getState();
+  return {
+    ok: true,
+    bundle: { ...bundle, laser, laserModeStartSnapshot: captureLaserModeStartSnapshot(laser) },
+  };
+}
+
 function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: false }>): boolean {
   if (rebuilt.closeReview === true) {
     useJobReviewStore.getState().close();
@@ -260,14 +269,35 @@ function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: fal
 // in-dialog blocker (the same edit would refuse Start today) and never
 // writes the StartBlocker store or discards receipts — Cancel after a failed
 // rebuild must leave the app exactly as the operator found it.
+async function rebuildReviewedStart(
+  checkpointToReplace: JobCheckpoint | null,
+  completedReceipt: LastCompletedReceipt | null,
+  purpose: JobReviewPurpose,
+  previousBundle: ReviewedStartBundle,
+  onCompletedReplayChanged: (() => Promise<void> | void) | undefined,
+  signal: AbortSignal,
+): Promise<RebuiltStart> {
+  return purpose === 'laser-second-pass'
+    ? refreshFrozenReview(previousBundle)
+    : rebuildCurrentStart(
+        checkpointToReplace,
+        completedReceipt,
+        purpose,
+        previousBundle,
+        onCompletedReplayChanged,
+        signal,
+      );
+}
+
 async function rebuildCurrentStart(
   checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
   purpose: JobReviewPurpose,
-  frameWcsNormalizationWarning: string | undefined,
+  previousBundle: ReviewedStartBundle,
   onCompletedReplayChanged: (() => Promise<void> | void) | undefined,
   signal: AbortSignal,
 ): Promise<RebuiltStart> {
+  const frameWcsNormalizationWarning = previousBundle.frameWcsNormalizationWarning;
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();

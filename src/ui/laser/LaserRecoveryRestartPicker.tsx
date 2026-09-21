@@ -36,6 +36,7 @@ export function LaserRecoveryRestartPicker(props: {
         <input
           id="laser-recovery-start-line"
           type="number"
+          title="Original G-code line number, starting at 1. Recovery replays this line and the rest of the job."
           min={1}
           max={artifact.fingerprint.lines}
           step={1}
@@ -49,6 +50,7 @@ export function LaserRecoveryRestartPicker(props: {
         />
         <button
           type="button"
+          title="Use acknowledged command progress as the restart estimate; it does not prove where engraving physically stopped."
           disabled={props.disabled || props.fromLine === undefined}
           onClick={() => props.onChange(undefined)}
         >

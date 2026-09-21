@@ -136,10 +136,19 @@ class JobCheckpointTracker {
   }
 
   private queueProgress(runId: RunId, queuedAck: number): void {
+    // ADR-337 archives after acceptance. Until activation, the pending intent
+    // owns this run and updateProgress has no active slot to advance yet.
+    if (progressDeferredOrSettled(this.repository, runId, queuedAck)) return;
     this.highestQueuedAck = Math.max(this.highestQueuedAck, queuedAck);
     this.enqueue(async () => {
       try {
         const updated = await this.repository.updateProgress(runId, queuedAck, this.nowIso());
+        if (
+          updated.ok &&
+          !updated.value &&
+          progressDeferredOrSettled(this.repository, runId, queuedAck)
+        )
+          return;
         if (!updated.ok || !updated.value) {
           this.reportQueueFailure(updated);
           return;
@@ -202,6 +211,20 @@ class JobCheckpointTracker {
       }
     });
   }
+}
+
+function progressDeferredOrSettled(
+  repository: RecoveryRepository,
+  runId: RunId,
+  ackedLines: number,
+): boolean {
+  const snapshot = repository.getSnapshot();
+  if (snapshot.activeRun?.runId === runId) return false;
+  if (snapshot.pendingStart?.runId === runId) return true;
+  if (snapshot.lastCompletedReceipt?.runId === runId) return true;
+  return (
+    snapshot.recoveryCapsule?.runId === runId && snapshot.recoveryCapsule.ackedLines >= ackedLines
+  );
 }
 
 function onceTrackingFailureReporter(

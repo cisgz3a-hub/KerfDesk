@@ -20,6 +20,7 @@ import {
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { JobStartTransmissionError } from '../state/laser-start-transmission-error';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
 import {
   createCurrentTestExecutionArtifact,
@@ -340,6 +341,20 @@ describe('runCncSupervisedRecoveryFlow', () => {
     );
   });
 
+  it('retains the attempted CNC recovery when close clears live state before a write rejects', async () => {
+    const repo = repository();
+    const capsule = await saveInterruptedRun(repo);
+    useLaserStore.setState({
+      startJob: async (_gcode, options) => {
+        useLaserStore.setState({ streamer: null, activeRunId: null });
+        throw new JobStartTransmissionError(new Error('Partial write'), options?.runId ?? null, 1);
+      },
+    });
+    expect(await runCncSupervisedRecoveryFlow(capsule, completeRecoveryReview, repo)).toBe(false);
+    expect(repo.getSnapshot().recoveryCapsule?.runId).not.toBe(capsule.runId);
+    expect(repo.getSnapshot().recoveryCapsule?.ackedLines).toBe(1);
+  });
+
   it('releases the claim even when rejected-attempt artifact cleanup fails', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
@@ -393,9 +408,7 @@ describe('runCncSupervisedRecoveryFlow', () => {
     expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('another window'));
   });
 
-  // Rule 7 / ADR-228 regression pin. `preflight.ok` is false for ANY issue, so
-  // checking it directly refused recovery over heuristic policy findings and
-  // stranded a partially-cut workpiece. Only compile integrity may refuse.
+  // ADR-228: only compile-integrity findings may refuse recovery.
   it('starts recovery with one copy of more than 128 repeated policy advisories', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);

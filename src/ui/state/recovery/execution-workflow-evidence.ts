@@ -2,11 +2,16 @@ import type { CncResumePoint } from '../../../core/recovery/cnc-resume-point';
 import type { JobReviewAcknowledgement } from '../../laser/job-review/job-review-model';
 import type { CncSetupAttestation } from '../cnc-setup-attestation';
 import type { LaserModeStartEvidence } from '../laser-mode-start-evidence';
+import type { LaserSecondPassChain } from './laser-second-pass-lineage';
 
 export type ExecutionWorkflowV2 =
   | {
       readonly kind: 'ordinary-start';
       readonly completedReplaySourceRunId?: string;
+    }
+  | {
+      readonly kind: 'laser-second-pass';
+      readonly stages: LaserSecondPassChain;
     }
   | {
       readonly kind: 'laser-recovery';
@@ -15,6 +20,7 @@ export type ExecutionWorkflowV2 =
       readonly sourceAckedLines: number;
       readonly requestedFromLine: number;
       readonly effectiveFromLine: number;
+      readonly laserSecondPassChain?: LaserSecondPassChain;
     }
   | {
       readonly kind: 'cnc-supervised-recovery';
@@ -123,6 +129,7 @@ export function laserRecoveryExecutionEvidence(args: {
   readonly reviewedAtIso: string;
   readonly warningsShown: ReadonlyArray<string>;
   readonly laserModeStartEvidence: LaserModeStartEvidence;
+  readonly laserSecondPassChain?: LaserSecondPassChain;
 }): ExecutionProvenanceEvidenceV2 {
   return {
     workflow: {
@@ -132,6 +139,9 @@ export function laserRecoveryExecutionEvidence(args: {
       sourceAckedLines: args.sourceAckedLines,
       requestedFromLine: args.requestedFromLine,
       effectiveFromLine: args.effectiveFromLine,
+      ...(args.laserSecondPassChain === undefined
+        ? {}
+        : { laserSecondPassChain: args.laserSecondPassChain }),
     },
     review: {
       reviewedAtIso: args.reviewedAtIso,

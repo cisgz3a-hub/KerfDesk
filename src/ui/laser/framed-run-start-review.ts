@@ -32,6 +32,9 @@ export async function reviewFramedRunForStart(
   // means an external handoff fact died, so there is nothing left to approve.
   const shouldAbandon = (): boolean => {
     const liveLaser = useLaserStore.getState();
+    if (candidate.authorizationContext === 'laser-second-pass') {
+      return liveLaser.framedRun !== permit;
+    }
     if (
       useStore.getState().project !== candidate.project ||
       !onlyFrameOwnershipChanged(laserAtOpen, liveLaser)
@@ -49,6 +52,7 @@ export async function reviewFramedRunForStart(
       laser,
       prepared: candidate.preparedStart,
       laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
+      outputScope: candidate.outputScope,
       ...(candidate.frameWcsNormalizationWarning === undefined
         ? {}
         : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),
@@ -56,6 +60,9 @@ export async function reviewFramedRunForStart(
     checkpointToReplace: null,
     completedReceipt: null,
     shouldAbandon,
+    ...(candidate.authorizationContext === 'laser-second-pass'
+      ? { purpose: 'laser-second-pass' }
+      : {}),
   });
   if (review === null) {
     if (shouldAbandon()) {

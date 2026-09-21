@@ -7,7 +7,11 @@ import type { PreparedOutput } from '../../io/gcode';
 import { currentOutputScope, useStore } from '../state';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
-import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import {
+  rebuildCanvasPlanForGcode,
+  reportedWorkPositionMm,
+  type CanvasMotionPlan,
+} from '../state/canvas-motion-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -16,7 +20,6 @@ import {
   type LaserModeStartSnapshot,
 } from '../state/laser-mode-start-evidence';
 import type { ExecutionArtifactV1 } from '../state/recovery';
-import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import { renderVariableText } from '../text/render-variable-text';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import {
@@ -49,6 +52,7 @@ export type PreparedRecoverySource = {
   readonly controllerSnapshot: ReturnType<typeof useLaserStore.getState>;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly laserResumeChain: NonNullable<ExecutionArtifactV1['laserResumeChain']>;
+  readonly laserSecondPassChain?: ExecutionArtifactV1['laserSecondPassChain'];
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
 };
@@ -228,11 +232,25 @@ export function prepareArchivedRecoverySource(
     project,
     gcode: artifact.gcode,
     prepared: recoveredPrepared,
-    canvasPlan: executionArtifactCanvasPlan(artifact),
+    // Diagnostic archived canvas metadata is not sealed. Reuse the qualified
+    // prepared plan's canonical profile/placement, then bind any resume or
+    // second-pass lineage to the exact saved bytes before runtime reuse.
+    canvasPlan:
+      qualified.gcode === artifact.gcode
+        ? qualified.canvasPlan
+        : rebuildCanvasPlanForGcode(
+            qualified.canvasPlan,
+            artifact.gcode,
+            reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true) ??
+              undefined,
+          ),
     warnings: qualified.warnings,
     controllerSnapshot: laser,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     laserResumeChain: artifact.laserResumeChain ?? [],
+    ...(artifact.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: artifact.laserSecondPassChain }),
     ...(qualified.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: qualified.preflightMotionOffset }),

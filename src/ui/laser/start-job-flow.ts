@@ -93,23 +93,35 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
     return;
   }
   if (permit === null) return;
+  await runFramedPermitStart(permit, repository);
+}
+
+/** Claims and transmits exactly one completion-issued permit. Derived jobs
+ * use this same review, durable intent, final assertion, and archive owner. */
+export async function runFramedPermitStart(
+  permit: FramedRunPermit,
+  repository: RecoveryRepository = recoveryRepository,
+): Promise<boolean> {
+  if (useLaserStore.getState().framedRun !== permit || framedRunReadinessIssue(permit) !== null) {
+    return false;
+  }
   // ADR-237: the single Job Review runs here at Start. Transient camera
   // permits were reviewed before their Frame and carry evidence from birth.
   const review = permit.candidate.review ?? (await reviewFramedRunForStart(permit));
-  if (review === null) return;
+  if (review === null) return false;
   if (useLaserStore.getState().framedRun !== permit) {
     useToastStore.getState().pushToast(FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE, 'warning');
-    return;
+    return false;
   }
   const claim = claimCurrentFramedRunStart(permit);
   if (claim === null) {
     useToastStore
       .getState()
       .pushToast('This framed job is already being handed to the controller.', 'warning');
-    return;
+    return false;
   }
   try {
-    await streamFramedRun(permit, review, claim, repository);
+    return await streamFramedRun(permit, review, claim, repository);
   } finally {
     releaseFramedRunStartClaim(claim);
   }
@@ -120,7 +132,7 @@ async function streamFramedRun(
   review: FramedRunReviewEvidence,
   claim: FramedRunStartClaim,
   repository: RecoveryRepository,
-): Promise<void> {
+): Promise<boolean> {
   const authorizationArgs = {
     preparedAgainst: permit.controller,
     checkpointToReplace: null,
@@ -130,8 +142,8 @@ async function streamFramedRun(
     framedRunClaim: claim,
   } as const;
   const currentLaser = await currentLaserForAuthorizedStart(authorizationArgs);
-  if (currentLaser === null) return;
-  await streamPreparedStart({
+  if (currentLaser === null) return false;
+  return streamPreparedStart({
     outputScope: permit.candidate.outputScope,
     project: permit.candidate.project,
     laser: currentLaser,
@@ -285,16 +297,16 @@ async function repairOrReportBlockedStart(
 // the first wire byte. The durable pre-wire record is the start intent — two
 // linear scans of the emitted program — and the execution archive is written
 // once the controller has accepted it.
-async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
+async function streamPreparedStart(args: PreparedStartArgs): Promise<boolean> {
   const runId = createRunId();
   if (
     args.completedReceipt !== null &&
     !(await completedReceiptIsCurrent(args.completedReceipt, args.repository))
   ) {
-    return;
+    return false;
   }
   const handoff = await armFreshStartHandoff(args, runId);
-  if (handoff.blocked) return;
+  if (handoff.blocked) return false;
   const authorizationArgs = {
     preparedAgainst: args.laser,
     checkpointToReplace: args.checkpointToReplace,
@@ -311,9 +323,9 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
       args.completedReceipt,
       args.repository,
     );
-    return;
+    return false;
   }
-  await transmitPreparedStart({
+  return transmitPreparedStart({
     args,
     runId,
     handoffArmed: handoff.armed,

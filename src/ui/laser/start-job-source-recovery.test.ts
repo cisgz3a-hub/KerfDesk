@@ -177,7 +177,8 @@ describe('recovery source preparation', () => {
     const recovered = prepareArchivedRecoverySource(artifact);
 
     expect(recovered?.gcode).toBe(artifact.gcode);
-    expect(recovered?.canvasPlan).toBe(artifact.canvasPlan);
+    expect(recovered?.canvasPlan.fingerprint).toEqual(artifact.fingerprint);
+    expect(recovered?.canvasPlan.device).toEqual(artifact.prepared.project.device);
     expect(recovered?.controllerSnapshot).toBe(qualifiedAgainst);
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });

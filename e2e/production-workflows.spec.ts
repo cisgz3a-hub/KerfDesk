@@ -855,6 +855,148 @@ async function selectRecoveryMovement(
   });
 }
 
+test('paints, erases, adjusts and recovers a second pass from a completed image', async ({
+  page,
+  kerfdesk,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('dialog', (dialog) => {
+    errors.push(dialog.message());
+    void dialog.accept();
+  });
+  await selectAll(page);
+  await runMenuCommand(page, 'Edit', 'Delete');
+  await kerfdesk.setOpenFiles([
+    { name: 'painted-image.png', kind: 'png-fixture', width: 120, height: 120 },
+  ]);
+  await (await toolbarCommand(page, 'Import...')).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('12');
+  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await fillAndCommit(page, 'Selection width', '20');
+  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await fillAndCommit(page, 'Selection height', '20');
+  await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
+  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await expect(page.getByTestId('canvas-motion-probe')).toHaveAttribute(
+    'data-lifecycle',
+    'finished',
+    { timeout: 30_000 },
+  );
+  await dismissNotifications(page);
+  const paintButton = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
+  await expect(paintButton).toBeEnabled();
+  await selectAll(page);
+  await fillAndCommit(page, 'Selection X position', '47');
+  const beforePainting = serialWrites(await kerfdesk.events());
+  await paintButton.click();
+  const workbench = page.getByRole('dialog', { name: 'Paint a second pass', exact: true });
+  const canvas = workbench.getByRole('img', {
+    name: 'Paint second-pass areas on the saved engraving',
+  });
+  await expect(canvas).toBeVisible();
+  await workbench.getByLabel('Brush diameter (mm)').fill('8');
+  await workbench.getByLabel('Paint power (% of original)').fill('150');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Expected the painted engraving canvas.');
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(
+    workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      canvas
+        .locator('canvas')
+        .nth(1)
+        .evaluate(
+          (node: HTMLCanvasElement) =>
+            node
+              .getContext('2d')
+              ?.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1)
+              .data[3] ?? 0,
+        ),
+    )
+    .toBeGreaterThan(0);
+  await workbench.getByRole('button', { name: 'Eraser', exact: true }).click();
+  await workbench.getByLabel('Brush diameter (mm)').fill('2');
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      canvas
+        .locator('canvas')
+        .nth(1)
+        .evaluate(
+          (node: HTMLCanvasElement) =>
+            node
+              .getContext('2d')
+              ?.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1)
+              .data[3] ?? 255,
+        ),
+    )
+    .toBe(0);
+  await workbench.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).not.toBeVisible();
+  await workbench.getByRole('button', { name: 'Redo', exact: true }).click();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  expect(serialWrites(await kerfdesk.events()).slice(beforePainting.length)).not.toMatch(
+    /G[0123]\s/,
+  );
+  await expect(page.getByText(/Job recovery tracking hit an unexpected error/)).toHaveCount(0);
+  await workbench.screenshot({ path: testInfo.outputPath('painted-image-second-pass.png') });
+  await workbench.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+  await paintButton.click();
+  await expect(
+    workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }),
+  ).toBeVisible();
+  await expect(workbench.getByRole('button', { name: 'Erase 2', exact: true })).toBeVisible();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Frame second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }).click();
+  await workbench.getByLabel('Selected stroke power (% of original)').fill('125');
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeDisabled();
+  await workbench.getByRole('button', { name: 'Preview second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Frame second pass', exact: true }),
+  ).toBeEnabled();
+  await workbench.getByRole('button', { name: 'Frame second pass', exact: true }).click();
+  await expect(
+    workbench.getByRole('button', { name: 'Start second pass', exact: true }),
+  ).toBeEnabled();
+  await kerfdesk.setAutoAcknowledge(false);
+  await workbench.getByRole('button', { name: 'Start second pass', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Review painted second pass' });
+  await expect(review).toBeVisible();
+  await expect(review.getByRole('spinbutton')).toHaveCount(0);
+  await review.getByRole('button', { name: 'Start second pass', exact: true }).click();
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await kerfdesk.acknowledgeSerial(1);
+  await kerfdesk.disconnectSerial();
+  const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
+  await expect(recovery.getByText('Interrupted job saved', { exact: true })).toBeVisible();
+  await recovery.getByText('Interrupted job saved', { exact: true }).click();
+  await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Review interrupted laser job' })).toContainText(
+    'Exact job artifact saved',
+  );
+  expect(errors).toEqual([]);
+});
+
 test('uses jog speed for XY buttons and return to work zero without hijacking canvas arrows', async ({
   page,
   kerfdesk,

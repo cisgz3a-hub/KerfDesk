@@ -25,6 +25,7 @@ import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgemen
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
+import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
 
 /** Final, explicit activation for the sealed laser recovery dialog. Review and
  * cancellation never call this function and therefore cannot claim a capsule. */
@@ -208,6 +209,9 @@ async function buildLaserRecoveryArtifact(
     reviewedAtIso: planned.reviewedAtIso,
     warningsShown: planned.source.warnings,
     laserModeStartEvidence: planned.laserModeStartEvidence,
+    ...(planned.source.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: planned.source.laserSecondPassChain }),
   });
   const createdAtIso = new Date().toISOString();
   const archivedControllerObservation = createArchivedControllerObservation({
@@ -227,6 +231,9 @@ async function buildLaserRecoveryArtifact(
     gcode: planned.resumeGcode,
     prepared: planned.source.prepared,
     laserResumeChain: [...planned.source.laserResumeChain, { fromLine: planned.resumeFromLine }],
+    ...(planned.source.laserSecondPassChain === undefined
+      ? {}
+      : { laserSecondPassChain: planned.source.laserSecondPassChain }),
     outputScope: planned.capsule.artifact.outputScope,
     ...(planned.source.jobOrigin === undefined ? {} : { jobOrigin: planned.source.jobOrigin }),
     canvasPlan,
@@ -310,7 +317,11 @@ async function resolveFailedAttempt(args: {
 }): Promise<void> {
   const state = useLaserStore.getState();
   const message = args.error instanceof Error ? args.error.message : String(args.error);
-  if (state.streamer === null || state.activeRunId !== args.recoveryRunId) {
+  const attemptedAckedLines = attemptedRunAcknowledgements(args.error, args.recoveryRunId);
+  if (
+    attemptedAckedLines === null &&
+    (state.streamer === null || state.activeRunId !== args.recoveryRunId)
+  ) {
     const cleanup = await cleanupRejectedRecoveryAttempt({
       repository: args.repository,
       sourceRunId: args.sourceCapsule.runId,
@@ -330,16 +341,24 @@ async function resolveFailedAttempt(args: {
     recoveryRunId: args.recoveryRunId,
   });
   if (activated.ok && activated.value) {
-    await args.repository.interruptRun(args.recoveryRunId, state.streamer.completed, {
-      kind: 'write-failed',
-      message,
-    });
+    await args.repository.interruptRun(
+      args.recoveryRunId,
+      attemptedAckedLines ?? state.streamer?.completed ?? 0,
+      {
+        kind: 'write-failed',
+        message,
+      },
+    );
   } else {
     await args.repository.noteUntrackedRunAccepted(args.recoveryRunId);
   }
   jobAwareAlert(
     `Laser recovery transmission became uncertain:\n\n${message}\n\nInspect and requalify the machine before any further motion.`,
   );
+}
+
+function attemptedRunAcknowledgements(error: unknown, runId: string): number | null {
+  return isJobStartTransmissionError(error) && error.runId === runId ? error.ackedLines : null;
 }
 
 function controllerObservation(laser: ReturnType<typeof useLaserStore.getState>) {

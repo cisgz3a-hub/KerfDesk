@@ -1596,6 +1596,53 @@ authorization, Frame proof, controller command, or safety boundary.
   This prevents a demonstrated false disconnect and does not establish that a particular
   browser, USB adapter or controller keeps streaming while minimised.
 
+#### Painted second passes (2026-09-22, ADR-339)
+
+- After a settled laser completion, **Paint a second pass…** opens the retained saved job.
+  The completed-run selector also offers older retained completions. When a completed run
+  was a recovery or a painted pass, the preview follows its independently verified retained
+  ancestor so the original full engraving is available where that archive still exists.
+  The current artwork document is never replaced or recompiled by this workflow.
+- Use **Paintbrush**, set its diameter in millimetres and paint areas to repeat. **Eraser**
+  removes areas; **Hand**, Alt-drag and wheel zoom support detailed marking. Several strokes
+  can have different power. Select a painted stroke to edit its power, delete individual
+  strokes, or use Undo/Redo and Clear areas. The most recent stroke wins in overlaps. A
+  painted overlap never adds an extra pass; any deliberate repeated passes in the source
+  program remain repeated inside the mask.
+- **Power (% of original)** is a multiplier of every saved S value, preserving grayscale:
+  100% repeats the source power and 150% multiplies it by 1.5. Values that exceed the saved
+  profile's maximum S are capped and disclosed. Speed, beam mode, scan direction, scan
+  offsets, pixel-width correction and useful unpowered runways remain as emitted originally.
+  The mask does not crop/reprocess the source image or restart its dithering.
+- **Preview second pass** compiles off the UI thread. Its coloured burn paths show the
+  actual selected output; faint paths show the saved engraving for context. The painted
+  mask is a selection, not a physical prediction of material darkness. Entire unselected
+  sweeps are omitted. Intersecting sweeps can traverse unpainted areas with S0 to retain
+  their run-in/run-out motion; all repositioning commands turn the beam off.
+- **Frame second pass** traces the exact derived motion bounds and returns to its captured
+  position. **Start second pass** opens one immutable Job Review with current controller
+  facts, selected-pass metrics and acknowledgements. Editing the painted output invalidates
+  that Frame. Closing the workbench revokes only its own permit. Frame and Start are explicit
+  machine actions; painting, erasing, zooming and previewing move nothing.
+- Keep the workpiece and work origin unchanged from the saved engraving. Source placement
+  is fixed, including jobs originally started from Current Position; a later parked head
+  cannot re-anchor the painted pass. Fresh controller evidence qualifies the approach and
+  live preview. Saved observations never qualify the current machine.
+- Each accepted painted pass gets a new run identity, durable Start intent, exact archive
+  and recovery tracking. Ordered source-resume and paint transforms are bound into its
+  provenance. A disconnect can therefore resume the derived pass without regenerating the
+  full original job. Uncertain first writes keep the attempted run, even if the transport
+  closes before reporting the write failure; the old offer is not silently restored.
+- Painted drafts for the 20 most recently edited sources are retained locally, keyed to each
+  exact run and fingerprint. Storage failure is disclosed and preserves prior saved drafts.
+  Drafts and bounded execution history are different: history
+  still retains at most 20 terminal runs within 100 MiB, with its existing protected slots.
+- Supported inputs are the generated flat XY laser image, fill and vector programs. Native
+  external arcs, coordinate-changing commands, Z/rotary motion, dwell and stationary M3
+  exposure cannot yet be transformed faithfully and produce a specific preparation error.
+  No physical result, browser-minimisation behaviour or Falcon qualification follows from
+  the software tests alone.
+
 While a job streams, the app owns an immutable exact execution artifact in
 IndexedDB plus a small `activeRun` slot keyed by a unique run ID. Progress is
 updated every 25 acknowledgements and at state transitions. Interruption moves

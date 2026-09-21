@@ -77,7 +77,7 @@ export type JobReviewModel = {
 
 export type JobReviewStreamThroughput = Pick<StreamThroughputInput, 'window' | 'controllerKind'>;
 
-export function buildJobReviewModel(args: {
+type JobReviewModelArgs = {
   readonly project: Project;
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
@@ -86,7 +86,10 @@ export function buildJobReviewModel(args: {
   /** Live streaming window for the connected controller (ADR-331); callers
    * without a live session omit it and get no throughput advisory. */
   readonly streamThroughput?: JobReviewStreamThroughput;
-}): JobReviewModel {
+};
+
+export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
+  if (args.prepared.laserSecondPassChain !== undefined) return buildSecondPassReviewModel(args);
   const machineKind = machineKindOf(args.project.machine);
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
@@ -149,6 +152,82 @@ export function buildJobReviewModel(args: {
       args.project.scene,
     ),
   };
+}
+
+/** The archived semantic job explains how the source was made; it is not a
+ * count or power summary of the selected emitted program. Keep these facts
+ * about the exact derived bytes and the operator's frozen brush selection. */
+function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
+  const prepared = args.prepared;
+  const selection = prepared.laserSecondPassChain?.at(-1)?.selection;
+  const powers = [
+    ...new Set(
+      selection?.strokes
+        .filter((stroke) => stroke.mode === 'paint')
+        .map((stroke) => formatCount(stroke.powerScale * 100)) ?? [],
+    ),
+  ];
+  return {
+    machineKind: 'laser',
+    stats: [
+      timeTile(prepared.metrics.duration, 'laser'),
+      sizeTile(prepared.metrics.jobBounds, prepared.metrics.motionBounds),
+      {
+        label: 'Output scope',
+        value: 'Painted areas only',
+        detail: 'Engraving is limited to your painted areas.',
+        emphasis: 'text',
+      },
+      {
+        label: 'Painted power',
+        value: `${powers.join(' / ')}% of original`,
+        detail: `Saved grayscale is scaled per brush and capped at S${formatCount(args.project.device.maxPowerS)}.`,
+        emphasis: 'text',
+      },
+      gcodeTile(prepared.gcode),
+      originTile(prepared.jobOrigin),
+    ],
+    warnings: dedupe([
+      ...prepared.warnings,
+      ...detectM7AirAssistWarnings(
+        prepared.gcode,
+        args.laserModeStartSnapshot.controllerBuildInfo,
+        buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
+      ),
+      ...secondPassThroughputWarnings(args),
+    ]),
+    resolvedOriginLabel: describeJobOrigin(prepared.jobOrigin),
+    toolPlanLabels: [],
+    acknowledgement: buildAcknowledgement(args, 'laser'),
+    outputQualityFacts: [
+      {
+        label: 'Saved motion',
+        value: 'Original speed, direction, and runways retained.',
+        tone: 'default',
+      },
+      {
+        label: 'Saved passes',
+        value: 'Saved repeated passes repeat inside the painted areas.',
+        tone: 'default',
+      },
+      {
+        label: 'Overlapping strokes',
+        value: 'The latest paint or erase stroke wins.',
+        tone: 'default',
+      },
+    ],
+    effectiveOperations: [],
+  };
+}
+
+function secondPassThroughputWarnings(args: JobReviewModelArgs): ReadonlyArray<string> {
+  if (args.streamThroughput === undefined) return [];
+  return detectStreamThroughputWarnings({
+    ...args.streamThroughput,
+    gcode: args.prepared.gcode,
+    motionSeconds: commandedMotionSeconds(args.prepared.metrics.duration),
+    transportSeconds: args.prepared.metrics.duration.breakdown.transportSeconds ?? 0,
+  });
 }
 
 // Cut plus travel: the seconds the planner expects motion to be commanded,

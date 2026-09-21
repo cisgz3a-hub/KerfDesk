@@ -118,11 +118,17 @@ export async function stageFreshExecutionArtifact(args: {
       laser: args.laser,
       archivedControllerObservation,
       ...evidence,
+      ...(args.prepared.laserSecondPassChain === undefined
+        ? {}
+        : { workflow: { kind: 'laser-second-pass', stages: args.prepared.laserSecondPassChain } }),
     });
     const artifact = createExecutionArtifact({
       runId: args.runId,
       gcode: args.prepared.gcode,
       prepared: args.prepared.prepared,
+      ...(args.prepared.laserSecondPassChain === undefined
+        ? {}
+        : { laserSecondPassChain: args.prepared.laserSecondPassChain }),
       outputScope: args.outputScope,
       ...(args.prepared.jobOrigin === undefined ? {} : { jobOrigin: args.prepared.jobOrigin }),
       canvasPlan: args.prepared.canvasPlan,

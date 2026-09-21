@@ -3,7 +3,7 @@
 // or CNC stock, bit, safe-Z, spindle, coolant, park — plus the ordered tool
 // plan of the exact prepared program.
 
-import type { MachineKind } from '../../../core/scene';
+import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { buildMachineReviewFacts, type JobReviewFact } from './job-review-live-rows';
@@ -21,8 +21,10 @@ export function JobReviewMachineSection(props: {
   readonly machineKind: MachineKind;
   readonly toolPlanLabels: ReadonlyArray<string>;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
+  readonly project?: Project;
 }): JSX.Element {
-  const project = useStore((s) => s.project);
+  const liveProject = useStore((s) => s.project);
+  const project = props.project ?? liveProject;
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const facts = [
     ...buildMachineReviewFacts(project, controllerSettings),

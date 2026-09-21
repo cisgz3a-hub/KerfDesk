@@ -24,6 +24,8 @@ export function useJobReviewRebuildTrigger(): () => void {
   }, []);
   useEffect(() => {
     const unsubscribe = useStore.subscribe((current, previous) => {
+      const review = useJobReviewStore.getState().state;
+      if (review.kind === 'open' && review.purpose === 'laser-second-pass') return;
       if (
         current.project === previous.project &&
         current.jobPlacement === previous.jobPlacement &&

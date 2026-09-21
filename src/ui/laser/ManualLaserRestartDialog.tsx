@@ -58,33 +58,61 @@ export function ManualLaserRestartDialog(props: {
         disabled={starting}
         onSelect={setFromLine}
       />
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
-        Restart from G-code line
-        <input
-          type="number"
-          min={1}
-          max={maximumLine}
-          step={1}
-          value={fromLine}
-          disabled={starting}
-          style={{ width: 110 }}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (Number.isInteger(value) && value >= 1 && value <= maximumLine) setFromLine(value);
-          }}
-        />
-      </label>
+      <ManualRestartLine
+        maximum={maximumLine}
+        fromLine={fromLine}
+        disabled={starting}
+        onChange={setFromLine}
+      />
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}
       <DialogActions>
-        <button type="button" disabled={starting} onClick={close}>
+        <button
+          type="button"
+          title="Close the restart preview without starting the job."
+          disabled={starting}
+          onClick={close}
+        >
           Cancel
         </button>
-        <button type="button" disabled={starting} onClick={() => void start()}>
+        <button
+          type="button"
+          title="Review recovery, then move with the beam off to replay the selected movement and remaining job."
+          disabled={starting}
+          onClick={() => void start()}
+        >
           {starting ? 'Starting recovery…' : 'Start selected remainder'}
         </button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function ManualRestartLine(props: {
+  readonly maximum: number;
+  readonly fromLine: number;
+  readonly disabled: boolean;
+  readonly onChange: (line: number) => void;
+}): JSX.Element {
+  return (
+    <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+      Restart from G-code line
+      <input
+        type="number"
+        title="Prepared G-code line number, starting at 1. Restart replays this line and the rest of the job."
+        min={1}
+        max={props.maximum}
+        step={1}
+        value={props.fromLine}
+        disabled={props.disabled}
+        style={{ width: 110 }}
+        onChange={(event) => {
+          const value = Number(event.target.value);
+          if (Number.isInteger(value) && value >= 1 && value <= props.maximum)
+            props.onChange(value);
+        }}
+      />
+    </label>
   );
 }
 

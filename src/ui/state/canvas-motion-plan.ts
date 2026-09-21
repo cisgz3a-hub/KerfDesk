@@ -368,7 +368,7 @@ export function reportedWorkPositionMm(
   return { x: mPos.x - wco.x, y: mPos.y - wco.y, z: mPos.z - wco.z };
 }
 
-function canvasCoordinateFrame(
+export function canvasCoordinateFrame(
   prepared: Extract<PreparedOutput, { readonly ok: true }>,
   machine: MachineStartSnapshot,
   reportInches: boolean,
@@ -415,7 +415,7 @@ function normalized(point: MotionPoint, reportInches: boolean): MotionPoint {
   return { x, y, z };
 }
 
-function canvasCapability(
+export function canvasCapability(
   statusQuery: StatusQueryCapability,
   rotary: boolean,
 ): CanvasPlanCapability {
@@ -425,7 +425,7 @@ function canvasCapability(
   return 'file-only';
 }
 
-function capabilityReason(capability: CanvasPlanCapability, rotary: boolean): string | null {
+export function capabilityReason(capability: CanvasPlanCapability, rotary: boolean): string | null {
   if (rotary) return 'Live trail unavailable for rotary jobs; start markers are surface-relative.';
   if (capability === 'settle-only')
     return 'Live position unavailable; route confirms after motion settles.';

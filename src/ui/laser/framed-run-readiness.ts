@@ -14,7 +14,7 @@ export function framedRunReadinessIssue(
   options: { readonly ignoreControllerStatusState?: boolean } = {},
 ): string | null {
   if (permit === null) return FRAME_JOB_FIRST_MESSAGE;
-  const transientProject = permit.candidate.authorizationContext === 'transient-camera';
+  const transientProject = permit.candidate.authorizationContext !== undefined;
   if (
     !transientProject &&
     currentReplayExecutionSignature(app) !== permit.candidate.executionSignature
