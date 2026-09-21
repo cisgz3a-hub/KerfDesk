@@ -3,7 +3,12 @@
 
 import { selectControllerDriver } from '../../../core/controllers';
 import type { DeviceProfile } from '../../../core/devices';
-import { AirAssistRow, FireControlRow, LaserPowerRows } from '../DeviceProfilePowerFields';
+import {
+  AirAssistRow,
+  AirRestartRow,
+  FireControlRow,
+  LaserPowerRows,
+} from '../DeviceProfilePowerFields';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
 
@@ -41,6 +46,7 @@ function LaserMachineStep({ state, dispatch }: DeviceSetupStepProps): JSX.Elemen
         grblLabels={driver.capabilities.settings === 'grbl-dollar'}
       />
       <AirAssistRow device={state.draft} update={update} />
+      <AirRestartRow device={state.draft} update={update} />
       <FireControlRow device={state.draft} update={update} />
       <div style={warningStyle}>
         <strong>Hardware check required:</strong> verify the beam is off at S0, test the lowest

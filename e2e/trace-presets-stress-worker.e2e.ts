@@ -17,7 +17,7 @@ const FIXTURE_PATH = fileURLToPath(
 );
 const FIXTURE_BYTES = readFileSync(FIXTURE_PATH);
 const FIXTURE_SHA256 = 'e4b23a55c73c679b81889ac86a07efccd62039619b9758d63a96ca492032f846';
-// The product watchdog, now a SILENCE budget (ADR-335): a trace that keeps
+// The product watchdog, now a SILENCE budget (ADR-336): a trace that keeps
 // heartbeating may exceed it. It stays the test's own ceiling for the dragon.
 const COMPUTE_BUDGET_MS = 30_000;
 // Mirrors HEARTBEAT_INTERVAL_MS in src/ui/trace/trace-worker.ts.
@@ -35,7 +35,7 @@ interface TraceObservation {
   outcome: 'ok' | 'error' | null;
   // Heartbeats seen while this request computed. They prove the worker stayed
   // audible without ending the request, which is what keeps a long trace's
-  // silence budget alive (ADR-335).
+  // silence budget alive (ADR-336).
   beats: number;
   message: string | null;
   polylines: number;

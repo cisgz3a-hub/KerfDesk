@@ -20850,7 +20850,88 @@ transfer, or the two halves talking to each other. There is no hardware evidence
 That is why it ships off, why every failure path falls back to the main-thread transport, and why
 the Machine Setup control says so. Anyone enabling it should air-cut first.
 
-## ADR-335 - The trace worker's budget bounds silence, not work (2026-09-21)
+---
+
+## ADR-335 - Air assist is held across an Air-off operation when the controller cannot restart it (2026-09-21)
+
+**Status:** Accepted. Closes the gap ADR-323 left open: that decision removed the `M9` that Frame
+sent immediately before Start, and this one removes the `M9` the job itself sends mid-program.
+Neither is hardware-verified.
+
+### Context
+
+ADR-323 traced "dark shadows at the start of the burn that fade" on a Creality Falcon A1 Pro to air
+assist not running for the opening part of the job, and removed `M9` from that machine's Frame
+tool-off lines. It fixed Frame only. The same trigger survives inside the job.
+
+The emitted program switches air per operation. Measured across every controller family, an
+operation sequence of Air-on, Air-off, Air-on emits:
+
+```
+M8 | layer a | M9 | layer b | M8 | layer c | M9
+```
+
+That middle `M9` and `M8` are the churn. On the A1 family they are not a clean off and on. Creality
+exposes `$152` as a delay before the pump actually stops after `M9`, documented by LightBurn's
+staff with the remedy `$152=0`, and the shipped 1.0.6 build has been reported dropping the pump
+seconds after a fresh `M8`. The user-visible result is the widely reported "air works while
+engraving but stops when it cycles over to cutting". The operations that lose their air are the
+ones AFTER the gap, which the operator did ask for air on.
+
+This is specific to that vendor firmware, from primary sources read for ADR-323: gnea/grbl's
+`coolant_control.c` sets the coolant state immediately as a planner-synced pin toggle; grblHAL adds
+only an on-delay; FluidNC's `delay_ms` is blocking and zero in stock configs; Smoothieware's switch
+module documents no timer; Marlin's `AIR_ASSIST` drives the relay directly. For all of those,
+`M9` then `M8` is indistinguishable from a first `M8`.
+
+A dwell after `M8` is not available as a remedy here: start and end pauses are themselves reported
+to make the A1's pump fail.
+
+### Decision
+
+On a profile that declares `airAssistRestartUnreliable`, an Air-off operation that sits BETWEEN two
+Air-on operations keeps the air running instead of cycling it. A leading or trailing run of Air-off
+operations is never bridged, so the pump is never armed before the first operation that wants it
+and never held past the last one. Every other profile keeps per-operation switching unchanged.
+
+`bridgedAirGapIndices` in `core/output/air-assist-hold.ts` is the only place the rule lives. The
+emitter reads it to decide the bytes and Job Review reads it to describe them, so the advisory can
+never claim a hold the emitter did not make; a test drives both from the same jobs and asserts they
+agree.
+
+The Falcon A1 Pro profile sets the flag. The Falcon-compatible GRBL profile does not, because stock
+GRBL restarts correctly. A Machine Setup checkbox clears it, which is what an operator wants once
+`$152=0` is set on the controller.
+
+Job Review names the bridged operations, says why the air is being held, and names `$152=0`. It is
+an advisory, never a Start refusal (rule 7 / ADR-228): turning Air on for the bridged operation
+makes the emitted program match the operations table exactly.
+
+### Consequences
+
+An operation that asked for no air can now run with air on. That is a real departure from the
+operations table and it is why the advisory exists. It is accepted because the alternative on this
+firmware is worse in both directions: the bridged operation already receives air for the length of
+the `$152` standby, and every operation after it risks receiving none. The same reasoning does NOT
+extend to pre-arming air before the first operation, which ADR-323 rejected and which this
+deliberately still does not do.
+
+The bridging is invisible to every other machine, and the emitted bytes for them are unchanged.
+
+### Verification and limits
+
+Pinned: the churn for a default profile; a single `M8`/`M9` pair for a restart-unreliable one; no
+pre-arm; no hold past the last Air-on operation; every gap bridged, not only the first; the shipped
+Falcon A1 Pro profile bridging and the Falcon-compatible profile still cycling; the advisory
+agreeing with the emitter across four job shapes; and the flag surviving a profile round trip while
+a junk value is dropped.
+
+NOT verified: the firmware behaviour itself. `$152`, its default, and the 1.0.6 pump-drop are
+community and vendor reports, not measurements taken here, and no hardware was operated. The
+physical check is a coupon whose middle operation has Air off, listening for the pump through it
+and through the operation after it.
+
+## ADR-336 - The trace worker's budget bounds silence, not work (2026-09-21)
 
 **Status:** Accepted; amends the trace worker watchdog. Preserves rule 7 / ADR-241: nothing here
 refuses artwork by size.

@@ -25,6 +25,7 @@ import { assertNever } from '../scene';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
+import { bridgedAirGapIndices } from './air-assist-hold';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
@@ -433,6 +434,24 @@ function groupCoolantMode(group: Group, device: DeviceProfile): CoolantMode {
   return device.airAssistCommand === 'none' ? 'off' : device.airAssistCommand;
 }
 
+/**
+ * The coolant mode each group actually runs under, by group index.
+ *
+ * Normally that is exactly what the operation asked for. `bridgedAirGapIndices`
+ * owns the one exception and the reasoning behind it (ADR-335); every Air-on
+ * group resolves to the same device command, so a single held mode suffices.
+ */
+function coolantPlan(job: Job, device: DeviceProfile): ReadonlyArray<CoolantMode> {
+  const wanted = job.groups.map((group) => groupCoolantMode(group, device));
+  const bridged = bridgedAirGapIndices(
+    wanted.map((mode) => mode !== 'off'),
+    device.airAssistRestartUnreliable === true,
+  );
+  if (bridged.size === 0) return wanted;
+  const held = wanted.find((mode) => mode !== 'off') ?? 'off';
+  return wanted.map((mode, index) => (bridged.has(index) ? held : mode));
+}
+
 function coolantTransition(from: CoolantMode, to: CoolantMode): string {
   if (from === to) return '';
   if (to === 'off') return `M9${LINE_END}`;
@@ -453,7 +472,8 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   parts.push(preamble(dialect));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
-  for (const group of job.groups) {
+  const plan = coolantPlan(job, device);
+  for (const [index, group] of job.groups.entries()) {
     const wantedMode = powerModeForGroup(group, dialect);
     if (wantedMode === 'M3' && mode !== 'M3') {
       // Restore constant power for vector cutting.
@@ -467,7 +487,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
       parts.push((mode === 'M3' ? 'M5' + LINE_END : '') + 'M4 S0' + LINE_END);
       mode = 'M4';
     }
-    const nextCoolant = groupCoolantMode(group, device);
+    const nextCoolant = plan[index] ?? 'off';
     parts.push(coolantTransition(coolant, nextCoolant));
     coolant = nextCoolant;
     parts.push(emitAnyGroup(group, device, dialect));

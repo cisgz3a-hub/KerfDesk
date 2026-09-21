@@ -35,6 +35,7 @@ import {
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
+import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
@@ -109,6 +110,11 @@ export function buildJobReviewModel(args: {
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectAirAssistStartWarnings(
+        args.prepared.prepared.job,
+        args.project.device,
+        args.project.scene.layers,
+      ),
+      ...detectAirAssistCyclingWarnings(
         args.prepared.prepared.job,
         args.project.device,
         args.project.scene.layers,

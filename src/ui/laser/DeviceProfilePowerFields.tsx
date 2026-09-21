@@ -101,6 +101,27 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
   );
 }
 
+// ADR-335. Creality's A1 family cannot be trusted to restart its pump inside a
+// running job, so the emitter holds air on across an Air-off operation that
+// sits between two Air-on ones. Clearing this restores plain per-operation
+// air, which is what an operator wants once `$152=0` is set on the controller.
+// Hidden while air output is disabled, where it would mean nothing.
+export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element | null {
+  if (device.airAssistCommand === 'none') return null;
+  return (
+    <Row label="Air restart">
+      <input
+        type="checkbox"
+        checked={device.airAssistRestartUnreliable === true}
+        aria-label="Controller cannot restart air assist mid-job"
+        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and Job Review says so. Untick once $152=0 is set on the controller."
+        onChange={(event) => update({ airAssistRestartUnreliable: event.target.checked })}
+      />
+      <span style={{ opacity: 0.7 }}>cannot switch air off and on mid-job</span>
+    </Row>
+  );
+}
+
 export function FireControlRow({ device, update }: DeviceRowsProps): JSX.Element | null {
   if (!profileSupportsCapability(device, 'low-power-fire')) return null;
   const control = device.fireControl ?? {

@@ -2347,6 +2347,15 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operator left on stays on. With the first operation's Air off, Job
     Review shows the air-off opening-operation advisory; Start is not
     blocked.
+12. **Air pump across an Air-off operation (ADR-335).** Build three
+    operations with Air on, off, then on, and Start. On a profile with
+    "Air restart" ticked the program must contain exactly one `M8` and
+    one `M9`, the pump must still be running through the middle
+    operation and the last one, and Job Review must name the held
+    operation and `$152=0`. Untick "Air restart" and the same job must
+    go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
+    operation with the box ticked, the hold is not working; if it is
+    off only with the box unticked, the firmware timer is confirmed.
 
 When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —

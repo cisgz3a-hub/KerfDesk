@@ -1,5 +1,10 @@
 /* eslint-disable no-restricted-syntax -- controller motion is scene data drawn
- * into the always-light canvas; fixed colors keep the safety trail unambiguous. */
+ * onto the canvas, not chrome. The safety chrome (frame/job markers, approach,
+ * head ring) stays a fixed red at both canvas themes so it can never be read as
+ * anything but the machine. Only the label follows the bed — a hard-white plate
+ * on the dark bed read as a sticker pasted over the work, and #dc2626 text on
+ * that plate fails contrast — and it stays red either way. Burn colours proper
+ * live in canvasTheme.burn* (ADR-047). */
 import type { Vec2 } from '../../core/scene';
 import {
   mapControllerPointToScene,
@@ -7,8 +12,10 @@ import {
   type LiveCanvasRun,
 } from '../state/canvas-motion-plan';
 import { cncPassPosition } from '../state/canvas-pass-progress';
+import { canvasTheme } from '../theme/canvas-theme';
+import { drawBurnGlow, drawBurnTail } from './draw-burn-trail';
+import { drawCanvasMotionRoute, type RoutePalette } from './draw-canvas-motion-route';
 import type { ViewTransform } from './view-transform';
-import { drawCanvasMotionRoute } from './draw-canvas-motion-route';
 
 export type CanvasMotionOverlay = {
   readonly plan: CanvasMotionPlan;
@@ -17,13 +24,17 @@ export type CanvasMotionOverlay = {
 };
 
 const RED = '#dc2626';
-// The completed trail strokes every burned segment at a fixed device width, so on a
-// dense hatch fill the strokes overlap into a solid mass that hides the artwork
-// underneath. A lighter red keeps the progress reading obvious without the blackout.
-const COMPLETED = '#f87171';
-const PLANNED = 'rgba(71, 85, 105, 0.28)';
+const HEAD_CORE = '#ffffff';
 const START_LABEL_TEXT_OPACITY = 0.5;
 const START_LABEL_BACKGROUND_OPACITY = 0.2;
+
+function routePalette(): RoutePalette {
+  return {
+    planned: canvasTheme.burnPlanned,
+    scorch: canvasTheme.burnScorch,
+    travel: canvasTheme.burnTravel,
+  };
+}
 
 export function drawCanvasMotionOverlay(
   ctx: CanvasRenderingContext2D,
@@ -31,7 +42,10 @@ export function drawCanvasMotionOverlay(
   view: ViewTransform,
 ): void {
   const { plan, run } = overlay;
-  if (run !== null) drawCanvasMotionRoute(ctx, plan, run, view, PLANNED, COMPLETED);
+  if (run !== null) {
+    drawCanvasMotionRoute(ctx, plan, run, view, routePalette());
+    drawBurnTail(ctx, plan, run, view);
+  }
   drawApproach(ctx, plan, run, view);
   if (overlay.showStartMarkers !== false) drawStartMarkers(ctx, plan, view);
   if (
@@ -43,13 +57,27 @@ export function drawCanvasMotionOverlay(
   }
 }
 
+// Distance below which two markers are treated as the same point on screen.
+const MARKER_COLLISION_PX = 26;
+
 function drawStartMarkers(
   ctx: CanvasRenderingContext2D,
   plan: CanvasMotionPlan,
   view: ViewTransform,
 ): void {
   drawFrameStart(ctx, plan, view);
-  if (plan.jobStart !== null) drawMarker(ctx, plan.jobStart, 'JOB START', view);
+  if (plan.jobStart === null) return;
+  // A job origin placed on the frame corner is the common case, and stacking
+  // both plates at one point rendered the two labels as overlapping nonsense.
+  drawMarker(ctx, plan.jobStart, 'JOB START', view, collidesWithFrameStart(plan, view) ? 1 : -1);
+}
+
+function collidesWithFrameStart(plan: CanvasMotionPlan, view: ViewTransform): boolean {
+  const frameStart = plan.framePerimeter[0];
+  if (frameStart === undefined || plan.jobStart === null) return false;
+  const a = sceneToCanvas(frameStart, view);
+  const b = sceneToCanvas(plan.jobStart, view);
+  return Math.hypot(a.x - b.x, a.y - b.y) < MARKER_COLLISION_PX;
 }
 
 function drawApproach(
@@ -104,6 +132,7 @@ function drawMarker(
   point: Vec2,
   label: string,
   view: ViewTransform,
+  labelSide: 1 | -1 = -1,
 ): void {
   const at = sceneToCanvas(point, view);
   ctx.save();
@@ -114,7 +143,7 @@ function drawMarker(
   drawLabel(
     ctx,
     at.x + 8,
-    at.y - 8,
+    at.y + labelSide * 8,
     label,
     START_LABEL_BACKGROUND_OPACITY,
     START_LABEL_TEXT_OPACITY,
@@ -122,6 +151,11 @@ function drawMarker(
   ctx.restore();
 }
 
+/**
+ * The head reads as the beam: a warm glow for the heat it is putting into the
+ * material, a white-hot core, and the red ring that keeps it identifiable as
+ * the machine rather than as artwork.
+ */
 function drawHead(
   ctx: CanvasRenderingContext2D,
   point: Vec2,
@@ -129,11 +163,17 @@ function drawHead(
   view: ViewTransform,
 ): void {
   const at = sceneToCanvas(point, view);
+  drawBurnGlow(ctx, at, run);
   ctx.save();
-  ctx.fillStyle = RED;
+  ctx.fillStyle = run.lifecycle === 'finished' ? RED : HEAD_CORE;
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = RED;
+  ctx.lineWidth = 1.75;
   ctx.beginPath();
   ctx.arc(at.x, at.y, 5, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.stroke();
   const z = run.plan.machineKind === 'cnc' ? ` • Z ${run.reportedHead?.z.toFixed(2)} mm` : '';
   drawLabel(
     ctx,
@@ -162,14 +202,33 @@ function drawLabel(
   textAlpha = 1,
 ): void {
   ctx.font = '600 11px system-ui, sans-serif';
-  const width = ctx.measureText(label).width + 10;
-  ctx.fillStyle = `rgba(255, 255, 255, ${backgroundAlpha})`;
-  ctx.fillRect(x - 4, y - 12, width, 17);
+  const width = ctx.measureText(label).width + 12;
+  ctx.save();
+  ctx.globalAlpha *= backgroundAlpha;
+  ctx.fillStyle = canvasTheme.motionLabelPlate;
+  fillPlate(ctx, x - 5, y - 12, width, 17);
+  ctx.restore();
   ctx.save();
   ctx.globalAlpha *= textAlpha;
-  ctx.fillStyle = RED;
+  ctx.fillStyle = canvasTheme.motionLabelInk;
   ctx.fillText(label, x, y);
   ctx.restore();
+}
+
+function fillPlate(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  if (typeof ctx.roundRect !== 'function') {
+    ctx.fillRect(x, y, width, height);
+    return;
+  }
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 4);
+  ctx.fill();
 }
 
 function sceneToCanvas(point: Vec2, view: ViewTransform): Vec2 {

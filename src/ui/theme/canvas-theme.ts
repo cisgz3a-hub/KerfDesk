@@ -100,4 +100,51 @@ export const canvasTheme = {
   get designSurround() {
     return themed('#dfe3e8', '#191d23');
   },
+  // Live-motion label (draw-canvas-motion). Both follow the bed: a hard-white
+  // plate on the dark bed read as a sticker pasted over the work, and the
+  // safety red that carries it needs lifting to stay legible on the dark plate.
+  get motionLabelPlate() {
+    return themed('#ffffff', '#111820');
+  },
+  get motionLabelInk() {
+    return themed('#dc2626', '#fca5a5');
+  },
+  // Live burn progress (draw-canvas-motion-route, draw-burn-trail).
+  //
+  // The completed trail used one saturated red at a fixed device width, so a
+  // dense hatch fill — whose lines sit well under a pixel apart at working
+  // zoom — overlapped into a solid mass that hid the artwork underneath. The
+  // trail now paints opaque into its raster and composites ONCE at a capped
+  // alpha, so overlapping burns settle at a single uniform scorch instead of
+  // accumulating, and the artwork still reads through a fully covered region.
+  //
+  // Warm amber rather than red: red stays reserved for the safety chrome
+  // (frame/job markers, approach, head ring), so scorch never reads as a
+  // machine-state warning.
+  get burnScorch() {
+    return themed('#c2410c', '#fb923c');
+  },
+  // Rapids are not work, so they recede instead of competing with the burn.
+  get burnTravel() {
+    return themed('#94a3b8', '#64748b');
+  },
+  get burnPlanned() {
+    // Slate at 0.28 was invisible against the dark bed, and both values are
+    // pre-divided by the composite alpha so they land where they are specified.
+    return themed('rgba(71, 85, 105, 0.42)', 'rgba(148, 163, 184, 0.40)');
+  },
 } as const;
+
+/**
+ * Cooling ramp for the ember tail behind the live head, coldest first. The last
+ * entry is the white-hot core at the beam itself; on the light bed the hot end
+ * stays a saturated gold, since near-white would vanish against paper.
+ *
+ * A sibling export rather than a `canvasTheme` member so every value on that
+ * object stays a single colour string.
+ */
+export function burnEmberRamp(): ReadonlyArray<string> {
+  return getCanvasColorScheme() === 'dark'
+    ? ['#7c2d12', '#b45309', '#ea580c', '#fb923c', '#fbbf24', '#fef3c7']
+    : ['#9a3412', '#c2410c', '#ea580c', '#f97316', '#fbbf24', '#fcd34d'];
+}
