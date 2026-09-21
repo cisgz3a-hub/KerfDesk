@@ -205,6 +205,15 @@ behaviour and timeouts are unchanged. All eight existing fresh-status guard regr
 including pre-write reports, reconnects, changed work placement and successful fresh Idle.
 The corrected painted-pass and collapsed-completion browser workflows both passed in 1.4 minutes.
 E2E type checking, scoped lint, formatting and the raw file-size gate passed.
+The hosted `pnpm release:check` on `adf483cd1` also completed successfully: 2,284 test files and
+15,466 tests passed, with 14 files / 22 tests skipped. All 130 release-integrity tests and the
+type, lint, formatting, repository, web/Electron build and size/export gates passed.
+
+Main's subsequent artwork-settings update (`a3f4da41d`, PR #827) merged without conflicts. All
+28 combined production and artwork browser workflows passed in 7.7 minutes after integration,
+including the corrected painted-pass handshake, completion offer, cable recovery and large-image
+restart. Application/E2E type checks, merged-document formatting, ADR numbering and whitespace
+checks passed. The integration preserves upstream settings ownership and the Frame-first contract.
 
 ## Physical and product limits
 
