@@ -3,7 +3,8 @@
 The existing tracing/preview fixes on `origin/main` at `377e692ba` were incomplete for this
 image. This repair is isolated on `codex/sharp-large-image-verification` in
 `D:\LaserForge\sharp-large-image-verification`. The primary checkout and Claude's work were
-preserved. Nothing has been merged, deployed or sent to real hardware.
+preserved. At this local-verification checkpoint nothing had been merged or deployed, and
+no real hardware was operated. Publication status is recorded by the subsequent PR/CI runs.
 
 ## Original image and reproduction
 
@@ -111,3 +112,32 @@ pnpm exec playwright test e2e/trace-sharp-output.e2e.ts --output artifacts/sharp
 
 No real controller, air cut, material run, installed Electron package, hosted deployment,
 or complete repository release gate was qualified by these checks.
+
+## Review of concurrent Claude changes before publication
+
+Reviewed the uncommitted Sharp/Frame patch in `.claude/worktrees/big-problem-47d443`, at
+HEAD `377e692ba`, before creating this PR. The sibling image-trace worktree was clean on
+the same main commit. The existing merged worker-heartbeat, bend-scan, packed-preview and
+preparation-retention fixes remain part of this branch's base.
+
+- The new trace policy would downsample the exact owl from 1254 x 1254 to 1118 x 1118:
+  its measured mask transition density is 0.1225588094, above the proposed 0.025 gate.
+  In a separate 2048 x 2048 dense hatching fixture with 32 isolated single-pixel marks,
+  the proposed resampling and Sharp preprocessing retained 0 of the 32 marks. The current
+  policy remains native. The proposed downsampling is excluded: it changes Sharp fidelity
+  and is unnecessary for the verified native-resolution owl fix.
+- The new Frame registry overlaps the ownership fix already tested here. An isolated
+  exact-source proof found it starts work before reserving ownership, allowing two
+  compilations on synchronous reentry. Changed-key replacement also allows unresolved
+  jobs to overlap, retains an older progress value, and can clear the busy flag while an
+  older request remains pending. This branch keeps one owner through Frame completion.
+- Claude's progress text and `aria-busy` additions are optional UI changes. The proposed
+  progress publisher has no request ownership binding; it was not copied. The Start-flow
+  change is comment-only. No missing independent queue protection was found.
+
+The reviewed files were fingerprinted before/after the independent probes and did not
+change during review. Local evidence is in `artifacts/sharp-owl/claude-policy-review.json`
+and `artifacts/sharp-owl/claude-review/`. The trace-policy SHA-256 was
+`83dfb5590a706a0933d215f1e7fa72ca279fad132ed9aabeda1ea29a5a4e550d`.
+Claude's checkout and the unrelated timing/inspector work in the primary checkout were
+not edited or folded into this fix.
