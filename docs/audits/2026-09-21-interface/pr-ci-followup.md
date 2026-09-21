@@ -31,8 +31,9 @@ This section preserves the initial repair at `e796b9aa`. The subsequent main int
 supersedes that temporary test contract; it does not turn the failed local run into a pass.
 
 The hosted failure attachment records a successful worker result in **29,117.7 ms** with 101
-heartbeats, 7,711 closed paths and 348,018 vertices. Its strict **30,000 ms** compute ceiling
-passed. The old test then used the remaining compute allowance, less than 883 ms, for result
+heartbeats, 7,711 closed paths and 348,018 vertices. The recorded duration is below the former
+**30,000 ms** compute ceiling; the assertion itself was not reached after the preview failure.
+The old test used the remaining compute allowance, less than 883 ms, for result
 observation, probe geometry processing, SVG conversion and preview rendering. The subsequent
 failure screenshot shows the ready preview.
 
@@ -75,3 +76,35 @@ The original [release CI run](https://github.com/cisgz3a-hub/KerfDesk/actions/ru
 passed on `c508774b93f3fd1fb59daeffe59ad8def2b1b321`, including 15,112 passing unit cases,
 22 skipped cases and 130 release-integrity tests. That result predates the later main integrations
 and cannot replace required checks on the final PR commit.
+
+## Native-worker observation follow-up
+
+The [post-remediation native-worker run](pr-remediation-trace-initial.json) records one passing
+Sharp commit case and one failed cancellation case. Sharp computed in **58,520.3 ms**, with
+**2,415.8 ms** longest silence and 196 heartbeats, producing 7,711 closed polylines and 348,018
+vertices. Exact saved-geometry equality and workspace responsiveness passed under the current
+ADR-336 contract; this is not a sub-30-second performance result.
+
+Cancel closed the dialog and terminated proxy owner 2. Playwright observed one closed worker:
+the earlier owner 1 had been retired before the browser reported its creation. The fixture
+incorrectly indexed browser observations by the proxy constructor ordinal and received
+`undefined`. That failure occurred before Save and the no-commit assertions, so those assertions
+were not established by this first attempt.
+
+The correction captures the sole browser-observed open worker while the page probe separately
+confirms exactly the expected unretired owner and an active heartbeat. Cancel must close that
+captured record, leave zero observed open workers, terminate the exact proxy owner, and save
+the original two-object project without a traced-image object. Supersession uses the same
+observation barrier before starting its replacement; it must close the old record and retain
+a distinct live replacement. Constructor order is no longer treated as browser event order.
+
+The [focused follow-up](pr-remediation-trace-followup.json) passes **both changed cases** on
+their first run after the correction. Cancellation reaches its complete project/no-commit
+assertions. Supersession preserves source bytes, reports the old request as superseded and
+completes a 32 × 32 replacement with one polyline and two vertices. Its recorded compute time
+is 29.5 ms and longest silence is 538.1 ms. This is native browser-worker evidence with a test
+observer; no physical controller or port was used.
+
+Normal Sharp tracing, the heartbeat/progress probe, timing limits, geometry equality and
+responsiveness assertions were unchanged by this final test-only fix. Browser-test TypeScript,
+scoped ESLint and Prettier passed. The earlier failed reports remain intact.

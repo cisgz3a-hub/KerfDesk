@@ -25,6 +25,13 @@ cases in the focused follow-up. Those eight include a real-store GRBL simulator 
 dwell estimate is unavailable; settled completion still exposes Done and clicking it leaves the
 project and outbound command history unchanged. These are software and simulator results.
 
+The [latest development UI report](pr-remediation-ui-dev.json) passes both routine-controls and
+simulated Done cases; [the compiled report](pr-remediation-ui-built.json) passes the routine-controls
+case again. These are two distinct scenarios plus one compiled repetition, not three distinct
+scenarios. Their screenshot writes were restored from exact byte backups to preserve historical
+images. The native-worker Sharp, cancellation and replacement results, including the corrected
+test-observer failure, are detailed in [the browser-gate follow-up](pr-ci-followup.md).
+
 ## Final tutorial integration and browser-gate follow-up
 
 Main's tutorial update at `af1a1b83f7ece14a46e3386b1845bb35daf971ac` was subsequently merged

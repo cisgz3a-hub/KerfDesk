@@ -1,0 +1,228 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\LaserForge\\ui-audit-20260921\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/trace-presets-stress-worker.e2e.ts",
+      "--grep",
+      "default Sharp|cancels an actively tracing Sharp",
+      "--workers=1",
+      "--output=artifacts/pr-publication/remediation-trace-browser/browser-results",
+      "--reporter=json"
+    ],
+    "configFile": "D:\\LaserForge\\ui-audit-20260921\\playwright.config.ts",
+    "rootDir": "D:/LaserForge/ui-audit-20260921/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/LaserForge/ui-audit-20260921/artifacts/pr-publication/remediation-trace-browser/browser-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/LaserForge/ui-audit-20260921/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "D:\\LaserForge\\ui-audit-20260921\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "trace-presets-stress-worker.e2e.ts",
+      "file": "trace-presets-stress-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "default Sharp traces the actual dragon in a real worker and commits its preview",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 99140,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:56:28.112Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "dragon-trace-timing.json",
+                      "contentType": "application/json",
+                      "body": "eyJwcmVzZXROYW1lIjoiU2hhcnAiLCJjb21wdXRlTXMiOjU4NTIwLjI5OTk5OTk4MjEyLCJsb25nZXN0U2lsZW5jZU1zIjoyNDE1LjgwMDAwMDAxMTkyMSwiYmVhdHMiOjE5NiwicG9seWxpbmVzIjo3NzExLCJ2ZXJ0aWNlcyI6MzQ4MDE4fQ=="
+                    },
+                    {
+                      "name": "dragon-committed-scene.json",
+                      "contentType": "application/json",
+                      "body": "eyJpZCI6IjRiZmIwNjM2LTlkOGEtNDdjYS04OGJkLWU5MWRhYTU0YWI5MCIsInRyYWNlTW9kZSI6ImZpbGxlZC1jb250b3VycyIsImJvdW5kcyI6eyJtaW5YIjoyMy43MTU3ODk0NzM2ODQyMSwibWluWSI6MjEuOTkwNDc2MTkwNDc2MTksIm1heFgiOjEyMzguODk0MTE3NjQ3MDU5LCJtYXhZIjoxMjMzLjgyMjA5MTcxNTAxNTZ9LCJncmlkIjpbMTI1NCwxMjU0XSwicG9seWxpbmVzIjo3NzExLCJ2ZXJ0aWNlcyI6MzQ4MDE4fQ=="
+                    },
+                    {
+                      "name": "dragon-workspace-hover.json",
+                      "contentType": "application/json",
+                      "body": "eyJyZWRyYXdzIjowLCJwb2ludGVyTW92ZXMiOjEyfQ=="
+                    },
+                    {
+                      "name": "centerline-worker-lifecycle.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJmaXh0dXJlIjogewogICAgIm5hbWUiOiAiY2VudGVybGluZS1zdHJlc3MtdGVzdC0yMDI2MDkwOS5wbmciLAogICAgInNoYTI1NiI6ICJlNGIyM2E1NWM3M2M2NzliODE4ODlhYzg2YTA3ZWZjY2Q2MjAzOTYxOWI5NzU4ZDYzYTk2Y2E0OTIwMzJmODQ2IiwKICAgICJieXRlcyI6IDIyODU3MzIsCiAgICAid2lkdGgiOiAxMjU0LAogICAgImhlaWdodCI6IDEyNTQKICB9LAogICJuYXRpdmVXb3JrZXJzIjogWwogICAgewogICAgICAidXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6NTE4Ni9zcmMvdWkvdHJhY2UvdHJhY2Utd29ya2VyLnRzP3dvcmtlcl9maWxlJnR5cGU9bW9kdWxlIiwKICAgICAgImNsb3NlZCI6IHRydWUKICAgIH0sCiAgICB7CiAgICAgICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo1MTg2L3NyYy91aS90cmFjZS90cmFjZS13b3JrZXIudHM/d29ya2VyX2ZpbGUmdHlwZT1tb2R1bGUiLAogICAgICAiY2xvc2VkIjogZmFsc2UKICAgIH0KICBdLAogICJwcm9iZSI6IHsKICAgICJyZXF1ZXN0cyI6IFsKICAgICAgewogICAgICAgICJvd25lciI6IDEsCiAgICAgICAgImlkIjogMSwKICAgICAgICAib3B0aW9ucyI6IHsKICAgICAgICAgICJudW1iZXJPZkNvbG9ycyI6IDIsCiAgICAgICAgICAicGF0aE9taXQiOiAxNiwKICAgICAgICAgICJsaW5lVG9sZXJhbmNlIjogMSwKICAgICAgICAgICJxdWFkcmF0aWNUb2xlcmFuY2UiOiAxLAogICAgICAgICAgImJsdXJSYWRpdXMiOiAwLAogICAgICAgICAgImJsdXJEZWx0YSI6IDAsCiAgICAgICAgICAibGluZUZpbHRlciI6IHRydWUsCiAgICAgICAgICAiZml4ZWRQYWxldHRlIjogWwogICAgICAgICAgICAiI2ZmZmZmZiIsCiAgICAgICAgICAgICIjMDAwMDAwIgogICAgICAgICAgXSwKICAgICAgICAgICJjdXRvZmZMdW1hIjogMCwKICAgICAgICAgICJ0aHJlc2hvbGRMdW1hIjogMTI4LAogICAgICAgICAgImF1dG9Ta2V0Y2hUcmFjZSI6IHRydWUsCiAgICAgICAgICAiaWdub3JlTGVzc1RoYW5QaXhlbHMiOiAyLAogICAgICAgICAgInNtb290aG5lc3MiOiAxLAogICAgICAgICAgIm9wdGltaXplIjogMC4yLAogICAgICAgICAgImRlc3BlY2tsZU1pblBpeGVscyI6IDEyLAogICAgICAgICAgImZpbGxQaW5ob2xlQ3JhY2tzIjogdHJ1ZSwKICAgICAgICAgICJzdXBlcnNhbXBsZUNvbnRvdXIiOiB0cnVlLAogICAgICAgICAgImF1dG9VcHNjYWxlU21hbGxTb3VyY2VzIjogdHJ1ZSwKICAgICAgICAgICJ1cHNjYWxlU21hbGxTbW9vdGhTb3VyY2VzIjogdHJ1ZQogICAgICAgIH0sCiAgICAgICAgIndpZHRoIjogMTI1NCwKICAgICAgICAiaGVpZ2h0IjogMTI1NCwKICAgICAgICAicG9zdGVkQXQiOiA2NzA5Ljg5OTk5OTk3NjE1OCwKICAgICAgICAic3RhcnRlZEF0IjogbnVsbCwKICAgICAgICAic2V0dGxlZEF0IjogbnVsbCwKICAgICAgICAibGFzdE1lc3NhZ2VBdCI6IDY3MDkuODk5OTk5OTc2MTU4LAogICAgICAgICJsb25nZXN0U2lsZW5jZU1zIjogMCwKICAgICAgICAib3V0Y29tZSI6IG51bGwsCiAgICAgICAgImJlYXRzIjogMCwKICAgICAgICAibWVzc2FnZSI6IG51bGwsCiAgICAgICAgInBvbHlsaW5lcyI6IDAsCiAgICAgICAgImNsb3NlZFBvbHlsaW5lcyI6IDAsCiAgICAgICAgInZlcnRpY2VzIjogMCwKICAgICAgICAidGlja3NBdFN0YXJ0IjogMCwKICAgICAgICAidGlja3NBdEVuZCI6IDAsCiAgICAgICAgImdlb21ldHJ5Qnl0ZXMiOiAwCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAib3duZXIiOiAyLAogICAgICAgICJpZCI6IDIsCiAgICAgICAgIm9wdGlvbnMiOiB7CiAgICAgICAgICAibnVtYmVyT2ZDb2xvcnMiOiAyLAogICAgICAgICAgInBhdGhPbWl0IjogMTYsCiAgICAgICAgICAibGluZVRvbGVyYW5jZSI6IDAuNSwKICAgICAgICAgICJxdWFkcmF0aWNUb2xlcmFuY2UiOiAwLjUsCiAgICAgICAgICAiYmx1clJhZGl1cyI6IDAsCiAgICAgICAgICAiYmx1ckRlbHRhIjogMCwKICAgICAgICAgICJsaW5lRmlsdGVyIjogZmFsc2UsCiAgICAgICAgICAiZml4ZWRQYWxldHRlIjogWwogICAgICAgICAgICAiI2ZmZmZmZiIsCiAgICAgICAgICAgICIjMDAwMDAwIgogICAgICAgICAgXSwKICAgICAgICAgICJ1c2VPdHN1VGhyZXNob2xkIjogdHJ1ZSwKICAgICAgICAgICJkZXNwZWNrbGVNaW5QaXhlbHMiOiAxLAogICAgICAgICAgInNtb290aG5lc3MiOiAwLjU1LAogICAgICAgICAgIm9wdGltaXplIjogMC4xNQogICAgICAgIH0sCiAgICAgICAgIndpZHRoIjogMTI1NCwKICAgICAgICAiaGVpZ2h0IjogMTI1NCwKICAgICAgICAicG9zdGVkQXQiOiA3MjI1LjY5OTk5OTk4ODA3OSwKICAgICAgICAic3RhcnRlZEF0IjogODYyOS4wOTk5OTk5OTQwNCwKICAgICAgICAic2V0dGxlZEF0IjogNjcxNDkuMzk5OTk5OTc2MTYsCiAgICAgICAgImxhc3RNZXNzYWdlQXQiOiA2NzE0OS4zOTk5OTk5NzYxNiwKICAgICAgICAibG9uZ2VzdFNpbGVuY2VNcyI6IDI0MTUuODAwMDAwMDExOTIxLAogICAgICAgICJvdXRjb21lIjogIm9rIiwKICAgICAgICAiYmVhdHMiOiAxOTYsCiAgICAgICAgIm1lc3NhZ2UiOiBudWxsLAogICAgICAgICJwb2x5bGluZXMiOiA3NzExLAogICAgICAgICJjbG9zZWRQb2x5bGluZXMiOiA3NzExLAogICAgICAgICJ2ZXJ0aWNlcyI6IDM0ODAxOCwKICAgICAgICAidGlja3NBdFN0YXJ0IjogMjMwLAogICAgICAgICJ0aWNrc0F0RW5kIjogMjUzNiwKICAgICAgICAiZ2VvbWV0cnlCeXRlcyI6IDM2NTE3MzA3CiAgICAgIH0KICAgIF0sCiAgICAid29ya2VycyI6IFsKICAgICAgewogICAgICAgICJvd25lciI6IDEsCiAgICAgICAgInVybCI6ICJodHRwOi8vMTI3LjAuMC4xOjUxODYvc3JjL3VpL3RyYWNlL3RyYWNlLXdvcmtlci50cz93b3JrZXJfZmlsZSZ0eXBlPW1vZHVsZSIsCiAgICAgICAgInRlcm1pbmF0ZWRBdCI6IDcyMjIKICAgICAgfSwKICAgICAgewogICAgICAgICJvd25lciI6IDIsCiAgICAgICAgInVybCI6ICJodHRwOi8vMTI3LjAuMC4xOjUxODYvc3JjL3VpL3RyYWNlL3RyYWNlLXdvcmtlci50cz93b3JrZXJfZmlsZSZ0eXBlPW1vZHVsZSIsCiAgICAgICAgInRlcm1pbmF0ZWRBdCI6IG51bGwKICAgICAgfQogICAgXSwKICAgICJ0aWNrcyI6IDMyNTcKICB9Cn0="
+                    },
+                    {
+                      "name": "browser-file-events.json",
+                      "contentType": "application/json",
+                      "body": "W3sia2luZCI6InBpY2tlci1vcGVuIiwibXVsdGlwbGUiOmZhbHNlfSx7ImtpbmQiOiJwaWNrZXItc2F2ZSIsIm5hbWUiOiJwcm9qZWN0LWJhc2ljLmxmMiJ9LHsia2luZCI6ImZpbGUtc2F2ZWQiLCJuYW1lIjoicHJvamVjdC1iYXNpYy5sZjIiLCJieXRlcyI6MTE4MzA1NjU1fV0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "07d410bea3792245bd01-845c27ae02d2bd7c5a8a",
+          "file": "trace-presets-stress-worker.e2e.ts",
+          "line": 132,
+          "column": 3
+        },
+        {
+          "title": "cancels an actively tracing Sharp dragon from the dialog without committing it",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 73434,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts:295:80",
+                    "location": {
+                      "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                      "column": 80,
+                      "line": 295
+                    },
+                    "snippet": "  293 |     )\n  294 |     .toEqual(expect.any(Number));\n> 295 |   await expect.poll(() => nativeWorkers.get(page)?.[active.owner - 1]?.closed).toBe(true);\n      |                                                                                ^\n  296 |   const project = await saveProject(page, kerfdesk);\n  297 |   expect(project.scene.objects).toHaveLength(2);\n  298 |   expect(project.scene.objects.some((object) => object.kind === 'traced-image')).toBe(false);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                        "column": 80,
+                        "line": 295
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate\n\n  293 |     )\n  294 |     .toEqual(expect.any(Number));\n> 295 |   await expect.poll(() => nativeWorkers.get(page)?.[active.owner - 1]?.closed).toBe(true);\n      |                                                                                ^\n  296 |   const project = await saveProject(page, kerfdesk);\n  297 |   expect(project.scene.objects).toHaveLength(2);\n  298 |   expect(project.scene.objects.some((object) => object.kind === 'traced-image')).toBe(false);\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts:295:80"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:58:07.594Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\remediation-trace-browser\\browser-results\\trace-presets-stress-worke-578a2-ialog-without-committing-it\\test-failed-1.png"
+                    },
+                    {
+                      "name": "centerline-worker-lifecycle.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJmaXh0dXJlIjogewogICAgIm5hbWUiOiAiY2VudGVybGluZS1zdHJlc3MtdGVzdC0yMDI2MDkwOS5wbmciLAogICAgInNoYTI1NiI6ICJlNGIyM2E1NWM3M2M2NzliODE4ODlhYzg2YTA3ZWZjY2Q2MjAzOTYxOWI5NzU4ZDYzYTk2Y2E0OTIwMzJmODQ2IiwKICAgICJieXRlcyI6IDIyODU3MzIsCiAgICAid2lkdGgiOiAxMjU0LAogICAgImhlaWdodCI6IDEyNTQKICB9LAogICJuYXRpdmVXb3JrZXJzIjogWwogICAgewogICAgICAidXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6NTE4Ni9zcmMvdWkvdHJhY2UvdHJhY2Utd29ya2VyLnRzP3dvcmtlcl9maWxlJnR5cGU9bW9kdWxlIiwKICAgICAgImNsb3NlZCI6IHRydWUKICAgIH0KICBdLAogICJwcm9iZSI6IHsKICAgICJyZXF1ZXN0cyI6IFsKICAgICAgewogICAgICAgICJvd25lciI6IDEsCiAgICAgICAgImlkIjogMSwKICAgICAgICAib3B0aW9ucyI6IHsKICAgICAgICAgICJudW1iZXJPZkNvbG9ycyI6IDIsCiAgICAgICAgICAicGF0aE9taXQiOiAxNiwKICAgICAgICAgICJsaW5lVG9sZXJhbmNlIjogMSwKICAgICAgICAgICJxdWFkcmF0aWNUb2xlcmFuY2UiOiAxLAogICAgICAgICAgImJsdXJSYWRpdXMiOiAwLAogICAgICAgICAgImJsdXJEZWx0YSI6IDAsCiAgICAgICAgICAibGluZUZpbHRlciI6IHRydWUsCiAgICAgICAgICAiZml4ZWRQYWxldHRlIjogWwogICAgICAgICAgICAiI2ZmZmZmZiIsCiAgICAgICAgICAgICIjMDAwMDAwIgogICAgICAgICAgXSwKICAgICAgICAgICJjdXRvZmZMdW1hIjogMCwKICAgICAgICAgICJ0aHJlc2hvbGRMdW1hIjogMTI4LAogICAgICAgICAgImF1dG9Ta2V0Y2hUcmFjZSI6IHRydWUsCiAgICAgICAgICAiaWdub3JlTGVzc1RoYW5QaXhlbHMiOiAyLAogICAgICAgICAgInNtb290aG5lc3MiOiAxLAogICAgICAgICAgIm9wdGltaXplIjogMC4yLAogICAgICAgICAgImRlc3BlY2tsZU1pblBpeGVscyI6IDEyLAogICAgICAgICAgImZpbGxQaW5ob2xlQ3JhY2tzIjogdHJ1ZSwKICAgICAgICAgICJzdXBlcnNhbXBsZUNvbnRvdXIiOiB0cnVlLAogICAgICAgICAgImF1dG9VcHNjYWxlU21hbGxTb3VyY2VzIjogdHJ1ZSwKICAgICAgICAgICJ1cHNjYWxlU21hbGxTbW9vdGhTb3VyY2VzIjogdHJ1ZQogICAgICAgIH0sCiAgICAgICAgIndpZHRoIjogMTI1NCwKICAgICAgICAiaGVpZ2h0IjogMTI1NCwKICAgICAgICAicG9zdGVkQXQiOiA0MDczNi44MDAwMDAwMTE5MiwKICAgICAgICAic3RhcnRlZEF0IjogbnVsbCwKICAgICAgICAic2V0dGxlZEF0IjogbnVsbCwKICAgICAgICAibGFzdE1lc3NhZ2VBdCI6IDQwNzM2LjgwMDAwMDAxMTkyLAogICAgICAgICJsb25nZXN0U2lsZW5jZU1zIjogMCwKICAgICAgICAib3V0Y29tZSI6IG51bGwsCiAgICAgICAgImJlYXRzIjogMCwKICAgICAgICAibWVzc2FnZSI6IG51bGwsCiAgICAgICAgInBvbHlsaW5lcyI6IDAsCiAgICAgICAgImNsb3NlZFBvbHlsaW5lcyI6IDAsCiAgICAgICAgInZlcnRpY2VzIjogMCwKICAgICAgICAidGlja3NBdFN0YXJ0IjogMCwKICAgICAgICAidGlja3NBdEVuZCI6IDAsCiAgICAgICAgImdlb21ldHJ5Qnl0ZXMiOiAwCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAib3duZXIiOiAyLAogICAgICAgICJpZCI6IDIsCiAgICAgICAgIm9wdGlvbnMiOiB7CiAgICAgICAgICAibnVtYmVyT2ZDb2xvcnMiOiAyLAogICAgICAgICAgInBhdGhPbWl0IjogMTYsCiAgICAgICAgICAibGluZVRvbGVyYW5jZSI6IDAuNSwKICAgICAgICAgICJxdWFkcmF0aWNUb2xlcmFuY2UiOiAwLjUsCiAgICAgICAgICAiYmx1clJhZGl1cyI6IDAsCiAgICAgICAgICAiYmx1ckRlbHRhIjogMCwKICAgICAgICAgICJsaW5lRmlsdGVyIjogZmFsc2UsCiAgICAgICAgICAiZml4ZWRQYWxldHRlIjogWwogICAgICAgICAgICAiI2ZmZmZmZiIsCiAgICAgICAgICAgICIjMDAwMDAwIgogICAgICAgICAgXSwKICAgICAgICAgICJ1c2VPdHN1VGhyZXNob2xkIjogdHJ1ZSwKICAgICAgICAgICJkZXNwZWNrbGVNaW5QaXhlbHMiOiAxLAogICAgICAgICAgInNtb290aG5lc3MiOiAwLjU1LAogICAgICAgICAgIm9wdGltaXplIjogMC4xNQogICAgICAgIH0sCiAgICAgICAgIndpZHRoIjogMTI1NCwKICAgICAgICAiaGVpZ2h0IjogMTI1NCwKICAgICAgICAicG9zdGVkQXQiOiA0MTM0My45MDAwMDAwMDU5NiwKICAgICAgICAic3RhcnRlZEF0IjogNTg4MjkuMDk5OTk5OTk0MDQsCiAgICAgICAgInNldHRsZWRBdCI6IG51bGwsCiAgICAgICAgImxhc3RNZXNzYWdlQXQiOiA1OTEwMS45MDAwMDAwMDU5NiwKICAgICAgICAibG9uZ2VzdFNpbGVuY2VNcyI6IDE3NDg1LjE5OTk5OTk4ODA4LAogICAgICAgICJvdXRjb21lIjogbnVsbCwKICAgICAgICAiYmVhdHMiOiAxLAogICAgICAgICJtZXNzYWdlIjogbnVsbCwKICAgICAgICAicG9seWxpbmVzIjogMCwKICAgICAgICAiY2xvc2VkUG9seWxpbmVzIjogMCwKICAgICAgICAidmVydGljZXMiOiAwLAogICAgICAgICJ0aWNrc0F0U3RhcnQiOiAyMTM3LAogICAgICAgICJ0aWNrc0F0RW5kIjogMCwKICAgICAgICAiZ2VvbWV0cnlCeXRlcyI6IDAKICAgICAgfQogICAgXSwKICAgICJ3b3JrZXJzIjogWwogICAgICB7CiAgICAgICAgIm93bmVyIjogMSwKICAgICAgICAidXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6NTE4Ni9zcmMvdWkvdHJhY2UvdHJhY2Utd29ya2VyLnRzP3dvcmtlcl9maWxlJnR5cGU9bW9kdWxlIiwKICAgICAgICAidGVybWluYXRlZEF0IjogNDEzNDAuMTk5OTk5OTg4MDgKICAgICAgfSwKICAgICAgewogICAgICAgICJvd25lciI6IDIsCiAgICAgICAgInVybCI6ICJodHRwOi8vMTI3LjAuMC4xOjUxODYvc3JjL3VpL3RyYWNlL3RyYWNlLXdvcmtlci50cz93b3JrZXJfZmlsZSZ0eXBlPW1vZHVsZSIsCiAgICAgICAgInRlcm1pbmF0ZWRBdCI6IDU5MjgyLjY5OTk5OTk4ODA4CiAgICAgIH0KICAgIF0sCiAgICAidGlja3MiOiAyNTYzCiAgfQp9"
+                    },
+                    {
+                      "name": "browser-file-events.json",
+                      "contentType": "application/json",
+                      "body": "W3sia2luZCI6InBpY2tlci1vcGVuIiwibXVsdGlwbGUiOmZhbHNlfV0="
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\remediation-trace-browser\\browser-results\\trace-presets-stress-worke-578a2-ialog-without-committing-it\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\remediation-trace-browser\\browser-results\\trace-presets-stress-worke-578a2-ialog-without-committing-it\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                    "column": 80,
+                    "line": 295
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "07d410bea3792245bd01-93e7d1a9bd70e311b072",
+          "file": "trace-presets-stress-worker.e2e.ts",
+          "line": 262,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-21T17:56:26.904Z",
+    "duration": 181838.48500000002,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}
