@@ -36,6 +36,9 @@ test('routine controls stay visible while setup, history, and tutorials remain r
   await rail.getByRole('button', { name: 'Tutorial: Jogging', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.locator('.lf-learn-library')).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(rail.getByRole('button', { name: 'Tutorial: Jogging', exact: true })).toBeFocused();
   mkdirSync(evidence, { recursive: true });

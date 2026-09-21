@@ -6,6 +6,19 @@ Branch: `codex/ui-audit-20260921`, based on `377e692baf26a9f66ba3877f157213095c5
 The primary checkout and its unrelated edits were preserved. Publication status is tracked by the
 associated PR; the software evidence below does not qualify a physical machine or packaged desktop.
 
+## Final tutorial integration and browser-gate follow-up
+
+Main's tutorial update at `af1a1b83f7ece14a46e3386b1845bb35daf971ac` was subsequently merged
+at `35b873829c9eb6681d52cc966dc7e15564be4360`. The final production build, including application
+TypeScript, passed. The compiled routine-controls case passed with lesson → library → workspace
+Escape navigation and focus restoration. Historical screenshots were preserved byte-for-byte.
+
+[The final tutorial supplement](pr-final-tutorial-integration.md) records the 817-definition /
+94-command snapshot and 132 passing tutorial cases. [The browser-gate follow-up](pr-ci-followup.md)
+records the initial hosted failures, passing toolbar rerun and unsuccessful local Sharp benchmark.
+Hosted release and browser checks on the final PR commit remain separate merge gates; these local
+results do not pre-empt their outcome.
+
 ## PR integration, 2026-09-22
 
 The branch integrated main through `9d72ba798faf3342efe0f808e1656924e3632b65`, including

@@ -10,6 +10,13 @@ accounts for the Appearance commands and machine-setup redesign, and tests all 9
 The integrated toolbar preserves Import Image and keeps Image Studio in More. The interface
 decision is now ADR-340; main's Appearance decision retains ADR-339.
 
+**Final main integration:** main's tutorial navigation update at `af1a1b83f` is included.
+[The final supplement](pr-final-tutorial-integration.md) records **817 definitions / 94 commands**,
+the seven changed tutorial definitions, 132 passing tutorial cases and the compiled Escape/focus
+check. The earlier 805- and 815-definition catalogues remain dated evidence.
+[The browser-gate follow-up](pr-ci-followup.md) preserves the initial hosted failures and the
+test-fixture corrections, including the unsuccessful local Sharp benchmark.
+
 ## Result
 
 **Follow-up completed 2026-09-22:** [the button-by-button functional audit](control-audit.md)

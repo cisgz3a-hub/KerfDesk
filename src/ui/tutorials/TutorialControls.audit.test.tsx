@@ -20,7 +20,7 @@ beforeEach(() => {
   localStorage.clear();
   resetStore();
   useUiStore.setState({ modalDepth: 0 });
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -29,7 +29,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   localStorage.clear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -46,6 +46,14 @@ function titleButton(title: string): HTMLButtonElement {
 async function click(button: HTMLElement): Promise<void> {
   await act(async () => {
     button.click();
+    await import('./TutorialCentre');
+  });
+}
+
+async function openLibrary(): Promise<void> {
+  await act(async () => {
+    root.render(<TutorialHost />);
+    useTutorialStore.getState().openTutorial();
     await import('./TutorialCentre');
   });
 }
@@ -91,7 +99,7 @@ describe('individual tutorial control outcomes', () => {
       expect(useStore.getState().project).toBe(before.project);
       expect(useStore.getState().undoStack).toBe(before.undoStack);
       expect(useStore.getState().dirty).toBe(before.dirty);
-      await click(titleButton('Close tutorials and return to your work (Escape)'));
+      await click(titleButton('Close tutorials and return to your work'));
       expect(document.querySelector('.lf-learn')).toBeNull();
       expect(useUiStore.getState().modalDepth).toBe(0);
     },
@@ -111,13 +119,145 @@ describe('individual tutorial control outcomes', () => {
     await click(opener);
     await click(titleButton('Browse all visual tutorials'));
     expect(document.querySelector('.lf-learn-library')).not.toBeNull();
-    const firstProject = [...document.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Start your first project'),
-    );
-    if (firstProject === undefined) throw new Error('Missing first project shortcut');
+    const firstProject = document.querySelector<HTMLButtonElement>('.lf-learn-start-lead button');
+    if (firstProject === null) throw new Error('Missing first project shortcut');
+    const firstLesson = TUTORIALS.find((tutorial) => tutorial.id === 'first-project');
+    expect(firstProject.title).toBe(`Open the lesson: ${firstLesson?.title}`);
     await click(firstProject);
     expect(useTutorialStore.getState().tutorialId).toBe('first-project');
     expect(document.querySelector('.lf-learn-reader')).not.toBeNull();
+  });
+
+  it('the other-machine link and every category show the exact matching lessons without editing the project', async () => {
+    const before = useStore.getState();
+    await openLibrary();
+    const hidden = TUTORIALS.filter((tutorial) => tutorial.machine === 'cnc').length;
+    const include = titleButton('Include lessons for the other machine type');
+    expect(include.textContent).toBe(`${hidden} more for other machines`);
+    expect(document.querySelectorAll('.lf-learn-card')).toHaveLength(TUTORIALS.length - hidden);
+    await click(include);
+    expect(document.querySelector<HTMLSelectElement>('select')?.value).toBe('all');
+    expect(document.querySelectorAll('.lf-learn-card')).toHaveLength(TUTORIALS.length);
+    expect(document.querySelector('.lf-learn-inline-link')).toBeNull();
+
+    for (const category of ['All', ...new Set(TUTORIALS.map((tutorial) => tutorial.category))]) {
+      await click(titleButton(`Show ${category.toLowerCase()} tutorials`));
+      const expected = TUTORIALS.filter(
+        (tutorial) => category === 'All' || tutorial.category === category,
+      )
+        .map((tutorial) => `Open tutorial: ${tutorial.title}`)
+        .sort();
+      const actual = [...document.querySelectorAll<HTMLButtonElement>('.lf-learn-card')]
+        .map((card) => card.title)
+        .sort();
+      expect(actual, category).toEqual(expected);
+      expect(
+        titleButton(`Show ${category.toLowerCase()} tutorials`).getAttribute('aria-pressed'),
+      ).toBe('true');
+      expect(document.querySelector('.lf-learn-start') !== null).toBe(category === 'All');
+    }
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+    expect(useStore.getState().dirty).toBe(before.dirty);
+  });
+
+  it('every opening-path button opens its named lesson and Back returns to the library', async () => {
+    const before = useStore.getState();
+    const path = TUTORIALS.filter((tutorial) => tutorial.category === 'Getting started');
+    await openLibrary();
+    expect(document.querySelectorAll('.lf-learn-path button')).toHaveLength(path.length);
+    for (const tutorial of path) {
+      const button = [
+        ...document.querySelectorAll<HTMLButtonElement>('.lf-learn-path button'),
+      ].find((candidate) => candidate.title === `Open the lesson: ${tutorial.title}`);
+      if (button === undefined) throw new Error(`Missing opening-path lesson ${tutorial.id}`);
+      await click(button);
+      expect(useTutorialStore.getState().tutorialId).toBe(tutorial.id);
+      expect(document.querySelector('.lf-learn-lesson-heading h1')?.textContent).toBe(
+        tutorial.title,
+      );
+      expect(document.querySelector('.lf-learn-step-detail h2')?.textContent).toBe(
+        tutorial.steps[0]?.title,
+      );
+      await click(titleButton('Return to the tutorial library (Escape)'));
+      expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+      expect(useTutorialStore.getState().trail).toEqual([]);
+    }
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+  });
+
+  it('the primary Start skips completed opening lessons and disappears after the opening path is complete', async () => {
+    const before = useStore.getState();
+    const path = TUTORIALS.filter((tutorial) => tutorial.category === 'Getting started');
+    const first = path[0];
+    const next = path[1];
+    if (first === undefined || next === undefined) throw new Error('Missing opening-path lessons');
+    localStorage.setItem(
+      'kerfdesk.visual-tutorials.v1',
+      JSON.stringify({
+        [first.id]: { step: first.steps.length - 1, completed: true },
+      }),
+    );
+    await openLibrary();
+    const primary = document.querySelector<HTMLButtonElement>('.lf-learn-start-lead button');
+    if (primary === null) throw new Error('Missing next unfinished opening lesson');
+    expect(primary.title).toBe(`Open the lesson: ${next.title}`);
+    expect(primary.textContent).toContain('Start:');
+    await click(primary);
+    expect(useTutorialStore.getState().tutorialId).toBe(next.id);
+    expect(document.querySelector('.lf-learn-step-detail h2')?.textContent).toBe(
+      next.steps[0]?.title,
+    );
+    await click(titleButton('Close tutorials and return to your work'));
+
+    localStorage.setItem(
+      'kerfdesk.visual-tutorials.v1',
+      JSON.stringify(
+        Object.fromEntries(
+          path.map((tutorial) => [
+            tutorial.id,
+            { step: tutorial.steps.length - 1, completed: true },
+          ]),
+        ),
+      ),
+    );
+    await openLibrary();
+    expect(document.querySelector('.lf-learn-start-lead button')).toBeNull();
+    expect(document.querySelectorAll('.lf-learn-path button[data-done="yes"]')).toHaveLength(
+      path.length,
+    );
+    expect(document.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe(
+      String(path.length),
+    );
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+  });
+
+  it('the related-lesson Back button restores its parent and then the library without editing the project', async () => {
+    const before = useStore.getState();
+    const parent = TUTORIALS.find((tutorial) => tutorial.id === 'first-project');
+    const related = TUTORIALS.find((tutorial) => tutorial.id === parent?.related[0]);
+    if (parent === undefined || related === undefined)
+      throw new Error('Missing related lesson fixture');
+    await openLibrary();
+    await click(titleButton(`Open tutorial: ${parent.title}`));
+    await click(titleButton(`Open related tutorial: ${related.title}`));
+    expect(useTutorialStore.getState().trail).toEqual([parent.id]);
+    expect(document.querySelector('.lf-learn-lesson-heading h1')?.textContent).toBe(related.title);
+    await click(titleButton(`Back to ${parent.title} (Escape)`));
+    expect(useTutorialStore.getState().tutorialId).toBe(parent.id);
+    expect(document.querySelector('.lf-learn-lesson-heading h1')?.textContent).toBe(parent.title);
+    expect(useTutorialStore.getState().trail).toEqual([]);
+    await click(titleButton('Return to the tutorial library (Escape)'));
+    expect(useTutorialStore.getState()).toMatchObject({
+      isOpen: true,
+      tutorialId: null,
+      trail: [],
+    });
+    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
   });
 
   it('step-list and related-lesson buttons select the requested content', async () => {

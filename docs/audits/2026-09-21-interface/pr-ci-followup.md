@@ -49,5 +49,7 @@ $env:PLAYWRIGHT_PORT='5186'
 pnpm exec playwright test e2e/trace-presets-stress-worker.e2e.ts --grep 'default Sharp' --workers=1 --output=artifacts/pr-publication/dragon-sharp-recheck --reporter=json
 ```
 
-Browser-test TypeScript and scoped ESLint passed after these test-only changes. The application
-source and the integration catalogue digest are unchanged. No hardware was operated.
+Browser-test TypeScript and scoped ESLint passed after these test-only changes. These repairs
+did not alter application source or its catalogue digest. Main's subsequent tutorial update is
+documented separately in [the final supplement](pr-final-tutorial-integration.md). No hardware
+was operated.

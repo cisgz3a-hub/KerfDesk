@@ -5,6 +5,10 @@ The branch integrated main through `9d72ba798` at merge commit
 inventory and verdict matrices remain dated evidence. Their verdicts do **not** automatically
 apply to newly inherited controls or changed implementations.
 
+A later integration of main's tutorial update is recorded in
+[the final tutorial supplement](pr-final-tutorial-integration.md). The 815-definition snapshot
+below remains evidence for this earlier integration, not the final source inventory.
+
 The separate [integration inventory](pr-integration-source/buttons.json) records **815 source
 control definitions and 94 command IDs**, scanning 2,635 source files. Its SHA-256 of scanned
 paths and contents is `c4256ab394fe578f8391e0df5346e8eb4bc6b4ac1f4f60a5a81d5a16ee9b5e29`.
