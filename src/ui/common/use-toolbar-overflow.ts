@@ -3,7 +3,7 @@ import type { AppCommand, CommandId } from '../commands/command-registry';
 
 export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.new', 'file.open', 'file.save', 'file.save-as'],
-  ['file.import'],
+  ['file.import', 'file.import-image'],
   [
     'tools.add-text',
     'tools.registration-jig',
@@ -16,13 +16,18 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['window.toggle-preview', 'file.inspect-gcode'],
 ];
 
+// Import Image takes the slot Image Studio used to hold: getting a picture ONTO
+// the bed is the step every image job starts with, while the Studio is where you
+// go once one is already there. The Studio stays a click away in More, and sits
+// with the other image tools under the Tools menu.
 const PRIMARY_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.new', 'file.open', 'file.save'],
-  ['tools.add-text', 'tools.trace-image', 'tools.edit-image'],
+  ['tools.add-text', 'tools.trace-image', 'file.import-image'],
 ];
 const PRIMARY_IDS = PRIMARY_GROUPS.flat();
+// Dropped into More in this order as the toolbar narrows.
 const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
-  'tools.edit-image',
+  'file.import-image',
   'tools.trace-image',
   'tools.add-text',
   'file.new',
