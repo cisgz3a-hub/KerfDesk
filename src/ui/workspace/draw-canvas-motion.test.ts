@@ -3,6 +3,7 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
 import { startLiveCanvasRun, type CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { canvasTheme } from '../theme/canvas-theme';
 import { drawCanvasMotionOverlay } from './draw-canvas-motion';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -99,12 +100,13 @@ describe('drawCanvasMotionOverlay', () => {
         { label: 'JOB START', alpha: 0.5 },
       ]),
     );
-    expect(recording.fillAlphas).toEqual([1, 1]);
-    expect(recording.fillStyles).toContain('rgba(255, 255, 255, 0.2)');
+    // Marker dots stay fully opaque; only the label plate behind them dims.
+    expect(recording.fillAlphas).toEqual([1, 0.2, 1, 0.2]);
+    expect(recording.fillStyles).toContain(canvasTheme.motionLabelPlate);
     expect(recording.dashes).toContainEqual([5, 5]);
   });
 
-  it('uses solid red for confirmed process and dashed red for confirmed travel', () => {
+  it('burns in warm scorch and lets travel recede, never solid red', () => {
     const canvasPlan = plan();
     const run = {
       ...startLiveCanvasRun(canvasPlan),
@@ -124,9 +126,10 @@ describe('drawCanvasMotionOverlay', () => {
         offsetY: 0,
       },
     );
-    expect(recording.strokeStyles).toContain('#f87171');
+    expect(recording.strokeStyles).toContain(canvasTheme.burnScorch);
+    expect(recording.strokeStyles).not.toContain('#f87171');
     expect(recording.dashes).toContainEqual([]);
-    expect(recording.dashes).toContainEqual([6, 4]);
+    expect(recording.dashes).toContainEqual([2, 6]);
   });
 
   it('labels the CNC head with Z and the running pass ordinal (ADR-216)', () => {
