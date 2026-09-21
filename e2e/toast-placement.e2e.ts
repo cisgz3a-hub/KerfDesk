@@ -52,9 +52,9 @@ test('Machine Setup reserves space for notices without covering its controls or 
   await notice.click();
   await expect(notice).toHaveCount(0);
   await expect(dialog.locator(':focus')).toHaveCount(1);
-  const next = dialog.getByRole('button', { name: 'Next', exact: true });
+  const next = dialog.getByRole('button', { name: 'Check essentials', exact: true });
   await next.scrollIntoViewIfNeeded();
   await expect(next).toBeInViewport({ ratio: 1 });
   await next.click();
-  await expect(dialog).toContainText('Step 2 of 6 — Choose your machine');
+  await expect(dialog).toContainText('Step 2 of 3');
 });

@@ -213,7 +213,7 @@ describe('JogPad accessible labels', () => {
 
     expect(useMachineSetupDialogStore.getState().state).toMatchObject({
       kind: 'open',
-      target: { kind: 'step', step: 'confirm' },
+      target: { kind: 'step', step: 'confirm', highlight: 'air-assist' },
     });
     expect(useStore.getState().project.device.airAssistCommand).toBe('none');
     expect(setAirAssistEnabled).not.toHaveBeenCalled();

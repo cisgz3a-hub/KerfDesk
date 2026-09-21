@@ -1,15 +1,14 @@
-// Final step: software configuration review plus an explicit hardware
-// handoff. Save never claims the physical machine is ready to move or
-// energize output.
-
-import { Button } from '../../kit';
+// Saving confirms the software draft, never the physical machine's readiness.
+import { useEffect, useState } from 'react';
 import { useLaserStore } from '../../state/laser-store';
-import type { DeviceSetupStepProps } from './device-setup-flow';
-import { deviceSetupSupportsMachineKind, machineSetupValidationIssues } from './device-setup-flow';
-import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
-import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
+import type { DeviceSetupStepProps } from './device-setup-flow';
+import { machineSetupValidationIssues } from './device-setup-flow';
+import { computeFirmwareDiffs } from './device-setup-firmware-diff';
 import { DeviceSetupCncReview } from './DeviceSetupCncReview';
+import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
+import { DeviceSetupReviewSections } from './DeviceSetupReviewSections';
+import './device-setup-review.css';
 
 export function DeviceSetupReviewStep({
   state,
@@ -27,285 +26,117 @@ export function DeviceSetupReviewStep({
     (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
   );
   return (
-    <section style={sectionStyle}>
+    <section className="lf-setup-review">
       <SoftwareStatus issues={issues} />
-      <ConnectionReview
-        state={state}
-        firmwareWrites={queuedFirmwareWrites}
-        onEdit={() => dispatch({ kind: 'go', step: 'identify' })}
-      />
-      <WorkspaceReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'confirm' })} />
-      <OutputReview state={state} dispatch={dispatch} />
-      {state.machineKind === 'cnc' ? (
-        <DeviceSetupCncReview
-          machine={state.cncDraft}
-          operationDrafts={operationDrafts}
-          onEdit={() => dispatch({ kind: 'go', step: 'cnc-setup' })}
+      <div className="lf-setup-review-grid">
+        <DeviceSetupReviewSections
+          state={state}
+          dispatch={dispatch}
+          firmwareWrites={queuedFirmwareWrites}
         />
-      ) : null}
-      <SafetyReview state={state} onEdit={() => dispatch({ kind: 'go', step: 'options' })} />
+        {state.machineKind === 'cnc' ? (
+          <DeviceSetupCncReview
+            machine={state.cncDraft}
+            operationDrafts={operationDrafts}
+            onEdit={() => dispatch({ kind: 'go', step: 'cnc-setup' })}
+          />
+        ) : null}
+      </div>
       <HardwareHandoff machineKinds={state.machineKinds} />
+      <ControllerSettings
+        state={state}
+        dispatch={dispatch}
+        queuedWriteCount={queuedFirmwareWrites.length}
+      />
     </section>
   );
 }
 
-function SoftwareStatus(props: { readonly issues: ReadonlyArray<string> }): JSX.Element {
-  const ready = props.issues.length === 0;
+function SoftwareStatus({ issues }: { readonly issues: ReadonlyArray<string> }): JSX.Element {
+  const ready = issues.length === 0;
   return (
-    <>
-      <p style={ready ? readyStyle : pendingStyle}>
-        {ready
-          ? 'Software configuration is internally consistent. Saving will not run or home the machine.'
-          : 'Resolve the software configuration issues below before saving.'}
-      </p>
-      {!ready ? (
-        <ul style={issueListStyle}>
-          {props.issues.map((issue) => (
-            <li key={issue}>{issue}</li>
-          ))}
-        </ul>
-      ) : null}
-    </>
+    <div className={`lf-setup-review-status ${ready ? 'is-ready' : 'has-issues'}`} role="status">
+      <span className="lf-setup-review-status-mark" aria-hidden="true">
+        {ready ? '✓' : '!'}
+      </span>
+      <div>
+        <strong>{ready ? 'Ready to save' : 'A few settings need attention'}</strong>
+        <p>
+          {ready
+            ? 'Software configuration is internally consistent. Saving will not run or home the machine.'
+            : 'Fix the issues below, then return here to save your setup.'}
+        </p>
+        {!ready ? (
+          <ul>
+            {issues.map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function ConnectionReview(props: {
-  readonly state: DeviceSetupStepProps['state'];
-  readonly firmwareWrites: ReadonlyArray<FirmwareDiff>;
-  readonly onEdit: () => void;
-}): JSX.Element {
-  const { state } = props;
-  const guide = machineSetupControllerGuide(
-    state.draft.controllerKind ?? 'grbl-v1.1',
-    state.draft.controllerCommandSet,
-  );
-  const baud =
-    guide.transportLabel === 'USB serial'
-      ? String(state.draft.baudRate ?? guide.defaultBaudRate)
-      : 'Not used';
-  const streaming =
-    guide.transportLabel === 'USB serial'
-      ? `${state.draft.streamingMode}${state.draft.streamingMode === 'char-counted' ? `, ${state.draft.rxBufferBytes} bytes` : ''}`
-      : 'Not used';
+function ControllerSettings({
+  state,
+  dispatch,
+  queuedWriteCount,
+}: DeviceSetupStepProps & { readonly queuedWriteCount: number }): JSX.Element {
+  const [expanded, setExpanded] = useState(queuedWriteCount > 0);
+  useEffect(() => {
+    if (queuedWriteCount > 0) setExpanded(true);
+  }, [queuedWriteCount]);
   return (
-    <ReviewSection title="Machine and connection" onEdit={props.onEdit}>
-      <ReviewRow
-        label="Capability"
-        value={
-          state.machineKinds.length === 2
-            ? 'Laser + CNC'
-            : state.machineKinds[0] === 'cnc'
-              ? 'CNC only'
-              : 'Laser only'
-        }
-      />
-      <ReviewRow label="Active mode" value={state.machineKind === 'cnc' ? 'CNC' : 'Laser'} />
-      <ReviewRow label="Profile" value={state.draft.name} />
-      <ReviewRow label="Controller" value={`${guide.label} (${guide.transportLabel})`} />
-      <ReviewRow label="Baud" value={baud} />
-      <ReviewRow
-        label="Output"
-        value={
-          guide.transportLabel === 'USB serial'
-            ? state.draft.gcodeDialect.dialectId
-            : 'Ruida .rd file'
-        }
-      />
-      <ReviewRow label="Streaming" value={streaming} />
-      <ReviewRow
-        label="Firmware after save"
-        value={
-          props.firmwareWrites.length === 0
+    <details
+      className="lf-setup-review-disclosure"
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary title="Compare controller settings with this draft and review optional writes for Save.">
+        <span className="lf-setup-review-disclosure-title">
+          Controller settings <span className="lf-setup-review-optional">Optional</span>
+        </span>
+        <span className="lf-setup-review-disclosure-status">
+          {queuedWriteCount === 0
             ? 'No writes queued'
-            : `${props.firmwareWrites.map((write) => `${write.code}=${write.desired}`).join(', ')}; exact re-read required`
-        }
-      />
-    </ReviewSection>
+            : `${queuedWriteCount} setting${queuedWriteCount === 1 ? '' : 's'} queued for Save`}
+        </span>
+      </summary>
+      <div className="lf-setup-review-disclosure-body">
+        <DeviceSetupFirmwareStep state={state} dispatch={dispatch} />
+      </div>
+    </details>
   );
 }
 
-function WorkspaceReview(props: {
-  readonly state: DeviceSetupStepProps['state'];
-  readonly onEdit: () => void;
-}): JSX.Element {
-  const { state } = props;
-  const guide = machineSetupControllerGuide(
-    state.draft.controllerKind ?? 'grbl-v1.1',
-    state.draft.controllerCommandSet,
-  );
-  const homing = state.draft.homing.enabled
-    ? `${guide.homeCommand ?? 'enabled'} toward ${state.draft.homing.direction}`
-    : 'Disabled';
-  return (
-    <ReviewSection title="Workspace and coordinates" onEdit={props.onEdit}>
-      <ReviewRow
-        label="Work area"
-        value={`${state.draft.bedWidth} × ${state.draft.bedHeight} mm`}
-      />
-      <ReviewRow label="Origin" value={state.draft.origin} />
-      <ReviewRow label="Homing" value={homing} />
-      <ReviewRow
-        label="Output max / requested Frame feed"
-        value={`${state.draft.maxFeed} / ${state.draft.framingFeedMmPerMin} mm/min`}
-      />
-    </ReviewSection>
-  );
-}
-
-function OutputReview(props: {
-  readonly state: DeviceSetupStepProps['state'];
-  readonly dispatch: DeviceSetupStepProps['dispatch'];
-}): JSX.Element {
-  return (
-    <>
-      {deviceSetupSupportsMachineKind(props.state, 'laser') ? (
-        <ReviewSection
-          title="Laser machine output"
-          onEdit={() => props.dispatch({ kind: 'go', step: 'confirm' })}
-        >
-          <LaserOutputRows state={props.state} />
-        </ReviewSection>
-      ) : null}
-      {deviceSetupSupportsMachineKind(props.state, 'cnc') ? (
-        <ReviewSection
-          title="CNC machine output"
-          onEdit={() => props.dispatch({ kind: 'go', step: 'cnc-setup' })}
-        >
-          <CncOutputRows state={props.state} />
-        </ReviewSection>
-      ) : null}
-    </>
-  );
-}
-
-function CncOutputRows({ state }: { readonly state: DeviceSetupStepProps['state'] }): JSX.Element {
-  const params = state.cncDraft.params;
-  return (
-    <>
-      <ReviewRow label="Safe Z" value={`${params.safeZMm} mm`} />
-      <ReviewRow
-        label="Spindle"
-        value={`${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`}
-      />
-      <ReviewRow label="Coolant" value={params.coolant ?? 'off'} />
-      <ReviewRow label="Park" value={`${params.parkXMm ?? 0}, ${params.parkYMm ?? 0} mm`} />
-    </>
-  );
-}
-
-function LaserOutputRows({
-  state,
+function HardwareHandoff({
+  machineKinds,
 }: {
-  readonly state: DeviceSetupStepProps['state'];
-}): JSX.Element {
-  const fire = state.draft.fireControl;
-  return (
-    <>
-      <ReviewRow
-        label="Power range"
-        value={`${state.draft.minPowerS}–${state.draft.maxPowerS} S`}
-      />
-      <ReviewRow label="Laser mode" value={state.draft.laserModeEnabled ? 'Expected on' : 'Off'} />
-      <ReviewRow label="Air output" value={state.draft.airAssistCommand} />
-      <ReviewRow
-        label="Low-power Fire"
-        value={fire?.enabled === true ? `Enabled, ${fire.maxPowerPercent}% cap` : 'Disabled'}
-      />
-    </>
-  );
-}
-
-function SafetyReview(props: {
-  readonly state: DeviceSetupStepProps['state'];
-  readonly onEdit: () => void;
-}): JSX.Element {
-  const { state } = props;
-  const poweredZ =
-    state.draft.capabilities?.includes('z-axis') === true
-      ? `${state.draft.zTravelMm ?? 'unknown'} mm`
-      : 'Disabled';
-  return (
-    <ReviewSection title="Safety and optional features" onEdit={props.onEdit}>
-      <ReviewRow
-        label="No-go zones"
-        value={`${state.draft.noGoZones.filter((zone) => zone.enabled).length} enabled`}
-      />
-      <ReviewRow label="Powered Z" value={poweredZ} />
-      <ReviewRow
-        label="Probe"
-        value={
-          state.draft.zProbePresent === true ? 'Recorded; hardware test pending' : 'Not recorded'
-        }
-      />
-      {deviceSetupSupportsMachineKind(state, 'laser') ? <LaserSafetyRows state={state} /> : null}
-    </ReviewSection>
-  );
-}
-
-function LaserSafetyRows({
-  state,
-}: {
-  readonly state: DeviceSetupStepProps['state'];
-}): JSX.Element {
-  return (
-    <>
-      <ReviewRow
-        label="Rotary"
-        value={state.draft.rotary?.enabled === true ? 'Enabled' : 'Disabled'}
-      />
-      <ReviewRow
-        label="Camera"
-        value={
-          state.draft.cameraAlignment === undefined ? 'Alignment pending / unchanged' : 'Aligned'
-        }
-      />
-    </>
-  );
-}
-
-function ReviewSection(props: {
-  readonly title: string;
-  readonly onEdit: () => void;
-  readonly children: React.ReactNode;
-}): JSX.Element {
-  return (
-    <article style={cardStyle}>
-      <header style={cardHeaderStyle}>
-        <strong>{props.title}</strong>
-        <Button variant="ghost" onClick={props.onEdit}>
-          Edit
-        </Button>
-      </header>
-      <dl style={definitionStyle}>{props.children}</dl>
-    </article>
-  );
-}
-
-function ReviewRow(props: { readonly label: string; readonly value: string }): JSX.Element {
-  return (
-    <>
-      <dt>{props.label}</dt>
-      <dd>{props.value}</dd>
-    </>
-  );
-}
-
-function HardwareHandoff(props: {
   readonly machineKinds: ReadonlyArray<'laser' | 'cnc'>;
 }): JSX.Element {
   return (
-    <div style={hardwareStyle}>
-      <strong>Hardware commissioning — operator check after saving</strong>
-      <ul style={hardwareListStyle}>
-        {hardwareChecklist(props.machineKinds).map((item) => (
-          <li key={item}>☐ {item}</li>
-        ))}
-      </ul>
-      <p style={hardwareNoteStyle}>
-        Keep the emergency stop accessible. Start with outputs disabled and motion clear of clamps,
-        then verify one item at a time. KerfDesk does not store these as complete automatically.
-      </p>
-    </div>
+    <aside className="lf-setup-review-handoff">
+      <strong>Before your first run</strong>
+      <p>Check the physical machine after saving. Software setup does not verify the hardware.</p>
+      <details className="lf-setup-review-hardware-details">
+        <summary title="Review the physical checks to perform before your first machine run.">
+          Hardware commissioning checklist
+        </summary>
+        <ul className="lf-setup-review-checklist">
+          {hardwareChecklist(machineKinds).map((item) => (
+            <li key={item}>
+              <span aria-hidden="true">☐</span> {item}
+            </li>
+          ))}
+        </ul>
+        <p>
+          Keep the emergency stop accessible. Start with outputs disabled and motion clear of
+          clamps, then verify one item at a time. KerfDesk does not store these as complete
+          automatically.
+        </p>
+      </details>
+    </aside>
   );
 }
 
@@ -340,60 +171,3 @@ function hardwareChecklist(machineKinds: ReadonlyArray<'laser' | 'cnc'>): Readon
       : [];
   return [...common, ...laser, ...cnc, ...swap];
 }
-
-const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 9 };
-const readyStyle: React.CSSProperties = {
-  margin: 0,
-  fontWeight: 600,
-  color: 'var(--lf-success-fg)',
-  fontSize: 12,
-};
-const pendingStyle: React.CSSProperties = {
-  margin: 0,
-  fontWeight: 600,
-  color: 'var(--lf-warning-fg)',
-  fontSize: 12,
-};
-const issueListStyle: React.CSSProperties = {
-  margin: 0,
-  paddingLeft: 18,
-  color: 'var(--lf-warning-fg)',
-  fontSize: 12,
-};
-const cardStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 8,
-};
-const cardHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginBottom: 5,
-  fontSize: 12,
-};
-const definitionStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '130px minmax(0, 1fr)',
-  gap: '4px 10px',
-  margin: 0,
-  fontSize: 12,
-};
-const hardwareStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-warning)',
-  borderRadius: 6,
-  padding: 9,
-  fontSize: 12,
-};
-const hardwareListStyle: React.CSSProperties = {
-  listStyle: 'none',
-  margin: '7px 0',
-  padding: 0,
-  display: 'grid',
-  gap: 4,
-};
-const hardwareNoteStyle: React.CSSProperties = {
-  margin: 0,
-  color: 'var(--lf-text-muted)',
-  lineHeight: 1.45,
-};

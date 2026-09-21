@@ -11,7 +11,7 @@ export function Row({
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <div style={rowStyle}>
+    <div className="lf-device-setting-row" style={rowStyle}>
       <span style={labelStyle}>{label}</span>
       <span style={fieldStyle}>{children}</span>
     </div>

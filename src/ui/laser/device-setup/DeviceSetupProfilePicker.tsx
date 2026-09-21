@@ -1,8 +1,3 @@
-// Always-visible, searchable catalog of reviewed machine profiles — the
-// first thing the operator sees in Machine Setup. One click fills the whole
-// draft; the manual identity fields below it remain the fallback for
-// machines that are not listed. (ADR-240)
-
 import { useState } from 'react';
 import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -14,46 +9,41 @@ import {
 import { filterMachineProfileSuggestions } from '../../../core/devices/profile-suggestions';
 import { fillRunwayPolicyForDevice } from '../../../core/job/fill-runway-policy';
 import { Button } from '../../kit';
-import {
-  badgeStyle,
-  buttonRowStyle,
-  cardHeaderStyle,
-  cardStyle,
-  catalogGridStyle,
-  mutedStyle,
-  notesStyle,
-} from '../MachineSetupStyles';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const [query, setQuery] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const suggestions = suggestMachineProfiles({
     detectedControllerKind: state.detectedControllerKind ?? null,
     detectedProfilePatch: state.detected,
     controllerSettings: state.controllerRead ? state.detected : null,
     settingsRows: [],
   });
-  const visible = filterMachineProfileSuggestions(suggestions, query);
+  const matches = filterMachineProfileSuggestions(suggestions, query);
+  const active = matches.find((suggestion) => profilePresetIsActive(state.draft, suggestion));
+  const preview =
+    active === undefined
+      ? matches.slice(0, 2)
+      : [active, ...matches.filter((item) => item !== active).slice(0, 1)];
+  const visible = showAll || query.trim() !== '' ? matches : preview;
   return (
-    <section aria-label="Reviewed machine profiles" style={pickerStyle}>
-      <div style={pickerHeaderStyle}>
-        <strong>Pick your machine</strong>
+    <section aria-label="Reviewed machine profiles" className="lf-setup-catalog">
+      <div className="lf-setup-catalog-heading">
+        <div>
+          <h4>Start with a machine profile</h4>
+          <p>A starting point you can adjust in the next step.</p>
+        </div>
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search machines…"
           aria-label="Search machine profiles"
-          title="Filter the reviewed profiles by machine name, controller, or bed size."
-          style={searchStyle}
+          title="Search by machine name, controller or work area."
         />
       </div>
-      <p style={mutedStyle}>
-        One click fills every setting with the profile&apos;s reviewed defaults. You still confirm
-        work area, origin, homing, and power before saving — or skip this and configure the machine
-        manually below.
-      </p>
-      <div style={catalogGridStyle}>
+      <div className="lf-setup-profile-grid">
         {visible.map((suggestion) => (
           <PresetCard
             key={suggestion.profileId}
@@ -63,11 +53,19 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
           />
         ))}
       </div>
+      {query.trim() === '' && matches.length > 2 ? (
+        <Button variant="ghost" onClick={() => setShowAll(!showAll)} aria-expanded={showAll}>
+          {showAll ? 'Show fewer profiles' : `Browse all ${matches.length} profiles`}
+        </Button>
+      ) : null}
       {visible.length === 0 ? (
-        <p style={mutedStyle}>
-          No profile matches “{query}”. Clear the search or configure the machine manually below.
+        <p className="lf-setup-empty">
+          No profile matches “{query}”. Try another search, or enter your settings below.
         </p>
       ) : null}
+      <p className="lf-setup-catalog-hint">
+        Machine not listed? Keep your current settings and check the controller below.
+      </p>
     </section>
   );
 }
@@ -88,45 +86,52 @@ function PresetCard(props: {
 }): JSX.Element {
   const { suggestion } = props;
   const profile = suggestion.profile;
-  const buttonTitle = props.isActive
-    ? 'This machine is selected.'
-    : `Start from ${profile.name}'s defaults.`;
   return (
-    <article style={cardStyle}>
-      <div style={cardHeaderStyle}>
-        <strong>{profile.name}</strong>
-        <span style={buttonRowStyle}>
-          <span style={badgeStyle}>{suggestionConfidenceLabel(suggestion.confidence)}</span>
-          <span style={badgeStyle}>{profileConfidenceLabel(profile)}</span>
-        </span>
+    <article className="lf-setup-profile" data-selected={props.isActive}>
+      <div className="lf-setup-profile-main">
+        <div>
+          <strong>{profile.name}</strong>
+          <p>
+            {profile.bedWidth} × {profile.bedHeight} mm
+            {profile.laserSubProfile?.opticalPowerW !== undefined
+              ? `, ${profile.laserSubProfile.opticalPowerW} W`
+              : ''}
+          </p>
+        </div>
+        <Button
+          variant={props.isActive ? 'default' : 'primary'}
+          disabled={props.isActive}
+          onClick={props.onUse}
+          aria-label={props.isActive ? `Selected ${profile.name}` : `Use ${profile.name}`}
+          title={
+            props.isActive ? 'This machine is selected.' : `Start from ${profile.name}'s defaults.`
+          }
+        >
+          {props.isActive ? 'Selected' : 'Use profile'}
+        </Button>
       </div>
-      <p style={mutedStyle}>
-        {profile.bedWidth} × {profile.bedHeight} mm
-        {profile.laserSubProfile?.opticalPowerW !== undefined
-          ? `, ${profile.laserSubProfile.opticalPowerW} W`
-          : ''}
-      </p>
-      {suggestion.confidence === 'manual-only' ? null : (
-        <ul style={reasonsStyle}>
-          {suggestion.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
+      <div className="lf-setup-profile-badges">
+        <span>{suggestionConfidenceLabel(suggestion.confidence)}</span>
+        <span>{profileConfidenceLabel(profile)}</span>
+      </div>
+      {suggestion.warnings.length > 0 ? (
+        <p className="lf-setup-profile-warning">{suggestion.warnings[0]}</p>
+      ) : null}
+      <details className="lf-setup-profile-notes">
+        <summary title={`Read profile notes for ${profile.name}`}>Profile details</summary>
+        {suggestion.confidence === 'manual-only' ? null : (
+          <ul>
+            {suggestion.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        )}
+        <ul>
+          {suggestion.entry.reviewNotes.map((note) => (
+            <li key={note}>{note}</li>
           ))}
         </ul>
-      )}
-      {suggestion.warnings.length > 0 ? <p style={warningStyle}>{suggestion.warnings[0]}</p> : null}
-      <ul style={notesStyle}>
-        {suggestion.entry.reviewNotes.slice(0, 2).map((note) => (
-          <li key={note}>{note}</li>
-        ))}
-      </ul>
-      <Button
-        variant={props.isActive ? 'default' : 'primary'}
-        disabled={props.isActive}
-        onClick={props.onUse}
-        title={buttonTitle}
-      >
-        {props.isActive ? 'Selected' : `Use ${profile.name}`}
-      </Button>
+      </details>
     </article>
   );
 }
@@ -136,32 +141,3 @@ function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confide
   if (confidence === 'possible') return 'Possible match';
   return 'Manual choice';
 }
-
-const pickerStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 10,
-};
-const pickerHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  flexWrap: 'wrap',
-  fontSize: 13,
-};
-const searchStyle: React.CSSProperties = { flex: '1 1 180px', maxWidth: 260, fontSize: 12 };
-const reasonsStyle: React.CSSProperties = {
-  margin: '2px 0 4px',
-  paddingLeft: 18,
-  fontSize: 11,
-  color: 'var(--lf-success-fg)',
-};
-const warningStyle: React.CSSProperties = {
-  margin: '2px 0 4px',
-  fontSize: 11,
-  color: 'var(--lf-warning-fg)',
-};

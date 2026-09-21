@@ -95,7 +95,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
     machine: 'laser',
     minutes: 5,
     location:
-      'Tools → Scan Offset Test; Machine Setup → Options & calibration → Raster scan-offset calibration',
+      'Tools → Scan Offset Test; Machine Setup → Essentials → Accessories and calibration → Raster scan-offset calibration',
     prerequisites: 'Save current artwork before generating a coupon; the test replaces the canvas.',
     visual: 'scan-offset',
     steps: [

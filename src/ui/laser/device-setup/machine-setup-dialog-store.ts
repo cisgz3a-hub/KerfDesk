@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import type { DeviceSetupStep } from './device-setup-flow';
 
-export type DeviceSetupHighlight = 'autofocus';
+export type DeviceSetupHighlight = 'autofocus' | 'air-assist';
 
 export type CncStartupSetupField =
   | 'material'

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { actionGridStyle, framedRunStatusStyle, primaryActionStyle } from './JobControls.styles';
 import { startJobTitle } from './JobEstimatePresentation';
 import { LiveJobTimeBadge } from './LiveJobTimeBadge';
@@ -68,7 +69,9 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const laser = useFramedRunLaserState();
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const estimate = useJobEstimate();
-  const busy = props.disabled || props.streaming;
+  const framePending = useFramePreparationStore((state) => state.pending);
+  const preparingFrame = framePending && laser.motionOperation?.kind !== 'frame';
+  const busy = props.disabled || props.streaming || framePending;
   const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
   const framedReady = framedRunIssue === null;
   return {
@@ -77,7 +80,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     framedReady,
     frameControl: frameControlProps(busy, laser.statusReport?.state),
     startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
-    frameLabel: framedReady ? 'Frame again' : 'Frame job',
+    frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
     startControl: {
       disabled: busy,
       title: framedReady
@@ -89,6 +92,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       framedReady,
       laser.framedRun !== null,
       framedRunIssue,
+      preparingFrame,
     ),
     estimate,
   };
@@ -143,8 +147,10 @@ function framedRunStatusText(
   framedReady: boolean,
   hasFramedRun: boolean,
   framedRunIssue: string | null,
+  preparingFrame: boolean,
 ): string {
   if (frameOperationActive) return 'Framing exact job…';
+  if (preparingFrame) return 'Preparing the exact job for Frame…';
   if (framedReady) return 'Ready to start — framed job unchanged';
   if (!hasFramedRun) return 'Not framed — prepare and Frame this job first';
   return `Frame expired — ${framedRunIssue}`;
