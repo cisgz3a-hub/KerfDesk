@@ -110,10 +110,26 @@ public static class QualificationWindows {
     EnumChildWindows(parent, (hwnd, parameter) => { matches.Add(hwnd); return true; }, IntPtr.Zero);
     return matches.ToArray();
   }
-  public static void SetFilename(IntPtr hwnd, string path) {
+  // WM_SETTEXT alone is not enough on the modern (IFileDialog) common dialog:
+  // it replaces the edit's text without raising the EN_CHANGE the dialog needs
+  // to adopt the name, so Save commits the name the dialog still believes in.
+  // Measured on Windows 11 26200 against a real SaveFileDialog: WM_SETTEXT
+  // returned DialogResult.Cancel and the caller received `untitled.lf2`, which
+  // is exactly what the installer qualification reported from windows-latest.
+  // Posting WM_CHAR per character is what a typing operator produces, and the
+  // same probe then returned the requested path. UI Automation is not an option
+  // here: the filename edit exposes no ValuePattern.
+  public static void ClearText(IntPtr hwnd) {
     UIntPtr result;
-    if (SendText(hwnd, 0x000C, UIntPtr.Zero, path, 0x22, 5000, out result) == IntPtr.Zero || result == UIntPtr.Zero)
-      throw new InvalidOperationException("Native WM_SETTEXT failed or timed out.");
+    if (SendText(hwnd, 0x000C, UIntPtr.Zero, "", 0x22, 5000, out result) == IntPtr.Zero)
+      throw new InvalidOperationException("Native WM_SETTEXT (clear) failed or timed out.");
+  }
+  public static void TypeFilename(IntPtr hwnd, string path) {
+    ClearText(hwnd);
+    foreach (char character in path) {
+      if (!PostMessage(hwnd, 0x0102, new IntPtr((int)character), IntPtr.Zero))
+        throw new InvalidOperationException("Native WM_CHAR could not be posted to the filename edit.");
+    }
   }
   public static string ReadFilename(IntPtr hwnd) {
     var text = new StringBuilder(32768); UIntPtr result;
@@ -273,6 +289,22 @@ function Wait-NativeDialog {
   throw 'Timed out waiting for the real Windows common file dialog.'
 }
 
+# Types the path and waits for the edit to hold it. WM_CHAR is posted, not sent,
+# so the characters land asynchronously; polling the read-back is what makes this
+# deterministic on a slow runner instead of a fixed sleep. Autocomplete can
+# briefly append a suggestion, so an exact match ends the wait and a mismatch at
+# the deadline fails loudly rather than letting Save commit some other name.
+function Set-NativeFilename([IntPtr]$Edit, [string]$Path) {
+  [QualificationWindows]::TypeFilename($Edit, $Path)
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  do {
+    $text = [QualificationWindows]::ReadFilename($Edit)
+    if ([string]::Equals($text, $Path, [StringComparison]::Ordinal)) { return $text }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  return $text
+}
+
 function Complete-FileDialog {
   if (-not [IO.Path]::IsPathRooted($FilePath)) { throw 'File dialog requires an absolute file path.' }
   if ($Action -eq 'Open' -and -not [IO.File]::Exists($FilePath)) { throw 'Input file does not exist.' }
@@ -293,8 +325,8 @@ function Complete-FileDialog {
   $result.controls = $selection
   $result.controlMethod = 'owned native HWND messages'
   Assert-OwnedControls $dialog $selection
-  [QualificationWindows]::SetFilename([IntPtr]$selection.edits[0].handle, $FilePath)
-  $result.enteredPath = [QualificationWindows]::ReadFilename([IntPtr]$selection.edits[0].handle)
+  $result.filenameMethod = 'typed WM_CHAR into the owned filename edit'
+  $result.enteredPath = Set-NativeFilename ([IntPtr]$selection.edits[0].handle) $FilePath
   if (-not [string]::Equals($result.enteredPath, $FilePath, [StringComparison]::Ordinal)) { throw 'Native filename edit did not retain the requested path.' }
   Save-WindowScreenshot ([IntPtr]$dialog.handle) 'dialog-filled.png'
   Assert-OwnedControls $dialog $selection

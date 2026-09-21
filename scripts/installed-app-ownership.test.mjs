@@ -147,3 +147,74 @@ test(
     assert.match(result.stdout, /Owned descendants selected/);
   },
 );
+
+test(
+  'the filename is typed into the owned edit, because WM_SETTEXT alone loses the name',
+  { skip: process.platform !== 'win32' },
+  () => {
+    // Measured on Windows 11 26200 against a real SaveFileDialog: setting the
+    // edit's text with WM_SETTEXT left the modern dialog holding its own name,
+    // so it returned DialogResult.Cancel and the caller got `untitled.lf2` —
+    // the exact symptom the installer qualification reported from
+    // windows-latest. Posting WM_CHAR per character is what a typing operator
+    // produces and the same probe then returned the requested path. This pins
+    // the typing so a future edit cannot quietly go back to WM_SETTEXT.
+    const command = String.raw`
+      $ErrorActionPreference = 'Stop'
+      Set-StrictMode -Version Latest
+      $tokens = $null; $parseErrors = $null
+      $ast = [System.Management.Automation.Language.Parser]::ParseFile($env:QUALIFICATION_HELPER, [ref]$tokens, [ref]$parseErrors)
+      if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+      $definition = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Initialize-WindowTools' }, $true)
+      if ($null -eq $definition) { throw 'Missing Initialize-WindowTools' }
+      . ([ScriptBlock]::Create($definition.Extent.Text))
+      Initialize-WindowTools
+      # A real EDIT control of our own: no app, no file dialog, no desktop input.
+      Add-Type -AssemblyName System.Windows.Forms
+      $form = New-Object System.Windows.Forms.Form
+      $box = New-Object System.Windows.Forms.TextBox
+      $form.Controls.Add($box); $form.Opacity = 0; $form.ShowInTaskbar = $false
+      $form.Show(); [System.Windows.Forms.Application]::DoEvents()
+      $sep = [string][char]92
+      $path = 'C:' + $sep + 'dir with spaces' + $sep + 'file-name_1.lf2'
+      [QualificationWindows]::TypeFilename($box.Handle, $path)
+      # WM_CHAR is posted, so pump until the control has consumed the queue.
+      $deadline = [DateTime]::UtcNow.AddSeconds(10)
+      do {
+        [System.Windows.Forms.Application]::DoEvents()
+        $read = [QualificationWindows]::ReadFilename($box.Handle)
+        if ($read -eq $path) { break }
+        Start-Sleep -Milliseconds 40
+      } while ([DateTime]::UtcNow -lt $deadline)
+      $form.Close()
+      if ($read -ne $path) { throw "Typed filename did not land: [$read]" }
+      # Clearing first is what makes the dialog's prefilled name go away.
+      if (-not ($ast.Extent.Text -match 'ClearText\(hwnd\)')) { throw 'TypeFilename no longer clears the edit first' }
+      if (-not ($ast.Extent.Text -match '0x0102')) { throw 'WM_CHAR posting is gone; the modern dialog will lose the name again' }
+      Write-Output 'Typed filename landed in a real edit control'
+    `;
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        env: {
+          ...process.env,
+          QUALIFICATION_HELPER: fileURLToPath(
+            new URL('./installed-file-dialog.ps1', import.meta.url),
+          ),
+        },
+        windowsHide: true,
+        encoding: 'utf8',
+        timeout: 60_000,
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(
+      result.status,
+      0,
+      `${result.stdout}
+${result.stderr}`,
+    );
+    assert.match(result.stdout, /Typed filename landed/);
+  },
+);
