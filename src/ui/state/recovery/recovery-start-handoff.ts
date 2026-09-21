@@ -5,8 +5,10 @@ import type {
   RecoveryRepositorySnapshot,
   StoredRecoveryArtifact,
 } from './recovery-model';
+import type { JobCheckpoint } from '../../../core/recovery';
 import {
   armClaimedRecoveryStartMutation,
+  armFreshStartIntentMutation,
   armFreshStartMutation,
   cancelPendingStartMutation,
   reconcilePendingStartMutation,
@@ -30,6 +32,10 @@ type HandoffHost = {
     requiredArtifactRunId?: RunId,
   ) => Promise<RecoveryRepositoryResult<T>>;
   readonly refresh: () => Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>>;
+  /** Materialize the fingerprint-only artifact an intent-armed handoff stands
+   * for, so the capsule reconciliation writes has something to point at.
+   * Resolves false when the artifact could not be written. */
+  readonly materializeIntentArtifact: (runId: RunId, intent: JobCheckpoint) => Promise<boolean>;
 };
 
 export class RecoveryStartHandoff {
@@ -53,6 +59,19 @@ export class RecoveryStartHandoff {
           armedAtIso,
         ),
       runId,
+    );
+  }
+
+  /** ADR-337: arm before the archive exists. The intent alone is enough to
+   * tell the operator, after a crash, which program was handed over and how
+   * long it was — which is the whole job of this record. */
+  armFreshStartIntent(
+    runId: RunId,
+    intent: JobCheckpoint,
+    armedAtIso = this.host.nowIso(),
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    return this.host.mutate('arm durable job Start intent', (slots) =>
+      armFreshStartIntentMutation(slots, runId, intent, armedAtIso),
     );
   }
 
@@ -116,7 +135,16 @@ export class RecoveryStartHandoff {
     }, delayMs);
   }
 
-  private reconcileNow(): Promise<RecoveryRepositoryResult<boolean>> {
+  private async reconcileNow(): Promise<RecoveryRepositoryResult<boolean>> {
+    // An intent-armed handoff has no archive yet, so the capsule it becomes
+    // would reference a run with no artifact and be dropped on the next
+    // hydration — silence, exactly where the operator most needs to be told
+    // the machine may have moved. Write the fingerprint-only stand-in first.
+    const pending = this.host.getSnapshot().pendingStart;
+    if (pending?.intent !== undefined) {
+      const materialized = await this.host.materializeIntentArtifact(pending.runId, pending.intent);
+      if (!materialized) return ok(false);
+    }
     return this.host.mutate('reconcile uncertain Start handoff', (slots) =>
       reconcilePendingStartMutation(slots, this.host.nowIso()),
     );

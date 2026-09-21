@@ -39,8 +39,8 @@ import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-sourc
 import {
   completedReceiptIsCurrent,
   replayCompilationMatches,
-  stageFreshExecutionArtifact,
 } from './start-job-execution-tracking';
+import { createStartIntent } from '../state/recovery/start-intent';
 import {
   completedReplayInvalidationHandler,
   discardChangedCompletedReplay,
@@ -281,37 +281,20 @@ async function repairOrReportBlockedStart(
   return 'blocked';
 }
 
+// ADR-337: nothing proportional to the job's geometry runs between here and
+// the first wire byte. The durable pre-wire record is the start intent — two
+// linear scans of the emitted program — and the execution archive is written
+// once the controller has accepted it.
 async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
   const runId = createRunId();
-  let staged = await stageFreshExecutionArtifact({
-    runId,
-    prepared: args.prepared,
-    outputScope: args.outputScope,
-    laser: args.laser,
-    repository: args.repository,
-    reviewedAtIso: args.reviewedAtIso,
-    reviewModel: args.reviewModel,
-    ...(args.laserModeStartEvidence === undefined
-      ? {}
-      : { laserModeStartEvidence: args.laserModeStartEvidence }),
-    ...(args.cncSetupAttestation === undefined
-      ? {}
-      : { cncSetupAttestation: args.cncSetupAttestation }),
-    ...(args.completedReceipt === null
-      ? {}
-      : { completedReplaySourceRunId: args.completedReceipt.runId }),
-  });
   if (
     args.completedReceipt !== null &&
     !(await completedReceiptIsCurrent(args.completedReceipt, args.repository))
   ) {
-    if (staged) await args.repository.discardStagedRun(runId);
     return;
   }
-  const handoff = await armFreshStartHandoff(args.repository, runId, staged);
+  const handoff = await armFreshStartHandoff(args, runId);
   if (handoff.blocked) return;
-  staged = handoff.staged;
-  const handoffArmed = handoff.armed;
   const authorizationArgs = {
     preparedAgainst: args.laser,
     checkpointToReplace: args.checkpointToReplace,
@@ -322,8 +305,7 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
   } as const;
   const authorization = currentLaserForAuthorizedStartNow(authorizationArgs);
   if (!authorization.ok) {
-    if (handoffArmed) await args.repository.cancelPendingStart(runId);
-    if (staged) await args.repository.discardStagedRun(runId);
+    if (handoff.armed) await args.repository.cancelPendingStart(runId);
     await reportStartAuthorizationRefusal(
       authorization.refusal,
       args.completedReceipt,
@@ -334,8 +316,7 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<void> {
   await transmitPreparedStart({
     args,
     runId,
-    staged,
-    handoffArmed,
+    handoffArmed: handoff.armed,
     authorizationArgs,
     authorization,
   });
@@ -348,21 +329,33 @@ async function completedReplayCanContinue(
   return receipt === null || completedReceiptIsCurrent(receipt, repository);
 }
 
+/** Arm the durable Start handoff from the cheap intent (ADR-337).
+ *
+ * Unavailable recovery storage is NOT a Start gate: rule 7 refuses only when
+ * transport cannot accept work, output cannot be produced or streamed, or the
+ * reviewed artifact cannot be handed off consistently. A run whose durable
+ * record could not be written still goes to the machine, and
+ * `activateAcceptedFreshRun` tells the operator afterwards that it has no
+ * forensic record — the same posture staging had before this decision. */
 async function armFreshStartHandoff(
-  repository: RecoveryRepository,
+  args: PreparedStartArgs,
   runId: ReturnType<typeof createRunId>,
-  staged: boolean,
-): Promise<{ readonly staged: boolean; readonly armed: boolean; readonly blocked: boolean }> {
-  if (!staged) return { staged: false, armed: false, blocked: false };
-  const armed = await repository.armFreshStart(runId);
-  if (armed.ok && armed.value) return { staged: true, armed: true, blocked: false };
-  await repository.cancelPendingStart(runId);
-  await repository.discardStagedRun(runId);
-  if (!armed.ok) return { staged: false, armed: false, blocked: false };
+): Promise<{ readonly armed: boolean; readonly blocked: boolean }> {
+  const intent = createStartIntent({
+    gcode: args.prepared.gcode,
+    machineKind: args.machineKind,
+    outputScope: args.outputScope,
+    ...(args.prepared.jobOrigin === undefined ? {} : { jobOrigin: args.prepared.jobOrigin }),
+    nowIso: new Date().toISOString(),
+  });
+  const armed = await args.repository.armFreshStartIntent(runId, intent);
+  if (armed.ok && armed.value) return { armed: true, blocked: false };
+  await args.repository.cancelPendingStart(runId);
+  if (!armed.ok) return { armed: false, blocked: false };
   reportStartBlockers([
     'Another job Start is already being prepared. Wait for it to finish and try again.',
   ]);
-  return { staged: false, armed: false, blocked: true };
+  return { armed: false, blocked: true };
 }
 
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC
