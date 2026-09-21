@@ -105,6 +105,9 @@ No real controller, camera, printer, laser, spindle or material action was perfo
 and local/simulated state checks do not qualify physical setup or hardware output. Build and
 repository checks are recorded in [verification.md](verification.md).
 
+The first hosted browser gate and its test-fixture corrections are recorded separately in
+[the PR follow-up](pr-ci-followup.md), including the unsuccessful local Sharp performance check.
+
 ## Reproduction without changing dated evidence
 
 ```sh

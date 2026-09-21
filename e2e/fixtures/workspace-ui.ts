@@ -19,13 +19,14 @@ export async function toolbarCommand(page: Page, name: string): Promise<Locator>
   const button = page
     .getByRole('banner', { name: 'Toolbar', exact: true })
     .getByRole('button', { name, exact: true });
-  if (await button.isVisible()) return button;
   const menu = page.getByRole('menu', { name: 'More commands', exact: true });
-  if (!(await menu.isVisible())) {
+  if (!(await button.isVisible()) && !(await menu.isVisible())) {
     await page.getByRole('button', { name: 'More commands', exact: true }).click();
   }
-  return menu
-    .getByRole('menuitem', { name, exact: true })
+  // Async imports can make Trace eligible while this helper opens More. Keep
+  // the locator live across that move instead of pinning it to the old surface.
+  return button
+    .or(menu.getByRole('menuitem', { name, exact: true }))
     .or(menu.getByRole('menuitemcheckbox', { name, exact: true }));
 }
 

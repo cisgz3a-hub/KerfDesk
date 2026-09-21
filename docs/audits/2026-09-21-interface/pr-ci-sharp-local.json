@@ -1,0 +1,163 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "D:\\LaserForge\\ui-audit-20260921\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "e2e/trace-presets-stress-worker.e2e.ts",
+      "--grep",
+      "default Sharp",
+      "--workers=1",
+      "--output=artifacts/pr-publication/dragon-sharp-recheck",
+      "--reporter=json"
+    ],
+    "configFile": "D:\\LaserForge\\ui-audit-20260921\\playwright.config.ts",
+    "rootDir": "D:/LaserForge/ui-audit-20260921/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/LaserForge/ui-audit-20260921/artifacts/pr-publication/dragon-sharp-recheck",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/LaserForge/ui-audit-20260921/e2e",
+        "testIgnore": ["**/production-bundle.spec.ts"],
+        "testMatch": ["**/*.e2e.ts", "**/*.spec.ts"],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [["json"]],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec vite . --host 127.0.0.1 --port 5186 --strictPort",
+      "cwd": "D:\\LaserForge\\ui-audit-20260921\\",
+      "url": "http://127.0.0.1:5186",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "trace-presets-stress-worker.e2e.ts",
+      "file": "trace-presets-stress-worker.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "default Sharp traces the actual dragon in a real worker and commits its preview",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 54226,
+                  "error": {
+                    "message": "TimeoutError: page.waitForFunction: Timeout 40000ms exceeded.",
+                    "stack": "TimeoutError: page.waitForFunction: Timeout 40000ms exceeded.\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts:136:16",
+                    "location": {
+                      "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                      "column": 16,
+                      "line": 136
+                    },
+                    "snippet": "  134 |       { timeout: COMPUTE_BUDGET_MS },\n  135 |     );\n> 136 |     await page.waitForFunction(\n      |                ^\n  137 |       (options) => {\n  138 |         const request = window.__centerlineWorkerProbe.requests\n  139 |           .filter((r) => JSON.stringify(r.options) === JSON.stringify(options))"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                        "column": 16,
+                        "line": 136
+                      },
+                      "message": "TimeoutError: page.waitForFunction: Timeout 40000ms exceeded.\n\n  134 |       { timeout: COMPUTE_BUDGET_MS },\n  135 |     );\n> 136 |     await page.waitForFunction(\n      |                ^\n  137 |       (options) => {\n  138 |         const request = window.__centerlineWorkerProbe.requests\n  139 |           .filter((r) => JSON.stringify(r.options) === JSON.stringify(options))\n    at D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts:136:16"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-21T17:28:46.538Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\dragon-sharp-recheck\\trace-presets-stress-worke-747dc-ker-and-commits-its-preview\\test-failed-1.png"
+                    },
+                    {
+                      "name": "centerline-worker-lifecycle.json",
+                      "contentType": "application/json",
+                      "body": "ewogICJmaXh0dXJlIjogewogICAgIm5hbWUiOiAiY2VudGVybGluZS1zdHJlc3MtdGVzdC0yMDI2MDkwOS5wbmciLAogICAgInNoYTI1NiI6ICJlNGIyM2E1NWM3M2M2NzliODE4ODlhYzg2YTA3ZWZjY2Q2MjAzOTYxOWI5NzU4ZDYzYTk2Y2E0OTIwMzJmODQ2IiwKICAgICJieXRlcyI6IDIyODU3MzIsCiAgICAid2lkdGgiOiAxMjU0LAogICAgImhlaWdodCI6IDEyNTQKICB9LAogICJuYXRpdmVXb3JrZXJzIjogWwogICAgewogICAgICAidXJsIjogImh0dHA6Ly8xMjcuMC4wLjE6NTE4Ni9zcmMvdWkvdHJhY2UvdHJhY2Utd29ya2VyLnRzP3dvcmtlcl9maWxlJnR5cGU9bW9kdWxlIiwKICAgICAgImNsb3NlZCI6IHRydWUKICAgIH0sCiAgICB7CiAgICAgICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo1MTg2L3NyYy91aS90cmFjZS90cmFjZS13b3JrZXIudHM/d29ya2VyX2ZpbGUmdHlwZT1tb2R1bGUiLAogICAgICAiY2xvc2VkIjogZmFsc2UKICAgIH0KICBdLAogICJwcm9iZSI6IHsKICAgICJyZXF1ZXN0cyI6IFsKICAgICAgewogICAgICAgICJvd25lciI6IDEsCiAgICAgICAgImlkIjogMSwKICAgICAgICAib3B0aW9ucyI6IHsKICAgICAgICAgICJudW1iZXJPZkNvbG9ycyI6IDIsCiAgICAgICAgICAicGF0aE9taXQiOiAxNiwKICAgICAgICAgICJsaW5lVG9sZXJhbmNlIjogMSwKICAgICAgICAgICJxdWFkcmF0aWNUb2xlcmFuY2UiOiAxLAogICAgICAgICAgImJsdXJSYWRpdXMiOiAwLAogICAgICAgICAgImJsdXJEZWx0YSI6IDAsCiAgICAgICAgICAibGluZUZpbHRlciI6IHRydWUsCiAgICAgICAgICAiZml4ZWRQYWxldHRlIjogWwogICAgICAgICAgICAiI2ZmZmZmZiIsCiAgICAgICAgICAgICIjMDAwMDAwIgogICAgICAgICAgXSwKICAgICAgICAgICJjdXRvZmZMdW1hIjogMCwKICAgICAgICAgICJ0aHJlc2hvbGRMdW1hIjogMTI4LAogICAgICAgICAgImF1dG9Ta2V0Y2hUcmFjZSI6IHRydWUsCiAgICAgICAgICAiaWdub3JlTGVzc1RoYW5QaXhlbHMiOiAyLAogICAgICAgICAgInNtb290aG5lc3MiOiAxLAogICAgICAgICAgIm9wdGltaXplIjogMC4yLAogICAgICAgICAgImRlc3BlY2tsZU1pblBpeGVscyI6IDEyLAogICAgICAgICAgImZpbGxQaW5ob2xlQ3JhY2tzIjogdHJ1ZSwKICAgICAgICAgICJzdXBlcnNhbXBsZUNvbnRvdXIiOiB0cnVlLAogICAgICAgICAgImF1dG9VcHNjYWxlU21hbGxTb3VyY2VzIjogdHJ1ZSwKICAgICAgICAgICJ1cHNjYWxlU21hbGxTbW9vdGhTb3VyY2VzIjogdHJ1ZQogICAgICAgIH0sCiAgICAgICAgIndpZHRoIjogMTI1NCwKICAgICAgICAiaGVpZ2h0IjogMTI1NCwKICAgICAgICAicG9zdGVkQXQiOiA2OTQ0LjIwMDAwMDAxNzg4MSwKICAgICAgICAic3RhcnRlZEF0IjogbnVsbCwKICAgICAgICAic2V0dGxlZEF0IjogbnVsbCwKICAgICAgICAib3V0Y29tZSI6IG51bGwsCiAgICAgICAgImJlYXRzIjogMCwKICAgICAgICAibWVzc2FnZSI6IG51bGwsCiAgICAgICAgInBvbHlsaW5lcyI6IDAsCiAgICAgICAgImNsb3NlZFBvbHlsaW5lcyI6IDAsCiAgICAgICAgInZlcnRpY2VzIjogMCwKICAgICAgICAiZ2VvbWV0cnlKc29uIjogbnVsbCwKICAgICAgICAidGlja3NBdFN0YXJ0IjogMCwKICAgICAgICAidGlja3NBdEVuZCI6IDAKICAgICAgfSwKICAgICAgewogICAgICAgICJvd25lciI6IDIsCiAgICAgICAgImlkIjogMiwKICAgICAgICAib3B0aW9ucyI6IHsKICAgICAgICAgICJudW1iZXJPZkNvbG9ycyI6IDIsCiAgICAgICAgICAicGF0aE9taXQiOiAxNiwKICAgICAgICAgICJsaW5lVG9sZXJhbmNlIjogMC41LAogICAgICAgICAgInF1YWRyYXRpY1RvbGVyYW5jZSI6IDAuNSwKICAgICAgICAgICJibHVyUmFkaXVzIjogMCwKICAgICAgICAgICJibHVyRGVsdGEiOiAwLAogICAgICAgICAgImxpbmVGaWx0ZXIiOiBmYWxzZSwKICAgICAgICAgICJmaXhlZFBhbGV0dGUiOiBbCiAgICAgICAgICAgICIjZmZmZmZmIiwKICAgICAgICAgICAgIiMwMDAwMDAiCiAgICAgICAgICBdLAogICAgICAgICAgInVzZU90c3VUaHJlc2hvbGQiOiB0cnVlLAogICAgICAgICAgImRlc3BlY2tsZU1pblBpeGVscyI6IDEsCiAgICAgICAgICAic21vb3RobmVzcyI6IDAuNTUsCiAgICAgICAgICAib3B0aW1pemUiOiAwLjE1CiAgICAgICAgfSwKICAgICAgICAid2lkdGgiOiAxMjU0LAogICAgICAgICJoZWlnaHQiOiAxMjU0LAogICAgICAgICJwb3N0ZWRBdCI6IDc0OTUuNTk5OTk5OTk0MDM5NSwKICAgICAgICAic3RhcnRlZEF0IjogODk2MC4wOTk5OTk5OTQwNCwKICAgICAgICAic2V0dGxlZEF0IjogbnVsbCwKICAgICAgICAib3V0Y29tZSI6IG51bGwsCiAgICAgICAgImJlYXRzIjogMTQwLAogICAgICAgICJtZXNzYWdlIjogbnVsbCwKICAgICAgICAicG9seWxpbmVzIjogMCwKICAgICAgICAiY2xvc2VkUG9seWxpbmVzIjogMCwKICAgICAgICAidmVydGljZXMiOiAwLAogICAgICAgICJnZW9tZXRyeUpzb24iOiBudWxsLAogICAgICAgICJ0aWNrc0F0U3RhcnQiOiAyMzcsCiAgICAgICAgInRpY2tzQXRFbmQiOiAwCiAgICAgIH0KICAgIF0sCiAgICAid29ya2VycyI6IFsKICAgICAgewogICAgICAgICJvd25lciI6IDEsCiAgICAgICAgInVybCI6ICJodHRwOi8vMTI3LjAuMC4xOjUxODYvc3JjL3VpL3RyYWNlL3RyYWNlLXdvcmtlci50cz93b3JrZXJfZmlsZSZ0eXBlPW1vZHVsZSIsCiAgICAgICAgInRlcm1pbmF0ZWRBdCI6IDc0OTEuNzAwMDAwMDE3ODgxCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAib3duZXIiOiAyLAogICAgICAgICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo1MTg2L3NyYy91aS90cmFjZS90cmFjZS13b3JrZXIudHM/d29ya2VyX2ZpbGUmdHlwZT1tb2R1bGUiLAogICAgICAgICJ0ZXJtaW5hdGVkQXQiOiBudWxsCiAgICAgIH0KICAgIF0sCiAgICAidGlja3MiOiAxODQ2CiAgfQp9"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\dragon-sharp-recheck\\trace-presets-stress-worke-747dc-ker-and-commits-its-preview\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "D:\\LaserForge\\ui-audit-20260921\\artifacts\\pr-publication\\dragon-sharp-recheck\\trace-presets-stress-worke-747dc-ker-and-commits-its-preview\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "D:\\LaserForge\\ui-audit-20260921\\e2e\\trace-presets-stress-worker.e2e.ts",
+                    "column": 16,
+                    "line": 136
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "07d410bea3792245bd01-845c27ae02d2bd7c5a8a",
+          "file": "trace-presets-stress-worker.e2e.ts",
+          "line": 112,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-21T17:28:45.911Z",
+    "duration": 59708.697,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

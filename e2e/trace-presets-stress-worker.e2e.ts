@@ -17,9 +17,12 @@ const FIXTURE_PATH = fileURLToPath(
 );
 const FIXTURE_BYTES = readFileSync(FIXTURE_PATH);
 const FIXTURE_SHA256 = 'e4b23a55c73c679b81889ac86a07efccd62039619b9758d63a96ca492032f846';
-// The product watchdog, now a SILENCE budget (ADR-336): a trace that keeps
-// heartbeating may exceed it. It stays the test's own ceiling for the dragon.
+// The product watchdog is a SILENCE budget (ADR-336). This remains the
+// dragon's separate compute ceiling, asserted from the worker timestamps.
 const COMPUTE_BUDGET_MS = 30_000;
+// Observing the worker result and painting hundreds of thousands of vertices
+// needs its own UI allowance; it must not consume the remaining compute budget.
+const PREVIEW_SETTLEMENT_BUDGET_MS = 10_000;
 // Mirrors HEARTBEAT_INTERVAL_MS in src/ui/trace/trace-worker.ts.
 const HEARTBEAT_INTERVAL_MS = 250;
 
@@ -130,21 +133,16 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
       preset,
       { timeout: COMPUTE_BUDGET_MS },
     );
-    const remaining = await page.evaluate(
-      ({ budget, options }) => {
+    await page.waitForFunction(
+      (options) => {
         const request = window.__centerlineWorkerProbe.requests
           .filter((r) => JSON.stringify(r.options) === JSON.stringify(options))
           .at(-1);
-        if (request?.startedAt === null || request?.startedAt === undefined)
-          throw Error('No preset worker acknowledgement');
-        return Math.max(1, budget - (performance.now() - request.startedAt));
+        return request !== undefined && request.settledAt !== null;
       },
-      { budget: COMPUTE_BUDGET_MS, options: preset },
+      preset,
+      { timeout: COMPUTE_BUDGET_MS + PREVIEW_SETTLEMENT_BUDGET_MS },
     );
-    const preview = dialog.locator('[aria-label="Trace preview (1254x1254 px)"]');
-    await expect(preview.locator('svg path').first()).toBeVisible({ timeout: remaining });
-    await expect(dialog.getByText(/Preview failed:/)).toHaveCount(0);
-    await expect(dialog.getByRole('button', { name: 'Show Points', exact: true })).toBeVisible();
     const request = (await observations(page))
       .filter((r) => JSON.stringify(r.options) === JSON.stringify(preset))
       .at(-1);
@@ -165,6 +163,12 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     if (computeMs > 4 * HEARTBEAT_INTERVAL_MS) expect(request.beats).toBeGreaterThan(0);
     expect(request.ticksAtEnd - request.ticksAtStart).toBeGreaterThan(0);
     expect(nativeWorkers.get(page)?.length).toBeGreaterThan(0);
+    const preview = dialog.locator('[aria-label="Trace preview (1254x1254 px)"]');
+    await expect(preview.locator('svg path').first()).toBeVisible({
+      timeout: PREVIEW_SETTLEMENT_BUDGET_MS,
+    });
+    await expect(dialog.getByText(/Preview failed:/)).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Show Points', exact: true })).toBeVisible();
     const svgPaths = await preview.locator('svg path').evaluateAll((paths) =>
       paths.map((path) => ({
         fill: path.getAttribute('fill'),

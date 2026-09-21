@@ -1,10 +1,10 @@
-import { expect, test as baseTest, type Locator, type Page } from '@playwright/test';
+import { expect, test as baseTest, type Page } from '@playwright/test';
 import { test as kerfDeskTest, type KerfDeskFixture } from './fixtures/kerfdesk-test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
-import { expandMachineUtilities } from './fixtures/workspace-ui';
+import { expandMachineUtilities, toolbarCommand } from './fixtures/workspace-ui';
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#ff0000"/></svg>';
@@ -682,20 +682,6 @@ async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const filenamePanel = page.getByRole('dialog', { name: 'Choose G-code filename' });
   await expect(filenamePanel).toBeVisible();
   await filenamePanel.getByRole('button', { name: 'Save', exact: true }).click();
-}
-
-async function toolbarCommand(page: Page, name: string): Promise<Locator> {
-  const button = page
-    .getByLabel('Toolbar', { exact: true })
-    .getByRole('button', { name, exact: true });
-  if (await button.isVisible()) return button;
-  const menu = page.getByRole('menu', { name: 'More commands', exact: true });
-  if (!(await menu.isVisible())) {
-    await page.getByRole('button', { name: 'More commands', exact: true }).click();
-  }
-  return menu
-    .getByRole('menuitem', { name, exact: true })
-    .or(menu.getByRole('menuitemcheckbox', { name, exact: true }));
 }
 
 async function installFileSystemMocks(
