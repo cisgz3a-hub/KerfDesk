@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
@@ -88,15 +89,15 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       await act(async () => button(host, 'Machine Setup').click());
-      expect(host.textContent).toContain('Step 1 of 6');
-      expect(host.textContent).toContain('Machine type');
-      await act(async () => button(host, 'Next').click());
-      expect(host.textContent).toContain('Step 2 of 6');
+      expect(host.textContent).toContain('Step 1 of 3');
+      expect(host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
       // The catalog is a plain always-visible section now — never collapsed
       // behind a <details> (ADR-240).
       const profileCatalog = host.querySelector('section[aria-label="Reviewed machine profiles"]');
       expect(profileCatalog?.closest('details')).toBeNull();
-      expect(profileCatalog?.textContent).toContain('Neotronics 4040 Max');
+      expect(
+        profileCatalog?.querySelector('input[aria-label="Search machine profiles"]'),
+      ).toBeInstanceOf(HTMLInputElement);
       expect(host.textContent).not.toContain('Run guided setup');
     } finally {
       await unmount();
@@ -111,12 +112,14 @@ describe('LaserWindow device-setup nudge', () => {
 
       await act(async () => setup.click());
 
-      expect(host.textContent).toContain('Step 5 of 6');
+      expect(host.textContent).toContain('Step 2 of 3');
       expect(host.textContent).toContain('Auto-focus setup');
       expect(host.textContent).toContain('Not configured');
       const field = host.querySelector<HTMLTextAreaElement>('#autofocus-cmd');
       expect(field).toBeInstanceOf(HTMLTextAreaElement);
       expect(field?.closest('details')?.open).toBe(true);
+      const accessories = field?.closest('details')?.parentElement?.closest('details');
+      expect(accessories?.open).toBe(true);
     } finally {
       await unmount();
     }
@@ -133,10 +136,27 @@ describe('LaserWindow device-setup nudge', () => {
 
       await act(async () => setupHoming.click());
 
-      expect(host.textContent).toContain('Step 4 of 6 — Confirm settings');
+      expect(host.textContent).toContain('Step 2 of 3');
       expect(host.querySelector('input[aria-label="Homing enabled"]')).toBeInstanceOf(
         HTMLInputElement,
       );
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('opens the air output controls from Manual Air recovery', async () => {
+    const { host, unmount } = await renderLaserWindow();
+    try {
+      await act(async () => button(host, 'Turn manual air assist on (no air output)').click());
+      await act(async () => button(host, 'Open Machine Setup for air assist').click());
+      expect(host.textContent).toContain('Step 2 of 3');
+      const output = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Air output command"]',
+      );
+      expect(output).toBeInstanceOf(HTMLSelectElement);
+      expect(output?.closest('details')?.open).toBe(true);
+      expect(useStore.getState().project.device.airAssistCommand).toBe('none');
     } finally {
       await unmount();
     }
@@ -150,13 +170,8 @@ describe('LaserWindow device-setup nudge', () => {
     try {
       expect(host.textContent).toContain('set up yet');
       await act(async () => button(host, 'Machine Setup').click());
-      for (let guard = 0; guard < 8; guard += 1) {
-        const atReview = [...host.querySelectorAll('button')].some((candidate) =>
-          candidate.textContent?.includes('Save machine setup'),
-        );
-        if (atReview) break;
-        await act(async () => button(host, 'Next').click());
-      }
+      await act(async () => button(host, 'Check essentials').click());
+      await act(async () => button(host, 'Review setup').click());
       await act(async () => button(host, 'Save machine setup').click());
       expect(host.textContent).not.toContain('set up yet');
       // The 4040 fill-policy rail banner was removed at the maintainer's
@@ -200,19 +215,19 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       await act(async () => button(host, 'Machine Setup').click());
-      await act(async () => button(host, 'Next').click());
+      const search = host.querySelector('input[aria-label="Search machine profiles"]');
+      if (!(search instanceof HTMLInputElement)) throw new Error('Profile search missing');
+      await act(async () => {
+        search.value = 'Neotronics 4040';
+        Simulate.change(search);
+      });
       const restore = button(host, 'Use Neotronics 4040 Max / LT-4LDS-V2 20W');
       expect(restore.disabled).toBe(false);
       await act(async () => restore.click());
 
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe('grbl-dynamic');
-      for (let guard = 0; guard < 8; guard += 1) {
-        const atReview = [...host.querySelectorAll('button')].some((candidate) =>
-          candidate.textContent?.includes('Save machine setup'),
-        );
-        if (atReview) break;
-        await act(async () => button(host, 'Next').click());
-      }
+      await act(async () => button(host, 'Check essentials').click());
+      await act(async () => button(host, 'Review setup').click());
       await act(async () => button(host, 'Save machine setup').click());
 
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe(
@@ -231,8 +246,10 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
 }
 
 function buttons(host: HTMLElement, label: string): HTMLButtonElement[] {
-  return [...host.querySelectorAll('button')].filter((candidate) =>
-    candidate.textContent?.includes(label),
+  return [...host.querySelectorAll('button')].filter(
+    (candidate) =>
+      candidate.textContent?.includes(label) ||
+      candidate.getAttribute('aria-label')?.includes(label),
   );
 }
 

@@ -8,6 +8,7 @@ import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { openSetupDisclosure } from './device-setup-test-helpers';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -32,8 +33,7 @@ describe('DeviceSetupWizard detected values', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await act(async () => button(view.host, 'Next').click()); // choose your machine
-      await act(async () => button(view.host, 'Next').click()); // connect & detect
+      await openSetupDisclosure(view.host, 'Connect and detect');
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
       await act(async () => button(view.host, 'Use detected values').click());
@@ -50,7 +50,7 @@ describe('DeviceSetupWizard detected values', () => {
       });
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
-      await act(async () => button(view.host, 'Next').click()); // confirm settings
+      await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('363');
     } finally {
       await view.unmount();

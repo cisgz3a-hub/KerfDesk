@@ -9,16 +9,17 @@ export type DeviceSetupStep =
   | 'options'
   | 'review';
 
-export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
-  'capability',
+export type DeviceSetupStage = 'identify' | 'confirm' | 'review';
+
+export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStage> = [
   'identify',
-  'connect',
   'confirm',
-  'options',
   'review',
 ];
 
-export const CNC_DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
+export const CNC_DEVICE_SETUP_STEP_ORDER = DEVICE_SETUP_STEP_ORDER;
+
+const DEVICE_SETUP_STEPS: ReadonlyArray<DeviceSetupStep> = [
   'capability',
   'identify',
   'connect',
@@ -28,12 +29,16 @@ export const CNC_DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
   'review',
 ];
 
-const DEVICE_SETUP_STEPS: ReadonlyArray<DeviceSetupStep> = [
-  ...new Set([...DEVICE_SETUP_STEP_ORDER, ...CNC_DEVICE_SETUP_STEP_ORDER]),
-];
+// Section IDs remain valid for existing recovery links and review Edit actions.
+// Navigation groups them into three stages without discarding the section target.
+export function deviceSetupStage(step: DeviceSetupStep): DeviceSetupStage {
+  if (step === 'review') return 'review';
+  if (step === 'confirm' || step === 'cnc-setup' || step === 'options') return 'confirm';
+  return 'identify';
+}
 
-export function deviceSetupStepOrder(machineKind: MachineKind): ReadonlyArray<DeviceSetupStep> {
-  return machineKind === 'cnc' ? CNC_DEVICE_SETUP_STEP_ORDER : DEVICE_SETUP_STEP_ORDER;
+export function deviceSetupStepOrder(_machineKind: MachineKind): ReadonlyArray<DeviceSetupStage> {
+  return DEVICE_SETUP_STEP_ORDER;
 }
 
 export function isDeviceSetupStep(value: string): value is DeviceSetupStep {

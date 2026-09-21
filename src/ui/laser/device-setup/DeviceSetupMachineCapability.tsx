@@ -1,4 +1,3 @@
-import { mutedStyle } from '../MachineSetupStyles';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupMachineCapability({
@@ -7,85 +6,104 @@ export function DeviceSetupMachineCapability({
 }: DeviceSetupStepProps): JSX.Element {
   const hybrid = state.machineKinds.length === 2;
   return (
-    <div style={capabilityStackStyle}>
-      <fieldset style={fieldsetStyle}>
-        <legend>Machine capability</legend>
-        <p style={mutedStyle}>
-          This controls which workspace modes are available. Choose Laser + CNC only for a machine
-          with interchangeable toolheads.
-        </p>
-        <MachineCapabilityRadio
-          label="Laser only — beam power, air assist, raster, and focus settings"
-          checked={state.machineKinds.length === 1 && state.machineKinds[0] === 'laser'}
-          onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['laser'] })}
-        />
-        <MachineCapabilityRadio
-          label="CNC only — safe Z, spindle, coolant, and park settings"
-          checked={state.machineKinds.length === 1 && state.machineKinds[0] === 'cnc'}
-          onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['cnc'] })}
-        />
-        <MachineCapabilityRadio
-          label="Laser + CNC — interchangeable laser and spindle toolheads"
-          checked={hybrid}
-          onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['laser', 'cnc'] })}
-        />
+    <div className="lf-setup-capabilities">
+      <fieldset className="lf-setup-machine-types">
+        <legend>What kind of machine do you have?</legend>
+        <div className="lf-setup-type-grid">
+          <MachineChoice
+            kind="laser"
+            label="Laser only"
+            description="Cut and engrave with a laser."
+            checked={!hybrid && state.machineKinds[0] === 'laser'}
+            onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['laser'] })}
+          />
+          <MachineChoice
+            kind="cnc"
+            label="CNC only"
+            description="Carve and mill with a spindle."
+            checked={!hybrid && state.machineKinds[0] === 'cnc'}
+            onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['cnc'] })}
+          />
+          <MachineChoice
+            kind="hybrid"
+            label="Laser + CNC"
+            description="One machine, swappable toolheads."
+            checked={hybrid}
+            onChange={() => dispatch({ kind: 'set-machine-kinds', machineKinds: ['laser', 'cnc'] })}
+          />
+        </div>
       </fieldset>
       {hybrid ? (
-        <fieldset style={fieldsetStyle}>
-          <legend>Active mode after Save</legend>
-          <MachineCapabilityRadio
-            name="active-machine-kind"
-            label="Laser"
-            checked={state.machineKind === 'laser'}
-            onChange={() => dispatch({ kind: 'select-machine-kind', machineKind: 'laser' })}
-          />
-          <MachineCapabilityRadio
-            name="active-machine-kind"
-            label="CNC"
-            checked={state.machineKind === 'cnc'}
-            onChange={() => dispatch({ kind: 'select-machine-kind', machineKind: 'cnc' })}
-          />
-          <p style={mutedStyle}>
-            Switching mode never energizes a tool. Confirm the installed toolhead and its hardware
-            interlocks before running a job.
-          </p>
+        <fieldset className="lf-setup-active-mode">
+          <legend>Which toolhead will you use?</legend>
+          {(['laser', 'cnc'] as const).map((kind) => (
+            <label key={kind}>
+              <input
+                type="radio"
+                name="active-machine-kind"
+                checked={state.machineKind === kind}
+                onChange={() => dispatch({ kind: 'select-machine-kind', machineKind: kind })}
+                title="Select the workspace mode after saving. This does not power the toolhead."
+              />
+              {kind === 'cnc' ? 'CNC' : 'Laser'}
+            </label>
+          ))}
+          <p>Match the installed toolhead. Changing this choice does not power it on.</p>
         </fieldset>
       ) : null}
     </div>
   );
 }
 
-function MachineCapabilityRadio(props: {
-  readonly name?: string;
+function MachineChoice(props: {
+  readonly kind: 'laser' | 'cnc' | 'hybrid';
   readonly label: string;
+  readonly description: string;
   readonly checked: boolean;
   readonly onChange: () => void;
 }): JSX.Element {
   return (
-    <label style={choiceStyle}>
+    <label className="lf-setup-type-card" data-selected={props.checked}>
       <input
         type="radio"
-        name={props.name ?? 'machine-capability'}
+        name="machine-capability"
+        aria-label={props.label}
         checked={props.checked}
         onChange={props.onChange}
-        title={`Configure Machine Setup for ${props.label}.`}
+        title={props.description}
       />
-      <span>{props.label}</span>
+      <MachineTypeIcon kind={props.kind} />
+      <strong>{props.label}</strong>
+      <span>{props.description}</span>
     </label>
   );
 }
 
-const capabilityStackStyle: React.CSSProperties = { display: 'grid', gap: 8 };
-const fieldsetStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 10,
-};
-const choiceStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 8,
-  alignItems: 'flex-start',
-  fontSize: 12,
-};
+function MachineTypeIcon({ kind }: { readonly kind: 'laser' | 'cnc' | 'hybrid' }): JSX.Element {
+  return (
+    <svg
+      className="lf-setup-type-icon"
+      viewBox="0 0 48 48"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7 39h34M10 35V10h28v25M10 15h28" />
+      {kind === 'cnc' ? (
+        <>
+          <path d="M19 15v11h10V15M22 26v8l4-3v-5M22 31l4-3" />
+          <path d="M15 36h18" />
+        </>
+      ) : (
+        <>
+          <path d="M19 15v8l5 4 5-4v-8M24 29v6M18 34l-3 2M30 34l3 2" />
+          <circle cx="24" cy="37" r="1" />
+        </>
+      )}
+      {kind === 'hybrid' ? <path d="M35 23h8m-3-3 3 3-3 3M43 31h-8m3-3-3 3 3 3" /> : null}
+    </svg>
+  );
+}

@@ -1,6 +1,5 @@
-// Step 5: optional boundaries and calibrations, every group closed by
-// default and headed by a live one-line status so the whole machine state
-// reads without opening anything (ADR-240). Editors stay draft-bound; no
+// Optional boundaries and calibrations, every group closed by default and
+// headed by a live one-line status. Editors stay draft-bound; no
 // live project state or hardware command changes when a field is edited.
 
 import { DEFAULT_ROTARY_SETUP, type DeviceProfile } from '../../../core/devices';
@@ -36,12 +35,8 @@ export function DeviceSetupOptionsStep({
   return (
     <section style={sectionStyle}>
       <div style={introStyle}>
-        <strong>Options and calibration — everything here is optional.</strong>
-        <span>
-          Each row shows its current state. No-go zones appear as job warnings; a completed Frame
-          for the exact job remains the ordinary Start gate. Other features stay off or uncalibrated
-          until configured.
-        </span>
+        <strong>Set up only what you use.</strong>
+        <span>Open an item to adjust it. Existing settings are kept when you leave it closed.</span>
       </div>
       <OptionSection title="No-go zones" tutorialId="machine-setup" status={noGoZoneStatus(draft)}>
         <SafetyZonesPanel zones={draft.noGoZones} onChange={(noGoZones) => update({ noGoZones })} />
@@ -153,7 +148,7 @@ function OptionSection(props: {
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <details open={props.open === true} style={detailsStyle}>
+    <details className="lf-setup-option" open={props.open === true} style={detailsStyle}>
       <summary style={summaryStyle} title={`Show or hide ${props.title}. Current: ${props.status}`}>
         <span>{props.title}</span>
         <span style={summaryStatusStyle}>{props.status}</span>

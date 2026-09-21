@@ -1,0 +1,341 @@
+@import './device-setup-fields.css';
+
+.lf-dialog.lf-setup-dialog {
+  width: min(1100px, calc(100vw - 32px));
+  height: min(800px, calc(100dvh - 40px));
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border-color: var(--lf-border);
+}
+
+.lf-setup-dialog > :first-child {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--lf-border);
+  flex-shrink: 0;
+}
+
+.lf-setup-layout {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.lf-setup-sidebar {
+  padding: 22px 16px;
+  background: var(--lf-bg-2);
+  border-right: 1px solid var(--lf-border);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.lf-setup-stepper {
+  display: grid;
+  gap: 8px;
+}
+
+.lf-setup-stepper button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 12px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lf-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lf-setup-stepper button[aria-current='step'] {
+  color: var(--lf-accent-fg);
+  background: var(--lf-bg-1);
+  border-color: var(--lf-border);
+}
+
+.lf-setup-stepper button:hover {
+  background: var(--lf-bg-1);
+}
+.lf-setup-stepper strong {
+  display: block;
+  font-size: 13px;
+}
+.lf-setup-stepper small {
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+  color: var(--lf-text-muted);
+}
+.lf-setup-stepper button > svg {
+  width: 12px;
+  opacity: 0;
+}
+.lf-setup-stepper button[aria-current='step'] > svg {
+  opacity: 1;
+}
+.lf-setup-step-number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 50%;
+  font-size: 12px;
+}
+.lf-setup-stepper [aria-current='step'] .lf-setup-step-number {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-on-fill);
+}
+
+.lf-setup-content {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 26px 30px;
+  scrollbar-gutter: stable;
+}
+.lf-setup-intro {
+  margin-bottom: 24px;
+}
+.lf-setup-eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--lf-text-muted);
+}
+.lf-setup-intro h3 {
+  margin: 8px 0;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+  font-weight: 650;
+}
+.lf-setup-intro h3:focus {
+  outline: none;
+}
+.lf-setup-intro > p:last-child {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--lf-text-muted);
+  margin: 0;
+  max-width: 560px;
+}
+.lf-setup-editor {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.lf-setup-stack {
+  display: grid;
+  gap: 18px;
+}
+.lf-setup-draft-note {
+  font-size: 11px;
+  color: var(--lf-text-muted);
+  line-height: 1.6;
+  padding: 0 8px;
+}
+.lf-setup-summary {
+  margin: 28px 8px 16px;
+  padding-top: 22px;
+  border-top: 1px solid var(--lf-border);
+}
+.lf-setup-summary-name {
+  display: block;
+  margin: 8px 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.lf-setup-chip {
+  display: inline-block;
+  border: 1px solid var(--lf-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--lf-text-muted);
+}
+.lf-setup-summary dl {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  margin: 8px 0 16px;
+}
+.lf-setup-summary dt {
+  color: var(--lf-text-muted);
+  margin-top: 6px;
+}
+.lf-setup-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.lf-setup-summary dd:nth-of-type(2) {
+  text-transform: capitalize;
+}
+.lf-setup-connection {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--lf-text-muted);
+}
+.lf-setup-connection > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lf-text-faint);
+}
+.lf-setup-connection > [data-connected='true'] {
+  background: var(--lf-success);
+}
+.lf-setup-bed-preview {
+  width: 100%;
+  display: block;
+  margin-top: 12px;
+}
+.lf-setup-bed {
+  fill: var(--lf-bg-1);
+  stroke: var(--lf-border-strong);
+  stroke-width: 1.2;
+}
+.lf-setup-bed-grid {
+  stroke: var(--lf-border);
+  stroke-width: 0.6;
+}
+.lf-setup-bed-origin {
+  fill: var(--lf-tint-accent);
+  stroke: var(--lf-accent-fg);
+  stroke-width: 1.5;
+}
+.lf-setup-bed-crosshair {
+  stroke: var(--lf-accent-fg);
+  stroke-width: 1;
+}
+.lf-setup-bed-preview text {
+  fill: var(--lf-text-muted);
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.lf-setup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--lf-border);
+  flex-shrink: 0;
+  background: var(--lf-bg-1);
+}
+.lf-setup-footer .lf-dialog-actions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  align-items: center;
+  gap: 10px;
+}
+.lf-setup-footer .lf-btn {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  font-size: 12px;
+}
+.lf-setup-footer-note {
+  font-size: 11px;
+  color: var(--lf-text-muted);
+}
+.lf-setup-dialog :is(button, summary, input, select):focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 3px;
+}
+.lf-setup-dialog button:disabled {
+  cursor: default;
+}
+
+@media (max-width: 760px) {
+  .lf-dialog.lf-setup-dialog {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 10px;
+  }
+  .lf-setup-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .lf-setup-sidebar {
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--lf-border);
+    overflow: visible;
+  }
+  .lf-setup-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .lf-setup-stepper button {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 6px;
+  }
+  .lf-setup-step-number {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+  .lf-setup-stepper strong {
+    font-size: 11px;
+  }
+  .lf-setup-stepper small,
+  .lf-setup-stepper button > svg,
+  .lf-setup-summary,
+  .lf-setup-draft-note {
+    display: none;
+  }
+  .lf-setup-content {
+    padding: 20px;
+  }
+  .lf-setup-intro h3 {
+    font-size: 23px;
+  }
+  .lf-setup-footer {
+    padding: 12px;
+  }
+  .lf-setup-footer-note {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .lf-setup-content {
+    padding: 18px 14px;
+  }
+  .lf-setup-dialog > :first-child {
+    padding: 14px;
+  }
+  .lf-setup-footer {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .lf-setup-footer > .lf-btn {
+    padding-left: 0;
+  }
+  .lf-setup-footer .lf-dialog-actions {
+    margin-left: auto;
+  }
+  .lf-setup-footer .lf-btn {
+    white-space: normal;
+  }
+}

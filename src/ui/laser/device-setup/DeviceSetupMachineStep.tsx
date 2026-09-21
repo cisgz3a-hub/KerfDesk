@@ -1,4 +1,4 @@
-// Machine-output portion of Confirm settings. CNC limits use their own
+// Machine-output portion of Essentials. CNC limits use their own
 // targetable component so project setup can deep-link into the same page.
 
 import { selectControllerDriver } from '../../../core/controllers';
@@ -11,10 +11,13 @@ import {
 } from '../DeviceProfilePowerFields';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
+import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
 
-export function DeviceSetupMachineStep(props: DeviceSetupStepProps): JSX.Element {
+export function DeviceSetupMachineStep(
+  props: DeviceSetupStepProps & { readonly highlight?: DeviceSetupHighlight | undefined },
+): JSX.Element {
   return (
-    <div style={outputStackStyle}>
+    <div className="lf-setup-fields" style={outputStackStyle}>
       {deviceSetupSupportsMachineKind(props.state, 'laser') ? (
         <LaserMachineStep {...props} />
       ) : null}
@@ -25,7 +28,11 @@ export function DeviceSetupMachineStep(props: DeviceSetupStepProps): JSX.Element
   );
 }
 
-function LaserMachineStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
+function LaserMachineStep({
+  state,
+  dispatch,
+  highlight,
+}: DeviceSetupStepProps & { readonly highlight?: DeviceSetupHighlight | undefined }): JSX.Element {
   const driver = selectControllerDriver(
     state.draft.controllerKind,
     state.draft.controllerCommandSet,
@@ -34,24 +41,38 @@ function LaserMachineStep({ state, dispatch }: DeviceSetupStepProps): JSX.Elemen
   return (
     <section style={sectionStyle}>
       <div style={introStyle}>
-        <strong>Laser output and accessories</strong>
+        <strong>Laser output</strong>
         <span>
-          The S range converts percentages into controller power values. Air and low-power Fire
-          remain disabled unless you explicitly configure and hardware-test them.
+          Full-power S is the controller value for 100% power. Match it to your controller settings.
         </span>
       </div>
       <LaserPowerRows
+        plainLabels
         device={state.draft}
         update={update}
         grblLabels={driver.capabilities.settings === 'grbl-dollar'}
       />
-      <AirAssistRow device={state.draft} update={update} />
-      <AirRestartRow device={state.draft} update={update} />
-      <FireControlRow device={state.draft} update={update} />
-      <div style={warningStyle}>
-        <strong>Hardware check required:</strong> verify the beam is off at S0, test the lowest
-        usable power on scrap, and confirm whether M7 or M8 operates the intended air relay.
-      </div>
+      <details
+        className="lf-setup-disclosure lf-setup-disclosure--nested"
+        open={highlight === 'air-assist'}
+      >
+        <summary>
+          <span>Air assist and test fire</span>
+          <small>
+            {state.draft.airAssistCommand} · Fire{' '}
+            {state.draft.fireControl?.enabled === true ? 'enabled' : 'off'}
+          </small>
+        </summary>
+        <div className="lf-setup-disclosure-body">
+          <AirAssistRow device={state.draft} update={update} />
+          <AirRestartRow device={state.draft} update={update} />
+          <FireControlRow device={state.draft} update={update} />
+          <p className="lf-setup-muted">
+            Verify the beam is off at S0 and test power on scrap. Confirm which relay controls your
+            air assist.
+          </p>
+        </div>
+      </details>
     </section>
   );
 }
@@ -64,12 +85,4 @@ const introStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.45,
   marginBottom: 2,
-};
-const warningStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-warning)',
-  borderRadius: 6,
-  padding: 8,
-  fontSize: 12,
-  lineHeight: 1.45,
-  color: 'var(--lf-warning-fg)',
 };

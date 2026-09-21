@@ -11409,6 +11409,29 @@ highest-value remaining motion fix now that Editable vectors is the default trac
 guided-steps and draft-commit decisions, ADR-210's capability contract, and the firmware write
 policy are unchanged)
 
+### Amendment — 2026-09-21: three visible stages
+
+The maintainer requested a shorter, clearer setup after reviewing the six-step layout. Both Laser
+and CNC now use **Machine → Essentials → Review & save**. **Machine** combines capability cards,
+the searchable catalog and **Controller and connection settings**, with optional **Connect and
+detect** and a separate **Import or export a machine profile** disclosure. The catalog begins with
+up to two compact previews, including the selected catalog profile; search or **Browse all N
+profiles** reveals the full list. **Essentials** groups work area, origin, homing and the applicable
+output/machine limits. **Accessories and calibration** is optional; **CNC job setup** appears only
+while CNC is active. Hybrids keep their CNC machine limits available while Laser is active.
+**Review & save** leads with compact summaries and Edit routes, then the physical pre-run checklist
+and optional **Controller settings**. CNC setting ownership remains as specified by ADR-306.
+
+Stage navigation is always available, including while a draft needs correction. Validation applies
+to the final Save, so operators can reach the field that needs attention without a Next gate.
+Connection remains optional and offline saving is supported. The existing section IDs remain valid
+for deep links, which open the containing stage and required disclosure.
+
+This amendment supersedes the original decision's page composition, optional-section placement and
+Next gates. It preserves capability/profile selection, explicit detected-value application, the
+single atomic draft and Save/Cancel boundary, per-setting firmware consent and verification, and all
+Frame/Start behavior. The original decision below records the previous layout.
+
 ### Context
 
 Maintainer direction (2026-07-21, in chat, with screenshots): Machine Setup is still too
@@ -17072,6 +17095,19 @@ no toolpath-resolution context.
 
 **Date:** 2026-08-09
 **Status:** Accepted; implemented and software/browser verified; controller and hardware qualification pending
+
+### Amendment — 2026-09-21: CNC setup within Essentials
+
+Machine Setup now has three visible stages under the ADR-240 amendment. CNC **Machine limits**
+appears in **Essentials**, including for a hybrid with Laser active. The current-job stock, material,
+default bit, tiling, and Tool Plan are available in its optional **CNC job setup** section only while
+CNC is active. Existing **Startup Setup** entry points and exact-field links open that stage and
+the relevant section. They do not add a fourth stage.
+
+This changes the placement described in Decision 1, not ownership: the setup draft remains the sole
+writable owner of these values. The machine-versus-current-job scopes, explicit material Apply,
+manual-value preservation, read-only Artwork/Job Review references, atomic Save/Cancel boundary,
+and firmware-write policy below remain unchanged.
 
 ### Context
 
