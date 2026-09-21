@@ -1,0 +1,58 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 2,
+  "numPassedTests": 2,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006116401,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit does not reinterpret a cached millimetre position as inches after changing $13",
+          "status": "passed",
+          "title": "does not reinterpret a cached millimetre position as inches after changing $13",
+          "duration": 520.1580000000013,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit never derives a large wrong-way jog from the previous unit system",
+          "status": "passed",
+          "title": "never derives a large wrong-way jog from the previous unit system",
+          "duration": 519.9948000000004,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006127590,
+      "endTime": 1790006128629.9949,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-audit-20260921.test.ts"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { idleCollector } from '../../core/controllers/grbl';
 import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { beginSettingsCollection } from './detected-settings-action';
+import { retainControllerReportUnits } from './controller-report-units';
 import {
   cancelControllerLifecycleRefs,
   startControllerCommand,
@@ -190,7 +191,7 @@ async function qualifyConnectedController(
     controllerOperation: { kind: 'connection-handshake', phase: 'settings' },
     log: pushLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
     detectedSettings: null,
-    controllerSettings: null,
+    controllerSettings: retainControllerReportUnits(get().controllerSettings),
     controllerSettingsObservation: null,
     ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),

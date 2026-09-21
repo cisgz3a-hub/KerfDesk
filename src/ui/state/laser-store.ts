@@ -164,6 +164,10 @@ export type LaserState = LaserStoreActions &
     // Dismiss (which left the profile alone).
     readonly detectedSettings: Partial<DeviceProfile> | null;
     readonly controllerSettings: ControllerSettingsSnapshot | null;
+    /** A $13 write makes raw position/WCO units ambiguous until a terminal
+     * settings read verifies the reporting contract. Keep status state and
+     * accessories observable, but do not publish coordinate numbers meanwhile. */
+    readonly reportUnitsUnconfirmed?: boolean;
     readonly controllerSettingsObservation: SessionObservationStamp | null;
     /** Qualification of the live controller session. Every record is bound to
      * controllerSessionEpoch so late replies from a reset or forgotten port can

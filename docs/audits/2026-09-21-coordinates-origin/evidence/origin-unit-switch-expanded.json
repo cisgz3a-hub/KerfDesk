@@ -1,0 +1,123 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 8,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006220195,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit does not reinterpret a cached millimetre position as inches after changing $13",
+          "status": "passed",
+          "title": "does not reinterpret a cached millimetre position as inches after changing $13",
+          "duration": 531.5717999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit never derives a large wrong-way jog from the previous unit system",
+          "status": "failed",
+          "title": "never derives a large wrong-way jog from the previous unit system",
+          "duration": 531.3698000000004,
+          "failureMessages": [
+            "AssertionError: expected [ '$J=G91 G21 X10.000 Y0.000 F1000\\n' ] to deeply equal [ '$J=G91 G21 X10.000 F1000\\n' ]\n    at D:\\LaserForge\\audit-coordinates-origin-20260921\\src\\ui\\state\\coordinate-origin-audit-20260921.test.ts:94:61\n    at file:///C:/Users/Asus/LaserForge-2.0/node_modules/.pnpm/@vitest+runner@3.2.6/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+          ],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit discards queued reports on either side of the $13 ACK until verified settings finish",
+          "status": "passed",
+          "title": "discards queued reports on either side of the $13 ACK until verified settings finish",
+          "duration": 516.9025999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract false -> true, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract false -> true, console false",
+          "duration": 518.5831999999991,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> false, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> false, console false",
+          "duration": 518.7759000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> false, console true",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> false, console true",
+          "duration": 520.469000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> true, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> true, console false",
+          "duration": 514.5612000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> true, console true",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> true, console true",
+          "duration": 514.1656000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit keeps coordinates unavailable after a rejected unit write until a settings read recovers",
+          "status": "passed",
+          "title": "keeps coordinates unavailable after a rejected unit write until a settings read recovers",
+          "duration": 516.0451999999968,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006234220,
+      "endTime": 1790006238903.0452,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-audit-20260921.test.ts"
+    }
+  ]
+}

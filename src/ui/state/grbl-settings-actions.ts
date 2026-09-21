@@ -25,6 +25,7 @@ import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
+import { beginReportUnitsWrite, retainControllerReportUnits } from './controller-report-units';
 import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
@@ -91,7 +92,7 @@ async function readMachineSettingsAction(
   set({
     controllerOperation: settingsControllerOperation(SETTINGS_READ_OPERATION_LABEL),
     detectedSettings: null,
-    controllerSettings: null,
+    controllerSettings: retainControllerReportUnits(get().controllerSettings),
     controllerSettingsObservation: null,
     ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
@@ -227,6 +228,7 @@ async function writeGrblSettingAction(
   const trimmed = value.trim();
   set({
     controllerOperation: settingsControllerOperation(`Writing $${id}`),
+    ...(id === 13 ? beginReportUnitsWrite() : {}),
   });
   try {
     await writeAndVerifySetting(set, get, refs, write, qualificationEpoch, id, trimmed);
@@ -261,7 +263,7 @@ async function writeAndVerifySetting(
   set({
     controllerOperation: settingsControllerOperation(`Verifying $${id}`),
     detectedSettings: null,
-    controllerSettings: null,
+    controllerSettings: retainControllerReportUnits(get().controllerSettings),
     controllerSettingsObservation: null,
     controllerQualification: qualifyingController(qualificationEpoch, 'settings-read'),
     grblSettingsRows: [],

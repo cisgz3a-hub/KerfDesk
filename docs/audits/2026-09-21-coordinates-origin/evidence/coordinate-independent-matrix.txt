@@ -1,0 +1,10 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/core/job/coordinate-origin-audit.test.ts (442 tests) 612ms
+
+ Test Files  1 passed (1)
+      Tests  442 passed (442)
+   Start at  23:50:58
+   Duration  8.72s (transform 3.41s, setup 30ms, collect 6.09s, tests 612ms, environment 1.21s, prepare 254ms)
+

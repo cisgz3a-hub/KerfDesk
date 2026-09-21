@@ -21599,3 +21599,27 @@ and repository verification. Serial browser tests use real module Workers and tr
 with simulated ports. Dense geometry tests do not establish a universal memory or time bound.
 No controller, laser, spindle, material, deployment or installed-package qualification is implied.
 The Frame-first policy and the exact reviewed-artifact handoff remain unchanged.
+
+---
+
+## ADR-343 - Coordinate observations retain their report-unit contract (2026-09-22)
+
+**Status:** Implemented locally following the 2026-09-21/22 coordinate/settings audit. No hardware or publication qualification is implied. The Frame-only Start policy of ADR-228/230/232/237 is unchanged.
+
+### Problem
+
+Changing GRBL report units could leave old raw status/WCO numbers beside a new `$13` value. A stationary `(10,20)` mm machine report then became `(254,508)` mm to coordinate consumers; an absolute-point jog could calculate a large wrong-way relative move. A settings refresh also temporarily discarded the previous report-unit bit. Separately, accepting a changed detected Z-travel value could inherit the previous value's manual confirmation. UI wording conflated recorded homing corner, controller Home, work zero and clearing persistent offsets.
+
+### Decision
+
+- Retain the last known report-unit interpretation while collecting fresh settings; it does not qualify unrelated settings values.
+- From dispatch of a `$13` write through verified terminal settings readback, retain status/accessory observations but withhold coordinate numbers whose unit contract is unconfirmed. Clear raw position/WCO and Frame evidence at a verified unit transition, then use a fresh controller report. Serial FIFO terminal acknowledgement provides the boundary for dropping queued earlier reports.
+- An unchanged-unit read preserves existing spatial evidence. A controller-session invalidation clears WCO with position evidence so an earlier offset cannot survive after its unit interpretation is lost. This repairs factual coordinate consistency; it is not a new Start policy gate.
+- Changing saved Z travel invalidates an inherited travel confirmation, unless the same explicit patch supplies a fresh confirmation. No controller value is written by this profile change.
+- Describe Home using the selected controller's actual command contract. Label the saved homing corner as a record; firmware owns physical direction. Explain that temporary G92 reset includes Z and leaves stored G54 intact, while persistent XY controls do not erase stored G54 Z.
+
+### Evidence and limits
+
+Independent before-fix regressions reproduced the report-unit motion error and both Z-confirmation paths. The audit adds physical-origin/anchor algebra, a small independent GRBL offset oracle and full simulated Falcon Frame/Start flows. Commands, results and remaining issues are recorded in `docs/audits/2026-09-21-coordinates-origin/README.md`.
+
+Two broader coordinate-model findings remain open: native-negative GRBL machine-to-bed display/advisory mapping, and placement-aware bounds for centre-origin 4040-safe contour entries. They require a shared coordinate-frame design across all consumers, not a partial clamp change or a new Frame/Start policy gate. No machine was operated and no saved user profile was changed.

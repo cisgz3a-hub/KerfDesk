@@ -9,7 +9,15 @@ export function deviceProfileWithInteractivePatch(
   current: DeviceProfile,
   patch: Partial<DeviceProfile>,
 ): DeviceProfile {
-  const next: DeviceProfile = { ...current, ...patch };
+  const patched: DeviceProfile = { ...current, ...patch };
+  // A measured travel confirmation belongs to that value. Controller-detected
+  // travel may replace it without going through the manual Z editor, so never
+  // inherit the old confirmation for different travel. An explicit confirmation
+  // in this patch is a new operator assertion and remains possible.
+  const next: DeviceProfile =
+    patched.zTravelMm !== current.zTravelMm && patch.zTravelConfirmed !== true
+      ? { ...patched, zTravelConfirmed: false }
+      : patched;
   // A rectified homography is solved in pixels produced by one lens model.
   // Replacing that model makes an inherited mapping stale.
   const cameraSafe = profileWithoutStaleRectifiedAlignment(current, patch, next);

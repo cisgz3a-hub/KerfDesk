@@ -9,6 +9,11 @@ import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf } from '../../core/scene';
 import * as detectedSettings from './detected-settings-action';
 import {
+  beginReportUnitsWrite,
+  retainControllerReportUnits,
+  unqualifiedControllerSettingsPatch,
+} from './controller-report-units';
+import {
   hasAccessoryCommand,
   type ConsoleStateEffect,
 } from '../../core/controllers/console-state-effect';
@@ -169,6 +174,7 @@ async function dispatchPreparedConsoleCommand(
   command: PreparedConsoleCommand,
   source: TranscriptSource,
 ): Promise<void> {
+  if (/^\$0*13\s*=/.test(command.normalized)) set(beginReportUnitsWrite());
   beginConsoleSettingsRead(set, get, refs, command);
   try {
     await writeConsoleCommand(refs, write, command, source);
@@ -199,7 +205,7 @@ function beginConsoleSettingsRead(
       'terminal-exchange',
     ),
     detectedSettings: null,
-    controllerSettings: null,
+    controllerSettings: retainControllerReportUnits(get().controllerSettings),
     controllerSettingsObservation: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
@@ -347,7 +353,7 @@ function consoleStateEffectPatch(
     case 'configuration-nonpositional':
       return {
         ...observationPatch,
-        ...settingsInvalidationPatch(),
+        ...unqualifiedControllerSettingsPatch(state),
       };
     case 'configuration':
       return {
@@ -355,7 +361,7 @@ function consoleStateEffectPatch(
         ...unknownCoordinatePatch(),
         homingState: 'unknown',
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
-        ...settingsInvalidationPatch(),
+        ...unqualifiedControllerSettingsPatch(state),
       };
   }
 }
@@ -379,16 +385,6 @@ function consoleObservationPatch(
       state,
       `[lf2] Console ${stateEffectLabel(effect)} invalidated cached machine/setup evidence: ${command}`,
     ),
-  };
-}
-
-function settingsInvalidationPatch(): Partial<LaserState> {
-  return {
-    detectedSettings: null,
-    controllerSettings: null,
-    controllerSettingsObservation: null,
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
   };
 }
 

@@ -1,0 +1,3677 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts (442 tests | 120 failed) 373ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-left' / 'absolute' 10ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-left' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-center' / 'absolute' 2ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-right' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'back-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-right' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'center-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-left' / 'front-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-left' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-left' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'back-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-right' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'center-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-right' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'front-right' / 'front-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-right' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-right' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'back-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-right' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'center-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-right' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-left' / 'front-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'back-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'center-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-left' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-right' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'rear-right' / 'front-right' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-left' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-right' / 'absolute' 7ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'back-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-left' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-left' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-left' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-left' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-right' / 'absolute' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-right' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'center-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-left' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-left' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-left' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-left' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-right' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-right' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-right' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=false > 'center' / 'front-right' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'absolute' 12ms
+   × independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'user-origin' 14ms
+     → expected [ { x: 1.587, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'verified-origin' 2ms
+     → expected [ { x: 1.587, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'current-position' 2ms
+     → expected [ …(5) ] to deep equally contain { x: 124.8375, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'user-origin' 2ms
+     → expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'verified-origin' 2ms
+     → expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'user-origin' 2ms
+     → expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'current-position' 2ms
+     → expected [ …(5) ] to deep equally contain { x: 61.6625, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'user-origin' 1ms
+     → expected [ { x: 1.587, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.587, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'current-position' 1ms
+     → expected [ { x: 124.838005, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'user-origin' 1ms
+     → expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'current-position' 1ms
+     → expected [ { x: 61.661999, y: -22.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'user-origin' 1ms
+     → expected [ { x: 1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'current-position' 1ms
+     → expected [ { x: 124.838005, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'user-origin' 1ms
+     → expected [ { x: -30, y: 41.588001 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'verified-origin' 1ms
+     → expected [ { x: -30, y: 41.588001 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -0.912 }, …(4) ] to deep equally contain { x: 93.25, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'user-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'verified-origin' 2ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'current-position' 1ms
+     → expected [ { x: 61.661999, y: -0.912 }, …(4) ] to deep equally contain { x: 61.6625, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'absolute' 2ms
+   × independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'user-origin' 2ms
+     → expected [ { x: -1.587, y: -1.588 }, …(4) ] to deep equally contain { x: -1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'verified-origin' 2ms
+     → expected [ { x: -1.587, y: -1.588 }, …(4) ] to deep equally contain { x: -1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'current-position' 2ms
+     → expected [ …(5) ] to deep equally contain { x: 121.6625, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'user-origin' 2ms
+     → expected [ { x: 30, y: -1.588 }, …(4) ] to deep equally contain { x: 30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'verified-origin' 1ms
+     → expected [ { x: 30, y: -1.588 }, …(4) ] to deep equally contain { x: 30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'current-position' 1ms
+     → expected [ { x: 153.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 153.25, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'user-origin' 1ms
+     → expected [ { x: 61.587002, y: -1.588 }, …(4) ] to deep equally contain { x: 61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'verified-origin' 1ms
+     → expected [ { x: 61.587002, y: -1.588 }, …(4) ] to deep equally contain { x: 61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 184.8375, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'user-origin' 1ms
+     → expected [ { x: -1.587, y: 20 }, …(4) ] to deep equally contain { x: -1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'verified-origin' 6ms
+     → expected [ { x: -1.587, y: 20 }, …(4) ] to deep equally contain { x: -1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'current-position' 2ms
+     → expected [ { x: 121.663002, y: -22.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center' / 'verified-origin' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'user-origin' 1ms
+     → expected [ { x: 61.587002, y: 20 }, …(4) ] to deep equally contain { x: 61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'verified-origin' 1ms
+     → expected [ { x: 61.587002, y: 20 }, …(4) ] to deep equally contain { x: 61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'current-position' 1ms
+     → expected [ { x: 184.837006, y: -22.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'user-origin' 1ms
+     → expected [ { x: -1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'verified-origin' 1ms
+     → expected [ { x: -1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'current-position' 1ms
+     → expected [ { x: 121.663002, y: -0.912 }, …(4) ] to deep equally contain { x: 121.6625, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'user-origin' 2ms
+     → expected [ { x: 30, y: 41.588001 }, …(4) ] to deep equally contain { x: 30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'verified-origin' 2ms
+     → expected [ { x: 30, y: 41.588001 }, …(4) ] to deep equally contain { x: 30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'current-position' 1ms
+     → expected [ { x: 153.25, y: -0.912 }, …(4) ] to deep equally contain { x: 153.25, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'user-origin' 1ms
+     → expected [ Array(5) ] to deep equally contain { x: 61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'verified-origin' 1ms
+     → expected [ Array(5) ] to deep equally contain { x: 61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'current-position' 1ms
+     → expected [ { x: 184.837006, y: -0.912 }, …(4) ] to deep equally contain { x: 184.8375, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'user-origin' 1ms
+     → expected [ { x: 1.587, y: 1.587 }, …(4) ] to deep equally contain { x: 1.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.587, y: 1.587 }, …(4) ] to deep equally contain { x: 1.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 124.8375, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'user-origin' 1ms
+     → expected [ { x: -30, y: 1.587 }, …(4) ] to deep equally contain { x: -30, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'verified-origin' 1ms
+     → expected [ { x: -30, y: 1.587 }, …(4) ] to deep equally contain { x: -30, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 93.25, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'user-origin' 1ms
+     → expected [ { x: -61.588001, y: 1.587 }, …(4) ] to deep equally contain { x: -61.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: 1.587 }, …(4) ] to deep equally contain { x: -61.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 61.6625, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'user-origin' 1ms
+     → expected [ { x: 1.587, y: -20 }, …(4) ] to deep equally contain { x: 1.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'verified-origin' 2ms
+     → expected [ { x: 1.587, y: -20 }, …(4) ] to deep equally contain { x: 1.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'current-position' 1ms
+     → expected [ { x: 124.838005, y: -62.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -62.5 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center' / 'user-origin' 1ms
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center' / 'current-position' 0ms
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'absolute' 0ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'user-origin' 1ms
+     → expected [ { x: -61.588001, y: -20 }, …(4) ] to deep equally contain { x: -61.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: -20 }, …(4) ] to deep equally contain { x: -61.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'current-position' 1ms
+     → expected [ { x: 61.661999, y: -62.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -62.5 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'user-origin' 1ms
+     → expected [ { x: 1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 124.8375, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'user-origin' 1ms
+     → expected [ { x: -30, y: -41.588001 }, …(4) ] to deep equally contain { x: -30, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'verified-origin' 1ms
+     → expected [ { x: -30, y: -41.588001 }, …(4) ] to deep equally contain { x: -30, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 93.25, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'user-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'verified-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 61.6625, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'user-origin' 1ms
+     → expected [ { x: -1.587, y: 1.587 }, …(4) ] to deep equally contain { x: -1.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'verified-origin' 1ms
+     → expected [ { x: -1.587, y: 1.587 }, …(4) ] to deep equally contain { x: -1.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 121.6625, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'user-origin' 3ms
+     → expected [ { x: 30, y: 1.587 }, …(4) ] to deep equally contain { x: 30, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'verified-origin' 1ms
+     → expected [ { x: 30, y: 1.587 }, …(4) ] to deep equally contain { x: 30, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'current-position' 1ms
+     → expected [ { x: 153.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 153.25, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'user-origin' 1ms
+     → expected [ { x: 61.587002, y: 1.587 }, …(4) ] to deep equally contain { x: 61.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'verified-origin' 1ms
+     → expected [ { x: 61.587002, y: 1.587 }, …(4) ] to deep equally contain { x: 61.5875, y: 1.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 184.8375, y: -40.9125 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'user-origin' 2ms
+     → expected [ { x: -1.587, y: -20 }, …(4) ] to deep equally contain { x: -1.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'verified-origin' 2ms
+     → expected [ { x: -1.587, y: -20 }, …(4) ] to deep equally contain { x: -1.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'current-position' 1ms
+     → expected [ { x: 121.663002, y: -62.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -62.5 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'absolute' 0ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'user-origin' 1ms
+     → expected [ { x: 61.587002, y: -20 }, …(4) ] to deep equally contain { x: 61.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'verified-origin' 1ms
+     → expected [ { x: 61.587002, y: -20 }, …(4) ] to deep equally contain { x: 61.5875, y: -20 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'current-position' 2ms
+     → expected [ { x: 184.837006, y: -62.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -62.5 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'user-origin' 1ms
+     → expected [ { x: -1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'verified-origin' 1ms
+     → expected [ { x: -1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 121.6625, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'user-origin' 2ms
+     → expected [ { x: 30, y: -41.588001 }, …(4) ] to deep equally contain { x: 30, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'verified-origin' 2ms
+     → expected [ { x: 30, y: -41.588001 }, …(4) ] to deep equally contain { x: 30, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'current-position' 2ms
+     → expected [ { x: 153.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 153.25, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'user-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 61.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'verified-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 61.5875, y: -41.5875 }
+   × independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 184.8375, y: -84.0875 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'back-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'back-left' / 'user-origin' 1ms
+     → expected [ { x: 1.588, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.588, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-left' / 'current-position' 12ms
+     → expected [ …(5) ] to deep equally contain { x: 124.8375, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'back-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'back-center' / 'user-origin' 2ms
+     → expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-center' / 'verified-origin' 2ms
+     → expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -44.088001 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'back-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'back-right' / 'user-origin' 1ms
+     → expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'back-right' / 'current-position' 1ms
+     → expected [ …(5) ] to deep equally contain { x: 61.6625, y: -44.0875 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'center-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'center-left' / 'user-origin' 1ms
+     → expected [ { x: 1.588, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'center' / 'center-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.588, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'center' / 'center-left' / 'current-position' 1ms
+     → expected [ { x: 124.836998, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'center' / 'absolute' 1ms
+   ✓ independent placement matrix, cnc=true > 'center' / 'center' / 'user-origin' 0ms
+   ✓ independent placement matrix, cnc=true > 'center' / 'center' / 'verified-origin' 0ms
+   ✓ independent placement matrix, cnc=true > 'center' / 'center' / 'current-position' 1ms
+   ✓ independent placement matrix, cnc=true > 'center' / 'center-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'center-right' / 'user-origin' 1ms
+     → expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'center' / 'center-right' / 'verified-origin' 1ms
+     → expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
+   × independent placement matrix, cnc=true > 'center' / 'center-right' / 'current-position' 2ms
+     → expected [ { x: 61.661999, y: -22.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -22.5 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'front-left' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'front-left' / 'user-origin' 1ms
+     → expected [ { x: 1.588, y: 41.587002 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-left' / 'verified-origin' 1ms
+     → expected [ { x: 1.588, y: 41.587002 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-left' / 'current-position' 1ms
+     → expected [ { x: 124.836998, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'front-center' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'front-center' / 'user-origin' 1ms
+     → expected [ { x: -30, y: 41.587002 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-center' / 'verified-origin' 1ms
+     → expected [ { x: -30, y: 41.587002 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-center' / 'current-position' 1ms
+     → expected [ { x: 93.25, y: -0.912 }, …(4) ] to deep equally contain { x: 93.25, y: -0.9125 }
+   ✓ independent placement matrix, cnc=true > 'center' / 'front-right' / 'absolute' 1ms
+   × independent placement matrix, cnc=true > 'center' / 'front-right' / 'user-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-right' / 'verified-origin' 1ms
+     → expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
+   × independent placement matrix, cnc=true > 'center' / 'front-right' / 'current-position' 1ms
+     → expected [ { x: 61.661999, y: -0.912 }, …(4) ] to deep equally contain { x: 61.6625, y: -0.9125 }
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / +0 / mx=false / my=false 2ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / +0 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / +0 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / +0 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 90 / mx=false / my=false 1ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 90 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 90 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 90 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 180 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 180 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 180 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 180 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 270 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 270 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 270 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-left' / 270 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / +0 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / +0 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / +0 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / +0 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 90 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 90 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 90 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 90 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 180 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 180 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 180 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 180 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 270 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 270 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 270 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'front-right' / 270 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / +0 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / +0 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / +0 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / +0 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 90 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 90 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 90 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 90 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 180 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 180 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 180 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 180 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 270 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 270 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 270 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-left' / 270 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / +0 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / +0 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / +0 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / +0 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 90 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 90 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 90 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 90 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 180 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 180 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 180 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 180 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 270 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 270 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 270 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'rear-right' / 270 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / +0 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / +0 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / +0 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / +0 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 90 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 90 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 90 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 90 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 180 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 180 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 180 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 180 / mx=true / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 270 / mx=false / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 270 / mx=false / my=true 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 270 / mx=true / my=false 0ms
+   ✓ independent raster pixel centres across origins, rotation and mirror > 'center' / 270 / mx=true / my=true 0ms
+   ✓ audit reproductions of coordinate-contract defects > reproduces a center-origin contour runway outside the actual centred bed 8ms
+   ✓ audit reproductions of coordinate-contract defects > reproduces native negative GRBL MPos drawn outside a positive front-left bed 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 120 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": -1.588,
+  },
+  {
+    "x": 61.587002,
+    "y": -1.588,
+  },
+  {
+    "x": 53.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": 1.587,
+    "y": -41.588001,
+  },
+  {
+    "x": 1.587,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'current-position'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -44.087002,
+  },
+  {
+    "x": 184.837997,
+    "y": -44.087002,
+  },
+  {
+    "x": 176.837997,
+    "y": -84.086998,
+  },
+  {
+    "x": 124.838005,
+    "y": -84.086998,
+  },
+  {
+    "x": 124.838005,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'verified-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-center' / 'verified-origin'
+AssertionError: expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
+
+- Expected: 
+{
+  "x": -30,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -30,
+    "y": -1.588,
+  },
+  {
+    "x": 30,
+    "y": -1.588,
+  },
+  {
+    "x": 22,
+    "y": -41.588001,
+  },
+  {
+    "x": -30,
+    "y": -41.588001,
+  },
+  {
+    "x": -30,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'current-position'
+AssertionError: expected [ { x: 93.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 93.25,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 93.25,
+    "y": -44.087002,
+  },
+  {
+    "x": 153.25,
+    "y": -44.087002,
+  },
+  {
+    "x": 145.25,
+    "y": -84.086998,
+  },
+  {
+    "x": 93.25,
+    "y": -84.086998,
+  },
+  {
+    "x": 93.25,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'verified-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-right' / 'verified-origin'
+AssertionError: expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": -1.588,
+  },
+  {
+    "x": -1.588,
+    "y": -1.588,
+  },
+  {
+    "x": -9.588,
+    "y": -41.588001,
+  },
+  {
+    "x": -61.588001,
+    "y": -41.588001,
+  },
+  {
+    "x": -61.588001,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-right' / 'current-position'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -44.087002,
+  },
+  {
+    "x": 121.662003,
+    "y": -44.087002,
+  },
+  {
+    "x": 113.662003,
+    "y": -84.086998,
+  },
+  {
+    "x": 61.661999,
+    "y": -84.086998,
+  },
+  {
+    "x": 61.661999,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": 20,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": 20,
+  },
+  {
+    "x": 61.587002,
+    "y": 20,
+  },
+  {
+    "x": 53.587002,
+    "y": -20,
+  },
+  {
+    "x": 1.587,
+    "y": -20,
+  },
+  {
+    "x": 1.587,
+    "y": 20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'current-position'
+AssertionError: expected [ { x: 124.838005, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -22.5,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -22.5,
+  },
+  {
+    "x": 184.837997,
+    "y": -22.5,
+  },
+  {
+    "x": 176.837997,
+    "y": -62.5,
+  },
+  {
+    "x": 124.838005,
+    "y": -62.5,
+  },
+  {
+    "x": 124.838005,
+    "y": -22.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'verified-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-right' / 'verified-origin'
+AssertionError: expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": 20,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": 20,
+  },
+  {
+    "x": -1.588,
+    "y": 20,
+  },
+  {
+    "x": -9.588,
+    "y": -20,
+  },
+  {
+    "x": -61.588001,
+    "y": -20,
+  },
+  {
+    "x": -61.588001,
+    "y": 20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-right' / 'current-position'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-right' / 'current-position'
+AssertionError: expected [ { x: 61.661999, y: -22.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -22.5 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -22.5,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -22.5,
+  },
+  {
+    "x": 121.662003,
+    "y": -22.5,
+  },
+  {
+    "x": 113.662003,
+    "y": -62.5,
+  },
+  {
+    "x": 61.661999,
+    "y": -62.5,
+  },
+  {
+    "x": 61.661999,
+    "y": -22.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": 41.588001,
+  },
+  {
+    "x": 61.587002,
+    "y": 41.588001,
+  },
+  {
+    "x": 53.587002,
+    "y": 1.588,
+  },
+  {
+    "x": 1.587,
+    "y": 1.588,
+  },
+  {
+    "x": 1.587,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'current-position'
+AssertionError: expected [ { x: 124.838005, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -0.912,
+  },
+  {
+    "x": 184.837997,
+    "y": -0.912,
+  },
+  {
+    "x": 176.837997,
+    "y": -40.911999,
+  },
+  {
+    "x": 124.838005,
+    "y": -40.911999,
+  },
+  {
+    "x": 124.838005,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'verified-origin'
+AssertionError: expected [ { x: -30, y: 41.588001 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+
+- Expected: 
+{
+  "x": -30,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -30,
+    "y": 41.588001,
+  },
+  {
+    "x": 30,
+    "y": 41.588001,
+  },
+  {
+    "x": 22,
+    "y": 1.588,
+  },
+  {
+    "x": -30,
+    "y": 1.588,
+  },
+  {
+    "x": -30,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'current-position'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-center' / 'current-position'
+AssertionError: expected [ { x: 93.25, y: -0.912 }, …(4) ] to deep equally contain { x: 93.25, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 93.25,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 93.25,
+    "y": -0.912,
+  },
+  {
+    "x": 153.25,
+    "y": -0.912,
+  },
+  {
+    "x": 145.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 93.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 93.25,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'verified-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-right' / 'verified-origin'
+AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": 41.588001,
+  },
+  {
+    "x": -1.588,
+    "y": 41.588001,
+  },
+  {
+    "x": -9.588,
+    "y": 1.588,
+  },
+  {
+    "x": -61.588001,
+    "y": 1.588,
+  },
+  {
+    "x": -61.588001,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-right' / 'current-position'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-right' / 'current-position'
+AssertionError: expected [ { x: 61.661999, y: -0.912 }, …(4) ] to deep equally contain { x: 61.6625, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -0.912,
+  },
+  {
+    "x": 121.662003,
+    "y": -0.912,
+  },
+  {
+    "x": 113.662003,
+    "y": -40.911999,
+  },
+  {
+    "x": 61.661999,
+    "y": -40.911999,
+  },
+  {
+    "x": 61.661999,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: -1.588 }, …(4) ] to deep equally contain { x: -1.5875, y: -1.5875 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": -1.588,
+  },
+  {
+    "x": -61.587002,
+    "y": -1.588,
+  },
+  {
+    "x": -53.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": -1.587,
+    "y": -41.588001,
+  },
+  {
+    "x": -1.587,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -44.087002,
+  },
+  {
+    "x": 61.663002,
+    "y": -44.087002,
+  },
+  {
+    "x": 69.663002,
+    "y": -84.086998,
+  },
+  {
+    "x": 121.663002,
+    "y": -84.086998,
+  },
+  {
+    "x": 121.663002,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'verified-origin'
+AssertionError: expected [ { x: 30, y: -1.588 }, …(4) ] to deep equally contain { x: 30, y: -1.5875 }
+
+- Expected: 
+{
+  "x": 30,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 30,
+    "y": -1.588,
+  },
+  {
+    "x": -30,
+    "y": -1.588,
+  },
+  {
+    "x": -22,
+    "y": -41.588001,
+  },
+  {
+    "x": 30,
+    "y": -41.588001,
+  },
+  {
+    "x": 30,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'current-position'
+AssertionError: expected [ { x: 153.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 153.25, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 153.25,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 153.25,
+    "y": -44.087002,
+  },
+  {
+    "x": 93.25,
+    "y": -44.087002,
+  },
+  {
+    "x": 101.25,
+    "y": -84.086998,
+  },
+  {
+    "x": 153.25,
+    "y": -84.086998,
+  },
+  {
+    "x": 153.25,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'verified-origin'
+AssertionError: expected [ { x: 61.587002, y: -1.588 }, …(4) ] to deep equally contain { x: 61.5875, y: -1.5875 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": -1.588,
+  },
+  {
+    "x": 1.587,
+    "y": -1.588,
+  },
+  {
+    "x": 9.587,
+    "y": -41.588001,
+  },
+  {
+    "x": 61.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": 61.587002,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -44.087002,
+  },
+  {
+    "x": 124.836998,
+    "y": -44.087002,
+  },
+  {
+    "x": 132.837006,
+    "y": -84.086998,
+  },
+  {
+    "x": 184.837006,
+    "y": -84.086998,
+  },
+  {
+    "x": 184.837006,
+    "y": -44.087002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: 20 }, …(4) ] to deep equally contain { x: -1.5875, y: 20 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": 20,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": 20,
+  },
+  {
+    "x": -61.587002,
+    "y": 20,
+  },
+  {
+    "x": -53.587002,
+    "y": -20,
+  },
+  {
+    "x": -1.587,
+    "y": -20,
+  },
+  {
+    "x": -1.587,
+    "y": 20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'current-position'
+AssertionError: expected [ { x: 121.663002, y: -22.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -22.5 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -22.5,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -22.5,
+  },
+  {
+    "x": 61.663002,
+    "y": -22.5,
+  },
+  {
+    "x": 69.663002,
+    "y": -62.5,
+  },
+  {
+    "x": 121.663002,
+    "y": -62.5,
+  },
+  {
+    "x": 121.663002,
+    "y": -22.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'verified-origin'
+AssertionError: expected [ { x: 61.587002, y: 20 }, …(4) ] to deep equally contain { x: 61.5875, y: 20 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": 20,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": 20,
+  },
+  {
+    "x": 1.587,
+    "y": 20,
+  },
+  {
+    "x": 9.587,
+    "y": -20,
+  },
+  {
+    "x": 61.587002,
+    "y": -20,
+  },
+  {
+    "x": 61.587002,
+    "y": 20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'current-position'
+AssertionError: expected [ { x: 184.837006, y: -22.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -22.5 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -22.5,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -22.5,
+  },
+  {
+    "x": 124.836998,
+    "y": -22.5,
+  },
+  {
+    "x": 132.837006,
+    "y": -62.5,
+  },
+  {
+    "x": 184.837006,
+    "y": -62.5,
+  },
+  {
+    "x": 184.837006,
+    "y": -22.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: 41.5875 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": 41.588001,
+  },
+  {
+    "x": -61.587002,
+    "y": 41.588001,
+  },
+  {
+    "x": -53.587002,
+    "y": 1.588,
+  },
+  {
+    "x": -1.587,
+    "y": 1.588,
+  },
+  {
+    "x": -1.587,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'current-position'
+AssertionError: expected [ { x: 121.663002, y: -0.912 }, …(4) ] to deep equally contain { x: 121.6625, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -0.912,
+  },
+  {
+    "x": 61.663002,
+    "y": -0.912,
+  },
+  {
+    "x": 69.663002,
+    "y": -40.911999,
+  },
+  {
+    "x": 121.663002,
+    "y": -40.911999,
+  },
+  {
+    "x": 121.663002,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'verified-origin'
+AssertionError: expected [ { x: 30, y: 41.588001 }, …(4) ] to deep equally contain { x: 30, y: 41.5875 }
+
+- Expected: 
+{
+  "x": 30,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 30,
+    "y": 41.588001,
+  },
+  {
+    "x": -30,
+    "y": 41.588001,
+  },
+  {
+    "x": -22,
+    "y": 1.588,
+  },
+  {
+    "x": 30,
+    "y": 1.588,
+  },
+  {
+    "x": 30,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'current-position'
+AssertionError: expected [ { x: 153.25, y: -0.912 }, …(4) ] to deep equally contain { x: 153.25, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 153.25,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 153.25,
+    "y": -0.912,
+  },
+  {
+    "x": 93.25,
+    "y": -0.912,
+  },
+  {
+    "x": 101.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 153.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 153.25,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'verified-origin'
+AssertionError: expected [ Array(5) ] to deep equally contain { x: 61.5875, y: 41.5875 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": 41.588001,
+  },
+  {
+    "x": 1.587,
+    "y": 41.588001,
+  },
+  {
+    "x": 9.587,
+    "y": 1.588,
+  },
+  {
+    "x": 61.587002,
+    "y": 1.588,
+  },
+  {
+    "x": 61.587002,
+    "y": 41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'current-position'
+AssertionError: expected [ { x: 184.837006, y: -0.912 }, …(4) ] to deep equally contain { x: 184.8375, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -0.912,
+  },
+  {
+    "x": 124.836998,
+    "y": -0.912,
+  },
+  {
+    "x": 132.837006,
+    "y": -40.911999,
+  },
+  {
+    "x": 184.837006,
+    "y": -40.911999,
+  },
+  {
+    "x": 184.837006,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: 1.587 }, …(4) ] to deep equally contain { x: 1.5875, y: 1.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": 1.587,
+  },
+  {
+    "x": 61.587002,
+    "y": 1.587,
+  },
+  {
+    "x": 53.587002,
+    "y": 41.587002,
+  },
+  {
+    "x": 1.587,
+    "y": 41.587002,
+  },
+  {
+    "x": 1.587,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -40.911999,
+  },
+  {
+    "x": 184.837997,
+    "y": -40.911999,
+  },
+  {
+    "x": 176.837997,
+    "y": -0.912,
+  },
+  {
+    "x": 124.838005,
+    "y": -0.912,
+  },
+  {
+    "x": 124.838005,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'verified-origin'
+AssertionError: expected [ { x: -30, y: 1.587 }, …(4) ] to deep equally contain { x: -30, y: 1.5875 }
+
+- Expected: 
+{
+  "x": -30,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -30,
+    "y": 1.587,
+  },
+  {
+    "x": 30,
+    "y": 1.587,
+  },
+  {
+    "x": 22,
+    "y": 41.587002,
+  },
+  {
+    "x": -30,
+    "y": 41.587002,
+  },
+  {
+    "x": -30,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'current-position'
+AssertionError: expected [ { x: 93.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 93.25, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 93.25,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 93.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 153.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 145.25,
+    "y": -0.912,
+  },
+  {
+    "x": 93.25,
+    "y": -0.912,
+  },
+  {
+    "x": 93.25,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'verified-origin'
+AssertionError: expected [ { x: -61.588001, y: 1.587 }, …(4) ] to deep equally contain { x: -61.5875, y: 1.5875 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": 1.587,
+  },
+  {
+    "x": -1.588,
+    "y": 1.587,
+  },
+  {
+    "x": -9.588,
+    "y": 41.587002,
+  },
+  {
+    "x": -61.588001,
+    "y": 41.587002,
+  },
+  {
+    "x": -61.588001,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -40.911999,
+  },
+  {
+    "x": 121.662003,
+    "y": -40.911999,
+  },
+  {
+    "x": 113.662003,
+    "y": -0.912,
+  },
+  {
+    "x": 61.661999,
+    "y": -0.912,
+  },
+  {
+    "x": 61.661999,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: -20 }, …(4) ] to deep equally contain { x: 1.5875, y: -20 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": -20,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": -20,
+  },
+  {
+    "x": 61.587002,
+    "y": -20,
+  },
+  {
+    "x": 53.587002,
+    "y": 20,
+  },
+  {
+    "x": 1.587,
+    "y": 20,
+  },
+  {
+    "x": 1.587,
+    "y": -20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'current-position'
+AssertionError: expected [ { x: 124.838005, y: -62.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -62.5 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -62.5,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -62.5,
+  },
+  {
+    "x": 184.837997,
+    "y": -62.5,
+  },
+  {
+    "x": 176.837997,
+    "y": -22.5,
+  },
+  {
+    "x": 124.838005,
+    "y": -22.5,
+  },
+  {
+    "x": 124.838005,
+    "y": -62.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'verified-origin'
+AssertionError: expected [ { x: -61.588001, y: -20 }, …(4) ] to deep equally contain { x: -61.5875, y: -20 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": -20,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": -20,
+  },
+  {
+    "x": -1.588,
+    "y": -20,
+  },
+  {
+    "x": -9.588,
+    "y": 20,
+  },
+  {
+    "x": -61.588001,
+    "y": 20,
+  },
+  {
+    "x": -61.588001,
+    "y": -20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'current-position'
+AssertionError: expected [ { x: 61.661999, y: -62.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -62.5 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -62.5,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -62.5,
+  },
+  {
+    "x": 121.662003,
+    "y": -62.5,
+  },
+  {
+    "x": 113.662003,
+    "y": -22.5,
+  },
+  {
+    "x": 61.661999,
+    "y": -22.5,
+  },
+  {
+    "x": 61.661999,
+    "y": -62.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: -41.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.587,
+    "y": -41.588001,
+  },
+  {
+    "x": 61.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": 53.587002,
+    "y": -1.588,
+  },
+  {
+    "x": 1.587,
+    "y": -1.588,
+  },
+  {
+    "x": 1.587,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 124.838005,
+    "y": -84.088005,
+  },
+  {
+    "x": 184.837997,
+    "y": -84.088005,
+  },
+  {
+    "x": 176.837997,
+    "y": -44.088001,
+  },
+  {
+    "x": 124.838005,
+    "y": -44.088001,
+  },
+  {
+    "x": 124.838005,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'verified-origin'
+AssertionError: expected [ { x: -30, y: -41.588001 }, …(4) ] to deep equally contain { x: -30, y: -41.5875 }
+
+- Expected: 
+{
+  "x": -30,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -30,
+    "y": -41.588001,
+  },
+  {
+    "x": 30,
+    "y": -41.588001,
+  },
+  {
+    "x": 22,
+    "y": -1.588,
+  },
+  {
+    "x": -30,
+    "y": -1.588,
+  },
+  {
+    "x": -30,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'current-position'
+AssertionError: expected [ { x: 93.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 93.25, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 93.25,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 93.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 153.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 145.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 93.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 93.25,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'verified-origin'
+AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: -41.5875 }
+
+- Expected: 
+{
+  "x": -61.5875,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -61.588001,
+    "y": -41.588001,
+  },
+  {
+    "x": -1.588,
+    "y": -41.588001,
+  },
+  {
+    "x": -9.588,
+    "y": -1.588,
+  },
+  {
+    "x": -61.588001,
+    "y": -1.588,
+  },
+  {
+    "x": -61.588001,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 61.6625,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.661999,
+    "y": -84.088005,
+  },
+  {
+    "x": 121.662003,
+    "y": -84.088005,
+  },
+  {
+    "x": 113.662003,
+    "y": -44.088001,
+  },
+  {
+    "x": 61.661999,
+    "y": -44.088001,
+  },
+  {
+    "x": 61.661999,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: 1.587 }, …(4) ] to deep equally contain { x: -1.5875, y: 1.5875 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": 1.587,
+  },
+  {
+    "x": -61.587002,
+    "y": 1.587,
+  },
+  {
+    "x": -53.587002,
+    "y": 41.587002,
+  },
+  {
+    "x": -1.587,
+    "y": 41.587002,
+  },
+  {
+    "x": -1.587,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -40.911999,
+  },
+  {
+    "x": 61.663002,
+    "y": -40.911999,
+  },
+  {
+    "x": 69.663002,
+    "y": -0.912,
+  },
+  {
+    "x": 121.663002,
+    "y": -0.912,
+  },
+  {
+    "x": 121.663002,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'verified-origin'
+AssertionError: expected [ { x: 30, y: 1.587 }, …(4) ] to deep equally contain { x: 30, y: 1.5875 }
+
+- Expected: 
+{
+  "x": 30,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 30,
+    "y": 1.587,
+  },
+  {
+    "x": -30,
+    "y": 1.587,
+  },
+  {
+    "x": -22,
+    "y": 41.587002,
+  },
+  {
+    "x": 30,
+    "y": 41.587002,
+  },
+  {
+    "x": 30,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'current-position'
+AssertionError: expected [ { x: 153.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 153.25, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 153.25,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 153.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 93.25,
+    "y": -40.911999,
+  },
+  {
+    "x": 101.25,
+    "y": -0.912,
+  },
+  {
+    "x": 153.25,
+    "y": -0.912,
+  },
+  {
+    "x": 153.25,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[52/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'verified-origin'
+AssertionError: expected [ { x: 61.587002, y: 1.587 }, …(4) ] to deep equally contain { x: 61.5875, y: 1.5875 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": 1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": 1.587,
+  },
+  {
+    "x": 1.587,
+    "y": 1.587,
+  },
+  {
+    "x": 9.587,
+    "y": 41.587002,
+  },
+  {
+    "x": 61.587002,
+    "y": 41.587002,
+  },
+  {
+    "x": 61.587002,
+    "y": 1.587,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[53/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -40.9125 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -40.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -40.911999,
+  },
+  {
+    "x": 124.836998,
+    "y": -40.911999,
+  },
+  {
+    "x": 132.837006,
+    "y": -0.912,
+  },
+  {
+    "x": 184.837006,
+    "y": -0.912,
+  },
+  {
+    "x": 184.837006,
+    "y": -40.911999,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[54/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: -20 }, …(4) ] to deep equally contain { x: -1.5875, y: -20 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": -20,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": -20,
+  },
+  {
+    "x": -61.587002,
+    "y": -20,
+  },
+  {
+    "x": -53.587002,
+    "y": 20,
+  },
+  {
+    "x": -1.587,
+    "y": 20,
+  },
+  {
+    "x": -1.587,
+    "y": -20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[55/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'current-position'
+AssertionError: expected [ { x: 121.663002, y: -62.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -62.5 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -62.5,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -62.5,
+  },
+  {
+    "x": 61.663002,
+    "y": -62.5,
+  },
+  {
+    "x": 69.663002,
+    "y": -22.5,
+  },
+  {
+    "x": 121.663002,
+    "y": -22.5,
+  },
+  {
+    "x": 121.663002,
+    "y": -62.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[56/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'verified-origin'
+AssertionError: expected [ { x: 61.587002, y: -20 }, …(4) ] to deep equally contain { x: 61.5875, y: -20 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": -20,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": -20,
+  },
+  {
+    "x": 1.587,
+    "y": -20,
+  },
+  {
+    "x": 9.587,
+    "y": 20,
+  },
+  {
+    "x": 61.587002,
+    "y": 20,
+  },
+  {
+    "x": 61.587002,
+    "y": -20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[57/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'current-position'
+AssertionError: expected [ { x: 184.837006, y: -62.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -62.5 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -62.5,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -62.5,
+  },
+  {
+    "x": 124.836998,
+    "y": -62.5,
+  },
+  {
+    "x": 132.837006,
+    "y": -22.5,
+  },
+  {
+    "x": 184.837006,
+    "y": -22.5,
+  },
+  {
+    "x": 184.837006,
+    "y": -62.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[58/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'verified-origin'
+AssertionError: expected [ { x: -1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: -41.5875 }
+
+- Expected: 
+{
+  "x": -1.5875,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -1.587,
+    "y": -41.588001,
+  },
+  {
+    "x": -61.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": -53.587002,
+    "y": -1.588,
+  },
+  {
+    "x": -1.587,
+    "y": -1.588,
+  },
+  {
+    "x": -1.587,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[59/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 121.6625,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 121.663002,
+    "y": -84.088005,
+  },
+  {
+    "x": 61.663002,
+    "y": -84.088005,
+  },
+  {
+    "x": 69.663002,
+    "y": -44.088001,
+  },
+  {
+    "x": 121.663002,
+    "y": -44.088001,
+  },
+  {
+    "x": 121.663002,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[60/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'verified-origin'
+AssertionError: expected [ { x: 30, y: -41.588001 }, …(4) ] to deep equally contain { x: 30, y: -41.5875 }
+
+- Expected: 
+{
+  "x": 30,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 30,
+    "y": -41.588001,
+  },
+  {
+    "x": -30,
+    "y": -41.588001,
+  },
+  {
+    "x": -22,
+    "y": -1.588,
+  },
+  {
+    "x": 30,
+    "y": -1.588,
+  },
+  {
+    "x": 30,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[61/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'current-position'
+AssertionError: expected [ { x: 153.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 153.25, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 153.25,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 153.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 93.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 101.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 153.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 153.25,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[62/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'verified-origin'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 61.5875, y: -41.5875 }
+
+- Expected: 
+{
+  "x": 61.5875,
+  "y": -41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 61.587002,
+    "y": -41.588001,
+  },
+  {
+    "x": 1.587,
+    "y": -41.588001,
+  },
+  {
+    "x": 9.587,
+    "y": -1.588,
+  },
+  {
+    "x": 61.587002,
+    "y": -1.588,
+  },
+  {
+    "x": 61.587002,
+    "y": -41.588001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[63/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'current-position'
+AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -84.0875 }
+
+- Expected: 
+{
+  "x": 184.8375,
+  "y": -84.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 184.837006,
+    "y": -84.088005,
+  },
+  {
+    "x": 124.836998,
+    "y": -84.088005,
+  },
+  {
+    "x": 132.837006,
+    "y": -44.088001,
+  },
+  {
+    "x": 184.837006,
+    "y": -44.088001,
+  },
+  {
+    "x": 184.837006,
+    "y": -84.088005,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[64/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.588, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": -1.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.588,
+    "y": -1.588,
+  },
+  {
+    "x": 61.588001,
+    "y": -1.588,
+  },
+  {
+    "x": 53.588001,
+    "y": -41.588001,
+  },
+  {
+    "x": 1.588,
+    "y": -41.588001,
+  },
+  {
+    "x": 1.588,
+    "y": -1.588,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[65/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-center' / 'current-position'
+AssertionError: expected [ { x: 93.25, y: -44.088001 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
+
+- Expected: 
+{
+  "x": 93.25,
+  "y": -44.0875,
+}
+
++ Received: 
+[
+  {
+    "x": 93.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 153.25,
+    "y": -44.088001,
+  },
+  {
+    "x": 145.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 93.25,
+    "y": -84.088005,
+  },
+  {
+    "x": 93.25,
+    "y": -44.088001,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[66/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.588, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": 20,
+}
+
++ Received: 
+[
+  {
+    "x": 1.588,
+    "y": 20,
+  },
+  {
+    "x": 61.588001,
+    "y": 20,
+  },
+  {
+    "x": 53.588001,
+    "y": -20,
+  },
+  {
+    "x": 1.588,
+    "y": -20,
+  },
+  {
+    "x": 1.588,
+    "y": 20,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[67/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-left' / 'current-position'
+AssertionError: expected [ { x: 124.836998, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -22.5,
+}
+
++ Received: 
+[
+  {
+    "x": 124.836998,
+    "y": -22.5,
+  },
+  {
+    "x": 184.837006,
+    "y": -22.5,
+  },
+  {
+    "x": 176.837006,
+    "y": -62.5,
+  },
+  {
+    "x": 124.836998,
+    "y": -62.5,
+  },
+  {
+    "x": 124.836998,
+    "y": -22.5,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[68/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-left' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-left' / 'verified-origin'
+AssertionError: expected [ { x: 1.588, y: 41.587002 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
+
+- Expected: 
+{
+  "x": 1.5875,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": 1.588,
+    "y": 41.587002,
+  },
+  {
+    "x": 61.588001,
+    "y": 41.587002,
+  },
+  {
+    "x": 53.588001,
+    "y": 1.587,
+  },
+  {
+    "x": 1.588,
+    "y": 1.587,
+  },
+  {
+    "x": 1.588,
+    "y": 41.587002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[69/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-left' / 'current-position'
+AssertionError: expected [ { x: 124.836998, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
+
+- Expected: 
+{
+  "x": 124.8375,
+  "y": -0.9125,
+}
+
++ Received: 
+[
+  {
+    "x": 124.836998,
+    "y": -0.912,
+  },
+  {
+    "x": 184.837006,
+    "y": -0.912,
+  },
+  {
+    "x": 176.837006,
+    "y": -40.911999,
+  },
+  {
+    "x": 124.836998,
+    "y": -40.911999,
+  },
+  {
+    "x": 124.836998,
+    "y": -0.912,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[70/120]⎯
+
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-center' / 'user-origin'
+ FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-center' / 'verified-origin'
+AssertionError: expected [ { x: -30, y: 41.587002 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
+
+- Expected: 
+{
+  "x": -30,
+  "y": 41.5875,
+}
+
++ Received: 
+[
+  {
+    "x": -30,
+    "y": 41.587002,
+  },
+  {
+    "x": 30,
+    "y": 41.587002,
+  },
+  {
+    "x": 22,
+    "y": 1.587,
+  },
+  {
+    "x": -30,
+    "y": 1.587,
+  },
+  {
+    "x": -30,
+    "y": 41.587002,
+  },
+]
+
+ ❯ src/core/job/coordinate-origin-audit.test.ts:137:53
+    135|       step.kind === 'cut' ? step.polyline.map(roundedPoint) : [],
+    136|     );
+    137|     for (const point of expected) expect(cutPoints).toContainEqual(poi…
+       |                                                     ^
+    138|     const preview = mapToolpathToScene(toolpath, prepared.jobOriginOff…
+    139|     const previewPoints = preview.steps.flatMap((step) =>
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[71/120]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  120 failed | 322 passed (442)
+   Start at  23:49:46
+   Duration  8.47s (transform 3.59s, setup 32ms, collect 6.14s, tests 373ms, environment 1.28s, prepare 162ms)
+

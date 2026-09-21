@@ -362,7 +362,7 @@ type InitialLaserState = Pick<
   | 'log'
   | 'transcript'
   | 'detectedSettings'
-  | 'controllerSettings'
+  | keyof Pick<LaserState, 'controllerSettings' | 'reportUnitsUnconfirmed'>
   | 'controllerSettingsObservation'
   | 'controllerBuildInfo'
   | 'controllerBuildInfoRawLines'
@@ -418,7 +418,7 @@ export function initialLaserState(): InitialLaserState {
     log: [],
     transcript: [],
     detectedSettings: null,
-    controllerSettings: null,
+    ...{ controllerSettings: null, reportUnitsUnconfirmed: false },
     controllerSettingsObservation: null,
     ...emptyControllerBuildInfoState(),
     controllerQualification: disconnectedControllerQualification(0),
