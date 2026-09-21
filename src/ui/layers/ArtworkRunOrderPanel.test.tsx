@@ -140,7 +140,7 @@ describe('ArtworkRunOrderPanel', () => {
     useStore.getState().selectObject(null);
     useUiStore.getState().setCutsLayersView('run-order');
     const host = await renderPanel();
-    const show = host.querySelector<HTMLButtonElement>('button[aria-label="Show Box on canvas"]');
+    const show = host.querySelector<HTMLButtonElement>('button[aria-label="Select Box"]');
     if (show === null) throw new Error('Show artwork button missing');
     await act(async () => show.click());
     expect(useStore.getState().selectedObjectId).toBe('Box');

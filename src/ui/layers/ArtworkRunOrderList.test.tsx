@@ -159,9 +159,7 @@ describe('ArtworkRunOrderRow position box', () => {
           />,
         ),
       );
-      const show = host.querySelector<HTMLButtonElement>(
-        'button[aria-label="Show Job 3 on canvas"]',
-      );
+      const show = host.querySelector<HTMLButtonElement>('button[aria-label="Select Job 3"]');
       if (show === null) throw new Error('Show artwork button missing');
       await act(async () => show.click());
       expect(onFocus).toHaveBeenCalledTimes(1);
