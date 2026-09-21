@@ -831,6 +831,7 @@ test('prepares a large image restart preview and starts only the selected remain
     alerts.push(dialog.message());
     void dialog.accept();
   });
+  await page.getByText('History & recovery', { exact: true }).click();
   await page.getByText('Start from line…', { exact: true }).click();
   const beforePreview = serialWrites(await kerfdesk.events());
   await page.getByRole('button', { name: 'Choose restart point…', exact: true }).click();

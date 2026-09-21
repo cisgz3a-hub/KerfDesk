@@ -145,7 +145,7 @@ edited-file lint, formatting and whitespace checks passed.
 
 ### Integrated release verification
 
-The complete `pnpm release:check` passed after integration with main: 2,237 test files and
+The complete `pnpm release:check` passed after integration with main `39eebb6fc`: 2,237 test files and
 14,902 tests passed, with 14 files / 22 tests skipped. All 130 release-integrity tests, lint,
 type checks, formatting, repository gates, web build and Electron main build passed. Browser
 type checking, discovery, cold startup and the production-bundle smoke passed.
@@ -157,8 +157,17 @@ after the held entry request was released, while warm loads took 6.0 seconds. Th
 waits for `DOMContentLoaded` before its unchanged 10-second workspace-render assertion, as the
 adjacent startup test already does. This corrects the test's load boundary without changing
 production startup behaviour or relaxing the render assertion.
-All four startup scenarios passed after this correction. Production code is unchanged from the
-successful full release verification.
+All four startup scenarios passed after this correction, with no production code change.
+
+The subsequent workspace-controls integration from main `e774f79a5` retains the visible interruption
+and second-pass entries while keeping manual history/restart inside the new **History & recovery**
+disclosure. The painted-pass decision is now ADR-341, preserving upstream ADR-340. The new dock
+completion acknowledgement and the separate darkening offer retain their distinct display/archive
+ownership; the affected completion and recovery workflows are checked again after this integration.
+All 98 focused tests across 11 files passed, including completed-notice controller simulations,
+checkpoint ownership, the prompt and Start arming. All four affected browser workflows passed;
+the manual restart test now opens the upstream history disclosure before finding its control.
+Application/E2E type checks, scoped lint, formatting and the ADR gate passed after integration.
 
 ## Physical and product limits
 
