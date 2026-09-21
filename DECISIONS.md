@@ -20307,6 +20307,44 @@ The preparation worker still holds the compiled Job alive for the length of the 
 chunk transfer, and a preview still costs one full route on each side of that boundary. Both
 remain open; neither is what exhausted the renderer here. No hardware was operated.
 
+### Amendment (2026-09-21) - Dense Sharp fills and repeated Frame requests
+
+The original-image follow-up found another allocation before the preview route exists. A
+1254 x 1254 owl traced with Sharp contains 14,389 contours and 494,902 vertices. Its default
+scanline Fill exhausted a 4 GB heap in the polygon union performed by `layer-fill`, before
+`compileJob` returned. The earlier statement that compilation was not the problem applied to
+the measured dragon/synthetic jobs; it did not cover this contour arrangement.
+
+A single even-odd path on a traced-image Scan Line operation now passes its transformed
+contours directly to the even-odd scanline sweep. The sweep already resolves holes, overlaps
+and crossings, so this case does not need a polygon arrangement. Contours are appended with
+iteration rather than an argument spread. Coincident scanline crossings cancel by parity,
+keeping touching ink in one continuous span. Multiple paths, non-zero winding, other artwork
+kinds, Island Fill and Offset Fill retain their existing normalization.
+
+This preserves the source fill region, not byte identity with the former polygon engine:
+the old union rounded boundaries to 1 micrometre and collapsed short edges before hatching.
+The direct sweep keeps source coordinates until the normal downstream representation rules.
+A regression pins a boundary just above a hatch row so this difference is explicit. No trace
+resolution, retained source vertices, hatch spacing, output size limit or refusal is added.
+
+Idle canvas marker workers now reserve the same memory lane as background preparation and
+retire on every terminal response before releasing it. Selecting the first process marker
+reads only the required contour/scanline/raster row/pass instead of allocating a full route.
+The marker selector is tested against the existing full route, including CNC precision and
+scan offsets; it does not change the emitted route.
+
+Ordinary Frame calls share one pending Promise through preparation and physical completion.
+Frame and Start show the preparation state and disable repeated button dispatch. Compilation
+failure and stale-job cancellation release ownership for a retry. Existing exact-job checks,
+Frame completion evidence, and the completed-Frame Start gate remain authoritative.
+
+Verification includes the original owl through Chrome Sharp tracing, committed geometry,
+filled Preview, scrubbing/playback and simulated-controller Frame; a 150,000-contour compiler
+regression; analytic fill-boundary tests; worker-lifetime/queue tests; and marker parity tests.
+See `docs/audits/2026-09-21-sharp-owl-verification.md` for measurements and limitations. No
+hardware was operated; browser evidence is not controller/material qualification.
+
 ## ADR-326 - The preparation worker owns nothing but the route it is handing over (2026-09-20)
 
 **Status:** Accepted; closes the worker-retention limit ADR-325 recorded as open. Amends the

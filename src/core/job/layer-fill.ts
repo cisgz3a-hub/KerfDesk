@@ -192,8 +192,8 @@ function appendFillPathContours(
   const originalClosedContours: Polyline[] = [];
   const openContours: Polyline[] = [];
   let batchNormalizationFailed = false;
-  for (const path of object.paths) {
-    if (!pathUsesOperation(object, path, layer)) continue;
+  const paths = object.paths.filter((path) => pathUsesOperation(object, path, layer));
+  for (const path of paths) {
     const closed: Polyline[] = [];
     for (const polyline of compilationPolylines(path, object.transform)) {
       const transformed = {
@@ -204,6 +204,18 @@ function appendFillPathContours(
       };
       if (transformed.closed) closed.push(transformed);
       else openContours.push(transformed);
+    }
+    // A single even-odd traced path already has exactly the scanline fill
+    // rule used below. The sweep resolves holes, overlaps and crossings
+    // directly; constructing a polygon union first adds no fill semantics.
+    // Dense Sharp traces can exhaust the renderer inside that redundant
+    // boolean operation, before even one hatch or preview step is built.
+    // Island/offset fills still need normalized contour topology, and
+    // multiple paths/non-zero inputs still need their per-object union.
+    if (canHatchTraceDirectly(object, layer, paths)) {
+      appendContours(out, closed);
+      appendContours(out, openContours);
+      return;
     }
     originalClosedContours.push(...closed);
     const resolved =
@@ -228,4 +240,22 @@ function appendFillPathContours(
     ...(resolvedObject.kind === 'ok' ? resolvedObject.value : normalizedBatches),
     ...openContours,
   );
+}
+
+function canHatchTraceDirectly(
+  object: SceneObject,
+  layer: Layer,
+  paths: ReadonlyArray<ColoredPath>,
+): boolean {
+  return (
+    object.kind === 'traced-image' &&
+    layer.fillStyle === 'scanline' &&
+    paths.length === 1 &&
+    (paths[0]?.fillRule ?? 'evenodd') === 'evenodd'
+  );
+}
+
+function appendContours(out: Polyline[], contours: ReadonlyArray<Polyline>): void {
+  // Contour counts can exceed the engine's function-argument limit.
+  for (const contour of contours) out.push(contour);
 }
