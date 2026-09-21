@@ -104,6 +104,7 @@ function RunOrderTools(
           type="search"
           value={props.search}
           aria-label="Search artwork jobs"
+          title="Find runs by artwork name, operation or setting"
           placeholder="Name, operation or setting"
           onChange={(event) => props.onSearch(event.currentTarget.value)}
         />
@@ -134,7 +135,12 @@ function RunOrderTools(
           Go
         </button>
         {props.search.length > 0 ? (
-          <button type="button" className="lf-btn lf-btn--ghost" onClick={() => props.onSearch('')}>
+          <button
+            type="button"
+            className="lf-btn lf-btn--ghost"
+            title="Clear the search to show every artwork run"
+            onClick={() => props.onSearch('')}
+          >
             Clear search
           </button>
         ) : null}

@@ -9,7 +9,9 @@ export type CutSettingsDefaultHandlers = {
 export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JSX.Element {
   return (
     <details className="lf-cut-settings-disclosure">
-      <summary>Saved defaults</summary>
+      <summary title="Show options for saving or restoring default operation settings">
+        Saved defaults
+      </summary>
       <div className="lf-cut-settings-disclosure__body">
         <p className="lf-laser-help">
           Apply edits before saving a default. Reset restores the saved settings immediately.

@@ -65,6 +65,7 @@ export function OperationToggles({
             type="checkbox"
             checked={operation.visible}
             aria-label={`Show ${operation.name}`}
+            title="Show or hide artwork using this operation on the workspace"
             onChange={(event) => setLayerParam(operation.id, { visible: event.target.checked })}
           />
           Show on canvas
@@ -74,6 +75,7 @@ export function OperationToggles({
             type="checkbox"
             checked={operation.output}
             aria-label={`Output ${operation.name}`}
+            title="Include artwork using this operation in preview and machine output"
             onChange={(event) => setLayerParam(operation.id, { output: event.target.checked })}
           />
           Include in output

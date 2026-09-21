@@ -47,7 +47,7 @@ export function LayerRowSettingsFields(props: {
       </section>
       {!operationTarget.mixedFields?.mode ? (
         <details className="lf-laser-options">
-          <summary>
+          <summary title="Show extra settings for the selected laser process">
             <span>
               {settings.mode === 'line' ? 'Line' : settings.mode === 'fill' ? 'Fill' : 'Image'}{' '}
               options

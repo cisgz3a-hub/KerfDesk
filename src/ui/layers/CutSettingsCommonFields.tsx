@@ -40,7 +40,9 @@ export function CutSettingsCommonFields(props: {
       </fieldset>
       {props.mode !== 'image' ? (
         <details className="lf-cut-settings-disclosure">
-          <summary>Power behaviour</summary>
+          <summary title="Show how the controller applies laser power during motion">
+            Power behaviour
+          </summary>
           <div className="lf-cut-settings-disclosure__body">
             <CutPowerModeField controllerKind={controllerKind} layer={props.layer} />
           </div>
@@ -57,7 +59,9 @@ export function CutSettingsCommonFields(props: {
 function MembershipFields(props: { readonly layer: Layer }): JSX.Element {
   return (
     <details className="lf-cut-settings-disclosure">
-      <summary>Visibility &amp; output</summary>
+      <summary title="Show controls for workspace visibility and job output">
+        Visibility &amp; output
+      </summary>
       <div className="lf-cut-settings-disclosure__body">
         <Field label="Show on workspace">
           <input

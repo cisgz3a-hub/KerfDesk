@@ -100,7 +100,9 @@ function FillScanDirectionFields(props: {
         />
       </Field>
       <details className="lf-cut-settings-disclosure">
-        <summary>Calibration override</summary>
+        <summary title="Show the override for bidirectional scanning without calibrated offsets">
+          Calibration override
+        </summary>
         <div className="lf-cut-settings-disclosure__body">
           <p className="lf-laser-help">
             Allow bidirectional scanning without calibrated offsets. Edges may appear doubled or

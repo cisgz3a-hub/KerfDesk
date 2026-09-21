@@ -105,7 +105,7 @@ function OperationList({ layers }: { readonly layers: ReadonlyArray<Layer> }): J
     .filter(({ layer }) => layer.name.toLocaleLowerCase().includes(query));
   return (
     <details className="lf-artwork-disclosure lf-operation-list">
-      <summary>
+      <summary title="Show all operations to choose a drawing colour and manage visibility and order">
         <Icon name="layers" size={18} />
         <span>
           <strong>All operations</strong>
@@ -122,6 +122,7 @@ function OperationList({ layers }: { readonly layers: ReadonlyArray<Layer> }): J
           <input
             type="search"
             aria-label="Find an operation"
+            title="Filter operations by name"
             placeholder="Find an operation…"
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}

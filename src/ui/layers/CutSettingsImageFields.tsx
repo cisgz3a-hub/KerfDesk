@@ -86,7 +86,9 @@ export function CutSettingsImageFields(props: {
 function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {
   return (
     <details className="lf-cut-settings-disclosure">
-      <summary>Image &amp; calibration extras</summary>
+      <summary title="Show original-pixel processing and scan-calibration options">
+        Image &amp; calibration extras
+      </summary>
       <div className="lf-cut-settings-disclosure__body">
         <ImageCheckboxField
           label="Allow uncalibrated scans"

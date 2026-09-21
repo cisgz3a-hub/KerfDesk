@@ -129,13 +129,7 @@ function ArtworkRunOrderContent(props: {
         </span>
       </div>
       {controller.filteredRows.length === 0 ? (
-        <div className="lf-run-order-empty">
-          <strong>No matching artwork</strong>
-          <p>Try an artwork name, operation or setting.</p>
-          <button type="button" className="lf-btn" onClick={() => controller.setSearch('')}>
-            Show all runs
-          </button>
-        </div>
+        <NoMatchingRuns onClear={() => controller.setSearch('')} />
       ) : (
         <ArtworkRunOrderList
           rows={controller.filteredRows}
@@ -155,6 +149,23 @@ function ArtworkRunOrderContent(props: {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function NoMatchingRuns(props: { readonly onClear: () => void }): JSX.Element {
+  return (
+    <div className="lf-run-order-empty">
+      <strong>No matching artwork</strong>
+      <p>Try an artwork name, operation or setting.</p>
+      <button
+        type="button"
+        className="lf-btn"
+        title="Clear the search to show every artwork run"
+        onClick={props.onClear}
+      >
+        Show all runs
+      </button>
     </div>
   );
 }
