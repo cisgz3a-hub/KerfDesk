@@ -40,8 +40,8 @@ function addJson(name) {
   };
 }
 const parsedLogs = {
-  originBaseline: addLog('origin-existing-tests.log', 'baseline'),
-  originOracle: addLog('origin-oracle-and-selectors.log', 'baseline'),
+  originBaseline: addLog('origin-existing-tests.txt', 'baseline'),
+  originOracle: addLog('origin-oracle-and-selectors.txt', 'baseline'),
   geometryBaseline: addLog('coordinate-baseline-tests.txt', 'unchanged-geometry'),
   geometryFinal: addLog('coordinate-final-separated-tests.txt', 'unchanged-geometry'),
 };
@@ -69,14 +69,42 @@ cohorts.origin = {
   failed: 0,
   evidence: 'origin-latest-per-file.json',
 };
+cohorts.nativeCoordinates = addJson('coordinate-repair-tests.json');
+cohorts.runtimeCoordinates = addJson('runtime-coordinate-final.json');
+cohorts.savedOutputAndOriginalRegressions = addJson('coordinate-integration-final.json');
+cohorts.connectedProfile = addJson('connected-profile-final.json');
+const contour = JSON.parse(
+  fs.readFileSync(path.join(evidence, 'contour-entry-latest-per-file.json'), 'utf8'),
+);
+for (const result of contour.suites) {
+  if (result.status !== 'passed') throw new Error(`Failed contour file: ${result.file}`);
+  files.set(canonical(result.file), {
+    name: canonical(result.file),
+    tests: result.tests,
+    status: result.status,
+    evidence: result.source,
+    stage: 'coordinate-model-repair',
+  });
+}
+cohorts.contourEntry = {
+  files: contour.files,
+  tests: contour.tests,
+  passed: contour.tests,
+  failed: 0,
+  evidence: 'contour-entry-latest-per-file.json',
+};
+cohorts.asyncPreparationOwnership = addJson('coordinate-owner-final-passing.json');
+cohorts.frameMetadata = addJson('frame-metadata-final.json');
 const entries = [...files.values()].sort((a, b) => a.name.localeCompare(b.name));
 const total = entries.reduce((sum, f) => sum + f.tests, 0);
 const summary = {
-  base: '288ad66baf23e0c75c0a05f6216787577ddc6812',
+  auditBase: '288ad66baf23e0c75c0a05f6216787577ddc6812',
+  repairBase: '4f1a33bc373dc5821a9b766a6e6385bb81f4de95',
+  initialAudit: { uniqueFiles: 126, correctnessChecks: 1372, openDefectCharacterisations: 3 },
   uniqueFiles: entries.length,
   assertions: total,
-  correctnessChecks: total - 3,
-  openDefectCharacterisations: 3,
+  correctnessChecks: total,
+  openDefectCharacterisations: 0,
   parsedLogs,
   cohorts,
   files: entries,

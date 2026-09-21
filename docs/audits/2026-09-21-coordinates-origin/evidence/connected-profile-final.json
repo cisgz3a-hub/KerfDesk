@@ -1,0 +1,49 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 1,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790032949795,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ConnectedMachineProfile"],
+          "fullName": "ConnectedMachineProfile keeps the displayed controller contract tied to the active connection when the saved profile changes",
+          "status": "passed",
+          "title": "keeps the displayed controller contract tied to the active connection when the saved profile changes",
+          "duration": 164.63560000000143,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790032968177,
+      "endTime": 1790032968341.6355,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/ConnectedMachineProfile.test.tsx"
+    }
+  ]
+}

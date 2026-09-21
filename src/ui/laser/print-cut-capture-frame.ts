@@ -9,16 +9,15 @@
 // solved transform landed the design at the wrong Y and, on the right-hand
 // origins, with the rotation sign flipped.
 //
-// Machine -> scene follows the same convention the live head overlay already
-// uses (canvas-motion-plan's 'machine' coordinate frame maps MPos straight
-// through toSceneCoords), so a captured mark means the same thing on canvas
-// as the head the operator just jogged there. WCO is deliberately NOT
-// subtracted here for that reason; if that convention ever changes it must
-// change for the head overlay and this together, not for one of them.
+// With a verified mapping, native MPos enters the profile-bed frame before
+// the scene, paired with Absolute output's inverse translation. Otherwise
+// retain controller-relative registration: scene -> compile round-trips the
+// captured controller number, without claiming its physical bed location.
 
 import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
+import { nativePointToBed, type NativeBedFrame } from '../../core/devices/native-bed-frame';
 
 type ReportedPoint = { readonly x: number; readonly y: number; readonly z: number };
 
@@ -32,8 +31,10 @@ export function capturedMachinePointToScene(
   reported: ReportedPoint,
   device: DeviceProfile,
   reportInches: boolean,
+  frame: NativeBedFrame | null,
 ): Vec2 | null {
-  if (!Number.isFinite(reported.x) || !Number.isFinite(reported.y)) return null;
+  if (![reported.x, reported.y, reported.z].every(Number.isFinite)) return null;
   const [xMm, yMm] = normalizeReportedMPosToMm([reported.x, reported.y, reported.z], reportInches);
-  return toSceneCoords({ x: xMm, y: yMm }, device);
+  const point = { x: xMm, y: yMm };
+  return toSceneCoords(frame === null ? point : nativePointToBed(point, frame), device);
 }

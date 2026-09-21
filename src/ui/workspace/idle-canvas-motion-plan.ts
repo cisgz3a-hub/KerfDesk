@@ -9,6 +9,7 @@ import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutputSnapshot, type PrepareOutputSnapshotOptions } from '../../io/gcode';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import type { JobPlacementSettings, ResolvedJobPlacement } from '../job-placement';
+import { runtimeCoordinatePreparationOptions } from '../job-placement';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
 import { renderVariableText } from '../text/render-variable-text';
 import {
@@ -43,6 +44,13 @@ export async function buildIdleCanvasMotionPlanFromRequest(
   );
   const preparationProject = await hydratePagedRasterProject(request.project);
   const prepared = await prepareOutputSnapshot(preparationProject, {
+    ...(request.resolvedPlacement.ok
+      ? runtimeCoordinatePreparationOptions(
+          request.project.device,
+          request.resolvedPlacement,
+          request.machine,
+        )
+      : { contourEntryBounds: null }),
     clock: () => new Date(),
     renderVariableText,
     ...(request.registration === undefined ? {} : { registration: request.registration }),

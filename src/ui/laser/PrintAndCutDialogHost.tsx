@@ -4,6 +4,7 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
 import { capturedMachinePointToScene } from './print-cut-capture-frame';
 import { PrintAndCutDialog } from './PrintAndCutDialog';
+import { nativeBedCaptureFrameKey, resolveNativeBedFrame } from '../state/native-bed-frame';
 
 export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): JSX.Element {
   const project = useStore((state) => state.project);
@@ -12,6 +13,8 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
   const session = usePrintCutSessionStore();
   const pushToast = useToastStore((state) => state.pushToast);
   const epoch = laser.trustedPositionEpoch ?? 0;
+  const nativeFrame = resolveNativeBedFrame(project.device, laser);
+  const coordinateFrameKey = nativeBedCaptureFrameKey(project.device, laser);
   const captureEnabled =
     laser.connection.kind === 'connected' &&
     laser.statusReport?.state === 'Idle' &&
@@ -23,9 +26,10 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       point,
       project.device,
       laser.controllerSettings?.reportInches === true,
+      nativeFrame,
     );
     if (scenePoint === null) return;
-    session.capture(which, scenePoint, epoch);
+    session.capture(which, scenePoint, epoch, coordinateFrameKey);
   };
   return (
     <PrintAndCutDialog
@@ -35,9 +39,14 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
           second: { x: Math.max(20, project.workspace.width - 10), y: 10 },
         }
       }
-      firstMachinePoint={session.first?.epoch === epoch ? session.first.point : null}
-      secondMachinePoint={session.second?.epoch === epoch ? session.second.point : null}
+      firstMachinePoint={capturedPointForFrame(session.first, epoch, coordinateFrameKey)}
+      secondMachinePoint={capturedPointForFrame(session.second, epoch, coordinateFrameKey)}
       captureEnabled={captureEnabled}
+      captureFrameNotice={
+        nativeFrame === null
+          ? 'Registration uses controller-relative positions. Physical bed location is unverified; keep the same origin and check the Frame.'
+          : null
+      }
       onCapture={capture}
       onCancel={props.onClose}
       onApply={(targets) => {
@@ -52,4 +61,12 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       }}
     />
   );
+}
+
+function capturedPointForFrame(
+  capture: ReturnType<typeof usePrintCutSessionStore.getState>['first'],
+  epoch: number,
+  key: string,
+) {
+  return capture?.epoch === epoch && capture.coordinateFrameKey === key ? capture.point : null;
 }

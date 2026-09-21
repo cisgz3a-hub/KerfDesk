@@ -1,0 +1,2582 @@
+{
+  "numTotalTestSuites": 33,
+  "numPassedTestSuites": 33,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 239,
+  "numPassedTests": 239,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790033446115,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) gives a Line-mode contour a tangential feed-matched entry after the controlled seek",
+          "status": "passed",
+          "title": "gives a Line-mode contour a tangential feed-matched entry after the controlled seek",
+          "duration": 6.203999999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) emits and labels a custom effective entry distance",
+          "status": "passed",
+          "title": "emits and labels a custom effective entry distance",
+          "duration": 0.5753000000000839,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) gives every Follow Shape loop its own tangential entry",
+          "status": "passed",
+          "title": "gives every Follow Shape loop its own tangential entry",
+          "duration": 0.875,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) emits one entry per contour per pass",
+          "status": "passed",
+          "title": "emits one entry per contour per pass",
+          "duration": 1.066599999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) shortens the entry at the bed edge instead of commanding off-bed motion",
+          "status": "passed",
+          "title": "shortens the entry at the bed edge instead of commanding off-bed motion",
+          "duration": 0.3041999999999234,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) falls back to the legacy seek when the contour starts on the bed boundary",
+          "status": "passed",
+          "title": "falls back to the legacy seek when the contour starts on the bed boundary",
+          "duration": 0.22870000000000346,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) keeps the legacy direct seek when the group carries no entry runway",
+          "status": "passed",
+          "title": "keeps the legacy direct seek when the group carries no entry runway",
+          "duration": 0.2278999999999769,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["4040 contour entry emission (ADR-239)"],
+          "fullName": "4040 contour entry emission (ADR-239) keeps generic profiles byte-stable: G0 seek, no controlled or entry motion",
+          "status": "passed",
+          "title": "keeps generic profiles byte-stable: G0 seek, no controlled or entry motion",
+          "duration": 0.2843000000000302,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033455866,
+      "endTime": 1790033455876.2842,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/output/grbl-strategy-4040-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring bakes the entry runway into 4040 Line groups from the layer overscan",
+          "status": "passed",
+          "title": "bakes the entry runway into 4040 Line groups from the layer overscan",
+          "duration": 7.1865999999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring bakes the entry runway into 4040 Follow Shape (offset) fill groups",
+          "status": "passed",
+          "title": "bakes the entry runway into 4040 Follow Shape (offset) fill groups",
+          "duration": 10.167799999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring leaves scanline fill on its ADR-234 sweep policy without a contour entry",
+          "status": "passed",
+          "title": "leaves scanline fill on its ADR-234 sweep policy without a contour entry",
+          "duration": 3.238900000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring honors overscan 0 as the explicit disable",
+          "status": "passed",
+          "title": "honors overscan 0 as the explicit disable",
+          "duration": 0.7195000000001528,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring caps oversized overscan at the 5 mm gap threshold",
+          "status": "passed",
+          "title": "caps oversized overscan at the 5 mm gap threshold",
+          "duration": 0.3102000000001226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring preserves a custom shared contour-entry value below the cap",
+          "status": "passed",
+          "title": "preserves a custom shared contour-entry value below the cap",
+          "duration": 0.24649999999996908,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compileJob ADR-239 contour entry wiring"],
+          "fullName": "compileJob ADR-239 contour entry wiring keeps generic profiles on legacy contour groups",
+          "status": "passed",
+          "title": "keeps generic profiles on legacy contour groups",
+          "duration": 0.27089999999998327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033462436,
+      "endTime": 1790033462458.3103,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/compile-job-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries clips at a centred bound instead of a positive-bed maximum",
+          "status": "passed",
+          "title": "clips at a centred bound instead of a positive-bed maximum",
+          "duration": 1.8659999999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries clips diagonals at the first reached side",
+          "status": "passed",
+          "title": "clips diagonals at the first reached side",
+          "duration": 0.21019999999998618,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":201,\"y\":30}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":201,\"y\":30}",
+          "duration": 0.1856999999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":-201,\"y\":30}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":-201,\"y\":30}",
+          "duration": 0.12580000000002656,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "duration": 0.10390000000006694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":-201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":-201}",
+          "duration": 0.08770000000004075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "duration": 0.08120000000008076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries does not add a runway when the explicit physical envelope is unknown",
+          "status": "passed",
+          "title": "does not add a runway when the explicit physical envelope is unknown",
+          "duration": 0.10840000000007421,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries keeps archived jobs without metadata on their original positive-bed clamp",
+          "status": "passed",
+          "title": "keeps archived jobs without metadata on their original positive-bed clamp",
+          "duration": 1.5080000000000382,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries uses explicit bounds for each Follow Shape loop and pass",
+          "status": "passed",
+          "title": "uses explicit bounds for each Follow Shape loop and pass",
+          "duration": 2.299099999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries invalidates placement evidence even when the selected anchor is already work zero",
+          "status": "passed",
+          "title": "invalidates placement evidence even when the selected anchor is already work zero",
+          "duration": 0.5500000000001819,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries rotary scaling/rebasing transforms explicit envelope Y, reverse=false",
+          "status": "passed",
+          "title": "rotary scaling/rebasing transforms explicit envelope Y, reverse=false",
+          "duration": 0.5007999999997992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries rotary scaling/rebasing transforms explicit envelope Y, reverse=true",
+          "status": "passed",
+          "title": "rotary scaling/rebasing transforms explicit envelope Y, reverse=true",
+          "duration": 0.23230000000012296,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033458739,
+      "endTime": 1790033458747.2324,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/contour-entry-envelope.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["contourEntryRunwayMm"],
+          "fullName": "contourEntryRunwayMm applies the ADR-234 length formula on the 4040-safe profile",
+          "status": "passed",
+          "title": "applies the ADR-234 length formula on the 4040-safe profile",
+          "duration": 1.670500000000061,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryRunwayMm"],
+          "fullName": "contourEntryRunwayMm caps the entry at the 5 mm gap threshold",
+          "status": "passed",
+          "title": "caps the entry at the 5 mm gap threshold",
+          "duration": 0.2012000000000853,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryRunwayMm"],
+          "fullName": "contourEntryRunwayMm honors the operator disabling overscan",
+          "status": "passed",
+          "title": "honors the operator disabling overscan",
+          "duration": 0.22879999999997835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryRunwayMm"],
+          "fullName": "contourEntryRunwayMm keeps every non-4040 profile on legacy contour emission",
+          "status": "passed",
+          "title": "keeps every non-4040 profile on legacy contour emission",
+          "duration": 0.14220000000000255,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint backs off along the first edge direction",
+          "status": "passed",
+          "title": "backs off along the first edge direction",
+          "duration": 0.7427999999999884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint normalizes diagonal first edges",
+          "status": "passed",
+          "title": "normalizes diagonal first edges",
+          "duration": 0.2844000000000051,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint skips degenerate leading edges to find a real tangent",
+          "status": "passed",
+          "title": "skips degenerate leading edges to find a real tangent",
+          "duration": 0.189200000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint bounds the entry by the room left before the bed edge",
+          "status": "passed",
+          "title": "bounds the entry by the room left before the bed edge",
+          "duration": 0.273900000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint skips the entry when no bed room remains",
+          "status": "passed",
+          "title": "skips the entry when no bed room remains",
+          "duration": 0.16579999999999018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint leaves the entry unbounded without a bed",
+          "status": "passed",
+          "title": "leaves the entry unbounded without a bed",
+          "duration": 0.1956000000000131,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contourEntryPoint"],
+          "fullName": "contourEntryPoint returns null when no edge defines a direction",
+          "status": "passed",
+          "title": "returns null when no edge defines a direction",
+          "duration": 0.21059999999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033461319,
+      "endTime": 1790033461323.274,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries keeps the artwork AABB free of entry motion",
+          "status": "passed",
+          "title": "keeps the artwork AABB free of entry motion",
+          "duration": 2.340099999999893,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries extends the motion envelope to the tangential entry point",
+          "status": "passed",
+          "title": "extends the motion envelope to the tangential entry point",
+          "duration": 0.3347000000001117,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries extends the motion envelope by a custom compiled distance",
+          "status": "passed",
+          "title": "extends the motion envelope by a custom compiled distance",
+          "duration": 0.1933000000001357,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries covers Follow Shape (offset) fill entries the same way",
+          "status": "passed",
+          "title": "covers Follow Shape (offset) fill entries the same way",
+          "duration": 0.302599999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries leaves groups without an entry runway untouched",
+          "status": "passed",
+          "title": "leaves groups without an entry runway untouched",
+          "duration": 0.20890000000008513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033463561,
+      "endTime": 1790033463564.3025,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyJobOrigin"],
+          "fullName": "applyJobOrigin moves the lower-left job bounds anchor to work coordinate 0,0 for user origin jobs",
+          "status": "passed",
+          "title": "moves the lower-left job bounds anchor to work coordinate 0,0 for user origin jobs",
+          "duration": 2.3233999999999924,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyJobOrigin"],
+          "fullName": "applyJobOrigin moves the selected anchor to the current work position for current-position jobs",
+          "status": "passed",
+          "title": "moves the selected anchor to the current work position for current-position jobs",
+          "duration": 0.2824000000000524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyJobOrigin"],
+          "fullName": "applyJobOrigin retains compile diagnostics while translating job geometry",
+          "status": "passed",
+          "title": "retains compile diagnostics while translating job geometry",
+          "duration": 0.19039999999995416,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["offsetJobBounds"],
+          "fullName": "offsetJobBounds converts work-coordinate job bounds into physical machine bounds using WCO",
+          "status": "passed",
+          "title": "converts work-coordinate job bounds into physical machine bounds using WCO",
+          "duration": 0.383199999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) front-left anchor on a front-left origin puts the physical front-left corner at work 0,0",
+          "status": "passed",
+          "title": "front-left anchor on a front-left origin puts the physical front-left corner at work 0,0",
+          "duration": 0.27750000000003183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) front-left anchor on a center origin puts the physical front-left corner at work 0,0",
+          "status": "passed",
+          "title": "front-left anchor on a center origin puts the physical front-left corner at work 0,0",
+          "duration": 0.17050000000006094,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) front-left anchor on a front-right origin puts the physical front-left corner at work 0,0",
+          "status": "passed",
+          "title": "front-left anchor on a front-right origin puts the physical front-left corner at work 0,0",
+          "duration": 0.13540000000000418,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) front-left anchor on a rear-left origin puts the physical front-left corner at work 0,0",
+          "status": "passed",
+          "title": "front-left anchor on a rear-left origin puts the physical front-left corner at work 0,0",
+          "duration": 0.12860000000000582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) front-left anchor on a rear-right origin puts the physical front-left corner at work 0,0",
+          "status": "passed",
+          "title": "front-left anchor on a rear-right origin puts the physical front-left corner at work 0,0",
+          "duration": 0.13570000000004256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) back-right anchor on a front-left origin puts the physical back-right corner at work 0,0",
+          "status": "passed",
+          "title": "back-right anchor on a front-left origin puts the physical back-right corner at work 0,0",
+          "duration": 0.27149999999994634,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) back-right anchor on a rear-right origin puts the physical back-right corner at work 0,0",
+          "status": "passed",
+          "title": "back-right anchor on a rear-right origin puts the physical back-right corner at work 0,0",
+          "duration": 0.16039999999998145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) every anchor lands its named physical edge on the work origin (front-left origin)",
+          "status": "passed",
+          "title": "every anchor lands its named physical edge on the work origin (front-left origin)",
+          "duration": 0.6049000000000433,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) every anchor lands its named physical edge on the work origin (front-right origin)",
+          "status": "passed",
+          "title": "every anchor lands its named physical edge on the work origin (front-right origin)",
+          "duration": 0.4011000000000422,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) every anchor lands its named physical edge on the work origin (rear-left origin)",
+          "status": "passed",
+          "title": "every anchor lands its named physical edge on the work origin (rear-left origin)",
+          "duration": 0.244199999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) every anchor lands its named physical edge on the work origin (rear-right origin)",
+          "status": "passed",
+          "title": "every anchor lands its named physical edge on the work origin (rear-right origin)",
+          "duration": 0.19830000000001746,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) every anchor lands its named physical edge on the work origin (center origin)",
+          "status": "passed",
+          "title": "every anchor lands its named physical edge on the work origin (center origin)",
+          "duration": 0.2235000000000582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327)"
+          ],
+          "fullName": "anchorPointForOrigin: anchors are physical corners on every device origin (ADR-327) jobOriginOffsetFromBounds honours the device origin and keeps the front-left mapping without one",
+          "status": "passed",
+          "title": "jobOriginOffsetFromBounds honours the device origin and keeps the front-left mapping without one",
+          "duration": 0.20830000000000837,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033454900,
+      "endTime": 1790033454907.2234,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-origin.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths returns the empty job unchanged",
+          "status": "passed",
+          "title": "returns the empty job unchanged",
+          "duration": 2.1604999999999563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths retains compile diagnostics while reordering job geometry",
+          "status": "passed",
+          "title": "retains compile diagnostics while reordering job geometry",
+          "duration": 1.1407999999996719,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths returns single-segment groups unchanged (no choice to make)",
+          "status": "passed",
+          "title": "returns single-segment groups unchanged (no choice to make)",
+          "duration": 0.3350000000000364,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders two segments so the closer one is visited first",
+          "status": "passed",
+          "title": "reorders two segments so the closer one is visited first",
+          "duration": 0.3314999999997781,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves source order when that travel policy is selected",
+          "status": "passed",
+          "title": "preserves source order when that travel policy is selected",
+          "duration": 0.22769999999991342,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves open-path direction when reversal is disabled",
+          "status": "passed",
+          "title": "preserves open-path direction when reversal is disabled",
+          "duration": 0.22929999999996653,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths can reverse layer priority without changing order inside each layer",
+          "status": "passed",
+          "title": "can reverse layer priority without changing order inside each layer",
+          "duration": 0.38100000000031287,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths never reverses artwork priority when reversing operations",
+          "status": "passed",
+          "title": "never reverses artwork priority when reversing operations",
+          "duration": 0.4863999999997759,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths uses the selected planning start point as the nearest-neighbor seed",
+          "status": "passed",
+          "title": "uses the selected planning start point as the nearest-neighbor seed",
+          "duration": 0.5940000000000509,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths can disable inside-first ordering",
+          "status": "passed",
+          "title": "can disable inside-first ordering",
+          "duration": 0.7894000000001142,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths leaves scanline fill groups in source order",
+          "status": "passed",
+          "title": "leaves scanline fill groups in source order",
+          "duration": 0.35350000000016735,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders offset fill contours to enter the closest contour first",
+          "status": "passed",
+          "title": "reorders offset fill contours to enter the closest contour first",
+          "duration": 0.27520000000004075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reorders compatible island fill groups to reduce travel",
+          "status": "passed",
+          "title": "reorders compatible island fill groups to reduce travel",
+          "duration": 11.069700000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does not reorder island fill groups across incompatible layer settings",
+          "status": "passed",
+          "title": "does not reorder island fill groups across incompatible layer settings",
+          "duration": 0.2817000000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does not reorder island fill groups across different motion policies",
+          "status": "passed",
+          "title": "does not reorder island fill groups across different motion policies",
+          "duration": 0.19549999999981083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths flips an open segment to enter from the nearer endpoint",
+          "status": "passed",
+          "title": "flips an open segment to enter from the nearer endpoint",
+          "duration": 0.2867999999998574,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths does NOT flip a closed segment (start == end, no win)",
+          "status": "passed",
+          "title": "does NOT flip a closed segment (start == end, no win)",
+          "duration": 0.5997999999999593,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths cuts contained closed contours before their containing outer contour",
+          "status": "passed",
+          "title": "cuts contained closed contours before their containing outer contour",
+          "duration": 0.36439999999993233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: optimization preserves every cut segment",
+          "status": "passed",
+          "title": "property: optimization preserves every cut segment",
+          "duration": 14.998000000000047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths reflects connected-cut continuity after path optimization",
+          "status": "passed",
+          "title": "reflects connected-cut continuity after path optimization",
+          "duration": 2.071100000000115,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths improves travel on a deliberately bad ordering (concrete fixture)",
+          "status": "passed",
+          "title": "improves travel on a deliberately bad ordering (concrete fixture)",
+          "duration": 1.2372000000000298,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths honest about NN limits — may pessimize tiny amounts on pathological 2-segment inputs",
+          "status": "passed",
+          "title": "honest about NN limits — may pessimize tiny amounts on pathological 2-segment inputs",
+          "duration": 1.541400000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: optimization is idempotent — running it twice == running once",
+          "status": "passed",
+          "title": "property: optimization is idempotent — running it twice == running once",
+          "duration": 3.598500000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths property: determinism — same input produces same output across calls",
+          "status": "passed",
+          "title": "property: determinism — same input produces same output across calls",
+          "duration": 2.3501000000001113,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves group metadata (color, power, speed, passes, layerId)",
+          "status": "passed",
+          "title": "preserves group metadata (color, power, speed, passes, layerId)",
+          "duration": 0.28680000000031214,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["optimizePaths"],
+          "fullName": "optimizePaths preserves cut content (same set of polylines, possibly reordered/reversed)",
+          "status": "passed",
+          "title": "preserves cut content (same set of polylines, possibly reordered/reversed)",
+          "duration": 0.33590000000003783,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033449307,
+      "endTime": 1790033449354.336,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/optimize-paths.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["planner timing with ADR-239 contour entries"],
+          "fullName": "planner timing with ADR-239 contour entries times the tangential entry as laser-off feed travel",
+          "status": "passed",
+          "title": "times the tangential entry as laser-off feed travel",
+          "duration": 9.482600000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033465636,
+      "endTime": 1790033465645.4827,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/planner-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization blends ten collinear controlled seeks and cuts at their actual G1 feed",
+          "status": "passed",
+          "title": "blends ten collinear controlled seeks and cuts at their actual G1 feed",
+          "duration": 11.729700000000093,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization keeps the M5 drain before a collinear G1 parking move",
+          "status": "passed",
+          "title": "keeps the M5 drain before a collinear G1 parking move",
+          "duration": 1.0596000000000458,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches the actual same mode and coolant group boundary",
+          "status": "passed",
+          "title": "matches the actual same mode and coolant group boundary",
+          "duration": 0.8143999999999778,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches the actual power mode change group boundary",
+          "status": "passed",
+          "title": "matches the actual power mode change group boundary",
+          "duration": 0.7460000000000946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches the actual coolant change group boundary",
+          "status": "passed",
+          "title": "matches the actual coolant change group boundary",
+          "duration": 0.7730999999998858,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization keeps redundant group arming continuous and actual mode changes stopped",
+          "status": "passed",
+          "title": "keeps redundant group arming continuous and actual mode changes stopped",
+          "duration": 1.3436999999998989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches vector pass re-arming with zero power=false",
+          "status": "passed",
+          "title": "matches vector pass re-arming with zero power=false",
+          "duration": 1.0600999999999203,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches vector pass re-arming with zero power=true",
+          "status": "passed",
+          "title": "matches vector pass re-arming with zero power=true",
+          "duration": 0.7881999999999607,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization retains standalone re-arm semantics through empty groups with zero prior power=false",
+          "status": "passed",
+          "title": "retains standalone re-arm semantics through empty groups with zero prior power=false",
+          "duration": 0.7630999999998949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization retains standalone re-arm semantics through empty groups with zero prior power=true",
+          "status": "passed",
+          "title": "retains standalone re-arm semantics through empty groups with zero prior power=true",
+          "duration": 0.7364000000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization omits collapsed vector seeks while retaining their emitted standalone pass re-arm",
+          "status": "passed",
+          "title": "omits collapsed vector seeks while retaining their emitted standalone pass re-arm",
+          "duration": 0.6852999999998701,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches controlled scanline Fill travel",
+          "status": "passed",
+          "title": "matches controlled scanline Fill travel",
+          "duration": 1.5036000000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches controlled offset Fill travel",
+          "status": "passed",
+          "title": "matches controlled offset Fill travel",
+          "duration": 0.6562999999998738,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization matches a feed-matched contour entry after its controlled seek",
+          "status": "passed",
+          "title": "matches a feed-matched contour entry after its controlled seek",
+          "duration": 0.800499999999829,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization keeps raster shutdown and following vector re-arm as real boundaries",
+          "status": "passed",
+          "title": "keeps raster shutdown and following vector re-arm as real boundaries",
+          "duration": 2.1932999999999083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization calibrates represented S0 vector motion as travel at power 0",
+          "status": "passed",
+          "title": "calibrates represented S0 vector motion as travel at power 0",
+          "duration": 1.0416999999999916,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization calibrates represented S0 vector motion as travel at power 0.01",
+          "status": "passed",
+          "title": "calibrates represented S0 vector motion as travel at power 0.01",
+          "duration": 0.8505999999999858,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["controlled laser seeks preserve emitted motion and synchronization"],
+          "fullName": "controlled laser seeks preserve emitted motion and synchronization retains G0 motion for an ordinary profile without controlled seeks",
+          "status": "passed",
+          "title": "retains G0 motion for an ordinary profile without controlled seeks",
+          "duration": 1.0769000000000233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033453969,
+      "endTime": 1790033453998.077,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/planner-emitted-seek-parity.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machineSpaceJob (R3 single source of truth)"],
+          "fullName": "machineSpaceJob (R3 single source of truth) is identity when no rotary is active",
+          "status": "passed",
+          "title": "is identity when no rotary is active",
+          "duration": 1.5804000000000542,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machineSpaceJob (R3 single source of truth)"],
+          "fullName": "machineSpaceJob (R3 single source of truth) scales and rebases Y under a chuck rotary — the same transform emit uses",
+          "status": "passed",
+          "title": "scales and rebases Y under a chuck rotary — the same transform emit uses",
+          "duration": 0.6078999999999724,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machineSpaceJob (R3 single source of truth)"],
+          "fullName": "machineSpaceJob (R3 single source of truth) does not apply to CNC projects",
+          "status": "passed",
+          "title": "does not apply to CNC projects",
+          "duration": 1.05600000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machineSpaceJob (R3 single source of truth)"],
+          "fullName": "machineSpaceJob (R3 single source of truth) reverseAxis mirrors Y within the wrap window (un-mirrors the engraving)",
+          "status": "passed",
+          "title": "reverseAxis mirrors Y within the wrap window (un-mirrors the engraving)",
+          "duration": 0.4782000000000153,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["machineSpaceJob (R3 single source of truth)"],
+          "fullName": "machineSpaceJob (R3 single source of truth) reverseAxis on a roller (scale 1) still mirrors — not identity",
+          "status": "passed",
+          "title": "reverseAxis on a roller (scale 1) still mirrors — not identity",
+          "duration": 0.2919999999999163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033460415,
+      "endTime": 1790033460419.4783,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-job.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyRotaryYScale raster"],
+          "fullName": "applyRotaryYScale raster rebases and scales raster Y bounds without changing row data",
+          "status": "passed",
+          "title": "rebases and scales raster Y bounds without changing row data",
+          "duration": 2.149400000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRotaryYScale raster"],
+          "fullName": "applyRotaryYScale raster maps raster rows onto descending Y when the rotary axis is reversed",
+          "status": "passed",
+          "title": "maps raster rows onto descending Y when the rotary axis is reversed",
+          "duration": 0.6746000000000549,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRotaryYScale raster"],
+          "fullName": "applyRotaryYScale raster keeps a streamed provider forward-only while mapping rows onto descending Y",
+          "status": "passed",
+          "title": "keeps a streamed provider forward-only while mapping rows onto descending Y",
+          "duration": 1.050299999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["applyRotaryYScale raster"],
+          "fullName": "applyRotaryYScale raster maps equivalent materialized and streamed rows onto the same reversed coordinates",
+          "status": "passed",
+          "title": "maps equivalent materialized and streamed rows onto the same reversed coordinates",
+          "duration": 1.8745999999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033459492,
+      "endTime": 1790033459497.8745,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-transform-raster.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["applyRotaryYScale"],
+          "fullName": "applyRotaryYScale retains compile diagnostics while mapping machine-space geometry",
+          "status": "passed",
+          "title": "retains compile diagnostics while mapping machine-space geometry",
+          "duration": 1.8167000000000826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033466399,
+      "endTime": 1790033466400.8167,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-transform.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["toolpath preview with ADR-239 contour entries"],
+          "fullName": "toolpath preview with ADR-239 contour entries previews rapid-to-entry then a laser-off feed ramp into the first vertex",
+          "status": "passed",
+          "title": "previews rapid-to-entry then a laser-off feed ramp into the first vertex",
+          "duration": 3.1299000000000206,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["toolpath preview with ADR-239 contour entries"],
+          "fullName": "toolpath preview with ADR-239 contour entries keeps the legacy direct travel without an entry runway",
+          "status": "passed",
+          "title": "keeps the legacy direct travel without an entry runway",
+          "duration": 0.3787999999999556,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["toolpath preview with ADR-239 contour entries"],
+          "fullName": "toolpath preview with ADR-239 contour entries previews a custom compiled entry distance exactly",
+          "status": "passed",
+          "title": "previews a custom compiled entry distance exactly",
+          "duration": 0.29169999999999163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033464468,
+      "endTime": 1790033464472.2917,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/toolpath-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'absolute' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'absolute' / 'left' clips consistently at the physical edge",
+          "duration": 14.069400000000314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'absolute' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'absolute' / 'right' clips consistently at the physical edge",
+          "duration": 1.9312000000004446,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'absolute' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'absolute' / 'top' clips consistently at the physical edge",
+          "duration": 1.4698999999995976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "duration": 1.1822000000001935,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "duration": 1.826100000000224,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "duration": 1.1140000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "duration": 1.104899999999816,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.906800000000203,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'current-position' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'current-position' / 'left' clips consistently at the physical edge",
+          "duration": 1.094499999999698,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'current-position' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'current-position' / 'right' clips consistently at the physical edge",
+          "duration": 1.137000000000171,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'current-position' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'current-position' / 'top' clips consistently at the physical edge",
+          "duration": 0.8656999999998334,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.8171000000002095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.9700000000002547,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.7665000000001783,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.7253999999998086,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-left' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.7166999999999462,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'absolute' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'absolute' / 'left' clips consistently at the physical edge",
+          "duration": 0.6604000000002088,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'absolute' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'absolute' / 'right' clips consistently at the physical edge",
+          "duration": 0.8449999999997999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'absolute' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'absolute' / 'top' clips consistently at the physical edge",
+          "duration": 0.6485999999999876,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.7316999999998188,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.6716999999998734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.8572000000003754,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.7699999999999818,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.7462000000000444,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'current-position' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'current-position' / 'left' clips consistently at the physical edge",
+          "duration": 0.6615999999999076,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'current-position' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'current-position' / 'right' clips consistently at the physical edge",
+          "duration": 0.7186000000001513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'current-position' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'current-position' / 'top' clips consistently at the physical edge",
+          "duration": 0.663300000000163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.6272000000003572,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.7373000000002321,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.7073999999997795,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.6671000000001186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'front-right' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.6408000000001266,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'absolute' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'absolute' / 'left' clips consistently at the physical edge",
+          "duration": 0.5806000000002314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'absolute' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'absolute' / 'right' clips consistently at the physical edge",
+          "duration": 0.6480999999998858,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'absolute' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'absolute' / 'top' clips consistently at the physical edge",
+          "duration": 0.8191999999999098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "duration": 1.2739000000001397,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "duration": 1.3184000000001106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.9994999999998981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "duration": 1.0558000000000902,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.835399999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'current-position' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'current-position' / 'left' clips consistently at the physical edge",
+          "duration": 1.0135000000000218,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'current-position' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'current-position' / 'right' clips consistently at the physical edge",
+          "duration": 1.1666000000000167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'current-position' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'current-position' / 'top' clips consistently at the physical edge",
+          "duration": 1.0255000000001928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.768500000000131,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.8904999999999745,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "duration": 1.051600000000235,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.9636999999997897,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-left' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.7515000000003056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'absolute' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'absolute' / 'left' clips consistently at the physical edge",
+          "duration": 1.1151999999997315,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'absolute' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'absolute' / 'right' clips consistently at the physical edge",
+          "duration": 1.052900000000136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'absolute' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'absolute' / 'top' clips consistently at the physical edge",
+          "duration": 0.6685999999999694,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.770600000000286,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "duration": 1.0947000000001026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "duration": 1.1846999999997934,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.8235999999997148,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.9924000000000888,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'current-position' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'current-position' / 'left' clips consistently at the physical edge",
+          "duration": 1.2031999999999243,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'current-position' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'current-position' / 'right' clips consistently at the physical edge",
+          "duration": 0.7602999999999156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'current-position' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'current-position' / 'top' clips consistently at the physical edge",
+          "duration": 1.0951999999997497,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.8831999999997606,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.800499999999829,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.6747000000000298,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.6911999999997533,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'rear-right' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.8872000000001208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'absolute' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'absolute' / 'left' clips consistently at the physical edge",
+          "duration": 0.6036000000003696,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'absolute' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'absolute' / 'right' clips consistently at the physical edge",
+          "duration": 0.5684000000001106,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'absolute' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'absolute' / 'top' clips consistently at the physical edge",
+          "duration": 0.5763999999999214,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'absolute' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.568199999999706,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'user-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.7390000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'user-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.6143999999999323,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'user-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.5882999999998901,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'user-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.6230999999997948,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'current-position' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'current-position' / 'left' clips consistently at the physical edge",
+          "duration": 0.7199999999997999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'current-position' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'current-position' / 'right' clips consistently at the physical edge",
+          "duration": 0.7199000000000524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'current-position' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'current-position' / 'top' clips consistently at the physical edge",
+          "duration": 0.6131000000000313,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'current-position' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.6789999999996326,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'verified-origin' / 'left' clips consistently at the physical edge",
+          "duration": 0.5968000000002576,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'verified-origin' / 'right' clips consistently at the physical edge",
+          "duration": 0.5785999999998239,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'verified-origin' / 'top' clips consistently at the physical edge",
+          "duration": 0.6468999999997322,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "status": "passed",
+          "title": "'center' / 'verified-origin' / 'bottom' clips consistently at the physical edge",
+          "duration": 0.5367000000001099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-left' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "duration": 1.0534999999999854,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-left' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.3623000000002321,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-left' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.2887000000000626,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-left' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-left' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.23170000000027358,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-right' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.3548999999998159,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-right' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.24729999999999563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-right' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.19250000000010914,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'front-right' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'front-right' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.17930000000023938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-left' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.2235000000000582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-left' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.24699999999984357,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-left' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.23660000000018044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-left' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-left' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.193000000000211,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-right' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.20619999999962602,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-right' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.24110000000018772,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-right' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.16869999999971697,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'rear-right' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'rear-right' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.18629999999984648,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'center' / 'absolute' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.15679999999974825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'center' / 'user-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.15830000000005384,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'center' / 'current-position' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.1653999999998632,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame 'center' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "status": "passed",
+          "title": "'center' / 'verified-origin' does not invent optional entry travel for an unknown envelope",
+          "duration": 0.21259999999983847,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame front-left fresh absolute compilation carries origin-correct bounds",
+          "status": "passed",
+          "title": "front-left fresh absolute compilation carries origin-correct bounds",
+          "duration": 0.585399999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame front-right fresh absolute compilation carries origin-correct bounds",
+          "status": "passed",
+          "title": "front-right fresh absolute compilation carries origin-correct bounds",
+          "duration": 0.2440999999998894,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame rear-left fresh absolute compilation carries origin-correct bounds",
+          "status": "passed",
+          "title": "rear-left fresh absolute compilation carries origin-correct bounds",
+          "duration": 0.21669999999994616,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame rear-right fresh absolute compilation carries origin-correct bounds",
+          "status": "passed",
+          "title": "rear-right fresh absolute compilation carries origin-correct bounds",
+          "duration": 0.1853000000000975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame center fresh absolute compilation carries origin-correct bounds",
+          "status": "passed",
+          "title": "center fresh absolute compilation carries origin-correct bounds",
+          "duration": 0.16380000000026484,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame user-origin without physical evidence never falls back to profile limits",
+          "status": "passed",
+          "title": "user-origin without physical evidence never falls back to profile limits",
+          "duration": 0.21270000000004075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame verified-origin without physical evidence never falls back to profile limits",
+          "status": "passed",
+          "title": "verified-origin without physical evidence never falls back to profile limits",
+          "duration": 0.11940000000004147,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame current-position without physical evidence never falls back to profile limits",
+          "status": "passed",
+          "title": "current-position without physical evidence never falls back to profile limits",
+          "duration": 0.07920000000012806,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame snapshot caching distinguishes unknown, default and changed program envelopes",
+          "status": "passed",
+          "title": "snapshot caching distinguishes unknown, default and changed program envelopes",
+          "duration": 1.4650000000001455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame front-left absolute native translation keeps artwork and envelope aligned",
+          "status": "passed",
+          "title": "front-left absolute native translation keeps artwork and envelope aligned",
+          "duration": 0.4701999999997497,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame front-right absolute native translation keeps artwork and envelope aligned",
+          "status": "passed",
+          "title": "front-right absolute native translation keeps artwork and envelope aligned",
+          "duration": 0.23209999999971842,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame rear-left absolute native translation keeps artwork and envelope aligned",
+          "status": "passed",
+          "title": "rear-left absolute native translation keeps artwork and envelope aligned",
+          "duration": 0.471599999999853,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame rear-right absolute native translation keeps artwork and envelope aligned",
+          "status": "passed",
+          "title": "rear-right absolute native translation keeps artwork and envelope aligned",
+          "duration": 0.3692999999998392,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared contour envelopes use the final program coordinate frame"],
+          "fullName": "prepared contour envelopes use the final program coordinate frame center absolute native translation keeps artwork and envelope aligned",
+          "status": "passed",
+          "title": "center absolute native translation keeps artwork and envelope aligned",
+          "duration": 0.7192000000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033452686,
+      "endTime": 1790033452779.7192,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/gcode/contour-entry-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan preserves coordinate preparation options in sidecar emission: {\"absoluteProgramOffset\":{\"x\":-400,\"y\":-400}}",
+          "status": "passed",
+          "title": "preserves coordinate preparation options in sidecar emission: {\"absoluteProgramOffset\":{\"x\":-400,\"y\":-400}}",
+          "duration": 21.095799999999826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan preserves coordinate preparation options in sidecar emission: {\"contourEntryBounds\":null}",
+          "status": "passed",
+          "title": "preserves coordinate preparation options in sidecar emission: {\"contourEntryBounds\":null}",
+          "duration": 2.718699999999899,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan preserves coordinate preparation options in sidecar emission: {\"absoluteProgramOffset\":{\"x\":-400,\"y\":-400},\"contourEntryBounds\":{\"minX\":-395,\"minY\":-400,\"maxX\":0,\"maxY\":0}}",
+          "status": "passed",
+          "title": "preserves coordinate preparation options in sidecar emission: {\"absoluteProgramOffset\":{\"x\":-400,\"y\":-400},\"contourEntryBounds\":{\"minX\":-395,\"minY\":-400,\"maxX\":0,\"maxY\":0}}",
+          "duration": 2.5456000000001495,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan round-trips current laser output with zero character changes",
+          "status": "passed",
+          "title": "round-trips current laser output with zero character changes",
+          "duration": 2.514599999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan round-trips current CNC output and preserves explicit terminal parking",
+          "status": "passed",
+          "title": "round-trips current CNC output and preserves explicit terminal parking",
+          "duration": 9.82400000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["emitGcodeWithExecutablePlan"],
+          "fullName": "emitGcodeWithExecutablePlan keeps a refused emission unchanged and reports no sidecar",
+          "status": "passed",
+          "title": "keeps a refused emission unchanged and reports no sidecar",
+          "duration": 0.3787999999999556,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033457635,
+      "endTime": 1790033457674.379,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/gcode/executable-plan-emission.test.ts"
+    }
+  ]
+}

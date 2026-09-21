@@ -1,9 +1,15 @@
 {
-  "base": "288ad66baf23e0c75c0a05f6216787577ddc6812",
-  "uniqueFiles": 126,
-  "assertions": 1375,
-  "correctnessChecks": 1372,
-  "openDefectCharacterisations": 3,
+  "auditBase": "288ad66baf23e0c75c0a05f6216787577ddc6812",
+  "repairBase": "4f1a33bc373dc5821a9b766a6e6385bb81f4de95",
+  "initialAudit": {
+    "uniqueFiles": 126,
+    "correctnessChecks": 1372,
+    "openDefectCharacterisations": 3
+  },
+  "uniqueFiles": 169,
+  "assertions": 1887,
+  "correctnessChecks": 1887,
+  "openDefectCharacterisations": 0,
   "parsedLogs": {
     "originBaseline": 19,
     "originOracle": 4,
@@ -34,6 +40,49 @@
       "files": 17,
       "tests": 160,
       "passed": 160,
+      "failed": 0
+    },
+    "nativeCoordinates": {
+      "files": 12,
+      "tests": 645,
+      "passed": 645,
+      "failed": 0
+    },
+    "runtimeCoordinates": {
+      "files": 16,
+      "tests": 111,
+      "passed": 111,
+      "failed": 0
+    },
+    "savedOutputAndOriginalRegressions": {
+      "files": 3,
+      "tests": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    "connectedProfile": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "contourEntry": {
+      "files": 17,
+      "tests": 253,
+      "passed": 253,
+      "failed": 0,
+      "evidence": "contour-entry-latest-per-file.json"
+    },
+    "asyncPreparationOwnership": {
+      "files": 8,
+      "tests": 182,
+      "passed": 182,
+      "failed": 0
+    },
+    "frameMetadata": {
+      "files": 1,
+      "tests": 11,
+      "passed": 11,
       "failed": 0
     }
   },
@@ -147,8 +196,8 @@
       "name": "src/core/job/compile-job-contour-entry.test.ts",
       "tests": 7,
       "status": "passed",
-      "evidence": "coordinate-final-separated-tests.txt",
-      "stage": "unchanged-geometry"
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
     },
     {
       "name": "src/core/job/compile-job-raster-rotation.test.ts",
@@ -158,25 +207,32 @@
       "stage": "unchanged-geometry"
     },
     {
+      "name": "src/core/job/contour-entry-envelope.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
       "name": "src/core/job/contour-entry.test.ts",
       "tests": 11,
       "status": "passed",
-      "evidence": "coordinate-final-separated-tests.txt",
-      "stage": "unchanged-geometry"
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
     },
     {
       "name": "src/core/job/coordinate-contract-reproductions.test.ts",
       "tests": 3,
       "status": "passed",
-      "evidence": "coordinate-final-separated-tests.txt",
-      "stage": "unchanged-geometry"
+      "evidence": "coordinate-integration-final.json",
+      "stage": "post-repair"
     },
     {
       "name": "src/core/job/coordinate-origin-audit.test.ts",
       "tests": 440,
       "status": "passed",
-      "evidence": "coordinate-final-separated-tests.txt",
-      "stage": "unchanged-geometry"
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
     },
     {
       "name": "src/core/job/frame-bounds.test.ts",
@@ -193,11 +249,53 @@
       "stage": "post-repair"
     },
     {
+      "name": "src/core/job/job-bounds-contour-entry.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/job-bounds-generic-fill-runway.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/job-bounds.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
       "name": "src/core/job/job-origin.test.ts",
       "tests": 17,
       "status": "passed",
-      "evidence": "coordinate-baseline-tests.txt",
-      "stage": "unchanged-geometry"
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/optimize-paths.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/planner-contour-entry.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/planner-emitted-seek-parity.test.ts",
+      "tests": 18,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
     },
     {
       "name": "src/core/job/registration-placement.test.ts",
@@ -205,6 +303,62 @@
       "status": "passed",
       "evidence": "coordinate-baseline-tests.txt",
       "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/job/rotary-job.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/rotary-transform-raster.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/rotary-transform.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/toolpath-contour-entry.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/output/grbl-strategy-4040-contour-entry.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/io/gcode/contour-entry-placement.test.ts",
+      "tests": 114,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/gcode/coordinate-envelope-integration.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "coordinate-integration-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/gcode/executable-plan-emission.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
     },
     {
       "name": "src/io/gcode/prepare-output-scan-offset-placement.test.ts",
@@ -259,7 +413,21 @@
       "name": "src/ui/job-placement.test.ts",
       "tests": 25,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/ConnectedMachineProfile.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "connected-profile-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/coordinate-preparation-ownership.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
       "stage": "post-repair"
     },
     {
@@ -329,7 +497,7 @@
       "name": "src/ui/laser/falcon-coordinate-flow.audit.test.ts",
       "tests": 8,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-integration-final.json",
       "stage": "post-repair"
     },
     {
@@ -357,14 +525,14 @@
       "name": "src/ui/laser/framed-run-device-metadata-retention.test.ts",
       "tests": 11,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "frame-metadata-final.json",
       "stage": "post-repair"
     },
     {
       "name": "src/ui/laser/framed-run-start-claim.test.ts",
       "tests": 2,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-owner-final-passing.json",
       "stage": "post-repair"
     },
     {
@@ -389,6 +557,41 @@
       "stage": "post-repair"
     },
     {
+      "name": "src/ui/laser/laser-mode-start-acknowledgement.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/laser-recovery-preview-plan.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/live-job-estimate-position.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/live-job-estimate.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/native-coordinate-placement.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
       "name": "src/ui/laser/no-homing-frame-gate.test.ts",
       "tests": 3,
       "status": "passed",
@@ -407,6 +610,20 @@
       "evidence": "origin-final-tests.json",
       "status": "passed",
       "name": "src/ui/laser/OriginRow.test.tsx",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/print-cut-capture-frame.test.ts",
+      "tests": 14,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/print-cut-no-homing-epoch.test.tsx",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
       "stage": "post-repair"
     },
     {
@@ -476,7 +693,7 @@
       "name": "src/ui/laser/start-job-framed-permit-claim.test.ts",
       "tests": 18,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-owner-final-passing.json",
       "stage": "post-repair"
     },
     {
@@ -546,7 +763,7 @@
       "name": "src/ui/laser/start-job-readiness.test.ts",
       "tests": 19,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-repair-tests.json",
       "stage": "post-repair"
     },
     {
@@ -578,6 +795,13 @@
       "stage": "post-repair"
     },
     {
+      "name": "src/ui/laser/start-preparation-owner.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
       "name": "src/ui/laser/use-frame-action.disclosure.test.ts",
       "tests": 10,
       "status": "passed",
@@ -595,7 +819,7 @@
       "name": "src/ui/laser/use-frame-action.framed-run.test.ts",
       "tests": 9,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-owner-final-passing.json",
       "stage": "post-repair"
     },
     {
@@ -617,6 +841,20 @@
       "tests": 1,
       "status": "passed",
       "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-job-estimate.test.tsx",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/canvas-motion-plan.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
       "stage": "post-repair"
     },
     {
@@ -893,6 +1131,13 @@
       "stage": "post-repair"
     },
     {
+      "name": "src/ui/state/native-bed-frame.test.ts",
+      "tests": 90,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
       "name": "src/ui/state/origin-actions.test.ts",
       "tests": 15,
       "status": "passed",
@@ -900,10 +1145,94 @@
       "stage": "post-repair"
     },
     {
+      "name": "src/ui/state/print-cut-session-store.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
       "name": "src/ui/state/probe-actions.test.ts",
       "tests": 4,
       "status": "passed",
       "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview-owned-mapping.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview-preparation-failure.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview.parity.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/large-job-preparation-order.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/large-job-preparation.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/position-laser-click.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-cache-retention.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-client.test.ts",
+      "tests": 16,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-estimate.test.ts",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-projection.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
       "stage": "post-repair"
     },
     {
@@ -919,6 +1248,27 @@
       "status": "passed",
       "evidence": "coordinate-baseline-tests.txt",
       "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/ui/workspace/runtime-coordinate-hooks.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/runtime-coordinate-preparation.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/use-preview-toolpath.test.tsx",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
     }
   ]
 }

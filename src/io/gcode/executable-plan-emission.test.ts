@@ -11,10 +11,29 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { serializeExecutablePlan } from '../../core/execution-plan';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { emitGcode } from './emit-gcode';
 import { emitGcodeWithExecutablePlan } from './executable-plan-emission';
 
 describe('emitGcodeWithExecutablePlan', () => {
+  it.each([
+    { absoluteProgramOffset: { x: -400, y: -400 } },
+    { contourEntryBounds: null },
+    {
+      absoluteProgramOffset: { x: -400, y: -400 },
+      contourEntryBounds: { minX: -395, minY: -400, maxX: 0, maxY: 0 },
+    },
+  ])('preserves coordinate preparation options in sidecar emission: %j', (options) => {
+    const project = { ...laserProject(), device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE };
+    const current = emitGcode(project, options);
+    const planned = emitGcodeWithExecutablePlan(project, options);
+    expect(planned.gcode).toBe(current.gcode);
+    expect(planned.preflight).toEqual(current.preflight);
+    expect(planned.sidecar.kind).toBe('ok');
+    if (planned.sidecar.kind !== 'ok') throw new Error('missing executable sidecar');
+    expect(serializeExecutablePlan(planned.sidecar.plan)).toBe(current.gcode);
+  });
+
   it('round-trips current laser output with zero character changes', () => {
     const project = laserProject();
     const current = emitGcode(project);

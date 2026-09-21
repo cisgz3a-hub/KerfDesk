@@ -3,6 +3,7 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import type { PreparedOutput, PrepareOutputOptions } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
+import { runtimeCoordinatePreparationOptions } from '../job-placement';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import { prepareStartInput } from './start-job-input';
 import {
@@ -31,6 +32,11 @@ export async function prepareStartJobAsync(
   );
   if (!input.ok) return input.result;
   const prepared = await prepare(project, {
+    ...runtimeCoordinatePreparationOptions(
+      project.device,
+      input.placement,
+      input.machineWithReportUnits,
+    ),
     ...(input.placement.jobOrigin === undefined ? {} : { jobOrigin: input.placement.jobOrigin }),
     outputScope,
   });

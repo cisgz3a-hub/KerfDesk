@@ -11,6 +11,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { resetStore } from '../state/test-helpers';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import {
@@ -45,7 +46,10 @@ beforeEach(() => {
   resetStore();
   useStore.setState({
     project: {
-      ...createProject(DEFAULT_DEVICE_PROFILE),
+      ...createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+      }),
       scene: {
         ...EMPTY_SCENE,
         objects: [lineObject],
@@ -61,8 +65,10 @@ beforeEach(() => {
     confirmedPositionEpoch: null,
     surfaceHeightMm: 0,
   });
+  const evidence = stockNativeEvidence(useStore.getState().project.device, true);
   useLaserStore.setState({
     ...initialLaserState(),
+    ...evidence,
     connection: { kind: 'connected' },
     statusReport: idleControllerStatusForFrameTest(),
     controllerSessionEpoch: 7,
@@ -70,9 +76,7 @@ beforeEach(() => {
     activeControllerKind: 'grbl-v1.1',
     detectedControllerKind: 'grbl-v1.1',
     controllerSettings: {
-      maxPowerS: 1000,
-      minPowerS: 0,
-      laserModeEnabled: true,
+      ...evidence.controllerSettings,
       reportInches: false,
     },
     controllerSettingsObservation: { sessionEpoch: 7, observedAt: 1 },

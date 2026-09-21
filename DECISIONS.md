@@ -21602,13 +21602,15 @@ The Frame-first policy and the exact reviewed-artifact handoff remain unchanged.
 
 ---
 
-## ADR-343 - Coordinate observations retain their report-unit contract (2026-09-22)
+## ADR-343 - Coordinate frames and report units stay bound to prepared output (2026-09-22)
 
-**Status:** Implemented locally following the 2026-09-21/22 coordinate/settings audit. No hardware or publication qualification is implied. The Frame-only Start policy of ADR-228/230/232/237 is unchanged.
+**Status:** Accepted following the 2026-09-21/22 coordinate/settings audit and authorised repair. Hardware qualification remains separate. The Frame-only Start policy of ADR-228/230/232/237 is unchanged.
 
 ### Problem
 
 Changing GRBL report units could leave old raw status/WCO numbers beside a new `$13` value. A stationary `(10,20)` mm machine report then became `(254,508)` mm to coordinate consumers; an absolute-point jog could calculate a large wrong-way relative move. A settings refresh also temporarily discarded the previous report-unit bit. Separately, accepting a changed detected Z-travel value could inherit the previous value's manual confirmation. UI wording conflated recorded homing corner, controller Home, work zero and clearing persistent offsets.
+
+Native negative GRBL machine coordinates were also treated as positive profile-bed numbers. This misplaced overlays and advisory checks, and a homed Absolute job with zero WCO emitted positive XY into negative native travel. The 4040 contour-entry clamp assumed a zero-minimum bed, so a centred 400 mm bed could receive an entry at X203 beyond its X200 edge.
 
 ### Decision
 
@@ -21617,9 +21619,13 @@ Changing GRBL report units could leave old raw status/WCO numbers beside a new `
 - An unchanged-unit read preserves existing spatial evidence. A controller-session invalidation clears WCO with position evidence so an earlier offset cannot survive after its unit interpretation is lost. This repairs factual coordinate consistency; it is not a new Start policy gate.
 - Changing saved Z travel invalidates an inherited travel confirmation, unless the same explicit patch supplies a fresh confirmation. No controller value is written by this profile change.
 - Describe Home using the selected controller's actual command contract. Label the saved homing corner as a record; firmware owns physical direction. Explain that temporary G92 reset includes Z and leaves stored G54 intact, while persistent XY controls do not erase stored G54 Z.
+- Represent the native controller frame separately from the configured bed frame. Establish their translation from current-session stock-GRBL build/settings and homing evidence, or the explicit connected Falcon A1 command contract. Do not infer this translation from a homing-corner label or the sign of WCO. A travel/profile-size mismatch leaves the physical bed location unknown.
+- Convert native observations into the bed frame for overlays, captures, click targets and advisory geometry. A known Absolute placement applies the inverse bed-to-program translation during preparation and records it in `jobOriginOffset`; User, Current and Verified Origin retain their work-relative placement. Unknown physical mapping remains an explicit advisory/artwork-relative view, not a new Frame/Start policy gate.
+- Store contour-entry bounds on the prepared Job in that program's coordinates. Emission, motion bounds/Frame, preview and timing consume the same bounds, including rotary transformations. Unknown bounds omit the optional contour entry; burn geometry remains available. Fresh jobs use the profile's actual origin, while old archived jobs without the metadata retain their original byte contract.
+- Forward coordinate context through synchronous, worker, snapshot, Save, preview and estimate paths, including preparation cache keys. Emitting a prepared or archived Job never recomputes its envelope from a later caller's live state.
 
 ### Evidence and limits
 
 Independent before-fix regressions reproduced the report-unit motion error and both Z-confirmation paths. The audit adds physical-origin/anchor algebra, a small independent GRBL offset oracle and full simulated Falcon Frame/Start flows. Commands, results and remaining issues are recorded in `docs/audits/2026-09-21-coordinates-origin/README.md`.
 
-Two broader coordinate-model findings remain open: native-negative GRBL machine-to-bed display/advisory mapping, and placement-aware bounds for centre-origin 4040-safe contour entries. They require a shared coordinate-frame design across all consumers, not a partial clamp change or a new Frame/Start policy gate. No machine was operated and no saved user profile was changed.
+The repair converts the three original defect characterisations into correctness regressions and adds independent native-frame, physical edge, worker/Save/archive and Absolute-offset checks. No machine was operated and no saved user profile was changed. The existing hardware qualification boundary and Frame-only ordinary Start policy remain unchanged.

@@ -571,13 +571,13 @@
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -615,13 +615,13 @@ AssertionError: expected [ { x: 1.587, y: -1.588 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -661,13 +661,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-center' / 'verified-origin'
 AssertionError: expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally contain { x: -30, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -30,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -30,
@@ -704,13 +704,13 @@ AssertionError: expected [ { x: -30, y: -1.588 }, …(4) ] to deep equally conta
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'back-center' / 'current-position'
 AssertionError: expected [ { x: 93.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 93.25,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 93.25,
@@ -750,13 +750,13 @@ AssertionError: expected [ { x: 93.25, y: -44.087002 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-right' / 'verified-origin'
 AssertionError: expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equally contain { x: -61.5875, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -794,13 +794,13 @@ AssertionError: expected [ { x: -61.588001, y: -1.588 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -838,13 +838,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -44
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": 20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -881,13 +881,13 @@ AssertionError: expected [ { x: 1.587, y: 20 }, …(4) ] to deep equally contain
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'center-left' / 'current-position'
 AssertionError: expected [ { x: 124.838005, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -22.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -927,13 +927,13 @@ AssertionError: expected [ { x: 124.838005, y: -22.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-right' / 'verified-origin'
 AssertionError: expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally contain { x: -61.5875, y: 20 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": 20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -971,13 +971,13 @@ AssertionError: expected [ { x: -61.588001, y: 20 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-right' / 'current-position'
 AssertionError: expected [ { x: 61.661999, y: -22.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -22.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -22.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -1015,13 +1015,13 @@ AssertionError: expected [ { x: 61.661999, y: -22.5 }, …(4) ] to deep equally 
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -1058,13 +1058,13 @@ AssertionError: expected [ { x: 1.587, y: 41.588001 }, …(4) ] to deep equally 
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-left' / 'current-position'
 AssertionError: expected [ { x: 124.838005, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -1102,13 +1102,13 @@ AssertionError: expected [ { x: 124.838005, y: -0.912 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-left' / 'front-center' / 'verified-origin'
 AssertionError: expected [ { x: -30, y: 41.588001 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -30,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -30,
@@ -1146,13 +1146,13 @@ AssertionError: expected [ { x: -30, y: 41.588001 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-center' / 'current-position'
 AssertionError: expected [ { x: 93.25, y: -0.912 }, …(4) ] to deep equally contain { x: 93.25, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 93.25,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 93.25,
@@ -1192,13 +1192,13 @@ AssertionError: expected [ { x: 93.25, y: -0.912 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-right' / 'verified-origin'
 AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -1236,13 +1236,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: 41
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-right' / 'current-position'
 AssertionError: expected [ { x: 61.661999, y: -0.912 }, …(4) ] to deep equally contain { x: 61.6625, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -1280,13 +1280,13 @@ AssertionError: expected [ { x: 61.661999, y: -0.912 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: -1.588 }, …(4) ] to deep equally contain { x: -1.5875, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -1323,13 +1323,13 @@ AssertionError: expected [ { x: -1.587, y: -1.588 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -1367,13 +1367,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'verified-origin'
 AssertionError: expected [ { x: 30, y: -1.588 }, …(4) ] to deep equally contain { x: 30, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 30,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 30,
@@ -1410,13 +1410,13 @@ AssertionError: expected [ { x: 30, y: -1.588 }, …(4) ] to deep equally contai
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-center' / 'current-position'
 AssertionError: expected [ { x: 153.25, y: -44.087002 }, …(4) ] to deep equally contain { x: 153.25, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 153.25,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 153.25,
@@ -1454,13 +1454,13 @@ AssertionError: expected [ { x: 153.25, y: -44.087002 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'verified-origin'
 AssertionError: expected [ { x: 61.587002, y: -1.588 }, …(4) ] to deep equally contain { x: 61.5875, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -1497,13 +1497,13 @@ AssertionError: expected [ { x: 61.587002, y: -1.588 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'back-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -1541,13 +1541,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: 20 }, …(4) ] to deep equally contain { x: -1.5875, y: 20 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": 20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -1584,13 +1584,13 @@ AssertionError: expected [ { x: -1.587, y: 20 }, …(4) ] to deep equally contai
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-left' / 'current-position'
 AssertionError: expected [ { x: 121.663002, y: -22.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -22.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -22.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -1628,13 +1628,13 @@ AssertionError: expected [ { x: 121.663002, y: -22.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'verified-origin'
 AssertionError: expected [ { x: 61.587002, y: 20 }, …(4) ] to deep equally contain { x: 61.5875, y: 20 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": 20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -1671,13 +1671,13 @@ AssertionError: expected [ { x: 61.587002, y: 20 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'center-right' / 'current-position'
 AssertionError: expected [ { x: 184.837006, y: -22.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -22.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -22.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -1715,13 +1715,13 @@ AssertionError: expected [ { x: 184.837006, y: -22.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: 41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -1758,13 +1758,13 @@ AssertionError: expected [ { x: -1.587, y: 41.588001 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-left' / 'current-position'
 AssertionError: expected [ { x: 121.663002, y: -0.912 }, …(4) ] to deep equally contain { x: 121.6625, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -1802,13 +1802,13 @@ AssertionError: expected [ { x: 121.663002, y: -0.912 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'verified-origin'
 AssertionError: expected [ { x: 30, y: 41.588001 }, …(4) ] to deep equally contain { x: 30, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 30,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 30,
@@ -1845,13 +1845,13 @@ AssertionError: expected [ { x: 30, y: 41.588001 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-center' / 'current-position'
 AssertionError: expected [ { x: 153.25, y: -0.912 }, …(4) ] to deep equally contain { x: 153.25, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 153.25,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 153.25,
@@ -1889,13 +1889,13 @@ AssertionError: expected [ { x: 153.25, y: -0.912 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'verified-origin'
 AssertionError: expected [ Array(5) ] to deep equally contain { x: 61.5875, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -1932,13 +1932,13 @@ AssertionError: expected [ Array(5) ] to deep equally contain { x: 61.5875, y: 4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'front-right' / 'front-right' / 'current-position'
 AssertionError: expected [ { x: 184.837006, y: -0.912 }, …(4) ] to deep equally contain { x: 184.8375, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -1976,13 +1976,13 @@ AssertionError: expected [ { x: 184.837006, y: -0.912 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: 1.587 }, …(4) ] to deep equally contain { x: 1.5875, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -2019,13 +2019,13 @@ AssertionError: expected [ { x: 1.587, y: 1.587 }, …(4) ] to deep equally cont
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -2063,13 +2063,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'verified-origin'
 AssertionError: expected [ { x: -30, y: 1.587 }, …(4) ] to deep equally contain { x: -30, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -30,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -30,
@@ -2106,13 +2106,13 @@ AssertionError: expected [ { x: -30, y: 1.587 }, …(4) ] to deep equally contai
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-center' / 'current-position'
 AssertionError: expected [ { x: 93.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 93.25, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 93.25,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 93.25,
@@ -2150,13 +2150,13 @@ AssertionError: expected [ { x: 93.25, y: -40.911999 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'verified-origin'
 AssertionError: expected [ { x: -61.588001, y: 1.587 }, …(4) ] to deep equally contain { x: -61.5875, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -2193,13 +2193,13 @@ AssertionError: expected [ { x: -61.588001, y: 1.587 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'back-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -2237,13 +2237,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -40
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: -20 }, …(4) ] to deep equally contain { x: 1.5875, y: -20 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": -20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -2280,13 +2280,13 @@ AssertionError: expected [ { x: 1.587, y: -20 }, …(4) ] to deep equally contai
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-left' / 'current-position'
 AssertionError: expected [ { x: 124.838005, y: -62.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -62.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -62.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -2324,13 +2324,13 @@ AssertionError: expected [ { x: 124.838005, y: -62.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'verified-origin'
 AssertionError: expected [ { x: -61.588001, y: -20 }, …(4) ] to deep equally contain { x: -61.5875, y: -20 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": -20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -2367,13 +2367,13 @@ AssertionError: expected [ { x: -61.588001, y: -20 }, …(4) ] to deep equally c
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'center-right' / 'current-position'
 AssertionError: expected [ { x: 61.661999, y: -62.5 }, …(4) ] to deep equally contain { x: 61.6625, y: -62.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -62.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -2411,13 +2411,13 @@ AssertionError: expected [ { x: 61.661999, y: -62.5 }, …(4) ] to deep equally 
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: 1.5875, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.587,
@@ -2454,13 +2454,13 @@ AssertionError: expected [ { x: 1.587, y: -41.588001 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.838005,
@@ -2498,13 +2498,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 124.8375, y: -8
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'verified-origin'
 AssertionError: expected [ { x: -30, y: -41.588001 }, …(4) ] to deep equally contain { x: -30, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -30,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -30,
@@ -2541,13 +2541,13 @@ AssertionError: expected [ { x: -30, y: -41.588001 }, …(4) ] to deep equally c
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-center' / 'current-position'
 AssertionError: expected [ { x: 93.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 93.25, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 93.25,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 93.25,
@@ -2585,13 +2585,13 @@ AssertionError: expected [ { x: 93.25, y: -84.088005 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'verified-origin'
 AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -61.5875,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -61.588001,
@@ -2628,13 +2628,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: -61.5875, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-left' / 'front-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.6625,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.661999,
@@ -2672,13 +2672,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 61.6625, y: -84
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: 1.587 }, …(4) ] to deep equally contain { x: -1.5875, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -2715,13 +2715,13 @@ AssertionError: expected [ { x: -1.587, y: 1.587 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -2759,13 +2759,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'verified-origin'
 AssertionError: expected [ { x: 30, y: 1.587 }, …(4) ] to deep equally contain { x: 30, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 30,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 30,
@@ -2802,13 +2802,13 @@ AssertionError: expected [ { x: 30, y: 1.587 }, …(4) ] to deep equally contain
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-center' / 'current-position'
 AssertionError: expected [ { x: 153.25, y: -40.911999 }, …(4) ] to deep equally contain { x: 153.25, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 153.25,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 153.25,
@@ -2846,13 +2846,13 @@ AssertionError: expected [ { x: 153.25, y: -40.911999 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'verified-origin'
 AssertionError: expected [ { x: 61.587002, y: 1.587 }, …(4) ] to deep equally contain { x: 61.5875, y: 1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": 1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -2889,13 +2889,13 @@ AssertionError: expected [ { x: 61.587002, y: 1.587 }, …(4) ] to deep equally 
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'back-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -40.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -40.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -2933,13 +2933,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -4
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: -20 }, …(4) ] to deep equally contain { x: -1.5875, y: -20 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": -20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -2976,13 +2976,13 @@ AssertionError: expected [ { x: -1.587, y: -20 }, …(4) ] to deep equally conta
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-left' / 'current-position'
 AssertionError: expected [ { x: 121.663002, y: -62.5 }, …(4) ] to deep equally contain { x: 121.6625, y: -62.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -62.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -3020,13 +3020,13 @@ AssertionError: expected [ { x: 121.663002, y: -62.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'verified-origin'
 AssertionError: expected [ { x: 61.587002, y: -20 }, …(4) ] to deep equally contain { x: 61.5875, y: -20 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": -20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -3063,13 +3063,13 @@ AssertionError: expected [ { x: 61.587002, y: -20 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'center-right' / 'current-position'
 AssertionError: expected [ { x: 184.837006, y: -62.5 }, …(4) ] to deep equally contain { x: 184.8375, y: -62.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -62.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -3107,13 +3107,13 @@ AssertionError: expected [ { x: 184.837006, y: -62.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'verified-origin'
 AssertionError: expected [ { x: -1.587, y: -41.588001 }, …(4) ] to deep equally contain { x: -1.5875, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -1.5875,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -1.587,
@@ -3150,13 +3150,13 @@ AssertionError: expected [ { x: -1.587, y: -41.588001 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-left' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 121.6625,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 121.663002,
@@ -3194,13 +3194,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 121.6625, y: -8
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'verified-origin'
 AssertionError: expected [ { x: 30, y: -41.588001 }, …(4) ] to deep equally contain { x: 30, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 30,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 30,
@@ -3237,13 +3237,13 @@ AssertionError: expected [ { x: 30, y: -41.588001 }, …(4) ] to deep equally co
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-center' / 'current-position'
 AssertionError: expected [ { x: 153.25, y: -84.088005 }, …(4) ] to deep equally contain { x: 153.25, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 153.25,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 153.25,
@@ -3281,13 +3281,13 @@ AssertionError: expected [ { x: 153.25, y: -84.088005 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'verified-origin'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 61.5875, y: -41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 61.5875,
   "y": -41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 61.587002,
@@ -3324,13 +3324,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 61.5875, y: -41
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'rear-right' / 'front-right' / 'current-position'
 AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -84.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 184.8375,
   "y": -84.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 184.837006,
@@ -3368,13 +3368,13 @@ AssertionError: expected [ …(5) ] to deep equally contain { x: 184.8375, y: -8
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.588, y: -1.588 }, …(4) ] to deep equally contain { x: 1.5875, y: -1.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": -1.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.588,
@@ -3411,13 +3411,13 @@ AssertionError: expected [ { x: 1.588, y: -1.588 }, …(4) ] to deep equally con
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'back-center' / 'current-position'
 AssertionError: expected [ { x: 93.25, y: -44.088001 }, …(4) ] to deep equally contain { x: 93.25, y: -44.0875 }
 
-- Expected: 
+- Expected:
 {
   "x": 93.25,
   "y": -44.0875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 93.25,
@@ -3455,13 +3455,13 @@ AssertionError: expected [ { x: 93.25, y: -44.088001 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.588, y: 20 }, …(4) ] to deep equally contain { x: 1.5875, y: 20 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": 20,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.588,
@@ -3498,13 +3498,13 @@ AssertionError: expected [ { x: 1.588, y: 20 }, …(4) ] to deep equally contain
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'center-left' / 'current-position'
 AssertionError: expected [ { x: 124.836998, y: -22.5 }, …(4) ] to deep equally contain { x: 124.8375, y: -22.5 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -22.5,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.836998,
@@ -3542,13 +3542,13 @@ AssertionError: expected [ { x: 124.836998, y: -22.5 }, …(4) ] to deep equally
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-left' / 'verified-origin'
 AssertionError: expected [ { x: 1.588, y: 41.587002 }, …(4) ] to deep equally contain { x: 1.5875, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": 1.5875,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 1.588,
@@ -3585,13 +3585,13 @@ AssertionError: expected [ { x: 1.588, y: 41.587002 }, …(4) ] to deep equally 
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-left' / 'current-position'
 AssertionError: expected [ { x: 124.836998, y: -0.912 }, …(4) ] to deep equally contain { x: 124.8375, y: -0.9125 }
 
-- Expected: 
+- Expected:
 {
   "x": 124.8375,
   "y": -0.9125,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": 124.836998,
@@ -3629,13 +3629,13 @@ AssertionError: expected [ { x: 124.836998, y: -0.912 }, …(4) ] to deep equall
  FAIL  src/core/job/coordinate-origin-audit.test.ts > independent placement matrix, cnc=true > 'center' / 'front-center' / 'verified-origin'
 AssertionError: expected [ { x: -30, y: 41.587002 }, …(4) ] to deep equally contain { x: -30, y: 41.5875 }
 
-- Expected: 
+- Expected:
 {
   "x": -30,
   "y": 41.5875,
 }
 
-+ Received: 
++ Received:
 [
   {
     "x": -30,
@@ -3674,4 +3674,3 @@ AssertionError: expected [ { x: -30, y: 41.587002 }, …(4) ] to deep equally co
       Tests  120 failed | 322 passed (442)
    Start at  23:49:46
    Duration  8.47s (transform 3.59s, setup 32ms, collect 6.14s, tests 373ms, environment 1.28s, prepare 162ms)
-

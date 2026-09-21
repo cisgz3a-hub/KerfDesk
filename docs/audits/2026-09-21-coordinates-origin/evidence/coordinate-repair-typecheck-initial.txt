@@ -1,0 +1,17 @@
+src/core/job/contour-entry-envelope.test.ts(97,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ToolpathStepList'.
+  Property '0' does not exist on type 'ToolpathStepList'.
+src/core/job/contour-entry-placement.test.ts(162,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ToolpathStepList'.
+  Property '0' does not exist on type 'ToolpathStepList'.
+src/core/job/contour-entry-placement.test.ts(163,12): error TS7053: Element implicitly has an 'any' type because expression of type '1' can't be used to index type 'ToolpathStepList'.
+  Property '1' does not exist on type 'ToolpathStepList'.
+src/core/job/contour-entry-placement.test.ts(222,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ToolpathStepList'.
+  Property '0' does not exist on type 'ToolpathStepList'.
+src/core/job/contour-entry-placement.test.ts(284,14): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ToolpathStepList'.
+  Property '0' does not exist on type 'ToolpathStepList'.
+src/core/output/grbl-strategy.ts(239,19): error TS6133: 'dialect' is declared but its value is never read.
+src/io/gcode/coordinate-envelope-integration.test.ts(24,68): error TS2353: Object literal may only specify known properties, and 'overscanMm' does not exist in type 'Layer'.
+src/ui/laser/print-cut-capture-frame.test.ts(27,23): error TS2554: Expected 4 arguments, but got 3.
+src/ui/laser/print-cut-capture-frame.test.ts(40,23): error TS2554: Expected 4 arguments, but got 3.
+src/ui/laser/print-cut-capture-frame.test.ts(49,23): error TS2554: Expected 4 arguments, but got 3.
+src/ui/laser/print-cut-capture-frame.test.ts(58,12): error TS2554: Expected 4 arguments, but got 3.
+src/ui/laser/print-cut-capture-frame.test.ts(60,7): error TS2554: Expected 4 arguments, but got 3.

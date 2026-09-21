@@ -139,9 +139,10 @@ export function OriginRow(props: {
   // hasCustomXy does not (|x|,|y| only). Choosing the wrong one is invisible
   // until an operator zeroes Z against stock without setting an XY origin.
   //
-  //   hasCustom   — Reset origin and Clear persistent origin: both clear the
-  //                 offset on ALL axes (G92.1 / G10 L2), so a Z-only offset is
-  //                 a real thing to clear and must keep them enabled.
+  //   hasCustom   — Reset origin and Clear persistent origin: both clear
+  //                 temporary XYZ offsets (G92.1), so a temporary Z-only
+  //                 offset keeps them enabled. Persistent clear also clears
+  //                 saved G54 XY; its G10 L2 X0 Y0 leaves saved G54 Z unchanged.
   //   hasCustomXy — the Set-origin attention pulse, and the Release motors
   //                 gate. The gate is a CROSS-COMPONENT invariant: it must use
   //                 whatever predicate NoHomingPositionGuide keys originSettled

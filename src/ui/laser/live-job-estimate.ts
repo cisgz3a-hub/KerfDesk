@@ -23,6 +23,7 @@ import {
   prepareOutput,
   prepareOutputSnapshot,
   type PreparedOutput,
+  type PrepareOutputOptions,
   type VariableTextRenderer,
 } from '../../io/gcode';
 import type { SimilarityTransform } from '../../core/registration';
@@ -32,7 +33,8 @@ import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy'
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
 export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = PREPARATION_COMPILED_SEGMENT_BUDGET;
-export type LiveJobEstimateOptions = Pick<JobDurationEstimateOptions, 'initialPosition'>;
+export type LiveJobEstimateOptions = Pick<JobDurationEstimateOptions, 'initialPosition'> &
+  Pick<PrepareOutputOptions, 'contourEntryBounds' | 'absoluteProgramOffset'>;
 
 export type LiveJobEstimate =
   | { readonly kind: 'empty' }
@@ -71,6 +73,7 @@ export function estimateLiveJob(
   // Same prepared job as Save / Start / Preview, so ETA times the path the
   // machine runs.
   const prepared = prepareOutput(project, {
+    ...options,
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
@@ -96,6 +99,7 @@ export async function estimateLiveJobSnapshot(
   if (costlyCanvasPreparation(outputProject)) return { kind: 'too-large' };
   const hydrated = await hydratePagedRasterProject(project);
   const prepared = await prepareOutputSnapshot(hydrated, {
+    ...options,
     outputScope,
     clock,
     renderVariableText,
@@ -119,6 +123,7 @@ export function estimateLiveJobUnbounded(
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
   const prepared = prepareOutput(project, {
+    ...options,
     outputScope,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });

@@ -1,4 +1,3 @@
-import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import { rotaryAppliesTo } from '../../core/job';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../core/recovery';
@@ -19,9 +18,7 @@ const previews = new WeakMap<ExecutionArtifactV1, CanvasMotionPlan>();
 export function laserRecoveryPreviewPlan(artifact: ExecutionArtifactV1): CanvasMotionPlan {
   const cached = previews.get(artifact);
   if (cached !== undefined) return cached;
-  const { initialPosition, workOffsetMm } = historicalPreviewPosition(
-    artifact.archivedControllerObservation,
-  );
+  const { initialPosition } = historicalPreviewPosition(artifact.archivedControllerObservation);
   const manifest = buildMotionManifest(artifact.gcode, {
     machineKind: 'laser',
     ...(initialPosition === null ? {} : { initialPosition }),
@@ -29,7 +26,11 @@ export function laserRecoveryPreviewPlan(artifact: ExecutionArtifactV1): CanvasM
   const device = artifact.prepared.project.device;
   const mapping = {
     device,
-    coordinateFrame: { kind: 'machine', workOffsetMm } as const,
+    // Historical WCO is a native offset, not proof of where the bed lies.
+    coordinateFrame: {
+      kind: 'relative',
+      jobOriginOffset: artifact.prepared.jobOriginOffset,
+    } as const,
   };
   const rotary = rotaryAppliesTo(device, undefined);
   const fingerprint = fingerprintGcode(artifact.gcode);
@@ -67,7 +68,5 @@ function historicalPreviewPosition(
     { statusReport: observation.statusReport ?? null, wcoCache: observation.wco ?? null },
     reportInches,
   );
-  const wco = observation.statusReport?.wco ?? observation.wco ?? { x: 0, y: 0, z: 0 };
-  const [x, y, z] = normalizeReportedMPosToMm([wco.x, wco.y, wco.z], reportInches);
-  return { initialPosition, workOffsetMm: { x, y, z } };
+  return { initialPosition };
 }

@@ -15,6 +15,7 @@ import {
   computeSceneOutputBounds,
   jobOriginOffset,
   jobOriginOffsetFromBounds,
+  offsetJobBounds,
   optimizePaths,
   type Job,
   type JobBounds,
@@ -39,10 +40,17 @@ import {
   programMaterializationFailure,
 } from './program-materialization';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
+import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
+  /** Physical entry envelope in the final program frame. Null means unknown.
+   * Omitted absolute exports use profile limits; placed jobs require evidence. */
+  readonly contourEntryBounds?: JobBounds | null;
+  /** Known bed-number to controller-program translation for Absolute jobs.
+   * Relative placement modes already choose their own work-coordinate target. */
+  readonly absoluteProgramOffset?: Vec2;
 };
 
 export type PreparedOutput =
@@ -159,15 +167,24 @@ export function completePreparedOutput(
   input: Extract<PreparedOutputInput, { readonly ok: true }>,
   compiled: Job,
 ): Extract<PreparedOutput, { readonly ok: true }> {
-  const offset = input.options.jobOrigin
-    ? resolveJobOriginOffset(
-        input.sourceProject,
-        compiled,
-        input.options.jobOrigin,
-        input.outputScope,
-      )
-    : ZERO_OFFSET;
-  const placed = applyJobOriginOffset(compiled, offset);
+  const offset =
+    (input.options.jobOrigin?.startFrom ?? 'absolute') === 'absolute'
+      ? (input.options.absoluteProgramOffset ?? ZERO_OFFSET)
+      : input.options.jobOrigin
+        ? resolveJobOriginOffset(
+            input.sourceProject,
+            compiled,
+            input.options.jobOrigin,
+            input.outputScope,
+          )
+        : ZERO_OFFSET;
+  const entryBounds =
+    input.options.contourEntryBounds !== undefined
+      ? input.options.contourEntryBounds
+      : (input.options.jobOrigin?.startFrom ?? 'absolute') === 'absolute'
+        ? offsetJobBounds(contourEntryBoundsForDevice(input.project.device), offset)
+        : null;
+  const placed = withContourEntryBounds(applyJobOriginOffset(compiled, offset), entryBounds);
   // Optimization preserves cut geometry/settings while reordering and possibly
   // reversing paths. Joining formerly separated paths can also change planner
   // junction timing, not only travel distance. Doing it HERE means the preview

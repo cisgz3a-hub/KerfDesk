@@ -33,4 +33,24 @@ describe('print-and-cut session trust', () => {
     useStore.getState().setPrintAndCutTargets(null);
     expect(useStore.getState().project.printAndCutTargets).toBeUndefined();
   });
+  it('invalidates mixed or stale coordinate mappings without rejecting a stable controller-relative pair', () => {
+    const session = usePrintCutSessionStore.getState();
+    session.capture('first', { x: -300, y: 200 }, 3, 'controller-relative');
+    session.capture('second', { x: -290, y: 200 }, 3, 'controller-relative');
+    expect(
+      resolvePrintCutRegistration(
+        project,
+        3,
+        usePrintCutSessionStore.getState(),
+        'controller-relative',
+      ).kind,
+    ).toBe('valid');
+    expect(
+      resolvePrintCutRegistration(project, 3, usePrintCutSessionStore.getState(), 'bed').kind,
+    ).toBe('invalid');
+    session.capture('second', { x: 68, y: 68 }, 3, 'bed');
+    expect(resolvePrintCutRegistration(project, 3, usePrintCutSessionStore.getState()).kind).toBe(
+      'invalid',
+    );
+  });
 });

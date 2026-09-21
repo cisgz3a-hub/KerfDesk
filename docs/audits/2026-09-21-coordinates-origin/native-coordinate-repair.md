@@ -1,0 +1,21 @@
+# C-M1 repair evidence
+
+The native/controller, work/program and profile-bed coordinate frames now have an explicit relationship. This repair uses translations only. The five configured device origins still define their existing axis directions; neither the homing corner nor a negative WCO invents a reflection.
+
+`nativeBedFrame` qualifies a native XY envelope whose dimensions match the profile bed to within 0.001 mm. `resolveNativeBedFrame` accepts current-session stock-GRBL settings/build observations, matching active and detected stock identity, enabled/confirmed homing, and the observed `$23`, `$130`, `$131` and build force-origin option. It also supports the matching live Creality A1 Pro command set's documented positive-workspace convention. A profile name alone, stale observations, an unrecognised fork, or different configured travel does not qualify a frame.
+
+For a native-to-bed translation `N` and current WCO `W`, a generated work/program point `P` has bed position `P + W + N`. Qualified Absolute artwork is therefore compiled with translation `-(W + N)`. That translation is retained in `prepared.jobOriginOffset`, so scene previews undo it while Frame and emitted G-code use the same prepared geometry. User and Current Position retain their work-coordinate placement. Verified Origin deliberately has no trusted physical envelope. Contour bounds are supplied in final program coordinates through the C-M2 shared preparation option.
+
+The mapping reaches Start preparation, initial no-go-zone approach checks, idle/live canvas markers, Save/Inspector contexts, Print & Cut capture and canvas-point positioning. The independent worker/preview/estimate integration is recorded by the other repair owners. Historical recovery previews use the sealed artwork-relative offset rather than treating an old raw WCO as a physical-bed mapping.
+
+Unknown physical mappings remain advisory for ordinary Start and Frame. Print & Cut can retain controller-relative captures without homing; its two captured points and output must share a coordinate-frame key as well as the existing position epoch. A mapping or profile-coordinate change requires recapture, preventing a pair measured in different references. Moving to a specific canvas bed point needs a known mapping. Board measurement and its verification jog targets remain native coordinates: measured sizes are translation invariant and native verification positions must not be shifted into bed coordinates before jogging.
+
+Absolute file export with an active custom WCO retains that known offset when qualifying the connected coordinate frame. Unknown custom WCO does not silently become zero. This does not change the existing ordinary Start rule for clearing a custom origin before Absolute placement.
+
+## Verification
+
+`evidence/coordinate-repair-tests.json` records **12 files, 645 tests passed, zero failed**. This comprises the original independent 440-case origin/anchor/placement/raster matrix and 205 focused tests. New coverage includes 80 combinations of device origin, stock homing direction and force-origin setting; stale/missing/mismatched evidence; the explicit A1 positive contract; negative Absolute emitted coordinates and scene/Frame parity; User Origin physical bounds; custom-WCO Absolute export; a real first-approach clamp intersection; inch normalization; negative native board measurement/verification; unknown-mode Start advisories; Print & Cut reference stability and no-homing round trips; and inverse canvas-point targeting.
+
+The initial scoped lint findings were resolver/host/preflight complexity and a hook dependency warning. Those were corrected without changing the accepted coordinate semantics. `evidence/coordinate-repair-lint-followup.txt` is clean. `git diff --check` passed after the repair edits. The parent report records integrated typecheck, full-suite and release checks.
+
+No controller command was sent to hardware. These results do not identify or qualify the user's actual Falcon firmware, switch corner, axis directions, dimensions or homing state. The existing primary GRBL links and the freshly retrieved official A1 profile evidence are recorded in `coordinate-math.md` and `evidence/settings-falcon-vendor-current.json`.

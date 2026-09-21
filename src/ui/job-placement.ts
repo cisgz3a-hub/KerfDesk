@@ -4,6 +4,10 @@ import type { JobOriginPlacement, JobPlacementSettings, JobStartMode } from '../
 import type { MotionBoundsOffset } from '../core/invariants';
 import { normalizeReportedMPosToMm } from '../core/controllers/grbl/machine-envelope';
 import { hasCustomXyOrigin, type WorkCoordinateOffset } from './state/origin-actions';
+import { resolveNativeBedFrame, type NativeBedEvidence } from './state/native-bed-frame';
+import { nativePointToBed } from '../core/devices/native-bed-frame';
+import { machineBoundsForDevice } from '../core/devices/machine-bounds';
+import type { PrepareOutputOptions } from '../io/gcode/prepare-output';
 
 export type { JobPlacementSettings };
 
@@ -62,7 +66,7 @@ export function jobPlacementAfterProfileSelection(
   return jobPlacementAfterDeviceChange(current, previousDevice, nextDevice);
 }
 
-export type MachinePlacementSnapshot = {
+export type MachinePlacementSnapshot = NativeBedEvidence & {
   readonly statusReport: StatusReport | null;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
@@ -106,16 +110,11 @@ export function resolveJobPlacement(
   }
 }
 
-// Save G-code is a file export, not a motion command: for every mode except
-// Current Position the emitted bytes are independent of the live machine
-// state (user/verified origin translate the job anchor to work (0,0);
-// absolute passes coordinates through). When the live resolution succeeds we
-// keep it — a connected machine still contributes its WCO to the absolute
-// bounds preflight — but a failed live resolution must not block the export.
-// Falling back drops only the motion offset, so preflight degrades to the
-// size-only relative mode that Verified Origin starts already use (ADR-053).
-// Current Position is the one mode whose bytes bake in the live head
-// position, so it alone keeps its live-machine requirement at export time.
+// Save is a file export, so missing origin state must not block it except in
+// Current Position, whose placement needs the live head. Keep a known WCO in
+// the Absolute fallback: a verified native-to-bed contract then lets the caller
+// export bed positions in the connected controller's actual work frame.
+// Without qualified runtime evidence, callers retain profile-relative output.
 export function resolveExportJobPlacement(
   settings: JobPlacementSettings,
   machine: MachinePlacementSnapshot,
@@ -123,8 +122,10 @@ export function resolveExportJobPlacement(
   const live = resolveJobPlacement(settings, machine);
   if (live.ok) return live;
   switch (settings.startFrom) {
-    case 'absolute':
-      return { ok: true };
+    case 'absolute': {
+      const wco = knownWco(machine);
+      return wco === null ? { ok: true } : { ok: true, preflightMotionOffset: xyOffset(wco) };
+    }
     case 'user-origin':
       return { ok: true, jobOrigin: { startFrom: 'user-origin', anchor: settings.anchor } };
     case 'verified-origin':
@@ -155,13 +156,44 @@ export function resolvePreviewJobPlacement(
 export function trustedMotionOffsetForPreflight(
   device: DeviceProfile,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  evidence: NativeBedEvidence & Pick<MachinePlacementSnapshot, 'workOriginActive'> = {},
 ): MotionBoundsOffset | undefined {
   // Verified Origin is set by hand, so GRBL's machine position is fiction even
   // on a homing-capable machine — never trust an absolute offset for it, which
   // forces the size-only relative preflight regardless of homing (ADR-053).
   if (placement.jobOrigin?.startFrom === 'verified-origin') return undefined;
-  if (!device.homing.enabled) return undefined;
-  return placement.preflightMotionOffset;
+  const frame = resolveNativeBedFrame(device, evidence);
+  if (frame === null) return undefined;
+  const nativeOffset =
+    placement.preflightMotionOffset ??
+    ((placement.jobOrigin === undefined || placement.jobOrigin.startFrom === 'absolute') &&
+    evidence.workOriginActive !== true
+      ? { x: 0, y: 0 }
+      : undefined);
+  return nativeOffset === undefined ? undefined : nativePointToBed(nativeOffset, frame);
+}
+
+/** Runtime programs use controller work coordinates. Absolute artwork uses
+ * profile bed coordinates, so only that mode needs the inverse frame shift. */
+export function runtimeCoordinatePreparationOptions(
+  device: DeviceProfile,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  evidence: NativeBedEvidence & Pick<MachinePlacementSnapshot, 'workOriginActive'>,
+): Pick<PrepareOutputOptions, 'contourEntryBounds' | 'absoluteProgramOffset'> {
+  const offset = trustedMotionOffsetForPreflight(device, placement, evidence);
+  if (offset === undefined) return { contourEntryBounds: null };
+  const bed = machineBoundsForDevice(device);
+  const absolute =
+    placement.jobOrigin === undefined || placement.jobOrigin.startFrom === 'absolute';
+  return {
+    contourEntryBounds: {
+      minX: bed.minX - offset.x,
+      maxX: bed.maxX - offset.x,
+      minY: bed.minY - offset.y,
+      maxY: bed.maxY - offset.y,
+    },
+    ...(absolute ? { absoluteProgramOffset: { x: -offset.x, y: -offset.y } } : {}),
+  };
 }
 
 function resolveAbsolute(machine: MachinePlacementSnapshot): ResolvedJobPlacement {

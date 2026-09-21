@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile, type Origin } from '../../core/devices';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import {
   clampToBed,
   dispatchPositionLaser,
@@ -89,8 +90,13 @@ describe('dispatchPositionLaser', () => {
   });
 
   it('sends one absolute jog to the mapped machine point when ready', () => {
+    const device = {
+      ...deviceWith('rear-left'),
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
     const jogToMachinePosition = vi.fn(async () => undefined);
     useLaserStore.setState({
+      ...stockNativeEvidence(device, true),
       connection: { kind: 'connected' },
       streamer: null,
       motionOperation: null,
@@ -105,9 +111,42 @@ describe('dispatchPositionLaser', () => {
       },
       jogToMachinePosition,
     });
-    const device = deviceWith('rear-left'); // identity origin transform
     dispatchPositionLaser({ x: 12.5, y: 40 }, device);
     expect(jogToMachinePosition).toHaveBeenCalledTimes(1);
     expect(jogToMachinePosition).toHaveBeenCalledWith(12.5, 40, positionLaserFeed(device.maxFeed));
+  });
+
+  it('converts a canvas destination to negative native coordinates and refuses unknown mapping', () => {
+    const device = {
+      ...deviceWith('front-left'),
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    const jogToMachinePosition = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      ...stockNativeEvidence(device),
+      connection: { kind: 'connected' },
+      streamer: null,
+      motionOperation: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: null,
+        wPos: null,
+        feed: null,
+        spindle: null,
+        wco: null,
+      },
+      jogToMachinePosition,
+    });
+    dispatchPositionLaser({ x: 50, y: 30 }, device);
+    expect(jogToMachinePosition).toHaveBeenCalledWith(
+      50 - device.bedWidth,
+      -30,
+      positionLaserFeed(device.maxFeed),
+    );
+    useLaserStore.setState({ controllerBuildInfoObservation: null });
+    dispatchPositionLaser({ x: 50, y: 30 }, device);
+    expect(jogToMachinePosition).toHaveBeenCalledTimes(1);
+    expect(useToastStore.getState().toasts[0]?.message).toContain('mapping is unverified');
   });
 });

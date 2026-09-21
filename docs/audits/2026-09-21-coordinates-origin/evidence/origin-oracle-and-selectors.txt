@@ -1,0 +1,12 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/ui/laser/OriginRow.test.tsx (16 tests) 242ms
+ ✓ src/ui/state/coordinate-origin-oracle-audit-20260921.test.ts (13 tests) 10ms
+ ✓ src/ui/state/manual-motion-fresh-idle.test.ts (5 tests) 22ms
+ ✓ src/ui/state/infer-machine-position.test.ts (9 tests) 6ms
+
+ Test Files  4 passed (4)
+      Tests  43 passed (43)
+   Start at  23:51:19
+   Duration  21.97s (transform 9.01s, setup 68ms, collect 14.77s, tests 280ms, environment 4.61s, prepare 802ms)

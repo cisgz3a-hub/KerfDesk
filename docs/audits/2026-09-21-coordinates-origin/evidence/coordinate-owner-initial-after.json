@@ -1,0 +1,258 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 19,
+  "numPassedTests": 19,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790034304860,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate cancels old Absolute work when a same-session observation establishes native bed mapping",
+          "status": "passed",
+          "title": "cancels old Absolute work when a same-session observation establishes native bed mapping",
+          "duration": 82.52329999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate keeps $30/$32 and equivalent $I/settings observation replacements advisory",
+          "status": "passed",
+          "title": "keeps $30/$32 and equivalent $I/settings observation replacements advisory",
+          "duration": 2.736499999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate uses the resolved Verified Origin instead of the unrelated live Absolute selector",
+          "status": "passed",
+          "title": "uses the resolved Verified Origin instead of the unrelated live Absolute selector",
+          "duration": 2.9121000000000095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate refuses a stale Frame handoff after mapping changes, even after the owner settled",
+          "status": "passed",
+          "title": "refuses a stale Frame handoff after mapping changes, even after the owner settled",
+          "duration": 14.778299999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate accepts Frame handoff after an advisory refresh and preserves the exact prepared bytes",
+          "status": "passed",
+          "title": "accepts Frame handoff after an advisory refresh and preserves the exact prepared bytes",
+          "duration": 12.871099999999842,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790034331634,
+      "endTime": 1790034331749.871,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/coordinate-preparation-ownership.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime cancels a stale active Frame, dispatches the queued Save, and issues no Frame permit",
+          "status": "passed",
+          "title": "cancels a stale active Frame, dispatches the queued Save, and issues no Frame permit",
+          "duration": 80.95600000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime removes only a stale queued Start and allows an explicit retry after Save",
+          "status": "passed",
+          "title": "removes only a stale queued Start and allows an explicit retry after Save",
+          "duration": 6.9409999999998035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime preserves healthy preparation across advisory settings and UI-only changes",
+          "status": "passed",
+          "title": "preserves healthy preparation across advisory settings and UI-only changes",
+          "duration": 4.923099999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime cancels on a controller session change without touching another queued owner",
+          "status": "passed",
+          "title": "cancels on a controller session change without touching another queued owner",
+          "duration": 4.402799999999843,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["R1: current Frame/Start preparation owns its worker lifetime"],
+          "fullName": "R1: current Frame/Start preparation owns its worker lifetime keeps caller cancellation as AbortError and rejects an already-stale captured source",
+          "status": "passed",
+          "title": "keeps caller cancellation as AbortError and rejects an already-stale captured source",
+          "duration": 5.918099999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790034327774,
+      "endTime": 1790034327877.9182,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-preparation-owner.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization selects G54 for g92-and-g10 controllers and waits for its fresh position before Frame",
+          "status": "passed",
+          "title": "selects G54 for g92-and-g10 controllers and waits for its fresh position before Frame",
+          "duration": 123.24469999999928,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization selects G54 for g92-only controllers and waits for its fresh position before Frame",
+          "status": "passed",
+          "title": "selects G54 for g92-only controllers and waits for its fresh position before Frame",
+          "duration": 41.52399999999761,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization dispatches the exact prepared artifact and motion envelope without opening Job Review",
+          "status": "passed",
+          "title": "dispatches the exact prepared artifact and motion envelope without opening Job Review",
+          "duration": 11.359199999998964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization stays pending after dispatch and resolves true only when completion publishes its permit",
+          "status": "passed",
+          "title": "stays pending after dispatch and resolves true only when completion publishes its permit",
+          "duration": 9.599900000001071,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization resolves false when an owned Frame is cancelled while its safety lock remains",
+          "status": "passed",
+          "title": "resolves false when an owned Frame is cancelled while its safety lock remains",
+          "duration": 11.703300000001036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization returns false and creates no permit when the controller accepts no Frame dispatch",
+          "status": "passed",
+          "title": "returns false and creates no permit when the controller accepts no Frame dispatch",
+          "duration": 8.47609999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization returns false and creates no permit when physical Frame dispatch fails",
+          "status": "passed",
+          "title": "returns false and creates no permit when physical Frame dispatch fails",
+          "duration": 7.813699999998789,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization expires on project drift but preserves a permit through camera-only drift",
+          "status": "passed",
+          "title": "expires on project drift but preserves a permit through camera-only drift",
+          "duration": 15.08929999999964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization expires permanently when print-and-cut registration changes away and back",
+          "status": "passed",
+          "title": "expires permanently when print-and-cut registration changes away and back",
+          "duration": 12.12840000000142,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790034321695,
+      "endTime": 1790034321937.1284,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.framed-run.test.ts"
+    }
+  ]
+}

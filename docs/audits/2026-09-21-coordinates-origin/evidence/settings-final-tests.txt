@@ -1,0 +1,43 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.test.tsx (11 tests) 2472ms
+   ✓ DeviceSetupWizard > atomically saves a laser profile and workspace at the end  748ms
+   ✓ DeviceSetupWizard > shows CNC-only machine settings and commits them with the profile  618ms
+   ✓ DeviceSetupWizard > saves a hybrid machine with both output contracts and one explicit active mode  427ms
+ ✓ src/ui/laser/DeviceSettings.test.tsx (14 tests) 526ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.cnc.test.tsx (2 tests) 475ms
+   ✓ DeviceSetupWizard router commit > applies accepted settings without replacing the user-selected firmware profile  342ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.catalog.test.tsx (3 tests) 269ms
+ ✓ src/ui/laser/JobControls.test.tsx (7 tests) 278ms
+ ✓ src/ui/laser/OriginRow.test.tsx (16 tests) 107ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.detected-values.test.tsx (1 test) 216ms
+ ✓ src/ui/laser/JobControls.layout.test.tsx (4 tests) 289ms
+ ✓ src/ui/laser/device-setup/DeviceSetupMaxFeedInvariant.test.tsx (1 test) 79ms
+ ✓ src/core/devices/catalogue-output-contracts.test.ts (8 tests) 26ms
+ ✓ src/io/machine-profile/machine-profile-catalog-workflow.test.ts (1 test) 45ms
+ ✓ src/core/devices/device-profile-patch.test.ts (15 tests) 38ms
+ ✓ src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx (10 tests) 26ms
+ ✓ src/io/machine-profile/machine-profile-io.test.ts (14 tests) 17ms
+ ✓ src/ui/laser/device-setup/device-setup-flow.test.ts (23 tests) 13ms
+ ✓ src/core/controllers/grbl/parse-settings.test.ts (21 tests) 15ms
+ ✓ src/core/devices/profile-catalog.test.ts (10 tests) 20ms
+ ✓ src/core/devices/device-profile.test.ts (13 tests) 7ms
+ ✓ src/ui/laser/OriginRow.attention.test.tsx (5 tests) 64ms
+ ✓ src/ui/state/machine-profile-actions.test.ts (5 tests) 10ms
+ ✓ src/core/devices/profile-suggestions.test.ts (4 tests) 6ms
+ ✓ src/io/machine-profile/machine-profile-camera.test.ts (3 tests) 10ms
+ ✓ src/ui/state/cnc-machine-profile-persistence.test.ts (3 tests) 8ms
+ ✓ src/ui/state/machine-setup-output-parity.test.ts (1 test) 245ms
+ ✓ src/core/controllers/falcon-command-contract.test.ts (4 tests) 9ms
+ ✓ src/ui/laser/device-setup/machine-setup-controller-guide.test.ts (4 tests) 5ms
+ ✓ src/ui/state/machine-setup-history.test.ts (1 test) 8ms
+ ✓ src/io/machine-profile/machine-profile-rotary.test.ts (2 tests) 8ms
+ ✓ src/io/machine-profile/machine-profile-command-set.test.ts (1 test) 7ms
+
+ Test Files  29 passed (29)
+      Tests  207 passed (207)
+   Start at  23:57:17
+   Duration  93.21s (transform 8.56s, setup 132ms, collect 51.93s, tests 5.30s, environment 23.94s, prepare 4.12s)
+
+JSON report written to D:/LaserForge/audit-coordinates-origin-20260921/docs/audits/2026-09-21-coordinates-origin/evidence/settings-final-tests.json

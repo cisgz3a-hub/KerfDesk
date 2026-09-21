@@ -1,0 +1,143 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > rejects Set Origin when the G92 write fails
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > marks the work origin active only after the controller acknowledges Set Origin
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > does not finish Set Origin until the work offset is known (post-Release/Wake)
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > warns that the origin is unconfirmed when no work offset arrives (B21)
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > does not treat a zero WCO as a custom origin when none was set
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > preserves a known Z offset when Set Origin changes X/Y only
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > marks the XY origin persistent but invalidates Z cleared by G92.1
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > requires an Idle status before advanced persistent origin writes
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > clears the active work-origin flag when Reset Origin succeeds
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > does not pretend Reset Origin cleared a known persistent G54 origin
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > clears persistent G54 origin through the advanced clear action
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > invalidates origin truth when a persistent-origin transaction fails after G92 clears
+
+
+stderr | src/ui/state/laser-store-origin.test.ts > laser-store origin actions > requires a known Idle state and no outstanding acknowledgement
+
+
+ ✓ src/ui/state/laser-store-origin.test.ts (15 tests) 7883ms
+   ✓ laser-store origin actions > rejects Set Origin when the G92 write fails  541ms
+   ✓ laser-store origin actions > marks the work origin active only after the controller acknowledges Set Origin  542ms
+   ✓ laser-store origin actions > does not finish Set Origin until the work offset is known (post-Release/Wake)  569ms
+   ✓ laser-store origin actions > warns that the origin is unconfirmed when no work offset arrives (B21)  523ms
+   ✓ laser-store origin actions > keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)  518ms
+   ✓ laser-store origin actions > does not treat a zero WCO as a custom origin when none was set  520ms
+   ✓ laser-store origin actions > preserves a known Z offset when Set Origin changes X/Y only  522ms
+   ✓ laser-store origin actions > Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)  531ms
+   ✓ laser-store origin actions > marks the XY origin persistent but invalidates Z cleared by G92.1  521ms
+   ✓ laser-store origin actions > requires an Idle status before advanced persistent origin writes  513ms
+   ✓ laser-store origin actions > clears the active work-origin flag when Reset Origin succeeds  517ms
+   ✓ laser-store origin actions > does not pretend Reset Origin cleared a known persistent G54 origin  507ms
+   ✓ laser-store origin actions > clears persistent G54 origin through the advanced clear action  517ms
+   ✓ laser-store origin actions > invalidates origin truth when a persistent-origin transaction fails after G92 clears  519ms
+   ✓ laser-store origin actions > requires a known Idle state and no outstanding acknowledgement  518ms
+ ✓ src/ui/state/laser-probe-lifecycle.test.ts (10 tests) 4749ms
+   ✓ probe controller transaction lifecycle > owns every ack and proves settlement before establishing Z evidence  548ms
+   ✓ probe controller transaction lifecycle > allows fail-off lines but emits no probe motion after MPG takeover  519ms
+   ✓ probe controller transaction lifecycle > captures replies delivered synchronously before write resolves  518ms
+   ✓ probe controller transaction lifecycle > rejects an invalid structural request without establishing evidence  519ms
+   ✓ probe controller transaction lifecycle > does not write a partial corner WCS when the final side contact fails  519ms
+   ✓ probe controller transaction lifecycle > aborts on a status-only Alarm even when no numbered ALARM line arrives  523ms
+   ✓ probe controller transaction lifecycle > preserves XY evidence during a Z probe but invalidates it on a global alarm  527ms
+   ✓ probe controller transaction lifecycle > soft-resets after timeout and keeps Start locked until two fresh Idle reports  551ms
+   ✓ probe controller transaction lifecycle > treats an early reboot banner as transaction loss instead of a response  517ms
+ ✓ src/ui/state/laser-store-jog-to-point.test.ts (11 tests) 6508ms
+   ✓ jogToMachinePosition > jogs the relative delta from the current machine position  546ms
+   ✓ jogToMachinePosition > reaches the (0,0) origin corner from a nonzero position  517ms
+   ✓ jogToMachinePosition > does nothing when already at the target  519ms
+   ✓ jogToMachinePosition > lifts Z to the CNC safe height before the XY traverse, then jogs (F105)  767ms
+   ✓ jogToMachinePosition > writes nothing when a CNC point move lacks current Work-Z evidence  519ms
+   ✓ jogToMachinePosition > does not add a Z retract for a laser project  517ms
+   ✓ jogToMachinePosition > retains a cancelled owner when the CNC safe-Z retract rejects ambiguously  517ms
+   ✓ jogToMachinePosition > never dispatches XY or its settle marker before a delayed safe-Z handoff resolves  686ms
+   ✓ jogToMachinePosition > cancels the point move when MPG takes control during safe-Z settlement  578ms
+   ✓ jogToMachinePosition > lets Cancel supersede an in-progress safe-Z status proof and settle the owner  822ms
+   ✓ jogToMachinePosition > reports missing fresh status before attempting a position-based move  518ms
+ ✓ src/core/controllers/grbl/status-parser.test.ts (38 tests) 18ms
+ ✓ src/ui/state/laser-corner-probe-atomic.test.ts (13 tests) 7455ms
+   ✓ atomic corner-probe controller transaction > writes no controller bytes when static plate and cutter geometry is unsafe  633ms
+   ✓ atomic corner-probe controller transaction > writes no bytes for unsupported runtime parameters 0  531ms
+   ✓ atomic corner-probe controller transaction > writes no bytes for unsupported runtime parameters 1  516ms
+   ✓ atomic corner-probe controller transaction > writes no bytes for unsupported runtime parameters 2  536ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 0 fails  554ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 1 fails  540ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 2 fails  550ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 3 fails  557ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 4 fails  592ms
+   ✓ atomic corner-probe controller transaction > does not write a partial WCS when probe contact 5 fails  551ms
+   ✓ atomic corner-probe controller transaction > keeps coordinate evidence invalid when an alarm occurs at the combined G10 boundary  566ms
+   ✓ atomic corner-probe controller transaction > keeps coordinate evidence invalid when an alarm occurs at the final park boundary  572ms
+   ✓ atomic corner-probe controller transaction > treats a combined G10 acknowledgement timeout as coordinate-uncertain  747ms
+ ✓ src/ui/state/laser-home-action.test.ts (8 tests) 4396ms
+   ✓ home command timeout > writes no Home command while the controller is known Run  636ms
+   ✓ home command timeout > writes no Home command while the controller is known Hold  529ms
+   ✓ home command timeout > writes no Home command while the controller is known Jog  522ms
+   ✓ home command timeout > retains intentional Home-from-Alarm recovery  525ms
+   ✓ home command timeout > writes no Home command before any controller status or Alarm evidence exists  519ms
+   ✓ home command timeout > writes no Home command while an older terminal acknowledgement is owed  524ms
+   ✓ home command timeout > does not time out while Home status reports keep arriving  598ms
+   ✓ home command timeout > cannot confirm Home when a reboot lands after the final Idle observation  536ms
+ ✓ src/ui/state/laser-jog-actions.zone-guard.test.ts (5 tests) 2750ms
+   ✓ jog no-go zone warnings (DEV-04) > dispatches an unchanged jog whose path crosses an enabled zone and warns  620ms
+   ✓ jog no-go zone warnings (DEV-04) > allows a jog that stays clear of the zone  529ms
+   ✓ jog no-go zone warnings (DEV-04) > allows a Z-only jog even when the head is parked inside a zone  539ms
+   ✓ jog no-go zone warnings (DEV-04) > checks an absolute jog as a destination instead of a relative delta  527ms
+   ✓ jog no-go zone warnings (DEV-04) > dispatches an unchanged relative XY jog with an unresolved path and warns  526ms
+ ✓ src/ui/state/laser-jog-actions.bounds-warning.test.ts (4 tests) 2665ms
+   ✓ jog configured-machine-bounds warning > sends an absolute board-point destination beyond configured travel and warns  545ms
+   ✓ jog configured-machine-bounds warning > sends a relative fine step past the edge with a warning, and the edge silently  1088ms
+   ✓ jog configured-machine-bounds warning > warns with signed travel limits for a center-origin device  519ms
+   ✓ jog configured-machine-bounds warning > treats relative:false axes as the absolute destination and still proceeds  510ms
+ ✓ src/ui/state/laser-origin-transaction.test.ts (11 tests) 22ms
+ ✓ src/core/controllers/grbl/probe.test.ts (14 tests) 13ms
+ ✓ src/ui/state/origin-actions.test.ts (15 tests) 14ms
+ ✓ src/ui/state/laser-store-origin-ownership.test.ts (3 tests) 57ms
+ ✓ src/ui/state/laser-store-jog-to-point-readiness.test.ts (5 tests) 2621ms
+   ✓ CNC jog-to-point readiness ordering > writes no retract or XY motion when 'the controller is not Idle'  538ms
+   ✓ CNC jog-to-point readiness ordering > writes no retract or XY motion when 'another motion operation is active'  522ms
+   ✓ CNC jog-to-point readiness ordering > writes no retract or XY motion when 'a controller operation is active'  516ms
+   ✓ CNC jog-to-point readiness ordering > writes no retract or XY motion when 'momentary Fire is active'  521ms
+   ✓ CNC jog-to-point readiness ordering > writes no retract or XY motion when 'autofocus is active'  521ms
+ ✓ src/ui/state/laser-status-position.test.ts (4 tests) 5ms
+ ✓ src/ui/state/laser-probe-actions.test.ts (1 test) 564ms
+   ✓ laser probe wire ownership > does not establish work-Z evidence when MPG takes ownership during final Idle proof  562ms
+ ✓ src/ui/state/laser-owned-motion-status-race.test.ts (1 test) 11ms
+ ✓ src/ui/state/probe-actions.test.ts (4 tests) 7ms
+ ✓ src/core/controllers/grbl/status-parser-multi-axis.test.ts (11 tests) 9ms
+ ✓ src/ui/state/laser-home-proof.test.ts (6 tests) 4ms
+
+ Test Files  19 passed (19)
+      Tests  179 passed (179)
+   Start at  23:44:41
+   Duration  133.37s (transform 9.94s, setup 223ms, collect 54.71s, tests 39.75s, environment 26.07s, prepare 4.13s)

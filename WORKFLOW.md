@@ -2394,6 +2394,19 @@ homing direction or change work zero. Home uses the selected controller's comman
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
 
+The controller's native MPos is distinct from the drawn bed coordinates (ADR-342). Stock GRBL
+can report negative machine positions after homing. With current-session build, travel and homing
+evidence, KerfDesk maps that native frame to the profile bed and translates Absolute output back
+into the controller's frame. It does not change firmware offsets to do this. User and Current
+Position placement remain relative to their selected work/head reference. When the physical bed
+mapping is unknown, the canvas uses the artwork frame and Job Review explains the limitation;
+the completed Frame remains the ordinary Start gate.
+
+Contour entry moves use the prepared program's explicit physical envelope, including centred
+origins and translated work origins. If that envelope is unknown, the optional contour entry is
+omitted. Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+jobs retain their original entry behaviour so recovery does not silently change sealed output.
+
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across
 status frames). It must never read the raw `statusReport.wco` — GRBL

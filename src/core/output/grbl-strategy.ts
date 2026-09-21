@@ -14,7 +14,7 @@
 // units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
 
 import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
-import { contourEntryPoint } from '../job/contour-entry';
+import { contourEntryPoint, type ContourEntryBounds } from '../job/contour-entry';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
 import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
 import type { FillSpan } from '../job/fill-sweeps';
@@ -115,7 +115,9 @@ type SegmentEmissionContext = {
   readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
   readonly entryRunwayMm?: number | undefined;
+  readonly entryBounds: ContourEntryBounds;
 };
+type GroupEmissionContext = Pick<SegmentEmissionContext, 'device' | 'dialect' | 'entryBounds'>;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
   const { s, feed, dialect } = context;
@@ -165,10 +167,7 @@ function segmentApproachLines(
   const entry =
     context.entryRunwayMm === undefined
       ? null
-      : contourEntryPoint(seg.polyline, context.entryRunwayMm, {
-          widthMm: context.device.bedWidth,
-          heightMm: context.device.bedHeight,
-        });
+      : contourEntryPoint(seg.polyline, context.entryRunwayMm, context.entryBounds);
   if (entry === null) {
     return [laserOffSeekLine(first.x, first.y, context.device, context.dialect)];
   }
@@ -178,7 +177,8 @@ function segmentApproachLines(
   ];
 }
 
-function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
+function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
+  const { device, dialect } = context;
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
@@ -195,10 +195,9 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
     if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
     for (const seg of group.segments) {
       const segText = emitSegment(seg, {
+        ...context,
         s,
         feed,
-        device,
-        dialect,
         entryRunwayMm: group.entryRunwayMm,
       });
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
@@ -207,9 +206,9 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
   return chunks.join(LINE_END) + LINE_END;
 }
 
-function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
-  if ((group.fillStyle ?? 'scanline') === 'offset')
-    return emitOffsetFillGroup(group, device, dialect);
+function emitFillGroup(group: FillGroup, groupContext: GroupEmissionContext): string {
+  if ((group.fillStyle ?? 'scanline') === 'offset') return emitOffsetFillGroup(group, groupContext);
+  const { device, dialect } = groupContext;
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
@@ -236,11 +235,8 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   return chunks.join(LINE_END) + LINE_END;
 }
 
-function emitOffsetFillGroup(
-  group: FillGroup,
-  device: DeviceProfile,
-  dialect: GrblGcodeDialect,
-): string {
+function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): string {
+  const { device } = context;
   const s = scaleS(group.power, device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
@@ -252,10 +248,9 @@ function emitOffsetFillGroup(
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
       const segText = emitSegment(seg, {
+        ...context,
         s,
         feed,
-        device,
-        dialect,
         entryRunwayMm: group.entryRunwayMm,
       });
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
@@ -411,14 +406,14 @@ function emitRasterGroupHere(
   });
 }
 
-function emitAnyGroup(group: Group, device: DeviceProfile, dialect: GrblGcodeDialect): string {
+function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
   switch (group.kind) {
     case 'cut':
-      return emitGroup(group, device, dialect);
+      return emitGroup(group, context);
     case 'fill':
-      return emitFillGroup(group, device, dialect);
+      return emitFillGroup(group, context);
     case 'raster':
-      return emitRasterGroupHere(group, device, dialect);
+      return emitRasterGroupHere(group, context.device, context.dialect);
     case 'cnc':
       // CNC jobs are emitted by cncGrblStrategy; emit-gcode routes by the
       // project's machine kind. A cnc group reaching the laser strategy is a
@@ -473,6 +468,10 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
   const plan = coolantPlan(job, device);
+  const entryBounds =
+    job.contourEntryBounds === undefined
+      ? { widthMm: device.bedWidth, heightMm: device.bedHeight }
+      : job.contourEntryBounds;
   for (const [index, group] of job.groups.entries()) {
     const wantedMode = powerModeForGroup(group, dialect);
     if (wantedMode === 'M3' && mode !== 'M3') {
@@ -490,7 +489,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     const nextCoolant = plan[index] ?? 'off';
     parts.push(coolantTransition(coolant, nextCoolant));
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, device, dialect));
+    parts.push(emitAnyGroup(group, { device, dialect, entryBounds }));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
   parts.push(coolantTransition(coolant, 'off'));

@@ -1,0 +1,15 @@
+
+D:\LaserForge\audit-coordinates-origin-20260921\src\ui\app\use-shortcuts.ts
+  88:5  warning  React Hook useMemo has an unnecessary dependency: 'coordinateEvidenceKey'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\LaserForge\audit-coordinates-origin-20260921\src\ui\laser\PrintAndCutDialogHost.tsx
+  9:8  error  Function 'PrintAndCutDialogHost' has a complexity of 13. Maximum allowed is 12  complexity
+
+D:\LaserForge\audit-coordinates-origin-20260921\src\ui\laser\start-job-readiness.ts
+  293:8  error  Function 'finalizeStartPreparation' has too many lines (85). Maximum allowed is 80  max-lines-per-function
+  293:8  error  Function 'finalizeStartPreparation' has a complexity of 15. Maximum allowed is 12   complexity
+
+D:\LaserForge\audit-coordinates-origin-20260921\src\ui\state\native-bed-frame.ts
+  52:8  error  Function 'resolveNativeBedFrame' has a complexity of 30. Maximum allowed is 12  complexity
+
+✖ 5 problems (4 errors, 1 warning)

@@ -11,6 +11,7 @@ import { useOutputScope } from '../state';
 import { type CanvasMotionPlan, type LiveCanvasRun } from '../state/canvas-motion-plan';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
+import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
@@ -294,6 +295,7 @@ function canvasMachineSnapshot(
   canvasRevision = '',
 ) {
   return {
+    ...nativeBedEvidenceSnapshot(state),
     connection: state.connection,
     statusReport: state.statusReport,
     alarmCode: state.alarmCode,
@@ -330,6 +332,7 @@ function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>)
     // The snapshot forwards homingState (ADR-327); confirmHome flips it without
     // touching any other keyed field, so it must key the revision too.
     state.homingState,
+    JSON.stringify(nativeBedEvidenceSnapshot(state)),
     position,
   ].join('|');
 }

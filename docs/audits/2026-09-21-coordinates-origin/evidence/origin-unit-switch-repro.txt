@@ -1,0 +1,47 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ❯ src/ui/state/coordinate-origin-audit-20260921.test.ts (2 tests | 2 failed) 1060ms
+   × 2026-09-21 independent origin/coordinate audit > does not reinterpret a cached millimetre position as inches after changing $13 535ms
+     → expected false to be true // Object.is equality
+   × 2026-09-21 independent origin/coordinate audit > never derives a large wrong-way jog from the previous unit system 523ms
+     → expected [ Array(1) ] to not include '$J=G91 G21 X-234.000 Y-488.000 F1000\n'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/state/coordinate-origin-audit-20260921.test.ts > 2026-09-21 independent origin/coordinate audit > does not reinterpret a cached millimetre position as inches after changing $13
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/ui/state/coordinate-origin-audit-20260921.test.ts:61:75
+     59|     // Accept invalidation (null) or a unit-aware preserved value. $13…
+     60|     // formatting, never physical position, so 254,508 mm is not a val…
+     61|     expect(position === null || (position.x === 10 && position.y === 2…
+       |                                                                           ^
+     62|   });
+     63|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/state/coordinate-origin-audit-20260921.test.ts > 2026-09-21 independent origin/coordinate audit > never derives a large wrong-way jog from the previous unit system
+AssertionError: expected [ Array(1) ] to not include '$J=G91 G21 X-234.000 Y-488.000 F1000\n'
+ ❯ src/ui/state/coordinate-origin-audit-20260921.test.ts:75:65
+     73|     }
+     74|     await move;
+     75|     expect(writes.filter((line) => line.startsWith('$J='))).not.toCont…
+       |                                                                 ^
+     76|       '$J=G91 G21 X-234.000 Y-488.000 F1000\n',
+     77|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  23:48:39
+   Duration  14.45s (transform 6.93s, setup 33ms, collect 11.89s, tests 1.06s, environment 937ms, prepare 162ms)

@@ -1,0 +1,12 @@
+
+ RUN  v4.1.11 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ❯ src/ui/state/canvas-motion-plan.test.ts (26 tests | 1 failed) 45ms
+     × keeps the truthful machine frame for an origin-anchored start on a homed machine 8ms
+ ❯ src/ui/job-placement.test.ts (25 tests | 1 failed) 18ms
+     × trusts the user-origin offset when homing is enabled 8ms
+
+ Test Files  2 failed | 4 passed (6)
+      Tests  2 failed | 158 passed (160)
+   Start at  07:30:13
+   Duration  22.78s (transform 6.61s, setup 90ms, import 17.70s, tests 125ms, environment 3.59s)

@@ -33,11 +33,14 @@ import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import {
   DEFAULT_JOB_PLACEMENT,
   trustedMotionOffsetForPreflight,
+  runtimeCoordinatePreparationOptions,
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
 import type { HomingState } from '../state/laser-store';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
+import type { NativeBedEvidence } from '../state/native-bed-frame';
+import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
@@ -135,6 +138,7 @@ export type MachineStartSnapshot = {
   // it does not refuse Frame or Start (ADR-228).
   readonly cncJobsSupported?: boolean;
   readonly activeControllerKind?: ControllerKind;
+  readonly activeControllerCommandSet?: NativeBedEvidence['activeControllerCommandSet'];
   readonly detectedControllerKind?: ControllerKind | null;
   // Camera placement observations used for warning/canvas context. These
   // optional fields keep non-camera callers backward-compatible.
@@ -147,6 +151,8 @@ export type MachineStartSnapshot = {
   readonly reportInches?: boolean;
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
+  readonly controllerSettings?: ControllerSettingsSnapshot | null;
+  readonly controllerSettingsObservation?: SessionObservationStamp | null;
 };
 
 export function prepareStartJob(
@@ -172,6 +178,11 @@ export function prepareStartJob(
   if (!input.ok) return input.result;
   const inspected = inspectPreparedStart(
     prepareOutput(project, {
+      ...runtimeCoordinatePreparationOptions(
+        project.device,
+        input.placement,
+        input.machineWithReportUnits,
+      ),
       ...(input.placement.jobOrigin === undefined ? {} : { jobOrigin: input.placement.jobOrigin }),
       outputScope,
     }),
@@ -221,11 +232,16 @@ export async function prepareStartJobSnapshot(
     options.resolvedJobOrigin,
   );
   if (!placement.ok) return { ok: false, messages: placement.messages };
-  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
+  const motionOffset = trustedMotionOffsetForPreflight(
+    project.device,
+    placement,
+    machineWithReportUnits,
+  );
 
   const preparationProject = await hydratePagedRasterProject(project);
   const inspected = inspectPreparedStart(
     await prepareOutputSnapshot(preparationProject, {
+      ...runtimeCoordinatePreparationOptions(project.device, placement, machineWithReportUnits),
       clock: options.clock,
       renderVariableText: options.renderVariableText,
       ...registrationOption(options.registration),
@@ -278,13 +294,13 @@ export function finalizeStartPreparation(
   options: FinalizeStartPreparationOptions,
 ): StartJobPreparation {
   const { prepared, toolPlan, advisoryWarnings } = options.inspected;
+  const coordinates = coordinatePreflightContext(options);
   const { gcode, preflight } = emitPreparedGcode(prepared, {
     ...(options.placement.jobOrigin === undefined
       ? {}
       : { jobOrigin: options.placement.jobOrigin }),
     outputScope: options.outputScope,
-    ...(options.motionOffset === undefined ? {} : { preflightMotionOffset: options.motionOffset }),
-    ...initialMachinePositionOption(options.machineWithReportUnits),
+    ...coordinates.emitOptions,
     sourceGeometryChecks: options.sourceGeometryChecks,
   });
   const emitSplit = partitionEmitPreflight(preflight);
@@ -317,6 +333,7 @@ export function finalizeStartPreparation(
     prepared.project,
     options.controllerSettings,
     [
+      ...coordinates.warnings,
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
@@ -350,11 +367,26 @@ export function finalizeStartPreparation(
     options.placement.jobOrigin,
     toolPlan,
     prepared,
-    options.machine,
+    options.machineWithReportUnits,
     options.motionOffset,
     controllerReportsInches(options.controllerSettings),
     options.canvasPlanKey,
   );
+}
+
+function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
+  if (options.motionOffset === undefined)
+    return {
+      emitOptions: { preflightCoordinateMode: 'relative-origin' as const },
+      warnings: [UNKNOWN_NATIVE_BED_MESSAGE],
+    };
+  return {
+    emitOptions: {
+      preflightMotionOffset: options.motionOffset,
+      ...initialMachinePositionOption(options.machineWithReportUnits, options.project.device),
+    },
+    warnings: [],
+  };
 }
 
 function nonExecutableProgramMessages(preflight: {

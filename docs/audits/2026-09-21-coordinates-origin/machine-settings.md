@@ -13,7 +13,7 @@ files / 207 tests**. No controller was connected or commanded by this audit owne
 
 | ID | Finding and consequence | Local repair | Evidence |
 | --- | --- | --- | --- |
-| SS-01, P2 | Accepting a changed detected `$132` replaced Z travel but inherited `zTravelConfirmed=true`. A profile whose 75 mm travel had been checked became 150 mm and continued to enable laser focus jogging as though the replacement value had been checked. Both direct Apply and the setup wizard reproduced this. | The shared interactive profile patch clears inherited Z confirmation whenever the travel value changes. Unchanged travel retains its confirmation; an explicit fresh confirmation remains possible. This uses the existing focus-jog readiness rule and adds no Start policy gate. | `src/core/devices/device-profile-patch.ts:12`; `src/ui/laser/FocusJogControls.tsx:72`; two failures in `evidence/settings-regression-before.log`, both passing after repair. |
+| SS-01, P2 | Accepting a changed detected `$132` replaced Z travel but inherited `zTravelConfirmed=true`. A profile whose 75 mm travel had been checked became 150 mm and continued to enable laser focus jogging as though the replacement value had been checked. Both direct Apply and the setup wizard reproduced this. | The shared interactive profile patch clears inherited Z confirmation whenever the travel value changes. Unchanged travel retains its confirmation; an explicit fresh confirmation remains possible. This uses the existing focus-jog readiness rule and adds no Start policy gate. | `src/core/devices/device-profile-patch.ts:12`; `src/ui/laser/FocusJogControls.tsx:72`; two failures in `evidence/settings-regression-before.txt`, both passing after repair. |
 | SS-02, P2 | Home help always said `$H` and “all axes”. The Falcon A1 Pro driver actually homes X then Y with `$HX` and `$HY`; its Z command is separate. | Home help now uses the connected driver's exact command sequence, or the configured profile while disconnected, and distinguishes the machine reference from the workpiece origin. | `src/ui/laser/JobSetupControls.tsx:48`; `src/core/controllers/falcon-command-contract.ts:24`; fresh vendor configuration below. |
 | SS-03, P2 | The machine-origin selector told users to match the homing corner. The separate homing-corner field reused that same wording, while the review said the Home command moved “toward” the selected value. In fact the recorded corner is descriptive metadata; it does not change firmware direction. | The UI distinguishes coordinate orientation from “Recorded home”, explains controller ownership of homing direction, and names `$23` only on the relevant GRBL configuration path. Bed help also distinguishes usable work area from configured `$130/$131` travel. | `src/ui/laser/DeviceProfileFields.tsx:30`; `src/ui/laser/device-setup/DeviceSetupConfirmStep.tsx:64`; `src/ui/laser/device-setup/DeviceSetupReviewStep.tsx:136`. |
 | SS-04, P2 | Reset Origin claimed a return to machine zero. `G92.1` removes temporary XYZ offsets while any underlying saved G54 remains. Advanced persistent-origin help also implied all saved axes were changed, although the G10 commands name X and Y only. | Reset help/toast identify temporary offsets and retained G54. Advanced confirmation/help explicitly identify temporary XYZ versus saved G54 XY and warn that temporary Z zero must be established again. No command or button readiness changed. | `src/ui/laser/OriginRow.tsx:20`, `:101`, `:230`, `:312`; command sequence at `src/ui/state/origin-actions.ts:94`. Independent command/origin evidence is recorded by the origin audit owner. |
@@ -92,13 +92,13 @@ for the built-in A1 Pro choice, not a demonstrated user import workflow.
 
 ## Verification record
 
-- Baseline: `evidence/settings-core-ui-tests.log`, 23 files / 161 passing tests.
-- Independent desired-behaviour reproduction: `evidence/settings-regression-before.log`,
+- Baseline: `evidence/settings-core-ui-tests.txt`, 23 files / 161 passing tests.
+- Independent desired-behaviour reproduction: `evidence/settings-regression-before.txt`,
   2 failures / 7 passes. Both failures concern inherited Z confirmation after a
   changed detected travel.
-- Initial repair verification: `evidence/settings-repair-tests.log`, 8 files / 78 passes.
+- Initial repair verification: `evidence/settings-repair-tests.txt`, 8 files / 78 passes.
 - Final verification after all settings and origin-help edits:
-  `evidence/settings-final-tests.log` and `evidence/settings-final-tests.json`,
+  `evidence/settings-final-tests.txt` and `evidence/settings-final-tests.json`,
   **29 files / 207 passes, zero failures**.
 - Exact tested file list: `evidence/settings-final-file-list.json`. JSON reporter
   `numTotalTestSuites` includes nested describe groups; the file count is

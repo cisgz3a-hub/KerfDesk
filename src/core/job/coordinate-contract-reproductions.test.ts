@@ -1,5 +1,4 @@
-// These are explicit reproductions of OPEN defects. Their passing assertions
-// document current failure symptoms; they are separate from the correctness matrix.
+// Correctness regressions for the three failures reproduced by the initial audit.
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEVICE_PROFILE,
@@ -9,10 +8,13 @@ import {
   type Origin,
 } from '../devices';
 import { deriveMachineEnvelope } from '../controllers/grbl/machine-envelope';
+import { nativeBedFrame } from '../devices/native-bed-frame';
+import { parseBuildInfoResponses } from '../controllers/grbl/build-info';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project, type Vec2 } from '../scene';
 import { prepareOutput } from '../../io/gcode/prepare-output';
 import { emitGcode } from '../../io/gcode/emit-gcode';
 import { mapControllerPointToScene } from '../../ui/state/canvas-motion-plan';
+import { trustedMotionOffsetForPreflight } from '../../ui/job-placement';
 import { computeJobBounds, computeJobMotionBounds } from './job-bounds';
 
 const COLOR = '#ff0000';
@@ -59,8 +61,8 @@ function explicitXyWords(gcode: string): Vec2[] {
     return x === null || y === null ? [] : [{ x: Number(x[1]), y: Number(y[1]) }];
   });
 }
-describe('audit reproductions of coordinate-contract defects', () => {
-  it('reproduces a center-origin contour runway outside the actual centred bed', () => {
+describe('coordinate-contract regressions', () => {
+  it('clips a center-origin contour runway at the actual centred bed edge', () => {
     const base = projectFor('center');
     const original = base.scene.objects[0];
     if (original?.kind !== 'imported-svg') throw new Error('fixture');
@@ -100,36 +102,73 @@ describe('audit reproductions of coordinate-contract defects', () => {
     const prepared = prepareOutput(project);
     if (!prepared.ok) throw new Error('fixture');
     const output = emitGcode(project);
-    // Burn endpoints 198 -> 188 fit [-200, 200], but the nominal 5 mm entry
-    // goes to X203 because its clamp assumes [0, 400]. Frame includes it and
-    // preflight warns; this is not a hidden Start gate or unreported motion.
+    // Burn endpoints 198 -> 188 leave exactly 2 mm for the requested 5 mm entry.
     expect(computeJobBounds(prepared.job, device)?.maxX).toBe(198);
     expect(machineBoundsForDevice(device).maxX).toBe(200);
-    expect(computeJobMotionBounds(prepared.job, device)?.maxX).toBe(203);
-    expect(output.gcode).toContain('X203.000 Y30.000');
-    expect(output.preflight.issues.some((issue) => issue.code === 'out-of-bed')).toBe(true);
+    expect(computeJobMotionBounds(prepared.job, device)?.maxX).toBe(200);
+    expect(output.gcode).toContain('X200.000 Y30.000');
+    expect(output.gcode).not.toContain('X203.000 Y30.000');
+    expect(output.preflight.issues.some((issue) => issue.code === 'out-of-bed')).toBe(false);
   });
 
-  it('reproduces native negative GRBL MPos drawn outside a positive front-left bed', () => {
+  it('maps native negative GRBL MPos into the physical front-left bed', () => {
     const device = projectFor('front-left').device;
     const native = deriveMachineEnvelope({ x: 358, y: 268, z: 50 }, 3, false);
     expect(native.x).toEqual({ minMm: -358, maxMm: 0 });
+    const frame = nativeBedFrame(device, { minX: -358, maxX: 0, minY: -268, maxY: 0 });
+    if (frame === null) throw new Error('Native frame fixture');
     // A head 50 right and 30 back from the physical front-left corner on
     // conventional-axis stock GRBL. WPos=(50,30), WCO=(-358,-268).
     const shown = mapControllerPointToScene(
       { x: 50, y: 30, z: 0 },
-      { device, coordinateFrame: { kind: 'machine', workOffsetMm: { x: -358, y: -268, z: 0 } } },
+      {
+        device,
+        coordinateFrame: {
+          kind: 'machine',
+          workOffsetMm: { x: -358, y: -268, z: 0 },
+          nativeToBedOffsetMm: frame.nativeToBedOffsetMm,
+        },
+      },
     );
-    expect(shown).toEqual({ x: -308, y: 506 });
-    expect(shown).not.toEqual({ x: 50, y: 238 });
+    expect(shown).toEqual({ x: 50, y: 238 });
   });
 
-  it('reproduces out-of-bed warnings for a valid job inside native negative GRBL travel', () => {
-    const project = projectFor('front-left');
+  it('avoids false out-of-bed warnings for verified native negative GRBL travel', () => {
+    const base = projectFor('front-left');
+    const project = {
+      ...base,
+      device: { ...base.device, homing: { enabled: true, direction: 'front-left' as const } },
+    };
     const offset = { x: -300, y: -100 };
+    const build = parseBuildInfoResponses(['[VER:1.1h.20190830:]', '[OPT:V,15,128]']);
+    if (!build.ok) throw new Error('Build fixture');
+    const motionOffset = trustedMotionOffsetForPreflight(
+      project.device,
+      {
+        ok: true,
+        jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+        preflightMotionOffset: offset,
+      },
+      {
+        homingState: 'confirmed',
+        activeControllerKind: 'grbl-v1.1',
+        detectedControllerKind: 'grbl-v1.1',
+        controllerSessionEpoch: 3,
+        controllerSettingsObservation: { sessionEpoch: 3, observedAt: 1000 },
+        controllerBuildInfoObservation: { sessionEpoch: 3, observedAt: 1000 },
+        controllerBuildInfo: build.value,
+        controllerSettings: {
+          homingEnabled: true,
+          homingDirectionMask: 3,
+          bedWidth: 358,
+          bedHeight: 268,
+        },
+      },
+    );
+    expect(motionOffset).toEqual({ x: 58, y: 168 });
     const output = emitGcode(project, {
       jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
-      preflightMotionOffset: offset,
+      preflightMotionOffset: motionOffset,
     });
     const native = deriveMachineEnvelope({ x: 358, y: 268, z: 50 }, 3, false);
     for (const point of explicitXyWords(output.gcode)) {
@@ -138,6 +177,6 @@ describe('audit reproductions of coordinate-contract defects', () => {
       expect(point.y + offset.y).toBeGreaterThanOrEqual(native.y.minMm);
       expect(point.y + offset.y).toBeLessThanOrEqual(native.y.maxMm);
     }
-    expect(output.preflight.issues.some((issue) => issue.code === 'out-of-bed')).toBe(true);
+    expect(output.preflight.issues.some((issue) => issue.code === 'out-of-bed')).toBe(false);
   });
 });

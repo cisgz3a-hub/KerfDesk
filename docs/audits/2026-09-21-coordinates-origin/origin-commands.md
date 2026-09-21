@@ -29,7 +29,7 @@ Independent fake-transport reproduction:
    required relative move of approximately `X+10, Y0` mm.
 
 The first two new regression tests failed against the audited base. Their
-original output is retained in `evidence/origin-unit-switch-repro.log`.
+original output is retained in `evidence/origin-unit-switch-repro.txt`.
 
 Repair:
 
@@ -97,9 +97,9 @@ from this candidate, so it was not changed speculatively.
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Existing origin/home/jog/probe/status baseline | 19 files, 179 tests passed | `evidence/origin-existing-tests.log` |
-| New independent coordinate oracle plus selectors, origin UI and fresh-Idle checks | 4 files, 43 tests passed | `evidence/origin-oracle-and-selectors.log` |
-| Original unit-switch reproductions | 2 failed, confirming the defect | `evidence/origin-unit-switch-repro.log` |
+| Existing origin/home/jog/probe/status baseline | 19 files, 179 tests passed | `evidence/origin-existing-tests.txt` |
+| New independent coordinate oracle plus selectors, origin UI and fresh-Idle checks | 4 files, 43 tests passed | `evidence/origin-oracle-and-selectors.txt` |
+| Original unit-switch reproductions | 2 failed, confirming the defect | `evidence/origin-unit-switch-repro.txt` |
 | Post-repair targeted suite | 17 files, 176 tests passed | `evidence/origin-final-tests.json`, `.log`, and `origin-final-files.txt` |
 | Final expanded unit-switch regression file, including `$013` | 12 tests passed, supersedes its earlier 11-test entry | `evidence/origin-unit-switch-final.json`, `.log` |
 

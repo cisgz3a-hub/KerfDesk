@@ -2,6 +2,7 @@ import type { SimilarityTransform } from '../../core/registration';
 import type { Project } from '../../core/scene';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
+import { nativeBedCaptureFrameKey } from '../state/native-bed-frame';
 import {
   resolvePrintCutRegistration,
   usePrintCutSessionStore,
@@ -17,6 +18,7 @@ export function currentPrintCutOutputRegistration(
     project,
     laser.trustedPositionEpoch ?? 0,
     usePrintCutSessionStore.getState(),
+    nativeBedCaptureFrameKey(project.device, laser),
   );
   return resolved.kind === 'valid' ? resolved.transform : null;
 }

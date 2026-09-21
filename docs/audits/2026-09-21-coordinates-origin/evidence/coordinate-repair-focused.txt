@@ -1,0 +1,8 @@
+
+ RUN  v4.1.11 D:/LaserForge/audit-coordinates-origin-20260921
+
+
+ Test Files  11 passed (11)
+      Tests  202 passed (202)
+   Start at  07:36:03
+   Duration  39.90s (transform 16.23s, setup 106ms, import 30.26s, tests 671ms, environment 6.45s)

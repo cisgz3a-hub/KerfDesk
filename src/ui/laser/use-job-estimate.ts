@@ -29,6 +29,10 @@ import { projectHasPagedRasterAssets } from '../import/paged-raster-hydration';
 import { PRINT_CUT_REGISTRATION_INVALID_MESSAGE } from '../../io/gcode/prepare-output-snapshot';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import { useSettledHeadPosition } from './settled-head-position';
+import {
+  useRuntimeCoordinatePreparation,
+  type RuntimeCoordinatePreparation,
+} from '../use-runtime-coordinate-preparation';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -37,6 +41,7 @@ type Settled = {
   readonly outputScopeKey: string;
   readonly registrationKey: string;
   readonly placementKey: string;
+  readonly coordinateOptions: RuntimeCoordinatePreparation;
   readonly initialPosition: LiveJobEstimateOptions['initialPosition'];
   readonly estimate: LiveJobEstimate;
 };
@@ -54,6 +59,7 @@ export function useJobEstimate(): LiveJobEstimate {
   const firstRegistrationPoint = usePrintCutSessionStore((state) => state.first);
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
   const resolvedPlacement = useEstimatePlacement(jobPlacement);
+  const coordinateOptions = useRuntimeCoordinatePreparation(project.device, resolvedPlacement);
   const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
   const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
   const initialPosition = useEstimateInitialPosition();
@@ -73,6 +79,7 @@ export function useJobEstimate(): LiveJobEstimate {
     outputScopeKey,
     registrationKey,
     placementKey,
+    coordinateOptions,
     jobOrigin,
     initialRegistration,
     initialPosition,
@@ -155,6 +162,7 @@ function initialSettledEstimate(inputs: EstimateInputs): Settled {
     outputScopeKey: inputs.outputScopeKey,
     registrationKey: inputs.registrationKey,
     placementKey: inputs.placementKey,
+    coordinateOptions: inputs.coordinateOptions,
     initialPosition: inputs.initialPosition,
     estimate,
   };
@@ -167,6 +175,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     outputScopeKey,
     registrationKey,
     placementKey,
+    coordinateOptions,
     jobOrigin,
     initialPosition,
   } = inputs;
@@ -182,7 +191,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     () => () => {
       workerGeneration.current += 1;
     },
-    [project, outputScopeKey, registrationKey, placementKey, initialPosition],
+    [project, outputScopeKey, registrationKey, placementKey, coordinateOptions, initialPosition],
   );
   useEffect(() => {
     if (
@@ -190,6 +199,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
       settled.outputScopeKey === outputScopeKey &&
       settled.registrationKey === registrationKey &&
       settled.placementKey === placementKey &&
+      settled.coordinateOptions === coordinateOptions &&
       settled.initialPosition === initialPosition
     ) {
       return undefined;
@@ -204,6 +214,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
           outputScopeKey,
           registrationKey,
           placementKey,
+          coordinateOptions,
           initialPosition,
           estimate: value,
         });
@@ -211,6 +222,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
         project,
         outputScope,
         jobOrigin,
+        coordinateOptions,
         initialPosition,
         isCancelled: () => cancelled,
         isFollowUpStale: () => workerGeneration.current !== generation,
@@ -229,9 +241,11 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     settled.outputScopeKey,
     settled.registrationKey,
     settled.placementKey,
+    settled.coordinateOptions,
     settled.initialPosition,
     registrationKey,
     placementKey,
+    coordinateOptions,
     jobOrigin,
     initialPosition,
   ]);
@@ -241,12 +255,10 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
 function initialEstimate(inputs: EstimateInputs, asyncSnapshot: boolean): LiveJobEstimate {
   if (inputs.initialRegistration === null) return invalidPrintCutEstimate();
   if (asyncSnapshot) return { kind: 'too-large' };
-  return estimateLiveJob(
-    inputs.project,
-    inputs.outputScope,
-    inputs.jobOrigin,
-    inputs.initialPosition === undefined ? {} : { initialPosition: inputs.initialPosition },
-  );
+  return estimateLiveJob(inputs.project, inputs.outputScope, inputs.jobOrigin, {
+    ...inputs.coordinateOptions,
+    ...(inputs.initialPosition === undefined ? {} : { initialPosition: inputs.initialPosition }),
+  });
 }
 
 function hasVariableText(project: Project): boolean {
@@ -259,6 +271,7 @@ type RecomputeEstimateArgs = {
   readonly project: Project;
   readonly outputScope: OutputScope;
   readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly coordinateOptions: RuntimeCoordinatePreparation;
   readonly initialPosition: LiveJobEstimateOptions['initialPosition'];
   readonly isCancelled: () => boolean;
   readonly isFollowUpStale: () => boolean;
@@ -267,7 +280,10 @@ type RecomputeEstimateArgs = {
 
 function recomputeEstimate(args: RecomputeEstimateArgs): void {
   const { project, outputScope, jobOrigin, initialPosition } = args;
-  const options = initialPosition === undefined ? {} : { initialPosition };
+  const options = {
+    ...args.coordinateOptions,
+    ...(initialPosition === undefined ? {} : { initialPosition }),
+  };
   const registration = currentPrintCutOutputRegistration(project);
   const usesSnapshot =
     hasVariableText(project) || registration !== undefined || projectHasPagedRasterAssets(project);
@@ -303,6 +319,7 @@ function followUpWithWorkerEstimate(
   if (value.kind !== 'too-large') return;
   const registration = currentPrintCutOutputRegistration(args.project);
   const offThread = prepareJobEstimateOffThread(args.project, {
+    ...args.coordinateOptions,
     outputScope: args.outputScope,
     ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
     ...(usesSnapshot

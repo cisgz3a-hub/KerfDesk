@@ -374,6 +374,14 @@ export type CncCompilationSidecar = {
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;
+  /** Physical contour-entry limits in these exact program coordinates. Null
+   * omits optional entries; absent preserves pre-envelope archived output. */
+  readonly contourEntryBounds?: {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+  } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
   readonly cncCompilation?: CncCompilationSidecar;
 };

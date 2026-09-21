@@ -220,6 +220,8 @@ function requestKey(options: LargeJobPreparationOptions): string {
   return JSON.stringify({
     jobOrigin: options.jobOrigin ?? null,
     outputScope: options.outputScope ?? null,
+    contourEntryBounds: options.contourEntryBounds,
+    absoluteProgramOffset: options.absoluteProgramOffset,
     snapshot: options.snapshot ?? null,
     initialPosition:
       options.initialPosition === undefined

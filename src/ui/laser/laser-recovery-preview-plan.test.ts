@@ -90,8 +90,8 @@ describe('sealed laser restart preview', () => {
       { x: 35.4, y: 50.8, z: 0 },
     ]);
     expect(preview.coordinateFrame).toEqual({
-      kind: 'machine',
-      workOffsetMm: { x: 12.7, y: 6.35, z: 0 },
+      kind: 'relative',
+      jobOriginOffset: artifact.prepared.jobOriginOffset,
     });
   });
 });

@@ -191,6 +191,12 @@ function outputOptions(options: PrepareOutputSnapshotOptions): PrepareOutputOpti
   return {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
+    ...(options.contourEntryBounds === undefined
+      ? {}
+      : { contourEntryBounds: options.contourEntryBounds }),
+    ...(options.absoluteProgramOffset === undefined
+      ? {}
+      : { absoluteProgramOffset: options.absoluteProgramOffset }),
   };
 }
 
@@ -221,6 +227,8 @@ function snapshotCacheKey(
     serialValue: context.serialValue,
     jobOrigin: options.jobOrigin ?? null,
     outputScope: options.outputScope ?? null,
+    contourEntryBounds: options.contourEntryBounds,
+    absoluteProgramOffset: options.absoluteProgramOffset,
     registration: options.registration ?? null,
   });
 }
