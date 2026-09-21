@@ -194,6 +194,18 @@ Both targeted browser workflows then passed in 1.4 minutes: the collapsed-panel 
 and the complete paint/erase/power/Frame/Start/interrupted-recovery workflow. E2E type checking,
 edited-test lint and formatting passed.
 
+The next hosted run on `adf483cd1` passed 149 workflows and exposed a separate simulated-controller
+timing race at painted-pass Start. Its trace and screenshot show the exact fresh-status refusal:
+the test emitted Idle immediately after clicking Start, before the final query write completed.
+The fake controller also replies synchronously inside that write, which deliberately does not meet
+the existing post-write status contract. Sending the click and Idle in one browser task reproduced
+the same refusal deterministically. The shared review helper now waits for the new query and
+completed transport in the final live-status phase before emitting its reply. Production Start
+behaviour and timeouts are unchanged. All eight existing fresh-status guard regressions passed,
+including pre-write reports, reconnects, changed work placement and successful fresh Idle.
+The corrected painted-pass and collapsed-completion browser workflows both passed in 1.4 minutes.
+E2E type checking, scoped lint, formatting and the raw file-size gate passed.
+
 ## Physical and product limits
 
 Software tests and fake Web Serial establish the application contract, not physical burn fidelity.

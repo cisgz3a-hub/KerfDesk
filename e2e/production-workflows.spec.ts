@@ -3,7 +3,13 @@ import {
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
-import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
+import {
+  expect,
+  test,
+  type KerfDeskFixture,
+  type Locator,
+  type Page,
+} from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -1035,8 +1041,11 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   const review = page.getByRole('dialog', { name: 'Review painted second pass' });
   await expect(review).toBeVisible();
   await expect(review.getByRole('spinbutton')).toHaveCount(0);
-  await review.getByRole('button', { name: 'Start second pass', exact: true }).click();
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmJobReview(
+    page,
+    kerfdesk,
+    review.getByRole('button', { name: 'Start second pass', exact: true }),
+  );
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await kerfdesk.acknowledgeSerial(1);
   await kerfdesk.disconnectSerial();
@@ -1103,20 +1112,59 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
 
 // ADR-224: every Start now opens the Job Review dialog; its single Start
 // button is the acknowledgement that absorbed the old native confirms.
-async function confirmJobReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+async function confirmJobReview(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  startButton: Locator = page
+    .getByRole('dialog', { name: 'Review job before starting' })
+    .getByRole('button', { name: 'Start job' }),
+): Promise<void> {
+  const before = await reviewStartBoundary(page);
   const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
     (byte) => byte === 0x3f,
   ).length;
-  await page
-    .getByRole('dialog', { name: 'Review job before starting' })
-    .getByRole('button', { name: 'Start job' })
-    .click();
+  await startButton.click();
   await expect
     .poll(
       async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
     )
     .toBeGreaterThan(statusQueriesBefore);
+  // The fixture replies synchronously inside the query write. Start requires
+  // a later report, after that write resolves. Ignore earlier periodic queries
+  // during handoff, and also allow a reply that already started this new stream.
+  await expect
+    .poll(async () => {
+      const current = await reviewStartBoundary(page);
+      return current.streamerEpoch !== before.streamerEpoch || current.awaitingFreshReport;
+    })
+    .toBe(true);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+}
+
+async function reviewStartBoundary(page: Page): Promise<{
+  streamerEpoch: number;
+  awaitingFreshReport: boolean;
+}> {
+  return page.evaluate(async () => {
+    const moduleUrl = '/src/ui/state/laser-store.ts';
+    const { useLaserStore } = (await import(moduleUrl)) as {
+      useLaserStore: {
+        getState: () => {
+          streamerEpoch: number;
+          controllerOperation: { kind: string; phase?: string } | null;
+          pendingTransportWrites?: number;
+        };
+      };
+    };
+    const state = useLaserStore.getState();
+    return {
+      streamerEpoch: state.streamerEpoch,
+      awaitingFreshReport:
+        state.controllerOperation?.kind === 'start-arming' &&
+        state.controllerOperation.phase === 'live-status' &&
+        (state.pendingTransportWrites ?? 0) === 0,
+    };
+  });
 }
 
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
