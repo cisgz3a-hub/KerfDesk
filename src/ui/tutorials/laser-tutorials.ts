@@ -8,7 +8,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 3,
-    location: 'Select artwork > operation controls > Process: Line',
+    location: 'Select artwork → operation controls → Process: Line',
     prerequisites: 'Laser mode and a vector shape, such as a rectangle or imported SVG.',
     visual: 'laser-line',
     steps: [
@@ -60,7 +60,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 3,
-    location: 'Select artwork > Process: Fill > Advanced cut settings',
+    location: 'Select artwork → Process: Fill → Advanced cut settings',
     prerequisites: 'Laser mode and closed vector artwork with the area you want to engrave.',
     visual: 'laser-fill',
     steps: [
@@ -108,7 +108,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 4,
-    location: 'Select an image > Process: Image > Advanced cut settings',
+    location: 'Select an image → Process: Image → Advanced cut settings',
     prerequisites: 'Laser mode and an imported bitmap at the intended physical size.',
     visual: 'raster',
     steps: [

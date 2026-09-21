@@ -1,5 +1,12 @@
 import type { Tutorial, TutorialVisual } from './tutorial-types';
 
+type Stage = {
+  /** What this step is called, in this lesson's own words. */
+  readonly title: string;
+  /** What the reader should be looking at when the step is done. */
+  readonly result: string;
+};
+
 type ImageToolLesson = {
   readonly id: string;
   readonly title: string;
@@ -9,6 +16,8 @@ type ImageToolLesson = {
   readonly prepare: string;
   readonly action: string;
   readonly finish: string;
+  /** Named per lesson: nine Studio tools do not share three step titles. */
+  readonly stages: readonly [Stage, Stage, Stage];
   readonly tip: string;
   readonly keywords: readonly string[];
 };
@@ -26,33 +35,47 @@ function imageToolLesson(tool: ImageToolLesson): Tutorial {
     visual: tool.visual,
     steps: [
       {
-        title: 'Choose the area and tool',
+        title: tool.stages[0].title,
         instruction: tool.prepare,
         focus: tool.location,
-        result: 'The image is ready for the intended edit.',
+        result: tool.stages[0].result,
       },
       {
-        title: 'Make the edit',
+        title: tool.stages[1].title,
         instruction: tool.action,
-        focus: 'Edit the preview',
-        result: tool.summary,
+        focus: 'Work in the preview',
+        result: tool.stages[1].result,
       },
       {
-        title: 'Review and apply',
+        title: tool.stages[2].title,
         instruction: tool.finish,
         focus: 'Inspect → Apply',
-        result: 'The checked image can be committed to the project.',
+        result: tool.stages[2].result,
       },
     ],
     tip: tool.tip,
     keywords: ['image', 'studio', ...tool.keywords],
-    related: ['image-studio', 'image-layers', 'image-adjust'],
+    related: ['image-studio', 'image-layers', 'image-adjust'].filter((id) => id !== tool.id),
   };
 }
 
 export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   imageToolLesson({
     id: 'image-paint',
+    stages: [
+      {
+        title: 'Pick the layer and the mark',
+        result: 'The tool and colour suit the kind of mark you want to make.',
+      },
+      {
+        title: 'Set the brush, then drag',
+        result: 'The stroke follows the size, hardness and opacity you chose.',
+      },
+      {
+        title: 'Check the edge, then apply',
+        result: 'The marks are committed to the project image.',
+      },
+    ],
     title: 'Paint, draw and erase pixels',
     location: 'Brush, Pencil, Eraser or Line',
     visual: 'image-paint',
@@ -68,6 +91,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-select',
+    stages: [
+      {
+        title: 'Choose how to outline it',
+        result: 'The selection tool matches the shape of the region.',
+      },
+      {
+        title: 'Draw it, then add or subtract',
+        result: 'The outline covers exactly the pixels you meant.',
+      },
+      {
+        title: 'Edit inside it, then deselect',
+        result: 'Later edits can reach the whole layer again.',
+      },
+    ],
     title: 'Select part of an image',
     location: 'Marquee, Lasso or Magic wand',
     visual: 'image-select',
@@ -83,6 +120,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-fill',
+    stages: [
+      {
+        title: 'Set the colours and the limit',
+        result: 'The fill can only reach where you intend it to.',
+      },
+      {
+        title: 'Click to flood, or drag a gradient',
+        result: 'The region fills, or blends between the two colours.',
+      },
+      {
+        title: 'Confirm the boundary held',
+        result: 'The fill stopped where it should and nearby detail survived.',
+      },
+    ],
     title: 'Fill areas and add gradients',
     location: 'Paint bucket or Gradient',
     visual: 'image-fill',
@@ -98,6 +149,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-retouch',
+    stages: [
+      {
+        title: 'Zoom in and size the brush',
+        result: 'The brush is only slightly larger than the defect.',
+      },
+      {
+        title: 'Sample clean pixels, then paint',
+        result: 'The blemish is replaced with surrounding detail.',
+      },
+      {
+        title: 'Look for repeated pattern',
+        result: 'The repair reads as part of the image, not as a patch.',
+      },
+    ],
     title: 'Remove blemishes and clone detail',
     location: 'Clone stamp or Spot heal',
     visual: 'image-retouch',
@@ -113,6 +178,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-crop',
+    stages: [
+      {
+        title: 'Decide what must survive',
+        result: 'You know which content has to stay inside the new edge.',
+      },
+      {
+        title: 'Drag the box and commit',
+        result: 'The image is trimmed to the pixel dimensions shown.',
+      },
+      {
+        title: 'Re-check the physical size',
+        result: 'The millimetre size now follows the cropped area.',
+      },
+    ],
     title: 'Crop an image in the Studio',
     location: 'Crop',
     visual: 'image-crop',
@@ -128,6 +207,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-layers',
+    stages: [
+      {
+        title: 'Open Panels and pick a layer',
+        result: 'The active layer is the one your edits will land on.',
+      },
+      {
+        title: 'Add, paint and compare',
+        result: 'Opacity and visibility let you weigh one version against another.',
+      },
+      {
+        title: 'Reorder, then apply the composite',
+        result: 'The stack reads top-down as the project image.',
+      },
+    ],
     title: 'Build an image with layers',
     location: 'Panels → Layers',
     visual: 'image-layers',
@@ -143,6 +236,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-transform',
+    stages: [
+      {
+        title: 'Choose the pixels to move',
+        result: 'The transform will act on exactly the pixels you selected.',
+      },
+      {
+        title: 'Drag the handles, or resize',
+        result: 'Content moves, or the pixel dimensions change.',
+      },
+      {
+        title: 'Hold the ratio and the anchor',
+        result: 'The result keeps its proportions and the side you meant to fix.',
+      },
+    ],
     title: 'Move pixels and resize images',
     location: 'Move, free transform or Image menu',
     visual: 'image-transform',
@@ -158,6 +265,17 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-text',
+    stages: [
+      { title: 'Open Text and type the words', result: 'The lettering is ready to be rasterised.' },
+      {
+        title: 'Choose font, size and ink',
+        result: 'The words land as pixels on their own transparent layer.',
+      },
+      {
+        title: 'Place it and check legibility',
+        result: 'The lettering still reads at the size it will be made.',
+      },
+    ],
     title: 'Add lettering to an image',
     location: 'Text',
     visual: 'image-text',
@@ -173,6 +291,20 @@ export const IMAGE_TOOL_TUTORIALS: readonly Tutorial[] = [
   }),
   imageToolLesson({
     id: 'image-tone',
+    stages: [
+      {
+        title: 'Choose the layer and the area',
+        result: 'The adjustment is aimed at the pixels you meant to change.',
+      },
+      {
+        title: 'Make a small change, Preview on',
+        result: 'You can see the effect before committing to it.',
+      },
+      {
+        title: 'Compare, then keep or discard',
+        result: 'Only the adjustment you actually wanted survives.',
+      },
+    ],
     title: 'Adjust tones and filter an image',
     location: 'Adjust or Filter',
     visual: 'image-tone',

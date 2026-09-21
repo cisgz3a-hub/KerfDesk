@@ -8,7 +8,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'File > Import Height Map, or import an STL > select the relief',
+    location: 'File → Import Height Map, or import an STL → select the relief',
     prerequisites: 'CNC mode, a grayscale height map or STL source, and measured stock.',
     visual: 'relief',
     steps: [
@@ -30,7 +30,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose roughing or finishing',
         instruction:
-          'Inspect the relief operation and choose Relief roughing or Relief finishing as appropriate. Use Startup Setup > Tool Plan to assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
+          'Inspect the relief operation and choose Relief roughing or Relief finishing as appropriate. Use Startup Setup → Tool Plan to assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
         focus: 'Relief operation and Tool Plan',
         result: 'The toolpath uses the chosen cutters and the spacing for that stage of the carve.',
       },
@@ -64,7 +64,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 3,
-    location: 'A CNC profile operation > Tabs > Edit positions',
+    location: 'A CNC profile operation → Tabs → Edit positions',
     prerequisites: 'A CNC profile with one unlocked vector object selected for position editing.',
     visual: 'tabs',
     steps: [
@@ -117,7 +117,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'CNC Startup Setup > Bit library, Default bit and Tool Plan',
+    location: 'CNC Startup Setup → Bit library, Default bit and Tool Plan',
     prerequisites: 'CNC mode and the specifications of the cutters you intend to use.',
     visual: 'library',
     steps: [

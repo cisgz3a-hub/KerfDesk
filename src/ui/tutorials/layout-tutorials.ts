@@ -8,7 +8,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 2,
-    location: 'Arrange menu → alignment commands',
+    location: 'Arrange → Align commands',
     prerequisites: 'Two or more unlocked objects.',
     visual: 'align',
     steps: [
@@ -45,7 +45,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 2,
-    location: 'Arrange menu → Distribute commands',
+    location: 'Arrange → Distribute commands',
     prerequisites: 'At least three unlocked objects.',
     visual: 'distribute',
     steps: [
