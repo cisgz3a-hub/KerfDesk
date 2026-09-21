@@ -19,6 +19,8 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { setAppThemePreference } from '../theme/app-theme';
+import { useAppThemePreference } from '../theme/use-app-theme';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { handleUnifiedArtworkImport } from '../app/import-dispatch';
 import { openProjectCommand } from './open-project-command';
@@ -67,6 +69,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const machinePanelOpen = useUiStore((s) => s.railPanelVisibility.machine);
   const toggleRailPanel = useUiStore((s) => s.toggleRailPanel);
   const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
+  const appTheme = useAppThemePreference();
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -88,6 +91,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       printAndCut: callbacks.requestPrintAndCut,
       toggleSidePanels: () => toggleWorkspaceSidePanels(useUiStore.getState()),
       resetWorkspaceLayout: () => resetWorkspaceLayout(useUiStore.getState()),
+      appTheme,
+      setAppTheme: setAppThemePreference,
     }),
   );
 }

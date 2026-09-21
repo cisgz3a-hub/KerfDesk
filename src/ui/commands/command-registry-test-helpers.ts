@@ -14,6 +14,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     ...baseCtxFlags(),
     ...baseCtxActions(),
     ...baseCtxArrangeActions(),
+    ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;
 }
@@ -138,6 +139,10 @@ function baseCtxActions(): Partial<AppCommandContext> {
     showConnectionHelp: vi.fn(),
     showSafety: vi.fn(),
   };
+}
+
+function baseCtxAppearance(): Partial<AppCommandContext> {
+  return { appTheme: 'light', setAppTheme: vi.fn() };
 }
 
 function baseCtxArrangeActions(): Partial<AppCommandContext> {
