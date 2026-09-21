@@ -344,7 +344,9 @@ describe('isolated execution recovery ownership', () => {
   it('waits for rejected-run cleanup before the Start flow settles', async () => {
     const { repository } = recoveryHarness();
     const cleanupControl: { finish?: () => void } = {};
-    const discard = vi.spyOn(repository, 'discardStagedRun').mockImplementation(
+    // ADR-337: a Start refused at the wire has no staged archive to discard —
+    // its cleanup is releasing the handoff armed before the first byte.
+    const discard = vi.spyOn(repository, 'cancelPendingStart').mockImplementation(
       () =>
         new Promise((resolve) => {
           cleanupControl.finish = () => resolve({ ok: true, value: true });
@@ -359,7 +361,7 @@ describe('isolated execution recovery ownership', () => {
     await vi.waitFor(() => expect(discard).toHaveBeenCalledTimes(1));
     expect(settled).toBe(false);
     const finishCleanup = cleanupControl.finish;
-    if (finishCleanup === undefined) throw new Error('Expected pending staged-run cleanup.');
+    if (finishCleanup === undefined) throw new Error('Expected pending Start-handoff cleanup.');
     finishCleanup();
     await start;
 

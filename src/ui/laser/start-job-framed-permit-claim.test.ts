@@ -79,17 +79,19 @@ function recoveryRepository(): RecoveryRepository {
   });
 }
 
-function pauseNextArtifactStage(repository: RecoveryRepository) {
-  const originalStage = repository.stageArtifact.bind(repository);
+// ADR-337: same window, earlier owner — the archive now follows the wire, so
+// the boundary a mid-flight change must survive is the durable Start arming.
+function pauseNextStartArming(repository: RecoveryRepository) {
+  const originalArm = repository.armFreshStartIntent.bind(repository);
   let release = (): void => undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const stage = vi.spyOn(repository, 'stageArtifact').mockImplementationOnce(async (artifact) => {
+  const arm = vi.spyOn(repository, 'armFreshStartIntent').mockImplementationOnce(async (...a) => {
     await gate;
-    return originalStage(artifact);
+    return originalArm(...a);
   });
-  return { stage, release };
+  return { arm, release };
 }
 
 async function installConnectedFramedRun(
@@ -226,9 +228,9 @@ describe('ordinary framed Start permit claim', () => {
 
   it('refuses a permit revoked while exact-artifact staging is pending', async () => {
     const repository = recoveryRepository();
-    const paused = pauseNextArtifactStage(repository);
+    const paused = pauseNextStartArming(repository);
     const start = runStartJobFlow(repository);
-    await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(paused.arm).toHaveBeenCalledTimes(1));
 
     useLaserStore.setState({ framedRun: null, frameVerification: null });
     paused.release();
@@ -248,9 +250,9 @@ describe('ordinary framed Start permit claim', () => {
 
     try {
       const repository = recoveryRepository();
-      const paused = pauseNextArtifactStage(repository);
+      const paused = pauseNextStartArming(repository);
       const start = runStartJobFlow(repository);
-      await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(paused.arm).toHaveBeenCalledTimes(1));
       const state = useLaserStore.getState();
       const driver = selectControllerDriver(state.activeControllerKind);
 
@@ -278,12 +280,12 @@ describe('ordinary framed Start permit claim', () => {
   it('allows only one async owner to claim the same permit', async () => {
     const repository = recoveryRepository();
     const permit = useLaserStore.getState().framedRun;
-    const paused = pauseNextArtifactStage(repository);
+    const paused = pauseNextStartArming(repository);
     const first = runStartJobFlow(repository);
-    await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(paused.arm).toHaveBeenCalledTimes(1));
 
     await runStartJobFlow(repository);
-    expect(paused.stage).toHaveBeenCalledTimes(1);
+    expect(paused.arm).toHaveBeenCalledTimes(1);
 
     paused.release();
     await first;

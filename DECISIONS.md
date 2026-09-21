@@ -20990,7 +20990,101 @@ at 1000 px) is itself unaddressed — both are open. The budget now rests on a m
 the generators rather than on total runtime: a pipeline that stopped yielding for 30 s would read
 as silence, correctly but unhelpfully, and the worst case measured has a ninefold margin.
 
-## ADR-337 - The bend scan reads the chain by index instead of copying it (2026-09-21)
+## ADR-337 - The durable record a Start needs before the wire is the intent, not the archive (2026-09-21)
+
+**Status:** Accepted; amends the Start sequence in `WORKFLOW.md` and the staging step ADR-118
+introduced. Does not touch ADR-228/230/232/237: Frame remains the sole ordinary Start policy gate,
+and this decision adds no gate of its own.
+
+### Context
+
+A maintainer reported that pressing Start left the machine still for several seconds before it
+moved. The cause was not the controller. `streamPreparedStart` built and durably stored the full
+forensic execution archive, then armed the Start handoff, and only then reached `safeWrite` — so
+every byte of archive work sat between the operator's click and any motion, on the main thread,
+with the interface frozen through it.
+
+The archive is large because it embeds `canvasPlan.manifest`, which holds one `{x, y, z}` object
+per motion vertex in the job. Everything that touches it is therefore proportional to the job's
+geometry rather than to its G-code: the structured-clone size estimator walks every one of those
+nodes, and the IndexedDB write clones them again. ADR-334's predecessor work removed the worst of
+it (five whole-graph traversals became three, and snapshot hydration stopped re-walking all twenty
+retained history artifacts on every refresh), but what remained was still unbounded. Measured in
+plain node on V8, the pre-wire cost at 250k motion points was 430 ms of traversal plus 171 ms of
+structured clone, before the storage commit.
+
+`armFreshStart` could not be moved ahead of it, because it reads the artifact back out of the
+store to build the handoff record. The ordering was structural, not incidental.
+
+What that ordering actually protects is narrow and important. `pendingStart` is armed before the
+first byte so that an app which dies inside the Start window reconciles, on next launch, into a
+capsule that says the machine may have moved. It needs the run's identity, its program
+fingerprint and its sendable line count. It does not need the compiled job or the motion plan;
+those serve replay and forensics, which no crashed run is waiting on.
+
+### Decision
+
+1. A fresh Start arms its durable handoff from a **start intent** — a `JobCheckpoint` built from
+   the emitted program: fingerprint, sendable line count, machine kind, output scope and resolved
+   job origin. Two linear scans of the G-code text, a few hundred bytes persisted. Nothing
+   proportional to the job's geometry runs between Start and the first wire byte.
+2. The execution archive is built and stored **after** the controller has accepted the program,
+   from `transmitPreparedStart`, and `activateFreshRun` then moves tracking from the pending
+   intent to the active run exactly as before.
+3. Reconciliation of an intent-armed handoff materializes the fingerprint-only artifact the
+   intent stands for before writing the capsule, so the capsule never points at a run with no
+   artifact — which hydration would drop, turning the one case the operator most needs to hear
+   about into silence. The stand-in reuses the `legacy-fingerprint-only` shape and its
+   `legacy-checkpoint` origin; the name is historical, the shape is exactly right.
+4. An intent that does not parse, or whose sendable line count disagrees with the handoff it is
+   attached to, fails the whole `pendingStart` record closed. Half a durable Start record is
+   worse than none: it would report a program length nobody authorized.
+5. Unavailable recovery storage is still **not** a Start gate. A run whose handoff could not be
+   armed goes to the machine anyway and the operator is told afterwards that it has no forensic
+   record — the same rule-7 posture staging had before this decision, deliberately preserved.
+   Only "another Start is already being prepared" blocks, as it did.
+
+### Consequences
+
+Pre-wire host work at 250k motion points falls from 602 ms to 34 ms, and the multi-megabyte
+IndexedDB commit is replaced by a slot write of a few hundred bytes. The saving scales with
+geometry, so the jobs that felt worst — traced curves, raster, V-carve, relief — improve most,
+and the interface no longer freezes between the click and the motion.
+
+The guarantee that changes is forensic, and only inside one window. A run interrupted between the
+first byte and the archive write now leaves the fingerprint-only stand-in rather than the full
+archive. The operator is still told the machine may have moved, still sees which program and how
+long it was, and laser recovery still resumes — `runCheckpointResumeFlow` recompiles from the
+current project and verifies the fingerprint, which is precisely what the stand-in carries. What
+is lost is the archived copy of the compiled job for that run: exact-job replay and the execution
+archive entry. The window is the few hundred milliseconds that used to sit before the wire.
+
+A downgrade hazard exists and is not mitigated: a build predating this decision reads
+`pendingStart.intent` as an unknown field and reconciles it into a capsule labelled
+`exact-execution` whose artifact was never written, which its hydration then drops. Rolling back
+past this change while a Start is in flight loses that capsule.
+
+### Verification and limits
+
+Covered by tests: arming without a staged archive; refusing to arm over an existing pending Start
+or active run; reconciliation producing a capsule that admits motion may have begun, backed by the
+fingerprint-only kind, while an artifact-backed handoff still reports `exact-execution`; the
+persisted round trip; and three tamper cases — a length that disagrees with its handoff, a
+malformed fingerprint, and an intent attached to a supervised-recovery handoff — each rejecting
+the whole record. The pre-existing Start-flow suites were re-aimed at the arming boundary rather
+than the staging boundary, and still prove what they proved: a controller-origin or output-scope
+change at the asynchronous boundary before the wire refuses the Start and leaves no pending
+handoff behind, a permit revoked there refuses it, and a Start rejected at the wire awaits its
+cleanup before settling.
+
+NOT verified: no crash was actually staged. The reconciliation path is driven through its
+mutations and the slot parser, not by killing a real browser mid-Start, so the evidence is that
+the records are correct, not that a real interrupted session produces them. There is no hardware
+evidence of any kind — no machine is available to this project. The timings above are plain-node
+V8 measurements of the same modules, not browser profiles; the earlier figures quoted from a
+vitest/jsdom run overstated this traversal by about 6.5x and should not be compared against.
+
+## ADR-338 - The bend scan reads the chain by index instead of copying it (2026-09-21)
 
 **Status:** Accepted. A pure performance change: the traced geometry is byte-identical, verified
 across a corpus rather than argued.

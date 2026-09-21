@@ -84,17 +84,22 @@ function startSpy() {
   return vi.mocked(useLaserStore.getState().startJob);
 }
 
-function pauseNextArtifactStage(repository: RecoveryRepository) {
-  const originalStage = repository.stageArtifact.bind(repository);
+// ADR-337 moved the execution archive after the first wire byte, so the
+// asynchronous boundary a mid-flight change has to survive is now the durable
+// Start arming, not staging. Same window, earlier owner.
+function pauseNextStartArming(repository: RecoveryRepository) {
+  const originalArm = repository.armFreshStartIntent.bind(repository);
   let release = (): void => undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const stage = vi.spyOn(repository, 'stageArtifact').mockImplementationOnce(async (artifact) => {
-    await gate;
-    return originalStage(artifact);
-  });
-  return { stage, release };
+  const arm = vi
+    .spyOn(repository, 'armFreshStartIntent')
+    .mockImplementationOnce(async (runId, intent, armedAtIso) => {
+      await gate;
+      return originalArm(runId, intent, armedAtIso);
+    });
+  return { arm, release };
 }
 
 async function makeInterruptedRun(repository: RecoveryRepository) {
@@ -193,19 +198,22 @@ describe('interrupted laser job intent separation', () => {
       'current output scope',
       () => useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true }),
     ],
-  ])('refuses Start when %s changes during artifact staging', async (_label, change) => {
+  ])('refuses Start when %s changes during Start arming', async (_label, change) => {
     const repository = recoveryHarness();
-    const paused = pauseNextArtifactStage(repository);
-    const discard = vi.spyOn(repository, 'discardStagedRun');
+    const paused = pauseNextStartArming(repository);
+    const cancel = vi.spyOn(repository, 'cancelPendingStart');
 
     const start = runStartJobFlow(repository);
-    await vi.waitFor(() => expect(paused.stage).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(paused.arm).toHaveBeenCalledOnce());
     change();
     paused.release();
     await start;
 
     expect(startSpy()).not.toHaveBeenCalled();
-    expect(discard).toHaveBeenCalledOnce();
+    // The armed handoff is released, so a refused Start leaves nothing behind
+    // that a later reconciliation could read as an uncertain run.
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(repository.getSnapshot().pendingStart).toBeNull();
     expect(repository.getSnapshot().activeRun).toBeNull();
   });
 

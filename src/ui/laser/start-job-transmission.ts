@@ -9,7 +9,10 @@ import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence'
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
 import type { prepareCurrentStartJob } from './start-job-source';
 import type { JobReviewModel } from './job-review';
-import { activateAcceptedFreshRun } from './start-job-execution-tracking';
+import {
+  activateAcceptedFreshRun,
+  stageFreshExecutionArtifact,
+} from './start-job-execution-tracking';
 import {
   currentLaserForAuthorizedStartNow,
   type CurrentStartAuthorizationArgs,
@@ -42,12 +45,11 @@ export type PreparedStartArgs = {
 export async function transmitPreparedStart(input: {
   readonly args: PreparedStartArgs;
   readonly runId: ReturnType<typeof createRunId>;
-  readonly staged: boolean;
   readonly handoffArmed: boolean;
   readonly authorizationArgs: CurrentStartAuthorizationArgs;
   readonly authorization: Extract<StartAuthorization, { readonly ok: true }>;
 }): Promise<void> {
-  let { staged, handoffArmed } = input;
+  let { handoffArmed } = input;
   let boundaryRefusal: StartAuthorizationRefusal | null = null;
   const assertion = finalStartAssertion(input.authorizationArgs, (refusal) => {
     boundaryRefusal = refusal;
@@ -65,14 +67,14 @@ export async function transmitPreparedStart(input: {
     );
     startAccepted = true;
     advancement.accept();
-    const acceptedHandoff = handoffArmed;
     handoffArmed = false;
-    staged = false;
-    await activateAcceptedFreshRun(input.runId, acceptedHandoff, input.args.repository);
+    // ADR-337: the archive is built and stored only now, off the path between
+    // Start and motion. The handoff armed before the wire already carries the
+    // operator-facing truth if this never completes.
+    await archiveAcceptedFreshRun(input.args, input.runId);
   } catch (error) {
     if (!startAccepted) advancement.cancel();
     if (handoffArmed) await input.args.repository.cancelPendingStart(input.runId);
-    if (staged) await input.args.repository.discardStagedRun(input.runId);
     if (boundaryRefusal !== null) {
       await reportStartAuthorizationRefusal(
         boundaryRefusal,
@@ -85,6 +87,36 @@ export async function transmitPreparedStart(input: {
     reportStartBlockers([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
+}
+
+/** Build and store the execution archive for a run the controller has already
+ * accepted, then hand tracking from the pending intent to the active run.
+ * Staging is best-effort by construction (it cannot un-send the program), and
+ * `activateAcceptedFreshRun` already owns telling the operator when a run will
+ * have no forensic record. */
+async function archiveAcceptedFreshRun(
+  args: PreparedStartArgs,
+  runId: ReturnType<typeof createRunId>,
+): Promise<void> {
+  const staged = await stageFreshExecutionArtifact({
+    runId,
+    prepared: args.prepared,
+    outputScope: args.outputScope,
+    laser: args.laser,
+    repository: args.repository,
+    reviewedAtIso: args.reviewedAtIso,
+    reviewModel: args.reviewModel,
+    ...(args.laserModeStartEvidence === undefined
+      ? {}
+      : { laserModeStartEvidence: args.laserModeStartEvidence }),
+    ...(args.cncSetupAttestation === undefined
+      ? {}
+      : { cncSetupAttestation: args.cncSetupAttestation }),
+    ...(args.completedReceipt === null
+      ? {}
+      : { completedReplaySourceRunId: args.completedReceipt.runId }),
+  });
+  await activateAcceptedFreshRun(runId, staged, args.repository);
 }
 
 function preparedStartOptions(

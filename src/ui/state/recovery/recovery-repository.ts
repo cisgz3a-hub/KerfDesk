@@ -1,4 +1,4 @@
-import type { JobInterruption } from '../../../core/recovery';
+import type { JobCheckpoint, JobInterruption } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
 import { RecoveryActivationCoordinator } from './recovery-activation-coordinator';
 import { legacyArtifact, readLegacyCheckpoint } from './legacy-checkpoint-migration';
@@ -32,7 +32,8 @@ import {
 } from './recovery-terminal-coordinator';
 import { recoveryTerminalPersistencePlan } from './recovery-terminal-persistence';
 import type { RecoveryRepositoryOptions } from './recovery-repository-options';
-import { RecoveryStartHandoff } from './recovery-start-handoff';
+import type { RecoveryStartHandoff } from './recovery-start-handoff';
+import { createStartHandoff } from './recovery-start-handoff-host';
 import { RecoveryProgressCoordinator } from './recovery-progress-update';
 import { commitRecoverySlotMutation } from './recovery-mutation-commit';
 import { sanitizeUnhydratedRecoveryReferences } from './recovery-owner-sanitizer';
@@ -69,13 +70,16 @@ export class RecoveryRepository {
       discardStaged: (runId) => this.terminalCoordinator.discardStaged(runId),
       storageFailure: (operation, error) => this.storageFailure(operation, error),
     });
-    this.startHandoff = new RecoveryStartHandoff({
+    this.startHandoff = createStartHandoff({
+      backend: options.backend,
       nowIso: this.nowIso,
       getSnapshot: this.getSnapshot,
-      exactArtifactRecord: (runId) => this.artifactStore.exact(runId),
+      artifactStore: this.artifactStore,
+      currentGeneration: () => this.currentGeneration(),
       mutate: (operation, mutate, requiredArtifactRunId) =>
         this.mutateAndRefresh(operation, mutate, [], requiredArtifactRunId),
       refresh: this.refresh.bind(this),
+      onFailure: (operation, error) => this.warn(operation, errorMessage(error)),
     });
     this.artifactCleanup = new RecoveryArtifactCleanupCoordinator({
       backend: options.backend,
@@ -137,6 +141,11 @@ export class RecoveryRepository {
   ): Promise<RecoveryRepositoryResult<boolean>> {
     return this.startHandoff.armFreshStart(runId, armedAtIso);
   }
+
+  /** ADR-337: arm the Start handoff from the intent, before the execution
+   * archive is built. The archive follows once the controller has accepted. */
+  armFreshStartIntent = (runId: RunId, intent: JobCheckpoint, armedAtIso = this.nowIso()) =>
+    this.startHandoff.armFreshStartIntent(runId, intent, armedAtIso);
 
   async armClaimedRecoveryStart(args: {
     readonly sourceRunId: RunId;
