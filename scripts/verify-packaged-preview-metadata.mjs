@@ -3,9 +3,14 @@
 // on the metadata that actually lands inside each packaged application.
 
 import asar from '@electron/asar';
+import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
+// An asar archive opens with a pickled uint32 naming the header length: a
+// 4-byte pickle payload size followed by the 4-byte value itself.
+const ASAR_SIZE_PICKLE_BYTES = 8;
 
 const RENDERER_ASSET_PATTERN = /^dist\/web\/assets\/[^/]+\.js$/;
 const RENDERER_SURFACES = [
@@ -35,6 +40,11 @@ export function verifyPackagedPreviewMetadata(value, expectedVersion) {
 }
 
 export function verifyPackagedRendererVersion(archivePath, expectedVersion) {
+  // Checked here as well as at the entry point: on a short archive every
+  // extracted asset would read back as zeros, and the failure would surface as
+  // "found 0 renderer assets" rather than as the truncation it is. The cost is
+  // one stat and one header parse.
+  assertPackagedArchiveComplete(archivePath);
   const rendererAssets = asar
     .listPackage(archivePath, { isPack: false })
     .map((entry) => ({
@@ -77,7 +87,46 @@ function containsExactVersion(source, expectedVersion) {
   return false;
 }
 
+/** Bytes of packed file content the header accounts for. Entries marked
+ * unpacked live in `<archive>.unpacked` and contribute none. */
+function packedBodyBytes(node) {
+  let total = 0;
+  for (const entry of Object.values(node.files ?? {})) {
+    if (entry.files !== undefined) total += packedBodyBytes(entry);
+    else if (entry.unpacked !== true) total += entry.size ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Refuse an archive shorter than its own header describes.
+ *
+ * This has to come before anything is read out of the archive. `@electron/asar`
+ * length-checks its header read and throws, but its file read allocates a
+ * zero-filled buffer and then ignores the count `fs.readSync` returns, so a
+ * body that runs past the end of the file comes back as NUL bytes with no
+ * error at all. A truncated `app.asar` therefore parses its header and hands
+ * back zeros, and the caller reports whatever those zeros fail to decode as:
+ * on 2026-09-21 this gate failed with `Unexpected token '\x00', "\x00\x00…" is
+ * not valid JSON`, which says nothing about the actual fault.
+ *
+ * A short `app.asar` is precisely the packaging failure this script exists to
+ * catch, so it is named as one.
+ */
+export function assertPackagedArchiveComplete(archivePath) {
+  const { header, headerSize } = asar.getRawHeader(archivePath);
+  const required = ASAR_SIZE_PICKLE_BYTES + headerSize + packedBodyBytes(header);
+  const actual = fs.statSync(archivePath).size;
+  if (actual < required) {
+    throw new Error(
+      `packaged archive is truncated: ${actual} bytes on disk, ${required} required by its own header`,
+    );
+  }
+  return required;
+}
+
 export function verifyPackagedPreviewAsar(archivePath, expectedVersion) {
+  assertPackagedArchiveComplete(archivePath);
   const packageJson = JSON.parse(asar.extractFile(archivePath, 'package.json').toString('utf8'));
   verifyPackagedPreviewMetadata(packageJson, expectedVersion);
   verifyPackagedRendererVersion(archivePath, expectedVersion);
