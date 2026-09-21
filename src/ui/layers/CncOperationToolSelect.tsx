@@ -10,6 +10,7 @@ export function CncOperationToolSelect(props: {
   readonly tools: ReadonlyArray<CncTool>;
   readonly allTools: ReadonlyArray<CncTool>;
   readonly defaultTool?: CncTool | undefined;
+  readonly hint?: string;
   readonly onChange: (toolId: string | null) => void;
 }): JSX.Element {
   const selected =
@@ -39,6 +40,11 @@ export function CncOperationToolSelect(props: {
           <CncToolOptions tools={props.tools} />
         </select>
       </label>
+      {props.value !== null && props.hint !== undefined ? (
+        <p className="lf-cnc-settings-hint" role="note">
+          {props.hint}
+        </p>
+      ) : null}
       {selected === undefined ? null : (
         <>
           <p className="lf-cnc-settings-hint">{selected.name}</p>

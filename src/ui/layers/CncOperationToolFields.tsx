@@ -66,8 +66,8 @@ export function CncOperationToolFields(props: {
       />
       <p className="lf-cnc-settings-hint">
         {props.settings.feedSource?.kind === 'material-recipe'
-          ? 'Bit changes refresh material starting feeds.'
-          : 'Bit changes keep your current feed values.'}
+          ? 'Primary bit changes refresh material starting feeds.'
+          : 'Primary bit changes keep your current feed values.'}
       </p>
       <CncSecondaryToolFields {...props} machine={machine} draft={draft} onChange={commit} />
       <CncOperationBitLibrary machine={machine} />
@@ -138,6 +138,7 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Single stage (V-bit only)"
           tools={flatTools}
           allTools={machine.tools}
+          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
           onChange={(vClearToolId) => props.onChange({ vClearToolId })}
         />
       ) : null}
@@ -149,6 +150,7 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Single bit"
           tools={roughers}
           allTools={machine.tools}
+          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
           onChange={(pocketRoughToolId) => props.onChange({ pocketRoughToolId })}
         />
       ) : null}
@@ -160,6 +162,7 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Roughing only"
           tools={machine.tools}
           allTools={machine.tools}
+          hint="Uses the primary bit's feed, plunge and RPM. Check these values for both bits. Relief finishing follows the surface and scallop setting; depth per pass does not apply."
           onChange={(reliefFinishToolId) => props.onChange({ reliefFinishToolId })}
         />
       ) : null}

@@ -199,7 +199,16 @@ describe('direct CNC operation assignments', () => {
     await renderFields();
     await choose('Material', 'acrylic');
     await choose('Bit', 'em-1588');
+    const beforeSecondary = selectedSettings();
     await choose('Pocket roughing bit', 'em-3175');
+    expect(selectedSettings()).toEqual({ ...beforeSecondary, pocketRoughToolId: 'em-3175' });
+    expect(host.textContent).toContain('Primary bit changes refresh material starting feeds.');
+    const roughingNote = field('Pocket roughing bit')
+      .closest('.lf-cnc-tool-field')
+      ?.querySelector('[role="note"]');
+    expect(roughingNote?.textContent).toContain(
+      "Uses the primary bit's feed, plunge, RPM and depth per pass.",
+    );
     const before = useStore.getState().project;
     const loaded = deserializeProject(serializeProject(before));
     if (loaded.kind !== 'ok') throw new Error(JSON.stringify(loaded));
@@ -215,6 +224,10 @@ describe('direct CNC operation assignments', () => {
       reliefFinishToolId: 'bn-3175',
     });
     expect(loaded.project.machine).toEqual(before.machine);
+    await choose('Pocket roughing bit', '');
+    expect(
+      field('Pocket roughing bit').closest('.lf-cnc-tool-field')?.querySelector('[role="note"]'),
+    ).toBeNull();
   });
 
   it('recalculates automatic feeds for the chosen bit while retaining other assignments', async () => {
