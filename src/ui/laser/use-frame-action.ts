@@ -13,6 +13,7 @@ import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidenc
 import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperation } from '../state/laser-motion-operation';
 import { useToastStore } from '../state/toast-store';
+import { runOwnedFrame } from '../state/frame-preparation-store';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
@@ -43,12 +44,14 @@ export function useFrameAction(): () => void {
  * final clean Idle; dispatch, cancel, Alarm, reset, or write failure earns
  * no permit.
  */
-export async function runFrameNow(): Promise<boolean> {
-  ensureFramedRunInvalidationSubscriptions();
-  clearStartBlockers();
-  const initial = await prepareFrameReviewBundle();
-  if (initial === null) return false;
-  return dispatchPreparedFrame(initial);
+export function runFrameNow(): Promise<boolean> {
+  return runOwnedFrame(async () => {
+    ensureFramedRunInvalidationSubscriptions();
+    clearStartBlockers();
+    const initial = await prepareFrameReviewBundle();
+    if (initial === null) return false;
+    return dispatchPreparedFrame(initial);
+  });
 }
 
 export type TransientFrameControllerPreparation = {
