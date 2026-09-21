@@ -199,6 +199,26 @@ export function bendWindow(
 
 // Intersect the head's exit tangent with the tail's entry tangent. Null for
 // gentle bends, near-parallel tangents, or a vertex behind either arm.
+/**
+ * The corner two tangent legs of one chain would meet at, addressed by index.
+ *
+ * `headEnd` is exclusive and `tailStart` inclusive, so the legs are
+ * `points[0 .. headEnd - 1]` and `points[tailStart .. ]` without either being
+ * copied out: the sharpener asks this of every candidate vertex on chains
+ * thousands of points long, and slicing them there made the scan quadratic.
+ */
+export function bendVertexAt(
+  points: ReadonlyArray<Vec2>,
+  headEnd: number,
+  tailStart: number,
+): BendVertex | null {
+  const a1 = chordAnchorIn(points, headEnd - 1, -1, 0, headEnd - 1);
+  const a2 = points[headEnd - 1];
+  const b1 = points[tailStart];
+  const b2 = chordAnchorIn(points, tailStart, 1, tailStart, points.length - 1);
+  return bendVertexFrom(a1, a2, b1, b2);
+}
+
 export function bendVertex(
   head: ReadonlyArray<Vec2>,
   tail: ReadonlyArray<Vec2>,
@@ -207,6 +227,15 @@ export function bendVertex(
   const a2 = head.at(-1);
   const b1 = tail[0];
   const b2 = chordAnchor(tail, 'head');
+  return bendVertexFrom(a1, a2, b1, b2);
+}
+
+function bendVertexFrom(
+  a1: Vec2 | undefined,
+  a2: Vec2 | undefined,
+  b1: Vec2 | undefined,
+  b2: Vec2 | undefined,
+): BendVertex | null {
   if (!a1 || !a2 || !b1 || !b2) return null;
   const dirA = unit(a2.x - a1.x, a2.y - a1.y);
   const dirB = unit(b2.x - b1.x, b2.y - b1.y);
@@ -304,12 +333,23 @@ function inkNear(point: Vec2, distSq: Float64Array, width: number): boolean {
 // tail's first) until TANGENT_CHORD_PX of arc length is behind the anchor.
 function chordAnchor(points: ReadonlyArray<Vec2>, from: 'head' | 'tail'): Vec2 | undefined {
   const n = points.length;
-  if (n < 2) return undefined;
   const startIdx = from === 'tail' ? n - 1 : 0;
-  const step = from === 'tail' ? -1 : 1;
+  return chordAnchorIn(points, startIdx, from === 'tail' ? -1 : 1, 0, n - 1);
+}
+
+// The same walk over a range of a larger array: `low`/`high` are the inclusive
+// bounds of the leg, standing in for the sliced-out copy's own ends.
+function chordAnchorIn(
+  points: ReadonlyArray<Vec2>,
+  startIdx: number,
+  step: -1 | 1,
+  low: number,
+  high: number,
+): Vec2 | undefined {
+  if (high - low < 1) return undefined;
   let cum = 0;
   let idx = startIdx;
-  while (idx + step >= 0 && idx + step < n && cum < TANGENT_CHORD_PX) {
+  while (idx + step >= low && idx + step <= high && cum < TANGENT_CHORD_PX) {
     const a = points[idx];
     const b = points[idx + step];
     if (a === undefined || b === undefined) break;

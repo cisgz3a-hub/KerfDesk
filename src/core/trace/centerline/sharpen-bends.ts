@@ -19,7 +19,7 @@ import {
   apexReachScale,
   apexSupportedByInk,
   arcLengthOf,
-  bendVertex,
+  bendVertexAt,
   bendWindow,
   legIsStraight,
   netTurnAcross,
@@ -28,7 +28,7 @@ import {
   turnIsConcentrated,
   vertexHugsChain,
 } from './bend-geometry';
-import { trimArc } from './polyline-window';
+import { arcTrimIndex } from './polyline-window';
 
 const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
 // One corner per physical corner: after a rebuild, nearby candidates (the
@@ -204,31 +204,33 @@ function attemptBend(
 ): BendResult | null {
   const p = pts[i];
   if (p === undefined) return null;
-  const head = trimArc(pts.slice(0, i + 1), 'tail', arm);
-  const tail = trimArc(pts.slice(i), 'head', arm);
-  if (head.length < 2 || tail.length < 2) return null;
+  // The legs are ranges of `pts`, not copies of it. Every gate below reads a
+  // neighbourhood of the candidate, and only an ACCEPTED bend materializes a
+  // chain — which matters because the scan asks this of every vertex, and
+  // slicing two legs out per ask made a dense closed contour quadratic.
+  const headEnd = arcTrimIndex(pts, 0, i, 'tail', arm);
+  const tailStart = arcTrimIndex(pts, i, pts.length - 1, 'head', arm);
+  if (headEnd < 2 || pts.length - tailStart < 2) return null;
   // A drawn corner has straight legs and its turn CONCENTRATED at the
   // vertex; a glyph-scale curve (radius near the window size) passes the leg
   // test but turns uniformly, so the concentration gate rejects it.
   if (!legIsStraight(pts, i, arm, 'before') || !legIsStraight(pts, i, arm, 'after')) return null;
   if (!turnIsConcentrated(pts, i, arm)) return null;
-  const bend = bendVertex(head, tail);
+  const bend = bendVertexAt(pts, headEnd, tailStart);
   if (bend === null) return null;
-  const wedge = wedgeInkSupport(head, tail, bend.vertex, distSq, width);
+  const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, distSq, width);
   if (wedge === null) return null;
   const { legStart, legEnd } = wedge;
-  const removedFrom = head.length;
-  const removedTo = pts.length - tail.length;
   const maxOffset = maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
-  if (!vertexHugsChain(bend.vertex, pts, removedFrom, removedTo, maxOffset)) return null;
+  if (!vertexHugsChain(bend.vertex, pts, headEnd, tailStart, maxOffset)) return null;
   if (
-    !replacementCoversRemoved(pts, removedFrom, removedTo, legStart, bend.vertex, legEnd, maxOffset)
+    !replacementCoversRemoved(pts, headEnd, tailStart, legStart, bend.vertex, legEnd, maxOffset)
   ) {
     return null;
   }
   return {
-    points: [...head, bend.vertex, ...tail],
-    resumeAt: head.length + 1,
+    points: [...pts.slice(0, headEnd), bend.vertex, ...pts.slice(tailStart)],
+    resumeAt: headEnd + 1,
     corner: bend.vertex,
   };
 }
@@ -241,14 +243,15 @@ function attemptBend(
 // unless the drawn stroke actually runs there (the Arch House serif-spike
 // defect).
 function wedgeInkSupport(
-  head: ReadonlyArray<Vec2>,
-  tail: ReadonlyArray<Vec2>,
+  pts: ReadonlyArray<Vec2>,
+  headEnd: number,
+  tailStart: number,
   apex: Vec2,
   distSq: Float64Array,
   width: number,
 ): { readonly legStart: Vec2; readonly legEnd: Vec2 } | null {
-  const legStart = head.at(-1);
-  const legEnd = tail[0];
+  const legStart = pts[headEnd - 1];
+  const legEnd = pts[tailStart];
   if (legStart === undefined || legEnd === undefined) return null;
   if (!apexSupportedByInk(legStart, apex, distSq, width)) return null;
   if (!apexSupportedByInk(legEnd, apex, distSq, width)) return null;
@@ -290,6 +293,31 @@ function trySharpenClosed(
 ): BendResult | null {
   const mid = Math.floor(pts.length / 2);
   const shift = (i - mid + pts.length) % pts.length;
-  const rotated = [...pts.slice(shift), ...pts.slice(0, shift)];
-  return trySharpenOpen(rotated, mid, distSq, width, maxArm);
+  // The rotation exists only to centre the candidate so the open-chain gates
+  // have chain on both sides of it. When the ring already provides that where
+  // the candidate lies, those gates read the very same points unrotated, so a
+  // REJECTION can be decided without building an array — and the scan asks
+  // once per vertex, which is what made a dense closed contour quadratic in
+  // its own length. An accepted candidate still goes through the rotation, so
+  // the chain returned here is the one the old path returned, unchanged.
+  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm);
+}
+
+// One allocation and one pass. The scan rotates the ring once per candidate
+// vertex to centre it, so on a dense contour this runs thousands of times over
+// thousands of points; `[...pts.slice(shift), ...pts.slice(0, shift)]` built
+// three arrays and copied every point twice to produce the same order.
+function rotateRing(pts: ReadonlyArray<Vec2>, shift: number): Vec2[] {
+  const n = pts.length;
+  const rotated: Vec2[] = new Array<Vec2>(n);
+  let write = 0;
+  for (let read = shift; read < n; read += 1) {
+    const p = pts[read];
+    if (p !== undefined) rotated[write++] = p;
+  }
+  for (let read = 0; read < shift; read += 1) {
+    const p = pts[read];
+    if (p !== undefined) rotated[write++] = p;
+  }
+  return rotated;
 }
