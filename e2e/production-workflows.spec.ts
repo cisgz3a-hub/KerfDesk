@@ -667,6 +667,10 @@ test('offers a selected-area second pass after completion with the Machine panel
   kerfdesk,
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  // Wait for the responsive panel replacement before selecting its controls.
+  await expect(
+    page.getByRole('region', { name: 'Workspace side panels', exact: true }),
+  ).toHaveAttribute('data-layout', 'spacious');
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);

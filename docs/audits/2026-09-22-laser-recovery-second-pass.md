@@ -14,6 +14,7 @@ second passes, and trace selection through emitted output, Frame, Start, persist
 | Runtime recovery still trusted diagnostic coordinate metadata | Altered finite canvas offset/origin passed artifact integrity and moved the same point from `(5,395)` to `(1394,1283)` | Rebuild runtime mapping from canonical sealed source and current qualified controller evidence. |
 | Few blocks with many sampled arc points escaped compaction | 3,501 blocks / 497,002 points estimated at 73,319,428 bytes, above 64 MiB | Point-count trigger packs the same route to about 12.2 MB. Every movement survives hydration. |
 | Progress arriving during normal post-accept archival raised a false failure warning | Browser screenshot; focused test receives `{ok:true,value:false}` from progress update before activation | Defer progress until its active slot exists, preserving retry watermarks. Richer terminal records supersede queued progress. Actual storage failures remain reported. |
+| A terminal event could finish before its archive activated, consume the one-time error reporter, or remain waiting after disconnect | Actual ordinary Start, painted Start and Run Again with delayed artifact storage; delayed terminal responses reproduce a missed activation notification | Retain the owned pending terminal, distinguish the same-generation Start handoff from a genuine failure, and retry on its archive activation. A bounded retry covers activation arriving before the no-op response; replaced runs and resets retain their refusal semantics. |
 | A click could paint executable output without a visible mask | Chrome renders a `[p,p]` zero-length stroked line with zero pixels, while the capsule model selects a disk | Deduplicate the final point and render all-coincident stored strokes as disks. Browser pixel checks cover paint and erase. |
 | Pointer geometry was shifted by the canvas border | Pointer origin used the outer bounding rectangle; canvas content began one pixel inside | Subtract border offsets for brush and wheel anchors; normalise backing-store scaling to actual CSS dimensions. |
 | Reusing ordinary review could compile the unrelated open document | Confirm's existing rebuild read live canvas state | Frozen second-pass review refreshes controller facts while retaining exact selected bytes. |
@@ -168,6 +169,30 @@ All 98 focused tests across 11 files passed, including completed-notice controll
 checkpoint ownership, the prompt and Start arming. All four affected browser workflows passed;
 the manual restart test now opens the upstream history disclosure before finding its control.
 Application/E2E type checks, scoped lint, formatting and the ADR gate passed after integration.
+
+The final delayed-storage audit exercised the real ordinary, painted and Run Again Start entry
+points against the GRBL simulator. A terminal event before archive activation returned a successful
+no-op, incorrectly raised a tracking warning, and consumed the reporter before a subsequent real
+storage failure. Run Again additionally had no final Frame-claim cleanup notification, so a
+disconnected replay could remain active in storage after its archive became available. The tracker
+now observes only the matching pending-intent activation, preserves generation/arm/run ownership,
+and retries a response that arrives after that notification. It never treats the no-op as a saved
+completion and cannot loop on repeated no-ops. Genuine storage errors remain visible.
+Confirmed supersession retires the old terminal before any later status update can retry it.
+An initial real storage failure also retains the matching activation wakeup while reporting the
+error, including when the failure response arrives after activation. The final focused suite
+passed all 133 tests across 13 files, including 34 ownership/error cases and 10 actual ordinary,
+painted and Run Again simulator cases. Application type checking, scoped lint, formatting and
+file-size gates passed. Independent final review found no remaining blocker in this correction.
+
+The first hosted browser run on `65278ba9b` passed 149 of 150 workflows. Its sole failure preceded
+controller connection: resizing the completion test to 1440 px removed the compact Machine tab
+between the fixture's visibility check and click. The captured trace and screenshot show the
+spacious panels already present. The test now awaits that explicit layout state before selecting
+controls; the application and existing action timeouts are unchanged.
+Both targeted browser workflows then passed in 1.4 minutes: the collapsed-panel completion offer
+and the complete paint/erase/power/Frame/Start/interrupted-recovery workflow. E2E type checking,
+edited-test lint and formatting passed.
 
 ## Physical and product limits
 

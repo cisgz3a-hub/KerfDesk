@@ -12,6 +12,12 @@ import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
 import { checkpointInterruption } from './checkpoint-interruption';
+import {
+  checkpointArchiveHandoffIsCurrent,
+  pendingCheckpointArchiveHandoff,
+  subscribeCheckpointArchiveActivation,
+  type CheckpointArchiveHandoff,
+} from './checkpoint-archive-handoff';
 
 type StreamObservation = {
   readonly runId: RunId;
@@ -50,9 +56,14 @@ export function installJobCheckpointTracking(
   });
   tracker.sync(useLaserStore.getState());
   const unsubscribe = useLaserStore.subscribe(tracker.sync);
+  const unsubscribeArchive = subscribeCheckpointArchiveActivation(
+    repository,
+    tracker.retryActivatedArchive,
+  );
   return () => {
     active = false;
     unsubscribe();
+    unsubscribeArchive();
   };
 }
 
@@ -68,6 +79,9 @@ class JobCheckpointTracker {
   private terminalQueued = false;
   private pendingMissingTerminal: PendingMissingTerminal | null = null;
   private queuedMissingTerminal: PendingMissingTerminal | null = null;
+  private deferredArchiveHandoff: CheckpointArchiveHandoff | null = null;
+  private activatedArchiveHandoff: CheckpointArchiveHandoff | null = null;
+  private supersededTerminalRunId: RunId | null = null;
   private queue: Promise<void>;
   private readonly reportQueueFailure: TrackingFailureReporter;
 
@@ -84,6 +98,18 @@ class JobCheckpointTracker {
   readonly sync = (state: LaserState, priorState?: LaserState): void => {
     if (state.streamer === null) this.observeMissingStreamer(state, priorState);
     else this.observeStreamer(state, state.streamer);
+  };
+
+  readonly retryActivatedArchive = (handoff: CheckpointArchiveHandoff): void => {
+    this.activatedArchiveHandoff = handoff;
+    const waiting = this.deferredArchiveHandoff;
+    if (
+      waiting?.runId !== handoff.runId ||
+      waiting.generation !== handoff.generation ||
+      waiting.armedAtIso !== handoff.armedAtIso
+    )
+      return;
+    if (this.ownsTerminal(handoff.runId)) this.sync(useLaserStore.getState());
   };
 
   private observeMissingStreamer(state: LaserState, priorState: LaserState | undefined): void {
@@ -105,7 +131,7 @@ class JobCheckpointTracker {
 
   private observeStreamer(state: LaserState, streamer: StreamerState): void {
     const runId = state.activeRunId;
-    if (runId === null) {
+    if (runId === null || runId === this.supersededTerminalRunId) {
       this.clearRunWatermarks();
       return;
     }
@@ -129,20 +155,78 @@ class JobCheckpointTracker {
     this.terminalQueued = true;
     this.enqueue(async () => {
       try {
+        if (!this.terminalStillOwned(runId)) return;
+        const before = this.repository.getSnapshot();
         const interrupted = await this.repository.interruptRun(
           runId,
           ackedLines,
           interruption,
           this.nowIso(),
         );
-        if (interrupted.ok && interrupted.value) return;
+        if (interrupted.ok && interrupted.value) {
+          this.clearDeferredArchiveHandoff(runId);
+          return;
+        }
         if (this.watermarkRunId === runId) this.terminalQueued = false;
+        const handoff = this.archiveHandoffOrRetire(before, runId);
+        if (this.ownsTerminal(runId) && handoff !== null) {
+          this.deferredArchiveHandoff = handoff;
+          if (this.repository.getSnapshot().activeRun?.runId === runId)
+            this.sync(useLaserStore.getState());
+          if (interrupted.ok) return;
+        }
         this.reportQueueFailure(interrupted);
       } catch (error) {
         if (this.watermarkRunId === runId) this.terminalQueued = false;
         throw error;
       }
     });
+  }
+
+  private ownsTerminal(runId: RunId): boolean {
+    return this.watermarkRunId === runId || this.pendingMissingTerminal?.runId === runId;
+  }
+
+  private archiveHandoffOrRetire(
+    before: ReturnType<RecoveryRepository['getSnapshot']>,
+    runId: RunId,
+  ): CheckpointArchiveHandoff | null {
+    const handoff = pendingCheckpointArchiveHandoff(
+      this.repository,
+      before,
+      runId,
+      this.activatedArchiveHandoff,
+    );
+    if (handoff === null && before.pendingStart?.runId === runId) {
+      // A positively replaced intent must never be retried against its new
+      // owner after another controller update. Current-run storage errors keep
+      // their matching handoff and remain eligible for retry.
+      this.retireTerminal(runId);
+    }
+    return handoff;
+  }
+
+  private terminalStillOwned(runId: RunId): boolean {
+    if (runId === this.supersededTerminalRunId) return false;
+    const pending = this.deferredArchiveHandoff;
+    if (
+      pending?.runId !== runId ||
+      checkpointArchiveHandoffIsCurrent(this.repository, pending, this.activatedArchiveHandoff)
+    )
+      return true;
+    this.retireTerminal(runId);
+    return false;
+  }
+
+  private retireTerminal(runId: RunId): void {
+    this.supersededTerminalRunId = runId;
+    this.clearDeferredArchiveHandoff(runId);
+    if (this.pendingMissingTerminal?.runId === runId) this.pendingMissingTerminal = null;
+    if (this.watermarkRunId === runId) this.clearRunWatermarks();
+  }
+
+  private clearDeferredArchiveHandoff(runId: RunId): void {
+    if (this.deferredArchiveHandoff?.runId === runId) this.deferredArchiveHandoff = null;
   }
 
   private queueProgress(runId: RunId, queuedAck: number): void {
@@ -180,6 +264,7 @@ class JobCheckpointTracker {
 
   private beginRun(runId: RunId): void {
     if (this.pendingMissingTerminal?.runId !== runId) this.pendingMissingTerminal = null;
+    if (this.deferredArchiveHandoff?.runId !== runId) this.deferredArchiveHandoff = null;
     this.previous = null;
     this.watermarkRunId = runId;
     this.lastPersistedAck = cachedAck(this.repository, runId);
@@ -200,7 +285,10 @@ class JobCheckpointTracker {
     if (pending === null || this.queuedMissingTerminal === pending) return;
     this.queuedMissingTerminal = pending;
     this.enqueue(async () => {
+      let retryAfterActivation = false;
       try {
+        if (!this.ownsPendingTerminal(pending)) return;
+        const before = this.repository.getSnapshot();
         const settled =
           pending.kind === 'completed'
             ? await this.repository.completeRun(pending.runId, pending.settledAtIso)
@@ -211,9 +299,16 @@ class JobCheckpointTracker {
                 pending.settledAtIso,
               );
         if (!settled.ok || !settled.value) {
+          const handoff = this.archiveHandoffOrRetire(before, pending.runId);
+          if (this.deferMissingTerminal(pending, handoff)) {
+            retryAfterActivation = this.repository.getSnapshot().activeRun?.runId === pending.runId;
+            if (!settled.ok) this.reportQueueFailure(settled);
+            return;
+          }
           this.reportQueueFailure(settled);
           return;
         }
+        this.clearDeferredArchiveHandoff(pending.runId);
         clearInactiveRunOwnership(pending.runId);
         if (this.pendingMissingTerminal === pending) {
           this.pendingMissingTerminal = null;
@@ -225,8 +320,29 @@ class JobCheckpointTracker {
         }
       } finally {
         if (this.queuedMissingTerminal === pending) this.queuedMissingTerminal = null;
+        // Activation can land while this no-op's response is still awaited,
+        // making its ordinary Start cleanup update miss the queued terminal.
+        // Retry once from the now-active slot; another no-op is a real failure.
+        if (retryAfterActivation) this.retryOwnedMissingTerminal(pending);
       }
     });
+  }
+
+  private retryOwnedMissingTerminal(pending: PendingMissingTerminal): void {
+    if (this.pendingMissingTerminal === pending) this.queueMissingTerminalSettlement();
+  }
+
+  private ownsPendingTerminal(pending: PendingMissingTerminal): boolean {
+    return this.pendingMissingTerminal === pending && this.terminalStillOwned(pending.runId);
+  }
+
+  private deferMissingTerminal(
+    pending: PendingMissingTerminal,
+    handoff: CheckpointArchiveHandoff | null,
+  ): boolean {
+    if (this.pendingMissingTerminal !== pending || handoff === null) return false;
+    this.deferredArchiveHandoff = handoff;
+    return true;
   }
 }
 
