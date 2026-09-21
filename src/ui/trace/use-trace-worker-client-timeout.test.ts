@@ -30,7 +30,7 @@ const traceOptions = {
 
 const ZERO_BOUNDS = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
-// Mirrors TRACE_WORKER_TIMEOUT_MS in use-trace-worker-client.ts.
+// Mirrors TRACE_WORKER_SILENCE_MS in use-trace-worker-client.ts.
 const WATCHDOG_BUDGET_MS = 30_000;
 
 // Controlled compute duration. The replacement must finish after one interval
@@ -280,6 +280,134 @@ describe('traceImage watchdog measures compute time, not queue time', () => {
 
       await vi.advanceTimersByTimeAsync(WATCHDOG_BUDGET_MS + 1);
 
+      expect(await outcome).toBe('Trace worker timed out');
+      expect(workers[0]?.terminated).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// The budget bounds silence, not work. A dense line drawing traces far past it
+// — a 600px coloring-page rosette grid alone measures about 19 s — so charging
+// the whole computation against one fixed deadline refused valid artwork and
+// told the operator the worker had timed out.
+describe('traceImage watchdog bounds silence, not total work', () => {
+  it('keeps a trace that runs long past the budget while it keeps heartbeating', async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    const workers: HeartbeatWorker[] = [];
+    const TRACE_MS = 5 * WATCHDOG_BUDGET_MS;
+    const HEARTBEAT_MS = 250;
+    class HeartbeatWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminated = false;
+      beats = 0;
+
+      constructor() {
+        workers.push(this);
+      }
+
+      postMessage(request: TraceWorkerRequest): void {
+        this.emit({ id: request.id, kind: 'started' });
+        for (let elapsed = HEARTBEAT_MS; elapsed < TRACE_MS; elapsed += HEARTBEAT_MS) {
+          setTimeout(() => {
+            this.beats += 1;
+            this.emit({ id: request.id, kind: 'progress' });
+          }, elapsed);
+        }
+        setTimeout(() => {
+          this.emit({
+            id: request.id,
+            kind: 'ok',
+            paths: [],
+            bounds: ZERO_BOUNDS,
+            width: request.image.width,
+            height: request.image.height,
+          });
+        }, TRACE_MS);
+      }
+
+      terminate(): void {
+        this.terminated = true;
+      }
+
+      emit(response: TraceWorkerResponse): void {
+        queueMicrotask(() => {
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+    }
+    vi.stubGlobal('Worker', HeartbeatWorker);
+    try {
+      const client = await import('./use-trace-worker-client');
+      const outcome = client.traceImage(largeImage(401), traceOptions).then(
+        (result) => ({ kind: 'ok' as const, result }),
+        (error: unknown) => ({
+          kind: 'failed' as const,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+
+      await vi.advanceTimersByTimeAsync(TRACE_MS + 1);
+
+      expect(await outcome).toEqual({
+        kind: 'ok',
+        result: { paths: [], bounds: ZERO_BOUNDS, width: 401, height: 400 },
+      });
+      expect(workers[0]?.terminated).toBe(false);
+      expect(workers[0]?.beats).toBeGreaterThan(TRACE_MS / WATCHDOG_BUDGET_MS);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still terminates a worker that heartbeats and then goes quiet', async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    const workers: FallsSilentWorker[] = [];
+    class FallsSilentWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminated = false;
+
+      constructor() {
+        workers.push(this);
+      }
+
+      postMessage(request: TraceWorkerRequest): void {
+        this.emit({ id: request.id, kind: 'started' });
+        // Alive for two budgets, then nothing at all.
+        for (const at of [250, WATCHDOG_BUDGET_MS, WATCHDOG_BUDGET_MS * 2]) {
+          setTimeout(() => this.emit({ id: request.id, kind: 'progress' }), at);
+        }
+      }
+
+      terminate(): void {
+        this.terminated = true;
+      }
+
+      emit(response: TraceWorkerResponse): void {
+        queueMicrotask(() => {
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+    }
+    vi.stubGlobal('Worker', FallsSilentWorker);
+    try {
+      const client = await import('./use-trace-worker-client');
+      const outcome = client.traceImage(largeImage(401), traceOptions).then(
+        () => 'resolved',
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+      );
+
+      // Two budgets in: still heartbeating, so still alive.
+      await vi.advanceTimersByTimeAsync(WATCHDOG_BUDGET_MS * 2 + 1);
+      expect(workers[0]?.terminated).toBe(false);
+
+      // One budget of silence after the last beat is what kills it.
+      await vi.advanceTimersByTimeAsync(WATCHDOG_BUDGET_MS + 1);
       expect(await outcome).toBe('Trace worker timed out');
       expect(workers[0]?.terminated).toBe(true);
     } finally {

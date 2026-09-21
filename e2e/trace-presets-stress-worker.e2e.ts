@@ -17,7 +17,11 @@ const FIXTURE_PATH = fileURLToPath(
 );
 const FIXTURE_BYTES = readFileSync(FIXTURE_PATH);
 const FIXTURE_SHA256 = 'e4b23a55c73c679b81889ac86a07efccd62039619b9758d63a96ca492032f846';
-const COMPUTE_BUDGET_MS = 30_000; // Unchanged product watchdog; setup has a separate test budget.
+// The product watchdog, now a SILENCE budget (ADR-336): a trace that keeps
+// heartbeating may exceed it. It stays the test's own ceiling for the dragon.
+const COMPUTE_BUDGET_MS = 30_000;
+// Mirrors HEARTBEAT_INTERVAL_MS in src/ui/trace/trace-worker.ts.
+const HEARTBEAT_INTERVAL_MS = 250;
 
 interface TraceObservation {
   owner: number;
@@ -29,6 +33,10 @@ interface TraceObservation {
   startedAt: number | null;
   settledAt: number | null;
   outcome: 'ok' | 'error' | null;
+  // Heartbeats seen while this request computed. They prove the worker stayed
+  // audible without ending the request, which is what keeps a long trace's
+  // silence budget alive (ADR-336).
+  beats: number;
   message: string | null;
   polylines: number;
   closedPolylines: number;
@@ -149,6 +157,12 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     expect(request.closedPolylines).toBeGreaterThan(0);
     expect(request.vertices).toBeGreaterThan(1);
     expect(request.settledAt - request.startedAt).toBeLessThan(COMPUTE_BUDGET_MS);
+    // The real worker heartbeats from inside the trace, and only from there:
+    // never faster than the interval, and audible at all once the trace has
+    // run longer than one. This is what keeps its silence budget alive.
+    const computeMs = request.settledAt - request.startedAt;
+    expect(request.beats).toBeLessThanOrEqual(Math.ceil(computeMs / HEARTBEAT_INTERVAL_MS) + 1);
+    if (computeMs > 4 * HEARTBEAT_INTERVAL_MS) expect(request.beats).toBeGreaterThan(0);
     expect(request.ticksAtEnd - request.ticksAtStart).toBeGreaterThan(0);
     expect(nativeWorkers.get(page)?.length).toBeGreaterThan(0);
     const svgPaths = await preview.locator('svg path').evaluateAll((paths) =>
@@ -360,6 +374,9 @@ async function installWorkerProbe(page: Page): Promise<void> {
             request.startedAt = performance.now();
             request.ticksAtStart = probe.ticks;
             window.dispatchEvent(new Event('centerline-worker-started'));
+          } else if (reply.kind === 'progress') {
+            // Still computing: the request is not settled by a heartbeat.
+            request.beats++;
           } else {
             request.settledAt = performance.now();
             request.ticksAtEnd = probe.ticks;
@@ -391,6 +408,7 @@ async function installWorkerProbe(page: Page): Promise<void> {
             startedAt: null,
             settledAt: null,
             outcome: null,
+            beats: 0,
             message: null,
             polylines: 0,
             closedPolylines: 0,
