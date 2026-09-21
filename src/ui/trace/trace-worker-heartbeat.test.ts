@@ -1,7 +1,8 @@
 // A trace never hands the worker's event loop back, so the only place a
-// heartbeat can come from is inside the computation. The worker therefore
-// drains the trace's own checkpoints and posts from them — without yielding,
-// so the algorithm's order and the worker's blocked event loop are unchanged.
+// heartbeat can come from is inside the computation. The worker posts from the
+// points where the resumable trace returns to its runner — in the SAME native
+// execution mode runTraceSteps used, so no inner checkpoint is added to a hot
+// loop and the trace is not one step slower than it was.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TraceSteps } from '../../core/trace/trace-steps';
@@ -40,7 +41,7 @@ function request(id: number): TraceWorkerRequest {
   };
 }
 
-/** A trace of `checkpoints` work units, recording the mode each one was asked for. */
+/** A trace of `checkpoints` yields, recording the execution mode each was asked for. */
 function steppedTrace(checkpoints: number, modes: boolean[]): () => TraceSteps<string[]> {
   return function* run(): TraceSteps<string[]> {
     for (let index = 0; index < checkpoints; index += 1) {
@@ -91,7 +92,7 @@ async function runWorker(args: {
 
 describe('trace worker heartbeat', () => {
   it('reports progress through a long trace and finishes with the result', async () => {
-    // Twelve checkpoints, a second apart: a beat is due at every one after the
+    // Twelve yields, a second apart: a beat is due at every one after the
     // first interval has passed.
     const { posted, modes } = await runWorker({ checkpoints: 12, msPerCheckpoint: 1_000 });
 
@@ -100,14 +101,15 @@ describe('trace worker heartbeat', () => {
     const beats = posted.filter((response) => response.kind === 'progress');
     expect(beats.length).toBeGreaterThan(0);
     expect(beats.every((beat) => beat.id === 7)).toBe(true);
-    // Checkpoints are requested, which is what gives the heartbeat somewhere
-    // to run; the trace itself is drained straight through.
+    // Native execution mode, exactly as runTraceSteps drains it: the heartbeat
+    // rides the yields the trace already makes and adds none of its own, so it
+    // costs the trace nothing.
     expect(modes).toHaveLength(12);
-    expect(modes.every((mode) => mode === true)).toBe(true);
+    expect(modes.every((mode) => mode === false)).toBe(true);
   });
 
   it('stays silent through a trace that never reaches the interval', async () => {
-    // Ten checkpoints one millisecond apart never reach 250 ms.
+    // Ten yields one millisecond apart never reach 250 ms.
     const { posted } = await runWorker({ checkpoints: 10, msPerCheckpoint: 1 });
 
     expect(posted.map((response) => response.kind)).toEqual(['started', 'ok']);
@@ -119,9 +121,9 @@ describe('trace worker heartbeat', () => {
     const { posted } = await runWorker({ checkpoints, msPerCheckpoint: perCheckpoint });
 
     const beats = posted.filter((response) => response.kind === 'progress').length;
-    // The clock only moves when a checkpoint reads it, so a beat can land no
-    // sooner than the first checkpoint at or past the interval: one every
-    // ceil(250 / 100) = 3 checkpoints, and never two in one interval.
+    // The clock only moves when a yield reads it, so a beat can land no sooner
+    // than the first yield at or past the interval: one every
+    // ceil(250 / 100) = 3 yields, and never two in one interval.
     const checkpointsPerBeat = Math.ceil(HEARTBEAT_INTERVAL_MS / perCheckpoint);
     expect(beats).toBe(Math.floor(checkpoints / checkpointsPerBeat));
   });

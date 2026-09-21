@@ -34,8 +34,11 @@ export type TraceWorkerRequest = {
 };
 
 // A trace never hands the worker's event loop back, so a heartbeat can only
-// come from inside the computation. Checkpoints are the one execution point
-// there; posting from them does not yield, so the trace runs straight through.
+// come from inside the computation. The resumable TraceSteps generators return
+// to their runner often enough on their own: measured on dense line art, the
+// native drain reaches the runner 180k-9.8M times with a worst-case silence of
+// 3.3 s, against this budget's 30 s. Posting from there does not yield, so the
+// trace runs exactly as runTraceSteps ran it.
 const HEARTBEAT_INTERVAL_MS = 250;
 
 export type TraceWorkerResponse =
@@ -95,19 +98,20 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
 };
 
 /**
- * Drain the trace at full speed while reporting that it is still alive.
+ * Drain the trace exactly as runTraceSteps does, reporting that it is alive.
  *
- * Checkpoints are requested (`next(true)`) purely to get an execution point
- * inside the hot loops — this runner never awaits, so the worker's event loop
- * stays blocked exactly as the native drain leaves it and the algorithm's order
- * is unchanged. Measured cost of the checkpoints on a dense 600px line drawing:
- * 18.9 s to 21.0 s, about 11%, against a trace the client used to abandon.
+ * The execution mode stays `false`: cooperative checkpoints would add an inner
+ * yield to every hot loop, measured at 6% on dense Line Art and 18% on Edge
+ * Detection, and they are not needed — the generators already return to their
+ * runner at each entry and delegation boundary, far inside the silence budget.
+ * Nothing here awaits, so the worker's event loop stays blocked as before; a
+ * blocked worker can still post, because delivery does not need it to yield.
  */
 function heartbeatRunner(id: number): <T>(steps: TraceSteps<T>) => T {
   let due = performance.now() + HEARTBEAT_INTERVAL_MS;
   return <T>(steps: TraceSteps<T>): T => {
     for (;;) {
-      const step = steps.next(true);
+      const step = steps.next(false);
       if (step.done) return step.value;
       const now = performance.now();
       if (now < due) continue;

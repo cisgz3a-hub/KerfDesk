@@ -20864,35 +20864,47 @@ time and restarted once on the worker's `started` ack, it then had to cover the 
 A trace never hands the worker's event loop back, so the client had no way to tell a worker that
 had crashed from one that was still working. The deadline was therefore a size refusal wearing a
 liveness check's clothing, and the threshold was far lower than it looked: a 600 px rosette grid
-measures about 19 s on this machine, so a page-sized drawing had no chance of fitting.
+measures about 19 s on this machine, and the same grid at 1000 px takes 57 s.
 
 ### Decision
 
 1. The worker heartbeats. `TraceWorkerResponse` gains `{ kind: 'progress' }`, posted at most every
-   250 ms from inside the computation.
-2. The heartbeat rides the trace's own checkpoints — the resumable `TraceSteps` generators the
-   inline cooperative runner already drives. The worker's runner asks for checkpoints
-   (`next(true)`) purely to get an execution point inside the hot loops; unlike the inline runner
-   it never awaits, so the algorithm's order and the worker's blocked event loop are exactly as
-   the native drain left them. Measured cost on a dense 600 px drawing: 18.9 s to 21.0 s, about
-   11%, against a trace that previously did not finish at all.
+   250 ms from inside the computation. A worker blocked in a synchronous loop can still post:
+   delivery does not require the sender to yield.
+2. The heartbeat rides the yields the resumable `TraceSteps` generators already make, in the SAME
+   native execution mode `runTraceSteps` used. Cooperative checkpoints were tried first and
+   rejected: they add an inner yield to every hot loop, measured at 6% on dense Line Art and 18%
+   on Edge Detection, and they are not needed. The native drain reaches its runner 180,000 to
+   9,800,000 times on the drawings measured, worst-case silence 3.3 s against a 30 s budget.
+   The trace is therefore not one step slower than before this change.
 3. `TRACE_WORKER_TIMEOUT_MS` becomes `TRACE_WORKER_SILENCE_MS`, restarted by every heartbeat as
    well as by `started`. A worker that has crashed, wedged, or never started still fails after
    30 s of silence, and supersession still retires its worker unchanged.
 
 ### Verification and limits
 
-`trace-worker-heartbeat.test.ts` pins that checkpoints are requested, that beats are at most one
-per interval and carry the request id, that a short trace stays silent, and that a failing trace
-still reports its error. `use-trace-worker-client-timeout.test.ts` adds a trace running five
-budgets long that survives on its heartbeats, and a worker that beats and then goes quiet, which
-is still terminated one budget after its last word. Each new test fails against the previous
-worker and client. The existing ack-then-hang and supersede cases are unchanged.
+Measured native-mode silence, the property the budget now judges:
+
+| drawing | preset | trace | yields | worst silence |
+| --- | --- | --- | --- | --- |
+| 600 px | Line Art | 19.2 s | 182,654 | 1.9 s |
+| 600 px | Sharp | 3.2 s | 251,386 | 0.3 s |
+| 1000 px | Line Art | 57.4 s | 401,101 | 3.3 s |
+| 1254 px | Edge Detection | 52.7 s | 9,814,280 | 2.9 s |
+
+`trace-worker-heartbeat.test.ts` pins that the native execution mode is kept, that beats are at
+most one per interval and carry the request id, that a short trace stays silent, and that a
+failing trace still reports its error. `use-trace-worker-client-timeout.test.ts` adds a trace
+running five budgets long that survives on its heartbeats, and a worker that beats and then goes
+quiet, which is still terminated one budget after its last word. Each new test fails against the
+previous worker and client. The existing ack-then-hang and supersede cases are unchanged. The
+five real-worker dragon e2e traces assert the same invariant in a real browser.
 
 Live: the 2000 px drawing that failed twice with "Trace worker timed out" now completes in 339 s —
 eleven times the old deadline — at 41,773 paths and 1,279,890 points.
 
 This bounds the wait; it does not shorten it. Nothing yet tells the operator that a five-minute
-trace is progressing rather than stuck, and the tracer's cost on dense ink (19 s at 600 px) is
-itself unaddressed — both are open. The heartbeat cannot rescue a worker wedged between two
-checkpoints inside one long step; that case still reads as silence, correctly.
+trace is progressing rather than stuck, and the tracer's cost on dense ink (19 s at 600 px, 57 s
+at 1000 px) is itself unaddressed — both are open. The budget now rests on a measured property of
+the generators rather than on total runtime: a pipeline that stopped yielding for 30 s would read
+as silence, correctly but unhelpfully, and the worst case measured has a ninefold margin.
