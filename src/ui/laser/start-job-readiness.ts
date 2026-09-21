@@ -97,6 +97,8 @@ export type StartJobPreparation =
     };
 
 export type MachineStartSnapshot = {
+  /** Explicit for connected sessions before their first position report. */
+  readonly connected?: boolean;
   readonly statusReport: StatusReport | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;

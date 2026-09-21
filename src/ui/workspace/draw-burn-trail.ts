@@ -1,7 +1,8 @@
 import type { Vec2 } from '../../core/scene';
+import { lerp } from '../../core/job/toolpath-math';
 import { burnEmberRamp } from '../theme/canvas-theme';
 import type { CanvasMotionPlan, LiveCanvasRun } from '../state/canvas-motion-plan';
-import { visitRouteRange, type RouteSegment } from './route-range-walk';
+import { routeMotionAt, visitRouteRange, type RouteSegment } from './route-range-walk';
 import type { ViewTransform } from './view-transform';
 
 /** Route length behind the head that still reads as hot. */
@@ -13,6 +14,28 @@ const MIN_BURN_PX = 1.1;
 const MAX_BURN_PX = 3;
 const HOT_WIDTH_FACTOR = 1.7;
 const GLOW_RADIUS_PX = 13;
+
+/** The position marker is always visible; its hot indication needs active work. */
+export function burnIsActive(run: LiveCanvasRun): boolean {
+  if (
+    run.lifecycle !== 'running' ||
+    run.plan.capability !== 'realtime' ||
+    run.route.uncertain ||
+    run.route.confirmedRouteMm <= 0 ||
+    run.reportedSpindleRpm === 0 ||
+    (run.controllerState !== null && run.controllerState !== 'Run')
+  )
+    return false;
+  // Reconciliation can retain several possible locations at a crossing.
+  // Never paint a powered head when one of those locations is laser-off travel.
+  if (
+    run.route.candidates.some(
+      (candidate) => run.plan.manifest.blocks[candidate.blockIndex]?.kind !== 'process',
+    )
+  )
+    return false;
+  return routeMotionAt(run.plan, run.route.confirmedRouteMm)?.intent === 'process';
+}
 
 /**
  * Device-pixel width of a burned mark.
@@ -51,7 +74,7 @@ export function drawBurnTail(
   run: LiveCanvasRun,
   view: ViewTransform,
 ): void {
-  if (run.lifecycle === 'finished') return;
+  if (!burnIsActive(run)) return;
   const ramp = burnEmberRamp();
   const head = Math.max(0, run.route.confirmedRouteMm);
   const bands = collectTailBands(plan, head, ramp.length);
@@ -78,7 +101,7 @@ export function drawBurnGlow(
   run: LiveCanvasRun,
   radiusPx = GLOW_RADIUS_PX,
 ): void {
-  if (run.lifecycle === 'finished' || typeof ctx.createRadialGradient !== 'function') return;
+  if (!burnIsActive(run) || typeof ctx.createRadialGradient !== 'function') return;
   const ramp = burnEmberRamp();
   const core = ramp[ramp.length - 1];
   const mid = ramp[Math.max(0, ramp.length - 2)];
@@ -114,11 +137,33 @@ function collectTailBands(
   if (span <= 0) return bands;
   visitRouteRange(plan, start, headRouteMm, (segment) => {
     if (segment.intent !== 'process') return;
-    const age = (segment.endRouteMm - start) / span;
-    const index = Math.min(bandCount - 1, Math.max(0, Math.floor(age * bandCount)));
-    bands[index]?.push(segment);
+    appendTailSegment(bands, segment, start, span);
   });
   return bands;
+}
+
+// Split at heat boundaries so the same physical line has the same ramp whether
+// the emitter represents it as one long G1 or many short G1 moves. Route extents
+// include Z, while the interpolation uses the already-mapped scene endpoints.
+function appendTailSegment(
+  bands: RouteSegment[][],
+  segment: RouteSegment,
+  start: number,
+  span: number,
+): void {
+  const length = segment.endRouteMm - segment.startRouteMm;
+  for (const [index, band] of bands.entries()) {
+    const from = Math.max(segment.startRouteMm, start + (span * index) / bands.length);
+    const to = Math.min(segment.endRouteMm, start + (span * (index + 1)) / bands.length);
+    if (to <= from) continue;
+    band.push({
+      ...segment,
+      from: lerp(segment.from, segment.to, (from - segment.startRouteMm) / length),
+      to: lerp(segment.from, segment.to, (to - segment.startRouteMm) / length),
+      startRouteMm: from,
+      endRouteMm: to,
+    });
+  }
 }
 
 function strokeSegments(

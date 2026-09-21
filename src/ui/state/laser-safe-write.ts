@@ -134,11 +134,15 @@ function commitSuccessfulWrite(
   // held back the same way and published with the next line that matters
   // (ADR-333). The transport counter is NOT deferred: Start's queue fence and
   // the motion settlement read it.
-  if (source === 'job') bufferTranscriptEntry(refs, entry);
+  const publishJobBatch = source === 'job' && bufferTranscriptEntry(refs, entry);
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
     ...motionTransportWritePatch(state, action, -1, motionOperationId),
-    ...(source === 'job' ? {} : publishTranscriptPatch(refs, state, entry)),
+    ...(source === 'job'
+      ? publishJobBatch
+        ? publishTranscriptPatch(refs, state)
+        : {}
+      : publishTranscriptPatch(refs, state, entry)),
   }));
 }
 

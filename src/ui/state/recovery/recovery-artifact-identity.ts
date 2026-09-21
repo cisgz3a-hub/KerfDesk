@@ -44,8 +44,20 @@ function sameLegacyFingerprintIdentity(
   left: LegacyFingerprintOnlyArtifactV1,
   right: LegacyFingerprintOnlyArtifactV1,
 ): boolean {
+  return left.createdAtIso === right.createdAtIso && sameRecoveryProgramIdentity(left, right);
+}
+
+type RecoveryProgramIdentity = Pick<
+  RecoveryArtifactV1,
+  'sendableLines' | 'machineKind' | 'fingerprint' | 'outputScope' | 'jobOrigin'
+>;
+
+/** An intent and its eventual archive must describe the same emitted run. */
+export function sameRecoveryProgramIdentity(
+  left: RecoveryProgramIdentity,
+  right: RecoveryProgramIdentity,
+): boolean {
   return (
-    left.createdAtIso === right.createdAtIso &&
     left.sendableLines === right.sendableLines &&
     left.machineKind === right.machineKind &&
     left.fingerprint.fnv1a === right.fingerprint.fnv1a &&

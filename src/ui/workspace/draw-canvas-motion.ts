@@ -13,7 +13,7 @@ import {
 } from '../state/canvas-motion-plan';
 import { cncPassPosition } from '../state/canvas-pass-progress';
 import { canvasTheme } from '../theme/canvas-theme';
-import { drawBurnGlow, drawBurnTail } from './draw-burn-trail';
+import { burnIsActive, drawBurnGlow, drawBurnTail } from './draw-burn-trail';
 import { drawCanvasMotionRoute, type RoutePalette } from './draw-canvas-motion-route';
 import type { ViewTransform } from './view-transform';
 
@@ -152,9 +152,8 @@ function drawMarker(
 }
 
 /**
- * The head reads as the beam: a warm glow for the heat it is putting into the
- * material, a white-hot core, and the red ring that keeps it identifiable as
- * the machine rather than as artwork.
+ * The red position marker remains visible throughout the run. Only confirmed
+ * active process motion gets the warm glow and white-hot core.
  */
 function drawHead(
   ctx: CanvasRenderingContext2D,
@@ -165,7 +164,7 @@ function drawHead(
   const at = sceneToCanvas(point, view);
   drawBurnGlow(ctx, at, run);
   ctx.save();
-  ctx.fillStyle = run.lifecycle === 'finished' ? RED : HEAD_CORE;
+  ctx.fillStyle = burnIsActive(run) ? HEAD_CORE : RED;
   ctx.beginPath();
   ctx.arc(at.x, at.y, 3.5, 0, Math.PI * 2);
   ctx.fill();

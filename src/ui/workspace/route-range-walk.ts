@@ -10,11 +10,22 @@ export type RouteSegment = {
   readonly from: Vec2;
   readonly to: Vec2;
   readonly intent: ExecutablePlanMotionIntent;
-  /** Route position of the segment's far end, in millimetres from job start. */
+  /** Clipped route extent, in millimetres from job start (including Z travel). */
+  readonly startRouteMm: number;
   readonly endRouteMm: number;
 };
 
 export type RouteSegmentVisitor = (segment: RouteSegment) => void;
+
+/** Half-open motion lookup: at a cut-to-travel boundary, travel is now current. */
+export function routeMotionAt(
+  plan: CanvasMotionPlan,
+  routeMm: number,
+): CanvasPreviewMotion | undefined {
+  const motions = canvasPreviewMotionSequence(plan).motions;
+  const motion = motions[firstMotionEndingAfter(motions, routeMm)];
+  return motion !== undefined && motion.routeStartMm <= routeMm ? motion : undefined;
+}
 
 /**
  * Walks every drawable segment intersecting `[fromRouteMm, toRouteMm)`, clipped
@@ -66,6 +77,7 @@ function visitMotionRange(
         from: mapControllerPointToScene(start, plan),
         to: mapControllerPointToScene(end, plan),
         intent: motion.intent,
+        startRouteMm: clippedStart,
         endRouteMm: clippedEnd,
       });
     }

@@ -145,6 +145,7 @@ describe('runTrace stale-result guard (P2-A)', () => {
     expect(traceImageWithFallback).toHaveBeenCalledWith(
       expect.objectContaining({ width: 1, height: 2 }),
       options,
+      undefined,
     );
     expect(setState).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -209,6 +210,7 @@ describe('runTrace stale-result guard (P2-A)', () => {
     expect(traceImageWithFallback).toHaveBeenCalledWith(
       expect.objectContaining({ width: 410, height: 1024 }),
       options,
+      undefined,
     );
     expect(setState).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -292,6 +294,7 @@ describe('runTrace stale-result guard (P2-A)', () => {
       2,
       expect.objectContaining({ width: 820, height: 820 }),
       expect.objectContaining({ pixelScale: 2 }),
+      undefined,
     );
     expect(setState).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ready' }));
   });

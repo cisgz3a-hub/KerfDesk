@@ -27,12 +27,12 @@ import { buildDisplayPolylines } from './display-polylines';
 import { strokePolylinesBatched } from './draw-vector-strokes';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import {
-  MAX_PLAN_PREVIEW_ROUTE_STEPS,
   planPreviewRouteEligible,
   previewRouteForDrawing,
   registerExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
 import type { PreviewIssue, PreviewToolpath } from './preview-status';
+import { previewRouteExceedsBudget } from './preview-route-budget';
 import {
   mapOwnedToolpathToPackedScene,
   mapOwnedToolpathToScene,
@@ -220,7 +220,7 @@ export function buildPreviewToolpathFromPrepared(
     planPreviewRouteEligible({
       prepared,
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
-      routeStepCount: machineToolpath.steps.length,
+      route: machineToolpath,
     });
   // Past the same budget, the mapped route lands in columnar buffers instead
   // of a step object per span: nothing compares against it any more, and a
@@ -230,7 +230,7 @@ export function buildPreviewToolpathFromPrepared(
   const ownsMachineRoute = streamedRaster || (options.executablePlan === true && !planPreview);
   const mapPreview = !ownsMachineRoute
     ? mapToolpathToScene
-    : machineToolpath.steps.length > MAX_PLAN_PREVIEW_ROUTE_STEPS
+    : previewRouteExceedsBudget(machineToolpath)
       ? mapOwnedToolpathToPackedScene
       : mapOwnedToolpathToScene;
   const previewToolpath = mapPreview(machineToolpath, prepared.jobOriginOffset, project.device);

@@ -1,14 +1,11 @@
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../../core/controllers/grbl';
-import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
-import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { mockPlatform, renderWizard } from './device-setup-wizard.test-support';
 import {
   changeSetupInput as changeInput,
   changeSetupSelect as changeSelect,
@@ -31,39 +28,6 @@ const IDLE_STATUS = {
   spindle: 0,
 } as const;
 
-function mockPlatform(serialSupported = true): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) => []),
-    pickFileForSave: vi.fn(async (_request: FileSaveRequest) => null),
-    serial: { isSupported: () => serialSupported, requestPort: async () => null },
-  };
-}
-
-async function renderWizard(
-  onClose: () => void = () => undefined,
-  adapter: PlatformAdapter = mockPlatform(),
-): Promise<{ readonly host: HTMLDivElement; readonly unmount: () => Promise<void> }> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <PlatformProvider adapter={adapter}>
-        <DeviceSetupWizard onClose={onClose} />
-      </PlatformProvider>,
-    );
-  });
-  return {
-    host,
-    unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    },
-  };
-}
-
 afterEach(() => {
   resetStore();
   useLaserStore.setState({
@@ -80,6 +44,33 @@ afterEach(() => {
 // The three-stage shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
+  it('offers worker streaming only for GRBL-family controllers and keeps its saved preference', async () => {
+    const view = await renderWizard();
+    const workerOption = () =>
+      view.host.querySelector<HTMLInputElement>(
+        'input[aria-label="Read the serial port and refill the job stream in a worker"]',
+      );
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Advanced connection and streaming');
+      const option = workerOption();
+      if (option === null) throw new Error('GRBL worker option missing');
+      await act(async () => option.click());
+      expect(workerOption()?.checked).toBe(true);
+
+      for (const controllerKind of ['marlin', 'smoothieware']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()).toBeNull();
+      }
+      for (const controllerKind of ['grblhal', 'fluidnc', 'grbl-v1.1']) {
+        await changeSelect(view.host, 'Controller firmware', controllerKind);
+        expect(workerOption()?.checked).toBe(true);
+      }
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it.each(['laser', 'cnc'] as const)(
     'reaches Save in two advances for %s without connecting',
     async (kind) => {

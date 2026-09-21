@@ -123,19 +123,18 @@ describe('worker serial connection (ADR-334)', () => {
     expect(seen).toEqual(['ok', '<Idle|MPos:0,0,0|FS:0,0>']);
   });
 
-  // The invariant the whole design rests on: ownership changes only on the
-  // worker's own acknowledgement, so the two sides can never both be writing.
-  it('keeps the refill on this side until the worker confirms the arm', async () => {
+  it('keeps the refill on this side until the worker establishes the snapshot barrier', async () => {
     const h = harness();
     const refill = h.connection.hostedStreaming;
     if (refill === undefined) throw new Error('expected a hosted-refill transport');
 
-    const arming = refill.arm(armedStreamer());
+    const arming = refill.arm(armedStreamer);
     await Promise.resolve();
     expect(refill.isArmed()).toBe(false);
-    expect(h.sent.at(-1)?.message).toMatchObject({ kind: 'arm' });
+    expect(h.sent.at(-1)?.message).toMatchObject({ kind: 'prepare-arm' });
 
-    h.emit({ kind: 'armed' });
+    h.emit({ kind: 'ready', id: 1 });
+    h.emit({ kind: 'armed', id: 1 });
     await arming;
     expect(refill.isArmed()).toBe(true);
   });
@@ -144,34 +143,38 @@ describe('worker serial connection (ADR-334)', () => {
     const h = harness();
     const refill = h.connection.hostedStreaming;
     if (refill === undefined) throw new Error('expected a hosted-refill transport');
-    const arming = refill.arm(armedStreamer());
-    h.emit({ kind: 'armed' });
+    const arming = refill.arm(armedStreamer);
+    h.emit({ kind: 'ready', id: 1 });
+    h.emit({ kind: 'armed', id: 1 });
     await arming;
 
     const releasing = refill.release();
     await Promise.resolve();
     expect(refill.isArmed()).toBe(true);
 
-    h.emit({ kind: 'released' });
+    h.emit({ kind: 'released', id: 2 });
     await releasing;
     expect(refill.isArmed()).toBe(false);
   });
 
-  it('takes the refill back anyway when the worker stops answering', async () => {
+  it('closes the transport rather than resuming refill after a release timeout', async () => {
     vi.useFakeTimers();
     const h = harness();
     const refill = h.connection.hostedStreaming;
     if (refill === undefined) throw new Error('expected a hosted-refill transport');
-    const arming = refill.arm(armedStreamer());
-    h.emit({ kind: 'armed' });
+    const arming = refill.arm(armedStreamer);
+    h.emit({ kind: 'ready', id: 1 });
+    h.emit({ kind: 'armed', id: 1 });
     await arming;
 
     const releasing = refill.release();
     await vi.advanceTimersByTimeAsync(WORKER_HANDSHAKE_TIMEOUT_MS + 10);
     await releasing;
 
-    // Better this side writes refills than nobody does.
     expect(refill.isArmed()).toBe(false);
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(1);
+    await expect(h.connection.write('G1 X2\n')).rejects.toThrow('not writable');
   });
 
   it('reports a failed refill to whoever owns the containment', () => {
@@ -232,13 +235,14 @@ describe('worker serial connection (ADR-334)', () => {
     const h = harness();
     const refill = h.connection.hostedStreaming;
     if (refill === undefined) throw new Error('expected a hosted-refill transport');
-    const arming = refill.arm(armedStreamer());
-    h.emit({ kind: 'armed' });
+    const arming = refill.arm(armedStreamer);
+    h.emit({ kind: 'ready', id: 1 });
+    h.emit({ kind: 'armed', id: 1 });
     await arming;
 
     const forgetting = h.connection.forget?.();
     await Promise.resolve();
-    h.emit({ kind: 'released' });
+    h.emit({ kind: 'released', id: 2 });
     await Promise.resolve();
     h.emit({ kind: 'closed' });
     await forgetting;
