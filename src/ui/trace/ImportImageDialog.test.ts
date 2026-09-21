@@ -345,10 +345,9 @@ describe('commit source revalidation (P2-A)', () => {
     const ctx = ctxWith(() => seed);
     await commit(args(seed, { boundary: { x: 1, y: 0, width: 1, height: 2 } }), ctx);
 
-    expect(traceImageWithFallback).toHaveBeenCalledWith(
-      expect.objectContaining({ width: 1, height: 2 }),
-      DEFAULT_TRACE_OPTIONS,
-    );
+    const [pixels, options] = vi.mocked(traceImageWithFallback).mock.calls[0] ?? [];
+    expect(pixels).toMatchObject({ width: 1, height: 2 });
+    expect(options).toEqual(DEFAULT_TRACE_OPTIONS);
     expect(ctx.traceExistingImage).toHaveBeenCalledWith(
       'src-1',
       expect.objectContaining({
@@ -402,10 +401,9 @@ describe('commit source revalidation (P2-A)', () => {
 
     await commit(args(seed, { boundary: { x: 4500, y: 0, width: 1200, height: 3000 } }), ctx);
 
-    expect(traceImageWithFallback).toHaveBeenCalledWith(
-      expect.objectContaining({ width: 410, height: 1024 }),
-      DEFAULT_TRACE_OPTIONS,
-    );
+    const [pixels, options] = vi.mocked(traceImageWithFallback).mock.calls[0] ?? [];
+    expect(pixels).toMatchObject({ width: 410, height: 1024 });
+    expect(options).toEqual(DEFAULT_TRACE_OPTIONS);
     expect(ctx.traceExistingImage).toHaveBeenCalledWith(
       'src-1',
       expect.objectContaining({

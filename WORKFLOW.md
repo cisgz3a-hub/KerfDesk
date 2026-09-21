@@ -1241,6 +1241,11 @@ pause/`M400` boundaries and actual spindle or coolant state changes. Redundant `
 `M9` re-arms do not invent another stop, and laser power carried by a planned motion stays on that
 motion span.
 
+For a connected controller, unproven `G4 P` units keep a dwell-containing job's estimate
+unavailable even when the live timing analysis stopped earlier for a size budget, missing
+position or missing controller identity. Offline estimates retain profile assumptions; proven
+controller and no-dwell estimates remain available. This changes displayed timing, not Start.
+
 Saved cut and travel time scales apply to both the pre-run estimate and the live countdown's
 motion baseline. CNC plunge time belongs to cut time, while retract time belongs to rapid travel;
 programmed spindle-start and restart dwells are added separately, without either scale. Job Review
@@ -1278,6 +1283,11 @@ model:
 
 Positive subsecond estimates display `<1s`. An exhausted estimate while the job remains active
 displays that it is waiting for the controller; numerical rounding never implies completion.
+
+The live burn glow requires a running, unambiguous process segment and no controller evidence
+that the laser is off. Travel, stopped/error/disconnected states, and uncertain route positions
+keep the ordinary position marker. Cooling colours follow physical route distance, so splitting
+one straight cut into smaller G-code moves does not change its cooling pattern.
 
 The in-memory sidecar carries the emitted-program fingerprint plus initial position, connection
 session, position epoch, active driver, and current-session detected-family evidence. If any of that
@@ -5062,6 +5072,9 @@ and lifts the command's CNC-only gate.)*
    snapshots behind an atomically replaced per-session manifest. It retains current
    and previous generations and writes an epoch tombstone on clear. Content-addressed
    field blobs remain a future optimization; manual Save never depends on local data.
+   Cleanup of an unreadable slot compares the bytes or IndexedDB epoch observed by that read.
+   A newer successful backup at the same key survives cleanup, and foreign live or unverified
+   session slots remain protected.
 3. **Preview output**, **Save G-code**, **Frame**, and **Start** use the exact same
    `prepareOutput` artifact. Deterministic inert comments identify source kind and
    digest, physical dimensions/resolution, mapping/depth/polarity, roughing and

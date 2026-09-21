@@ -35,12 +35,13 @@ export async function traceImageWithBoundaryMode(
   requestedOptions: TraceOptions,
   boundary: TraceBoundary | null | undefined,
   mode: BoundaryMode,
+  signal?: AbortSignal,
 ): Promise<TraceResult> {
   const options = resolveTraceSourceOptions(image, requestedOptions);
   if (mode === 'crop' || boundary === null || boundary === undefined) {
-    return traceImageRegion(image, options, boundary);
+    return traceImageRegion(image, options, boundary, signal);
   }
-  const full = await traceImageWithFallback(image, options);
+  const full = await traceImageWithFallback(image, options, signal);
   const notices = new Set(full.notices);
   const paths = await enhanceRegionPaths({
     image,
@@ -48,7 +49,7 @@ export async function traceImageWithBoundaryMode(
     fullTracePaths: full.paths,
     options,
     trace: async (img, opts) => {
-      const result = await traceImageWithFallback(img, opts);
+      const result = await traceImageWithFallback(img, opts, signal);
       for (const notice of result.notices ?? []) notices.add(notice);
       return result.paths;
     },

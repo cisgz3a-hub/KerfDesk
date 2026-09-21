@@ -34,11 +34,15 @@ export function hostedRefillArmed(refs: ConnectionRefs): boolean {
  */
 export async function armHostedRefill(
   refs: ConnectionRefs,
-  streamer: StreamerState | null,
+  readStreamer: () => StreamerState | null,
 ): Promise<void> {
   const refill = hostedRefill(refs);
+  const streamer = readStreamer();
   if (refill === null || streamer === null || streamer.status !== 'streaming') return;
-  await refill.arm(streamer);
+  await refill.arm(() => {
+    const current = readStreamer();
+    return current?.status === 'streaming' ? current : null;
+  });
 }
 
 /**

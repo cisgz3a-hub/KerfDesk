@@ -1,8 +1,17 @@
 import type { JobCheckpoint } from '../../../core/recovery';
-import type { LegacyFingerprintOnlyArtifactV1 } from './execution-artifact';
-import { matchesStoredArtifact } from './recovery-artifact-identity';
+import {
+  isRecoveryArtifact,
+  type LegacyFingerprintOnlyArtifactV1,
+  type RecoveryArtifactV1,
+} from './execution-artifact';
+import { matchesStoredArtifact, sameRecoveryProgramIdentity } from './recovery-artifact-identity';
+import { storedExecutionArtifactIntegrityIsValid } from './execution-artifact-integrity';
 import type { RecoveryStorageBackend } from './recovery-backend';
-import { LEGACY_CHECKPOINT_ARTIFACT_ORIGIN, validRecoverySlots } from './recovery-model';
+import {
+  LEGACY_CHECKPOINT_ARTIFACT_ORIGIN,
+  validRecoverySlots,
+  validStoredArtifact,
+} from './recovery-model';
 import { startIntentStandInArtifact } from './start-intent';
 
 export async function insertLegacyRecoveryCapsule(args: {
@@ -56,23 +65,39 @@ export async function insertLegacyRecoveryCapsule(args: {
  * stand-in it superseded. */
 export async function putStartIntentStandIn(args: {
   readonly backend: RecoveryStorageBackend;
-  readonly archived: (runId: string) => Promise<{ readonly ok: boolean }>;
   readonly generation: number;
   readonly nowIso: () => string;
   readonly onFailure: (error: unknown) => void;
   readonly runId: string;
   readonly intent: JobCheckpoint;
-}): Promise<boolean> {
+}): Promise<RecoveryArtifactV1['kind'] | null> {
   try {
-    if ((await args.archived(args.runId)).ok) return true;
-    return await args.backend.putArtifact({
+    const inserted = await args.backend.putArtifact({
       runId: args.runId,
       generation: args.generation,
       origin: LEGACY_CHECKPOINT_ARTIFACT_ORIGIN,
       artifact: startIntentStandInArtifact(args.runId, args.intent, args.nowIso()),
     });
+    if (inserted) return 'legacy-fingerprint-only';
+    // A crash can leave the real archive, or an earlier reconciliation's
+    // stand-in, committed before its slot transition. Neither is in execution
+    // history yet. Read the immutable row directly and preserve its kind.
+    const stored = validStoredArtifact(await args.backend.getArtifact(args.runId));
+    if (
+      stored === null ||
+      stored.runId !== args.runId ||
+      stored.generation !== args.generation ||
+      !isRecoveryArtifact(stored.artifact) ||
+      !sameRecoveryProgramIdentity(stored.artifact, args.intent)
+    ) {
+      return null;
+    }
+    return stored.artifact.kind === 'legacy-fingerprint-only' ||
+      (await storedExecutionArtifactIntegrityIsValid(stored))
+      ? stored.artifact.kind
+      : null;
   } catch (error) {
     args.onFailure(error);
-    return false;
+    return null;
   }
 }

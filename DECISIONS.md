@@ -20327,10 +20327,11 @@ not the problem — it is roughly 207 bytes per segment. The copies are.
 
 1. `planPreviewRouteEligible` holds every rule that decides whether a prepared job may carry the
    plan-backed preview authority: the existing current-position and ADR-243 streamed-raster
-   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_STEPS` keeps
+   fallbacks, plus a new one — a machine route longer than `MAX_PLAN_PREVIEW_ROUTE_SEGMENTS` keeps
    the legacy route. That constant is `MAX_COMPILED_MOTION_SEGMENTS`, the same 250,000 the
    operator is already shown as "Large program: … preparation, preview, and streaming may be
-   slow". Route steps never undercount the motion segments that raise that advisory.
+   slow". The budget counts each cut-polyline edge, plus at least one segment per step,
+   and stops counting once the limit is exceeded. A large contour cannot hide inside one step.
 2. `buildPreviewToolpathFromPrepared` asks the gate BEFORE mapping. Only the plan comparison
    keeps the freshly built machine route alive past that point, so when the gate declines, the
    machine array is consumed in place by `mapOwnedToolpathToScene` — the treatment streamed
@@ -20569,7 +20570,7 @@ materializing it, so nothing could keep one packed.
    thin wrapper over it — and `PackedToolpathSteps` reads a route straight out of those buffers,
    one fresh step at a time. Per-vertex Z (`zs`) and the multi-tool `toolId` have no column, so
    `packToolpath` REFUSES such a route rather than dropping the fields, and it stays an array.
-3. Past `MAX_PLAN_PREVIEW_ROUTE_STEPS` — the same budget ADR-325 uses — a preview route that no
+3. Past `MAX_PLAN_PREVIEW_ROUTE_SEGMENTS` — the same budget ADR-325 uses — a preview route that no
    longer has a plan authority to compare against is mapped into scene space directly as buffers,
    consuming the machine array slot by slot as it goes. Below the budget nothing changes.
 4. A packed route crosses the ADR-244 boundary as one `packed` response whose buffers are
@@ -20815,11 +20816,11 @@ elsewhere and no record in the log.
    so both halves of the exchange fall under the console's existing "show stream" filter and the
    Super Console's Stream group. The tag comes from `streamOwnsTerminalAck`, a pure mirror of the
    ownership branch the ack ledger uses, pinned against it over a state matrix.
-2. Those entries, inbound and outbound, are appended to a buffer on the refs instead of the
-   store. The next line anyone waits on — a status report, an error, a banner, any console or
-   motion reply — publishes them ahead of itself in one update, in wire order. The status poll
-   runs at four a second while connected, so the transcript is never more than a quarter second
-   behind and stays complete. Every path that resets the transcript clears the buffer.
+2. Those entries, inbound and outbound, are held in bounded rings on the refs instead of the
+   store: at most 500 transcript entries and 200 log lines. A non-job line publishes them ahead
+   of itself in wire order. Job-only traffic also publishes on the first entry at least 250 ms
+   after the batch began, independently of status polling. Marlin suppresses queued status
+   queries during streaming. Every transcript reset clears both rings and their batch deadline.
 3. The transport counter is NOT deferred: Start's queue fence and the motion settlement read it.
 4. The live bar, the job rail and the console deck subscribe to the streamer by value, not by
    identity. Status is published immediately, since it flips a control or a heading; the line
@@ -20835,7 +20836,7 @@ elsewhere and no record in the log.
 
 Per-acknowledgement store updates drop from four to three, and the console's per-line work
 disappears: a burst of twelve acknowledgements now produces no render at all, then one. The
-transcript keeps every line and its millisecond timestamps, so it remains the tool for measuring
+transcript keeps its newest retained lines and their millisecond timestamps, so it remains the tool for measuring
 real acknowledgement latency on a machine. An operator whose machine stops on its own hold is
 told which state it is in and what will clear it, instead of reading `JOB RUNNING`.
 
@@ -20889,26 +20890,29 @@ streams can be handed to a worker after the operator has granted the port.
    — only while armed — writes the refill before forwarding the line that triggered it. It owns no
    judgement: what a status report means, whether an error is fatal, whether a pause is safe and
    when a job is over all stay on the main thread, which sees the same lines it always saw.
-3. Exactly one side writes refills, and ownership moves only through an acknowledged handshake.
-   The main thread keeps writing until the worker's `armed` arrives and keeps deferring until its
-   `released` does. Every store action that changes the stream's status takes the refill back
-   first. Hosting is armed once, after the first window is on the wire, and is not re-armed after
-   a pause or a tool change: a second handover point would need its own proof for a benefit that
-   only applies to the remainder of an interrupted job.
-4. Every wait on the worker is bounded, and a worker that stops answering loses the refill rather
-   than keeping it — better that this side writes than that nobody does. A failed refill out
-   there routes into the one containment path a failed refill here already uses.
-5. It is off by default, behind `workerHostedStreaming` on the device profile, offered in Machine
-   Setup as experimental and untested on hardware. A runtime that has no `Worker`, cannot start a
+3. Exactly one side writes refills. `prepare-arm` pauses inbound delivery and returns a `ready`
+   barrier after all earlier lines. The renderer processes those lines, captures the current
+   stream, and suppresses its own refill before sending `arm`. The worker adopts that snapshot
+   before resuming delivery. Correlated replies cannot revive a cancelled arm. Release keeps
+   renderer suppression until the worker's ordered `released` marker arrives. Hosting is armed
+   once, after the first window is on the wire, and is not re-armed after a pause or tool change.
+4. Every handshake is bounded. A silent worker is terminated and the transport closes; timeout
+   never returns write ownership to a renderer while the worker may still refill. Reboot banners,
+   MPG takeover, Alarm/Sleep reports, an outbound reset and a failed refill synchronously retire
+   the worker's old queue. An ordered marker lets the renderer process invalidation before it
+   resumes ownership. The main handlers still own the resulting machine state and notices.
+5. It is off by default, behind `workerHostedStreaming` on the device profile, offered for the
+   GRBL family in Machine Setup as experimental and untested on hardware. Marlin and Smoothieware
+   use the ordinary transport even if an older profile retains the flag. A runtime that has no `Worker`, cannot start a
    module worker, or refuses to transfer the streams keeps the main-thread transport silently:
    opting in cannot cost an operator their machine, and with the flag off the app is byte for byte
    the app it was.
 
 ### Consequences
 
-With the flag on, nothing the interface does can delay the wire: the renderer can block for a
-second and the controller still gets its refills. With it off — the default, and every automated
-test in this repository — the transport is unchanged.
+Once armed, the worker can refill while the renderer is busy. The initial handover still needs
+the renderer, and host scheduling is not a physical timing guarantee. With the flag off, the
+ordinary transport is unchanged.
 
 The cost is a second implementation of the write path and a handshake to keep it single-writer.
 That is the reason for the narrow split: the worker is a byte pipe plus one pure function, and
@@ -20921,19 +20925,17 @@ the `onAck` + `step` loop it replaces line for line, and it streams a 40-line jo
 against the firmware simulator with the machine ending where the program says. The worker's logic
 is driven through real `ReadableStream`/`WritableStream` objects: line forwarding and order across
 split chunks, refills only while armed, the handover acknowledgements, write acknowledgement and
-failure by id, and lock release on close. The renderer's half is driven through a fake bridge:
-the stream transfer, write resolution and rejection, subscriber isolation, that `isArmed` flips
-only on the worker's own acknowledgement in both directions, that a silent worker cannot hang
-Disconnect, and that an unsolicited close reads as a dropped cable. The store side is tested for
-not writing a refill while armed, writing it when the transport cannot host, and taking the
-refill back the moment the stream stops streaming.
+failure by id, and lock release on close. Controlled delivery between the real core and connection
+exercises acknowledgements crossing prepare/ready/arm/release, cancellation, and timeout closure.
+The actual store line handler also receives reboot, MPG, Alarm and Sleep immediately followed by
+an acknowledgement in the same chunk: the invalidated job must never refill. Selected-driver
+tests prove incompatible firmware families use the ordinary transport.
 
-NOT verified, anywhere: a real `Worker`. This repository's test environment has no worker, no
-`navigator.serial` and no transferable streams, and the in-app browser pane has no serial API
-either, so no test and no manual check in this project can execute the worker shell, the stream
-transfer, or the two halves talking to each other. There is no hardware evidence of any kind.
-That is why it ships off, why every failure path falls back to the main-thread transport, and why
-the Machine Setup control says so. Anyone enabling it should air-cut first.
+Browser qualification uses a real module Worker and transferable streams backed by a simulated
+port. This exercises the production shell and message boundary without opening a physical serial
+port. It does not qualify a USB adapter, controller or material job. Hosting remains off by
+default and marked experimental; failures after transfer close the connection rather than
+silently resuming a second writer.
 
 ---
 
@@ -21116,11 +21118,13 @@ those serve replay and forensics, which no crashed run is waiting on.
 2. The execution archive is built and stored **after** the controller has accepted the program,
    from `transmitPreparedStart`, and `activateFreshRun` then moves tracking from the pending
    intent to the active run exactly as before.
-3. Reconciliation of an intent-armed handoff materializes the fingerprint-only artifact the
-   intent stands for before writing the capsule, so the capsule never points at a run with no
-   artifact — which hydration would drop, turning the one case the operator most needs to hear
-   about into silence. The stand-in reuses the `legacy-fingerprint-only` shape and its
-   `legacy-checkpoint` origin; the name is historical, the shape is exactly right.
+3. Reconciliation reads the immutable same-generation artifact directly, without requiring
+   terminal execution history. If archive persistence completed before the crash, a matching
+   verified exact archive is reused. Otherwise reconciliation reuses or creates the intent's
+   fingerprint-only stand-in. The capsule preserves the actual backing kind and the transition
+   remains bound to the observed pending run and arm timestamp across storage awaits, so it
+   cannot replace a newer pending Start. The stand-in keeps the `legacy-fingerprint-only` shape
+   and `legacy-checkpoint` origin. No capsule points at an absent or mismatched artifact.
 4. An intent that does not parse, or whose sendable line count disagrees with the handoff it is
    attached to, fails the whole `pendingStart` record closed. Half a durable Start record is
    worse than none: it would report a program length nobody authorized.
@@ -21162,9 +21166,10 @@ change at the asynchronous boundary before the wire refuses the Start and leaves
 handoff behind, a permit revoked there refuses it, and a Start rejected at the wire awaits its
 cleanup before settling.
 
-NOT verified: no crash was actually staged. The reconciliation path is driven through its
-mutations and the slot parser, not by killing a real browser mid-Start, so the evidence is that
-the records are correct, not that a real interrupted session produces them. There is no hardware
+Audit regressions stage interruption before archive storage, after an exact archive, and after
+stand-in storage, then reopen both memory and IndexedDB repositories. They verify capsule kind,
+subsequent Start, integrity rejection and concurrent pending-Start replacement. IndexedDB uses
+the production backend over fake-indexeddb; no browser process was killed mid-Start. There is no hardware
 evidence of any kind — no machine is available to this project. The timings above are plain-node
 V8 measurements of the same modules, not browser profiles; the earlier figures quoted from a
 vitest/jsdom run overstated this traversal by about 6.5x and should not be compared against.
@@ -21219,8 +21224,9 @@ minimum of three alternating rounds:
 | 25 traces at 300 px | 8,716 ms | 7,507 ms | 1.16x |
 | Line Art + Smooth at 424 px (the heavy regime) | 7,167 ms | 5,578 ms | **1.28x** |
 
-`bend-scan-work.test.ts` pins the work rather than the clock: scanning a 600-point closed chain
-that rebuilds nothing must copy nothing, and `trimArc` must not reverse a 4,000-point chain to
+`bend-scan-work.test.ts` pins the measured work: scanning a 600-point closed chain avoids
+slice/reverse copies in leg probes; full-ring rotation still allocates and copies once per
+admitted candidate. `trimArc` must not reverse a 4,000-point chain to
 drop 5 px off one end. Both fail against the previous implementation with the counts above, and a
 reference implementation of the old `trimArc` pins the rewrite's output shape for shapes and arcs
 including the degenerate ones.

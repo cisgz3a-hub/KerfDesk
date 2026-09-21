@@ -67,15 +67,13 @@ export type SerialOpenRequest = {
 
 /**
  * Present only on a transport that can host the character-counting refill off
- * the main thread (ADR-334). Ownership changes solely through these two
- * promises, each resolved by the transport's own acknowledgement, so exactly
- * one side writes refills at any moment. Absent means the main thread writes
- * them, as it always has.
+ * the main thread (ADR-334). The transport establishes a line-delivery barrier
+ * before sampling the live stream. Absent means the main thread writes refills.
  */
 export type HostedStreamRefill = {
   readonly isArmed: () => boolean;
-  /** Hand the refill over from this exact stream position. */
-  readonly arm: (streamer: unknown) => Promise<void>;
+  /** Read the current position at the barrier, or null if no longer eligible. */
+  readonly arm: (readSnapshot: () => unknown | null) => Promise<void>;
   /** Take it back before changing the stream's status. */
   readonly release: () => Promise<void>;
   /** A refill write failed out there; the caller owns the containment. */

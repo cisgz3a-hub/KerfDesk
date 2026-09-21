@@ -1,4 +1,4 @@
-import { selectControllerDriver } from '../../core/controllers';
+import { selectControllerDriver, type ControllerDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialPortIdentity, SerialPortRef } from '../../platform/types';
 import {
   beginConnectAttempt,
@@ -11,6 +11,7 @@ import { closeConnectionOnce } from './laser-connection-teardown';
 import type { ConnectControllerOptions } from './laser-store-action-types';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SerialOpenRequest } from '../../platform/types';
+import { isGrblFamilyDriver } from './laser-disconnect-transaction';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -74,7 +75,7 @@ export async function runConnectAction(
       return;
     }
     const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
-    const connection = await portRef.open(serialOpenRequest(baudRate, options));
+    const connection = await portRef.open(serialOpenRequest(baudRate, options, refs.driver));
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await closeCancelledConnection(refs, attempt, connection);
       return;
@@ -96,10 +97,18 @@ export async function runConnectAction(
 // Split out to keep runConnectAction under the complexity cap. The hosted
 // transport is advisory: the platform silently keeps the main-thread one when
 // it cannot hand the port to a worker (ADR-334).
-function serialOpenRequest(baudRate: number, options: ConnectControllerOptions): SerialOpenRequest {
+function serialOpenRequest(
+  baudRate: number,
+  options: ConnectControllerOptions,
+  driver: ControllerDriver,
+): SerialOpenRequest {
   return {
     baudRate,
-    ...(options.hostedStreaming === true ? { hostedStreaming: true } : {}),
+    // The worker pump understands GRBL acknowledgements only. A saved opt-in
+    // may survive a controller change or arrive through an imported profile.
+    ...(options.hostedStreaming === true && isGrblFamilyDriver(driver)
+      ? { hostedStreaming: true }
+      : {}),
   };
 }
 

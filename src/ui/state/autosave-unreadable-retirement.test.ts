@@ -35,7 +35,12 @@ describe('unreadable autosave retirement', () => {
     expect(first.snapshot).toBeNull();
     expect(first.warnings).toContain('corrupt-slot');
     expect(first.unreadable).toEqual([
-      { storageKey: staleKey, sessionId: 'stale-window', backend: 'local' },
+      {
+        storageKey: staleKey,
+        sessionId: 'stale-window',
+        backend: 'local',
+        raw: olderBuildRecord(),
+      },
     ]);
 
     expect(localStorage.getItem(staleKey)).toBeNull();
@@ -111,7 +116,7 @@ describe('unreadable autosave retirement', () => {
     expect(read.snapshot).toBeNull();
     expect(read.warnings).toContain('corrupt-slot');
     expect(read.unreadable).toEqual([
-      { storageKey, sessionId: 'owner-window', backend: 'indexeddb' },
+      { storageKey, sessionId: 'owner-window', backend: 'indexeddb', epoch: 1 },
     ]);
     expect((await service.readLatest()).warnings).toEqual([]);
   });

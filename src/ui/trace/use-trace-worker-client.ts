@@ -193,8 +193,35 @@ function rejectAllPendingAndRetireWorker(worker: Worker, error: Error): void {
 // death mid-flight), fall back to inline tracing for THIS call when it
 // is small enough. Without it, every commit through the dialog would
 // error-toast after a bounded inline path could have succeeded.
-export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
+export async function traceImage(
+  image: RawImageData,
+  options: TraceOptions,
+  signal?: AbortSignal,
+): Promise<TraceResult> {
+  if (signal?.aborted === true) throw new TraceRequestSupersededError();
   const epoch = ++latestTraceEpoch;
+  const cancel = (): void => {
+    // A closing preview may outlive the replacement or commit that superseded
+    // it. Only its own current computation can be cancelled by this signal.
+    if (epoch !== latestTraceEpoch) return;
+    latestTraceEpoch += 1;
+    if (workerInstance !== null && pendingByRequestId.size > 0) {
+      rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
+    }
+  };
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    return await traceImageForEpoch(image, options, epoch);
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
+async function traceImageForEpoch(
+  image: RawImageData,
+  options: TraceOptions,
+  epoch: number,
+): Promise<TraceResult> {
   if (workerInstance !== null && pendingByRequestId.size > 0) {
     rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
   }
@@ -358,13 +385,14 @@ function traceWorkerSendErrorMessage(err: unknown): string {
 export async function traceImageWithFallback(
   image: RawImageData,
   options: TraceOptions,
+  signal?: AbortSignal,
 ): Promise<TraceResult> {
-  const first = await traceImage(image, options);
+  const first = await traceImage(image, options, signal);
   if (first.paths.length > 0) return first;
   if (!hasAggressivePreprocessing(options)) return first;
   // Keep the same palette/backend and disclose that Otsu, ink despeckle,
   // and short-path filtering were relaxed. Preview and commit carry this
   // result together so recovered artwork never masquerades as the first pass.
-  const retried = await traceImage(image, relaxAggressivePreprocessing(options));
+  const retried = await traceImage(image, relaxAggressivePreprocessing(options), signal);
   return { ...retried, notices: ['relaxed-settings'] };
 }

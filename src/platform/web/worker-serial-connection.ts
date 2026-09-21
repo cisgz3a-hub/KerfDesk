@@ -5,19 +5,11 @@
 // arrive through `onLine` in wire order, `write` still resolves only once the
 // bytes are queued, and `close` still leaves the port closable.
 //
-// The one addition is `hostedStreaming`, through which the job stream hands
-// the character-counting refill to the worker and takes it back. Both
-// directions wait for the worker's own acknowledgement, and postMessage
-// preserves order, so the two sides can never both be writing refills:
-//
-//   main writes refills ──arm──▶ (still main) ──armed──▶ worker writes refills
-//   worker writes refills ─release─▶ (still worker) ──released──▶ main writes
-//
-// Every wait is bounded. A worker that stops answering must not be able to
-// hang Disconnect, which is the lesson `bounded-writer-close.ts` already
-// records for the main-thread transport.
+// Handover establishes a line-delivery barrier before sampling the renderer.
+// A timed-out handover closes the transport; it never creates a second writer.
 
-import type { HostedStreamRefill, SerialConnection } from '../types';
+import type { SerialConnection } from '../types';
+import { createWorkerRefillHandover } from './worker-refill-handover';
 import {
   isSerialWorkerResponse,
   type SerialWorkerRequest,
@@ -47,10 +39,8 @@ type PendingWrite = { readonly resolve: () => void; readonly reject: (error: Err
 
 type Session = {
   closed: boolean;
-  armed: boolean;
   nextWriteId: number;
-  armedSignal: (() => void) | null;
-  releasedSignal: (() => void) | null;
+  handover: ReturnType<typeof createWorkerRefillHandover> | null;
   closedSignal: (() => void) | null;
   readonly lineSubs: Set<(line: string) => void>;
   readonly closeSubs: Set<() => void>;
@@ -70,7 +60,26 @@ export function createWorkerSerialConnection(args: {
     if (isSerialWorkerResponse(message)) routeResponse(session, message);
   });
   attachStreams(bridge, port, unsubscribe);
-  const hostedStreaming = createHostedRefill(session, bridge, timeoutMs);
+  let terminated = false;
+  const terminate = (): void => {
+    if (terminated) return;
+    terminated = true;
+    unsubscribe();
+    bridge.terminate();
+  };
+  session.handover = createWorkerRefillHandover({
+    post: (message) => bridge.postMessage(message),
+    timeoutMs,
+    onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
+    fail: () => {
+      // An unanswered handover leaves ownership uncertain. Stop the worker
+      // before notifying the store, so no fallback can duplicate its writes.
+      terminate();
+      fireClose(session);
+      void port.close().catch(() => undefined);
+    },
+  });
+  const hostedStreaming = session.handover.refill;
   const shutDown = async (): Promise<void> => {
     if (!session.closed) {
       // The worker holds the stream locks, so it must let go before the port
@@ -82,8 +91,7 @@ export function createWorkerSerialConnection(args: {
       session.closedSignal = null;
       fireClose(session);
     }
-    unsubscribe();
-    bridge.terminate();
+    terminate();
   };
 
   return {
@@ -119,10 +127,8 @@ export function createWorkerSerialConnection(args: {
 function createSession(): Session {
   return {
     closed: false,
-    armed: false,
     nextWriteId: 1,
-    armedSignal: null,
-    releasedSignal: null,
+    handover: null,
     closedSignal: null,
     lineSubs: new Set(),
     closeSubs: new Set(),
@@ -155,11 +161,12 @@ function attachStreams(
 }
 
 function routeResponse(session: Session, message: SerialWorkerResponse): void {
+  if (session.closed) return;
   if (message.kind === 'line') {
     deliverLine(session, message.line);
     return;
   }
-  if (routeHandover(session, message)) return;
+  if (session.handover?.receive(message)) return;
   if (routeWriteResult(session, message)) return;
   if (message.kind === 'stream-write-error') {
     for (const handler of session.writeErrorSubs) handler(message.message);
@@ -168,23 +175,6 @@ function routeResponse(session: Session, message: SerialWorkerResponse): void {
   session.closedSignal?.();
   session.closedSignal = null;
   fireClose(session);
-}
-
-/** The refill handover, the only thing that moves write ownership. */
-function routeHandover(session: Session, message: SerialWorkerResponse): boolean {
-  if (message.kind === 'armed') {
-    session.armed = true;
-    session.armedSignal?.();
-    session.armedSignal = null;
-    return true;
-  }
-  if (message.kind === 'released') {
-    session.armed = false;
-    session.releasedSignal?.();
-    session.releasedSignal = null;
-    return true;
-  }
-  return false;
 }
 
 function routeWriteResult(session: Session, message: SerialWorkerResponse): boolean {
@@ -216,44 +206,13 @@ function deliverLine(session: Session, line: string): void {
 function fireClose(session: Session): void {
   if (session.closed) return;
   session.closed = true;
-  session.armed = false;
+  session.handover?.close();
+  session.closedSignal?.();
+  session.closedSignal = null;
   for (const write of session.pendingWrites.values())
     write.reject(new Error('Serial port closed before the write completed.'));
   session.pendingWrites.clear();
   for (const handler of session.closeSubs) handler();
-}
-
-function createHostedRefill(
-  session: Session,
-  bridge: SerialWorkerBridge,
-  timeoutMs: number,
-): HostedStreamRefill {
-  return {
-    isArmed: () => session.armed,
-    arm: async (streamer) => {
-      if (session.closed || session.armed) return;
-      await settleWithin(timeoutMs, (done) => {
-        session.armedSignal = done;
-        bridge.postMessage({ kind: 'arm', streamer: streamer as never });
-      });
-      session.armedSignal = null;
-    },
-    release: async () => {
-      if (session.closed || !session.armed) {
-        session.armed = false;
-        return;
-      }
-      await settleWithin(timeoutMs, (done) => {
-        session.releasedSignal = done;
-        bridge.postMessage({ kind: 'release' });
-      });
-      session.releasedSignal = null;
-      // A worker that never answered must not keep the refill: the main thread
-      // resumes writing rather than leaving the stream with no writer at all.
-      session.armed = false;
-    },
-    onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
-  };
 }
 
 function subscribe<T>(subscribers: Set<T>, handler: T): () => void {
