@@ -5,6 +5,7 @@ import {
   MACHINE_PROFILE_SCHEMA_VERSION,
   type MachineProfileDocument,
   deserializeMachineProfileDocument,
+  serializeCanonicalDeviceProfile,
   serializeMachineProfileDocument,
 } from './machine-profile-io';
 
@@ -157,6 +158,26 @@ describe('LaserForge machine profile documents', () => {
       kind: 'invalid',
       reason: 'profile.bidirectionalScanPolicy is invalid',
     });
+  });
+
+  it('round-trips the optional firmware-trait flags and refuses a junk value', () => {
+    // Only ever written as `true` (ADR-334, ADR-335). Absent must stay absent
+    // rather than become `false`, or a saved profile stops matching the
+    // catalog entry it came from, and a junk value must not read as on.
+    const set = deserializeProfilePatch({
+      airAssistRestartUnreliable: true,
+      workerHostedStreaming: true,
+    });
+    const junk = deserializeProfilePatch({ airAssistRestartUnreliable: 'yes' });
+
+    if (set.kind !== 'ok' || junk.kind !== 'ok') throw new Error('expected both to parse');
+    expect(set.document.profile.airAssistRestartUnreliable).toBe(true);
+    expect(set.document.profile.workerHostedStreaming).toBe(true);
+    expect(serializeCanonicalDeviceProfile(set.document.profile)).toContain(
+      '"airAssistRestartUnreliable": true',
+    );
+    expect('airAssistRestartUnreliable' in junk.document.profile).toBe(false);
+    expect('workerHostedStreaming' in junk.document.profile).toBe(false);
   });
 
   it('roundtrips pending status and marks statusless imported calibration pending', () => {

@@ -22,6 +22,11 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   // `Bf:` capacity report (ADR-331).
   rxBufferBytes: GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
   airAssistCommand: 'M8',
+  // The A1's own air control is timer-backed, so a mid-program M9 is not a
+  // clean off: `$152` holds the pump in standby afterwards and the restart is
+  // what users report failing. Air is held across an Air-off operation that
+  // sits between two Air-on ones rather than cycled over it (ADR-335).
+  airAssistRestartUnreliable: true,
   autofocusCommand: '$HZ1',
   maxFeed: 10000,
   framingFeedMmPerMin: 10000,
