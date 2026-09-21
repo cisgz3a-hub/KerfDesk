@@ -8,18 +8,51 @@ import {
   canvasPreviewMotionSequence,
   type CanvasPreviewMotion,
 } from '../state/canvas-preview-motion';
+import { burnWidthPx } from './draw-burn-trail';
+import { visitRouteRange } from './route-range-walk';
 import type { ViewTransform } from './view-transform';
 
+export type RoutePalette = {
+  /** Route not yet confirmed by the controller. */
+  readonly planned: string;
+  /** Settled burn behind the head. */
+  readonly scorch: string;
+  /** Confirmed rapid — travelled, but nothing was cut there. */
+  readonly travel: string;
+};
+
+/**
+ * Opacity the whole confirmed trail composites at, applied ONCE.
+ *
+ * The scorch is painted opaque into its raster so that overlapping burns are
+ * idempotent: a raster fill whose hatch lines land under a pixel apart settles
+ * at exactly this opacity instead of accumulating toward solid, which is what
+ * turned a finished fill into a blank mass over the artwork.
+ */
+const TRAIL_ALPHA = 0.62;
+const PLANNED_WIDTH_PX = 1.2;
+const TRAVEL_WIDTH_PX = 1;
+const TRAVEL_DASH_PX = [2, 6];
+/**
+ * Rapids recede hard. A raster fill returns the head once per hatch row, so at
+ * working zoom the travel strokes alone outnumber the burn and — drawn at the
+ * same weight — they pack into a slab that reads as solid material.
+ */
+const TRAVEL_ALPHA_FACTOR = 0.3;
+
 type CachedRoutePaths = {
-  readonly planned: Path2D;
   readonly process: Path2D;
   readonly travel: Path2D;
   confirmedRouteMm: number;
 };
 
-type CachedPlannedPath = {
+type PlannedPaths = {
+  readonly process: Path2D;
+  readonly travel: Path2D;
+};
+
+type CachedPlannedPath = PlannedPaths & {
   readonly pathConstructor: typeof Path2D;
-  readonly path: Path2D;
 };
 
 type CachedRouteRaster = {
@@ -28,6 +61,13 @@ type CachedRouteRaster = {
   readonly pathConstructor: typeof Path2D;
   readonly viewKey: string;
   confirmedRouteMm: number;
+};
+
+type StrokeStyle = {
+  readonly color: string;
+  readonly widthPx: number;
+  readonly dashPx?: ReadonlyArray<number>;
+  readonly alpha?: number;
 };
 
 const routePathCache = new WeakMap<CanvasMotionPlan, CachedRoutePaths>();
@@ -39,20 +79,65 @@ export function drawCanvasMotionRoute(
   plan: CanvasMotionPlan,
   run: LiveCanvasRun,
   view: ViewTransform,
-  plannedColor: string,
-  completedColor: string,
+  palette: RoutePalette,
 ): void {
   if (plan.capability === 'file-only' || plan.capability === 'unavailable') return;
   const PathCtor = typeof Path2D === 'function' ? Path2D : null;
   if (PathCtor === null) {
-    drawRouteFallback(ctx, plan, run, view, plannedColor, completedColor);
+    drawRouteFallback(ctx, plan, run, view, palette);
     return;
   }
-  if (drawRasterizedRoute(ctx, plan, run, view, plannedColor, completedColor, PathCtor)) return;
+  if (drawRasterizedRoute(ctx, plan, run, view, palette, PathCtor)) return;
   const cached = routePaths(plan, PathCtor, run.route.confirmedRouteMm);
-  strokeScenePath(ctx, cached.planned, view, plannedColor, 1.2, []);
-  strokeScenePath(ctx, cached.process, view, completedColor, 2.4, []);
-  strokeScenePath(ctx, cached.travel, view, completedColor, 1.5, [6, 4]);
+  strokePlanned(ctx, plannedPaths(plan, PathCtor), view, palette);
+  strokeScenePath(ctx, cached.process, view, scorchStyle(palette, plan, view));
+  strokeScenePath(ctx, cached.travel, view, travelStyle(palette));
+}
+
+function plannedStyle(palette: RoutePalette): StrokeStyle {
+  return { color: palette.planned, widthPx: PLANNED_WIDTH_PX, alpha: TRAIL_ALPHA };
+}
+
+/**
+ * A planned rapid is drawn far fainter than a planned cut. Lumping both into
+ * one path at one weight made every hatch row's return leg count as heavily as
+ * the cut itself, so the rapids between two fill islands packed into a slab
+ * over the bed that looked like material.
+ */
+function strokePlanned(
+  ctx: CanvasRenderingContext2D,
+  paths: PlannedPaths,
+  view: ViewTransform,
+  palette: RoutePalette,
+  alpha = TRAIL_ALPHA,
+): void {
+  strokeScenePath(ctx, paths.travel, view, {
+    color: palette.planned,
+    widthPx: PLANNED_WIDTH_PX,
+    alpha: alpha * TRAVEL_ALPHA_FACTOR,
+  });
+  strokeScenePath(ctx, paths.process, view, {
+    color: palette.planned,
+    widthPx: PLANNED_WIDTH_PX,
+    alpha,
+  });
+}
+
+function scorchStyle(
+  palette: RoutePalette,
+  plan: CanvasMotionPlan,
+  view: ViewTransform,
+): StrokeStyle {
+  return { color: palette.scorch, widthPx: burnWidthPx(plan, view), alpha: TRAIL_ALPHA };
+}
+
+function travelStyle(palette: RoutePalette): StrokeStyle {
+  return {
+    color: palette.travel,
+    widthPx: TRAVEL_WIDTH_PX,
+    dashPx: TRAVEL_DASH_PX,
+    alpha: TRAIL_ALPHA * TRAVEL_ALPHA_FACTOR,
+  };
 }
 
 function routePaths(
@@ -62,7 +147,7 @@ function routePaths(
 ): CachedRoutePaths {
   let cached = routePathCache.get(plan);
   if (cached === undefined || confirmedRouteMm < cached.confirmedRouteMm) {
-    cached = createRoutePaths(plan, PathCtor);
+    cached = createRoutePaths(PathCtor);
     routePathCache.set(plan, cached);
   }
   const target = Math.max(
@@ -74,24 +159,23 @@ function routePaths(
   return cached;
 }
 
-function createRoutePaths(plan: CanvasMotionPlan, PathCtor: typeof Path2D): CachedRoutePaths {
+function createRoutePaths(PathCtor: typeof Path2D): CachedRoutePaths {
   return {
-    planned: plannedPath(plan, PathCtor),
     process: new PathCtor(),
     travel: new PathCtor(),
     confirmedRouteMm: 0,
   };
 }
 
-function plannedPath(plan: CanvasMotionPlan, PathCtor: typeof Path2D): Path2D {
+function plannedPaths(plan: CanvasMotionPlan, PathCtor: typeof Path2D): PlannedPaths {
   const cached = plannedPathCache.get(plan);
-  if (cached !== undefined && cached.pathConstructor === PathCtor) return cached.path;
-  const path = new PathCtor();
+  if (cached !== undefined && cached.pathConstructor === PathCtor) return cached;
+  const built = { process: new PathCtor(), travel: new PathCtor() };
   for (const motion of canvasPreviewMotionSequence(plan).motions) {
-    appendFullMotion(path, motion, plan);
+    appendFullMotion(motion.intent === 'process' ? built.process : built.travel, motion, plan);
   }
-  plannedPathCache.set(plan, { pathConstructor: PathCtor, path });
-  return path;
+  plannedPathCache.set(plan, { ...built, pathConstructor: PathCtor });
+  return built;
 }
 
 function drawRasterizedRoute(
@@ -99,8 +183,7 @@ function drawRasterizedRoute(
   plan: CanvasMotionPlan,
   run: LiveCanvasRun,
   view: ViewTransform,
-  plannedColor: string,
-  completedColor: string,
+  palette: RoutePalette,
   PathCtor: typeof Path2D,
 ): boolean {
   if (
@@ -111,18 +194,21 @@ function drawRasterizedRoute(
   ) {
     return false;
   }
-  const cached = routeRaster(plan, ctx.canvas, view, plannedColor, PathCtor);
+  const cached = routeRaster(plan, ctx.canvas, view, palette, PathCtor);
   if (cached === null) return false;
   const target = Math.max(
     0,
     Math.min(run.route.confirmedRouteMm, canvasPreviewMotionSequence(plan).totalRouteMm),
   );
-  if (target < cached.confirmedRouteMm) {
-    resetRouteRaster(cached, plan, view, plannedColor, PathCtor);
-  }
-  appendConfirmedRasterRange(plan, cached, cached.confirmedRouteMm, target, view, completedColor);
+  if (target < cached.confirmedRouteMm) resetRouteRaster(cached, plan, view, palette, PathCtor);
+  appendConfirmedRasterRange(plan, cached, cached.confirmedRouteMm, target, view, palette);
   cached.confirmedRouteMm = target;
+  // The single composite that caps the trail: whatever overlapped inside the
+  // raster, the artwork below still reads through at 1 - TRAIL_ALPHA.
+  ctx.save();
+  ctx.globalAlpha = TRAIL_ALPHA;
   ctx.drawImage(cached.canvas, 0, 0);
+  ctx.restore();
   return true;
 }
 
@@ -130,7 +216,7 @@ function routeRaster(
   plan: CanvasMotionPlan,
   target: HTMLCanvasElement,
   view: ViewTransform,
-  plannedColor: string,
+  palette: RoutePalette,
   PathCtor: typeof Path2D,
 ): CachedRouteRaster | null {
   const viewKey = `${target.width}:${target.height}:${view.scale}:${view.offsetX}:${view.offsetY}`;
@@ -150,7 +236,7 @@ function routeRaster(
     viewKey,
     confirmedRouteMm: 0,
   };
-  resetRouteRaster(created, plan, view, plannedColor, PathCtor);
+  resetRouteRaster(created, plan, view, palette, PathCtor);
   routeRasterCache.set(plan, created);
   return created;
 }
@@ -159,11 +245,11 @@ function resetRouteRaster(
   cached: CachedRouteRaster,
   plan: CanvasMotionPlan,
   view: ViewTransform,
-  plannedColor: string,
+  palette: RoutePalette,
   PathCtor: typeof Path2D,
 ): void {
   cached.context.clearRect(0, 0, cached.canvas.width, cached.canvas.height);
-  strokeScenePath(cached.context, plannedPath(plan, PathCtor), view, plannedColor, 1.2, []);
+  strokePlanned(cached.context, plannedPaths(plan, PathCtor), view, palette, 1);
   cached.confirmedRouteMm = 0;
 }
 
@@ -173,14 +259,24 @@ function appendConfirmedRasterRange(
   fromRouteMm: number,
   toRouteMm: number,
   view: ViewTransform,
-  completedColor: string,
+  palette: RoutePalette,
 ): void {
   if (toRouteMm <= fromRouteMm) return;
   const process = new cached.pathConstructor();
   const travel = new cached.pathConstructor();
   appendConfirmedRange(plan, { process, travel }, fromRouteMm, toRouteMm);
-  strokeScenePath(cached.context, process, view, completedColor, 2.4, []);
-  strokeScenePath(cached.context, travel, view, completedColor, 1.5, [6, 4]);
+  // Opaque into the raster: the cap is the composite in drawRasterizedRoute,
+  // so repeated overlap can never darken past one burn.
+  strokeScenePath(cached.context, process, view, {
+    color: palette.scorch,
+    widthPx: burnWidthPx(plan, view),
+  });
+  strokeScenePath(cached.context, travel, view, {
+    color: palette.travel,
+    widthPx: TRAVEL_WIDTH_PX,
+    dashPx: TRAVEL_DASH_PX,
+    alpha: TRAVEL_ALPHA_FACTOR,
+  });
 }
 
 function appendFullMotion(path: Path2D, motion: CanvasPreviewMotion, plan: CanvasMotionPlan): void {
@@ -198,75 +294,29 @@ function appendConfirmedRange(
   fromRouteMm: number,
   toRouteMm: number,
 ): void {
-  if (toRouteMm <= fromRouteMm) return;
-  const motions = canvasPreviewMotionSequence(plan).motions;
-  const first = firstMotionEndingAfter(motions, fromRouteMm);
-  for (let motionIndex = first; motionIndex < motions.length; motionIndex += 1) {
-    const motion = motions[motionIndex];
-    if (motion === undefined || motion.routeStartMm >= toRouteMm) break;
-    const path = motion.intent === 'process' ? paths.process : paths.travel;
-    appendMotionRange(path, motion, plan, fromRouteMm, toRouteMm);
-  }
-}
-
-function appendMotionRange(
-  path: Path2D,
-  motion: CanvasPreviewMotion,
-  plan: CanvasMotionPlan,
-  fromRouteMm: number,
-  toRouteMm: number,
-): void {
-  if (isVertical(motion)) return;
-  let segmentStartMm = motion.routeStartMm;
-  for (let index = 1; index < motion.pointsMm.length; index += 1) {
-    const from = motion.pointsMm[index - 1];
-    const to = motion.pointsMm[index];
-    if (from === undefined || to === undefined) continue;
-    const length = distance(from, to);
-    const segmentEndMm = segmentStartMm + length;
-    const clippedStart = Math.max(segmentStartMm, fromRouteMm);
-    const clippedEnd = Math.min(segmentEndMm, toRouteMm);
-    if (length > Number.EPSILON && clippedEnd > clippedStart) {
-      const start = interpolate(from, to, (clippedStart - segmentStartMm) / length);
-      const end = interpolate(from, to, (clippedEnd - segmentStartMm) / length);
-      const sceneStart = mapControllerPointToScene(start, plan);
-      const sceneEnd = mapControllerPointToScene(end, plan);
-      path.moveTo(sceneStart.x, sceneStart.y);
-      path.lineTo(sceneEnd.x, sceneEnd.y);
-    }
-    segmentStartMm = segmentEndMm;
-    if (segmentStartMm >= toRouteMm) break;
-  }
-}
-
-function firstMotionEndingAfter(
-  motions: ReadonlyArray<CanvasPreviewMotion>,
-  routeMm: number,
-): number {
-  let low = 0;
-  let high = motions.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    const motion = motions[middle];
-    if (motion !== undefined && motion.routeEndMm > routeMm) high = middle;
-    else low = middle + 1;
-  }
-  return low;
+  visitRouteRange(plan, fromRouteMm, toRouteMm, (segment) => {
+    const path = segment.intent === 'process' ? paths.process : paths.travel;
+    path.moveTo(segment.from.x, segment.from.y);
+    path.lineTo(segment.to.x, segment.to.y);
+  });
 }
 
 function strokeScenePath(
   ctx: CanvasRenderingContext2D,
   path: Path2D,
   view: ViewTransform,
-  color: string,
-  widthPx: number,
-  dashPx: ReadonlyArray<number>,
+  style: StrokeStyle,
 ): void {
   ctx.save();
   ctx.setTransform(view.scale, 0, 0, view.scale, view.offsetX, view.offsetY);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = widthPx / view.scale;
-  ctx.setLineDash(dashPx.map((value) => value / view.scale));
+  ctx.globalAlpha = style.alpha ?? 1;
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.widthPx / view.scale;
+  // Confirmed motion is emitted as independent two-point segments, so butt caps
+  // leave a visible gap at every joint on a curve.
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash((style.dashPx ?? []).map((value) => value / view.scale));
   ctx.stroke(path);
   ctx.restore();
 }
@@ -276,18 +326,26 @@ function drawRouteFallback(
   plan: CanvasMotionPlan,
   run: LiveCanvasRun,
   view: ViewTransform,
-  plannedColor: string,
-  completedColor: string,
+  palette: RoutePalette,
 ): void {
   for (const motion of canvasPreviewMotionSequence(plan).motions) {
-    drawMotion(ctx, motion, motion.pointsMm, plannedColor, false, view, plan);
+    const planned = plannedStyle(palette);
+    drawMotion(
+      ctx,
+      motion,
+      motion.pointsMm,
+      motion.intent === 'process'
+        ? planned
+        : { ...planned, alpha: TRAIL_ALPHA * TRAVEL_ALPHA_FACTOR },
+      view,
+      plan,
+    );
     if (motion.routeStartMm >= run.route.confirmedRouteMm) continue;
     drawMotion(
       ctx,
       motion,
       confirmedMotionPoints(motion, run.route.confirmedRouteMm),
-      completedColor,
-      true,
+      motion.intent === 'process' ? scorchStyle(palette, plan, view) : travelStyle(palette),
       view,
       plan,
     );
@@ -298,16 +356,18 @@ function drawMotion(
   ctx: CanvasRenderingContext2D,
   motion: CanvasPreviewMotion,
   points: ReadonlyArray<ExecutablePlanPoint>,
-  color: string,
-  completed: boolean,
+  style: StrokeStyle,
   view: ViewTransform,
   plan: CanvasMotionPlan,
 ): void {
   if (isVertical(motion) || points.length < 2) return;
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = completed ? (motion.intent === 'process' ? 2.4 : 1.5) : 1.2;
-  ctx.setLineDash(completed && motion.intent !== 'process' ? [6, 4] : []);
+  ctx.globalAlpha = style.alpha ?? 1;
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.widthPx;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash(style.dashPx === undefined ? [] : [...style.dashPx]);
   ctx.beginPath();
   points.forEach((point, index) => {
     const scene = mapControllerPointToScene(point, plan);
