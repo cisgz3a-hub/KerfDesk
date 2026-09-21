@@ -1,6 +1,8 @@
+import type { JobCheckpoint } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
 import type { PersistedRecoverySlots } from './recovery-model';
 import type { SlotMutation } from './recovery-slot-mutations';
+import { START_INTENT_INTERRUPTION_MESSAGE as START_HANDOFF_UNCERTAIN_MESSAGE } from './start-intent';
 
 export function armFreshStartMutation(
   slots: PersistedRecoverySlots,
@@ -24,6 +26,34 @@ export function armFreshStartMutation(
         kind: 'fresh',
         sendableLines: artifact.sendableLines,
         armedAtIso,
+      },
+    },
+    value: true,
+  };
+}
+
+/** ADR-337: arm a fresh Start from the intent alone, before the execution
+ * archive exists. The guards are the artifact-backed ones minus the artifact:
+ * one pending Start and one active run at a time. */
+export function armFreshStartIntentMutation(
+  slots: PersistedRecoverySlots,
+  runId: RunId,
+  intent: JobCheckpoint,
+  armedAtIso: string,
+): SlotMutation<boolean> {
+  if (slots.pendingStart !== null || slots.activeRun !== null) {
+    return unchanged(slots, false);
+  }
+  return {
+    slots: {
+      ...slots,
+      revision: slots.revision + 1,
+      pendingStart: {
+        runId,
+        kind: 'fresh',
+        sendableLines: intent.sendableLines,
+        armedAtIso,
+        intent,
       },
     },
     value: true,
@@ -98,14 +128,16 @@ export function reconcilePendingStartMutation(
       pendingStart: null,
       recoveryCapsule: {
         runId: pending.runId,
-        artifactKind: 'exact-execution',
+        // An intent-armed handoff is backed by the fingerprint-only stand-in
+        // the reconciler materializes, not by an execution archive that does
+        // not exist yet (ADR-337).
+        artifactKind: pending.intent === undefined ? 'exact-execution' : 'legacy-fingerprint-only',
         revision,
         ackedLines: 0,
         sendableLines: pending.sendableLines,
         interruption: {
           kind: 'unknown',
-          message:
-            'The application restarted while Start was being accepted. Motion may or may not have begun.',
+          message: START_HANDOFF_UNCERTAIN_MESSAGE,
         },
         updatedAtIso,
       },

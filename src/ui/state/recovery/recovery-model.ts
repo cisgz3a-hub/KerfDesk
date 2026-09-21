@@ -1,4 +1,9 @@
-import { parseOptionalJobInterruption, type JobInterruption } from '../../../core/recovery';
+import {
+  parseOptionalJobInterruption,
+  type JobCheckpoint,
+  type JobInterruption,
+} from '../../../core/recovery';
+import { parsePendingStartIntent } from './start-intent';
 import type {
   ExecutionArtifactV1,
   LegacyFingerprintOnlyArtifactV1,
@@ -79,6 +84,11 @@ export type PendingStartRecord = {
   readonly kind: 'fresh' | 'supervised-recovery';
   readonly sendableLines: number;
   readonly armedAtIso: string;
+  /** ADR-337: what a fresh Start arms BEFORE the first wire byte, standing in
+   * for the execution archive until the controller has accepted the program.
+   * Absent on a handoff armed against an already-staged artifact, which is
+   * still how supervised recovery arms. */
+  readonly intent?: JobCheckpoint;
   readonly sourceRecovery?: {
     readonly runId: RunId;
     readonly revision: number;
@@ -373,6 +383,9 @@ function parsePendingStart(value: unknown): PendingStartRecord | null | undefine
   if (base.kind === 'fresh') {
     return value['sourceRecovery'] === undefined ? base : undefined;
   }
+  // Only a fresh Start arms from an intent; a supervised recovery handoff is
+  // always armed against an artifact that is already staged.
+  if (base.intent !== undefined) return undefined;
   return parseRecoveryPendingStart(base, value['sourceRecovery']);
 }
 
@@ -392,7 +405,8 @@ function parsePendingStartBase(
   ) {
     return undefined;
   }
-  return { runId, kind, sendableLines, armedAtIso };
+  const intent = parsePendingStartIntent(value['intent'], sendableLines);
+  return intent === undefined ? undefined : { runId, kind, sendableLines, armedAtIso, ...intent };
 }
 
 function parseRecoveryPendingStart(
