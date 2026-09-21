@@ -17,6 +17,33 @@
   white-space: normal;
 }
 
+.lf-connected-profile {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--lf-border);
+  border-left: 3px solid var(--lf-success);
+  border-radius: 6px;
+  background: var(--lf-bg-0);
+  overflow-wrap: anywhere;
+}
+
+.lf-connected-profile-label {
+  color: var(--lf-success-fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lf-connected-profile-name {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.lf-connected-profile-detail {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+
 .lf-machine-rail [data-help-id='control:laser.machine-setup.launch'] {
   display: flex;
   align-items: center;
