@@ -69,6 +69,7 @@ import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
+import { createStartArmingCompletion } from './laser-start-arming-completion';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -137,6 +138,7 @@ async function runStartJob(
   assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
   const setupEpoch = captureStartSetupEpoch(get());
+  const completion = createStartArmingCompletion(context);
   set({
     controllerOperation: { kind: 'start-arming', phase: 'queue-fence' },
     ...(options.framedRunPermit === undefined ? { frameVerification: null, framedRun: null } : {}),
@@ -148,19 +150,20 @@ async function runStartJob(
     // during those awaits, so the owner gets one last synchronous refusal
     // point before streamer/activeRun state or the first program write exists.
     options.assertFinalStartAuthorized?.();
+    completion.assertCurrent();
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
-    const isImmediateToolChange = entersHoldNow && stepped.toSend.length === 0;
+    const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
     set((state) => ({
       streamer: stepped.state,
-      streamerEpoch: state.streamerEpoch + 1,
+      streamerEpoch: writeOwner.streamerEpoch,
       activeRunId: options.runId ?? null,
       ...liveCanvasStartPatch(
         options.canvasPlan,
         Date.now(),
         validatedStartJobTimingPlan(gcode, options, state),
-        isImmediateToolChange ? 'tool-change' : 'running',
+        entersHoldNow && stepped.toSend.length === 0 ? 'tool-change' : 'running',
         stepped.state.queued,
         gcode,
       ),
@@ -172,15 +175,17 @@ async function runStartJob(
       pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
       ...toolChangeEntryPatch(state, entersHoldNow),
     }));
-    const writeOwner = streamWriteOwner(get());
+    completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
     try {
       await safeWrite(stepped.toSend, 'start');
+      if (!completion.ownsCurrent()) return;
       set((state) => liveCanvasExecutionAcceptedPatch(state));
       // The first window is on the wire and accounted for, so the transport
       // may take the refill from here (ADR-334). A transport that cannot host
       // it, or a stream that is no longer simply streaming, is a no-op.
-      await armHostedRefill(context.refs, () => get().streamer);
+      await armHostedRefill(context.refs, () => (completion.ownsCurrent() ? get().streamer : null));
+      completion.accept();
     } catch (error) {
       const state = get();
       const ackedLines =
@@ -191,10 +196,7 @@ async function runStartJob(
       throw new JobStartTransmissionError(error, options.runId ?? null, ackedLines);
     }
   } finally {
-    set((state) => ({
-      controllerOperation:
-        state.controllerOperation?.kind === 'start-arming' ? null : state.controllerOperation,
-    }));
+    completion.finish();
   }
 }
 

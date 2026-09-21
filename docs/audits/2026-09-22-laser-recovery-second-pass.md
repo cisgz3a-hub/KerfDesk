@@ -129,6 +129,20 @@ file-size/ADR/export gates passed. The production web build passed; existing bun
 remain. Earlier browser attempts reused an unrelated older dev server;
 the passing runs explicitly started this worktree's server on an isolated port.
 
+Release integration also reproduced a short-job completion race with the actual serial handlers:
+the final acknowledgement could arrive before the first write or hosted-refill arming returned.
+The `start-arming` reservation prevented the normal settle marker from starting, then a later Idle
+removed the stream without completion proof. A late old Start could also clear a replacement
+run/session's reservation. The regression covers both arrival orders and preserves the distinction
+between accepted, failed and superseded runs; confirmed completion must still use the existing
+driver-specific settle marker and two fresh Idle reports.
+
+Start now releases only its own controller/session/stream reservation and retries settlement after
+successful transmission and hosted handover. Nine actual-handler regressions pass, including early
+ACKs, uncertain writes, superseded starts and pre-wire rejection. The adjacent lifecycle,
+containment and checkpoint suites passed all 38 tests across six files; final TypeScript,
+edited-file lint, formatting and whitespace checks passed.
+
 ## Physical and product limits
 
 Software tests and fake Web Serial establish the application contract, not physical burn fidelity.
