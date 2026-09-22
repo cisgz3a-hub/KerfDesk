@@ -8,15 +8,11 @@ import { isChiploadMaterialKey, type ChiploadMaterial } from '../../core/cnc';
 import type { Toolpath } from '../../core/job';
 import {
   isRegistrationBox,
-  flattenColoredPathCurves,
   sceneLayerVisibility,
-  type ColoredPath,
   type Layer,
-  type Polyline,
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
@@ -30,12 +26,8 @@ import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
 import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
-import {
-  buildDisplayPolylines,
-  buildFillDisplayPolylines,
-  type DisplayPolylineCache,
-  type DisplayPolylines,
-} from './display-polylines';
+import type { DisplayPolylineCache } from './display-polylines';
+import { drawObjectDisplay, isVectorSceneObject, resolveObjectDisplay } from './object-display';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawCncRemoval } from './draw-cnc-removal';
 import { drawRasterImage, pruneRasterImageCaches, rasterDisplayDataUrl } from './draw-raster';
@@ -48,11 +40,7 @@ import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
 import { drawCncTabAnchors } from './cnc-tab-editor';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
-import {
-  drawLargeSceneNotice,
-  fillClosedPolylinesBatched,
-  strokePolylinesBatched,
-} from './draw-vector-strokes';
+import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-strokes';
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 
@@ -172,7 +160,7 @@ function drawPreviewModeScene(
   view: ViewTransform,
   opts: DrawOpts,
 ): void {
-  drawObjectsFaint(ctx, project, view);
+  drawObjectsFaint(ctx, project, view, opts.displayPolylineCache, opts.onRasterBitmapReady);
   // Raster sim under the vector toolpath: image engrave is the burned
   // "background", cuts/scans layer on top (matches LightBurn preview).
   drawRasterPreview(
@@ -286,7 +274,9 @@ function drawObjects(
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
-    if (drawObjectPolylines(ctx, obj, layerByColor, view, displayPolylineCache)) {
+    if (
+      drawObjectPolylines(ctx, obj, layerByColor, view, displayPolylineCache, onRasterBitmapReady)
+    ) {
       simplified = true;
     }
     ctx.setLineDash([]);
@@ -339,117 +329,22 @@ function selectedObjectsForOverlay(
   );
 }
 
+// imported-svg, text, traced-image and shape all carry the same ColoredPath[]
+// shape — one resolution + one painter (object-display.ts). Dense objects are
+// blitted from a cached sprite; the rest paint directly, one beginPath/stroke
+// per path (per-polyline stroke() was the original post-import freeze).
 function drawObjectPolylines(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
   displayPolylineCache: DisplayPolylineCache | undefined,
+  requestRedraw: (() => void) | undefined,
 ): boolean {
-  // imported-svg, text, AND traced-image all carry the same
-  // ColoredPath[] shape — single drawing path. Each variant
-  // populates `paths` upstream (parseSvg for SVG, textToPolylines
-  // for text, traceImageToSvgString→parseSvg for traced image).
-  if (
-    obj.kind !== 'imported-svg' &&
-    obj.kind !== 'text' &&
-    obj.kind !== 'traced-image' &&
-    obj.kind !== 'shape'
-  ) {
-    return false;
-  }
-  let simplified = false;
-  for (const path of obj.paths) {
-    const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
-    if (!resolution.visible) continue;
-    const layer = resolution.operation;
-    if (layer === undefined) {
-      ctx.strokeStyle = canvasVectorDisplayColor(path.color);
-      ctx.lineWidth = 1.5;
-      const display = displayPathFor(path, obj, view, displayPolylineCache);
-      simplified = includesSimplifiedDisplay(simplified, display);
-      strokePolylinesBatched(ctx, obj, display.polylines, view);
-      continue;
-    }
-    const effectiveLayer = effectiveOperationForObject(layer, obj);
-    if (effectiveLayer.mode === 'fill') {
-      const display = displayPathFor(path, obj, view, displayPolylineCache, true);
-      simplified = includesSimplifiedDisplay(simplified, display);
-      drawFilledDesignGeometry(
-        ctx,
-        obj,
-        display.polylines,
-        effectiveLayer,
-        view,
-        canvasVectorDisplayColor(layer.color),
-        path.fillRule,
-      );
-      continue;
-    }
-    ctx.strokeStyle = canvasVectorDisplayColor(layer.color);
-    ctx.lineWidth = effectiveLayer.output ? 1.5 : 0.75;
-    // Single beginPath/stroke per color. Per-polyline stroke() was the cause
-    // of the post-import freeze: each stroke is a GPU sync, so a
-    // 5000-polyline traced image emitted 5000 syncs per redraw at
-    // 60 Hz → canvas chokes. Batching to one stroke per color drops
-    // that to O(colors) ≈ 1-8. Standard Canvas2D pattern (MDN).
-    const display = displayPathFor(path, obj, view, displayPolylineCache);
-    simplified = includesSimplifiedDisplay(simplified, display);
-    strokePolylinesBatched(ctx, obj, display.polylines, view);
-  }
-  return simplified;
-}
-
-function displayPathFor(
-  path: ColoredPath,
-  object: SceneObject,
-  view: ViewTransform,
-  cache: DisplayPolylineCache | undefined,
-  fill = false,
-): DisplayPolylines {
-  const objectScale = Math.max(
-    Math.abs(object.transform.scaleX),
-    Math.abs(object.transform.scaleY),
-  );
-  const toleranceMm = 0.25 / Math.max(1e-9, view.scale * objectScale);
-  if (cache !== undefined) {
-    return fill ? cache.getFillPath(path, toleranceMm) : cache.getPath(path, toleranceMm);
-  }
-  const flattened = flattenColoredPathCurves(path, { toleranceMm });
-  const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
-  return fill ? buildFillDisplayPolylines(polylines) : buildDisplayPolylines(polylines);
-}
-
-function includesSimplifiedDisplay(current: boolean, display: DisplayPolylines): boolean {
-  return current || display.isSimplified;
-}
-
-function drawFilledDesignGeometry(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  polylines: ReadonlyArray<Polyline>,
-  layer: Layer,
-  view: ViewTransform,
-  color: string,
-  fillRule?: ColoredPath['fillRule'],
-): void {
-  const open = polylines.filter((polyline) => !polyline.closed);
-
-  if (polylines.some((polyline) => polyline.closed)) {
-    ctx.fillStyle = color;
-    fillClosedPolylinesBatched(
-      ctx,
-      obj,
-      polylines,
-      view,
-      fillRule ?? (obj.kind === 'text' ? 'nonzero' : 'evenodd'),
-    );
-  }
-  if (open.length === 0) return;
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = layer.output ? 1.5 : 0.75;
-  strokePolylinesBatched(ctx, obj, open, view);
+  if (!isVectorSceneObject(obj)) return false;
+  const resolved = resolveObjectDisplay(obj, layerByColor, view, displayPolylineCache, 'design');
+  drawObjectDisplay(ctx, obj, resolved, view, requestRedraw);
+  return resolved.isSimplified;
 }
 
 // F-A3/A6/A8 — overlay any object whose transformed bbox extends past the

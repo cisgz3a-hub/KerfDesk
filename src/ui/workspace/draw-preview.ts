@@ -6,7 +6,6 @@
 import {
   assertNever,
   sceneLayerVisibility,
-  type Layer,
   type Project,
   type SceneObject,
   type OutputScope,
@@ -24,9 +23,8 @@ import {
 } from '../../io/gcode';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
-import { buildDisplayPolylines } from './display-polylines';
-import { strokePolylinesBatched } from './draw-vector-strokes';
-import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
+import type { DisplayPolylineCache } from './display-polylines';
+import { drawObjectDisplay, resolveObjectDisplay } from './object-display';
 import {
   planPreviewRouteEligible,
   previewRouteForDrawing,
@@ -53,13 +51,19 @@ export function drawObjectsFaint(
   ctx: CanvasRenderingContext2D,
   project: Project,
   view: ViewTransform,
+  displayPolylineCache?: DisplayPolylineCache,
+  requestRedraw?: () => void,
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.3;
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   for (const obj of project.scene.objects) {
     if (!hasFaintVectorGeometry(obj)) continue;
-    drawObjectPolylinesFaint(ctx, obj, layerByColor, view);
+    // Same resolution and painter as Design mode, in 'faint' style: a dense
+    // trace under the route comes from its sprite instead of being restroked
+    // on every Preview pan (object-display.ts, ADR-346).
+    const resolved = resolveObjectDisplay(obj, layerByColor, view, displayPolylineCache, 'faint');
+    drawObjectDisplay(ctx, obj, resolved, view, requestRedraw);
   }
   ctx.restore();
 }
@@ -76,23 +80,6 @@ function hasFaintVectorGeometry(obj: SceneObject): obj is FaintVectorObject {
       return false;
     default:
       return assertNever(obj, 'SceneObject');
-  }
-}
-
-function drawObjectPolylinesFaint(
-  ctx: CanvasRenderingContext2D,
-  obj: FaintVectorObject,
-  layerByColor: Map<string, Layer>,
-  view: ViewTransform,
-): void {
-  if (!hasFaintVectorGeometry(obj)) return;
-  for (const path of obj.paths) {
-    const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
-    if (!resolution.visible) continue;
-    ctx.strokeStyle = canvasVectorDisplayColor(resolution.operation?.color ?? path.color);
-    ctx.lineWidth = resolution.operation?.output === false ? 0.75 : 1.5;
-    const display = buildDisplayPolylines(path.polylines);
-    strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
 }
 

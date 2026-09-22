@@ -45,6 +45,12 @@ export function createDisplayPolylineCache(): DisplayPolylineCache {
     },
     getPath(path, toleranceMm, budget = LARGE_SCENE_SEGMENT_THRESHOLD) {
       if (path.curves === undefined) return this.get(path.polylines, budget);
+      // A path whose curves are all straight (every trace, every pen line)
+      // flattens to the same vertices at every tolerance, so its display is
+      // zoom-invariant: keying it on the tolerance re-flattened and
+      // re-decimated a million-point trace on every wheel notch.
+      const linear = linearCurvePolylines(path.curves);
+      if (linear !== null) return this.get(linear, budget);
       const cached = byCurves.get(path.curves);
       if (cached !== undefined && cached.budget === budget && cached.toleranceMm === toleranceMm) {
         return cached;
@@ -140,14 +146,10 @@ function createFillDisplayCache() {
     ReadonlyArray<Polyline> | ReadonlyArray<CurveSubpath>,
     FillCacheEntry
   >();
-  const linear = new WeakMap<ReadonlyArray<CurveSubpath>, ReadonlyArray<Polyline> | null>();
   return (path: ColoredPath, toleranceMm: number, budget = LARGE_SCENE_SEGMENT_THRESHOLD) => {
     const key = path.curves ?? path.polylines;
-    let lineGeometry = path.curves === undefined ? path.polylines : linear.get(path.curves);
-    if (lineGeometry === undefined && path.curves !== undefined) {
-      lineGeometry = linearCurvePolylines(path.curves);
-      linear.set(path.curves, lineGeometry);
-    }
+    const lineGeometry =
+      path.curves === undefined ? path.polylines : linearCurvePolylines(path.curves);
     const zoomInvariant = lineGeometry !== null;
     const cached = entries.get(key);
     if (
@@ -170,14 +172,29 @@ function createFillDisplayCache() {
   };
 }
 
-function linearCurvePolylines(curves: ReadonlyArray<CurveSubpath>): ReadonlyArray<Polyline> | null {
-  if (curves.some((curve) => curve.segments.some((segment) => segment.kind !== 'line')))
-    return null;
-  return curves.map((curve) => {
-    const points = [curve.start];
-    for (const segment of curve.segments) points.push(segment.to);
-    return { points, closed: curve.closed };
-  });
+// Straight-only curves flatten to their own vertices at every tolerance. The
+// materialized polylines are memoized per curve array so the stroke and fill
+// display caches, and every zoom level, share one copy.
+const linearCurveGeometry = new WeakMap<
+  ReadonlyArray<CurveSubpath>,
+  ReadonlyArray<Polyline> | null
+>();
+
+/** The polylines of an all-line curve array, or null when any segment bends. */
+export function linearCurvePolylines(
+  curves: ReadonlyArray<CurveSubpath>,
+): ReadonlyArray<Polyline> | null {
+  const cached = linearCurveGeometry.get(curves);
+  if (cached !== undefined) return cached;
+  const linear = curves.some((curve) => curve.segments.some((segment) => segment.kind !== 'line'))
+    ? null
+    : curves.map((curve) => {
+        const points = [curve.start];
+        for (const segment of curve.segments) points.push(segment.to);
+        return { points, closed: curve.closed };
+      });
+  linearCurveGeometry.set(curves, linear);
+  return linear;
 }
 
 function flattenForFill(

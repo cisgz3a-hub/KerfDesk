@@ -27,6 +27,7 @@ import type {
   PreparationWorkerResponse,
 } from './preparation-worker-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
+import { unpackProjectMessage } from '../packed-project-transfer';
 import { renderVariableText } from '../text/render-variable-text';
 import { PreparationTransferSender } from './preparation-transfer-sender';
 import type { PreparationTransferAcknowledgement } from './preparation-transfer-protocol';
@@ -119,7 +120,7 @@ function compile(
 async function estimateResponse(
   request: PreparationWorkerRequest,
 ): Promise<PreparationWorkerResponse> {
-  const hydrated = await hydratePagedRasterProject(request.project);
+  const hydrated = await hydratePagedRasterProject(unpackProjectMessage(request.project));
   const prepared = await compile(request, hydrated);
   return {
     id: request.id,
@@ -138,7 +139,7 @@ async function estimateResponse(
 // payload ends this frame, so the hydrated project and the compiled Job it was
 // derived from are unreachable before the first chunk is posted.
 async function previewPayload(request: PreparationWorkerRequest): Promise<LargeJobPreparation> {
-  const hydrated = await hydratePagedRasterProject(request.project);
+  const hydrated = await hydratePagedRasterProject(unpackProjectMessage(request.project));
   const prepared = await compile(request, hydrated);
   return largeJobPreparationFromPrepared(hydrated, prepared, preparationOptions(request));
 }
