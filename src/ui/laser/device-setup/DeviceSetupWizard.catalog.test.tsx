@@ -76,7 +76,64 @@ describe('DeviceSetupWizard catalog', () => {
       expect(view.host.querySelectorAll('.lf-setup-profile')).toHaveLength(2);
       await act(async () => button(view.host, 'Browse all').click());
       expect(view.host.querySelectorAll('.lf-setup-profile').length).toBeGreaterThan(2);
-      expect(button(view.host, 'Use Ortur Laser Master 3')).toBeInstanceOf(HTMLButtonElement);
+      expect(profileCard(view.host, 'Use Ortur Laser Master 3')).toBeInstanceOf(HTMLInputElement);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('selects a profile from anywhere on its card, while profile details stay neutral', async () => {
+    const view = await renderWizard();
+    try {
+      const search = input(view.host, 'Search machine profiles');
+      await act(async () => {
+        search.value = 'Sculpfun S30 (5 W, manual air)';
+        Simulate.change(search);
+      });
+      const card = view.host.querySelector('article.lf-setup-profile');
+      const radio = card?.querySelector('input[type="radio"]');
+      if (!(radio instanceof HTMLInputElement)) throw new Error('Profile card control missing');
+      const summary = card?.querySelector('summary');
+      if (!(summary instanceof HTMLElement)) throw new Error('Profile details missing');
+
+      await act(async () => summary.click());
+      expect(radio.checked).toBe(false);
+
+      const name = card?.querySelector('strong');
+      if (!(name instanceof HTMLElement)) throw new Error('Profile name missing');
+      await act(async () => name.click());
+      expect(radio.checked).toBe(true);
+      expect(card?.getAttribute('data-selected')).toBe('true');
+
+      await act(async () => button(view.host, 'Check essentials').click());
+      expect(input(view.host, 'Device name').value).toBe('Sculpfun S30 (5 W, manual air)');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('offers the controller readback on the Machine stage instead of inside a disclosure', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedSettings: { bedWidth: 363, bedHeight: 273 },
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const view = await renderWizard();
+    try {
+      const auto = view.host.querySelector('section[aria-label="Automatic setup"]');
+      if (!(auto instanceof HTMLElement)) throw new Error('Automatic setup lane missing');
+      expect(auto.closest('details')).toBeNull();
+      expect(auto.textContent).toContain('Bed width: 363.000 mm');
+      expect(view.host.querySelector('[role="status"]')).toBeNull();
+
+      await act(async () => button(view.host, 'Use detected values').click());
+      expect(view.host.querySelector('[role="status"]')?.textContent).toContain(
+        'Detected values applied to this setup draft',
+      );
+      expect(useStore.getState().project.device.bedWidth).toBe(DEFAULT_DEVICE_PROFILE.bedWidth);
+
+      await act(async () => button(view.host, 'Check essentials').click());
+      expect(input(view.host, 'Bed width (mm)').value).toBe('363');
     } finally {
       await view.unmount();
     }
@@ -96,7 +153,7 @@ describe('DeviceSetupWizard catalog', () => {
         search.value = 'Creality Falcon A1 Pro';
         Simulate.change(search);
       });
-      await act(async () => button(view.host, 'Use Creality Falcon A1 Pro').click());
+      await act(async () => profileCard(view.host, 'Use Creality Falcon A1 Pro').click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
       await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).toBe('358');
@@ -139,6 +196,15 @@ async function renderWizard(): Promise<{
       host.remove();
     },
   };
+}
+
+/** The catalog card control: one radio per profile, the whole card is its label. */
+function profileCard(host: HTMLElement, ariaLabel: string): HTMLInputElement {
+  const card = [...host.querySelectorAll<HTMLInputElement>('.lf-setup-profile input')].find(
+    (candidate) => candidate.getAttribute('aria-label')?.startsWith(ariaLabel),
+  );
+  if (!(card instanceof HTMLInputElement)) throw new Error(`Profile card missing: ${ariaLabel}`);
+  return card;
 }
 
 function select(host: HTMLElement, ariaLabel: string): HTMLSelectElement {

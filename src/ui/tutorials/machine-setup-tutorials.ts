@@ -16,8 +16,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose your machine',
         instruction:
-          'On Machine, choose Laser only, CNC only or Laser + CNC. Use search or Browse all profiles to find a laser profile, or choose a CNC preset. Check Controller and connection settings. Connect and detect is optional; Use detected values copies supported readings into the draft. You can also set up offline.',
-        focus: 'Machine · profile · optional connection',
+          'On Machine, choose Laser only, CNC only or Laser + CNC. If the controller is connected, Set up automatically lists what it reported and Use detected values copies those readings into the draft. Pick a laser profile by clicking anywhere on its card, using search or Browse all profiles, or choose a CNC preset. Check Controller and connection settings. Connecting is optional; you can also set up offline.',
+        focus: 'Machine · automatic setup · profile',
         result: 'The draft setup has the correct kind of machine and controller.',
       },
       {

@@ -1,5 +1,7 @@
 // Optional Machine-stage connection, using the selected driver and baud.
 // Identity/settings reads do not move the machine or write its configuration.
+// What a read returned, and the action that copies it into the draft, live in
+// the Set up automatically lane above this section (ADR-347).
 
 import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';
@@ -8,10 +10,8 @@ import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useLaserStore, type ConnectionState } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
-import { describePatch } from '../DetectedSettingsBanner';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
-import { DeviceSetupDetectedApply } from './DeviceSetupDetectedApply';
 
 export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
   const model = useConnectionStepModel(state);
@@ -34,7 +34,6 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   const activeControllerCommandSet = useLaserStore((s) => s.activeControllerCommandSet);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
-  const detected = useLaserStore((s) => s.detectedSettings);
   const connect = useLaserStore((s) => s.connect);
   const disconnect = useLaserStore((s) => s.disconnect);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
@@ -45,7 +44,6 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
   const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
   const connected = connection.kind === 'connected';
   const supportsSerial = platform.serial.isSupported();
-  const rows = detected === null ? [] : describePatch(detected, state.baseline);
   const mismatch =
     connected &&
     (activeControllerKind !== controllerKind ||
@@ -82,7 +80,6 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
     connection,
     controllerOperation,
     controllerKind,
-    detected,
     detectedControllerKind,
     driver,
     guide,
@@ -91,7 +88,6 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
     pushToast,
     readController,
     reconnect,
-    rows,
     state,
     supportsSerial,
   };
@@ -114,14 +110,13 @@ function SerialConnectStep(props: {
         <p style={hintStyle}>{model.guide.writeExplanation}</p>
       ) : null}
       {model.mismatch ? <ConnectionMismatch model={model} dispatch={props.dispatch} /> : null}
-      <ConnectionActions model={model} dispatch={props.dispatch} />
+      <ConnectionActions model={model} />
       {!model.supportsSerial ? (
         <p style={warningStyle}>
           Web Serial is unavailable. Use the desktop app or Chrome/Edge, or continue with manual
           values.
         </p>
       ) : null}
-      <DetectedReadback model={model} />
       <CommandContract guide={model.guide} />
     </section>
   );
@@ -167,7 +162,6 @@ function ConnectionMismatch(props: {
 
 function ConnectionActions(props: {
   readonly model: ReturnType<typeof useConnectionStepModel>;
-  readonly dispatch: DeviceSetupStepProps['dispatch'];
 }): JSX.Element {
   const { model } = props;
   if (model.connection.kind !== 'connected') {
@@ -185,57 +179,18 @@ function ConnectionActions(props: {
     );
   }
   return (
-    <>
-      <div style={actionsStyle}>
-        <Button
-          onClick={() => void model.readController()}
-          disabled={
-            model.mismatch ||
-            model.controllerOperation !== null ||
-            (model.guide.identityCommands.length === 0 && model.guide.settingsCommands.length === 0)
-          }
-          {...helpProps('control:laser.device-setup.reread')}
-        >
-          Run read-only checks
-        </Button>
-        {model.detected !== null && model.rows.length > 0 ? (
-          <DeviceSetupDetectedApply
-            state={model.state}
-            detected={model.detected}
-            dispatch={props.dispatch}
-          />
-        ) : null}
-      </div>
-      {model.state.detectedApplied ? (
-        <p role="status" aria-live="polite" aria-atomic="true" style={confirmationStyle}>
-          Detected values applied to this setup draft. Nothing is saved until you complete the final
-          Save step.
-        </p>
-      ) : null}
-    </>
-  );
-}
-
-function DetectedReadback(props: {
-  readonly model: ReturnType<typeof useConnectionStepModel>;
-}): JSX.Element {
-  if (props.model.rows.length === 0) {
-    return (
-      <p style={hintStyle}>
-        No mapped values have been read. You can continue and enter the manufacturer values by hand.
-      </p>
-    );
-  }
-  return (
-    <div style={readbackStyle}>
-      <strong>Detected profile values</strong>
-      <ul style={listStyle}>
-        {props.model.rows.map((row) => (
-          <li key={row.label}>
-            {row.label}: <strong>{row.newText}</strong>
-          </li>
-        ))}
-      </ul>
+    <div style={actionsStyle}>
+      <Button
+        onClick={() => void model.readController()}
+        disabled={
+          model.mismatch ||
+          model.controllerOperation !== null ||
+          (model.guide.identityCommands.length === 0 && model.guide.settingsCommands.length === 0)
+        }
+        {...helpProps('control:laser.device-setup.reread')}
+      >
+        Run read-only checks
+      </Button>
     </div>
   );
 }
@@ -305,13 +260,6 @@ const warningStyle: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-warning-fg)',
 };
-const confirmationStyle: React.CSSProperties = {
-  margin: 0,
-  color: 'var(--lf-success-fg)',
-  fontSize: 12,
-  fontWeight: 600,
-  lineHeight: 1.45,
-};
 const warningCardStyle: React.CSSProperties = {
   display: 'grid',
   gap: 7,
@@ -320,13 +268,6 @@ const warningCardStyle: React.CSSProperties = {
   padding: 9,
   fontSize: 12,
 };
-const readbackStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 8,
-  fontSize: 12,
-};
-const listStyle: React.CSSProperties = { margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.5 };
 const detailsStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 6,

@@ -186,7 +186,7 @@ describe('three-stage Machine Setup integration audit', () => {
     expect(useStore.getState().project).toBe(project);
   });
 
-  it('Browse all and profile details preserve the draft, while Use profile changes only the chosen draft profile', async () => {
+  it('Browse all and profile details preserve the draft, while choosing a card changes only the chosen draft profile', async () => {
     let snapshot = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null);
     function Harness(): JSX.Element {
       const [state, dispatch] = useReducer(deviceSetupReducer, snapshot);
@@ -211,13 +211,17 @@ describe('three-stage Machine Setup integration audit', () => {
       expect(details.open).toBe(false);
     }
     expect(snapshot.draft).toBe(draft);
-    const use = host.querySelector<HTMLButtonElement>('button[aria-label^="Use "]')!;
+    const use = host.querySelector<HTMLInputElement>('input[aria-label^="Use "]')!;
     const chosenName = use.closest('article')?.querySelector('strong')?.textContent;
+    expect(use.type).toBe('radio');
+    // The whole card is the control: the label wraps the card body, and only
+    // Profile details sits outside it so reading evidence cannot select.
+    expect(use.closest('label')?.classList.contains('lf-setup-profile-choice')).toBe(true);
+    expect(use.closest('label')?.querySelector('details')).toBeNull();
     act(() => use.click());
     expect(snapshot.draft.name).toBe(chosenName);
     expect(
-      host.querySelector<HTMLButtonElement>(`button[aria-label="Selected ${chosenName}"]`)
-        ?.disabled,
+      host.querySelector<HTMLInputElement>(`input[aria-label="Use ${chosenName}"]`)?.checked,
     ).toBe(true);
     act(() => button('Show fewer profiles').click());
     expect(host.querySelectorAll('article.lf-setup-profile')).toHaveLength(2);

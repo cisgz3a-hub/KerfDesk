@@ -6,6 +6,7 @@ import { machineSetupValidationIssues } from './device-setup-flow';
 import { deviceSetupStage } from './device-setup-steps';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
 import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
+import { DeviceSetupAutoDetect } from './DeviceSetupAutoDetect';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
@@ -32,6 +33,7 @@ function MachineStage(props: DeviceSetupStepProps): JSX.Element {
   return (
     <div className="lf-setup-stack">
       <DeviceSetupMachineCapability {...props} />
+      <DeviceSetupAutoDetect {...props} />
       <DeviceSetupIdentifyStep {...props} />
       <details className="lf-setup-disclosure" open={props.state.step === 'connect'}>
         <summary title="Connect to the controller and optionally read its settings into this draft.">

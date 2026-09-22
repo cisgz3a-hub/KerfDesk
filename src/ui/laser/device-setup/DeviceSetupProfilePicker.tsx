@@ -1,3 +1,8 @@
+// Catalog picker. The whole card is the control: each profile is one option
+// in a radio group, matching the machine-type cards above it, so choosing a
+// machine never depends on hitting a small button (ADR-347). "Profile details"
+// stays outside the label so reading the evidence does not select the profile.
+
 import { useState } from 'react';
 import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -32,7 +37,7 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
       <div className="lf-setup-catalog-heading">
         <div>
           <h4>Start with a machine profile</h4>
-          <p>A starting point you can adjust in the next step.</p>
+          <p>Choose a card to start from it. Every value stays editable in the next step.</p>
         </div>
         <input
           type="search"
@@ -88,35 +93,34 @@ function PresetCard(props: {
   const profile = suggestion.profile;
   return (
     <article className="lf-setup-profile" data-selected={props.isActive}>
-      <div className="lf-setup-profile-main">
-        <div>
+      <label className="lf-setup-profile-choice">
+        <input
+          type="radio"
+          name="setup-machine-profile"
+          checked={props.isActive}
+          onChange={props.onUse}
+          aria-label={`Use ${profile.name}`}
+          title={
+            props.isActive ? 'This machine is selected.' : `Start from ${profile.name}'s defaults.`
+          }
+        />
+        <span className="lf-setup-profile-main">
           <strong>{profile.name}</strong>
-          <p>
+          <span className="lf-setup-profile-size">
             {profile.bedWidth} × {profile.bedHeight} mm
             {profile.laserSubProfile?.opticalPowerW !== undefined
               ? `, ${profile.laserSubProfile.opticalPowerW} W`
               : ''}
-          </p>
-        </div>
-        <Button
-          variant={props.isActive ? 'default' : 'primary'}
-          disabled={props.isActive}
-          onClick={props.onUse}
-          aria-label={props.isActive ? `Selected ${profile.name}` : `Use ${profile.name}`}
-          title={
-            props.isActive ? 'This machine is selected.' : `Start from ${profile.name}'s defaults.`
-          }
-        >
-          {props.isActive ? 'Selected' : 'Use profile'}
-        </Button>
-      </div>
-      <div className="lf-setup-profile-badges">
-        <span>{suggestionConfidenceLabel(suggestion.confidence)}</span>
-        <span>{profileConfidenceLabel(profile)}</span>
-      </div>
-      {suggestion.warnings.length > 0 ? (
-        <p className="lf-setup-profile-warning">{suggestion.warnings[0]}</p>
-      ) : null}
+          </span>
+        </span>
+        <span className="lf-setup-profile-badges">
+          <span>{suggestionConfidenceLabel(suggestion.confidence)}</span>
+          <span>{profileConfidenceLabel(profile)}</span>
+        </span>
+        {suggestion.warnings.length > 0 ? (
+          <span className="lf-setup-profile-warning">{suggestion.warnings[0]}</span>
+        ) : null}
+      </label>
       <details className="lf-setup-profile-notes">
         <summary title={`Read profile notes for ${profile.name}`}>Profile details</summary>
         {suggestion.confidence === 'manual-only' ? null : (

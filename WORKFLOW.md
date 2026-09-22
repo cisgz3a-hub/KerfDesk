@@ -1887,12 +1887,18 @@ machine setup** requires valid configuration; review cards link back to the rele
 Connecting a controller is optional, so a complete setup can be saved offline.
 
 1. **Machine** — choose **Laser only**, **CNC only**, or **Laser + CNC** from capability cards;
-   hybrids also choose the active mode after Save. Laser-capable machines see up to two compact
-   profile previews, keeping the selected catalog profile in view. Search or **Browse all N
-   profiles** opens the rest of the catalog. CNC-capable machines also have CNC presets. Selecting
-   a profile copies it into the draft. Detected matches are prioritised among the remaining profiles
-   and explain their evidence under **Profile details**, but generic `$$` values never establish
-   hardware identity: "Possible match" remains the ceiling. Controller family, baud, output dialect,
+   hybrids also choose the active mode after Save. **Set up automatically** follows: it states what
+   the selected controller family reported, lists those values, and carries **Use detected values**
+   (ADR-347). While nothing is connected it says that connecting the controller below reads those
+   values into the draft, and that offline setup still works; a file-only controller has no lane.
+   Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
+   profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
+   machines also have CNC presets. A profile card is one option in a radio group: a pointer
+   anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
+   sits outside the choice so reading the evidence selects nothing. Detected matches are
+   prioritised among the remaining profiles and explain their evidence under **Profile details**,
+   but generic `$$` values never establish hardware identity: "Possible match" remains the
+   ceiling. Controller family, baud, output dialect,
    and advanced streaming remain available in **Controller and connection settings**. **Import or
    export a machine profile** is a separate disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
@@ -1900,7 +1906,8 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
    Optional **Connect and detect** uses the selected driver/baud and that controller family's
-   read-only identity/settings commands. **Use detected values** explicitly copies supported
+   read-only identity/settings commands, and holds the driver-mismatch resolution and the command
+   contract. **Use detected values**, in the automatic lane above it, explicitly copies supported
    values into the draft; detection never applies them automatically. Ruida remains file-only.
    CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
@@ -4378,7 +4385,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine > Connect and detect** shows the detected values. **Use detected
+   **Machine Setup > Machine > Set up automatically** shows the detected values. **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;

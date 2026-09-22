@@ -117,31 +117,49 @@
 .lf-setup-profile {
   border: 1px solid var(--lf-border);
   border-radius: 8px;
-  padding: 14px;
+  background: var(--lf-bg-1);
   min-width: 0;
+}
+.lf-setup-profile:hover {
+  border-color: var(--lf-accent-fg);
 }
 .lf-setup-profile[data-selected='true'] {
   border-color: var(--lf-accent);
-  background: var(--lf-accent-wash);
+  background: var(--lf-tint-accent);
+}
+/* The card itself is the control, so the whole block reacts to the pointer and
+   one tab stop per profile lands on a radio in the catalog group. */
+.lf-setup-profile-choice {
+  position: relative;
+  display: block;
+  padding: 14px 34px 14px 14px;
+  cursor: pointer;
+  min-width: 0;
+}
+.lf-setup-profile-choice:focus-within {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.lf-setup-profile-choice > input {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  margin: 0;
+  accent-color: var(--lf-accent);
 }
 .lf-setup-profile-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  display: block;
+  min-width: 0;
 }
 .lf-setup-profile-main strong {
   font-size: 13px;
 }
-.lf-setup-profile-main p {
+.lf-setup-profile-size {
+  display: block;
   color: var(--lf-text-muted);
-  margin: 4px 0 0;
+  margin-top: 4px;
   font-size: 11px;
-}
-.lf-setup-profile-main .lf-btn {
-  font-size: 11px;
-  flex-shrink: 0;
 }
 .lf-setup-profile-badges {
   display: flex;
@@ -157,13 +175,14 @@
   border-radius: 4px;
 }
 .lf-setup-profile-warning {
+  display: block;
   font-size: 11px;
   line-height: 1.5;
   color: var(--lf-warning-fg);
-  margin: 8px 0 0;
+  margin-top: 8px;
 }
 .lf-setup-profile-notes {
-  margin-top: 8px;
+  margin: 0 14px 12px;
   font-size: 11px;
   color: var(--lf-text-muted);
 }
@@ -174,6 +193,43 @@
   padding-left: 18px;
   line-height: 1.6;
 }
+.lf-setup-auto {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--lf-border);
+  border-radius: 10px;
+  background: var(--lf-bg-1);
+  min-width: 0;
+}
+.lf-setup-auto[data-ready='true'] {
+  border-color: var(--lf-accent);
+  background: var(--lf-tint-accent);
+}
+.lf-setup-auto h4 {
+  margin: 0;
+  font-size: 13px;
+}
+.lf-setup-auto p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--lf-text-muted);
+}
+.lf-setup-auto-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 2px 14px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.lf-setup-auto-done {
+  color: var(--lf-success-fg) !important;
+  font-weight: 600;
+}
+
 .lf-setup-empty {
   padding: 16px;
   border: 1px dashed var(--lf-border-strong);
@@ -324,8 +380,18 @@
   .lf-setup-fields input[type='number'] {
     width: 68px !important;
   }
-  .lf-setup-profile-main {
-    align-items: flex-start;
+  .lf-setup-profile-choice {
+    padding: 12px 30px 12px 12px;
+  }
+  .lf-setup-profile-choice > input {
+    top: 12px;
+    right: 10px;
+  }
+  .lf-setup-profile-notes {
+    margin: 0 12px 10px;
+  }
+  .lf-setup-auto {
+    padding: 12px;
   }
 }
 
