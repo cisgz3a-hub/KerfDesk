@@ -245,20 +245,10 @@ function recoveryPreviewIndex(route: RecoveryPreviewRoute): RecoveryPreviewIndex
   const cached = previewIndexes.get(route);
   if (cached !== undefined) return cached;
   const offset = mapControllerPointToScene({ x: 0, y: 0, z: 0 }, route);
-  // Origin transforms are axis mirrors plus translation. Derive signs directly
-  // so subtracting two large translated coordinates cannot erase a unit vector.
-  const scaleX = route.device.origin.endsWith('right') ? -1 : 1;
-  const scaleY =
-    route.device.origin.startsWith('front') || route.device.origin === 'center' ? -1 : 1;
+  const { scaleX, scaleY } = originMirrors(route.device.origin);
   const manifest = route.manifest;
   const count = packedBlockCount(manifest);
-  const bounds = new Float64Array(Math.ceil(count / BLOCKS_PER_PREVIEW_CHUNK) * 4);
-  for (let at = 0; at < bounds.length; at += 4) {
-    bounds[at] = Infinity;
-    bounds[at + 1] = Infinity;
-    bounds[at + 2] = -Infinity;
-    bounds[at + 3] = -Infinity;
-  }
+  const bounds = emptyChunkBounds(Math.ceil(count / BLOCKS_PER_PREVIEW_CHUNK));
   const data = manifest.pointData;
   for (let block = 0; block < count; block += 1) {
     if (packedBlockKind(manifest, block) !== 'process') continue;
@@ -266,17 +256,48 @@ function recoveryPreviewIndex(route: RecoveryPreviewRoute): RecoveryPreviewIndex
     const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
     const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
     for (let point = start; point < end; point += PACKED_POINT_WIDTH) {
-      const x = (data[point] ?? 0) * scaleX + offset.x;
-      const y = (data[point + 1] ?? 0) * scaleY + offset.y;
-      bounds[at] = Math.min(bounds[at] ?? Infinity, x);
-      bounds[at + 1] = Math.min(bounds[at + 1] ?? Infinity, y);
-      bounds[at + 2] = Math.max(bounds[at + 2] ?? -Infinity, x);
-      bounds[at + 3] = Math.max(bounds[at + 3] ?? -Infinity, y);
+      includeChunkPoint(
+        bounds,
+        at,
+        (data[point] ?? 0) * scaleX + offset.x,
+        (data[point + 1] ?? 0) * scaleY + offset.y,
+      );
     }
   }
   const result = { bounds, offset, scaleX, scaleY };
   previewIndexes.set(route, result);
   return result;
+}
+
+/** Origin transforms are axis mirrors plus translation. Derive the signs
+ * directly so subtracting two large translated coordinates cannot erase a
+ * unit vector. */
+function originMirrors(origin: RecoveryPreviewRoute['device']['origin']): {
+  readonly scaleX: number;
+  readonly scaleY: number;
+} {
+  return {
+    scaleX: origin.endsWith('right') ? -1 : 1,
+    scaleY: origin.startsWith('front') || origin === 'center' ? -1 : 1,
+  };
+}
+
+function emptyChunkBounds(chunks: number): Float64Array {
+  const bounds = new Float64Array(chunks * 4);
+  for (let at = 0; at < bounds.length; at += 4) {
+    bounds[at] = Infinity;
+    bounds[at + 1] = Infinity;
+    bounds[at + 2] = -Infinity;
+    bounds[at + 3] = -Infinity;
+  }
+  return bounds;
+}
+
+function includeChunkPoint(bounds: Float64Array, at: number, x: number, y: number): void {
+  bounds[at] = Math.min(bounds[at] ?? Infinity, x);
+  bounds[at + 1] = Math.min(bounds[at + 1] ?? Infinity, y);
+  bounds[at + 2] = Math.max(bounds[at + 2] ?? -Infinity, x);
+  bounds[at + 3] = Math.max(bounds[at + 3] ?? -Infinity, y);
 }
 
 function intersectsView(

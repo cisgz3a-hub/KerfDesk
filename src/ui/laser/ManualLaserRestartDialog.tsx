@@ -72,25 +72,35 @@ export function ManualLaserRestartDialog(props: {
       />
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}
-      <DialogActions>
-        <button
-          type="button"
-          title="Close the restart preview without starting the job."
-          disabled={starting}
-          onClick={close}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          title="Review recovery, then move with the beam off to replay the selected movement and remaining job."
-          disabled={starting}
-          onClick={() => void start()}
-        >
-          {starting ? 'Starting recovery…' : 'Start selected remainder'}
-        </button>
-      </DialogActions>
+      <ManualRestartActions starting={starting} onCancel={close} onStart={() => void start()} />
     </Dialog>
+  );
+}
+
+function ManualRestartActions(props: {
+  readonly starting: boolean;
+  readonly onCancel: () => void;
+  readonly onStart: () => void;
+}): JSX.Element {
+  return (
+    <DialogActions>
+      <button
+        type="button"
+        title="Close the restart preview without starting the job."
+        disabled={props.starting}
+        onClick={props.onCancel}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        title="Review recovery, then move with the beam off to replay the selected movement and remaining job."
+        disabled={props.starting}
+        onClick={props.onStart}
+      >
+        {props.starting ? 'Starting recovery…' : 'Start selected remainder'}
+      </button>
+    </DialogActions>
   );
 }
 
