@@ -88,6 +88,13 @@ async function initialBundle() {
   };
 }
 
+// The review only re-prepares when an input it depends on changed (ADR-345);
+// a replaced project object is the smallest such change, and it keeps these
+// cancellation races on the asynchronous path they exist to cover.
+function touchProject(): void {
+  useStore.setState((state) => ({ project: { ...state.project } }));
+}
+
 function delayedWorker() {
   let resolve: (value: StartJobPreparation) => void = () => undefined;
   const pending = new Promise<StartJobPreparation>((done) => {
@@ -109,6 +116,7 @@ describe('R1: Job Review owns cancellation during asynchronous preparation', () 
     'cancel during %s preparation cannot return approval',
     async (action) => {
       const initial = await initialBundle();
+      touchProject();
       const delayed = delayedWorker();
       const review = runJobReviewGate({
         initial,
@@ -132,6 +140,7 @@ describe('R1: Job Review owns cancellation during asynchronous preparation', () 
 
   it('a cancelled old rebuild cannot close a newly opened review', async () => {
     const initial = await initialBundle();
+    touchProject();
     const delayed = delayedWorker();
     const review = runJobReviewGate({
       initial,

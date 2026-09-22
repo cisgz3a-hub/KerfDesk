@@ -7,6 +7,7 @@ import {
   packMotionManifest,
   unpackMotionManifest,
   type PackedMotionManifest,
+  type PackMotionManifestOptions,
 } from './packed-motion-manifest';
 
 const PACK_MANIFEST_MINIMUM_BLOCKS = 4_096;
@@ -20,11 +21,20 @@ export type ArchivedCanvasMotionPlan =
 
 const hydratedPlans = new WeakMap<ArchivedCanvasMotionPlan, CanvasMotionPlan>();
 
-/** Archive every exact path point without object-per-point storage overhead. */
-export function archiveCanvasMotionPlan(plan: CanvasMotionPlan): ArchivedCanvasMotionPlan {
+/** Archive every exact path point without object-per-point storage overhead.
+ *
+ * `enforceArchiveBudget: false` packs the same bytes for a caller that is not
+ * writing an archive — the worker-to-main Start handoff (ADR-345) and the
+ * recovery preview. Only a real archive may be refused for its size; a job the
+ * operator can otherwise run must never become unpreparable because its
+ * manifest is large (ADR-241/243/244). */
+export function archiveCanvasMotionPlan(
+  plan: CanvasMotionPlan,
+  options: PackMotionManifestOptions = {},
+): ArchivedCanvasMotionPlan {
   // Minimal pre-existing fixtures and small legacy plans retain their shape.
   if (plan.manifest === undefined || !manifestNeedsCompaction(plan.manifest)) return plan;
-  return { ...plan, manifest: packMotionManifest(plan.manifest) };
+  return { ...plan, manifest: packMotionManifest(plan.manifest, options) };
 }
 
 function manifestNeedsCompaction(manifest: MotionManifest): boolean {

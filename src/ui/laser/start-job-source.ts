@@ -172,6 +172,24 @@ function hasVariableText(project: Project): boolean {
   );
 }
 
+/** True when a compile of this project is bound to the moment it ran — a
+ * Print-and-Cut registration or variable text evaluated against a clock — so
+ * its bytes cannot be reused by a later Start from unchanged inputs. */
+export function startPreparationIsTimeBound(project: Project): boolean {
+  return currentPrintCutOutputRegistration(project) !== undefined || hasVariableText(project);
+}
+
+/** Every controller and camera fact `prepareCurrentStartJob` compiles against,
+ * as one comparable value: two equal keys mean the two compiles would have
+ * received the same machine inputs. */
+export function startMachineInputsKey(
+  project: Project,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  camera: ReturnType<typeof useCameraStore.getState>,
+): string {
+  return JSON.stringify(machineSnapshot(project, laser, camera));
+}
+
 export async function prepareRecoverySource(overrides?: {
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;

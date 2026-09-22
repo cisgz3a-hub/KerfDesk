@@ -42,8 +42,10 @@ export function detectAirAssistCyclingWarnings(
       'This controller does not reliably restart its pump inside a running job, so ' +
       'switching air off and back on would risk losing it for every operation after. ' +
       `Turn Air on for ${held.length === 1 ? 'that operation' : 'those operations'} to make ` +
-      'the program match the table, or set $152=0 on the controller and untick ' +
-      '"Air restart" in Machine Setup to get per-operation air back.',
+      'the program match the table, or set $152=100 on the controller (the standby ' +
+      'wait; 100 keeps the pump and laser module powered instead of idling them after ' +
+      'the default 30 s) and untick "Air restart" in Machine Setup to get per-operation ' +
+      'air back.',
   ];
 }
 

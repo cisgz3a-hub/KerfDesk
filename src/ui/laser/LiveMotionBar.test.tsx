@@ -86,6 +86,7 @@ afterEach(() => {
     workZZeroEvidence: null,
     fireActive: false,
     pauseResumeTransition: null,
+    streamHold: null,
     ...realActions,
   });
   document.body.innerHTML = '';

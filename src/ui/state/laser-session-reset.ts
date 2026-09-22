@@ -18,6 +18,7 @@ type FinishedJobState = Pick<
   | 'toolChangeToolIds'
   | 'pendingToolLabel'
   | 'pendingToolId'
+  | 'streamHold'
 >;
 
 type SessionScopedState = FinishedJobState &
@@ -37,6 +38,7 @@ export function finishedJobStateReset(): FinishedJobState {
     toolChangeToolIds: [],
     pendingToolLabel: null,
     pendingToolId: null,
+    streamHold: null,
   };
 }
 

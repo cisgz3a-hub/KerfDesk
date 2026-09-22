@@ -117,10 +117,36 @@ function pushPoint(
 }
 
 export function gcodeCoordinateFailure(job: Job): JobCoordinateValue | null {
+  // The path strings exist to name a failure. Building one per coordinate of a
+  // dense fill (hundreds of thousands of them) cost more than the emission
+  // itself, so the common all-encodable case is decided by a plain walk and
+  // the named walk runs only once a failure is known to exist.
+  if (everyJobCoordinateEncodable(job)) return null;
   for (const coordinate of jobCoordinateValues(job)) {
-    if (!Number.isFinite(coordinate.value)) return coordinate;
-    const formatted = coordinate.value.toFixed(3);
-    if (!/^-?\d+\.\d{3}$/u.test(formatted)) return coordinate;
+    if (!isEncodableCoordinate(coordinate.value)) return coordinate;
   }
   return null;
+}
+
+function isEncodableCoordinate(value: number): boolean {
+  return Number.isFinite(value) && /^-?\d+\.\d{3}$/u.test(value.toFixed(3));
+}
+
+function everyJobCoordinateEncodable(job: Job): boolean {
+  for (const group of job.groups) {
+    if (group.kind !== 'cut' && group.kind !== 'fill') {
+      // Raster and CNC groups are few and small per job; the named walk
+      // already knows their exact coordinate set.
+      const values: JobCoordinateValue[] = [];
+      collectGroupCoordinates(group, 0, values);
+      if (!values.every((coordinate) => isEncodableCoordinate(coordinate.value))) return false;
+      continue;
+    }
+    for (const segment of group.segments) {
+      for (const point of segment.polyline) {
+        if (!isEncodableCoordinate(point.x) || !isEncodableCoordinate(point.y)) return false;
+      }
+    }
+  }
+  return true;
 }

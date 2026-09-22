@@ -3,6 +3,8 @@ import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
+import { useStore } from '../state';
+import { describeStreamHold, type StreamHold } from '../state/laser-stream-hold';
 import { isActiveJobStatus, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
 import {
   streamProgressPercent,
@@ -41,6 +43,10 @@ export function LiveMotionBar(): JSX.Element | null {
   const fireActive = useLaserStore((state) => state.fireActive);
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   const controllerHold = useLaserStore(selectControllerHold);
+  const streamHold = useLaserStore((state) => state.streamHold ?? null);
+  const falconAirTimerHint = useStore(
+    (state) => state.project.device.machineFamily === 'creality-falcon',
+  );
   const stopJob = useLaserStore((state) => state.stopJob);
   const setFireActive = useLaserStore((state) => state.setFireActive);
   const description = describeLiveMotion(
@@ -50,6 +56,8 @@ export function LiveMotionBar(): JSX.Element | null {
     fireActive,
     pauseResumeTransition,
     controllerHold,
+    streamHold,
+    falconAirTimerHint,
   );
   if (description === null) return null;
   const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
@@ -146,25 +154,17 @@ function describeLiveMotion(
   fireActive: boolean,
   pauseResumeTransition: PauseResumeTransition | null,
   controllerHold: ControllerHold,
+  streamHold: StreamHold | null = null,
+  falconAirTimerHint = false,
 ): MotionDescription | null {
   if (isActiveJobStatus(streamProgress.status)) {
-    // A hold the controller entered by itself — its own feed-hold input, a lid
-    // or door switch — stops motion while the host is still streaming happily,
-    // so the bar said JOB RUNNING over a stopped machine with no reason given
-    // (ADR-333). A host-requested pause is excluded: that one has its own
-    // heading and its own Resume control.
-    const heldReason =
-      controllerHold !== null && pauseResumeTransition === null && !isHostPaused(streamProgress)
-        ? controllerHoldDescription(controllerHold)
-        : null;
-    return {
-      heading: heldReason?.heading ?? jobHeading(streamProgress.status, pauseResumeTransition),
-      detail:
-        heldReason === null
-          ? jobProgress(streamProgress)
-          : `${heldReason.detail} · ${jobProgress(streamProgress)}`,
-      abortLabel: 'ABORT JOB',
-    };
+    return describeActiveJob(
+      streamProgress,
+      pauseResumeTransition,
+      controllerHold,
+      streamHold,
+      falconAirTimerHint,
+    );
   }
   if (controllerOperation !== null) {
     return {
@@ -190,8 +190,53 @@ function describeLiveMotion(
   return null;
 }
 
+// A hold the controller entered by itself — its own feed-hold input, a lid
+// or door switch — stops motion while the host is still streaming happily,
+// so the bar said JOB RUNNING over a stopped machine with no reason given
+// (ADR-333). A host-requested pause is excluded: that one has its own
+// heading and its own Resume control. A controller that is merely not
+// acknowledging sent lines is the third, quieter case (ADR-345).
+function describeActiveJob(
+  streamProgress: LiveStreamProgress,
+  pauseResumeTransition: PauseResumeTransition | null,
+  controllerHold: ControllerHold,
+  streamHold: StreamHold | null,
+  falconAirTimerHint: boolean,
+): MotionDescription {
+  const hostOwned = pauseResumeTransition !== null || isHostPaused(streamProgress);
+  const heldReason = hostOwned
+    ? null
+    : controllerHold !== null
+      ? controllerHoldDescription(controllerHold)
+      : streamHoldDescription(streamProgress, streamHold, falconAirTimerHint);
+  return {
+    heading: heldReason?.heading ?? jobHeading(streamProgress.status, pauseResumeTransition),
+    detail:
+      heldReason === null
+        ? jobProgress(streamProgress)
+        : `${heldReason.detail} · ${jobProgress(streamProgress)}`,
+    abortLabel: 'ABORT JOB',
+  };
+}
+
 function isHostPaused(streamProgress: LiveStreamProgress): boolean {
   return streamProgress.status === 'paused';
+}
+
+// The controller answers status queries but has stopped acknowledging the
+// lines already sent: the sender is waiting, not the machine holding on a
+// switch. Named with its age so a machine that holds its own program (the
+// Creality A1 standby timer) is not read as a frozen app.
+function streamHoldDescription(
+  streamProgress: LiveStreamProgress,
+  streamHold: StreamHold | null,
+  falconAirTimerHint: boolean,
+): { readonly heading: string; readonly detail: string } | null {
+  if (streamHold === null || streamProgress.status !== 'streaming') return null;
+  return {
+    heading: 'CONTROLLER HOLDING PROGRAM',
+    detail: describeStreamHold(streamHold, falconAirTimerHint),
+  };
 }
 
 // Deliberately no Resume button here. Releasing a controller-owned hold is the

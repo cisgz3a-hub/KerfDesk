@@ -32,7 +32,13 @@ import {
   replayCompilationMatches,
 } from '../start-job-execution-tracking';
 import { requiredFrameIssueFromPrepared } from '../required-frame-readiness';
-import { prepareCurrentStartJob } from '../start-job-source';
+import {
+  prepareCurrentStartJob,
+  startMachineInputsKey,
+  startPreparationIsTimeBound,
+} from '../start-job-source';
+import { controllerStartPreparationStillCurrent } from '../start-job-authorization';
+import { startPreparationCoordinateKey } from '../start-preparation-coordinate-key';
 import {
   buildJobReviewModel,
   type JobReviewModel,
@@ -241,6 +247,72 @@ type RebuiltStart =
       readonly display?: ReviewedStartBundle;
     };
 
+// The compile is pure in its inputs. When the project, placement, scope,
+// registration and controller evidence are exactly what the displayed bundle
+// was prepared from, re-running it can only reproduce the same bytes — and for
+// a dense fill that reproduction cost as much as the Frame did, at every
+// Confirm. Anything time-bound (variable text, registration) still recompiles;
+// so does any change the staleness owner would cancel on (ADR-345).
+async function preparedForRebuild(
+  previousBundle: ReviewedStartBundle,
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  camera: ReturnType<typeof useCameraStore.getState>,
+  completedReceipt: LastCompletedReceipt | null,
+  signal: AbortSignal,
+): Promise<
+  | PreparedCurrentStart
+  | Extract<Awaited<ReturnType<typeof prepareCurrentStartJob>>, { readonly ok: false }>
+> {
+  if (preparedStartReusable(previousBundle, app, laser, camera, completedReceipt)) {
+    return previousBundle.prepared;
+  }
+  return prepareCurrentStartJob(
+    app,
+    laser,
+    camera,
+    completedReceipt?.artifact.jobOrigin,
+    // The frame-first gate is applied afterwards, so a job edited inside the
+    // review can still refresh the review it is shown in.
+    false,
+    signal,
+  );
+}
+
+/** Whether `previous.prepared` is provably what a fresh compile would return
+ * for the live app and controller state (see preparedForRebuild). */
+function preparedStartReusable(
+  previous: ReviewedStartBundle,
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  camera: ReturnType<typeof useCameraStore.getState>,
+  completedReceipt: LastCompletedReceipt | null,
+): boolean {
+  if (previous.project !== app.project || startPreparationIsTimeBound(app.project)) return false;
+  if (currentReplayExecutionSignature(previous.app) !== currentReplayExecutionSignature(app)) {
+    return false;
+  }
+  if (!controllerStartPreparationStillCurrent(previous.laser, laser)) return false;
+  // Alarm, a busy operation, a lost connection, camera placement: every
+  // machine fact the compile reads, whether or not it would change the bytes.
+  if (
+    startMachineInputsKey(app.project, previous.laser, camera) !==
+    startMachineInputsKey(app.project, laser, camera)
+  ) {
+    return false;
+  }
+  const context = {
+    jobPlacement: app.jobPlacement,
+    ...(completedReceipt === null || completedReceipt.artifact.jobOrigin === undefined
+      ? {}
+      : { resolvedJobOrigin: completedReceipt.artifact.jobOrigin }),
+  };
+  return (
+    startPreparationCoordinateKey(app.project.device, previous.laser, context) ===
+    startPreparationCoordinateKey(app.project.device, laser, context)
+  );
+}
+
 function refreshFrozenReview(bundle: ReviewedStartBundle): RebuiltStart {
   const laser = useLaserStore.getState();
   return {
@@ -309,14 +381,12 @@ async function rebuildCurrentStart(
     await onCompletedReplayChanged?.();
     return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
   }
-  const prepared = await prepareCurrentStartJob(
+  const prepared = await preparedForRebuild(
+    previousBundle,
     app,
     laser,
     camera,
-    completedReceipt?.artifact.jobOrigin,
-    // The frame-first gate is applied below, after the compile, so a job
-    // edited inside the review can still refresh the review it is shown in.
-    false,
+    completedReceipt,
     signal,
   );
   if (!prepared.ok) return { ok: false, messages: prepared.messages };

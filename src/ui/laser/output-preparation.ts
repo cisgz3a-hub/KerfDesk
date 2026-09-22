@@ -5,6 +5,7 @@ import type {
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
 import { prepareOutputSnapshot, type PrepareOutputOptions } from '../../io/gcode';
 import { prepareOutputForStructuredClone } from '../../io/gcode/prepared-output-persistence';
+import { archiveCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import { emitPreparedRdFile } from '../../io/rd';
 import type { Project } from '../../core/scene';
 import { emitSavePreparedOutput } from './save-output-emission';
@@ -159,7 +160,15 @@ async function prepareStartOutput(
           },
         );
   return result.ok
-    ? { ...result, prepared: prepareOutputForStructuredClone(result.prepared) }
+    ? {
+        ...result,
+        prepared: prepareOutputForStructuredClone(result.prepared),
+        // Packed for the boundary, not archived: the client unpacks it
+        // (TransferredStartJobPreparation). The archive budget belongs to the
+        // archive, which is written later and is best-effort; enforcing it
+        // here would turn a large job into a Start refusal (ADR-345).
+        canvasPlan: archiveCanvasMotionPlan(result.canvasPlan, { enforceArchiveBudget: false }),
+      }
     : result;
 }
 

@@ -21,6 +21,7 @@ import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculat
 import { PagedAssetByteWriter } from '../import/paged-asset-byte-writer';
 import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { prepareOutputRequest } from './output-preparation';
+import { hydrateTransferredStartPreparation } from './output-preparation-worker-client';
 
 const IDLE: StatusReport = {
   state: 'Idle',
@@ -132,7 +133,9 @@ describe('output preparation worker payload', () => {
 
     expect(response.kind).toBe('start');
     if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
-    const { prepared, canvasPlan, gcode, metrics } = response.result;
+    const hydratedResult = hydrateTransferredStartPreparation(response.result);
+    if (!hydratedResult.ok) throw new Error('Start did not hydrate.');
+    const { prepared, canvasPlan, gcode, metrics } = hydratedResult;
     const plan = canvasExecutablePlan(canvasPlan);
     expect(plan).toBeDefined();
     if (plan === undefined) return;

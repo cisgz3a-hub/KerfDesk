@@ -1,18 +1,44 @@
 const GCODE_NUMBER = String.raw`[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?`;
 const WORD_BOUNDARY_AFTER_NUMBER = String.raw`(?=$|\s|[A-DF-Za-df-z])`;
 
+// The preflight scanners call these helpers three or four times per emitted
+// line, and a dense fill is hundreds of thousands of lines. Building the
+// RegExp on every call put the regex compiler on the hot path; the compiled
+// pattern is exactly the one the source strings describe, so caching it by
+// word (or command) changes nothing but the cost (ADR-345).
+const wordPatterns = new Map<string, RegExp>();
+const commandPatterns = new Map<string, RegExp>();
+
+function wordPattern(word: string): RegExp {
+  let pattern = wordPatterns.get(word);
+  if (pattern === undefined) {
+    pattern = new RegExp(
+      String.raw`(?:^|[^A-Za-z])${escapeRegExp(word)}(${GCODE_NUMBER})${WORD_BOUNDARY_AFTER_NUMBER}`,
+      'i',
+    );
+    wordPatterns.set(word, pattern);
+  }
+  return pattern;
+}
+
+function commandPattern(command: string): RegExp {
+  let pattern = commandPatterns.get(command);
+  if (pattern === undefined) {
+    pattern = new RegExp(String.raw`^${escapeRegExp(command)}(?=$|\s|[A-Za-z])`, 'i');
+    commandPatterns.set(command, pattern);
+  }
+  return pattern;
+}
+
 export function parseGcodeWord(line: string, word: string): number | null {
-  const match = new RegExp(
-    String.raw`(?:^|[^A-Za-z])${escapeRegExp(word)}(${GCODE_NUMBER})${WORD_BOUNDARY_AFTER_NUMBER}`,
-    'i',
-  ).exec(line);
+  const match = wordPattern(word).exec(line);
   if (match?.[1] === undefined) return null;
   const value = Number(match[1]);
   return Number.isFinite(value) ? value : null;
 }
 
 export function isGcodeCommand(line: string, command: string): boolean {
-  return new RegExp(String.raw`^${escapeRegExp(command)}(?=$|\s|[A-Za-z])`, 'i').test(line);
+  return commandPattern(command).test(line);
 }
 
 export function isGcodeMotionCommand(line: string): boolean {
@@ -58,6 +84,9 @@ export function* iterateGcodeLines(gcode: string | Iterable<string>): Generator<
 export function stripGcodeComment(line: string): string {
   const semi = line.indexOf(';');
   const head = semi >= 0 ? line.slice(0, semi) : line;
+  // Emitted motion lines carry no parenthesised comment: skip the two
+  // replaces that would only rebuild the same string.
+  if (head.indexOf('(') < 0) return head.trim();
   return head
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\(.*/, ' ')
