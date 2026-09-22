@@ -1,0 +1,1312 @@
+{
+  "auditBase": "288ad66baf23e0c75c0a05f6216787577ddc6812",
+  "repairBase": "4f1a33bc373dc5821a9b766a6e6385bb81f4de95",
+  "initialAudit": {
+    "uniqueFiles": 126,
+    "correctnessChecks": 1372,
+    "openDefectCharacterisations": 3
+  },
+  "uniqueFiles": 171,
+  "assertions": 1909,
+  "correctnessChecks": 1909,
+  "openDefectCharacterisations": 0,
+  "parsedLogs": {
+    "originBaseline": 19,
+    "originOracle": 4,
+    "geometryBaseline": 11,
+    "geometryFinal": 5
+  },
+  "cohorts": {
+    "frameStart": {
+      "files": 48,
+      "tests": 291,
+      "passed": 291,
+      "failed": 0
+    },
+    "settings": {
+      "files": 29,
+      "tests": 207,
+      "passed": 207,
+      "failed": 0
+    },
+    "origin": {
+      "files": 17,
+      "tests": 177,
+      "passed": 177,
+      "failed": 0,
+      "evidence": "origin-latest-per-file.json"
+    },
+    "additionalOriginIntegration": {
+      "files": 17,
+      "tests": 160,
+      "passed": 160,
+      "failed": 0
+    },
+    "nativeCoordinates": {
+      "files": 12,
+      "tests": 645,
+      "passed": 645,
+      "failed": 0
+    },
+    "runtimeCoordinates": {
+      "files": 16,
+      "tests": 111,
+      "passed": 111,
+      "failed": 0
+    },
+    "savedOutputAndOriginalRegressions": {
+      "files": 3,
+      "tests": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    "connectedProfile": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "contourEntry": {
+      "files": 17,
+      "tests": 253,
+      "passed": 253,
+      "failed": 0,
+      "evidence": "contour-entry-latest-per-file.json"
+    },
+    "asyncPreparationOwnership": {
+      "files": 8,
+      "tests": 182,
+      "passed": 182,
+      "failed": 0
+    },
+    "frameMetadata": {
+      "files": 1,
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "secondPass": {
+      "files": 2,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    "physicalReferenceFixtures": {
+      "files": 2,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    "noGoReferenceFixture": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "completeTimingFixture": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "files": [
+    {
+      "name": "src/core/controllers/falcon-command-contract.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/controllers/grbl/frame-lines.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/controllers/grbl/machine-envelope.test.ts",
+      "tests": 25,
+      "status": "passed",
+      "evidence": "coordinate-final-separated-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/controllers/grbl/parse-settings.test.ts",
+      "tests": 21,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/controllers/grbl/probe.test.ts",
+      "tests": 14,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/controllers/grbl/status-parser-multi-axis.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/controllers/grbl/status-parser.test.ts",
+      "tests": 38,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/devices/catalogue-output-contracts.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/devices/device-profile-patch.test.ts",
+      "tests": 15,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/devices/device-profile.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/devices/jog-direction.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/devices/machine-bounds.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/devices/origin-transform.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/devices/profile-catalog.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/devices/profile-suggestions.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/job/compile-job-contour-entry.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/compile-job-raster-rotation.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/job/contour-entry-envelope.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/job/contour-entry.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/coordinate-contract-reproductions.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "coordinate-integration-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/job/coordinate-origin-audit.test.ts",
+      "tests": 440,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/job/frame-bounds.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/job/frame-verification.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/core/job/job-bounds-contour-entry.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/job-bounds-generic-fill-runway.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/job-bounds.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "contour-bounds-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/job-origin.test.ts",
+      "tests": 17,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/optimize-paths.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/planner-contour-entry.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/planner-emitted-seek-parity.test.ts",
+      "tests": 18,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/registration-placement.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/core/job/rotary-job.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/rotary-transform-raster.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/rotary-transform.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/job/toolpath-contour-entry.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/core/output/grbl-strategy-4040-contour-entry.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/io/gcode/contour-entry-placement.test.ts",
+      "tests": 114,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/gcode/coordinate-envelope-integration.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "coordinate-integration-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/gcode/executable-plan-emission.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "contour-entry-focused-final.json",
+      "stage": "coordinate-model-repair"
+    },
+    {
+      "name": "src/io/gcode/prepare-output-scan-offset-placement.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/io/gcode/registration-placement.property.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/io/machine-profile/machine-profile-camera.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/machine-profile/machine-profile-catalog-workflow.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/machine-profile/machine-profile-command-set.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/machine-profile/machine-profile-io.test.ts",
+      "tests": 14,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/io/machine-profile/machine-profile-rotary.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/job-placement.test.ts",
+      "tests": 25,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/ConnectedMachineProfile.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "connected-profile-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/coordinate-preparation-ownership.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/device-setup-flow.test.ts",
+      "tests": 23,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/DeviceSetupMaxFeedInvariant.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/DeviceSetupWizard.catalog.test.tsx",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/DeviceSetupWizard.cnc.test.tsx",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/DeviceSetupWizard.detected-values.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/DeviceSetupWizard.test.tsx",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/device-setup/machine-setup-controller-guide.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/DeviceSettings.test.tsx",
+      "tests": 14,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/falcon-coordinate-flow.audit.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "coordinate-integration-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/frame-position-readiness.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/frame-verification-motion-bounds.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/frame-verification-policy.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/framed-run-device-metadata-retention.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "frame-metadata-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/framed-run-start-claim.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/JobControls-frame-motion-bounds.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/JobControls.layout.test.tsx",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/JobControls.test.tsx",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/laser-mode-start-acknowledgement.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/laser-recovery-preview-plan.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/live-job-estimate-position.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/live-job-estimate.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/native-coordinate-placement.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/no-homing-frame-gate.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/OriginRow.attention.test.tsx",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 16,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/laser/OriginRow.test.tsx",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/print-cut-capture-frame.test.ts",
+      "tests": 14,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/print-cut-no-homing-epoch.test.tsx",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/required-frame-readiness.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/second-pass-execution.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "second-pass-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/second-pass-preparation-proof.test.ts",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "second-pass-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-absolute-placement.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-archived-heavy-recovery.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-camera-placement.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-controller-compatibility.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-controller-guards.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-current-position-repeat.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-flow.review-at-start.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-flow.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-framed-permit-claim.test.ts",
+      "tests": 18,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-laser-mode-flow.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-no-go-zone-warning.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-no-go-zones.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "coordinate-no-go-fixture-after.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-output-scope.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-placement.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "coordinate-policy-fixtures-after.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-preparation-timing.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "timing-fixture-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-print-cut-warnings.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-readiness-policy.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-readiness-vcarve.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-readiness.test.ts",
+      "tests": 19,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-recovery-intent.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-reduced-override-flow.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-review-at-start.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-job-sidecar-budget.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/start-preparation-owner.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.disclosure.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.fluidnc.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.framed-run.test.ts",
+      "tests": 9,
+      "status": "passed",
+      "evidence": "coordinate-owner-final-passing.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.physical-safety.test.ts",
+      "tests": 9,
+      "status": "passed",
+      "evidence": "coordinate-policy-fixtures-after.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.rotary.test.ts",
+      "tests": 2,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-frame-action.transient-frame.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/use-job-estimate.test.tsx",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/canvas-motion-plan.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/cnc-frame-lines.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/cnc-machine-profile-persistence.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 12,
+      "evidence": "origin-unit-switch-final.json",
+      "status": "passed",
+      "name": "src/ui/state/coordinate-origin-audit-20260921.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 13,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/coordinate-origin-oracle-audit-20260921.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 2,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/detected-settings-action.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/frame-feed-limits.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/frame-verification.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/framed-run.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 9,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/infer-machine-position.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-corner-probe-atomic.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-home-action.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-home-proof.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-jog-actions.bounds-warning.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-jog-actions.zone-guard.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-line-handler-frame.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 17,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-line-handler.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-origin-transaction.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-owned-motion-status-race.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-probe-actions.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-probe-lifecycle.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 5,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-safe-write-epoch.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 4,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-status-position.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 2,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-console-settings-read.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 14,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-console.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 8,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-controller-qualification.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-store-frame-advisory-refresh.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-store-frame-races.test.ts",
+      "tests": 17,
+      "status": "passed",
+      "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-store-jog-to-point-readiness.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-store-jog-to-point.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 3,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-machine-settings-alarm.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 15,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-machine-settings.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 31,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-mpg-command-matrix.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 6,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-mpg-ownership.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/laser-store-origin-ownership.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 15,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/laser-store-origin.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/machine-profile-actions.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/machine-setup-history.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/machine-setup-output-parity.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "settings-final-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "tests": 5,
+      "evidence": "origin-final-tests.json",
+      "status": "passed",
+      "name": "src/ui/state/manual-motion-fresh-idle.test.ts",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/native-bed-frame.test.ts",
+      "tests": 90,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/origin-actions.test.ts",
+      "tests": 15,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/print-cut-session-store.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/state/probe-actions.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "origin-integration-additional.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview-owned-mapping.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview-preparation-failure.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview.parity.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/draw-preview.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/large-job-preparation-order.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/large-job-preparation.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/position-laser-click.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "evidence": "coordinate-repair-tests.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-cache-retention.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-client.test.ts",
+      "tests": 16,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-estimate.test.ts",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preparation-worker-projection.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/preview-scene-frame-owned.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/ui/workspace/preview-scene-frame.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "evidence": "coordinate-baseline-tests.txt",
+      "stage": "unchanged-geometry"
+    },
+    {
+      "name": "src/ui/workspace/runtime-coordinate-hooks.test.tsx",
+      "tests": 1,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/runtime-coordinate-preparation.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/workspace/use-preview-toolpath.test.tsx",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "runtime-coordinate-final.json",
+      "stage": "post-repair"
+    }
+  ]
+}

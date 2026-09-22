@@ -90,7 +90,7 @@ function workspaceRows(state: DeviceSetupStepProps['state']): ReviewRows {
     [
       'Homing',
       state.draft.homing.enabled
-        ? `${guide.homeCommand ?? 'enabled'} toward ${state.draft.homing.direction}`
+        ? `${guide.homeCommand?.split(/\r?\n/).join(' then ') ?? 'Enabled'}; recorded home: ${state.draft.homing.direction} (direction set by controller)`
         : 'Disabled',
     ],
     [

@@ -83,6 +83,14 @@ export type BuildToolpathOptions = {
   // Bed extents for bounding ADR-239 contour entries; absent previews the
   // unclamped entry (safe over-coverage when the device is unknown).
   readonly bedSizeMm?: { readonly widthMm: number; readonly heightMm: number };
+  /** Explicit program envelope for callers constructing legacy jobs. Prepared
+   * Job metadata takes precedence, including null (unknown/omit entry). */
+  readonly contourEntryBounds?: {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+  } | null;
 };
 
 export type ToolpathDistanceSummary = {

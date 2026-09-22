@@ -45,7 +45,11 @@ export function prepareStartInput(
     effectivePlacement,
     machineWithReportUnits,
     placement,
-    motionOffset: trustedMotionOffsetForPreflight(project.device, placement),
+    motionOffset: trustedMotionOffsetForPreflight(
+      project.device,
+      placement,
+      machineWithReportUnits,
+    ),
   };
 }
 

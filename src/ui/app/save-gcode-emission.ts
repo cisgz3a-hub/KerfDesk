@@ -1,6 +1,10 @@
 import type { Project } from '../../core/scene';
 import { prepareOutputSnapshot, type EmitGcodeOptions } from '../../io/gcode';
-import { trustedMotionOffsetForPreflight, type ResolvedJobPlacement } from '../job-placement';
+import {
+  trustedMotionOffsetForPreflight,
+  runtimeCoordinatePreparationOptions,
+  type ResolvedJobPlacement,
+} from '../job-placement';
 import {
   outputPreparationShouldRunOffThread,
   prepareSaveOutputOffThread,
@@ -47,12 +51,18 @@ function saveGcodeOptions(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): EmitGcodeOptions {
-  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
+  const evidence = {
+    ...ctx.machine,
+    ...(ctx.controllerSettings === undefined ? {} : { controllerSettings: ctx.controllerSettings }),
+  };
+  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement, evidence);
   return {
+    ...runtimeCoordinatePreparationOptions(ctx.project.device, placement, evidence),
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
+    ...(motionOffset === undefined ? { preflightCoordinateMode: 'relative-origin' as const } : {}),
   };
 }
 

@@ -1,0 +1,52 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 1,
+  "numPassedTests": 0,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790036477464,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Review and Start timing handoff"],
+          "fullName": "Review and Start timing handoff uses one calibrated emitted clock with physical approach and added dwell",
+          "status": "failed",
+          "title": "uses one calibrated emitted clock with physical approach and added dwell",
+          "duration": 18.82390000000032,
+          "failureMessages": [
+            "TypeError: Cannot read properties of undefined (reading 'x')\n    at mapControllerPointToScene (D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/canvas-motion-plan.ts:348:44)\n    at map (D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/canvas-motion-plan.ts:170:5)\n    at assembleCanvasPlan (D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/canvas-motion-plan.ts:190:11)\n    at buildCanvasMotionPlan (D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/canvas-motion-plan.ts:132:16)\n    at okPreparation (D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-preparation.ts:76:22)\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-preparation-timing.test.ts:45:20\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790036485227,
+      "endTime": 1790036485245.824,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-preparation-timing.test.ts"
+    }
+  ]
+}

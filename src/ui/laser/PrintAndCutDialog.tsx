@@ -8,6 +8,7 @@ export function PrintAndCutDialog(props: {
   readonly firstMachinePoint: Vec2 | null;
   readonly secondMachinePoint: Vec2 | null;
   readonly captureEnabled: boolean;
+  readonly captureFrameNotice?: string | null;
   readonly onCapture: (which: 'first' | 'second') => void;
   readonly onCancel: () => void;
   readonly onApply: (targets: PrintAndCutDesignTargets) => void;
@@ -55,6 +56,9 @@ export function PrintAndCutDialog(props: {
           onCapture={() => props.onCapture('second')}
         />
       </div>
+      {props.captureFrameNotice != null ? (
+        <p style={warningStyle}>{props.captureFrameNotice}</p>
+      ) : null}
       {invalidReason !== null ? <p style={warningStyle}>{invalidReason}</p> : null}
       <DialogActions>
         <Button onClick={props.onDisable}>Disable</Button>

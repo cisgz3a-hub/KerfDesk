@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildLaserSecondPassProgram } from '../../core/laser-second-pass';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import type { JobOriginPlacement } from '../../core/job';
+import { createProject } from '../../core/scene';
 import { fingerprintGcode } from '../../core/recovery';
 import { useStore } from '../state';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { JobStartTransmissionError } from '../state/laser-start-transmission-error';
 import { RecoveryRepository, type ExecutionArtifactV1 } from '../state/recovery';
 import { executionArtifactIntegrityIsValid } from '../state/recovery/execution-artifact-integrity';
@@ -124,48 +126,63 @@ function sourceFixture(origin?: JobOriginPlacement) {
 }
 
 describe('exact second-pass Frame and Start ownership', () => {
-  it('uses the verified worker result and its captured bounds without recompiling at Frame', async () => {
-    const fixture = await sourceFixture();
-    const expectedBounds = structuredClone(fixture.prepared.metrics.frameMotionBounds);
-    const requalify = vi.fn(async (initialPosition: { x: number; y: number; z: number }) => ({
-      manifest: buildMotionManifest(fixture.prepared.gcode, {
-        machineKind: 'laser',
-        initialPosition,
-      }),
-      duration: fixture.prepared.metrics.duration,
-    }));
-    registerVerifiedLaserSecondPassPreparation(
-      fixture.source,
-      fixture.prepared,
-      fixture.selection,
-      requalify,
-    );
-    useLaserStore.setState({
-      workOriginActive: true,
-      wcoCache: { x: 10, y: 20, z: 0 },
-      trustedPositionEpoch: 18,
-    });
-    const binding = vi
-      .spyOn(recoveryBinding, 'recoveryArtifactPreparedOutput')
-      .mockImplementation(() => {
-        throw new Error('The UI must not synchronously repeat worker compilation.');
+  it.each([false, true])(
+    'uses the verified worker result and captured bounds without recompiling, native mapping known=%s',
+    async (known) => {
+      const baseDevice = createProject().device;
+      const device = { ...baseDevice, homing: { ...baseDevice.homing, enabled: true } };
+      if (known) useLaserStore.setState(stockNativeEvidence(device, true));
+      const fixture = await createSecondPassExecutionFixture(repository, undefined, device);
+      const expectedBounds = structuredClone(fixture.prepared.metrics.frameMotionBounds);
+      const requalify = vi.fn(async (initialPosition: { x: number; y: number; z: number }) => ({
+        manifest: buildMotionManifest(fixture.prepared.gcode, {
+          machineKind: 'laser',
+          initialPosition,
+        }),
+        duration: fixture.prepared.metrics.duration,
+      }));
+      registerVerifiedLaserSecondPassPreparation(
+        fixture.source,
+        fixture.prepared,
+        fixture.selection,
+        requalify,
+      );
+      useLaserStore.setState({
+        workOriginActive: true,
+        wcoCache: { x: 10, y: 20, z: 0 },
+        trustedPositionEpoch: 18,
       });
-    Object.assign(fixture.prepared.metrics, {
-      frameMotionBounds: { minX: 900, minY: 900, maxX: 901, maxY: 901 },
-    });
-    const permit = await frameLaserSecondPass(fixture.source, fixture.prepared, fixture.selection);
-    expect(permit).not.toBeNull();
-    expect(binding).not.toHaveBeenCalled();
-    expect(vi.mocked(useLaserStore.getState().frame).mock.calls[0]?.[0]).toEqual(expectedBounds);
-    expect(requalify).toHaveBeenCalledWith({ x: 21, y: 22, z: 0 });
-    const plan = permit?.candidate.preparedStart.canvasPlan;
-    expect(plan?.coordinateFrame).toEqual({
-      kind: 'machine',
-      workOffsetMm: { x: 10, y: 20, z: 0 },
-    });
-    expect(plan?.positionEpoch).toBe(18);
-    expect(plan?.capability).toBe('realtime');
-  });
+      const binding = vi
+        .spyOn(recoveryBinding, 'recoveryArtifactPreparedOutput')
+        .mockImplementation(() => {
+          throw new Error('The UI must not synchronously repeat worker compilation.');
+        });
+      Object.assign(fixture.prepared.metrics, {
+        frameMotionBounds: { minX: 900, minY: 900, maxX: 901, maxY: 901 },
+      });
+      const permit = await frameLaserSecondPass(
+        fixture.source,
+        fixture.prepared,
+        fixture.selection,
+      );
+      expect(permit).not.toBeNull();
+      expect(binding).not.toHaveBeenCalled();
+      expect(vi.mocked(useLaserStore.getState().frame).mock.calls[0]?.[0]).toEqual(expectedBounds);
+      expect(requalify).toHaveBeenCalledWith({ x: 21, y: 22, z: 0 });
+      const plan = permit?.candidate.preparedStart.canvasPlan;
+      expect(plan?.coordinateFrame).toEqual(
+        known
+          ? {
+              kind: 'machine',
+              workOffsetMm: { x: 10, y: 20, z: 0 },
+              nativeToBedOffsetMm: { x: 0, y: 0 },
+            }
+          : { kind: 'relative', jobOriginOffset: fixture.source.prepared.jobOriginOffset },
+      );
+      expect(plan?.positionEpoch).toBe(18);
+      expect(plan?.capability).toBe('realtime');
+    },
+  );
 
   it('Frames only the clipped immutable program, then starts and archives it after review', async () => {
     const fixture = await sourceFixture();

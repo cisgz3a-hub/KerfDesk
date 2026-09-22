@@ -25,12 +25,19 @@ import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
 import { buildPreparedJobMetrics } from './prepared-job-metrics';
+import type { DeviceProfile } from '../../core/devices';
+import { nativePointToBed } from '../../core/devices/native-bed-frame';
+import { resolveNativeBedFrame } from '../state/native-bed-frame';
 
 export function withControllerReportUnits(
   machine: MachineStartSnapshot,
   controllerSettings: ControllerSettingsSnapshot | null,
 ): MachineStartSnapshot {
-  return { ...machine, reportInches: controllerReportsInches(controllerSettings) };
+  return {
+    ...machine,
+    controllerSettings,
+    reportInches: controllerReportsInches(controllerSettings),
+  };
 }
 
 export function controllerReportsInches(
@@ -39,7 +46,10 @@ export function controllerReportsInches(
   return controllerSettings?.reportInches === true;
 }
 
-export function initialMachinePositionOption(machine: MachineStartSnapshot): {
+export function initialMachinePositionOption(
+  machine: MachineStartSnapshot,
+  device: DeviceProfile,
+): {
   readonly preflightInitialMachinePosition?: { readonly x: number; readonly y: number };
 } {
   const raw = inferCurrentMachinePosition(
@@ -47,8 +57,9 @@ export function initialMachinePositionOption(machine: MachineStartSnapshot): {
     machine.wcoCache ?? machine.statusReport?.wco ?? null,
     machine.reportInches === true,
   );
-  if (raw === null) return {};
-  return { preflightInitialMachinePosition: { x: raw.x, y: raw.y } };
+  const frame = resolveNativeBedFrame(device, machine);
+  if (raw === null || frame === null) return {};
+  return { preflightInitialMachinePosition: nativePointToBed(raw, frame) };
 }
 
 export function okPreparation(

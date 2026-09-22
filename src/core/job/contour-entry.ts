@@ -7,8 +7,10 @@
 // burn edge so GRBL's junction planner carries the entry feed straight into
 // the ink instead of stopping at the junction.
 
-import { type DeviceProfile } from '../devices';
+import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
+import type { Job } from './job';
+import type { JobBounds } from './job-bounds';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import { feedMatchedFillRunwayMm } from './fill-sweep-plan';
 
@@ -34,12 +36,28 @@ export function contourEntryRunwayMm(
   return runwayMm > 0 ? runwayMm : undefined;
 }
 
-// Bed extents in machine coordinates ([0, width] x [0, height]) used to bound
-// the entry so it never commands off-bed motion.
+// Compatibility input for archived jobs that predate explicit program bounds.
 export type BedSizeMm = {
   readonly widthMm: number;
   readonly heightMm: number;
 };
+
+export type ContourEntryBounds = JobBounds | BedSizeMm | null | undefined;
+
+export function contourEntryBoundsForDevice(device: DeviceProfile): JobBounds {
+  const { minX, minY, maxX, maxY } = machineBoundsForDevice(device);
+  return { minX, minY, maxX, maxY };
+}
+
+/** Only entry-bearing jobs need this metadata. Null means the physical bed's
+ * position in program coordinates is unknown, so optional entries are omitted. */
+export function withContourEntryBounds(job: Job, bounds: JobBounds | null): Job {
+  return job.groups.some(
+    (group) => (group.kind === 'cut' || group.kind === 'fill') && (group.entryRunwayMm ?? 0) > 0,
+  )
+    ? { ...job, contourEntryBounds: bounds }
+    : job;
+}
 
 /**
  * Where the laser-off entry begins for one contour: the first vertex moved
@@ -53,10 +71,10 @@ export type BedSizeMm = {
 export function contourEntryPoint(
   polyline: ReadonlyArray<Vec2>,
   leadMm: number,
-  bed?: BedSizeMm,
+  bed?: ContourEntryBounds,
 ): Vec2 | null {
   const first = polyline[0];
-  if (first === undefined || leadMm <= 0) return null;
+  if (first === undefined || leadMm <= 0 || bed === null) return null;
   for (let i = 1; i < polyline.length; i += 1) {
     const pt = polyline[i];
     if (pt === undefined) continue;
@@ -82,12 +100,25 @@ function bedBoundedLeadMm(
   backX: number,
   backY: number,
   leadMm: number,
-  bed: BedSizeMm,
+  bed: JobBounds | BedSizeMm,
 ): number {
+  const bounds = 'minX' in bed ? bed : { minX: 0, minY: 0, maxX: bed.widthMm, maxY: bed.heightMm };
+  // The explicit envelope contract never invents travel for an outside start.
+  // Legacy size-only input retains archived output, including its old clamp.
+  if ('minX' in bed && !insideBounds(from, bounds)) return 0;
   let roomMm = leadMm;
-  if (backX > 0) roomMm = Math.min(roomMm, (bed.widthMm - from.x) / backX);
-  else if (backX < 0) roomMm = Math.min(roomMm, from.x / -backX);
-  if (backY > 0) roomMm = Math.min(roomMm, (bed.heightMm - from.y) / backY);
-  else if (backY < 0) roomMm = Math.min(roomMm, from.y / -backY);
+  if (backX > 0) roomMm = Math.min(roomMm, (bounds.maxX - from.x) / backX);
+  else if (backX < 0) roomMm = Math.min(roomMm, (from.x - bounds.minX) / -backX);
+  if (backY > 0) roomMm = Math.min(roomMm, (bounds.maxY - from.y) / backY);
+  else if (backY < 0) roomMm = Math.min(roomMm, (from.y - bounds.minY) / -backY);
   return Math.max(0, roomMm);
+}
+
+function insideBounds(point: Vec2, bounds: JobBounds): boolean {
+  return (
+    point.x >= bounds.minX &&
+    point.x <= bounds.maxX &&
+    point.y >= bounds.minY &&
+    point.y <= bounds.maxY
+  );
 }

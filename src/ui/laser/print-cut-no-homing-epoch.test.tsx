@@ -6,6 +6,7 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { nativeBedCaptureFrameKey } from '../state/native-bed-frame';
 import { useStore } from '../state/store';
 import { PrintAndCutDialogHost } from './PrintAndCutDialogHost';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
@@ -72,8 +73,9 @@ describe('Print-and-Cut without homing', () => {
   it('accepts registration captures only from the current position epoch', () => {
     const project = useStore.getState().project;
     const session = usePrintCutSessionStore.getState();
-    session.capture('first', { x: 20, y: 30 }, 4);
-    session.capture('second', { x: 30, y: 30 }, 4);
+    const frameKey = nativeBedCaptureFrameKey(project.device, useLaserStore.getState());
+    session.capture('first', { x: 20, y: 30 }, 4, frameKey);
+    session.capture('second', { x: 30, y: 30 }, 4, frameKey);
 
     expect(currentPrintCutOutputRegistration(project)).toMatchObject({
       scale: 1,

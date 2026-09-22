@@ -14,6 +14,7 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { useLaserStore } from '../state/laser-store';
+import { nativeBedCaptureFrameKey } from '../state/native-bed-frame';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
 import { PreparationSupersededError } from '../workspace/preparation-worker-client';
@@ -357,8 +358,9 @@ describe('useJobEstimate debounce (H16)', () => {
   it('surfaces invalid Print-and-Cut trust without waiting on background compilation', async () => {
     useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
     useLaserStore.setState({ trustedPositionEpoch: 4 });
-    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3);
-    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3);
+    const frameKey = nativeBedCaptureFrameKey(lineProject().device, useLaserStore.getState());
+    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3, frameKey);
+    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3, frameKey);
     useStore.setState({
       project: {
         ...lineProject(),
@@ -390,8 +392,9 @@ describe('useJobEstimate debounce (H16)', () => {
   it('never compiles a valid Print-and-Cut snapshot synchronously on mount', async () => {
     useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
     useLaserStore.setState({ trustedPositionEpoch: 3 });
-    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3);
-    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3);
+    const frameKey = nativeBedCaptureFrameKey(lineProject().device, useLaserStore.getState());
+    usePrintCutSessionStore.getState().capture('first', { x: 20, y: 20 }, 3, frameKey);
+    usePrintCutSessionStore.getState().capture('second', { x: 120, y: 20 }, 3, frameKey);
     useStore.setState({
       project: {
         ...lineProject(),

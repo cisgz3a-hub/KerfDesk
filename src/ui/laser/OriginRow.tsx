@@ -19,12 +19,13 @@ import { OriginTransactionCancelledError } from '../state/laser-origin-transacti
 // release -> hand-move -> Wake (Ctrl-X) -> Set origin LAST.
 const SET_PERSISTENT_ORIGIN_CONFIRM =
   'Set persistent G54 origin?\n\n' +
-  'This sends G10 L20 P1 X0 Y0 and writes the current head position into the controller. ' +
-  'It survives reset and power-cycle until you clear the persistent G54 origin.';
+  'This selects G54, clears temporary XYZ offsets (G92.1), then saves the current XY position with G10 L20 P1 X0 Y0. ' +
+  'The saved XY origin survives reset and power-cycle. Saved G54 Z is unchanged; any temporary Z zero must be set again.';
 
 const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
   'Clear persistent G54 origin?\n\n' +
-  'This sends G92.1, then G10 L2 P1 X0 Y0 to clear both transient and stored G54 origin offsets.';
+  'This selects G54, clears temporary XYZ offsets (G92.1), then clears saved G54 XY offsets with G10 L2 P1 X0 Y0. ' +
+  'Saved G54 Z is unchanged; any temporary Z zero must be set again.';
 
 const SET_ORIGIN_ATTENTION_TITLE =
   'No work origin is set. Move the head over the workpiece zero (jog or hand-place), ' +
@@ -64,7 +65,7 @@ function SetOriginButton(props: {
       title={
         props.needsAttention
           ? SET_ORIGIN_ATTENTION_TITLE
-          : 'Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop.'
+          : 'Declare the current head position as work X0 Y0 without moving. Re-establish it after reset or loss of position.'
       }
     >
       Set origin here
@@ -100,7 +101,7 @@ function ReleaseMotorsButton(props: {
 function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): string {
   if (persistentOrUnknown) return 'This origin may be stored in G54. Use Clear persistent origin.';
   return hasCustom
-    ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
+    ? 'Clear temporary work offsets (G92.1), including temporary Z zero. Any saved G54 offset remains.'
     : 'No custom origin active. Set one with "Set origin here" first.';
 }
 
@@ -138,9 +139,10 @@ export function OriginRow(props: {
   // hasCustomXy does not (|x|,|y| only). Choosing the wrong one is invisible
   // until an operator zeroes Z against stock without setting an XY origin.
   //
-  //   hasCustom   — Reset origin and Clear persistent origin: both clear the
-  //                 offset on ALL axes (G92.1 / G10 L2), so a Z-only offset is
-  //                 a real thing to clear and must keep them enabled.
+  //   hasCustom   — Reset origin and Clear persistent origin: both clear
+  //                 temporary XYZ offsets (G92.1), so a temporary Z-only
+  //                 offset keeps them enabled. Persistent clear also clears
+  //                 saved G54 XY; its G10 L2 X0 Y0 leaves saved G54 Z unchanged.
   //   hasCustomXy — the Set-origin attention pulse, and the Release motors
   //                 gate. The gate is a CROSS-COMPONENT invariant: it must use
   //                 whatever predicate NoHomingPositionGuide keys originSettled
@@ -253,7 +255,10 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .resetOrigin()
         .then(() =>
-          deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
+          deps.pushToast(
+            'Temporary work offsets cleared (G92.1); saved G54 is unchanged.',
+            'success',
+          ),
         )
         .catch(reportOriginActionFailure);
     },
@@ -334,22 +339,22 @@ function AdvancedOriginControls(props: {
     void setPersistentOrigin()
       .then(() => {
         placementAfterSetOrigin(setJobPlacement);
-        pushToast('Persistent G54 origin set to current head position.', 'success');
+        pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
       })
       .catch(reportOriginActionFailure);
   };
   const onClearPersistent = (): void => {
     if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
     void clearPersistentOrigin()
-      .then(() => pushToast('Persistent G54 origin cleared.', 'success'))
+      .then(() => pushToast('Persistent G54 XY and temporary XYZ offsets cleared.', 'success'))
       .catch(reportOriginActionFailure);
   };
   const persistentDisabled = props.busy || !props.persistentOriginReady;
   const setTitle = props.persistentOriginReady
-    ? 'Write the current head position as the persistent G54 origin (G10 L20 P1).'
+    ? 'Clear temporary offsets, including Z, then save current XY as the G54 origin (G10 L20 P1).'
     : 'Machine must be Idle before setting the persistent G54 origin.';
   const clearTitle = props.persistentOriginReady
-    ? 'Clear transient G92 and stored G54 origin offsets.'
+    ? 'Clear temporary XYZ and saved G54 XY offsets. Saved G54 Z is unchanged.'
     : 'Machine must be Idle before clearing the persistent G54 origin.';
   return (
     <details style={advancedDetailsStyle}>

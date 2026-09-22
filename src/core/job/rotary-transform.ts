@@ -22,6 +22,17 @@ export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Jo
   const map = <T extends CutSegment>(s: T): T => mapSegment(s, yScale, range.min, extent, reverse);
   return {
     ...job,
+    ...(job.contourEntryBounds == null
+      ? {}
+      : {
+          contourEntryBounds: rotaryEntryBounds(
+            job.contourEntryBounds,
+            yScale,
+            range.min,
+            extent,
+            reverse,
+          ),
+        }),
     groups: job.groups.map((group) => {
       if (group.kind === 'cut') return { ...group, segments: group.segments.map(map) };
       if (group.kind === 'fill') {
@@ -33,6 +44,18 @@ export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Jo
       return group;
     }),
   };
+}
+
+function rotaryEntryBounds(
+  bounds: NonNullable<Job['contourEntryBounds']>,
+  scale: number,
+  baseY: number,
+  extent: number,
+  reverse: boolean,
+): NonNullable<Job['contourEntryBounds']> {
+  const low = (bounds.minY - baseY) * scale;
+  const high = (bounds.maxY - baseY) * scale;
+  return { ...bounds, minY: reverse ? extent - high : low, maxY: reverse ? extent - low : high };
 }
 
 function jobYRange(job: Job): { readonly min: number; readonly max: number } | null {

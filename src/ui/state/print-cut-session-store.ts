@@ -2,19 +2,35 @@ import { create } from 'zustand';
 import { solveTwoPointRegistration, type SimilarityTransform } from '../../core/registration';
 import type { PrintAndCutDesignTargets, Project, Vec2 } from '../../core/scene';
 
-type CapturedPoint = { readonly point: Vec2; readonly epoch: number };
+type CapturedPoint = {
+  readonly point: Vec2;
+  readonly epoch: number;
+  readonly coordinateFrameKey?: string;
+};
 
 type PrintCutSessionState = {
   readonly first: CapturedPoint | null;
   readonly second: CapturedPoint | null;
-  readonly capture: (which: 'first' | 'second', point: Vec2, epoch: number) => void;
+  readonly capture: (
+    which: 'first' | 'second',
+    point: Vec2,
+    epoch: number,
+    coordinateFrameKey?: string,
+  ) => void;
   readonly clear: () => void;
 };
 
 export const usePrintCutSessionStore = create<PrintCutSessionState>((set) => ({
   first: null,
   second: null,
-  capture: (which, point, epoch) => set({ [which]: { point, epoch } }),
+  capture: (which, point, epoch, coordinateFrameKey) =>
+    set({
+      [which]: {
+        point,
+        epoch,
+        ...(coordinateFrameKey === undefined ? {} : { coordinateFrameKey }),
+      },
+    }),
   clear: () => set({ first: null, second: null }),
 }));
 
@@ -27,6 +43,7 @@ export function resolvePrintCutRegistration(
   project: Project,
   epoch: number,
   session: Pick<PrintCutSessionState, 'first' | 'second'>,
+  coordinateFrameKey?: string,
 ): PrintCutRegistrationState {
   const targets = project.printAndCutTargets;
   if (targets === undefined) return { kind: 'inactive' };
@@ -37,6 +54,17 @@ export function resolvePrintCutRegistration(
     return {
       kind: 'invalid',
       reason: 'Machine position trust changed. Capture both points again.',
+    };
+  }
+  if (
+    session.first.coordinateFrameKey !== session.second.coordinateFrameKey ||
+    (coordinateFrameKey !== undefined &&
+      (session.first.coordinateFrameKey !== coordinateFrameKey ||
+        session.second.coordinateFrameKey !== coordinateFrameKey))
+  ) {
+    return {
+      kind: 'invalid',
+      reason: 'The registration coordinate frame changed. Capture both points again.',
     };
   }
   return solveRegistration(targets, session.first.point, session.second.point);

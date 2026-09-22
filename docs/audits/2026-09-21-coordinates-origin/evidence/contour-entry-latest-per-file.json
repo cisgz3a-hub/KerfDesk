@@ -1,0 +1,108 @@
+{
+  "files": 17,
+  "tests": 253.0,
+  "suites": [
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/compile-job-contour-entry.test.ts",
+      "tests": 7,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/contour-entry-envelope.test.ts",
+      "tests": 13,
+      "status": "passed",
+      "source": "contour-bounds-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/contour-entry.test.ts",
+      "tests": 11,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds-contour-entry.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "source": "contour-bounds-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds-generic-fill-runway.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "source": "contour-bounds-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "source": "contour-bounds-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-origin.test.ts",
+      "tests": 17,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/optimize-paths.test.ts",
+      "tests": 26,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/planner-contour-entry.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/planner-emitted-seek-parity.test.ts",
+      "tests": 18,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-job.test.ts",
+      "tests": 5,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-transform-raster.test.ts",
+      "tests": 4,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/rotary-transform.test.ts",
+      "tests": 1,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/toolpath-contour-entry.test.ts",
+      "tests": 3,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/output/grbl-strategy-4040-contour-entry.test.ts",
+      "tests": 8,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/gcode/contour-entry-placement.test.ts",
+      "tests": 114,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    },
+    {
+      "file": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/gcode/executable-plan-emission.test.ts",
+      "tests": 6,
+      "status": "passed",
+      "source": "contour-entry-focused-final.json"
+    }
+  ]
+}

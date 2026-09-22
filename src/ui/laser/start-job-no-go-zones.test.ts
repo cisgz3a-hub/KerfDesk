@@ -8,6 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
 
@@ -26,20 +27,16 @@ describe('Start no-go entry path', () => {
     // Frame-first (ADR-228): no-go findings inform the Job Review as
     // warnings; the watched Frame trace is the placement proof.
     const project = guardedProject();
-    const result = prepareStartJob(
-      project,
-      {
-        maxPowerS: 1000,
-        minPowerS: 0,
-        laserModeEnabled: true,
-      },
-      {
-        statusReport: IDLE_AT_ENTRY,
-        alarmCode: null,
-        hasActiveStreamer: false,
-        frameVerification: frameVerificationForProject(project),
-      },
-    );
+    // This physical approach uses verified positive native travel, rather
+    // than treating an unqualified numeric MPos as a location on the bed.
+    const coordinates = stockNativeEvidence(project.device, true);
+    const result = prepareStartJob(project, coordinates.controllerSettings, {
+      ...coordinates,
+      statusReport: IDLE_AT_ENTRY,
+      alarmCode: null,
+      hasActiveStreamer: false,
+      frameVerification: frameVerificationForProject(project),
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -75,6 +72,7 @@ function guardedProject(): Project {
     ...base,
     device: {
       ...base.device,
+      homing: { ...base.device.homing, enabled: true },
       noGoZones: [
         { id: 'clamp', name: 'Clamp', enabled: true, x: 35, y: 80, width: 10, height: 40 },
       ],

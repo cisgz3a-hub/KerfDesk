@@ -4,6 +4,7 @@ import { createProject } from '../../core/scene';
 import { useStore } from '../state/store';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { useCameraStore } from '../state/camera-store';
 import { useToastStore } from '../state/toast-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
@@ -117,6 +118,35 @@ afterEach(() => {
 });
 
 describe('R1: current Frame/Start preparation owns its worker lifetime', () => {
+  it('retires an active worker when completed controller observations change Absolute coordinates', async () => {
+    const app = useStore.getState();
+    const device = {
+      ...app.project.device,
+      homing: { ...app.project.device.homing, enabled: true },
+    };
+    useStore.setState({
+      project: { ...app.project, device },
+      jobPlacement: { startFrom: 'absolute', anchor: 'front-left' },
+    });
+    const evidence = stockNativeEvidence(device);
+    useLaserStore.setState({
+      ...evidence,
+      controllerSettingsObservation: null,
+      controllerBuildInfoObservation: null,
+    });
+    const pending = start();
+    const worker = latest();
+    useLaserStore.setState(evidence);
+    const cancelled = worker.terminated;
+    // Settle an unfixed implementation too, so the regression never leaves
+    // a hanging promise or mistakes a timeout for the required cancellation.
+    if (!cancelled)
+      worker.respond({ kind: 'start', result: { ok: false, messages: ['stale worker'] } });
+    const result = await pending;
+    expect(cancelled).toBe(true);
+    expect(result).toEqual({ ok: false, messages: [STALE_START_PREPARATION_MESSAGE] });
+  });
+
   it('cancels a stale active Frame, dispatches the queued Save, and issues no Frame permit', async () => {
     const frame = runFrameNow();
     await vi.waitFor(() => expect(latest()?.posted[0]?.request.kind).toBe('start'));

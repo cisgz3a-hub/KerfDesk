@@ -66,6 +66,12 @@ export function emitGcodeWithExecutablePlan(
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
+    ...(options.contourEntryBounds === undefined
+      ? {}
+      : { contourEntryBounds: options.contourEntryBounds }),
+    ...(options.absoluteProgramOffset === undefined
+      ? {}
+      : { absoluteProgramOffset: options.absoluteProgramOffset }),
   });
   return emitPreparedGcodeWithExecutablePlan(prepared, options);
 }

@@ -4,6 +4,10 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
+import {
+  startPreparationCoordinateKey,
+  type StartPreparationPlacement,
+} from './start-preparation-coordinate-key';
 
 export const STALE_START_PREPARATION_MESSAGE =
   'The job or machine setup changed during preparation. Preparation was cancelled; try again with the current job.';
@@ -17,6 +21,7 @@ export function ownCurrentStartPreparation(
   app: ReturnType<typeof useStore.getState>,
   laser: ReturnType<typeof useLaserStore.getState>,
   callerSignal?: AbortSignal,
+  placement: Partial<StartPreparationPlacement> = {},
 ): {
   readonly signal: AbortSignal;
   readonly inputsChanged: () => boolean;
@@ -24,6 +29,13 @@ export function ownCurrentStartPreparation(
 } {
   const controller = new AbortController();
   const signature = currentReplayExecutionSignature(app);
+  const coordinateContext = {
+    jobPlacement: placement.jobPlacement ?? app.jobPlacement,
+    ...(placement.resolvedJobOrigin === undefined
+      ? {}
+      : { resolvedJobOrigin: placement.resolvedJobOrigin }),
+  };
+  const coordinateKey = startPreparationCoordinateKey(app.project.device, laser, coordinateContext);
   let changed = false;
   const cancel = (): void => controller.abort();
   const invalidate = (): void => {
@@ -34,10 +46,15 @@ export function ownCurrentStartPreparation(
     if (currentReplayExecutionSignature() !== signature) invalidate();
   };
   const observeController = (): void => {
+    // Print-and-Cut registration also depends on the native bed frame.
+    observeProject();
+    const current = useLaserStore.getState();
     if (
-      !controllerStartPreparationStillCurrent(laser, useLaserStore.getState(), {
+      !controllerStartPreparationStillCurrent(laser, current, {
         ignoreAdvisoryControllerEvidence: true,
-      })
+      }) ||
+      startPreparationCoordinateKey(app.project.device, current, coordinateContext) !==
+        coordinateKey
     )
       invalidate();
   };

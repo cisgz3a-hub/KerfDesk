@@ -1,0 +1,1624 @@
+{
+  "numTotalTestSuites": 48,
+  "numPassedTestSuites": 48,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 160,
+  "numPassedTests": 160,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006781165,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction writes no controller bytes when static plate and cutter geometry is unsafe",
+          "status": "passed",
+          "title": "writes no controller bytes when static plate and cutter geometry is unsafe",
+          "duration": 536.5493000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction writes no bytes for unsupported runtime parameters 0",
+          "status": "passed",
+          "title": "writes no bytes for unsupported runtime parameters 0",
+          "duration": 518.3631000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction writes no bytes for unsupported runtime parameters 1",
+          "status": "passed",
+          "title": "writes no bytes for unsupported runtime parameters 1",
+          "duration": 526.5273000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction writes no bytes for unsupported runtime parameters 2",
+          "status": "passed",
+          "title": "writes no bytes for unsupported runtime parameters 2",
+          "duration": 539.8908999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 0 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 0 fails",
+          "duration": 516.6261999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 1 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 1 fails",
+          "duration": 523.4660000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 2 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 2 fails",
+          "duration": 519.2276999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 3 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 3 fails",
+          "duration": 515.2227000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 4 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 4 fails",
+          "duration": 518.4228999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction does not write a partial WCS when probe contact 5 fails",
+          "status": "passed",
+          "title": "does not write a partial WCS when probe contact 5 fails",
+          "duration": 518.8192999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction keeps coordinate evidence invalid when an alarm occurs at the combined G10 boundary",
+          "status": "passed",
+          "title": "keeps coordinate evidence invalid when an alarm occurs at the combined G10 boundary",
+          "duration": 521.2079999999987,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction keeps coordinate evidence invalid when an alarm occurs at the final park boundary",
+          "status": "passed",
+          "title": "keeps coordinate evidence invalid when an alarm occurs at the final park boundary",
+          "duration": 521.9907999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["atomic corner-probe controller transaction"],
+          "fullName": "atomic corner-probe controller transaction treats a combined G10 acknowledgement timeout as coordinate-uncertain",
+          "status": "passed",
+          "title": "treats a combined G10 acknowledgement timeout as coordinate-uncertain",
+          "duration": 579.9071999999996,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006811828,
+      "endTime": 1790006818684.9072,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-corner-probe-atomic.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout writes no Home command while the controller is known Run",
+          "status": "passed",
+          "title": "writes no Home command while the controller is known Run",
+          "duration": 536.8184999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout writes no Home command while the controller is known Hold",
+          "status": "passed",
+          "title": "writes no Home command while the controller is known Hold",
+          "duration": 520.1018000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout writes no Home command while the controller is known Jog",
+          "status": "passed",
+          "title": "writes no Home command while the controller is known Jog",
+          "duration": 542.4189999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout retains intentional Home-from-Alarm recovery",
+          "status": "passed",
+          "title": "retains intentional Home-from-Alarm recovery",
+          "duration": 517.2845000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout writes no Home command before any controller status or Alarm evidence exists",
+          "status": "passed",
+          "title": "writes no Home command before any controller status or Alarm evidence exists",
+          "duration": 509.41179999999986,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout writes no Home command while an older terminal acknowledgement is owed",
+          "status": "passed",
+          "title": "writes no Home command while an older terminal acknowledgement is owed",
+          "duration": 517.2732999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout does not time out while Home status reports keep arriving",
+          "status": "passed",
+          "title": "does not time out while Home status reports keep arriving",
+          "duration": 515.7392,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["home command timeout"],
+          "fullName": "home command timeout cannot confirm Home when a reboot lands after the final Idle observation",
+          "status": "passed",
+          "title": "cannot confirm Home when a reboot lands after the final Idle observation",
+          "duration": 518.8355999999994,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006812333,
+      "endTime": 1790006816511.8357,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-home-action.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof accepts proof bound to the current session, position, and fresh status",
+          "status": "passed",
+          "title": "accepts proof bound to the current session, position, and fresh status",
+          "duration": 1.1608999999999696,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof rejects stale or incomplete evidence",
+          "status": "passed",
+          "title": "rejects stale or incomplete evidence",
+          "duration": 0.20299999999997453,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof rejects stale or incomplete evidence",
+          "status": "passed",
+          "title": "rejects stale or incomplete evidence",
+          "duration": 0.11889999999993961,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof rejects stale or incomplete evidence",
+          "status": "passed",
+          "title": "rejects stale or incomplete evidence",
+          "duration": 0.08620000000007622,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof rejects stale or incomplete evidence",
+          "status": "passed",
+          "title": "rejects stale or incomplete evidence",
+          "duration": 0.10630000000003292,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isCurrentHomingProof"],
+          "fullName": "isCurrentHomingProof rejects stale or incomplete evidence",
+          "status": "passed",
+          "title": "rejects stale or incomplete evidence",
+          "duration": 0.11259999999992942,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006838076,
+      "endTime": 1790006838078.1125,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-home-proof.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["jog configured-machine-bounds warning"],
+          "fullName": "jog configured-machine-bounds warning sends an absolute board-point destination beyond configured travel and warns",
+          "status": "passed",
+          "title": "sends an absolute board-point destination beyond configured travel and warns",
+          "duration": 524.1606999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog configured-machine-bounds warning"],
+          "fullName": "jog configured-machine-bounds warning sends a relative fine step past the edge with a warning, and the edge silently",
+          "status": "passed",
+          "title": "sends a relative fine step past the edge with a warning, and the edge silently",
+          "duration": 1022.1725999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog configured-machine-bounds warning"],
+          "fullName": "jog configured-machine-bounds warning warns with signed travel limits for a center-origin device",
+          "status": "passed",
+          "title": "warns with signed travel limits for a center-origin device",
+          "duration": 511.3897999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog configured-machine-bounds warning"],
+          "fullName": "jog configured-machine-bounds warning treats relative:false axes as the absolute destination and still proceeds",
+          "status": "passed",
+          "title": "treats relative:false axes as the absolute destination and still proceeds",
+          "duration": 521.7638999999999,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006823463,
+      "endTime": 1790006826042.764,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-jog-actions.bounds-warning.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["jog no-go zone warnings (DEV-04)"],
+          "fullName": "jog no-go zone warnings (DEV-04) dispatches an unchanged jog whose path crosses an enabled zone and warns",
+          "status": "passed",
+          "title": "dispatches an unchanged jog whose path crosses an enabled zone and warns",
+          "duration": 533.8481999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog no-go zone warnings (DEV-04)"],
+          "fullName": "jog no-go zone warnings (DEV-04) allows a jog that stays clear of the zone",
+          "status": "passed",
+          "title": "allows a jog that stays clear of the zone",
+          "duration": 524.2221999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog no-go zone warnings (DEV-04)"],
+          "fullName": "jog no-go zone warnings (DEV-04) allows a Z-only jog even when the head is parked inside a zone",
+          "status": "passed",
+          "title": "allows a Z-only jog even when the head is parked inside a zone",
+          "duration": 522.3501999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog no-go zone warnings (DEV-04)"],
+          "fullName": "jog no-go zone warnings (DEV-04) checks an absolute jog as a destination instead of a relative delta",
+          "status": "passed",
+          "title": "checks an absolute jog as a destination instead of a relative delta",
+          "duration": 509.5109000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jog no-go zone warnings (DEV-04)"],
+          "fullName": "jog no-go zone warnings (DEV-04) dispatches an unchanged relative XY jog with an unresolved path and warns",
+          "status": "passed",
+          "title": "dispatches an unchanged relative XY jog with an unresolved path and warns",
+          "duration": 510.90290000000005,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006820515,
+      "endTime": 1790006823116.9028,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-jog-actions.zone-guard.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after session changes during post-ACK success",
+          "status": "passed",
+          "title": "preserves the new owner after session changes during post-ACK success",
+          "duration": 5.010299999999916,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after session changes during post-ACK failure",
+          "status": "passed",
+          "title": "preserves the new owner after session changes during post-ACK failure",
+          "duration": 1.7237999999997555,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after write epoch changes during post-ACK success",
+          "status": "passed",
+          "title": "preserves the new owner after write epoch changes during post-ACK success",
+          "duration": 0.9126000000001113,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after write epoch changes during post-ACK failure",
+          "status": "passed",
+          "title": "preserves the new owner after write epoch changes during post-ACK failure",
+          "duration": 0.7947000000003754,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after connection changes during post-ACK success",
+          "status": "passed",
+          "title": "preserves the new owner after connection changes during post-ACK success",
+          "duration": 0.6162999999996828,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after connection changes during post-ACK failure",
+          "status": "passed",
+          "title": "preserves the new owner after connection changes during post-ACK failure",
+          "duration": 0.514299999999821,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after replacement operation changes during post-ACK success",
+          "status": "passed",
+          "title": "preserves the new owner after replacement operation changes during post-ACK success",
+          "duration": 0.5567999999998392,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership preserves the new owner after replacement operation changes during post-ACK failure",
+          "status": "passed",
+          "title": "preserves the new owner after replacement operation changes during post-ACK failure",
+          "duration": 0.40869999999995343,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership commits normal same-owner success only after the post-ACK patch resolves",
+          "status": "passed",
+          "title": "commits normal same-owner success only after the post-ACK patch resolves",
+          "duration": 1.699200000000019,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership keeps same-owner failures visible and invalidates their uncertain origin",
+          "status": "passed",
+          "title": "keeps same-owner failures visible and invalidates their uncertain origin",
+          "duration": 1.784900000000107,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["origin transaction completion ownership"],
+          "fullName": "origin transaction completion ownership does not write a second origin command or evaluate its patch after losing the first command owner",
+          "status": "passed",
+          "title": "does not write a second origin command or evaluate its patch after losing the first command owner",
+          "duration": 0.7226000000000568,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006827292,
+      "endTime": 1790006827307.7227,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-origin-transaction.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "does not let a superseded safe-Z phase reject a newly installed status confirmation",
+          "status": "passed",
+          "title": "does not let a superseded safe-Z phase reject a newly installed status confirmation",
+          "duration": 4.130200000000059,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006838064,
+      "endTime": 1790006838068.1301,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-owned-motion-status-race.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser probe wire ownership"],
+          "fullName": "laser probe wire ownership does not establish work-Z evidence when MPG takes ownership during final Idle proof",
+          "status": "passed",
+          "title": "does not establish work-Z evidence when MPG takes ownership during final Idle proof",
+          "duration": 526.4407000000001,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006834343,
+      "endTime": 1790006834869.4407,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-probe-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle owns every ack and proves settlement before establishing Z evidence",
+          "status": "passed",
+          "title": "owns every ack and proves settlement before establishing Z evidence",
+          "duration": 543.0211999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle allows fail-off lines but emits no probe motion after MPG takeover",
+          "status": "passed",
+          "title": "allows fail-off lines but emits no probe motion after MPG takeover",
+          "duration": 518.2616999999991,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle captures replies delivered synchronously before write resolves",
+          "status": "passed",
+          "title": "captures replies delivered synchronously before write resolves",
+          "duration": 520.3641000000025,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle rejects an invalid structural request without establishing evidence",
+          "status": "passed",
+          "title": "rejects an invalid structural request without establishing evidence",
+          "duration": 504.10489999999845,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle does not write a partial corner WCS when the final side contact fails",
+          "status": "passed",
+          "title": "does not write a partial corner WCS when the final side contact fails",
+          "duration": 522.1546000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle aborts on a status-only Alarm even when no numbered ALARM line arrives",
+          "status": "passed",
+          "title": "aborts on a status-only Alarm even when no numbered ALARM line arrives",
+          "duration": 506.33290000000125,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle preserves XY evidence during a Z probe but invalidates it on a global alarm",
+          "status": "passed",
+          "title": "preserves XY evidence during a Z probe but invalidates it on a global alarm",
+          "duration": 519.1425999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle soft-resets after timeout and keeps Start locked until two fresh Idle reports",
+          "status": "passed",
+          "title": "soft-resets after timeout and keeps Start locked until two fresh Idle reports",
+          "duration": 531.8942999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle clears probe busy when the physical port closes",
+          "status": "passed",
+          "title": "clears probe busy when the physical port closes",
+          "duration": 4.8760999999976775,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probe controller transaction lifecycle"],
+          "fullName": "probe controller transaction lifecycle treats an early reboot banner as transaction loss instead of a response",
+          "status": "passed",
+          "title": "treats an early reboot banner as transaction loss instead of a response",
+          "duration": 513.3557000000001,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006801646,
+      "endTime": 1790006806329.3557,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-probe-lifecycle.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC jog-to-point readiness ordering"],
+          "fullName": "CNC jog-to-point readiness ordering writes no retract or XY motion when 'the controller is not Idle'",
+          "status": "passed",
+          "title": "writes no retract or XY motion when 'the controller is not Idle'",
+          "duration": 515.9724999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC jog-to-point readiness ordering"],
+          "fullName": "CNC jog-to-point readiness ordering writes no retract or XY motion when 'another motion operation is active'",
+          "status": "passed",
+          "title": "writes no retract or XY motion when 'another motion operation is active'",
+          "duration": 515.1729999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC jog-to-point readiness ordering"],
+          "fullName": "CNC jog-to-point readiness ordering writes no retract or XY motion when 'a controller operation is active'",
+          "status": "passed",
+          "title": "writes no retract or XY motion when 'a controller operation is active'",
+          "duration": 506.97800000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC jog-to-point readiness ordering"],
+          "fullName": "CNC jog-to-point readiness ordering writes no retract or XY motion when 'momentary Fire is active'",
+          "status": "passed",
+          "title": "writes no retract or XY motion when 'momentary Fire is active'",
+          "duration": 503.91910000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC jog-to-point readiness ordering"],
+          "fullName": "CNC jog-to-point readiness ordering writes no retract or XY motion when 'autofocus is active'",
+          "status": "passed",
+          "title": "writes no retract or XY motion when 'autofocus is active'",
+          "duration": 504.02229999999963,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006832277,
+      "endTime": 1790006834823.0222,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-jog-to-point-readiness.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition jogs the relative delta from the current machine position",
+          "status": "passed",
+          "title": "jogs the relative delta from the current machine position",
+          "duration": 527.8768000000018,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition reaches the (0,0) origin corner from a nonzero position",
+          "status": "passed",
+          "title": "reaches the (0,0) origin corner from a nonzero position",
+          "duration": 518.0764999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition does nothing when already at the target",
+          "status": "passed",
+          "title": "does nothing when already at the target",
+          "duration": 520.453300000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition lifts Z to the CNC safe height before the XY traverse, then jogs (F105)",
+          "status": "passed",
+          "title": "lifts Z to the CNC safe height before the XY traverse, then jogs (F105)",
+          "duration": 749.0779000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition writes nothing when a CNC point move lacks current Work-Z evidence",
+          "status": "passed",
+          "title": "writes nothing when a CNC point move lacks current Work-Z evidence",
+          "duration": 505.90220000000045,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition does not add a Z retract for a laser project",
+          "status": "passed",
+          "title": "does not add a Z retract for a laser project",
+          "duration": 520.1029000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition retains a cancelled owner when the CNC safe-Z retract rejects ambiguously",
+          "status": "passed",
+          "title": "retains a cancelled owner when the CNC safe-Z retract rejects ambiguously",
+          "duration": 522.7159000000029,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition never dispatches XY or its settle marker before a delayed safe-Z handoff resolves",
+          "status": "passed",
+          "title": "never dispatches XY or its settle marker before a delayed safe-Z handoff resolves",
+          "duration": 697.6610999999975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition cancels the point move when MPG takes control during safe-Z settlement",
+          "status": "passed",
+          "title": "cancels the point move when MPG takes control during safe-Z settlement",
+          "duration": 578.2656000000025,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition lets Cancel supersede an in-progress safe-Z status proof and settle the owner",
+          "status": "passed",
+          "title": "lets Cancel supersede an in-progress safe-Z status proof and settle the owner",
+          "duration": 808.4396000000015,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["jogToMachinePosition"],
+          "fullName": "jogToMachinePosition reports missing fresh status before attempting a position-based move",
+          "status": "passed",
+          "title": "reports missing fresh status before attempting a position-based move",
+          "duration": 521.5476999999992,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006801646,
+      "endTime": 1790006808116.5476,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-jog-to-point.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Set Origin waiting for WCO retains its controller owner"],
+          "fullName": "Set Origin waiting for WCO retains its controller owner cancels the WCO wait after reset without restoring the old origin or logging success",
+          "status": "passed",
+          "title": "cancels the WCO wait after reset without restoring the old origin or logging success",
+          "duration": 20.67340000000013,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set Origin waiting for WCO retains its controller owner"],
+          "fullName": "Set Origin waiting for WCO retains its controller owner cancels the WCO wait after disconnect without restoring the old origin or logging success",
+          "status": "passed",
+          "title": "cancels the WCO wait after disconnect without restoring the old origin or logging success",
+          "duration": 5.258500000000367,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set Origin waiting for WCO retains its controller owner"],
+          "fullName": "Set Origin waiting for WCO retains its controller owner cancels the WCO wait after replacement operation without restoring the old origin or logging success",
+          "status": "passed",
+          "title": "cancels the WCO wait after replacement operation without restoring the old origin or logging success",
+          "duration": 4.067000000000007,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006831191,
+      "endTime": 1790006831221.067,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-origin-ownership.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["setOriginHere"],
+          "fullName": "setOriginHere atomically selects G54 and sets transient XY zero",
+          "status": "passed",
+          "title": "atomically selects G54 and sets transient XY zero",
+          "duration": 4.190600000000131,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["setOriginHere"],
+          "fullName": "setOriginHere keeps the bare G92 command for G92-only controller families",
+          "status": "passed",
+          "title": "keeps the bare G92 command for G92-only controller families",
+          "duration": 0.5222999999998592,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["setOriginHere"],
+          "fullName": "setOriginHere awaits the underlying write before resolving",
+          "status": "passed",
+          "title": "awaits the underlying write before resolving",
+          "duration": 0.46069999999986067,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["zeroZHere"],
+          "fullName": "zeroZHere atomically selects G54 and sets transient stock-top Z zero",
+          "status": "passed",
+          "title": "atomically selects G54 and sets transient stock-top Z zero",
+          "duration": 0.48099999999999454,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resetOrigin"],
+          "fullName": "resetOrigin atomically selects G54 and clears G92",
+          "status": "passed",
+          "title": "atomically selects G54 and clears G92",
+          "duration": 0.5342999999998028,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["setPersistentOriginHere"],
+          "fullName": "setPersistentOriginHere clears transient G92 before setting the persistent G54 origin",
+          "status": "passed",
+          "title": "clears transient G92 before setting the persistent G54 origin",
+          "duration": 0.5138000000001739,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["clearPersistentOrigin"],
+          "fullName": "clearPersistentOrigin clears transient G92 before clearing the persistent G54 origin",
+          "status": "passed",
+          "title": "clears transient G92 before clearing the persistent G54 origin",
+          "duration": 0.3661000000001877,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["releaseMotors"],
+          "fullName": "releaseMotors writes exactly $SLP with a trailing newline",
+          "status": "passed",
+          "title": "writes exactly $SLP with a trailing newline",
+          "duration": 0.41669999999999163,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomOrigin"],
+          "fullName": "hasCustomOrigin returns false on a null cache (no WCO frame received yet)",
+          "status": "passed",
+          "title": "returns false on a null cache (no WCO frame received yet)",
+          "duration": 0.2704999999998563,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomOrigin"],
+          "fullName": "hasCustomOrigin returns false on an exactly-zero offset",
+          "status": "passed",
+          "title": "returns false on an exactly-zero offset",
+          "duration": 0.2278000000001157,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomOrigin"],
+          "fullName": "hasCustomOrigin returns false on a sub-epsilon offset (GRBL float noise)",
+          "status": "passed",
+          "title": "returns false on a sub-epsilon offset (GRBL float noise)",
+          "duration": 0.08459999999990941,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomOrigin"],
+          "fullName": "hasCustomOrigin returns true when any axis magnitude exceeds epsilon",
+          "status": "passed",
+          "title": "returns true when any axis magnitude exceeds epsilon",
+          "duration": 0.15390000000002146,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomOrigin"],
+          "fullName": "hasCustomOrigin treats negative offsets symmetrically",
+          "status": "passed",
+          "title": "treats negative offsets symmetrically",
+          "duration": 0.09030000000007021,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomXyOrigin"],
+          "fullName": "hasCustomXyOrigin does not treat a Z-only touch-off as an XY job origin",
+          "status": "passed",
+          "title": "does not treat a Z-only touch-off as an XY job origin",
+          "duration": 0.18739999999979773,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["hasCustomXyOrigin"],
+          "fullName": "hasCustomXyOrigin recognizes either non-trivial XY offset and ignores float noise",
+          "status": "passed",
+          "title": "recognizes either non-trivial XY offset and ignores float noise",
+          "duration": 0.09510000000000218,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006828681,
+      "endTime": 1790006828691.1875,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/origin-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["probeResultFromControllerFailure"],
+          "fullName": "probeResultFromControllerFailure preserves GRBL probe alarm meaning",
+          "status": "passed",
+          "title": "preserves GRBL probe alarm meaning",
+          "duration": 2.2551999999999452,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["probeResultFromControllerFailure"],
+          "fullName": "probeResultFromControllerFailure preserves rejected-line and timeout context",
+          "status": "passed",
+          "title": "preserves rejected-line and timeout context",
+          "duration": 0.5253999999999905,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["describeProbeResult"],
+          "fullName": "describeProbeResult states that success includes physical settlement",
+          "status": "passed",
+          "title": "states that success includes physical settlement",
+          "duration": 0.24739999999997053,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["describeProbeResult"],
+          "fullName": "describeProbeResult warns that timeout leaves motion state unknown",
+          "status": "passed",
+          "title": "warns that timeout leaves motion state unknown",
+          "duration": 0.19830000000001746,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006835944,
+      "endTime": 1790006835947.2473,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/probe-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["buildZProbeLines"],
+          "fullName": "buildZProbeLines emits the two-stage cycle with thickness-compensated zero",
+          "status": "passed",
+          "title": "emits the two-stage cycle with thickness-compensated zero",
+          "duration": 2.6282000000001062,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildZProbeLines"],
+          "fullName": "buildZProbeLines slow re-touch runs strictly slower than the seek",
+          "status": "passed",
+          "title": "slow re-touch runs strictly slower than the seek",
+          "duration": 1.3441000000000258,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines selects the canonical G54 WCS before any probe motion or coordinate commit",
+          "status": "passed",
+          "title": "selects the canonical G54 WCS before any probe motion or coordinate commit",
+          "duration": 0.5712000000000899,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines selects units-per-minute feed mode before any probe motion",
+          "status": "passed",
+          "title": "selects units-per-minute feed mode before any probe motion",
+          "duration": 0.21600000000012187,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines commits XYZ once after every probe contact succeeds",
+          "status": "passed",
+          "title": "commits XYZ once after every probe contact succeeds",
+          "duration": 0.24639999999999418,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines side probes descend to plate-flank height, not below the stock",
+          "status": "passed",
+          "title": "side probes descend to plate-flank height, not below the stock",
+          "duration": 0.34400000000005093,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines uses the measured X inset independently for a rectangular plate",
+          "status": "passed",
+          "title": "uses the measured X inset independently for a rectangular plate",
+          "duration": 0.42879999999991014,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines expands the absolute park for a cutter wider than the legacy 5 mm distance",
+          "status": "passed",
+          "title": "expands the absolute park for a cutter wider than the legacy 5 mm distance",
+          "duration": 0.12869999999998072,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines mirrors probe directions, commit, and park for front-left",
+          "status": "passed",
+          "title": "mirrors probe directions, commit, and park for front-left",
+          "duration": 0.5399999999999636,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines mirrors probe directions, commit, and park for front-right",
+          "status": "passed",
+          "title": "mirrors probe directions, commit, and park for front-right",
+          "duration": 0.34410000000002583,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines mirrors probe directions, commit, and park for back-left",
+          "status": "passed",
+          "title": "mirrors probe directions, commit, and park for back-left",
+          "duration": 0.17589999999995598,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines mirrors probe directions, commit, and park for back-right",
+          "status": "passed",
+          "title": "mirrors probe directions, commit, and park for back-right",
+          "duration": 0.14030000000002474,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines every probe is followed by a back-off before the slow re-touch",
+          "status": "passed",
+          "title": "every probe is followed by a back-off before the slow re-touch",
+          "duration": 0.3872000000001208,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCornerProbeLines"],
+          "fullName": "buildCornerProbeLines ends parked just outside the corner in absolute mode",
+          "status": "passed",
+          "title": "ends parked just outside the corner in absolute mode",
+          "duration": 0.15590000000020154,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006827636,
+      "endTime": 1790006827644.156,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/probe.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes retains XYZ from the Falcon report captured when Frame lost its position",
+          "status": "passed",
+          "title": "retains XYZ from the Falcon report captured when Frame lost its position",
+          "duration": 2.8230000000000928,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes retains XYZ from MPos vectors with extra axes",
+          "status": "passed",
+          "title": "retains XYZ from MPos vectors with extra axes",
+          "duration": 0.7442999999999529,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes retains XYZ from WPos vectors with extra axes",
+          "status": "passed",
+          "title": "retains XYZ from WPos vectors with extra axes",
+          "duration": 0.1873000000000502,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes retains XYZ from WCO vectors with extra axes",
+          "status": "passed",
+          "title": "retains XYZ from WCO vectors with extra axes",
+          "duration": 0.1490999999999758,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,2",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,2",
+          "duration": 0.2700999999999567,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,,3,4",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,,3,4",
+          "duration": 0.12159999999994398,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,",
+          "duration": 0.1027000000000271,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,NaN",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,NaN",
+          "duration": 0.11140000000000327,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,Infinity",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,Infinity",
+          "duration": 0.09719999999992979,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,4mm",
+          "status": "passed",
+          "title": "keeps malformed or incomplete coordinate vectors unavailable: 1,2,3,4mm",
+          "duration": 0.13419999999996435,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL status reports with additional axes"],
+          "fullName": "GRBL status reports with additional axes still requires exactly three override values",
+          "status": "passed",
+          "title": "still requires exactly three override values",
+          "duration": 0.10739999999998417,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006837018,
+      "endTime": 1790006837023.1343,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/status-parser-multi-axis.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses optional executing line numbers without requiring them",
+          "status": "passed",
+          "title": "parses optional executing line numbers without requiring them",
+          "duration": 2.588799999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses <Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+          "status": "passed",
+          "title": "parses <Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+          "duration": 0.8984000000000378,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses <Run|MPos:1.234,5.678,0.000|FS:1500,500>",
+          "status": "passed",
+          "title": "parses <Run|MPos:1.234,5.678,0.000|FS:1500,500>",
+          "duration": 0.32970000000000255,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths never reads spindle from a 2-component F: field (Smoothie feed,override)",
+          "status": "passed",
+          "title": "never reads spindle from a 2-component F: field (Smoothie feed,override)",
+          "duration": 0.19220000000018445,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses Hold:0 substate",
+          "status": "passed",
+          "title": "parses Hold:0 substate",
+          "duration": 0.1974999999999909,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses the grblHAL Tool state",
+          "status": "passed",
+          "title": "parses the grblHAL Tool state",
+          "duration": 0.15799999999990177,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses Door:1 substate",
+          "status": "passed",
+          "title": "parses Door:1 substate",
+          "duration": 0.1390000000001237,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths does not parse numeric prefixes as substates",
+          "status": "passed",
+          "title": "does not parse numeric prefixes as substates",
+          "duration": 0.12209999999981846,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses WPos as an alternative to MPos",
+          "status": "passed",
+          "title": "parses WPos as an alternative to MPos",
+          "duration": 0.26969999999982974,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths accepts trailing whitespace and surrounding noise lines",
+          "status": "passed",
+          "title": "accepts trailing whitespace and surrounding noise lines",
+          "duration": 0.27500000000009095,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths parses WCO when present in the status frame",
+          "status": "passed",
+          "title": "parses WCO when present in the status frame",
+          "duration": 0.1632999999999356,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths returns wco=null on status frames that omit the WCO field (typical case)",
+          "status": "passed",
+          "title": "returns wco=null on status frames that omit the WCO field (typical case)",
+          "duration": 0.20270000000004984,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths tolerates a malformed WCO field without losing other fields",
+          "status": "passed",
+          "title": "tolerates a malformed WCO field without losing other fields",
+          "duration": 0.16279999999983374,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — happy paths"],
+          "fullName": "parseStatusReport — happy paths rejects blank and noncanonical numeric components without fabricating zero",
+          "status": "passed",
+          "title": "rejects blank and noncanonical numeric components without fabricating zero",
+          "duration": 0.3187000000000353,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — Pn pins (ADR-053 P3)"],
+          "fullName": "parseStatusReport — Pn pins (ADR-053 P3) decodes limit-switch letters from the Pn field",
+          "status": "passed",
+          "title": "decodes limit-switch letters from the Pn field",
+          "duration": 0.13960000000020045,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — Pn pins (ADR-053 P3)"],
+          "fullName": "parseStatusReport — Pn pins (ADR-053 P3) decodes a single Z limit",
+          "status": "passed",
+          "title": "decodes a single Z limit",
+          "duration": 0.08780000000001564,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — Pn pins (ADR-053 P3)"],
+          "fullName": "parseStatusReport — Pn pins (ADR-053 P3) decodes probe and door without flagging limits",
+          "status": "passed",
+          "title": "decodes probe and door without flagging limits",
+          "duration": 0.09739999999987958,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — Pn pins (ADR-053 P3)"],
+          "fullName": "parseStatusReport — Pn pins (ADR-053 P3) returns pins=null when GRBL omits the Pn field (nothing triggered)",
+          "status": "passed",
+          "title": "returns pins=null when GRBL omits the Pn field (nothing triggered)",
+          "duration": 0.053699999999935244,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — degenerate inputs"],
+          "fullName": "parseStatusReport — degenerate inputs returns null for non-status lines",
+          "status": "passed",
+          "title": "returns null for non-status lines",
+          "duration": 0.10130000000003747,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — degenerate inputs"],
+          "fullName": "parseStatusReport — degenerate inputs returns null for malformed reports",
+          "status": "passed",
+          "title": "returns null for malformed reports",
+          "duration": 0.0964000000001306,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — degenerate inputs"],
+          "fullName": "parseStatusReport — degenerate inputs returns null when the state token is not a known GRBL state",
+          "status": "passed",
+          "title": "returns null when the state token is not a known GRBL state",
+          "duration": 0.050200000000131695,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — degenerate inputs"],
+          "fullName": "parseStatusReport — degenerate inputs tolerates a missing FS field",
+          "status": "passed",
+          "title": "tolerates a missing FS field",
+          "duration": 0.09410000000002583,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport — degenerate inputs"],
+          "fullName": "parseStatusReport — degenerate inputs tolerates a missing axis field",
+          "status": "passed",
+          "title": "tolerates a missing axis field",
+          "duration": 0.06349999999997635,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Ov overrides (ADR-103 G3)"],
+          "fullName": "parseStatusReport Ov overrides (ADR-103 G3) parses Ov feed/rapid/spindle percentages",
+          "status": "passed",
+          "title": "parses Ov feed/rapid/spindle percentages",
+          "duration": 0.12770000000000437,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Ov overrides (ADR-103 G3)"],
+          "fullName": "parseStatusReport Ov overrides (ADR-103 G3) reports null ov when the field is absent (intermittent cadence)",
+          "status": "passed",
+          "title": "reports null ov when the field is absent (intermittent cadence)",
+          "duration": 0.0724999999999909,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Ov overrides (ADR-103 G3)"],
+          "fullName": "parseStatusReport Ov overrides (ADR-103 G3) reports null ov for a malformed field",
+          "status": "passed",
+          "title": "reports null ov for a malformed field",
+          "duration": 0.05480000000011387,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) decodes clockwise spindle, flood, and mist in any field-letter order",
+          "status": "passed",
+          "title": "decodes clockwise spindle, flood, and mist in any field-letter order",
+          "duration": 0.13640000000009422,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) decodes counter-clockwise spindle without inferring clockwise",
+          "status": "passed",
+          "title": "decodes counter-clockwise spindle without inferring clockwise",
+          "duration": 0.11230000000000473,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) treats an Ov frame without A as a known all-off accessory observation",
+          "status": "passed",
+          "title": "treats an Ov frame without A as a known all-off accessory observation",
+          "duration": 0.07660000000009859,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) keeps accessory state unknown when both A and intermittent Ov are absent",
+          "status": "passed",
+          "title": "keeps accessory state unknown when both A and intermittent Ov are absent",
+          "duration": 0.07750000000010004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) detects grblHAL secondary-spindle telemetry outside the primary A field",
+          "status": "passed",
+          "title": "detects grblHAL secondary-spindle telemetry outside the primary A field",
+          "duration": 0.5746999999998934,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport A accessories (ADR-179)"],
+          "fullName": "parseStatusReport A accessories (ADR-179) decodes grblHAL spindle-encoder faults and pending tool changes",
+          "status": "passed",
+          "title": "decodes grblHAL spindle-encoder faults and pending tool changes",
+          "duration": 0.1814999999999145,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport grblHAL MPG ownership"],
+          "fullName": "parseStatusReport grblHAL MPG ownership parses explicit MPG acquisition and release evidence",
+          "status": "passed",
+          "title": "parses explicit MPG acquisition and release evidence",
+          "duration": 0.11969999999996617,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport grblHAL MPG ownership"],
+          "fullName": "parseStatusReport grblHAL MPG ownership keeps MPG ownership unknown when the intermittent field is absent or malformed",
+          "status": "passed",
+          "title": "keeps MPG ownership unknown when the intermittent field is absent or malformed",
+          "duration": 0.09789999999998145,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Bf buffer state (ADR-331)"],
+          "fullName": "parseStatusReport Bf buffer state (ADR-331) parses planner blocks free and RX bytes free from a grblHAL Falcon report",
+          "status": "passed",
+          "title": "parses planner blocks free and RX bytes free from a grblHAL Falcon report",
+          "duration": 0.16640000000006694,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Bf buffer state (ADR-331)"],
+          "fullName": "parseStatusReport Bf buffer state (ADR-331) parses the stock GRBL 1.1 idle report",
+          "status": "passed",
+          "title": "parses the stock GRBL 1.1 idle report",
+          "duration": 0.1092999999998483,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Bf buffer state (ADR-331)"],
+          "fullName": "parseStatusReport Bf buffer state (ADR-331) reports null when the field is absent or malformed",
+          "status": "passed",
+          "title": "reports null when the field is absent or malformed",
+          "duration": 0.1713999999999487,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["parseStatusReport Bf buffer state (ADR-331)"],
+          "fullName": "parseStatusReport Bf buffer state (ADR-331) keeps the rest of the frame when Bf is malformed",
+          "status": "passed",
+          "title": "keeps the rest of the frame when Bf is malformed",
+          "duration": 0.10409999999978936,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006807735,
+      "endTime": 1790006807745.1714,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/status-parser.test.ts"
+    }
+  ]
+}

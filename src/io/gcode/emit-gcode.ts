@@ -15,6 +15,7 @@ import {
   rotaryAppliesTo,
   rotaryWrapLimitMm,
   type Job,
+  type JobBounds,
   type JobOriginPlacement,
 } from '../../core/job';
 import { gcodeCoordinateFailure } from '../../core/job/job-coordinate-encodability';
@@ -25,7 +26,7 @@ import {
   selectOutputStrategy,
   type CncPassSpan,
 } from '../../core/output';
-import type { OutputScope, Project } from '../../core/scene';
+import type { OutputScope, Project, Vec2 } from '../../core/scene';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import {
   gcodeMetadataHeader,
@@ -49,8 +50,19 @@ export type EmitGcodeResult = {
 export type EmitGcodeOptions = {
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
+  /** Physical contour-entry envelope expressed in the final program's XY frame.
+   * Null records an unknown physical envelope; archived prepared jobs retain
+   * their own envelope rather than deriving it again while emitting. */
+  readonly contourEntryBounds?: JobBounds | null;
+  /** Known bed-to-program translation for Absolute placement only. */
+  readonly absoluteProgramOffset?: Vec2;
+  /** Program/work XY to the configured bed frame. A native controller WCO
+   * must first be combined with its established native-to-bed translation. */
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
+  /** Initial XY in that same bed frame, not an unconverted native MPos. */
   readonly preflightInitialMachinePosition?: PreflightOptions['initialMachinePosition'];
+  /** Explicit for a runtime whose native-to-bed mapping is still unknown. */
+  readonly preflightCoordinateMode?: 'machine' | 'relative-origin';
   /** Exact archived recovery may verify compiled evidence and emitted bytes,
    * but must never rebuild source-geometry planners in the browser realm. */
   readonly sourceGeometryChecks?: 'full' | 'compiled-evidence-only';
@@ -70,6 +82,12 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin ? { jobOrigin: options.jobOrigin } : {}),
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
+    ...(options.contourEntryBounds === undefined
+      ? {}
+      : { contourEntryBounds: options.contourEntryBounds }),
+    ...(options.absoluteProgramOffset === undefined
+      ? {}
+      : { absoluteProgramOffset: options.absoluteProgramOffset }),
   });
   return emitPreparedGcode(prepared, options);
 }
@@ -227,9 +245,10 @@ function runEmitPreflight(
 ): PreflightResult {
   const machine = project.machine;
   const coordinateMode =
-    options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
+    options.preflightCoordinateMode ??
+    (options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
       ? 'relative-origin'
-      : 'machine';
+      : 'machine');
   if (machine !== undefined && machine.kind === 'cnc') {
     return runCncPreflight(project, machine, body, {
       motionOffset: options.preflightMotionOffset,

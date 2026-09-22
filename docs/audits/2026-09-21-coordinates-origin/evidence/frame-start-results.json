@@ -1,0 +1,3001 @@
+{
+  "numTotalTestSuites": 105,
+  "numPassedTestSuites": 105,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 283,
+  "numPassedTests": 283,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790005534748,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults defaults no-homing profiles to User Origin so the operator sets origin first",
+          "status": "passed",
+          "title": "defaults no-homing profiles to User Origin so the operator sets origin first",
+          "duration": 1.7173999999999978,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults keeps Absolute Coordinates as the homing-enabled default",
+          "status": "passed",
+          "title": "keeps Absolute Coordinates as the homing-enabled default",
+          "duration": 0.4249999999999545,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults moves an untouched default with a changed device while preserving explicit choices",
+          "status": "passed",
+          "title": "moves an untouched default with a changed device while preserving explicit choices",
+          "duration": 0.42399999999997817,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults keeps an explicit Current Position choice when a no-homing profile is selected",
+          "status": "passed",
+          "title": "keeps an explicit Current Position choice when a no-homing profile is selected",
+          "duration": 0.3605999999999767,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults restores Absolute Coordinates when a homing profile is explicitly selected",
+          "status": "passed",
+          "title": "restores Absolute Coordinates when a homing profile is explicitly selected",
+          "duration": 0.26890000000003056,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["profile-aware placement defaults"],
+          "fullName": "profile-aware placement defaults preserves deliberate origin modes across homing profile selection",
+          "status": "passed",
+          "title": "preserves deliberate origin modes across homing profile selection",
+          "duration": 0.22010000000000218,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement requires an active custom origin before user-origin output",
+          "status": "passed",
+          "title": "requires an active custom origin before user-origin output",
+          "duration": 0.5707999999999629,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement does not accept a Z-only WCO as proof of an XY user origin",
+          "status": "passed",
+          "title": "does not accept a Z-only WCO as proof of an XY user origin",
+          "duration": 0.3951000000001841,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement resolves user-origin output to zero-based job coordinates plus WCO bounds offset",
+          "status": "passed",
+          "title": "resolves user-origin output to zero-based job coordinates plus WCO bounds offset",
+          "duration": 0.3667000000000371,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement resolves current-position output from MPos and WCO into work coordinates",
+          "status": "passed",
+          "title": "resolves current-position output from MPos and WCO into work coordinates",
+          "duration": 0.6203000000000429,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement prefers a status frame own fresh WCO over a stale work-offset cache",
+          "status": "passed",
+          "title": "prefers a status frame own fresh WCO over a stale work-offset cache",
+          "duration": 0.3524999999999636,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveJobPlacement"],
+          "fullName": "resolveJobPlacement normalizes inch-reported MPos and WCO before resolving placement",
+          "status": "passed",
+          "title": "normalizes inch-reported MPos and WCO before resolving placement",
+          "duration": 1.411299999999983,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["verified-origin placement (ADR-053)"],
+          "fullName": "verified-origin placement (ADR-053) requires an active custom origin",
+          "status": "passed",
+          "title": "requires an active custom origin",
+          "duration": 0.2699999999999818,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["verified-origin placement (ADR-053)"],
+          "fullName": "verified-origin placement (ADR-053) resolves to a relative placement with NO motion offset (position-untrusted)",
+          "status": "passed",
+          "title": "resolves to a relative placement with NO motion offset (position-untrusted)",
+          "duration": 0.22319999999990614,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["verified-origin placement (ADR-053)"],
+          "fullName": "verified-origin placement (ADR-053) does not require a known WCO (unlike user-origin, which errors here)",
+          "status": "passed",
+          "title": "does not require a known WCO (unlike user-origin, which errors here)",
+          "duration": 0.18810000000007676,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveExportJobPlacement (Save G-code)"],
+          "fullName": "resolveExportJobPlacement (Save G-code) resolves user-origin with no machine data — no motion offset, size-only preflight",
+          "status": "passed",
+          "title": "resolves user-origin with no machine data — no motion offset, size-only preflight",
+          "duration": 0.19399999999995998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveExportJobPlacement (Save G-code)"],
+          "fullName": "resolveExportJobPlacement (Save G-code) resolves verified-origin with no machine data",
+          "status": "passed",
+          "title": "resolves verified-origin with no machine data",
+          "duration": 0.12370000000009895,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveExportJobPlacement (Save G-code)"],
+          "fullName": "resolveExportJobPlacement (Save G-code) keeps the live WCO bounds offset when the machine resolution succeeds",
+          "status": "passed",
+          "title": "keeps the live WCO bounds offset when the machine resolution succeeds",
+          "duration": 0.31780000000003383,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveExportJobPlacement (Save G-code)"],
+          "fullName": "resolveExportJobPlacement (Save G-code) still refuses current-position exports without a live position (bytes depend on it)",
+          "status": "passed",
+          "title": "still refuses current-position exports without a live position (bytes depend on it)",
+          "duration": 0.22199999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolveExportJobPlacement (Save G-code)"],
+          "fullName": "resolveExportJobPlacement (Save G-code) exports absolute even while a custom origin is active (Start still refuses)",
+          "status": "passed",
+          "title": "exports absolute even while a custom origin is active (Start still refuses)",
+          "duration": 0.26909999999998035,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["trustedMotionOffsetForPreflight"],
+          "fullName": "trustedMotionOffsetForPreflight never trusts an offset for verified-origin, even with homing enabled",
+          "status": "passed",
+          "title": "never trusts an offset for verified-origin, even with homing enabled",
+          "duration": 0.26569999999992433,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["trustedMotionOffsetForPreflight"],
+          "fullName": "trustedMotionOffsetForPreflight trusts the user-origin offset when homing is enabled",
+          "status": "passed",
+          "title": "trusts the user-origin offset when homing is enabled",
+          "duration": 0.1957999999999629,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["trustedMotionOffsetForPreflight"],
+          "fullName": "trustedMotionOffsetForPreflight does not trust the user-origin offset when homing is disabled",
+          "status": "passed",
+          "title": "does not trust the user-origin offset when homing is disabled",
+          "duration": 0.1856999999999971,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolvePreviewJobPlacement (ADR-327)"],
+          "fullName": "resolvePreviewJobPlacement (ADR-327) falls back to the export placement for User and Verified Origin with no machine",
+          "status": "passed",
+          "title": "falls back to the export placement for User and Verified Origin with no machine",
+          "duration": 0.2495000000001255,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["resolvePreviewJobPlacement (ADR-327)"],
+          "fullName": "resolvePreviewJobPlacement (ADR-327) keeps the live resolution for Current Position and Absolute",
+          "status": "passed",
+          "title": "keeps the live resolution for Current Position and Absolute",
+          "duration": 0.16529999999988831,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005616311,
+      "endTime": 1790005616322.1653,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/job-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["frameBoundsSignature"],
+          "fullName": "frameBoundsSignature is a deterministic function of the four bounds",
+          "status": "passed",
+          "title": "is a deterministic function of the four bounds",
+          "duration": 1.6097000000002026,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frameBoundsSignature"],
+          "fullName": "frameBoundsSignature rounds to 3 dp so float noise does not force a re-frame",
+          "status": "passed",
+          "title": "rounds to 3 dp so float noise does not force a re-frame",
+          "duration": 0.22060000000010405,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frameBoundsSignature"],
+          "fullName": "frameBoundsSignature differs when the rectangle moves or resizes",
+          "status": "passed",
+          "title": "differs when the rectangle moves or resizes",
+          "duration": 0.7492999999999483,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005760331,
+      "endTime": 1790005760333.7493,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/frame-verification.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame position readiness"],
+          "fullName": "Frame position readiness accepts a newer complete Idle position sample",
+          "status": "passed",
+          "title": "accepts a newer complete Idle position sample",
+          "duration": 1.345299999999952,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame position readiness"],
+          "fullName": "Frame position readiness rejects the stale sample captured before setup changed coordinates",
+          "status": "passed",
+          "title": "rejects the stale sample captured before setup changed coordinates",
+          "duration": 0.18460000000004584,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame position readiness"],
+          "fullName": "Frame position readiness rejects a newer report without a usable work position",
+          "status": "passed",
+          "title": "rejects a newer report without a usable work position",
+          "duration": 0.16020000000025902,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005759074,
+      "endTime": 1790005759076.1602,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/frame-position-readiness.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame verification laser motion envelope"],
+          "fullName": "Frame verification laser motion envelope rejects a proof recorded before Fill overscan increased from 0 to 5 mm",
+          "status": "passed",
+          "title": "rejects a proof recorded before Fill overscan increased from 0 to 5 mm",
+          "duration": 28.68060000000014,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame verification laser motion envelope"],
+          "fullName": "Frame verification laser motion envelope rejects a proof when the reverse-row offset changes to 2 mm",
+          "status": "passed",
+          "title": "rejects a proof when the reverse-row offset changes to 2 mm",
+          "duration": 3.157199999999648,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame verification laser motion envelope"],
+          "fullName": "Frame verification laser motion envelope rejects a proof when the reverse-row offset changes to -2 mm",
+          "status": "passed",
+          "title": "rejects a proof when the reverse-row offset changes to -2 mm",
+          "duration": 2.5866000000000895,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame verification laser motion envelope"],
+          "fullName": "Frame verification laser motion envelope rejects a proof when enabling reverse rows activates a calibrated offset",
+          "status": "passed",
+          "title": "rejects a proof when enabling reverse rows activates a calibrated offset",
+          "duration": 3.682299999999941,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005730849,
+      "endTime": 1790005730887.6824,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/frame-verification-motion-bounds.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["frameVerificationBlockedMessage"],
+          "fullName": "frameVerificationBlockedMessage tells the operator to Frame first and to re-frame after drift",
+          "status": "passed",
+          "title": "tells the operator to Frame first and to re-frame after drift",
+          "duration": 2.0332999999998265,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005762792,
+      "endTime": 1790005762794.0332,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/frame-verification-policy.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when name changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when name changes",
+          "duration": 77.63839999999982,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when vendor changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when vendor changes",
+          "duration": 10.247999999999593,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when model changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when model changes",
+          "duration": 10.40059999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when profileSource changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when profileSource changes",
+          "duration": 12.777900000000045,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when catalogVersion changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when catalogVersion changes",
+          "duration": 13.307099999999991,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata keeps the exact permit and prepared facts when evidence changes",
+          "status": "passed",
+          "title": "keeps the exact permit and prepared facts when evidence changes",
+          "duration": 8.893100000000231,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata still expires the permit when cut calibration evidence changes",
+          "status": "passed",
+          "title": "still expires the permit when cut calibration evidence changes",
+          "duration": 10.697200000000521,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata still expires the permit when travel calibration evidence changes",
+          "status": "passed",
+          "title": "still expires the permit when travel calibration evidence changes",
+          "duration": 5.928200000000288,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata still expires the permit when no-go warning evidence changes",
+          "status": "passed",
+          "title": "still expires the permit when no-go warning evidence changes",
+          "duration": 10.878000000000611,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata still expires the permit when output power evidence changes",
+          "status": "passed",
+          "title": "still expires the permit when output power evidence changes",
+          "duration": 7.1983000000000175,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Frame retention across descriptive device metadata"],
+          "fullName": "completed Frame retention across descriptive device metadata still expires the permit when coordinate origin evidence changes",
+          "status": "passed",
+          "title": "still expires the permit when coordinate origin evidence changes",
+          "duration": 16.29150000000027,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005681157,
+      "endTime": 1790005681341.2915,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/framed-run-device-metadata-retention.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["framed-run Start claim ownership"],
+          "fullName": "framed-run Start claim ownership stores one atomic claim and releases only that exact owner",
+          "status": "passed",
+          "title": "stores one atomic claim and releases only that exact owner",
+          "duration": 4.053699999999935,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["framed-run Start claim ownership"],
+          "fullName": "framed-run Start claim ownership rejects a claim after the permit identity changes",
+          "status": "passed",
+          "title": "rejects a claim after the permit identity changes",
+          "duration": 0.7578000000003158,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005747624,
+      "endTime": 1790005747628.7578,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/framed-run-start-claim.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobControls laser motion Frame"],
+          "fullName": "JobControls laser motion Frame physically Frames the 4040 motion envelope, including runways and scan offset",
+          "status": "passed",
+          "title": "physically Frames the 4040 motion envelope, including runways and scan offset",
+          "duration": 145.83889999999974,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005690247,
+      "endTime": 1790005690392.8389,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/JobControls-frame-motion-bounds.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["no-homing relative Frame policy (frame-first, ADR-228)"],
+          "fullName": "no-homing relative Frame policy (frame-first, ADR-228) blocks Current Position Start until a Frame is completed for this exact job",
+          "status": "passed",
+          "title": "blocks Current Position Start until a Frame is completed for this exact job",
+          "duration": 17.751200000000154,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["no-homing relative Frame policy (frame-first, ADR-228)"],
+          "fullName": "no-homing relative Frame policy (frame-first, ADR-228) opens Current Position Start once a Frame is recorded at this head position",
+          "status": "passed",
+          "title": "opens Current Position Start once a Frame is recorded at this head position",
+          "duration": 23.21849999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["no-homing relative Frame policy (frame-first, ADR-228)"],
+          "fullName": "no-homing relative Frame policy (frame-first, ADR-228) a jog after the Frame invalidates it — Start blocks until a fresh trace",
+          "status": "passed",
+          "title": "a jog after the Frame invalidates it — Start blocks until a fresh trace",
+          "duration": 2.2905000000000655,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005706201,
+      "endTime": 1790005706244.2905,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/no-homing-frame-gate.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["required Frame rotary compatibility"],
+          "fullName": "required Frame rotary compatibility accepts only the emitted machine-space signature for an active roller rotary",
+          "status": "passed",
+          "title": "accepts only the emitted machine-space signature for an active roller rotary",
+          "duration": 6.773400000000038,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["required Frame rotary compatibility"],
+          "fullName": "required Frame rotary compatibility accepts only the emitted machine-space signature for an active chuck rotary",
+          "status": "passed",
+          "title": "accepts only the emitted machine-space signature for an active chuck rotary",
+          "duration": 0.6123999999999796,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005733540,
+      "endTime": 1790005733547.6123,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/required-frame-readiness.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Start gating for Absolute Coordinates"],
+          "fullName": "Start gating for Absolute Coordinates requires only a completed Frame — not homing — on a homing-capable laser",
+          "status": "passed",
+          "title": "requires only a completed Frame — not homing — on a homing-capable laser",
+          "duration": 26.122600000000148,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start gating for Absolute Coordinates"],
+          "fullName": "Start gating for Absolute Coordinates keeps Current Position available without homing — only the frame gate remains",
+          "status": "passed",
+          "title": "keeps Current Position available without homing — only the frame gate remains",
+          "duration": 1.6493999999997868,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005736096,
+      "endTime": 1790005736123.6494,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-absolute-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["archived exact costly recovery"],
+          "fullName": "archived exact costly recovery qualifies the bound artifact without synchronously recompiling its project",
+          "status": "passed",
+          "title": "qualifies the bound artifact without synchronously recompiling its project",
+          "duration": 714.0959999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["archived exact costly recovery"],
+          "fullName": "archived exact costly recovery does not synchronously rebuild V-carve advisories for a legacy artifact without evidence",
+          "status": "passed",
+          "title": "does not synchronously rebuild V-carve advisories for a legacy artifact without evidence",
+          "duration": 394.6162000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["archived exact costly recovery"],
+          "fullName": "archived exact costly recovery does not rebuild V-carve clearance geometry from a current exact artifact",
+          "status": "passed",
+          "title": "does not rebuild V-carve clearance geometry from a current exact artifact",
+          "duration": 114.84959999999955,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["archived exact costly recovery"],
+          "fullName": "archived exact costly recovery does not rebuild pocket or helical-entry geometry from an exact artifact",
+          "status": "passed",
+          "title": "does not rebuild pocket or helical-entry geometry from an exact artifact",
+          "duration": 50.9353000000001,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005620516,
+      "endTime": 1790005621790.9353,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-archived-heavy-recovery.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Start camera-placement integration"],
+          "fullName": "Start camera-placement integration starts a camera-placed job on a relative origin once framed",
+          "status": "passed",
+          "title": "starts a camera-placed job on a relative origin once framed",
+          "duration": 39.17290000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start camera-placement integration"],
+          "fullName": "Start camera-placement integration starts without a completed Home on a homing-capable machine once framed",
+          "status": "passed",
+          "title": "starts without a completed Home on a homing-capable machine once framed",
+          "duration": 5.356300000000374,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start camera-placement integration"],
+          "fullName": "Start camera-placement integration starts without an epoch-bound confirmation on a no-homing machine once framed",
+          "status": "passed",
+          "title": "starts without an epoch-bound confirmation on a no-homing machine once framed",
+          "duration": 4.169499999999971,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005721591,
+      "endTime": 1790005721640.1694,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-camera-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Start controller identity disclosure"],
+          "fullName": "Start controller identity disclosure warns but does not refuse when detected firmware differs",
+          "status": "passed",
+          "title": "warns but does not refuse when detected firmware differs",
+          "duration": 40.07639999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start controller identity disclosure"],
+          "fullName": "Start controller identity disclosure warns but does not refuse after the user selects another profile",
+          "status": "passed",
+          "title": "warns but does not refuse after the user selects another profile",
+          "duration": 6.115299999999934,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start controller identity disclosure"],
+          "fullName": "Start controller identity disclosure keeps matching profile and controller identities quiet",
+          "status": "passed",
+          "title": "keeps matching profile and controller identities quiet",
+          "duration": 5.427200000000084,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Start controller identity disclosure"],
+          "fullName": "Start controller identity disclosure warns but does not refuse when firmware detection is still unknown",
+          "status": "passed",
+          "title": "warns but does not refuse when firmware detection is still unknown",
+          "duration": 4.416300000000319,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005713640,
+      "endTime": 1790005713695.4163,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-controller-compatibility.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards keeps a reported $32=0 review-grade under the physical-Frame policy",
+          "status": "passed",
+          "title": "keeps a reported $32=0 review-grade under the physical-Frame policy",
+          "duration": 42.0278000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards keeps a reported $30 mismatch review-grade in snapshot preparation",
+          "status": "passed",
+          "title": "keeps a reported $30 mismatch review-grade in snapshot preparation",
+          "duration": 6.625,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards keeps unknown $30/$32 evidence review-grade for laser Start",
+          "status": "passed",
+          "title": "keeps unknown $30/$32 evidence review-grade for laser Start",
+          "duration": 4.880899999999656,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards surfaces proven M7-unsupported as a Job Review warning without refusing Start",
+          "status": "passed",
+          "title": "surfaces proven M7-unsupported as a Job Review warning without refusing Start",
+          "duration": 5.14409999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards surfaces proven M7 incompatibility as a machine-neutral advisory, never a block",
+          "status": "passed",
+          "title": "surfaces proven M7 incompatibility as a machine-neutral advisory, never a block",
+          "duration": 1.5440000000003238,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser controller Start guards"],
+          "fullName": "laser controller Start guards allows option M proof and warns explicitly when M7 support is unknown",
+          "status": "passed",
+          "title": "allows option M proof and warns explicitly when M7 support is unknown",
+          "duration": 7.112500000000182,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005684601,
+      "endTime": 1790005684668.1125,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-controller-guards.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["completed Current Position replay"],
+          "fullName": "completed Current Position replay streams the exact framed bytes after Frame motion changes the live head position",
+          "status": "passed",
+          "title": "streams the exact framed bytes after Frame motion changes the live head position",
+          "duration": 125.61000000000058,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed Current Position replay"],
+          "fullName": "completed Current Position replay reuses the frozen origin after the live head moves",
+          "status": "passed",
+          "title": "reuses the frozen origin after the live head moves",
+          "duration": 55.36579999999958,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005671882,
+      "endTime": 1790005672062.3657,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-current-position-repeat.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ADR-237 Start-time Job Review"],
+          "fullName": "ADR-237 Start-time Job Review opens the single Job Review at Start for a review-pending permit and streams on confirm",
+          "status": "passed",
+          "title": "opens the single Job Review at Start for a review-pending permit and streams on confirm",
+          "duration": 83.40490000000045,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ADR-237 Start-time Job Review"],
+          "fullName": "ADR-237 Start-time Job Review cancelling the Start review streams nothing and keeps the permit armed",
+          "status": "passed",
+          "title": "cancelling the Start review streams nothing and keeps the permit armed",
+          "duration": 6.448099999999613,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ADR-237 Start-time Job Review"],
+          "fullName": "ADR-237 Start-time Job Review streams a birth-reviewed permit without reopening Job Review",
+          "status": "passed",
+          "title": "streams a birth-reviewed permit without reopening Job Review",
+          "duration": 14.158300000000054,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ADR-237 Start-time Job Review"],
+          "fullName": "ADR-237 Start-time Job Review streams nothing when the permit dies while the Start review is open",
+          "status": "passed",
+          "title": "streams nothing when the permit dies while the Start review is open",
+          "duration": 7.6635000000005675,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005662319,
+      "endTime": 1790005662430.6636,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-flow.review-at-start.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runStartJobFlow"],
+          "fullName": "runStartJobFlow passes a new run identity and active-profile streaming settings to the streamer",
+          "status": "passed",
+          "title": "passes a new run identity and active-profile streaming settings to the streamer",
+          "duration": 176.09119999999984,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runStartJobFlow"],
+          "fullName": "runStartJobFlow allows a no-homing User Origin laser Start after a settings-read failure",
+          "status": "passed",
+          "title": "allows a no-homing User Origin laser Start after a settings-read failure",
+          "duration": 24.210000000000036,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runStartJobFlow"],
+          "fullName": "runStartJobFlow forces ping-pong for a legacy Marlin profile with char-counted streaming",
+          "status": "passed",
+          "title": "forces ping-pong for a legacy Marlin profile with char-counted streaming",
+          "duration": 19.216599999999744,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership stores exact streamed G-code as a line-zero active run only after Start is accepted",
+          "status": "passed",
+          "title": "stores exact streamed G-code as a line-zero active run only after Start is accepted",
+          "duration": 48.70020000000022,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership does not let a 2516 / 118035 interrupted capsule block a different normal job",
+          "status": "passed",
+          "title": "does not let a 2516 / 118035 interrupted capsule block a different normal job",
+          "duration": 611.1703000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership preserves the older capsule when a new ordinary Start is refused before acceptance",
+          "status": "passed",
+          "title": "preserves the older capsule when a new ordinary Start is refused before acceptance",
+          "duration": 20.602600000000166,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership waits for rejected-run cleanup before the Start flow settles",
+          "status": "passed",
+          "title": "waits for rejected-run cleanup before the Start flow settles",
+          "duration": 66.60390000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership replaces the older capsule only after a new ordinary Start is accepted",
+          "status": "passed",
+          "title": "replaces the older capsule only after a new ordinary Start is accepted",
+          "duration": 30.577299999999923,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isolated execution recovery ownership"],
+          "fullName": "isolated execution recovery ownership continues the job with a warning when artifact persistence is unavailable",
+          "status": "passed",
+          "title": "continues the job with a warning when artifact persistence is unavailable",
+          "duration": 14.504399999999805,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed-job replay"],
+          "fullName": "completed-job replay runs the exact completed job from line one with a new run identity and no recovery",
+          "status": "passed",
+          "title": "runs the exact completed job from line one with a new run identity and no recovery",
+          "duration": 58.55319999999938,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["completed-job replay"],
+          "fullName": "completed-job replay invalidates replay when the current canvas changes during async compilation",
+          "status": "passed",
+          "title": "invalidates replay when the current canvas changes during async compilation",
+          "duration": 19.203199999999924,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005604466,
+      "endTime": 1790005605556.2031,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-flow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim keeps and starts a completed permit across an advisory settings and build-info refresh",
+          "status": "passed",
+          "title": "keeps and starts a completed permit across an advisory settings and build-info refresh",
+          "duration": 137.03319999999985,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim still revokes a completed permit when the controller session changes",
+          "status": "passed",
+          "title": "still revokes a completed permit when the controller session changes",
+          "duration": 9.931899999999587,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim refuses a permit revoked while exact-artifact staging is pending",
+          "status": "passed",
+          "title": "refuses a permit revoked while exact-artifact staging is pending",
+          "duration": 80.54030000000057,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim refuses Start when a mutating user macro revokes the permit during staging",
+          "status": "passed",
+          "title": "refuses Start when a mutating user macro revokes the permit during staging",
+          "duration": 632.509,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim allows only one async owner to claim the same permit",
+          "status": "passed",
+          "title": "allows only one async owner to claim the same permit",
+          "duration": 61.6239000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim fails the final boundary when the claimed permit identity is replaced",
+          "status": "passed",
+          "title": "fails the final boundary when the claimed permit identity is replaced",
+          "duration": 7.38340000000062,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim retains the permit when final status transport is unavailable before authorization",
+          "status": "passed",
+          "title": "retains the permit when final status transport is unavailable before authorization",
+          "duration": 8.789999999999054,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim retains verification after a real accepted Start for recovery and completed-replay preparation",
+          "status": "passed",
+          "title": "retains verification after a real accepted Start for recovery and completed-replay preparation",
+          "duration": 546.315700000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim still invalidates retained verification on post-Start manual motion",
+          "status": "passed",
+          "title": "still invalidates retained verification on post-Start manual motion",
+          "duration": 548.7610000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim does not revoke a stamped Start-owned Run status at the same position",
+          "status": "passed",
+          "title": "does not revoke a stamped Start-owned Run status at the same position",
+          "duration": 11.135299999999916,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Run even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Run even if Idle later matches",
+          "duration": 4.729899999998452,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Hold even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Hold even if Idle later matches",
+          "duration": 4.363099999998667,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Jog even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Jog even if Idle later matches",
+          "duration": 4.541800000000876,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Door even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Door even if Idle later matches",
+          "duration": 3.6075999999993655,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Check even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Check even if Idle later matches",
+          "duration": 7.705799999999726,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Home even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Home even if Idle later matches",
+          "duration": 6.547599999999875,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes a claimed permit on unowned Start-arming Tool even if Idle later matches",
+          "status": "passed",
+          "title": "revokes a claimed permit on unowned Start-arming Tool even if Idle later matches",
+          "duration": 8.80119999999988,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["ordinary framed Start permit claim"],
+          "fullName": "ordinary framed Start permit claim revokes an owned Start Run when the reported position changes",
+          "status": "passed",
+          "title": "revokes an owned Start Run when the reported position changes",
+          "duration": 8.76339999999982,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005596688,
+      "endTime": 1790005598781.7634,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-framed-permit-claim.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery passes verified evidence and active profile streaming settings into Start",
+          "status": "passed",
+          "title": "passes verified evidence and active profile streaming settings into Start",
+          "duration": 88.24499999999989,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery requires informed acknowledgement before an ordinary Start with unknown $32",
+          "status": "passed",
+          "title": "requires informed acknowledgement before an ordinary Start with unknown $32",
+          "duration": 33.874399999999696,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery sends no ordinary job when the unknown-$32 review is cancelled",
+          "status": "passed",
+          "title": "sends no ordinary job when the unknown-$32 review is cancelled",
+          "duration": 13.60530000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery acknowledges unknown $32 before checkpoint recovery confirmation and streaming",
+          "status": "passed",
+          "title": "acknowledges unknown $32 before checkpoint recovery confirmation and streaming",
+          "duration": 19.4371000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery cancels checkpoint recovery before resume confirmation when $32 is declined",
+          "status": "passed",
+          "title": "cancels checkpoint recovery before resume confirmation when $32 is declined",
+          "duration": 16.611299999999574,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-mode acknowledgement across Start and recovery"],
+          "fullName": "laser-mode acknowledgement across Start and recovery uses the same $32 acknowledgement before manual recovery confirmation",
+          "status": "passed",
+          "title": "uses the same $32 acknowledgement before manual recovery confirmation",
+          "duration": 12.96690000000035,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005635026,
+      "endTime": 1790005635210.9668,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-laser-mode-flow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC fixture-envelope Job Review warning"],
+          "fullName": "CNC fixture-envelope Job Review warning warns without blocking when cutter radius reaches a fixture outside the bed",
+          "status": "passed",
+          "title": "warns without blocking when cutter radius reaches a fixture outside the bed",
+          "duration": 8.905499999999847,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005751778,
+      "endTime": 1790005751786.9055,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-no-go-zone-warning.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Start no-go entry path"],
+          "fullName": "Start no-go entry path warns when the entry move from the live head position crosses a no-go zone",
+          "status": "passed",
+          "title": "warns when the entry move from the live head position crosses a no-go zone",
+          "duration": 25.083399999999983,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005741086,
+      "endTime": 1790005741111.0835,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-no-go-zones.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob output scope"],
+          "fullName": "prepareStartJob output scope starts only selected artwork when Cut Selected Graphics is enabled",
+          "status": "passed",
+          "title": "starts only selected artwork when Cut Selected Graphics is enabled",
+          "duration": 41.967699999999695,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob output scope"],
+          "fullName": "prepareStartJob output scope re-blocks when selection-origin mode changes after Frame",
+          "status": "passed",
+          "title": "re-blocks when selection-origin mode changes after Frame",
+          "duration": 4.957400000000234,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob output scope"],
+          "fullName": "prepareStartJob output scope re-blocks when a selected-only Frame is reused for the full canvas",
+          "status": "passed",
+          "title": "re-blocks when a selected-only Frame is reused for the full canvas",
+          "duration": 2.7324000000003252,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005718554,
+      "endTime": 1790005718603.7324,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-output-scope.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement places the selected anchor at the current machine position for Current Position jobs",
+          "status": "passed",
+          "title": "places the selected anchor at the current machine position for Current Position jobs",
+          "duration": 35.86360000000013,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks User Origin when the operator has not set a custom origin",
+          "status": "passed",
+          "title": "blocks User Origin when the operator has not set a custom origin",
+          "duration": 0.47200000000020736,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement anchors a centered traced image to the custom work origin before emitting G-code",
+          "status": "passed",
+          "title": "anchors a centered traced image to the custom work origin before emitting G-code",
+          "duration": 5.972699999999804,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat negative WCO as a physical overhang when homing is disabled",
+          "status": "passed",
+          "title": "does not treat negative WCO as a physical overhang when homing is disabled",
+          "duration": 5.572899999999663,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "status": "passed",
+          "title": "does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "duration": 13.607200000000375,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "status": "passed",
+          "title": "warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "duration": 2.7498999999997977,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "status": "passed",
+          "title": "allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "duration": 6.449799999999868,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "status": "passed",
+          "title": "warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "duration": 6.794200000000274,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks custom-origin Start when the physical origin location is not known",
+          "status": "passed",
+          "title": "blocks custom-origin Start when the physical origin location is not known",
+          "duration": 0.5635999999999513,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns naming fill overscan when an absolute fill job is too close to the bed edge",
+          "status": "passed",
+          "title": "warns naming fill overscan when an absolute fill job is too close to the bed edge",
+          "duration": 6.774300000000039,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) blocks Start until a Frame is recorded, with the sole frame-first message",
+          "status": "passed",
+          "title": "blocks Start until a Frame is recorded, with the sole frame-first message",
+          "duration": 1.6983000000000175,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) allows Start after a matching Verified Frame",
+          "status": "passed",
+          "title": "allows Start after a matching Verified Frame",
+          "duration": 2.994299999999839,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) re-blocks when the origin moved since the Verified Frame",
+          "status": "passed",
+          "title": "re-blocks when the origin moved since the Verified Frame",
+          "duration": 10.343499999999949,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005624990,
+      "endTime": 1790005625090.3435,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Review and Start timing handoff"],
+          "fullName": "Review and Start timing handoff uses one calibrated emitted clock with physical approach and added dwell",
+          "status": "passed",
+          "title": "uses one calibrated emitted clock with physical approach and added dwell",
+          "duration": 26.569600000000264,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005738277,
+      "endTime": 1790005738303.5696,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-preparation-timing.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Print-and-Cut Frame warnings"],
+          "fullName": "Print-and-Cut Frame warnings prepares the exact job and warns when mixed jig output and job-origin placement are active",
+          "status": "passed",
+          "title": "prepares the exact job and warns when mixed jig output and job-origin placement are active",
+          "duration": 49.31849999999986,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Print-and-Cut Frame warnings"],
+          "fullName": "Print-and-Cut Frame warnings does not claim combined output when selected scope contains art only",
+          "status": "passed",
+          "title": "does not claim combined output when selected scope contains art only",
+          "duration": 8.43159999999989,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Print-and-Cut Frame warnings"],
+          "fullName": "Print-and-Cut Frame warnings does not claim combined output when selected scope contains registration box only",
+          "status": "passed",
+          "title": "does not claim combined output when selected scope contains registration box only",
+          "duration": 9.944400000000314,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005709591,
+      "endTime": 1790005709658.9443,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-print-cut-warnings.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["largeJobPreparationWarning"],
+          "fullName": "largeJobPreparationWarning advises on a scene over the preparation segment budget instead of refusing (ADR-241)",
+          "status": "passed",
+          "title": "advises on a scene over the preparation segment budget instead of refusing (ADR-241)",
+          "duration": 30.115299999999934,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["largeJobPreparationWarning"],
+          "fullName": "largeJobPreparationWarning stays silent for a modest scene",
+          "status": "passed",
+          "title": "stays silent for a modest scene",
+          "duration": 1.7726999999999862,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005743863,
+      "endTime": 1790005743895.7727,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-readiness-policy.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob flowing V-carve warnings"],
+          "fullName": "prepareStartJob flowing V-carve warnings includes the actual compiled flowing V-carve depth in Start warnings",
+          "status": "passed",
+          "title": "includes the actual compiled flowing V-carve depth in Start warnings",
+          "duration": 188.3986,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005755705,
+      "endTime": 1790005755893.3987,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-readiness-vcarve.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob warns instead of blocking CNC Start on controllers without the GRBL CNC dialect",
+          "status": "passed",
+          "title": "warns instead of blocking CNC Start on controllers without the GRBL CNC dialect",
+          "duration": 50.3154999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob warns when connected controller $30 differs from project max S",
+          "status": "passed",
+          "title": "warns when connected controller $30 differs from project max S",
+          "duration": 17.285300000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob returns G-code when project preflight and controller readiness both pass",
+          "status": "passed",
+          "title": "returns G-code when project preflight and controller readiness both pass",
+          "duration": 6.234100000000126,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob keeps existing project preflight failures as Start blockers",
+          "status": "passed",
+          "title": "keeps existing project preflight failures as Start blockers",
+          "duration": 2.19419999999991,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob allows Start with a nonzero $31 warning after critical readiness passes",
+          "status": "passed",
+          "title": "allows Start with a nonzero $31 warning after critical readiness passes",
+          "duration": 6.697000000000116,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob includes trace/vector intent warnings in the Start warning list",
+          "status": "passed",
+          "title": "includes trace/vector intent warnings in the Start warning list",
+          "duration": 4.11640000000034,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob allows 4040-safe Island Fill short sweeps with a warning on the Neotronics 4040 profile",
+          "status": "passed",
+          "title": "allows 4040-safe Island Fill short sweeps with a warning on the Neotronics 4040 profile",
+          "duration": 15.782700000000204,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob allows the same Neotronics 4040 fine-detail job with Scanline Fill",
+          "status": "passed",
+          "title": "allows the same Neotronics 4040 fine-detail job with Scanline Fill",
+          "duration": 8.573300000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob accepts a Verified Frame signature computed from the scan-offset-aware motion envelope",
+          "status": "passed",
+          "title": "accepts a Verified Frame signature computed from the scan-offset-aware motion envelope",
+          "duration": 12.564100000000053,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start until a controller status frame has been received",
+          "status": "passed",
+          "title": "blocks Start until a controller status frame has been received",
+          "duration": 0.47650000000021464,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while the controller is running another operation",
+          "status": "passed",
+          "title": "blocks Start while the controller is running another operation",
+          "duration": 0.34580000000005384,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while the controller reports Hold",
+          "status": "passed",
+          "title": "blocks Start while the controller reports Hold",
+          "duration": 0.3409999999998945,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while the controller reports Jog",
+          "status": "passed",
+          "title": "blocks Start while the controller reports Jog",
+          "duration": 0.19270000000005894,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while the controller reports Home",
+          "status": "passed",
+          "title": "blocks Start while the controller reports Home",
+          "duration": 0.15859999999975116,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while an alarm is active",
+          "status": "passed",
+          "title": "blocks Start while an alarm is active",
+          "duration": 0.2788999999997941,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start with alarm recovery copy when status reports Alarm without ALARM:N",
+          "status": "passed",
+          "title": "blocks Start with alarm recovery copy when status reports Alarm without ALARM:N",
+          "duration": 0.2680000000000291,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while a local streamer is already active",
+          "status": "passed",
+          "title": "blocks Start while a local streamer is already active",
+          "duration": 0.23309999999992215,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob blocks Start while autofocus is active",
+          "status": "passed",
+          "title": "blocks Start while autofocus is active",
+          "duration": 0.18560000000024957,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["prepareStartJob"],
+          "fullName": "prepareStartJob warns on a CNC Start with no current work-Z evidence",
+          "status": "passed",
+          "title": "warns on a CNC Start with no current work-Z evidence",
+          "duration": 5.269400000000132,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005614445,
+      "endTime": 1790005614577.2693,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-readiness.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation refuses Start when controller origin changes during Start arming",
+          "status": "passed",
+          "title": "refuses Start when controller origin changes during Start arming",
+          "duration": 132.9922000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation refuses Start when current output scope changes during Start arming",
+          "status": "passed",
+          "title": "refuses Start when current output scope changes during Start arming",
+          "duration": 72.5664999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation does not treat camera-only changes at the asynchronous arming boundary as drift",
+          "status": "passed",
+          "title": "does not treat camera-only changes at the asynchronous arming boundary as drift",
+          "duration": 23.48620000000028,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation preserves an older recovery capsule when a new ordinary Start is rejected",
+          "status": "passed",
+          "title": "preserves an older recovery capsule when a new ordinary Start is rejected",
+          "duration": 16.92529999999988,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation replaces an older recovery capsule only after a new ordinary Start is accepted",
+          "status": "passed",
+          "title": "replaces an older recovery capsule only after a new ordinary Start is accepted",
+          "duration": 17.3132999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation refuses a stale legacy checkpoint object after the stored record advances",
+          "status": "passed",
+          "title": "refuses a stale legacy checkpoint object after the stored record advances",
+          "duration": 12.216800000000148,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation keeps the explicit legacy fallback on the exact tail of matching G-code",
+          "status": "passed",
+          "title": "keeps the explicit legacy fallback on the exact tail of matching G-code",
+          "duration": 16.103299999999763,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["interrupted laser job intent separation"],
+          "fullName": "interrupted laser job intent separation manual start-from-line invalidates an unrelated legacy recovery record after acceptance",
+          "status": "passed",
+          "title": "manual start-from-line invalidates an unrelated legacy recovery record after acceptance",
+          "duration": 9.045100000000275,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005629713,
+      "endTime": 1790005630014.0452,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-recovery-intent.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC reduced-override Start flow"],
+          "fullName": "CNC reduced-override Start flow binds the acknowledged feed/rapid reduction to setup attestation",
+          "status": "passed",
+          "title": "binds the acknowledged feed/rapid reduction to setup attestation",
+          "duration": 160.85949999999957,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005701919,
+      "endTime": 1790005702079.8596,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-reduced-override-flow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["reviewFramedRunForStart"],
+          "fullName": "reviewFramedRunForStart hands the exact framed artifact and Frame WCS disclosure to the Start review",
+          "status": "passed",
+          "title": "hands the exact framed artifact and Frame WCS disclosure to the Start review",
+          "duration": 66.38719999999921,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["reviewFramedRunForStart"],
+          "fullName": "reviewFramedRunForStart voids the permit when the confirmed review no longer matches the framed artifact",
+          "status": "passed",
+          "title": "voids the permit when the confirmed review no longer matches the framed artifact",
+          "duration": 7.157400000000052,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005657550,
+      "endTime": 1790005657623.1575,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-review-at-start.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame preparation optional sidecar allocation"],
+          "fullName": "Frame preparation optional sidecar allocation keeps a dense exact program and Frame bounds without entering the sidecar builder for realtime-report",
+          "status": "passed",
+          "title": "keeps a dense exact program and Frame bounds without entering the sidecar builder for realtime-report",
+          "duration": 1256.2756,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame preparation optional sidecar allocation"],
+          "fullName": "Frame preparation optional sidecar allocation keeps a dense exact program and Frame bounds without entering the sidecar builder for queued-poll",
+          "status": "passed",
+          "title": "keeps a dense exact program and Frame bounds without entering the sidecar builder for queued-poll",
+          "duration": 1086.455,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame preparation optional sidecar allocation"],
+          "fullName": "Frame preparation optional sidecar allocation keeps a dense exact program and Frame bounds without entering the sidecar builder for none",
+          "status": "passed",
+          "title": "keeps a dense exact program and Frame bounds without entering the sidecar builder for none",
+          "duration": 1201.1722,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame preparation optional sidecar allocation"],
+          "fullName": "Frame preparation optional sidecar allocation counts expanded arc segments before creating the optional sidecar",
+          "status": "passed",
+          "title": "counts expanded arc segments before creating the optional sidecar",
+          "duration": 14.830600000000231,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame preparation optional sidecar allocation"],
+          "fullName": "Frame preparation optional sidecar allocation retains the verified sidecar for a small prepared program",
+          "status": "passed",
+          "title": "retains the verified sidecar for a small prepared program",
+          "duration": 15.179300000000694,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005693160,
+      "endTime": 1790005696733.1792,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-sidecar-budget.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the owned normalization from G55 on the permit for the Start review",
+          "status": "passed",
+          "title": "retains the owned normalization from G55 on the permit for the Start review",
+          "duration": 68.15729999999985,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the owned normalization from G56 on the permit for the Start review",
+          "status": "passed",
+          "title": "retains the owned normalization from G56 on the permit for the Start review",
+          "duration": 44.881700000000365,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the owned normalization from G57 on the permit for the Start review",
+          "status": "passed",
+          "title": "retains the owned normalization from G57 on the permit for the Start review",
+          "duration": 45.27000000000044,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the owned normalization from G58 on the permit for the Start review",
+          "status": "passed",
+          "title": "retains the owned normalization from G58 on the permit for the Start review",
+          "duration": 44.48919999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the owned normalization from G59 on the permit for the Start review",
+          "status": "passed",
+          "title": "retains the owned normalization from G59 on the permit for the Start review",
+          "duration": 32.95380000000023,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting does not write or add a normalization warning when G54 is already active",
+          "status": "passed",
+          "title": "does not write or add a normalization warning when G54 is already active",
+          "duration": 6.718800000000556,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting normalizes an unknown WCS without inventing a named-offset warning",
+          "status": "passed",
+          "title": "normalizes an unknown WCS without inventing a named-offset warning",
+          "duration": 36.3715000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the G54 disclosure when later placement preparation fails",
+          "status": "passed",
+          "title": "retains the G54 disclosure when later placement preparation fails",
+          "duration": 30.135800000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting retains the G54 disclosure when no fresh post-selection position arrives",
+          "status": "passed",
+          "title": "retains the G54 disclosure when no fresh post-selection position arrives",
+          "duration": 8.36200000000008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame WCS disclosure and completion reporting"],
+          "fullName": "Frame WCS disclosure and completion reporting returns false when the completed permit is invalidated before success is reported",
+          "status": "passed",
+          "title": "returns false when the completed permit is invalidated before success is reported",
+          "duration": 8.783499999999549,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005639314,
+      "endTime": 1790005639640.7834,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.disclosure.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runFrameNow FluidNC preparation route"],
+          "fullName": "runFrameNow FluidNC preparation route captures an actual prepared artifact that matches shared-streamer normalization",
+          "status": "passed",
+          "title": "captures an actual prepared artifact that matches shared-streamer normalization",
+          "duration": 36.375200000000405,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow FluidNC preparation route"],
+          "fullName": "runFrameNow FluidNC preparation route uses the Frame permit exact artifact in the real second-Start review route",
+          "status": "passed",
+          "title": "uses the Frame permit exact artifact in the real second-Start review route",
+          "duration": 47.6268,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005653067,
+      "endTime": 1790005653150.6267,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.fluidnc.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization selects G54 for g92-and-g10 controllers and waits for its fresh position before Frame",
+          "status": "passed",
+          "title": "selects G54 for g92-and-g10 controllers and waits for its fresh position before Frame",
+          "duration": 115.71460000000025,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization selects G54 for g92-only controllers and waits for its fresh position before Frame",
+          "status": "passed",
+          "title": "selects G54 for g92-only controllers and waits for its fresh position before Frame",
+          "duration": 43.06850000000031,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization dispatches the exact prepared artifact and motion envelope without opening Job Review",
+          "status": "passed",
+          "title": "dispatches the exact prepared artifact and motion envelope without opening Job Review",
+          "duration": 7.236700000000383,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization stays pending after dispatch and resolves true only when completion publishes its permit",
+          "status": "passed",
+          "title": "stays pending after dispatch and resolves true only when completion publishes its permit",
+          "duration": 6.311200000000099,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization resolves false when an owned Frame is cancelled while its safety lock remains",
+          "status": "passed",
+          "title": "resolves false when an owned Frame is cancelled while its safety lock remains",
+          "duration": 7.729200000000674,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization returns false and creates no permit when the controller accepts no Frame dispatch",
+          "status": "passed",
+          "title": "returns false and creates no permit when the controller accepts no Frame dispatch",
+          "duration": 6.693299999999908,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization returns false and creates no permit when physical Frame dispatch fails",
+          "status": "passed",
+          "title": "returns false and creates no permit when physical Frame dispatch fails",
+          "duration": 5.403000000000247,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization expires on project drift but preserves a permit through camera-only drift",
+          "status": "passed",
+          "title": "expires on project drift but preserves a permit through camera-only drift",
+          "duration": 11.768699999999626,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow framed-run authorization"],
+          "fullName": "runFrameNow framed-run authorization expires permanently when print-and-cut registration changes away and back",
+          "status": "passed",
+          "title": "expires permanently when print-and-cut registration changes away and back",
+          "duration": 9.22189999999955,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005610766,
+      "endTime": 1790005610980.222,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.framed-run.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 47.05030000000079,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 9.085800000000745,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 6.912500000000364,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "duration": 8.043800000000374,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "duration": 4.595800000000054,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames when calculated artwork bounds extend beyond the configured bed",
+          "status": "passed",
+          "title": "frames when calculated artwork bounds extend beyond the configured bed",
+          "duration": 5.843400000000656,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract does not turn a trusted work offset into a calculated bed veto",
+          "status": "passed",
+          "title": "does not turn a trusted work offset into a calculated bed veto",
+          "duration": 3.559700000000703,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps a perimeter no-go finding advisory and still frames",
+          "status": "passed",
+          "title": "keeps a perimeter no-go finding advisory and still frames",
+          "duration": 6.6065000000007785,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "status": "passed",
+          "title": "keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "duration": 5.99369999999999,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005643895,
+      "endTime": 1790005643992.9937,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.physical-safety.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runFrameNow rotary machine-space contract"],
+          "fullName": "runFrameNow rotary machine-space contract frames the scaled and rebased G-code envelope for an active 'roller' rotary",
+          "status": "passed",
+          "title": "frames the scaled and rebased G-code envelope for an active 'roller' rotary",
+          "duration": 44.261099999999715,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["runFrameNow rotary machine-space contract"],
+          "fullName": "runFrameNow rotary machine-space contract frames the scaled and rebased G-code envelope for an active 'chuck' rotary",
+          "status": "passed",
+          "title": "frames the scaled and rebased G-code envelope for an active 'chuck' rotary",
+          "duration": 7.866300000000592,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005676383,
+      "endTime": 1790005676434.8662,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.rotary.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["transient reviewed Frame dispatch"],
+          "fullName": "transient reviewed Frame dispatch physically Frames the immutable project and returns its exact completion permit",
+          "status": "passed",
+          "title": "physically Frames the immutable project and returns its exact completion permit",
+          "duration": 80.63979999999992,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005666817,
+      "endTime": 1790005666897.64,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.transient-frame.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion wraps the perimeter with a safe-Z retract and a restore to the pre-frame Z",
+          "status": "passed",
+          "title": "wraps the perimeter with a safe-Z retract and a restore to the pre-frame Z",
+          "duration": 4.559799999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion restores to a parked height above the stock (post-probe park)",
+          "status": "passed",
+          "title": "restores to a parked height above the stock (post-probe park)",
+          "duration": 0.5158999999998741,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion uses the separate Z feed without changing the XY perimeter feed",
+          "status": "passed",
+          "title": "uses the separate Z feed without changing the XY perimeter feed",
+          "duration": 0.3626999999999043,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion leaves a bit that started below work Z0 at safe Z instead of plunging back into stock",
+          "status": "passed",
+          "title": "leaves a bit that started below work Z0 at safe Z instead of plunging back into stock",
+          "duration": 0.3684000000000651,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion blocks when there is no current work-Z evidence",
+          "status": "passed",
+          "title": "blocks when there is no current work-Z evidence",
+          "duration": 0.2657000000001517,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion blocks when the driver has no Z-jog builder",
+          "status": "passed",
+          "title": "blocks when the driver has no Z-jog builder",
+          "duration": 0.3531000000000404,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion blocks when the pre-frame work Z is unknown",
+          "status": "passed",
+          "title": "blocks when the pre-frame work Z is unknown",
+          "duration": 0.24459999999999127,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildCncFrameMotion"],
+          "fullName": "buildCncFrameMotion omits a redundant restore when the bit is already at safe Z",
+          "status": "passed",
+          "title": "omits a redundant restore when the bit is already at safe Z",
+          "duration": 0.31359999999995125,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005715643,
+      "endTime": 1790005715650.353,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/cnc-frame-lines.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["frameMotionFeeds"],
+          "fullName": "frameMotionFeeds caps XY by the slower live axis and Z by its separate live maximum",
+          "status": "passed",
+          "title": "caps XY by the slower live axis and Z by its separate live maximum",
+          "duration": 2.3180999999999585,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frameMotionFeeds"],
+          "fullName": "frameMotionFeeds uses every known axis limit and falls back to the requested feed for unknown axes",
+          "status": "passed",
+          "title": "uses every known axis limit and falls back to the requested feed for unknown axes",
+          "duration": 0.45430000000010295,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frameMotionFeeds"],
+          "fullName": "frameMotionFeeds never raises a requested feed to a higher controller maximum",
+          "status": "passed",
+          "title": "never raises a requested feed to a higher controller maximum",
+          "duration": 0.2537000000002081,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005761547,
+      "endTime": 1790005761549.4543,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/frame-feed-limits.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is invalid with no recorded frame",
+          "status": "passed",
+          "title": "is invalid with no recorded frame",
+          "duration": 1.7682999999999538,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is valid when bounds, WCO, and active flag all match",
+          "status": "passed",
+          "title": "is valid when bounds, WCO, and active flag all match",
+          "duration": 0.22019999999997708,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is invalid when the job moved or resized (bounds signature differs)",
+          "status": "passed",
+          "title": "is invalid when the job moved or resized (bounds signature differs)",
+          "duration": 0.18840000000000146,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is invalid when the origin moved (WCO differs)",
+          "status": "passed",
+          "title": "is invalid when the origin moved (WCO differs)",
+          "duration": 0.11419999999998254,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is invalid when the origin was cleared (WCO went null)",
+          "status": "passed",
+          "title": "is invalid when the origin was cleared (WCO went null)",
+          "duration": 0.17459999999982756,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid is invalid when the custom-origin flag dropped",
+          "status": "passed",
+          "title": "is invalid when the custom-origin flag dropped",
+          "duration": 0.15639999999984866,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["isVerifiedFrameValid"],
+          "fullName": "isVerifiedFrameValid treats two null WCOs as equal (no-position-feedback machine)",
+          "status": "passed",
+          "title": "treats two null WCOs as equal (no-position-feedback machine)",
+          "duration": 0.161200000000008,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005749090,
+      "endTime": 1790005749093.1611,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/frame-verification.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence captures the exact controller state observed at physical Frame completion",
+          "status": "passed",
+          "title": "captures the exact controller state observed at physical Frame completion",
+          "duration": 2.8036000000001877,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence binds the permit to the candidate and final status sequence",
+          "status": "passed",
+          "title": "binds the permit to the candidate and final status sequence",
+          "duration": 0.6355000000000928,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence accepts unchanged setup and the reported pre-Frame work position",
+          "status": "passed",
+          "title": "accepts unchanged setup and the reported pre-Frame work position",
+          "duration": 0.610300000000052,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence keeps identity drift advisory instead of turning it into a new Frame refusal",
+          "status": "passed",
+          "title": "keeps identity drift advisory instead of turning it into a new Frame refusal",
+          "duration": 0.24360000000001492,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence keeps active-controller drift advisory instead of turning it into a new Frame refusal",
+          "status": "passed",
+          "title": "keeps active-controller drift advisory instead of turning it into a new Frame refusal",
+          "duration": 0.21089999999981046,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence uses stable cached WCO instead of an intermittent report WCO",
+          "status": "passed",
+          "title": "uses stable cached WCO instead of an intermittent report WCO",
+          "duration": 0.2400000000000091,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"controllerSessionEpoch\":8}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"controllerSessionEpoch\":8}",
+          "duration": 0.2578999999998359,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"wcoCache\":{\"x\":3,\"y\":4,\"z\":0}}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"wcoCache\":{\"x\":3,\"y\":4,\"z\":0}}",
+          "duration": 0.1492000000000644,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"workOriginActive\":false}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"workOriginActive\":false}",
+          "duration": 0.13869999999997162,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"workOriginSource\":\"g54-persistent\"}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"workOriginSource\":\"g54-persistent\"}",
+          "duration": 0.17249999999989996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"trustedPositionEpoch\":1}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"trustedPositionEpoch\":1}",
+          "duration": 0.13239999999996144,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"workZReferenceEpoch\":4}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"workZReferenceEpoch\":4}",
+          "duration": 0.11940000000004147,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses factual controller, origin, or work-Z drift: {\"workZZeroEvidence\":{\"source\":\"manual-zero\",\"referenceEpoch\":4}}",
+          "status": "passed",
+          "title": "refuses factual controller, origin, or work-Z drift: {\"workZZeroEvidence\":{\"source\":\"manual-zero\",\"referenceEpoch\":4}}",
+          "duration": 0.07240000000001601,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains the exact candidate across an equivalent settings refresh",
+          "status": "passed",
+          "title": "retains the exact candidate across an equivalent settings refresh",
+          "duration": 0.2514000000001033,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains the exact candidate across an equivalent settings-observation refresh",
+          "status": "passed",
+          "title": "retains the exact candidate across an equivalent settings-observation refresh",
+          "duration": 0.10159999999996217,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains the exact candidate across an equivalent build-info refresh",
+          "status": "passed",
+          "title": "retains the exact candidate across an equivalent build-info refresh",
+          "duration": 0.08919999999989159,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains the exact candidate across an equivalent build-observation refresh",
+          "status": "passed",
+          "title": "retains the exact candidate across an equivalent build-observation refresh",
+          "duration": 0.07110000000011496,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains the exact candidate across an equivalent all refresh",
+          "status": "passed",
+          "title": "retains the exact candidate across an equivalent all refresh",
+          "duration": 0.0645999999999276,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence uses the same millimetre interpretation for equivalent report-unit evidence: null",
+          "status": "passed",
+          "title": "uses the same millimetre interpretation for equivalent report-unit evidence: null",
+          "duration": 0.19489999999996144,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence uses the same millimetre interpretation for equivalent report-unit evidence: {}",
+          "status": "passed",
+          "title": "uses the same millimetre interpretation for equivalent report-unit evidence: {}",
+          "duration": 0.08039999999982683,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence uses the same millimetre interpretation for equivalent report-unit evidence: {\"reportInches\":false}",
+          "status": "passed",
+          "title": "uses the same millimetre interpretation for equivalent report-unit evidence: {\"reportInches\":false}",
+          "duration": 0.11020000000007713,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains equivalent fresh objects with reportInches=false",
+          "status": "passed",
+          "title": "retains equivalent fresh objects with reportInches=false",
+          "duration": 0.13879999999994652,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence retains equivalent fresh objects with reportInches=true",
+          "status": "passed",
+          "title": "retains equivalent fresh objects with reportInches=true",
+          "duration": 0.09669999999982792,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence preserves a report-unit change dependency at position/WCO basis 0",
+          "status": "passed",
+          "title": "preserves a report-unit change dependency at position/WCO basis 0",
+          "duration": 0.31379999999990105,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence preserves a report-unit change dependency at position/WCO basis 10",
+          "status": "passed",
+          "title": "preserves a report-unit change dependency at position/WCO basis 10",
+          "duration": 0.14670000000000982,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["FramedRun completion evidence"],
+          "fullName": "FramedRun completion evidence refuses a final position that did not return to the pre-Frame XYZ",
+          "status": "passed",
+          "title": "refuses a final position that did not return to the pre-Frame XYZ",
+          "duration": 0.17200000000002547,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005648564,
+      "endTime": 1790005648572.172,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/framed-run.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["frame proof records at trace completion (ADR-228 amendment)"],
+          "fullName": "frame proof records at trace completion (ADR-228 amendment) promotes the armed verification only when the trace settles with an empty queue",
+          "status": "passed",
+          "title": "promotes the armed verification only when the trace settles with an empty queue",
+          "duration": 6.919099999999617,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frame proof records at trace completion (ADR-228 amendment)"],
+          "fullName": "frame proof records at trace completion (ADR-228 amendment) keeps the proof unrecorded while queued perimeter legs remain",
+          "status": "passed",
+          "title": "keeps the proof unrecorded while queued perimeter legs remain",
+          "duration": 3.1109999999998763,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["frame proof records at trace completion (ADR-228 amendment)"],
+          "fullName": "frame proof records at trace completion (ADR-228 amendment) never promotes an armed verification after a mid-trace alarm",
+          "status": "passed",
+          "title": "never promotes an armed verification after a mid-trace alarm",
+          "duration": 1.1974999999997635,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine queued Frame writes"],
+          "fullName": "handleLine queued Frame writes clears frame verification when a queued frame leg fails to write",
+          "status": "passed",
+          "title": "clears frame verification when a queued frame leg fails to write",
+          "duration": 2.04300000000012,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine hard-limit during Verified Frame (ADR-053 P3)"],
+          "fullName": "handleLine hard-limit during Verified Frame (ADR-053 P3) raises a frame-limit notice naming the axis and clears the verification",
+          "status": "passed",
+          "title": "raises a frame-limit notice naming the axis and clears the verification",
+          "duration": 0.8794000000002598,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine hard-limit during Verified Frame (ADR-053 P3)"],
+          "fullName": "handleLine hard-limit during Verified Frame (ADR-053 P3) does not raise a frame-limit notice for a hard-limit alarm outside a frame",
+          "status": "passed",
+          "title": "does not raise a frame-limit notice for a hard-limit alarm outside a frame",
+          "duration": 0.38739999999961583,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine hard-limit during Verified Frame (ADR-053 P3)"],
+          "fullName": "handleLine hard-limit during Verified Frame (ADR-053 P3) does not treat a non-limit alarm (ALARM:2) during a frame as a limit hit",
+          "status": "passed",
+          "title": "does not treat a non-limit alarm (ALARM:2) during a frame as a limit hit",
+          "duration": 0.2858000000001084,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005647210,
+      "endTime": 1790005647225.286,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-line-handler-frame.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame completion across controller evidence refresh"],
+          "fullName": "Frame completion across controller evidence refresh retains terminal settlement and factual units for unchanged evidence",
+          "status": "passed",
+          "title": "retains terminal settlement and factual units for unchanged evidence",
+          "duration": 545.1085999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame completion across controller evidence refresh"],
+          "fullName": "Frame completion across controller evidence refresh retains terminal settlement and factual units for equivalent evidence",
+          "status": "passed",
+          "title": "retains terminal settlement and factual units for equivalent evidence",
+          "duration": 533.1613000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame completion across controller evidence refresh"],
+          "fullName": "Frame completion across controller evidence refresh retains terminal settlement and factual units for report-units evidence",
+          "status": "passed",
+          "title": "retains terminal settlement and factual units for report-units evidence",
+          "duration": 521.6452999999992,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005726300,
+      "endTime": 1790005727899.6453,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-frame-advisory-refresh.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races waits for the current leg terminal response before dispatching the next leg",
+          "status": "passed",
+          "title": "waits for the current leg terminal response before dispatching the next leg",
+          "duration": 543.1250999999975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races does not treat an in-flight status-poll transport as a Frame write",
+          "status": "passed",
+          "title": "does not treat an in-flight status-poll transport as a Frame write",
+          "duration": 517.5144999999975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races withholds the permit until transport settles and revokes on late rejection",
+          "status": "passed",
+          "title": "withholds the permit until transport settles and revokes on late rejection",
+          "duration": 1060.7784000000029,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races cannot mint a permit from final Idle after cancellation begins",
+          "status": "passed",
+          "title": "cannot mint a permit from final Idle after cancellation begins",
+          "duration": 705.5031000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races releases a cancelled tool-off prefix only after its old ack and fresh Idle",
+          "status": "passed",
+          "title": "releases a cancelled tool-off prefix only after its old ack and fresh Idle",
+          "duration": 723.4316000000035,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races does not apply Frame A terminal ok to Frame B installed by the ack-settlement update",
+          "status": "passed",
+          "title": "does not apply Frame A terminal ok to Frame B installed by the ack-settlement update",
+          "duration": 521.1555000000008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races isolates Frame B from Frame A late transport resolve callbacks",
+          "status": "passed",
+          "title": "isolates Frame B from Frame A late transport resolve callbacks",
+          "duration": 540.3523999999961,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races isolates Frame B from Frame A late transport reject callbacks",
+          "status": "passed",
+          "title": "isolates Frame B from Frame A late transport reject callbacks",
+          "duration": 546.8623999999982,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races retains the following ack when an early-acked write rejects after dispatching it",
+          "status": "passed",
+          "title": "retains the following ack when an early-acked write rejects after dispatching it",
+          "duration": 1049.9545999999973,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races quarantines an ambiguously rejected queued write until its late ack or reconnect",
+          "status": "passed",
+          "title": "quarantines an ambiguously rejected queued write until its late ack or reconnect",
+          "duration": 2546.1085999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Run",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Run",
+          "duration": 518.4207999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Jog",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Jog",
+          "duration": 514.8119999999981,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Hold",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Hold",
+          "duration": 519.4832999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Door",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Door",
+          "duration": 518.7280000000028,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Check",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Check",
+          "duration": 524.418700000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Home",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Home",
+          "duration": 512.1804000000047,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Frame transport and permit races"],
+          "fullName": "Frame transport and permit races permanently expires a completed permit after controller state Tool",
+          "status": "passed",
+          "title": "permanently expires a completed permit after controller state Tool",
+          "duration": 523.2581999999966,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005571158,
+      "endTime": 1790005583548.2583,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-frame-races.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["buildGrblFrameRetract (MCH-12)"],
+          "fullName": "buildGrblFrameRetract (MCH-12) is byte-identical to the old ui/state cncFrameRetractLine literal",
+          "status": "passed",
+          "title": "is byte-identical to the old ui/state cncFrameRetractLine literal",
+          "duration": 1.8461999999999534,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildGrblFrameRetract (MCH-12)"],
+          "fullName": "buildGrblFrameRetract (MCH-12) floors feeds at or above 1 while preserving positive fractions",
+          "status": "passed",
+          "title": "floors feeds at or above 1 while preserving positive fractions",
+          "duration": 0.3765000000000782,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildGrblFrameJogLines"],
+          "fullName": "buildGrblFrameJogLines traces the five-leg absolute perimeter, each line newline-terminated",
+          "status": "passed",
+          "title": "traces the five-leg absolute perimeter, each line newline-terminated",
+          "duration": 1.2169000000001233,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["buildGrblFrameJogLines"],
+          "fullName": "buildGrblFrameJogLines never rounds a decimal feed above its configured ceiling",
+          "status": "passed",
+          "title": "never rounds a decimal feed above its configured ceiling",
+          "duration": 0.756099999999833,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790005753069,
+      "endTime": 1790005753073.756,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/frame-lines.test.ts"
+    }
+  ]
+}

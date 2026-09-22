@@ -1,0 +1,170 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 3,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 13,
+  "numPassedTests": 13,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035783075,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement places the selected anchor at the current machine position for Current Position jobs",
+          "status": "passed",
+          "title": "places the selected anchor at the current machine position for Current Position jobs",
+          "duration": 68.07699999999932,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks User Origin when the operator has not set a custom origin",
+          "status": "passed",
+          "title": "blocks User Origin when the operator has not set a custom origin",
+          "duration": 1.1647999999986496,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement anchors a centered traced image to the custom work origin before emitting G-code",
+          "status": "passed",
+          "title": "anchors a centered traced image to the custom work origin before emitting G-code",
+          "duration": 10.590399999999136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat negative WCO as a physical overhang when homing is disabled",
+          "status": "passed",
+          "title": "does not treat negative WCO as a physical overhang when homing is disabled",
+          "duration": 8.494200000001001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "status": "passed",
+          "title": "does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "duration": 29.84689999999864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "status": "passed",
+          "title": "warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "duration": 9.65309999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "status": "passed",
+          "title": "allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "duration": 13.943299999998999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "status": "passed",
+          "title": "warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "duration": 12.81880000000092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks custom-origin Start when the physical origin location is not known",
+          "status": "passed",
+          "title": "blocks custom-origin Start when the physical origin location is not known",
+          "duration": 1.048899999999776,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns naming fill overscan when a homed absolute fill job is too close to the bed edge",
+          "status": "passed",
+          "title": "warns naming fill overscan when a homed absolute fill job is too close to the bed edge",
+          "duration": 11.722100000000864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) blocks Start until a Frame is recorded, with the sole frame-first message",
+          "status": "passed",
+          "title": "blocks Start until a Frame is recorded, with the sole frame-first message",
+          "duration": 4.614099999998871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) allows Start after a matching Verified Frame",
+          "status": "passed",
+          "title": "allows Start after a matching Verified Frame",
+          "duration": 6.546599999999671,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) re-blocks when the origin moved since the Verified Frame",
+          "status": "passed",
+          "title": "re-blocks when the origin moved since the Verified Frame",
+          "duration": 2.691499999998996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035791581,
+      "endTime": 1790035791764.6914,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts"
+    }
+  ]
+}

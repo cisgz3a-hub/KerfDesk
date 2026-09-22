@@ -1,0 +1,12 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/core/job/coordinate-origin-audit.test.ts (443 tests) 429ms
+ ✓ src/core/controllers/grbl/machine-envelope.test.ts (25 tests) 8ms
+ ✓ src/core/job/contour-entry.test.ts (11 tests) 7ms
+ ✓ src/core/job/compile-job-contour-entry.test.ts (7 tests) 16ms
+
+ Test Files  4 passed (4)
+      Tests  486 passed (486)
+   Start at  23:53:17
+   Duration  11.55s (transform 3.24s, setup 36ms, collect 6.48s, tests 459ms, environment 3.00s, prepare 542ms)

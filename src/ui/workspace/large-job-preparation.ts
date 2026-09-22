@@ -38,6 +38,12 @@ export function prepareLargeJob(
   prepare: typeof prepareOutput = prepareOutput,
 ): LargeJobPreparation {
   const prepared = prepare(project, {
+    ...(options.contourEntryBounds === undefined
+      ? {}
+      : { contourEntryBounds: options.contourEntryBounds }),
+    ...(options.absoluteProgramOffset === undefined
+      ? {}
+      : { absoluteProgramOffset: options.absoluteProgramOffset }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
@@ -50,6 +56,12 @@ export async function prepareLargeJobAsync(
   prepare: (project: Project, options: PrepareOutputOptions) => Promise<PreparedOutput>,
 ): Promise<LargeJobPreparation> {
   const prepared = await prepare(project, {
+    ...(options.contourEntryBounds === undefined
+      ? {}
+      : { contourEntryBounds: options.contourEntryBounds }),
+    ...(options.absoluteProgramOffset === undefined
+      ? {}
+      : { absoluteProgramOffset: options.absoluteProgramOffset }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });

@@ -1,0 +1,17 @@
+src/core/controllers/grbl/probe.test.ts
+src/core/controllers/grbl/status-parser-multi-axis.test.ts
+src/core/controllers/grbl/status-parser.test.ts
+src/ui/state/laser-corner-probe-atomic.test.ts
+src/ui/state/laser-home-action.test.ts
+src/ui/state/laser-home-proof.test.ts
+src/ui/state/laser-jog-actions.bounds-warning.test.ts
+src/ui/state/laser-jog-actions.zone-guard.test.ts
+src/ui/state/laser-origin-transaction.test.ts
+src/ui/state/laser-owned-motion-status-race.test.ts
+src/ui/state/laser-probe-actions.test.ts
+src/ui/state/laser-probe-lifecycle.test.ts
+src/ui/state/laser-store-jog-to-point-readiness.test.ts
+src/ui/state/laser-store-jog-to-point.test.ts
+src/ui/state/laser-store-origin-ownership.test.ts
+src/ui/state/origin-actions.test.ts
+src/ui/state/probe-actions.test.ts

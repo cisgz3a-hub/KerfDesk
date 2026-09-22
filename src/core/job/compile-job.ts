@@ -35,7 +35,11 @@ import {
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { sharedObjectPowerScalePercent } from './compile-job-object-policy';
 import { compilationPolylines } from './compilation-polylines';
-import { contourEntryRunwayMm } from './contour-entry';
+import {
+  contourEntryBoundsForDevice,
+  contourEntryRunwayMm,
+  withContourEntryBounds,
+} from './contour-entry';
 import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
@@ -88,7 +92,10 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         completeSceneObjects,
       );
     }
-    return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
+    return withContourEntryBounds(
+      diagnostics.length === 0 ? { groups } : { groups, diagnostics },
+      contourEntryBoundsForDevice(device),
+    );
   }
   const orderedObjects = orderedArtworkObjects(scene);
   for (const { layer, priorityObjectId } of artworkOperationRuns(scene)) {
@@ -102,7 +109,10 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
       completeSceneObjects,
     );
   }
-  return diagnostics.length === 0 ? { groups } : { groups, diagnostics };
+  return withContourEntryBounds(
+    diagnostics.length === 0 ? { groups } : { groups, diagnostics },
+    contourEntryBoundsForDevice(device),
+  );
 }
 
 function appendOperationCompilation(

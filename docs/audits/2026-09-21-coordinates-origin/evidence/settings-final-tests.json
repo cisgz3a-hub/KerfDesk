@@ -1,0 +1,2155 @@
+{
+  "numTotalTestSuites": 68,
+  "numPassedTestSuites": 68,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 207,
+  "numPassedTests": 207,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006237065,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts turns on and shuts down the stock S30 pump while leaving the manual variant alone",
+          "status": "passed",
+          "title": "turns on and shuts down the stock S30 pump while leaving the manual variant alone",
+          "duration": 10.698399999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts uses the vendor Falcon X/Y assignment for output bounds warnings",
+          "status": "passed",
+          "title": "uses the vendor Falcon X/Y assignment for output bounds warnings",
+          "duration": 3.49369999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts changes the bounds advisory for the fitted xTool head",
+          "status": "passed",
+          "title": "changes the bounds advisory for the fitted xTool head",
+          "duration": 3.8511000000000877,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts changes the bounds advisory for the fitted Ortur head",
+          "status": "passed",
+          "title": "changes the bounds advisory for the fitted Ortur head",
+          "duration": 1.2684999999999036,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts offers CNC mismatch advisories for named lasers while retaining legacy imports",
+          "status": "passed",
+          "title": "offers CNC mismatch advisories for named lasers while retaining legacy imports",
+          "duration": 0.6575000000000273,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts uses FluidNC default laser S255 but lets reported configuration replace that starter",
+          "status": "passed",
+          "title": "uses FluidNC default laser S255 but lets reported configuration replace that starter",
+          "duration": 2.002999999999929,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts keeps legacy researched evidence honest after machine-file import",
+          "status": "passed",
+          "title": "keeps legacy researched evidence honest after machine-file import",
+          "duration": 2.694900000000189,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["researched catalogue output contracts"],
+          "fullName": "researched catalogue output contracts keeps legacy unverified evidence honest after machine-file import",
+          "status": "passed",
+          "title": "keeps legacy unverified evidence honest after machine-file import",
+          "duration": 0.37760000000002947,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006290743,
+      "endTime": 1790006290768.3777,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/catalogue-output-contracts.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch clears calibration that becomes invalid after an interactive bed resize",
+          "status": "passed",
+          "title": "clears calibration that becomes invalid after an interactive bed resize",
+          "duration": 3.3362999999999374,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains valid calibration while preserving max-feed clamping",
+          "status": "passed",
+          "title": "retains valid calibration while preserving max-feed clamping",
+          "duration": 0.7729999999999109,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch clears lifecycle status when the interactive table is emptied",
+          "status": "passed",
+          "title": "clears lifecycle status when the interactive table is emptied",
+          "duration": 0.3851999999999407,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch clears scan calibration when controller, dialect, or laser-head identity changes",
+          "status": "passed",
+          "title": "clears scan calibration when controller, dialect, or laser-head identity changes",
+          "duration": 0.6739999999999782,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch clears a rectified camera alignment when lens calibration changes",
+          "status": "passed",
+          "title": "clears a rectified camera alignment when lens calibration changes",
+          "duration": 0.44849999999996726,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains a raw camera alignment when lens calibration changes",
+          "status": "passed",
+          "title": "retains a raw camera alignment when lens calibration changes",
+          "duration": 0.2782999999999447,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains a rectified camera alignment for unrelated profile edits",
+          "status": "passed",
+          "title": "retains a rectified camera alignment for unrelated profile edits",
+          "duration": 0.20059999999989486,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains a rectified alignment when the calibration value is unchanged",
+          "status": "passed",
+          "title": "retains a rectified alignment when the calibration value is unchanged",
+          "duration": 0.25060000000007676,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains a rectified alignment supplied with its replacement calibration",
+          "status": "passed",
+          "title": "retains a rectified alignment supplied with its replacement calibration",
+          "duration": 0.23730000000000473,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch preserves the calibration/alignment invariant across generated patch combinations",
+          "status": "passed",
+          "title": "preserves the calibration/alignment invariant across generated patch combinations",
+          "duration": 14.445400000000063,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch preserves camera alignment across generated unrelated edits",
+          "status": "passed",
+          "title": "preserves camera alignment across generated unrelated edits",
+          "duration": 3.7345000000000255,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch clears inherited rectified alignment for generated capture-binding changes",
+          "status": "passed",
+          "title": "clears inherited rectified alignment for generated capture-binding changes",
+          "duration": 11.197599999999966,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains rectified alignment only for an unchanged query fingerprint: hmac-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "status": "passed",
+          "title": "retains rectified alignment only for an unchanged query fingerprint: hmac-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "duration": 0.3806000000001859,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains rectified alignment only for an unchanged query fingerprint: hmac-sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "status": "passed",
+          "title": "retains rectified alignment only for an unchanged query fingerprint: hmac-sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "duration": 0.1088999999999487,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["deviceProfileWithInteractivePatch"],
+          "fullName": "deviceProfileWithInteractivePatch retains rectified alignment only for an unchanged query fingerprint: undefined",
+          "status": "passed",
+          "title": "retains rectified alignment only for an unchanged query fingerprint: undefined",
+          "duration": 0.08379999999988286,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006295066,
+      "endTime": 1790006295103.3806,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/device-profile-patch.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE matches the WORKFLOW.md F-A1 first-run defaults exactly",
+          "status": "passed",
+          "title": "matches the WORKFLOW.md F-A1 first-run defaults exactly",
+          "duration": 1.9320000000000164,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE ships an empty autofocus command — no portable default exists",
+          "status": "passed",
+          "title": "ships an empty autofocus command — no portable default exists",
+          "duration": 0.318599999999833,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE defaults air assist command to none so output is unchanged until configured",
+          "status": "passed",
+          "title": "defaults air assist command to none so output is unchanged until configured",
+          "duration": 0.12440000000015061,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE defaults scan offsets to empty so output is unchanged until calibrated",
+          "status": "passed",
+          "title": "defaults scan offsets to empty so output is unchanged until calibrated",
+          "duration": 0.3059000000000651,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE keeps generic seeks rapid and configures the 4040 controlled seek at F800",
+          "status": "passed",
+          "title": "keeps generic seeks rapid and configures the 4040 controlled seek at F800",
+          "duration": 0.14679999999998472,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE defaults machine profile metadata and no-go zones to safe built-in values",
+          "status": "passed",
+          "title": "defaults machine profile metadata and no-go zones to safe built-in values",
+          "duration": 1.40099999999984,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE uses a narrow air assist command enum",
+          "status": "passed",
+          "title": "uses a narrow air assist command enum",
+          "duration": 0.17440000000010514,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE is shaped so the workspace can be derived (bed* are positive numbers)",
+          "status": "passed",
+          "title": "is shaped so the workspace can be derived (bed* are positive numbers)",
+          "duration": 0.3402000000000953,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE bed dimensions sit in the millimetre range, not centimetre or inch",
+          "status": "passed",
+          "title": "bed dimensions sit in the millimetre range, not centimetre or inch",
+          "duration": 0.20659999999998035,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE planner defaults are present and sit in the GRBL-typical range",
+          "status": "passed",
+          "title": "planner defaults are present and sit in the GRBL-typical range",
+          "duration": 0.2636999999999716,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE framing feed defaults to a safe diode-laser jog rate (LightBurn parity)",
+          "status": "passed",
+          "title": "framing feed defaults to a safe diode-laser jog rate (LightBurn parity)",
+          "duration": 0.08760000000006585,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE ships an explicit public-spec laser/CNC contract without claiming unverified wiring or origin",
+          "status": "passed",
+          "title": "ships an explicit public-spec laser/CNC contract without claiming unverified wiring or origin",
+          "duration": 0.7572999999999865,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DEFAULT_DEVICE_PROFILE"],
+          "fullName": "DEFAULT_DEVICE_PROFILE does not inherit the Falcon-class frame feed for the heavier Neotronics 4040",
+          "status": "passed",
+          "title": "does not inherit the Falcon-class frame feed for the heavier Neotronics 4040",
+          "duration": 0.08570000000008804,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006304725,
+      "endTime": 1790006304732.0857,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/device-profile.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG ships the required built-in GRBL profiles with valid evidence",
+          "status": "passed",
+          "title": "ships the required built-in GRBL profiles with valid evidence",
+          "duration": 6.720499999999902,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG keeps every catalog profile coherent with its controller transport and dialect",
+          "status": "passed",
+          "title": "keeps every catalog profile coherent with its controller transport and dialect",
+          "duration": 3.7825000000000273,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG keeps a revised profile’s own catalogVersion instead of the catalog baseline",
+          "status": "passed",
+          "title": "keeps a revised profile’s own catalogVersion instead of the catalog baseline",
+          "duration": 0.47289999999998145,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG ships a specific Falcon A1 Pro grblHAL profile before the broad fallback",
+          "status": "passed",
+          "title": "ships a specific Falcon A1 Pro grblHAL profile before the broad fallback",
+          "duration": 0.6634999999998854,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG marks the brand starter profiles as public-spec starters so operators confirm specs",
+          "status": "passed",
+          "title": "marks the brand starter profiles as public-spec starters so operators confirm specs",
+          "duration": 0.9657999999999447,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG gives every built-in profile a user-facing confidence label",
+          "status": "passed",
+          "title": "gives every built-in profile a user-facing confidence label",
+          "duration": 1.7092000000000098,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG finds catalog entries by id and reports capabilities",
+          "status": "passed",
+          "title": "finds catalog entries by id and reports capabilities",
+          "duration": 0.7387999999998556,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG duplicates a built-in profile as a custom editable profile",
+          "status": "passed",
+          "title": "duplicates a built-in profile as a custom editable profile",
+          "duration": 0.5648000000001048,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG requires camera capability and camera profile metadata to agree",
+          "status": "passed",
+          "title": "requires camera capability and camera profile metadata to agree",
+          "duration": 2.0467000000001008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["GRBL_MACHINE_PROFILE_CATALOG"],
+          "fullName": "GRBL_MACHINE_PROFILE_CATALOG rejects a controlled laser-off seek feed above the machine feed ceiling",
+          "status": "passed",
+          "title": "rejects a controlled laser-off seek feed above the machine feed ceiling",
+          "duration": 0.5196000000000822,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006303458,
+      "endTime": 1790006303476.5195,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/profile-catalog.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["suggestMachineProfiles"],
+          "fullName": "suggestMachineProfiles reports matching firmware profiles as possible without identifying hardware from generic settings",
+          "status": "passed",
+          "title": "reports matching firmware profiles as possible without identifying hardware from generic settings",
+          "duration": 3.230299999999943,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["suggestMachineProfiles"],
+          "fullName": "suggestMachineProfiles keeps generic grblHAL possible instead of replacing the Falcon suggestion",
+          "status": "passed",
+          "title": "keeps generic grblHAL possible instead of replacing the Falcon suggestion",
+          "duration": 0.5153999999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["suggestMachineProfiles"],
+          "fullName": "suggestMachineProfiles filters by name, controller kind, and bed size, and an empty query returns everything",
+          "status": "passed",
+          "title": "filters by name, controller kind, and bed size, and an empty query returns everything",
+          "duration": 0.7011999999999716,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["suggestMachineProfiles"],
+          "fullName": "suggestMachineProfiles marks mismatched controller profiles manual-only with warnings",
+          "status": "passed",
+          "title": "marks mismatched controller profiles manual-only with warnings",
+          "duration": 0.5611999999998716,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006312338,
+      "endTime": 1790006312343.5613,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/profile-suggestions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Falcon A1 Pro vendor command contract"],
+          "fullName": "Falcon A1 Pro vendor command contract keeps generic controller commands unchanged and scopes the override to GRBL families",
+          "status": "passed",
+          "title": "keeps generic controller commands unchanged and scopes the override to GRBL families",
+          "duration": 2.6700999999998203,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Falcon A1 Pro vendor command contract"],
+          "fullName": "Falcon A1 Pro vendor command contract does not offer unsupported settings fetch, firmware writes, or native jog cancellation",
+          "status": "passed",
+          "title": "does not offer unsupported settings fetch, firmware writes, or native jog cancellation",
+          "duration": 2.219000000000051,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Falcon A1 Pro vendor command contract"],
+          "fullName": "Falcon A1 Pro vendor command contract uses finite tool-off feed-controlled G1 jogs and restores absolute mode",
+          "status": "passed",
+          "title": "uses finite tool-off feed-controlled G1 jogs and restores absolute mode",
+          "duration": 1.9701000000000022,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Falcon A1 Pro vendor command contract"],
+          "fullName": "Falcon A1 Pro vendor command contract frames with zero-power G1 lines instead of native $J commands and leaves the pump alone",
+          "status": "passed",
+          "title": "frames with zero-power G1 lines instead of native $J commands and leaves the pump alone",
+          "duration": 0.6966999999999643,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006321450,
+      "endTime": 1790006321457.6968,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/falcon-command-contract.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine profile camera metadata"],
+          "fullName": "machine profile camera metadata roundtrips camera metadata in .lfmachine.json",
+          "status": "passed",
+          "title": "roundtrips camera metadata in .lfmachine.json",
+          "duration": 5.695500000000038,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile camera metadata"],
+          "fullName": "machine profile camera metadata roundtrips RTSP camera source metadata in .lfmachine.json",
+          "status": "passed",
+          "title": "roundtrips RTSP camera source metadata in .lfmachine.json",
+          "duration": 2.0697000000000116,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile camera metadata"],
+          "fullName": "machine profile camera metadata rejects malformed camera metadata in imported machine profiles",
+          "status": "passed",
+          "title": "rejects malformed camera metadata in imported machine profiles",
+          "duration": 0.33989999999994325,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006313780,
+      "endTime": 1790006313788.3398,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-camera.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["built-in machine profile workflow coverage"],
+          "fullName": "built-in machine profile workflow coverage validates, resolves drivers/output, round-trips, and exports a tiny safe line job",
+          "status": "passed",
+          "title": "validates, resolves drivers/output, round-trips, and exports a tiny safe line job",
+          "duration": 43.677700000000186,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006293323,
+      "endTime": 1790006293366.6777,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-catalog-workflow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["vendor command contract persistence"],
+          "fullName": "vendor command contract persistence retains the command contract through export and import of a custom profile",
+          "status": "passed",
+          "title": "retains the command contract through export and import of a custom profile",
+          "duration": 6.0530999999998585,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006330225,
+      "endTime": 1790006330231.053,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-command-set.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents serializes deterministic .lfmachine.json with canonical profile safety fields",
+          "status": "passed",
+          "title": "serializes deterministic .lfmachine.json with canonical profile safety fields",
+          "duration": 4.181800000000067,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents roundtrips transport, camera calibration, alignment, scan offsets, and no-go zones",
+          "status": "passed",
+          "title": "roundtrips transport, camera calibration, alignment, scan offsets, and no-go zones",
+          "duration": 3.892699999999877,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects an invalid bidirectional scan policy",
+          "status": "passed",
+          "title": "rejects an invalid bidirectional scan policy",
+          "duration": 0.3946000000000822,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents round-trips the optional firmware-trait flags and refuses a junk value",
+          "status": "passed",
+          "title": "round-trips the optional firmware-trait flags and refuses a junk value",
+          "duration": 1.2478000000000975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents roundtrips pending status and marks statusless imported calibration pending",
+          "status": "passed",
+          "title": "roundtrips pending status and marks statusless imported calibration pending",
+          "duration": 1.123199999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents roundtrips explicit profile streaming settings",
+          "status": "passed",
+          "title": "roundtrips explicit profile streaming settings",
+          "duration": 0.5848999999998341,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents roundtrips hybrid output capability and machine-wide CNC settings",
+          "status": "passed",
+          "title": "roundtrips hybrid output capability and machine-wide CNC settings",
+          "duration": 0.8220000000001164,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents keeps a malformed imported CNC sub-profile reviewable with disclosed editable recovery",
+          "status": "passed",
+          "title": "keeps a malformed imported CNC sub-profile reviewable with disclosed editable recovery",
+          "duration": 0.563899999999876,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents backfills legacy machine profiles without explicit streaming settings",
+          "status": "passed",
+          "title": "backfills legacy machine profiles without explicit streaming settings",
+          "duration": 0.5399999999999636,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects malformed machine profile documents instead of guessing safety data",
+          "status": "passed",
+          "title": "rejects malformed machine profile documents instead of guessing safety data",
+          "duration": 0.21339999999986503,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects offsets beyond the profile-relative physical safety bound",
+          "status": "passed",
+          "title": "rejects offsets beyond the profile-relative physical safety bound",
+          "duration": 0.3895999999999731,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects malformed machine-profile streaming settings",
+          "status": "passed",
+          "title": "rejects malformed machine-profile streaming settings",
+          "duration": 0.6375000000000455,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects malformed nested machine profile fields before canonicalizing",
+          "status": "passed",
+          "title": "rejects malformed nested machine profile fields before canonicalizing",
+          "duration": 0.6144999999999072,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["LaserForge machine profile documents"],
+          "fullName": "LaserForge machine profile documents rejects unsupported formats and newer schemas clearly",
+          "status": "passed",
+          "title": "rejects unsupported formats and newer schemas clearly",
+          "duration": 0.18650000000002365,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006299376,
+      "endTime": 1790006299392.1865,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-io.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine profile rotary validation"],
+          "fullName": "machine profile rotary validation round-trips a valid rotary setup",
+          "status": "passed",
+          "title": "round-trips a valid rotary setup",
+          "duration": 5.212999999999965,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile rotary validation"],
+          "fullName": "machine profile rotary validation rejects a rotary with a non-numeric mmPerRotation",
+          "status": "passed",
+          "title": "rejects a rotary with a non-numeric mmPerRotation",
+          "duration": 1.3344999999999345,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006328589,
+      "endTime": 1790006328595.3345,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-rotary.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSettings disclosure"],
+          "fullName": "DeviceSettings disclosure opens the Device Profile panel by default so the fields are visible on mount",
+          "status": "passed",
+          "title": "opens the Device Profile panel by default so the fields are visible on mount",
+          "duration": 102.8409999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings disclosure"],
+          "fullName": "DeviceSettings disclosure names generic runways for Falcon without claiming Neotronics qualification",
+          "status": "passed",
+          "title": "names generic runways for Falcon without claiming Neotronics qualification",
+          "duration": 27.765100000000075,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command lets the operator choose the GRBL air assist command",
+          "status": "passed",
+          "title": "lets the operator choose the GRBL air assist command",
+          "duration": 49.26350000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command applies the Neotronics 4040 Max laser profile deliberately and lets Z be confirmed",
+          "status": "passed",
+          "title": "applies the Neotronics 4040 Max laser profile deliberately and lets Z be confirmed",
+          "duration": 44.83019999999988,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command lets the operator declare whether the machine has powered Z jog",
+          "status": "passed",
+          "title": "lets the operator declare whether the machine has powered Z jog",
+          "duration": 34.821500000000015,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command keeps Z travel confirmation disabled until powered Z and travel are present",
+          "status": "passed",
+          "title": "keeps Z travel confirmation disabled until powered Z and travel are present",
+          "duration": 29.885800000000017,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command clears Z travel confirmation when powered Z jog is disabled",
+          "status": "passed",
+          "title": "clears Z travel confirmation when powered Z jog is disabled",
+          "duration": 23.602699999999913,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings air assist command"],
+          "fullName": "DeviceSettings air assist command does not inherit stale Z travel confirmation when powered Z jog is enabled",
+          "status": "passed",
+          "title": "does not inherit stale Z travel confirmation when powered Z jog is enabled",
+          "duration": 26.735299999999825,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings controlled seek feed"],
+          "fullName": "DeviceSettings controlled seek feed labels output max feed separately from the live-capped requested Frame feed",
+          "status": "passed",
+          "title": "labels output max feed separately from the live-capped requested Frame feed",
+          "duration": 26.13590000000022,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings controlled seek feed"],
+          "fullName": "DeviceSettings controlled seek feed caps the editor at the machine feed ceiling and ignores larger values",
+          "status": "passed",
+          "title": "caps the editor at the machine feed ceiling and ignores larger values",
+          "duration": 28.309200000000146,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings in CNC mode (ADR-101 §6)"],
+          "fullName": "DeviceSettings in CNC mode (ADR-101 §6) hides the laser-only fields but keeps the machine-agnostic ones",
+          "status": "passed",
+          "title": "hides the laser-only fields but keeps the machine-agnostic ones",
+          "duration": 10.074399999999969,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings low-power Fire"],
+          "fullName": "DeviceSettings low-power Fire requires explicit profile enablement on an approved device",
+          "status": "passed",
+          "title": "requires explicit profile enablement on an approved device",
+          "duration": 33.06619999999975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings scan offsets"],
+          "fullName": "DeviceSettings scan offsets lets the operator edit calibrated scan-offset points on the device profile",
+          "status": "passed",
+          "title": "lets the operator edit calibrated scan-offset points on the device profile",
+          "duration": 57.73149999999987,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSettings scan offsets"],
+          "fullName": "DeviceSettings scan offsets rejects huge manual scan offsets at the profile-relative input bound",
+          "status": "passed",
+          "title": "rejects huge manual scan offsets at the profile-relative input bound",
+          "duration": 28.83929999999964,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006257864,
+      "endTime": 1790006258388.8394,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/DeviceSettings.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy orders the rail origin, then job actions, then placement, then the guide",
+          "status": "passed",
+          "title": "orders the rail origin, then job actions, then placement, then the guide",
+          "duration": 130.3685000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy leads the unframed job cluster with setup-and-Frame, Frame job, then Home",
+          "status": "passed",
+          "title": "leads the unframed job cluster with setup-and-Frame, Frame job, then Home",
+          "duration": 62.48369999999977,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy keeps passive frame status with the job cluster while framing",
+          "status": "passed",
+          "title": "keeps passive frame status with the job cluster while framing",
+          "duration": 42.01260000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls action hierarchy"],
+          "fullName": "JobControls action hierarchy keeps run actions out of the rail while placing safety detail with the job cluster",
+          "status": "passed",
+          "title": "keeps run actions out of the rail while placing safety detail with the job cluster",
+          "duration": 50.89419999999973,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006284439,
+      "endTime": 1790006284724.8943,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/JobControls.layout.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobControls Frame action"],
+          "fullName": "JobControls Frame action lets the physical Frame decide when calculated fill overscan extends past the bed",
+          "status": "passed",
+          "title": "lets the physical Frame decide when calculated fill overscan extends past the bed",
+          "duration": 114.80799999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls Frame action"],
+          "fullName": "JobControls Frame action blocks Frame when a custom origin is active but WCO is unknown",
+          "status": "passed",
+          "title": "blocks Frame when a custom origin is active but WCO is unknown",
+          "duration": 27.06079999999929,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls Frame action"],
+          "fullName": "JobControls Frame action renders explicit Start From and 9-anchor Job Origin controls",
+          "status": "passed",
+          "title": "renders explicit Start From and 9-anchor Job Origin controls",
+          "duration": 19.060699999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls running safety copy"],
+          "fullName": "JobControls running safety copy keeps detailed Pause safety copy without duplicating top-bar actions",
+          "status": "passed",
+          "title": "keeps detailed Pause safety copy without duplicating top-bar actions",
+          "duration": 38.747699999999895,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls running safety copy"],
+          "fullName": "JobControls running safety copy keeps conflicting machine controls disabled after a controller error",
+          "status": "passed",
+          "title": "keeps conflicting machine controls disabled after a controller error",
+          "duration": 22.9988000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls running safety copy"],
+          "fullName": "JobControls running safety copy keeps conflicting controls disabled while a finished job awaits Idle",
+          "status": "passed",
+          "title": "keeps conflicting controls disabled while a finished job awaits Idle",
+          "duration": 30.118100000000595,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["JobControls running safety copy"],
+          "fullName": "JobControls running safety copy shows frame status without a duplicate action and disables conflicting controls",
+          "status": "passed",
+          "title": "shows frame status without a duplicate action and disables conflicting controls",
+          "duration": 23.435199999999895,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006272859,
+      "endTime": 1790006273136.4353,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/JobControls.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Set origin attention pulse"],
+          "fullName": "Set origin attention pulse pulses when a ready no-homing machine has no origin and starts from User Origin",
+          "status": "passed",
+          "title": "pulses when a ready no-homing machine has no origin and starts from User Origin",
+          "duration": 35.74019999999973,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set origin attention pulse"],
+          "fullName": "Set origin attention pulse stops pulsing once a work origin is active",
+          "status": "passed",
+          "title": "stops pulsing once a work origin is active",
+          "duration": 6.282200000000103,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set origin attention pulse"],
+          "fullName": "Set origin attention pulse stays quiet for start modes that do not need a saved origin",
+          "status": "passed",
+          "title": "stays quiet for start modes that do not need a saved origin",
+          "duration": 6.553400000000238,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set origin attention pulse"],
+          "fullName": "Set origin attention pulse stays quiet on homing machines",
+          "status": "passed",
+          "title": "stays quiet on homing machines",
+          "duration": 5.83620000000019,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Set origin attention pulse"],
+          "fullName": "Set origin attention pulse stays quiet while the rail is disabled or streaming",
+          "status": "passed",
+          "title": "stays quiet while the rail is disabled or streaming",
+          "duration": 8.47860000000037,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006308191,
+      "endTime": 1790006308254.4785,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.attention.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls handles retired origin requests without success, placement changes or an unhandled rejection",
+          "status": "passed",
+          "title": "handles retired origin requests without success, placement changes or an unhandled rejection",
+          "duration": 38.11709999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls shows advanced persistent controls and disables transient reset for known G54 origin",
+          "status": "passed",
+          "title": "shows advanced persistent controls and disables transient reset for known G54 origin",
+          "duration": 5.939200000000255,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls confirms before setting persistent G54 origin",
+          "status": "passed",
+          "title": "confirms before setting persistent G54 origin",
+          "duration": 7.50899999999956,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables persistent origin controls until the machine is Idle",
+          "status": "passed",
+          "title": "disables persistent origin controls until the machine is Idle",
+          "duration": 4.239500000000135,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls returns to the known work zero with a beam-off jog",
+          "status": "passed",
+          "title": "returns to the known work zero with a beam-off jog",
+          "duration": 5.8728000000000975,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables return-to-zero until the origin position is known and Idle",
+          "status": "passed",
+          "title": "disables return-to-zero until the origin position is known and Idle",
+          "duration": 4.089599999999791,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability offers Release motors on a no-homing machine once an origin is settled",
+          "status": "passed",
+          "title": "offers Release motors on a no-homing machine once an origin is settled",
+          "duration": 3.529199999999946,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability leaves Release motors to the Position job card when no origin is settled",
+          "status": "passed",
+          "title": "leaves Release motors to the Position job card when no origin is settled",
+          "duration": 4.998399999999947,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability keeps Release motors on the row for a homing-enabled machine with no origin",
+          "status": "passed",
+          "title": "keeps Release motors on the row for a homing-enabled machine with no origin",
+          "duration": 5.519200000000183,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) upgrades Absolute Coordinates to User Origin once an origin exists",
+          "status": "passed",
+          "title": "upgrades Absolute Coordinates to User Origin once an origin exists",
+          "duration": 6.787499999999909,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Verified Origin selection",
+          "status": "passed",
+          "title": "keeps an explicit Verified Origin selection",
+          "duration": 3.760099999999966,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Current Position selection",
+          "status": "passed",
+          "title": "keeps an explicit Current Position selection",
+          "duration": 3.177400000000034,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) pulses for Verified Origin with no origin on a no-homing machine",
+          "status": "passed",
+          "title": "pulses for Verified Origin with no origin on a no-homing machine",
+          "duration": 2.8674000000000888,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "status": "passed",
+          "title": "keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "duration": 3.4088999999999032,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stops pulsing once an XY origin exists",
+          "status": "passed",
+          "title": "stops pulsing once an XY origin exists",
+          "duration": 2.875,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stays quiet for Current Position, which reads the live head",
+          "status": "passed",
+          "title": "stays quiet for Current Position, which reads the live head",
+          "duration": 2.77599999999984,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006276285,
+      "endTime": 1790006276390.776,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC machine profile persistence"],
+          "fullName": "CNC machine profile persistence repairs a persisted profile whose tool list contains only nulls",
+          "status": "passed",
+          "title": "repairs a persisted profile whose tool list contains only nulls",
+          "duration": 4.054300000000239,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC machine profile persistence"],
+          "fullName": "CNC machine profile persistence selects the first valid custom tool when a persisted active id is stale",
+          "status": "passed",
+          "title": "selects the first valid custom tool when a persisted active id is stale",
+          "duration": 1.071599999999762,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC machine profile persistence"],
+          "fullName": "CNC machine profile persistence normalizes profile metadata and parameters before apply",
+          "status": "passed",
+          "title": "normalizes profile metadata and parameters before apply",
+          "duration": 1.0583000000001448,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006316572,
+      "endTime": 1790006316579.0583,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/cnc-machine-profile-persistence.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine profile store actions"],
+          "fullName": "machine profile store actions replaces the active device profile and keeps workspace dimensions in sync",
+          "status": "passed",
+          "title": "replaces the active device profile and keeps workspace dimensions in sync",
+          "duration": 3.8063999999999396,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile store actions"],
+          "fullName": "machine profile store actions selects Absolute Coordinates when a homing-capable profile replaces Current Position",
+          "status": "passed",
+          "title": "selects Absolute Coordinates when a homing-capable profile replaces Current Position",
+          "duration": 0.685399999999845,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile store actions"],
+          "fullName": "machine profile store actions restores Absolute Coordinates when a homing-capable machine setup is saved",
+          "status": "passed",
+          "title": "restores Absolute Coordinates when a homing-capable machine setup is saved",
+          "duration": 0.8006999999997788,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile store actions"],
+          "fullName": "machine profile store actions clamps controlled laser-off travel when max feed is lowered",
+          "status": "passed",
+          "title": "clamps controlled laser-off travel when max feed is lowered",
+          "duration": 1.2058000000001812,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine profile store actions"],
+          "fullName": "machine profile store actions invalidates rectified alignment with calibration in one undoable profile update",
+          "status": "passed",
+          "title": "invalidates rectified alignment with calibration in one undoable profile update",
+          "duration": 1.5273999999999432,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006311029,
+      "endTime": 1790006311037.5273,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-profile-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine setup history"],
+          "fullName": "machine setup history restores setup, cached CNC, placement, selection/probe state, and output signature atomically",
+          "status": "passed",
+          "title": "restores setup, cached CNC, placement, selection/probe state, and output signature atomically",
+          "duration": 6.271600000000035,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006326770,
+      "endTime": 1790006326776.2715,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-setup-history.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC Startup Setup output compatibility"],
+          "fullName": "CNC Startup Setup output compatibility preserves unchanged mixed-material, multi-tool, and secondary-tool output byte for byte",
+          "status": "passed",
+          "title": "preserves unchanged mixed-material, multi-tool, and secondary-tool output byte for byte",
+          "duration": 244.13859999999977,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006319972,
+      "endTime": 1790006320216.1387,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-setup-output-parity.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch maps a complete Falcon-like dump to a full DeviceProfile patch",
+          "status": "passed",
+          "title": "maps a complete Falcon-like dump to a full DeviceProfile patch",
+          "duration": 3.5909999999998945,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch maps $22 into controller settings without mutating the device profile patch",
+          "status": "passed",
+          "title": "maps $22 into controller settings without mutating the device profile patch",
+          "duration": 1.1614999999999327,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch captures Neotronics-relevant limit, homing, and Z-axis settings from $$",
+          "status": "passed",
+          "title": "captures Neotronics-relevant limit, homing, and Z-axis settings from $$",
+          "duration": 0.7454000000000178,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch preserves a stock-valid zero homing pull-off for later product policy",
+          "status": "passed",
+          "title": "preserves a stock-valid zero homing pull-off for later product policy",
+          "duration": 0.27080000000000837,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch takes the max of $110/$111 for maxFeed (vector reach)",
+          "status": "passed",
+          "title": "takes the max of $110/$111 for maxFeed (vector reach)",
+          "duration": 0.2395000000001346,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch retains the raw per-axis rates on the snapshot for the slow-axis advisory (R4)",
+          "status": "passed",
+          "title": "retains the raw per-axis rates on the snapshot for the slow-axis advisory (R4)",
+          "duration": 0.346599999999853,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch takes the min of $120/$121 for accel (slowest axis bounds the planner)",
+          "status": "passed",
+          "title": "takes the min of $120/$121 for accel (slowest axis bounds the planner)",
+          "duration": 0.19129999999995562,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch omits a field when only one of its axes parsed",
+          "status": "passed",
+          "title": "omits a field when only one of its axes parsed",
+          "duration": 0.15420000000017353,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch returns an empty patch when no recognized settings parse",
+          "status": "passed",
+          "title": "returns an empty patch when no recognized settings parse",
+          "duration": 0.22479999999995925,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch maps disabled laser mode so Start can block unsafe M4 assumptions",
+          "status": "passed",
+          "title": "maps disabled laser mode so Start can block unsafe M4 assumptions",
+          "duration": 0.27890000000002146,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch records a grblHAL lathe ($32=2) as lathe, not as an unreported setting",
+          "status": "passed",
+          "title": "records a grblHAL lathe ($32=2) as lathe, not as an unreported setting",
+          "duration": 0.2684999999999036,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch keeps the reported mode on the snapshot for $32=0 and $32=1",
+          "status": "passed",
+          "title": "keeps the reported mode on the snapshot for $32=0 and $32=1",
+          "duration": 0.3126999999999498,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch leaves laser mode unproven for a $32 value no firmware defines",
+          "status": "passed",
+          "title": "leaves laser mode unproven for a $32 value no firmware defines",
+          "duration": 0.3492999999998574,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch omits the mode entirely when the dump did not report $32",
+          "status": "passed",
+          "title": "omits the mode entirely when the dump did not report $32",
+          "duration": 0.19709999999986394,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch keeps machineMode out of the DeviceProfile patch",
+          "status": "passed",
+          "title": "keeps machineMode out of the DeviceProfile patch",
+          "duration": 0.13889999999992142,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["settingsMapToProfilePatch"],
+          "fullName": "settingsMapToProfilePatch rejects non-numeric or non-positive values rather than poisoning the profile",
+          "status": "passed",
+          "title": "rejects non-numeric or non-positive values rather than poisoning the profile",
+          "duration": 0.18609999999989668,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["SettingsCollector state machine"],
+          "fullName": "SettingsCollector state machine idle ignores all responses",
+          "status": "passed",
+          "title": "idle ignores all responses",
+          "duration": 0.6011000000000877,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["SettingsCollector state machine"],
+          "fullName": "SettingsCollector state machine collecting accumulates settings and transitions to done on the trailing ok",
+          "status": "passed",
+          "title": "collecting accumulates settings and transitions to done on the trailing ok",
+          "duration": 1.6897000000001299,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["SettingsCollector state machine"],
+          "fullName": "SettingsCollector state machine collector done state keeps unknown settings visible for Machine Settings backup",
+          "status": "passed",
+          "title": "collector done state keeps unknown settings visible for Machine Settings backup",
+          "duration": 0.7911000000001422,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["SettingsCollector state machine"],
+          "fullName": "SettingsCollector state machine ignores a pre-collection ok (e.g., handshake ack arriving before any setting)",
+          "status": "passed",
+          "title": "ignores a pre-collection ok (e.g., handshake ack arriving before any setting)",
+          "duration": 0.1710000000000491,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["SettingsCollector state machine"],
+          "fullName": "SettingsCollector state machine treats `[MSG:...]` and status reports as no-ops",
+          "status": "passed",
+          "title": "treats `[MSG:...]` and status reports as no-ops",
+          "duration": 1.1323999999999614,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006302021,
+      "endTime": 1790006302034.1323,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/parse-settings.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow starts with the machine-type choice before profile, connection, and confirmation",
+          "status": "passed",
+          "title": "starts with the machine-type choice before profile, connection, and confirmation",
+          "duration": 1.936100000000124,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow walks the laser sequence without running a probe",
+          "status": "passed",
+          "title": "walks the laser sequence without running a probe",
+          "duration": 1.1351999999999407,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow adds one dedicated Startup Setup page only for an active CNC project",
+          "status": "passed",
+          "title": "adds one dedicated Startup Setup page only for an active CNC project",
+          "duration": 0.3525999999999385,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow keeps DeviceProfile and CNC config in the same draft",
+          "status": "passed",
+          "title": "keeps DeviceProfile and CNC config in the same draft",
+          "duration": 0.61850000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow retains CNC values when switching machine types during setup",
+          "status": "passed",
+          "title": "retains CNC values when switching machine types during setup",
+          "duration": 0.2212000000001808,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow selects a compatible controller contract and resets stale baud",
+          "status": "passed",
+          "title": "selects a compatible controller contract and resets stale baud",
+          "duration": 1.161299999999983,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow clears vendor-specific commands when explicitly selecting a firmware family",
+          "status": "passed",
+          "title": "clears vendor-specific commands when explicitly selecting a firmware family",
+          "duration": 0.33169999999995525,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow blocks unsupported CNC/controller combinations",
+          "status": "passed",
+          "title": "blocks unsupported CNC/controller combinations",
+          "duration": 1.0968000000000302,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow allows a zero CNC spindle spin-up delay",
+          "status": "passed",
+          "title": "allows a zero CNC spindle spin-up delay",
+          "duration": 0.37820000000010623,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow never strands invalid CNC limits before their dedicated edit page",
+          "status": "passed",
+          "title": "never strands invalid CNC limits before their dedicated edit page",
+          "duration": 0.6119999999998527,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow persists both output capabilities and CNC machine values for a hybrid machine",
+          "status": "passed",
+          "title": "persists both output capabilities and CNC machine values for a hybrid machine",
+          "duration": 0.6256000000000768,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow keeps readback separate until the operator explicitly accepts it",
+          "status": "passed",
+          "title": "keeps readback separate until the operator explicitly accepts it",
+          "duration": 0.1695999999999458,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow does not rewrite a user-selected profile when controller identity arrives",
+          "status": "passed",
+          "title": "does not rewrite a user-selected profile when controller identity arrives",
+          "duration": 0.23050000000012005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow applies a catalog preset exactly without layering detected values over it",
+          "status": "passed",
+          "title": "applies a catalog preset exactly without layering detected values over it",
+          "duration": 0.22669999999993706,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow routes accepted CNC $30 readback to spindle ceiling, not laser power",
+          "status": "passed",
+          "title": "routes accepted CNC $30 readback to spindle ceiling, not laser power",
+          "duration": 0.31330000000002656,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow keeps a CNC PWM S1000 scale out of spindle RPM unless explicitly selected",
+          "status": "passed",
+          "title": "keeps a CNC PWM S1000 scale out of spindle RPM unless explicitly selected",
+          "duration": 0.14760000000001128,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow uses the researched FluidNC laser default only after explicit controller selection",
+          "status": "passed",
+          "title": "uses the researched FluidNC laser default only after explicit controller selection",
+          "duration": 0.1313000000000102,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow leaves the spindle ceiling alone when the controller is in laser mode ($32=1)",
+          "status": "passed",
+          "title": "leaves the spindle ceiling alone when the controller is in laser mode ($32=1)",
+          "duration": 0.28910000000018954,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow keeps apply confirmation through duplicate detected syncs and clears it for new values",
+          "status": "passed",
+          "title": "keeps apply confirmation through duplicate detected syncs and clears it for new values",
+          "duration": 0.23929999999995744,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow clears the detected-applied note when a catalog preset replaces the draft",
+          "status": "passed",
+          "title": "clears the detected-applied note when a catalog preset replaces the draft",
+          "duration": 0.23469999999997526,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow blocks invalid geometry on editing steps while capability and connect stay passable",
+          "status": "passed",
+          "title": "blocks invalid geometry on editing steps while capability and connect stay passable",
+          "duration": 0.34149999999999636,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow keeps firmware writes queued in the draft and clears them when the contract changes",
+          "status": "passed",
+          "title": "keeps firmware writes queued in the draft and clears them when the contract changes",
+          "duration": 0.2401999999999589,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["unified machine setup flow"],
+          "fullName": "unified machine setup flow invalidates backup attestation and queued writes when a confirmed value changes",
+          "status": "passed",
+          "title": "invalidates backup attestation and queued writes when a confirmed value changes",
+          "duration": 0.11779999999998836,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006300776,
+      "endTime": 1790006300788.118,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/device-setup-flow.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Device Setup controlled travel feed invariant"],
+          "fullName": "Device Setup controlled travel feed invariant clamps the draft and renders the clamped value after max feed is lowered",
+          "status": "passed",
+          "title": "clamps the draft and renders the clamped value after max feed is lowered",
+          "duration": 78.28879999999981,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006288625,
+      "endTime": 1790006288703.2888,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupMaxFeedInvariant.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSetupWizard catalog"],
+          "fullName": "DeviceSetupWizard catalog opens with the machine-type choice and shows one six-step setup sequence",
+          "status": "passed",
+          "title": "opens with the machine-type choice and shows one six-step setup sequence",
+          "duration": 127.38020000000051,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard catalog"],
+          "fullName": "DeviceSetupWizard catalog filters the profile catalog by search text",
+          "status": "passed",
+          "title": "filters the profile catalog by search text",
+          "duration": 54.67739999999958,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard catalog"],
+          "fullName": "DeviceSetupWizard catalog keeps a selected catalog profile exact instead of overlaying controller observations",
+          "status": "passed",
+          "title": "keeps a selected catalog profile exact instead of overlaying controller observations",
+          "duration": 85.90890000000036,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006266846,
+      "endTime": 1790006267113.909,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.catalog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSetupWizard router commit"],
+          "fullName": "DeviceSetupWizard router commit applies accepted settings without replacing the user-selected firmware profile",
+          "status": "passed",
+          "title": "applies accepted settings without replacing the user-selected firmware profile",
+          "duration": 341.87699999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard router commit"],
+          "fullName": "DeviceSetupWizard router commit clears controller-read values after a real disconnect",
+          "status": "passed",
+          "title": "clears controller-read values after a real disconnect",
+          "duration": 131.74649999999974,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006262136,
+      "endTime": 1790006262609.7466,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.cnc.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSetupWizard detected values"],
+          "fullName": "DeviceSetupWizard detected values confirms applied values, keeps them draft-only, and clears confirmation on a new read",
+          "status": "passed",
+          "title": "confirms applied values, keeps them draft-only, and clears confirmation on a new read",
+          "duration": 215.13030000000026,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006279620,
+      "endTime": 1790006279835.1304,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.detected-values.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard connects only after using the selected controller and baud",
+          "status": "passed",
+          "title": "connects only after using the selected controller and baud",
+          "duration": 177.91209999999955,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard keeps detected identity observational until the operator explicitly adopts it",
+          "status": "passed",
+          "title": "keeps detected identity observational until the operator explicitly adopts it",
+          "duration": 99.77069999999912,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard disables serial connection when the platform does not support it",
+          "status": "passed",
+          "title": "disables serial connection when the platform does not support it",
+          "duration": 42.8130000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard keeps all edits in a draft and discards them on cancel",
+          "status": "passed",
+          "title": "keeps all edits in a draft and discards them on cancel",
+          "duration": 56.21860000000015,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard atomically saves a laser profile and workspace at the end",
+          "status": "passed",
+          "title": "atomically saves a laser profile and workspace at the end",
+          "duration": 747.6625000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard shows CNC-only machine settings and commits them with the profile",
+          "status": "passed",
+          "title": "shows CNC-only machine settings and commits them with the profile",
+          "duration": 617.9125000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard saves a hybrid machine with both output contracts and one explicit active mode",
+          "status": "passed",
+          "title": "saves a hybrid machine with both output contracts and one explicit active mode",
+          "duration": 427.28960000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard blocks a controller that cannot run the selected CNC output contract",
+          "status": "passed",
+          "title": "blocks a controller that cannot run the selected CNC output contract",
+          "duration": 30.88509999999951,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard uses external configuration guidance for Marlin instead of firmware writes",
+          "status": "passed",
+          "title": "uses external configuration guidance for Marlin instead of firmware writes",
+          "duration": 88.21700000000055,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard hides serial streaming and G-code controls for file-only Ruida setup",
+          "status": "passed",
+          "title": "hides serial streaming and G-code controls for file-only Ruida setup",
+          "duration": 43.90469999999914,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["DeviceSetupWizard"],
+          "fullName": "DeviceSetupWizard queues only confirmed common GRBL writes for final Save and keeps travel review-only",
+          "status": "passed",
+          "title": "queues only confirmed common GRBL writes for final Save and keeps travel review-only",
+          "duration": 137.284300000003,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006251664,
+      "endTime": 1790006254134.2842,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves distinct geometry and optional coordinate fields for front-left",
+          "status": "passed",
+          "title": "preserves distinct geometry and optional coordinate fields for front-left",
+          "duration": 12.084199999999782,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves distinct geometry and optional coordinate fields for front-right",
+          "status": "passed",
+          "title": "preserves distinct geometry and optional coordinate fields for front-right",
+          "duration": 2.2002000000002226,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves distinct geometry and optional coordinate fields for rear-left",
+          "status": "passed",
+          "title": "preserves distinct geometry and optional coordinate fields for rear-left",
+          "duration": 2.119000000000142,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves distinct geometry and optional coordinate fields for rear-right",
+          "status": "passed",
+          "title": "preserves distinct geometry and optional coordinate fields for rear-right",
+          "duration": 2.25,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves distinct geometry and optional coordinate fields for center",
+          "status": "passed",
+          "title": "preserves distinct geometry and optional coordinate fields for center",
+          "duration": 1.9230999999999767,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 keeps homing, direction, pull-off and report units as observations, not profile guesses",
+          "status": "passed",
+          "title": "keeps homing, direction, pull-off and report units as observations, not profile guesses",
+          "duration": 1.1030000000000655,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 preserves an unchanged measured Z travel confirmation",
+          "status": "passed",
+          "title": "preserves an unchanged measured Z travel confirmation",
+          "duration": 0.951799999999821,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 requires new Z confirmation after direct detected travel replacement",
+          "status": "passed",
+          "title": "requires new Z confirmation after direct detected travel replacement",
+          "duration": 0.8519999999998618,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 requires new Z confirmation when the setup wizard accepts changed detected travel",
+          "status": "passed",
+          "title": "requires new Z confirmation when the setup wizard accepts changed detected travel",
+          "duration": 0.6783999999997832,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Independent coordinate settings audit 2026-09-21"],
+          "fullName": "Independent coordinate settings audit 2026-09-21 allows explicit fresh confirmation of newly measured travel",
+          "status": "passed",
+          "title": "allows explicit fresh confirmation of newly measured travel",
+          "duration": 0.3110999999998967,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006297936,
+      "endTime": 1790006297960.6785,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machineSetupControllerGuide"],
+          "fullName": "machineSetupControllerGuide matches Falcon vendor commands without advertising settings reads or writes",
+          "status": "passed",
+          "title": "matches Falcon vendor commands without advertising settings reads or writes",
+          "duration": 2.05619999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machineSetupControllerGuide"],
+          "fullName": "machineSetupControllerGuide covers every supported controller and matches driver transport/commands",
+          "status": "passed",
+          "title": "covers every supported controller and matches driver transport/commands",
+          "duration": 0.755100000000084,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machineSetupControllerGuide"],
+          "fullName": "machineSetupControllerGuide never offers numeric firmware writes for FluidNC, Marlin, Smoothie, or Ruida",
+          "status": "passed",
+          "title": "never offers numeric firmware writes for FluidNC, Marlin, Smoothie, or Ruida",
+          "duration": 0.5334000000000287,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machineSetupControllerGuide"],
+          "fullName": "machineSetupControllerGuide documents the controller-specific read commands",
+          "status": "passed",
+          "title": "documents the controller-specific read commands",
+          "duration": 0.2802999999998974,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006322572,
+      "endTime": 1790006322575.5334,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/machine-setup-controller-guide.test.ts"
+    }
+  ]
+}

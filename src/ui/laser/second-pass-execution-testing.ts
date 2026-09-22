@@ -4,6 +4,7 @@ import {
 } from '../../core/laser-second-pass';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import type { JobOriginPlacement } from '../../core/job';
+import type { DeviceProfile } from '../../core/devices';
 import { fingerprintGcode } from '../../core/recovery';
 import {
   createLayer,
@@ -21,12 +22,13 @@ import { prepareStartJob } from './start-job-readiness';
 export async function createSecondPassExecutionFixture(
   repository: RecoveryRepository,
   origin?: JobOriginPlacement,
+  device?: DeviceProfile,
 ): Promise<{
   source: ExecutionArtifactV1;
   prepared: PreparedStartProgram;
   selection: LaserSecondPassSelection;
 }> {
-  const project = sourceProject();
+  const project = sourceProject(device);
   const laser = useLaserStore.getState();
   const original = prepareStartJob(
     project,
@@ -93,9 +95,9 @@ export async function createSecondPassExecutionFixture(
 // eslint-disable-next-line no-restricted-syntax -- Test artwork color, not application chrome.
 const TEST_SCENE_COLOR = '#ff0000';
 
-function sourceProject() {
+function sourceProject(device?: DeviceProfile) {
   return {
-    ...createProject(),
+    ...createProject(device),
     scene: {
       ...EMPTY_SCENE,
       layers: [

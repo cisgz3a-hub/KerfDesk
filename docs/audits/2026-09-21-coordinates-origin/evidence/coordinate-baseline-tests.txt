@@ -1,0 +1,19 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/io/gcode/registration-placement.property.test.ts (4 tests) 139ms
+ ✓ src/core/job/frame-bounds.test.ts (7 tests) 74ms
+ ✓ src/ui/workspace/preview-scene-frame.test.ts (6 tests) 57ms
+ ✓ src/core/job/job-origin.test.ts (17 tests) 13ms
+ ✓ src/core/job/compile-job-raster-rotation.test.ts (6 tests) 23ms
+ ✓ src/io/gcode/prepare-output-scan-offset-placement.test.ts (6 tests) 43ms
+ ✓ src/ui/workspace/preview-scene-frame-owned.test.ts (6 tests) 25ms
+ ✓ src/core/job/registration-placement.test.ts (4 tests) 17ms
+ ✓ src/core/devices/origin-transform.test.ts (7 tests) 8ms
+ ✓ src/core/devices/jog-direction.test.ts (5 tests) 4ms
+ ✓ src/core/devices/machine-bounds.test.ts (2 tests) 5ms
+
+ Test Files  11 passed (11)
+      Tests  70 passed (70)
+   Start at  23:44:29
+   Duration  42.89s (transform 5.34s, setup 149ms, collect 18.27s, tests 409ms, environment 15.27s, prepare 3.28s)

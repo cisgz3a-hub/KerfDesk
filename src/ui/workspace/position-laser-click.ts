@@ -12,6 +12,8 @@ import type { Vec2 } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
+import { resolveNativeBedFrame } from '../state/native-bed-frame';
+import { bedPointToNative } from '../../core/devices/native-bed-frame';
 
 // Same positioning feed policy as the JogPad: fast, capped by the device.
 const POSITION_FEED_CAP_MM_PER_MIN = 3000;
@@ -50,7 +52,17 @@ export function dispatchPositionLaser(scenePoint: Vec2, device: DeviceProfile): 
     useToastStore.getState().pushToast(blocked, 'error');
     return;
   }
-  const target = positionLaserTarget(scenePoint, device);
+  const frame = resolveNativeBedFrame(device, laser);
+  if (frame === null) {
+    useToastStore
+      .getState()
+      .pushToast(
+        'The controller-to-bed mapping is unverified. Home with a supported coordinate mapping before moving to a canvas point.',
+        'error',
+      );
+    return;
+  }
+  const target = bedPointToNative(positionLaserTarget(scenePoint, device), frame);
   void laser
     .jogToMachinePosition(target.x, target.y, positionLaserFeed(device.maxFeed))
     .catch(() => {

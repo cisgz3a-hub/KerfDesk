@@ -1,0 +1,118 @@
+[
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/catalogue-output-contracts.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/device-profile-patch.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/device-profile.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/profile-catalog.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/devices/profile-suggestions.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/falcon-command-contract.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-camera.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-catalog-workflow.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-command-set.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-io.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/machine-profile/machine-profile-rotary.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/DeviceSettings.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/JobControls.layout.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/JobControls.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.attention.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/cnc-machine-profile-persistence.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-profile-actions.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-setup-history.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/machine-setup-output-parity.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/controllers/grbl/parse-settings.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/device-setup-flow.test.ts",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupMaxFeedInvariant.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.catalog.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.cnc.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.detected-values.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/DeviceSetupWizard.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx",
+    "status": "passed"
+  },
+  {
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/device-setup/machine-setup-controller-guide.test.ts",
+    "status": "passed"
+  }
+]

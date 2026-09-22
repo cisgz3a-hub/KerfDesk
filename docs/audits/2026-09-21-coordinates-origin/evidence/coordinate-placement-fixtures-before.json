@@ -1,0 +1,176 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 13,
+  "numPassedTests": 10,
+  "numFailedTests": 3,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035717362,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement places the selected anchor at the current machine position for Current Position jobs",
+          "status": "passed",
+          "title": "places the selected anchor at the current machine position for Current Position jobs",
+          "duration": 112.45999999999913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks User Origin when the operator has not set a custom origin",
+          "status": "passed",
+          "title": "blocks User Origin when the operator has not set a custom origin",
+          "duration": 1.1915999999982887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement anchors a centered traced image to the custom work origin before emitting G-code",
+          "status": "passed",
+          "title": "anchors a centered traced image to the custom work origin before emitting G-code",
+          "duration": 14.106999999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat negative WCO as a physical overhang when homing is disabled",
+          "status": "passed",
+          "title": "does not treat negative WCO as a physical overhang when homing is disabled",
+          "duration": 9.355400000000373,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "status": "passed",
+          "title": "does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "duration": 37.81039999999848,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "status": "failed",
+          "title": "warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "duration": 24.278599999999642,
+          "failureMessages": [
+            "AssertionError: expected 'The controller-to-bed coordinate mapp…' to match /out of bed/i\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts:263:42\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "status": "passed",
+          "title": "allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "duration": 15.488199999999779,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "status": "failed",
+          "title": "warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "duration": 17.979699999999866,
+          "failureMessages": [
+            "AssertionError: expected 'The controller-to-bed coordinate mapp…' to match /X out of bed: -3/\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts:305:42\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks custom-origin Start when the physical origin location is not known",
+          "status": "passed",
+          "title": "blocks custom-origin Start when the physical origin location is not known",
+          "duration": 1.0706000000009226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns naming fill overscan when an absolute fill job is too close to the bed edge",
+          "status": "failed",
+          "title": "warns naming fill overscan when an absolute fill job is too close to the bed edge",
+          "duration": 17.914600000000064,
+          "failureMessages": [
+            "AssertionError: expected 'The controller-to-bed coordinate mapp…' to match /overscan/i\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts:337:42\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) blocks Start until a Frame is recorded, with the sole frame-first message",
+          "status": "passed",
+          "title": "blocks Start until a Frame is recorded, with the sole frame-first message",
+          "duration": 6.376899999999296,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) allows Start after a matching Verified Frame",
+          "status": "passed",
+          "title": "allows Start after a matching Verified Frame",
+          "duration": 10.471199999999953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) re-blocks when the origin moved since the Verified Frame",
+          "status": "passed",
+          "title": "re-blocks when the origin moved since the Verified Frame",
+          "duration": 2.6521000000011554,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035727349,
+      "endTime": 1790035727622.652,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts"
+    }
+  ]
+}

@@ -18,6 +18,10 @@ import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useSettledHeadPosition } from '../laser/settled-head-position';
+import {
+  useRuntimeCoordinatePreparation,
+  type RuntimeCoordinatePreparation,
+} from '../use-runtime-coordinate-preparation';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -43,6 +47,7 @@ export function usePreviewToolpath(
   // not rebuild. In current-position mode the origin tracks mPos, so the key
   // changes as the head moves (a legitimate rebuild).
   const placement = usePreviewPlacement(jobPlacement);
+  const coordinateOptions = useRuntimeCoordinatePreparation(project.device, placement);
   const placementKey = useMemo(() => JSON.stringify(placement), [placement]);
   // The scheduled build reads the latest resolved placement via a ref so the
   // placement object itself need not be an effect dependency.
@@ -69,6 +74,7 @@ export function usePreviewToolpath(
         project,
         externalGcodePreview,
         placement: placementRef.current,
+        coordinateOptions,
         outputScope,
         initialPosition: headRef.current,
         isCancelled: () => cancelled,
@@ -85,6 +91,7 @@ export function usePreviewToolpath(
     outputScope,
     externalGcodePreview,
     placementKey,
+    coordinateOptions,
     scheduleBuild,
     positionEpoch,
     firstRegistrationPoint,
@@ -98,6 +105,7 @@ function runScheduledPreviewBuild(args: {
   readonly project: Project;
   readonly externalGcodePreview: ReturnType<typeof useStore.getState>['externalGcodePreview'];
   readonly placement: ReturnType<typeof usePreviewPlacement>;
+  readonly coordinateOptions: RuntimeCoordinatePreparation;
   readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
   readonly initialPosition: LargeJobPreparationOptions['initialPosition'];
   readonly isCancelled: () => boolean;
@@ -122,11 +130,10 @@ function runScheduledPreviewBuild(args: {
     });
     return;
   }
-  const options = previewPreparationOptions(
-    resolved.jobOrigin,
-    args.outputScope,
-    args.initialPosition,
-  );
+  const options = {
+    ...args.coordinateOptions,
+    ...previewPreparationOptions(resolved.jobOrigin, args.outputScope, args.initialPosition),
+  };
   const registration = currentPrintCutOutputRegistration(args.project);
   const needsSnapshot = hasVariableText(args.project) || registration !== undefined;
   const backgroundOptions: LargeJobPreparationOptions = {

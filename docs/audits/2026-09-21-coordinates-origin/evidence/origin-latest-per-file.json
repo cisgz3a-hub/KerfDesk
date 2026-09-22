@@ -1,0 +1,104 @@
+[
+  {
+    "tests": 16,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.test.tsx"
+  },
+  {
+    "tests": 12,
+    "evidence": "origin-unit-switch-final.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-audit-20260921.test.ts"
+  },
+  {
+    "tests": 13,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-oracle-audit-20260921.test.ts"
+  },
+  {
+    "tests": 2,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/detected-settings-action.test.ts"
+  },
+  {
+    "tests": 9,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/infer-machine-position.test.ts"
+  },
+  {
+    "tests": 17,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-line-handler.test.ts"
+  },
+  {
+    "tests": 5,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-safe-write-epoch.test.ts"
+  },
+  {
+    "tests": 4,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-status-position.test.ts"
+  },
+  {
+    "tests": 2,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-console-settings-read.test.ts"
+  },
+  {
+    "tests": 14,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-console.test.ts"
+  },
+  {
+    "tests": 8,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-controller-qualification.test.ts"
+  },
+  {
+    "tests": 3,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-machine-settings-alarm.test.ts"
+  },
+  {
+    "tests": 15,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-machine-settings.test.ts"
+  },
+  {
+    "tests": 31,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-mpg-command-matrix.test.ts"
+  },
+  {
+    "tests": 6,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-mpg-ownership.test.ts"
+  },
+  {
+    "tests": 15,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-origin.test.ts"
+  },
+  {
+    "tests": 5,
+    "evidence": "origin-final-tests.json",
+    "status": "passed",
+    "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/manual-motion-fresh-idle.test.ts"
+  }
+]

@@ -24,12 +24,11 @@ import {
 } from './frame-controller-readiness';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
-import { controllerStartPreparationStillCurrent } from './start-job-authorization';
-import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { prepareCurrentStartJob } from './start-job-source';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { resolveFrameCandidate } from './frame-candidate';
+import { reviewedFrameIsCurrent } from './reviewed-frame-current';
 
 export function useFrameAction(): () => void {
   return () => {
@@ -332,19 +331,6 @@ async function prepareFrameLaser(
     );
     return null;
   }
-}
-
-function reviewedFrameIsCurrent(
-  bundle: ReviewedStartBundle,
-  currentLaser: ReturnType<typeof useLaserStore.getState>,
-  authorizationContext: FramedRunCandidate['authorizationContext'],
-): boolean {
-  const transientProject = authorizationContext !== undefined;
-  return (
-    (transientProject ||
-      currentReplayExecutionSignature() === bundle.prepared.canvasPlan.retentionKey) &&
-    controllerStartPreparationStillCurrent(bundle.laser, currentLaser)
-  );
 }
 
 function currentWorkXy(

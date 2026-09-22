@@ -1,0 +1,1285 @@
+{
+  "numTotalTestSuites": 32,
+  "numPassedTestSuites": 32,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 111,
+  "numPassedTests": 111,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790033883669,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["physical initial position (TIME-05)"],
+          "fullName": "physical initial position (TIME-05) counts the 300 mm approach independently of placement undefined",
+          "status": "passed",
+          "title": "counts the 300 mm approach independently of placement undefined",
+          "duration": 10.621799999999894,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["physical initial position (TIME-05)"],
+          "fullName": "physical initial position (TIME-05) counts the 300 mm approach independently of placement {\"startFrom\":\"user-origin\",\"anchor\":\"front-left\"}",
+          "status": "passed",
+          "title": "counts the 300 mm approach independently of placement {\"startFrom\":\"user-origin\",\"anchor\":\"front-left\"}",
+          "duration": 2.3727999999996428,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["physical initial position (TIME-05)"],
+          "fullName": "physical initial position (TIME-05) counts the 300 mm approach independently of placement {\"startFrom\":\"verified-origin\",\"anchor\":\"front-left\"}",
+          "status": "passed",
+          "title": "counts the 300 mm approach independently of placement {\"startFrom\":\"verified-origin\",\"anchor\":\"front-left\"}",
+          "duration": 1.6884000000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["physical initial position (TIME-05)"],
+          "fullName": "physical initial position (TIME-05) keeps Current Position as the finish target when the actual starting head differs",
+          "status": "passed",
+          "title": "keeps Current Position as the finish target when the actual starting head differs",
+          "duration": 1.918199999999615,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["physical initial position (TIME-05)"],
+          "fullName": "physical initial position (TIME-05) carries the starting head through bounded, snapshot and shared background preparation",
+          "status": "passed",
+          "title": "carries the starting head through bounded, snapshot and shared background preparation",
+          "duration": 20.504899999999907,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033924678,
+      "endTime": 1790033924715.505,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/live-job-estimate-position.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate estimates small vector jobs",
+          "status": "passed",
+          "title": "estimates small vector jobs",
+          "duration": 12.866399999999885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate prices Current Position from and back to the resolved live head position",
+          "status": "passed",
+          "title": "prices Current Position from and back to the resolved live head position",
+          "duration": 3.530999999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate skips huge traces before compiling or optimizing them in React render",
+          "status": "passed",
+          "title": "skips huge traces before compiling or optimizing them in React render",
+          "duration": 8.699599999999919,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate estimates image-only jobs instead of showing them as empty",
+          "status": "passed",
+          "title": "estimates image-only jobs instead of showing them as empty",
+          "duration": 6.218800000000101,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate skips an over-budget raster before compiling it (P1-A freeze guard)",
+          "status": "passed",
+          "title": "skips an over-budget raster before compiling it (P1-A freeze guard)",
+          "duration": 0.5210000000001855,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate ignores unselected over-budget raster work when estimating selected-only output",
+          "status": "passed",
+          "title": "ignores unselected over-budget raster work when estimating selected-only output",
+          "duration": 1.1894000000002052,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["live job estimate"],
+          "fullName": "live job estimate skips dense fill jobs even when their raw vector count is small",
+          "status": "passed",
+          "title": "skips dense fill jobs even when their raw vector count is small",
+          "duration": 14.895600000000286,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033917318,
+      "endTime": 1790033917365.8955,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/live-job-estimate.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) computes the first estimate synchronously on mount",
+          "status": "passed",
+          "title": "computes the first estimate synchronously on mount",
+          "duration": 78.13450000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) does not recompute during rapid project mutations (drag), then settles after the quiet period",
+          "status": "passed",
+          "title": "does not recompute during rapid project mutations (drag), then settles after the quiet period",
+          "duration": 28.62999999999738,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) reflects a meaningful scene change after the debounce window",
+          "status": "passed",
+          "title": "reflects a meaningful scene change after the debounce window",
+          "duration": 13.706699999998818,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) does not reset the estimate debounce on an unrelated store update",
+          "status": "passed",
+          "title": "does not reset the estimate debounce on an unrelated store update",
+          "duration": 17.744299999998475,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) resolves User Origin placement with the export fallback so the worker key matches the preview",
+          "status": "passed",
+          "title": "resolves User Origin placement with the export fallback so the worker key matches the preview",
+          "duration": 15.348900000000867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) resolves Verified Origin placement with the export fallback like User Origin (ADR-327)",
+          "status": "passed",
+          "title": "resolves Verified Origin placement with the export fallback like User Origin (ADR-327)",
+          "duration": 9.464500000001863,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) settles while a connected controller polls and the resolved placement is unchanged",
+          "status": "passed",
+          "title": "settles while a connected controller polls and the resolved placement is unchanged",
+          "duration": 17.613900000000285,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) replaces a too-large estimate with the worker result (ADR-244)",
+          "status": "passed",
+          "title": "replaces a too-large estimate with the worker result (ADR-244)",
+          "duration": 8.79439999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) surfaces invalid Print-and-Cut trust without waiting on background compilation",
+          "status": "passed",
+          "title": "surfaces invalid Print-and-Cut trust without waiting on background compilation",
+          "duration": 9.278399999999237,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) never compiles a valid Print-and-Cut snapshot synchronously on mount",
+          "status": "passed",
+          "title": "never compiles a valid Print-and-Cut snapshot synchronously on mount",
+          "duration": 13.811000000001513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) keeps the previous estimate when the background request is superseded (newer-request)",
+          "status": "passed",
+          "title": "keeps the previous estimate when the background request is superseded (newer-request)",
+          "duration": 11.074499999998807,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) keeps the previous estimate when the background request is superseded (newer-project)",
+          "status": "passed",
+          "title": "keeps the previous estimate when the background request is superseded (newer-project)",
+          "duration": 7.140900000002148,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["useJobEstimate debounce (H16)"],
+          "fullName": "useJobEstimate debounce (H16) reports a worker failure instead of leaving the estimate paused forever",
+          "status": "passed",
+          "title": "reports a worker failure instead of leaving the estimate paused forever",
+          "duration": 7.259200000000419,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033901863,
+      "endTime": 1790033902102.2593,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-job-estimate.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping reuses its fresh array and preserves the exact mixed route (front-left)",
+          "status": "passed",
+          "title": "reuses its fresh array and preserves the exact mixed route (front-left)",
+          "duration": 10.094800000000305,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping reuses its fresh array and preserves the exact mixed route (front-right)",
+          "status": "passed",
+          "title": "reuses its fresh array and preserves the exact mixed route (front-right)",
+          "duration": 2.7575000000001637,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping reuses its fresh array and preserves the exact mixed route (rear-left)",
+          "status": "passed",
+          "title": "reuses its fresh array and preserves the exact mixed route (rear-left)",
+          "duration": 2.205199999999877,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping reuses its fresh array and preserves the exact mixed route (rear-right)",
+          "status": "passed",
+          "title": "reuses its fresh array and preserves the exact mixed route (rear-right)",
+          "duration": 2.451599999999871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping reuses its fresh array and preserves the exact mixed route (center)",
+          "status": "passed",
+          "title": "reuses its fresh array and preserves the exact mixed route (center)",
+          "duration": 2.1779999999998836,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping keeps separate machine geometry for an ordinary executable-plan comparison",
+          "status": "passed",
+          "title": "keeps separate machine geometry for an ordinary executable-plan comparison",
+          "duration": 19.579200000000128,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["fresh streamed-raster preview mapping"],
+          "fullName": "fresh streamed-raster preview mapping keeps the pure mapper for embedded raster jobs",
+          "status": "passed",
+          "title": "keeps the pure mapper for embedded raster jobs",
+          "duration": 2.736500000000433,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033922281,
+      "endTime": 1790033922322.7366,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/draw-preview-owned-mapping.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["preview preparation failures"],
+          "fullName": "preview preparation failures preserves the selected-output failure message instead of returning a generic empty job",
+          "status": "passed",
+          "title": "preserves the selected-output failure message instead of returning a generic empty job",
+          "duration": 3.2931000000003223,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preview preparation failures"],
+          "fullName": "preview preparation failures defers a large embedded raster on the UI thread",
+          "status": "passed",
+          "title": "defers a large embedded raster on the UI thread",
+          "duration": 1.6623999999997068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preview preparation failures"],
+          "fullName": "preview preparation failures prepares the full 3000x3000 raster route without the UI scheduling gate (ADR-243/244)",
+          "status": "passed",
+          "title": "prepares the full 3000x3000 raster route without the UI scheduling gate (ADR-243/244)",
+          "duration": 1296.4160000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preview preparation failures"],
+          "fullName": "preview preparation failures defers page-backed raster preview to asynchronous worker preparation",
+          "status": "passed",
+          "title": "defers page-backed raster preview to asynchronous worker preparation",
+          "duration": 1.0994000000000597,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033934397,
+      "endTime": 1790033935700.0994,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/draw-preview-preparation-failure.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["preview / output parity (P1-C)"],
+          "fullName": "preview / output parity (P1-C) builds the preview from the SAME prepared (optimized) job that emit uses",
+          "status": "passed",
+          "title": "builds the preview from the SAME prepared (optimized) job that emit uses",
+          "duration": 23.750400000000354,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preview / output parity (P1-C)"],
+          "fullName": "preview / output parity (P1-C) builds selected-output preview from the same scoped prepared job",
+          "status": "passed",
+          "title": "builds selected-output preview from the same scoped prepared job",
+          "duration": 4.527599999999893,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preview / output parity (P1-C)"],
+          "fullName": "preview / output parity (P1-C) omits the phantom origin return when the active dialect does not park",
+          "status": "passed",
+          "title": "omits the phantom origin return when the active dialect does not park",
+          "duration": 4.7707000000000335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033931898,
+      "endTime": 1790033931931.7708,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/draw-preview.parity.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview renders a precomputed toolpath without compiling the project in the draw loop",
+          "status": "passed",
+          "title": "renders a precomputed toolpath without compiling the project in the draw loop",
+          "duration": 3.276499999999942,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview draws preview travel moves by default",
+          "status": "passed",
+          "title": "draws preview travel moves by default",
+          "duration": 0.3994999999999891,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview can hide preview travel moves without hiding laser-on cuts",
+          "status": "passed",
+          "title": "can hide preview travel moves without hiding laser-on cuts",
+          "duration": 0.28450000000020736,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview draws dim future route context plus start, end, and head markers while scrubbing",
+          "status": "passed",
+          "title": "draws dim future route context plus start, end, and head markers while scrubbing",
+          "duration": 0.560399999999845,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview draws completed cuts as a translucent route overlay instead of opaque artwork ink",
+          "status": "passed",
+          "title": "draws completed cuts as a translucent route overlay instead of opaque artwork ink",
+          "duration": 1.1149000000000342,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview samples oversized preview cuts without visiting every point on each redraw",
+          "status": "passed",
+          "title": "samples oversized preview cuts without visiting every point on each redraw",
+          "duration": 80.29020000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview samples many small preview cuts with a global operation budget",
+          "status": "passed",
+          "title": "samples many small preview cuts with a global operation budget",
+          "duration": 237.0569999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview samples faint source geometry in preview instead of redrawing every source point",
+          "status": "passed",
+          "title": "samples faint source geometry in preview instead of redrawing every source point",
+          "duration": 126.60609999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview draws drawn-shape source geometry in the faint preview layer",
+          "status": "passed",
+          "title": "draws drawn-shape source geometry in the faint preview layer",
+          "duration": 3.6838000000002467,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview keeps multi-operation artwork visible while ANY bound operation is visible",
+          "status": "passed",
+          "title": "keeps multi-operation artwork visible while ANY bound operation is visible",
+          "duration": 1.0785000000000764,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["drawPreview"],
+          "fullName": "drawPreview hides multi-operation artwork only when every bound operation is hidden",
+          "status": "passed",
+          "title": "hides multi-operation artwork only when every bound operation is hidden",
+          "duration": 0.45069999999986976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033909380,
+      "endTime": 1790033909835.4507,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/draw-preview.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["large-job preparation allocation lifetime"],
+          "fullName": "large-job preparation allocation lifetime finishes the exact estimate before retaining a full route (embedded)",
+          "status": "passed",
+          "title": "finishes the exact estimate before retaining a full route (embedded)",
+          "duration": 58.874399999999696,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["large-job preparation allocation lifetime"],
+          "fullName": "large-job preparation allocation lifetime finishes the exact estimate before retaining a full route (stateless-rows)",
+          "status": "passed",
+          "title": "finishes the exact estimate before retaining a full route (stateless-rows)",
+          "duration": 14.705399999999827,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["large-job preparation allocation lifetime"],
+          "fullName": "large-job preparation allocation lifetime finishes the exact estimate before retaining a full route (error-diffusion-rows)",
+          "status": "passed",
+          "title": "finishes the exact estimate before retaining a full route (error-diffusion-rows)",
+          "duration": 22.42450000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033919714,
+      "endTime": 1790033919810.4246,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/large-job-preparation-order.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareLargeJob"],
+          "fullName": "prepareLargeJob derives preview and ETA from one prepared output",
+          "status": "passed",
+          "title": "derives preview and ETA from one prepared output",
+          "duration": 27.418500000000222,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033941694,
+      "endTime": 1790033941721.4185,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/large-job-preparation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Preview request retention"],
+          "fullName": "Preview request retention separates explicit unknown, changed envelopes and absolute offsets in the shared Preview/ETA cache",
+          "status": "passed",
+          "title": "separates explicit unknown, changed envelopes and absolute offsets in the shared Preview/ETA cache",
+          "duration": 13.320999999999913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Preview request retention"],
+          "fullName": "Preview request retention releases the previous cached route before its replacement returns",
+          "status": "passed",
+          "title": "releases the previous cached route before its replacement returns",
+          "duration": 1.2474999999999454,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Preview request retention"],
+          "fullName": "Preview request retention delivers an older active result without making it reusable while a new Preview waits",
+          "status": "passed",
+          "title": "delivers an older active result without making it reusable while a new Preview waits",
+          "duration": 1.4816999999998188,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033929780,
+      "endTime": 1790033929796.4817,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/preparation-worker-cache-retention.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread returns null when the environment has no Worker",
+          "status": "passed",
+          "title": "returns null when the environment has no Worker",
+          "duration": 2.9073000000000775,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread resolves with the worker response",
+          "status": "passed",
+          "title": "resolves with the worker response",
+          "duration": 3.4856999999999516,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread shares one in-flight request per project + options (preview and estimate)",
+          "status": "passed",
+          "title": "shares one in-flight request per project + options (preview and estimate)",
+          "duration": 1.2766999999998916,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread shares semantic head coordinates and invalidates every axis for preview requests",
+          "status": "passed",
+          "title": "shares semantic head coordinates and invalidates every axis for preview requests",
+          "duration": 3.2749999999998636,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread shares semantic head coordinates and invalidates every axis for estimate requests",
+          "status": "passed",
+          "title": "shares semantic head coordinates and invalidates every axis for estimate requests",
+          "duration": 2.0113000000001193,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread keeps only the latest settled full Preview reusable",
+          "status": "passed",
+          "title": "keeps only the latest settled full Preview reusable",
+          "duration": 0.8110999999998967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread holds a same-project request with different options until the active compute settles",
+          "status": "passed",
+          "title": "holds a same-project request with different options until the active compute settles",
+          "duration": 0.8024000000000342,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread terminates the worker and rejects stale requests when the project changes",
+          "status": "passed",
+          "title": "terminates the worker and rejects stale requests when the project changes",
+          "duration": 3.031199999999899,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread rejects on a worker error response",
+          "status": "passed",
+          "title": "rejects on a worker error response",
+          "duration": 0.4731000000001586,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread delays worker construction and dispatch until the supersede quiet window ends",
+          "status": "passed",
+          "title": "delays worker construction and dispatch until the supersede quiet window ends",
+          "duration": 1.0838000000001102,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread coalesces a burst of new-project supersedes into one restart and one dispatch",
+          "status": "passed",
+          "title": "coalesces a burst of new-project supersedes into one restart and one dispatch",
+          "duration": 1.8933999999999287,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread rejects stale queued same-project requests, keeping only the active compute",
+          "status": "passed",
+          "title": "rejects stale queued same-project requests, keeping only the active compute",
+          "duration": 1.167699999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread marks an internally coalesced same-project supersede as superseded, not failed",
+          "status": "passed",
+          "title": "marks an internally coalesced same-project supersede as superseded, not failed",
+          "duration": 0.6360000000001946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread marks a different-project supersede as superseded — the scene changed, nothing failed",
+          "status": "passed",
+          "title": "marks a different-project supersede as superseded — the scene changed, nothing failed",
+          "duration": 0.43810000000007676,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread does NOT mark a real worker failure as superseded",
+          "status": "passed",
+          "title": "does NOT mark a real worker failure as superseded",
+          "duration": 0.4781999999997879,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareLargeJobOffThread"],
+          "fullName": "prepareLargeJobOffThread re-requests after a rejection instead of returning the failed promise",
+          "status": "passed",
+          "title": "re-requests after a rejection instead of returning the failed promise",
+          "duration": 0.6346000000000913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033903479,
+      "endTime": 1790033903503.6345,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/preparation-worker-client.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client returns null without Worker and does not run preparation inline",
+          "status": "passed",
+          "title": "returns null without Worker and does not run preparation inline",
+          "duration": 2.751700000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client requests and caches an estimate without preview geometry",
+          "status": "passed",
+          "title": "requests and caches an estimate without preview geometry",
+          "duration": 5.720399999999927,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client shares both in-flight and settled full Preview results with ETA",
+          "status": "passed",
+          "title": "shares both in-flight and settled full Preview results with ETA",
+          "duration": 1.2751999999998134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client does not return a cached estimate as a Preview",
+          "status": "passed",
+          "title": "does not return a cached estimate as a Preview",
+          "duration": 1.12929999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client finishes an active estimate before a newly requested full Preview without downgrading its cache",
+          "status": "passed",
+          "title": "finishes an active estimate before a newly requested full Preview without downgrading its cache",
+          "duration": 0.8927000000001044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client promotes a held estimate to full Preview and settles both consumers from one response",
+          "status": "passed",
+          "title": "promotes a held estimate to full Preview and settles both consumers from one response",
+          "duration": 0.8716999999999189,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client joins a held full Preview without cancelling it when ETA asks for the same options",
+          "status": "passed",
+          "title": "joins a held full Preview without cancelling it when ETA asks for the same options",
+          "duration": 0.6354000000001179,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client keeps settled estimate reuse within the four-entry LRU bound",
+          "status": "passed",
+          "title": "keeps settled estimate reuse within the four-entry LRU bound",
+          "duration": 1.116800000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client terminates stale estimate work and rejects both capabilities when the project changes",
+          "status": "passed",
+          "title": "terminates stale estimate work and rejects both capabilities when the project changes",
+          "duration": 4.115700000000061,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client retries a real estimate failure instead of retaining the rejected entry",
+          "status": "passed",
+          "title": "retries a real estimate failure instead of retaining the rejected entry",
+          "duration": 0.9271000000001095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client rejects an estimate-only response to a full Preview request",
+          "status": "passed",
+          "title": "rejects an estimate-only response to a full Preview request",
+          "duration": 0.6394000000000233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["estimate-only preparation client"],
+          "fullName": "estimate-only preparation client preserves the full Preview placement carrier through estimate promotion and cached reuse",
+          "status": "passed",
+          "title": "preserves the full Preview placement carrier through estimate promotion and cached reuse",
+          "duration": 1.321999999999889,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033911409,
+      "endTime": 1790033911430.322,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/preparation-worker-estimate.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection retains runtime contour bounds and absolute translation (snapshot undefined)",
+          "status": "passed",
+          "title": "retains runtime contour bounds and absolute translation (snapshot undefined)",
+          "duration": 465.0155999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection retains runtime contour bounds and absolute translation (snapshot {})",
+          "status": "passed",
+          "title": "retains runtime contour bounds and absolute translation (snapshot {})",
+          "duration": 71.83469999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection returns the exact estimate without constructing or posting preview geometry (snapshot undefined)",
+          "status": "passed",
+          "title": "returns the exact estimate without constructing or posting preview geometry (snapshot undefined)",
+          "duration": 88.20830000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection returns the exact estimate without constructing or posting preview geometry (snapshot {})",
+          "status": "passed",
+          "title": "returns the exact estimate without constructing or posting preview geometry (snapshot {})",
+          "duration": 92.2786000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection uses the physical head for the 'estimate' projection ({\"projection\":\"estimate\"})",
+          "status": "passed",
+          "title": "uses the physical head for the 'estimate' projection ({\"projection\":\"estimate\"})",
+          "duration": 90.54989999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection uses the physical head for the 'estimate' projection ({\"projection\":\"estimate\",\"snapshot\":{}})",
+          "status": "passed",
+          "title": "uses the physical head for the 'estimate' projection ({\"projection\":\"estimate\",\"snapshot\":{}})",
+          "duration": 167.0251000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection uses the physical head for the 'preview' projection ({\"projection\":\"preview\"})",
+          "status": "passed",
+          "title": "uses the physical head for the 'preview' projection ({\"projection\":\"preview\"})",
+          "duration": 201.86540000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["preparation worker result projection"],
+          "fullName": "preparation worker result projection preserves the default full Preview response and builds its route",
+          "status": "passed",
+          "title": "preserves the default full Preview response and builds its route",
+          "duration": 191.10150000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033913651,
+      "endTime": 1790033915019.1016,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/preparation-worker-projection.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runtime Preview and ETA evidence invalidation"],
+          "fullName": "runtime Preview and ETA evidence invalidation updates both when native reference is lost without rebuilding for unchanged evidence",
+          "status": "passed",
+          "title": "updates both when native reference is lost without rebuilding for unchanged evidence",
+          "duration": 134.76350000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033939274,
+      "endTime": 1790033939408.7634,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/runtime-coordinate-hooks.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["runtime coordinate inputs across preparation consumers"],
+          "fullName": "runtime coordinate inputs across preparation consumers absolute gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "status": "passed",
+          "title": "absolute gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "duration": 79.05690000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runtime coordinate inputs across preparation consumers"],
+          "fullName": "runtime coordinate inputs across preparation consumers user-origin gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "status": "passed",
+          "title": "user-origin gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "duration": 18.089899999999943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runtime coordinate inputs across preparation consumers"],
+          "fullName": "runtime coordinate inputs across preparation consumers current-position gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "status": "passed",
+          "title": "current-position gives no-snapshot worker Start the same bytes and Frame bounds as direct Start",
+          "duration": 13.391699999999673,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runtime coordinate inputs across preparation consumers"],
+          "fullName": "runtime coordinate inputs across preparation consumers absolute preserves the physical envelope and placement through Preview and ETA entry points",
+          "status": "passed",
+          "title": "absolute preserves the physical envelope and placement through Preview and ETA entry points",
+          "duration": 37.788800000000265,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["runtime coordinate inputs across preparation consumers"],
+          "fullName": "runtime coordinate inputs across preparation consumers user-origin preserves the physical envelope and placement through Preview and ETA entry points",
+          "status": "passed",
+          "title": "user-origin preserves the physical envelope and placement through Preview and ETA entry points",
+          "duration": 23.61920000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033928216,
+      "endTime": 1790033928388.6191,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/runtime-coordinate-preparation.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath schedules preview preparation outside render",
+          "status": "passed",
+          "title": "schedules preview preparation outside render",
+          "duration": 44.35330000000022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath does not reschedule a build on a status poll that resolves to the same placement [PRF-02]",
+          "status": "passed",
+          "title": "does not reschedule a build on a status poll that resolves to the same placement [PRF-02]",
+          "duration": 9.745400000000245,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath reschedules a build when the head moves in current-position mode [PRF-02]",
+          "status": "passed",
+          "title": "reschedules a build when the head moves in current-position mode [PRF-02]",
+          "duration": 8.195099999999911,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath builds a User Origin preview before the machine origin is set",
+          "status": "passed",
+          "title": "builds a User Origin preview before the machine origin is set",
+          "duration": 14.244200000000092,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath builds a Verified Origin preview before the machine origin is set (ADR-327)",
+          "status": "passed",
+          "title": "builds a Verified Origin preview before the machine origin is set (ADR-327)",
+          "duration": 6.879899999999907,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath cancels stale scheduled preparation when preview exits",
+          "status": "passed",
+          "title": "cancels stale scheduled preparation when preview exits",
+          "duration": 5.743900000000394,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath fills a paused over-budget preview in from the preparation worker (ADR-244)",
+          "status": "passed",
+          "title": "fills a paused over-budget preview in from the preparation worker (ADR-244)",
+          "duration": 7.725100000000111,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath leaves a moving head out of the background preparation key, matching the estimate",
+          "status": "passed",
+          "title": "leaves a moving head out of the background preparation key, matching the estimate",
+          "duration": 6.728500000000167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath keeps the paused banner when workers are unavailable",
+          "status": "passed",
+          "title": "keeps the paused banner when workers are unavailable",
+          "duration": 4.690900000000056,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath keeps the preparing banner when the background request is superseded (newer-request)",
+          "status": "passed",
+          "title": "keeps the preparing banner when the background request is superseded (newer-request)",
+          "duration": 5.009299999999712,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath keeps the preparing banner when the background request is superseded (newer-project)",
+          "status": "passed",
+          "title": "keeps the preparing banner when the background request is superseded (newer-project)",
+          "duration": 3.7568999999998596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["usePreviewToolpath"],
+          "fullName": "usePreviewToolpath surfaces a worker rejection and retry guidance instead of spinning forever",
+          "status": "passed",
+          "title": "surfaces a worker rejection and retry guidance instead of spinning forever",
+          "duration": 3.274800000000141,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033906650,
+      "endTime": 1790033906770.275,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/workspace/use-preview-toolpath.test.tsx"
+    }
+  ]
+}

@@ -2,8 +2,14 @@
 // coordinate model used by the workspace, bounds checks, framing, jogging,
 // and output transforms.
 
-import type { DeviceProfile, Origin } from '../../../core/devices';
-import { BedRows, FeedRows, NameRow, OriginCornerRow, OriginSelect } from '../DeviceProfileFields';
+import type { DeviceProfile } from '../../../core/devices';
+import {
+  BedRows,
+  FeedRows,
+  HomingCornerSelect,
+  NameRow,
+  OriginCornerRow,
+} from '../DeviceProfileFields';
 import { Row } from '../device-settings-shared';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
@@ -41,18 +47,23 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
           <span>
             {guide.homeCommand === null
               ? 'Not available for this controller'
-              : `Enable Home (${guide.homeCommand})`}
+              : `Enable Home (${guide.homeCommand.split(/\r?\n/).join(' then ')})`}
           </span>
         </label>
         {state.draft.homing.enabled ? (
-          <OriginSelect
+          <HomingCornerSelect
             value={state.draft.homing.direction}
-            onChange={(direction: Origin) =>
-              update({ homing: { ...state.draft.homing, direction } })
-            }
+            onChange={(direction) => update({ homing: { ...state.draft.homing, direction } })}
           />
         ) : null}
       </Row>
+      <p style={noteStyle}>
+        Recorded home is a note about the machine. The controller determines where Home moves.
+        {guide.writePolicy === 'guarded-single-setting'
+          ? ' GRBL uses its $23 firmware setting for homing direction.'
+          : ''}{' '}
+        Changing this recorded corner does not change firmware or set the workpiece origin.
+      </p>
       <p style={warningStyle}>
         Enable Home only after checking your switches and homing direction. Saving does not run
         Home.
@@ -91,5 +102,11 @@ const warningStyle: React.CSSProperties = {
   margin: '4px 0 0',
   fontSize: 12,
   color: 'var(--lf-warning-fg)',
+  lineHeight: 1.45,
+};
+const noteStyle: React.CSSProperties = {
+  margin: '4px 0 0',
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
   lineHeight: 1.45,
 };

@@ -62,6 +62,7 @@ import {
   publishTranscriptPatch,
 } from './laser-transcript-buffer';
 import { invalidateSettingsForMpgTakeover } from './laser-settings-mpg-takeover';
+import { refreshedReportUnitsPatch, retainControllerReportUnits } from './controller-report-units';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
 
@@ -245,8 +246,16 @@ function publishDetectedSettings(
     return;
   }
   set((current) => ({
+    // The terminal $$ acknowledgement is a FIFO boundary: any old-unit
+    // status generated before the setting changed has already been received.
+    // Discard raw coordinates across this boundary instead of rescaling them
+    // using a setting that did not apply when those numbers were reported.
+    ...refreshedReportUnitsPatch(current, detected.controllerSettings),
     detectedSettings: shouldShowDetectedSettingsReview(detected) ? detected.patch : null,
-    controllerSettings: detected.controllerSettings,
+    controllerSettings: {
+      ...retainControllerReportUnits(current.controllerSettings),
+      ...detected.controllerSettings,
+    },
     controllerSettingsObservation: {
       sessionEpoch: state.controllerSessionEpoch,
       observedAt: Date.now(),

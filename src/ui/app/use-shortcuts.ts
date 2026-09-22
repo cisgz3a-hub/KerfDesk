@@ -8,10 +8,11 @@
 // window keydown listener; order doesn't matter because the matchers
 // guard themselves (modifier checks, isEditableTarget, kind-of-event).
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { selectedConvertibleVectors, selectedObjectIds } from '../commands/selection-command-state';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
@@ -81,8 +82,19 @@ function useFileEditShortcuts(): void {
   const activeWcs = useLaserStore((s) => s.activeWcs);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsCapability = useLaserStore((s) => s.capabilities.settings);
+  const coordinateEvidenceKey = useLaserStore((s) => JSON.stringify(nativeBedEvidenceSnapshot(s)));
+  const coordinateEvidence = useMemo(
+    () => JSON.parse(coordinateEvidenceKey) as ReturnType<typeof nativeBedEvidenceSnapshot>,
+    [coordinateEvidenceKey],
+  );
   const pushToast = useToastStore((s) => s.pushToast);
-  const machine = { statusReport, workOriginActive, wcoCache };
+  const machine = {
+    ...coordinateEvidence,
+    statusReport,
+    workOriginActive,
+    wcoCache,
+    reportInches: controllerSettings?.reportInches === true,
+  };
   const confirmDiscard = (action: string): Promise<boolean> =>
     confirmDiscardAsync(platform, action);
   // prettier-ignore

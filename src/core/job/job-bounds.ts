@@ -4,7 +4,7 @@
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
-import { contourEntryPoint } from './contour-entry';
+import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import {
@@ -76,8 +76,23 @@ function computeBounds(
     maxY: Number.NEGATIVE_INFINITY,
   };
   let any = false;
+  const entryBounds =
+    job.contourEntryBounds === undefined
+      ? device === undefined
+        ? undefined
+        : { widthMm: device.bedWidth, heightMm: device.bedHeight }
+      : job.contourEntryBounds;
   for (const group of job.groups) {
-    if (extendBoundsForGroup(b, group, includeOverscanMotion, device, useRepresentedCncMotion))
+    if (
+      extendBoundsForGroup(
+        b,
+        group,
+        includeOverscanMotion,
+        device,
+        useRepresentedCncMotion,
+        entryBounds,
+      )
+    )
       any = true;
   }
   return any ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } : null;
@@ -90,15 +105,17 @@ function extendBoundsForGroup(
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
   useRepresentedCncMotion: boolean,
+  entryBounds: ContourEntryBounds,
 ): boolean {
   switch (group.kind) {
-    case 'cut': {
+    case 'cut':
+    case 'fill': {
+      if (group.kind === 'fill' && group.fillStyle !== 'offset')
+        return extendBoundsForFill(b, group, includeOverscanMotion, device);
       const any = extendBoundsForCut(b, group);
-      extendBoundsForContourEntries(b, group, includeOverscanMotion, device);
+      extendBoundsForContourEntries(b, group, includeOverscanMotion, entryBounds);
       return any;
     }
-    case 'fill':
-      return extendBoundsForFill(b, group, includeOverscanMotion, device);
     case 'raster':
       return extendBoundsForRaster(b, group, includeOverscanMotion, device);
     case 'cnc':
@@ -154,8 +171,6 @@ function extendBoundsForFill(
 ): boolean {
   const usesPlannedBurnBounds = group.fillRunwayPolicy === 'feed-matched-every-sweep';
   let any = usesPlannedBurnBounds ? false : extendBoundsForCut(b, group);
-  // Only Follow Shape (offset) groups carry entryRunwayMm (ADR-239).
-  extendBoundsForContourEntries(b, group, includeOverscanMotion, device);
   const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
   const plans = planFillSweeps(group, scanOffsetMm);
   for (const plan of plans) {
@@ -217,14 +232,12 @@ function extendBoundsForContourEntries(
   b: MutableBounds,
   group: CutGroup | FillGroup,
   includeOverscanMotion: boolean,
-  device: DeviceProfile | undefined,
+  entryBounds: ContourEntryBounds,
 ): void {
   const entryRunwayMm = group.entryRunwayMm ?? 0;
   if (!includeOverscanMotion || entryRunwayMm <= 0) return;
-  const bed =
-    device === undefined ? undefined : { widthMm: device.bedWidth, heightMm: device.bedHeight };
   for (const seg of group.segments) {
-    const entry = contourEntryPoint(seg.polyline, entryRunwayMm, bed);
+    const entry = contourEntryPoint(seg.polyline, entryRunwayMm, entryBounds);
     if (entry !== null) extendBoundsForPoint(b, entry);
   }
 }

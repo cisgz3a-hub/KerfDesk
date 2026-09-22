@@ -1349,7 +1349,11 @@ authorization, Frame proof, controller command, or safety boundary.
 2. App sends the command through the same guarded serial write path as all other controller writes.
 3. `$$` starts the existing settings collector so detected controller settings refresh when the dump completes.
 4. Read-only queries preserve the current work-origin, Z-zero, homing,
-   position, and frame-verification evidence.
+   position, and frame-verification evidence when the reported coordinate-unit contract
+   is unchanged. If settings readback reveals a changed `$13`, cached raw position/WCO
+   and Frame evidence are discarded until fresh position arrives in the verified units.
+   During an owned `$13` write and verification, status and accessories remain visible,
+   but coordinate numbers cannot be reused under an unconfirmed unit interpretation.
 
 #### Success — unlock alarm
 1. When the controller is in `Alarm`, user can send `$X` from the console or the alarm banner after confirming the head is safe.
@@ -2371,7 +2375,7 @@ Matches LightBurn's "Set Job Origin to Current Position" UX.
 existing SetupRow (Home / Auto-focus / Frame / Start) and the
 streaming controls. Two buttons:
 
-- **Set origin here** — sends `G92 X0 Y0`. Declares the current head
+- **Set origin here** — on GRBL-family controllers sends `G54 G92 X0 Y0`. Declares the current head
   position as work-coord (0, 0). Toast confirms the controller's `ok`
   acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
@@ -2380,8 +2384,28 @@ streaming controls. Two buttons:
   Coordinates placement to User Origin after that `ok` and its bounded
   work-offset wait finish; an explicit User, Verified, or Current Position
   choice is kept (ADR-327). A cancelled action leaves placement unchanged.
-- **Reset origin** — sends `G92.1`. Clears the offset, status returns
-  to "machine 0,0". Disabled when no custom origin is active.
+- **Reset origin** — on GRBL-family controllers sends `G54 G92.1`. Clears all temporary
+  G92 offsets, including temporary Z zero. Any stored G54 offset remains, so work
+  coordinates do not necessarily return to machine zero. Disabled when no custom
+  origin is active; a persistent or unknown origin uses the explicit persistent controls.
+
+The profile's **Recorded home** corner documents the setup. It does not write controller
+homing direction or change work zero. Home uses the selected controller's command contract
+(for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
+the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
+
+The controller's native MPos is distinct from the drawn bed coordinates (ADR-342). Stock GRBL
+can report negative machine positions after homing. With current-session build, travel and homing
+evidence, KerfDesk maps that native frame to the profile bed and translates Absolute output back
+into the controller's frame. It does not change firmware offsets to do this. User and Current
+Position placement remain relative to their selected work/head reference. When the physical bed
+mapping is unknown, the canvas uses the artwork frame and Job Review explains the limitation;
+the completed Frame remains the ordinary Start gate.
+
+Contour entry moves use the prepared program's explicit physical envelope, including centred
+origins and translated work origins. If that envelope is unknown, the optional contour entry is
+omitted. Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across
@@ -2440,32 +2464,33 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 
 **Hardware verification checklist (Falcon A1 Pro — user-driven).**
 
-1. Connect → `StatusDisplay` shows `Origin: machine 0,0` (muted).
-2. Jog (or motors-off hand-drag) the head to a workpiece corner.
-   MPos updates accordingly.
+1. Connect and wait for fresh controller position and WCO. Record any existing G54 offset;
+   reconnecting does not erase persistent coordinates or prove that work zero equals machine zero.
+2. Jog the head to a workpiece corner. If positioning by hand instead, use the documented
+   Release → move → Wake → Set origin order; stale MPos is not physical position evidence.
 3. Click **Set origin here**. Within ~5 s the readout flips to
    `Origin: X… Y… (custom)` (red/bold), values matching the previous
    MPos. Toast confirms.
 4. Click **Frame**. Head sweeps the job's front-left anchored bounding
    box *around the workpiece corner*, not around machine origin or the
    image's auto-centered canvas placement.
-5. Run a 5 mm × 5 mm test square (S=0 or low power on scrap). It
-   should burn at the workpiece corner.
-6. Click **Reset origin**. Toast confirms; readout returns to
-   `Origin: machine 0,0`.
-7. **Alarm-clear path.** Set origin again, then deliberately trigger
-   an alarm (e.g. hit a soft limit). The readout returns to
-   `Origin: machine 0,0` on alarm receipt. Click Unlock; the readout
-   stays at machine zero (GRBL keeps G92 cleared after `$X`).
+5. For an explicitly authorised hardware check, use a 5 mm × 5 mm tool-off route to
+   check placement. A separate low-power material test is needed to establish burn position;
+   `S0` motion itself cannot prove a burn.
+6. Click **Reset origin**. Toast confirms temporary offsets were cleared; fresh WCO should
+   reflect the remaining stored G54 and tool offsets, which need not be zero.
+7. **Alarm path.** Use a simulated alarm to verify that old origin authority and Frame
+   authorization are invalidated. A real alarm or `$X` acknowledgement alone does not prove
+   that stored offsets were erased or that the physical machine reference is still valid.
 8. **Abort-clear path.** Set origin, start a job, press **ABORT**
-   (the GRBL path requests Ctrl-X plus accessory-off cleanup). The readout returns
-   to machine zero after the controller reports the reset state.
-9. **Reconnect-clear path.** Set origin, disconnect, reconnect. The
-   readout shows `Origin: machine 0,0` (cache cleared on
-   `teardown`).
-10. **$10 unusual config.** Set `$10=1` (WPos-only) and repeat steps
-    2–3. The cache should still update — WCO is reported on a
-    separate bit from MPos/WPos.
+   (the GRBL path requests Ctrl-X plus accessory-off cleanup). Temporary G92 is cleared by
+   reset; persistent G54 remains. Check the fresh controller readback rather than assuming zero.
+9. **Reconnect path.** Disconnect and reconnect invalidate cached origin/Frame evidence.
+   Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
+10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
+    (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
+    bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
+    not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the

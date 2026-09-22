@@ -1,0 +1,61 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ❯ src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx (9 tests | 2 failed) 37ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves distinct geometry and optional coordinate fields for front-left 13ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves distinct geometry and optional coordinate fields for front-right 2ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves distinct geometry and optional coordinate fields for rear-left 2ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves distinct geometry and optional coordinate fields for rear-right 2ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves distinct geometry and optional coordinate fields for center 2ms
+   ✓ Independent coordinate settings audit 2026-09-21 > keeps homing, direction, pull-off and report units as observations, not profile guesses 2ms
+   ✓ Independent coordinate settings audit 2026-09-21 > preserves an unchanged measured Z travel confirmation 1ms
+   × Independent coordinate settings audit 2026-09-21 > requires new Z confirmation after direct detected travel replacement 10ms
+     → expected true to be false // Object.is equality
+   × Independent coordinate settings audit 2026-09-21 > requires new Z confirmation when the setup wizard accepts changed detected travel 1ms
+     → expected true to be false // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx > Independent coordinate settings audit 2026-09-21 > requires new Z confirmation after direct detected travel replacement
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx:126:44
+    124|     const device = useStore.getState().project.device;
+    125|     expect(device.zTravelMm).toBe(150);
+    126|     expect(focusJogReady(device, 'laser')).toBe(false);
+       |                                            ^
+    127|     expect(device.zTravelConfirmed).not.toBe(true);
+    128|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx > Independent coordinate settings audit 2026-09-21 > requires new Z confirmation when the setup wizard accepts changed detected travel
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/ui/laser/device-setup/machine-settings-coordinate-audit-20260921.test.tsx:136:49
+    134|     });
+    135|     expect(state.draft.zTravelMm).toBe(150);
+    136|     expect(focusJogReady(state.draft, 'laser')).toBe(false);
+       |                                                 ^
+    137|     expect(state.draft.zTravelConfirmed).not.toBe(true);
+    138|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  23:51:44
+   Duration  10.16s (transform 4.95s, setup 28ms, collect 8.68s, tests 37ms, environment 862ms, prepare 174ms)

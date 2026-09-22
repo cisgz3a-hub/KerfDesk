@@ -1,0 +1,132 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 8,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035191812,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership uses the verified worker result and its captured bounds without recompiling at Frame",
+          "status": "failed",
+          "title": "uses the verified worker result and its captured bounds without recompiling at Frame",
+          "duration": 186.78080000000045,
+          "failureMessages": [
+            "AssertionError: expected { kind: 'relative', …(1) } to deeply equal { kind: 'machine', …(1) }\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/second-pass-execution.test.ts:162:35\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership Frames only the clipped immutable program, then starts and archives it after review",
+          "status": "passed",
+          "title": "Frames only the clipped immutable program, then starts and archives it after review",
+          "duration": 148.29320000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership keeps cancel and duplicate Start from dispatching a second program",
+          "status": "passed",
+          "title": "keeps cancel and duplicate Start from dispatching a second program",
+          "duration": 64.07500000000073,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses controller movement while the worker binds the Frame approach",
+          "status": "passed",
+          "title": "refuses controller movement while the worker binds the Frame approach",
+          "duration": 19.251499999998487,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership keeps the original current-position placement when framing from a different head position",
+          "status": "passed",
+          "title": "keeps the original current-position placement when framing from a different head position",
+          "duration": 26.39690000000337,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses a revoked permit across the durable handoff and leaves no transmitted job",
+          "status": "passed",
+          "title": "refuses a revoked permit across the durable handoff and leaves no transmitted job",
+          "duration": 30.811899999996967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership retains the attempted second-pass archive when its first write may have reached the controller",
+          "status": "passed",
+          "title": "retains the attempted second-pass archive when its first write may have reached the controller",
+          "duration": 31.711699999999837,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses changed preview bytes and only revokes the exact owned permit on cancellation",
+          "status": "passed",
+          "title": "refuses changed preview bytes and only revokes the exact owned permit on cancellation",
+          "duration": 22.010600000001432,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership preserves transform ordering through disconnect recovery and another selected pass",
+          "status": "passed",
+          "title": "preserves transform ordering through disconnect recovery and another selected pass",
+          "duration": 93.25039999999717,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035219156,
+      "endTime": 1790035219779.2505,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/second-pass-execution.test.ts"
+    }
+  ]
+}

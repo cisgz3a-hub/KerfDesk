@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type Origin } from '../../core/devices';
-import { capturedMachinePointToScene } from './print-cut-capture-frame';
+import { capturedMachinePointToScene as captureWithFrame } from './print-cut-capture-frame';
+import { machineBoundsForDevice } from '../../core/devices/machine-bounds';
+import { nativeBedFrame } from '../../core/devices/native-bed-frame';
+
+// These original round-trip cases explicitly model a controller whose native
+// envelope matches the profile bed. Separate regressions cover negative GRBL.
+function capturedMachinePointToScene(
+  reported: Parameters<typeof captureWithFrame>[0],
+  device: Parameters<typeof captureWithFrame>[1],
+  inches: boolean,
+) {
+  return captureWithFrame(
+    reported,
+    device,
+    inches,
+    nativeBedFrame(device, machineBoundsForDevice(device)),
+  );
+}
 
 const ORIGINS: readonly Origin[] = [
   'rear-left',
@@ -15,6 +32,25 @@ function deviceAt(origin: Origin) {
 }
 
 describe('capturedMachinePointToScene', () => {
+  it('maps negative native GRBL marks through the bed before solving registration', () => {
+    const device = deviceAt('front-left');
+    const frame = nativeBedFrame(device, { minX: -400, minY: -300, maxX: 0, maxY: 0 });
+    expect(captureWithFrame({ x: -350, y: -270, z: 0 }, device, false, frame)).toEqual({
+      x: 50,
+      y: 270,
+    });
+    expect(
+      captureWithFrame({ x: -350 / 25.4, y: -270 / 25.4, z: 0 }, device, true, frame)?.x,
+    ).toBeCloseTo(50);
+    expect(captureWithFrame({ x: -350, y: -270, z: NaN }, device, false, frame)).toBeNull();
+  });
+  it.each(ORIGINS)('retains controller-relative registration without homing on %s', (origin) => {
+    const device = deviceAt(origin);
+    const native = { x: -350, y: -270, z: 0 };
+    const scene = captureWithFrame(native, device, false, null);
+    expect(scene).not.toBeNull();
+    expect(toMachineCoords(scene!, device)).toEqual({ x: native.x, y: native.y });
+  });
   // The round trip is the whole contract: the compile path emits
   // toMachineCoords(scenePoint), so jogging to that emitted position and
   // capturing it must recover the scene point on EVERY origin. Before the fix

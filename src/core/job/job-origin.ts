@@ -12,6 +12,7 @@ import type {
 } from './job';
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
+import { withContourEntryBounds } from './contour-entry';
 
 export type JobStartMode = 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
 
@@ -81,12 +82,15 @@ export function applyJobOrigin(
   device?: DeviceProfile,
 ): Job {
   const offset = jobOriginOffset(job, placement, device);
-  return applyJobOriginOffset(job, offset);
+  const placed = applyJobOriginOffset(job, offset);
+  return placement.startFrom === 'absolute' ? placed : withContourEntryBounds(placed, null);
 }
 
 export function applyJobOriginOffset(job: Job, offset: Vec2): Job {
   if (offset.x === 0 && offset.y === 0) return job;
-  return translateJob(job, offset.x, offset.y);
+  // A placement translation does not establish where the physical bed lies
+  // in work coordinates. Preparation rebinds known final-program evidence.
+  return withContourEntryBounds(translateJob(job, offset.x, offset.y), null);
 }
 
 // The translation applyJobOrigin applies for this job + placement (zero for

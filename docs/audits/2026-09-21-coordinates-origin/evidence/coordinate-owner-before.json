@@ -1,0 +1,104 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 5,
+  "numPassedTests": 3,
+  "numFailedTests": 2,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790034227043,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate cancels old Absolute work when a same-session observation establishes native bed mapping",
+          "status": "failed",
+          "title": "cancels old Absolute work when a same-session observation establishes native bed mapping",
+          "duration": 89.54099999999744,
+          "failureMessages": [
+            "AssertionError: expected false to be true // Object.is equality\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/coordinate-preparation-ownership.test.ts:86:34\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate keeps $30/$32 and equivalent $I/settings observation replacements advisory",
+          "status": "passed",
+          "title": "keeps $30/$32 and equivalent $I/settings observation replacements advisory",
+          "duration": 3.164600000000064,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate uses the resolved Verified Origin instead of the unrelated live Absolute selector",
+          "status": "passed",
+          "title": "uses the resolved Verified Origin instead of the unrelated live Absolute selector",
+          "duration": 2.007999999997992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate refuses a stale Frame handoff after mapping changes, even after the owner settled",
+          "status": "passed",
+          "title": "refuses a stale Frame handoff after mapping changes, even after the owner settled",
+          "duration": 14.40940000000046,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "coordinate evidence owns async preparation without becoming a new Start gate"
+          ],
+          "fullName": "coordinate evidence owns async preparation without becoming a new Start gate accepts Frame handoff after an advisory refresh and preserves the exact prepared bytes",
+          "status": "failed",
+          "title": "accepts Frame handoff after an advisory refresh and preserves the exact prepared bytes",
+          "duration": 10.709999999999127,
+          "failureMessages": [
+            "AssertionError: expected undefined to be 'G21\\nG90\\nG54\\nG94\\nM4 S0\\n; layer li…' // Object.is equality\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/coordinate-preparation-ownership.test.ts:136:51\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790034249254,
+      "endTime": 1790034249374.71,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/coordinate-preparation-ownership.test.ts"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { currentOutputScope } from '../state';
 import type { useStore } from '../state';
 import type { useLaserStore } from '../state/laser-store';
+import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import type { useToastStore } from '../state/toast-store';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import { projectInspectionContext } from '../gcode-inspector/gcode-inspection-source';
@@ -69,6 +70,7 @@ export function saveGcodeContext(
     jobPlacement: app.jobPlacement,
     outputScope: currentOutputScope(app),
     machine: {
+      ...nativeBedEvidenceSnapshot(laser),
       statusReport: laser.statusReport,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,

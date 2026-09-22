@@ -34,6 +34,7 @@ import { registerCanvasExecutablePlan } from './canvas-preview-motion';
 import { registerCanvasProgramSource } from './canvas-program-source';
 import { canvasExecutableSidecarWithinBudget } from './canvas-program-analysis-budget';
 import type { LiveJobTiming } from './live-job-timing';
+import { resolveNativeBedFrame } from './native-bed-frame';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
 
@@ -44,7 +45,11 @@ export type CanvasMotionPlan = {
   readonly machineKind: MachineKind;
   readonly device: DeviceProfile;
   readonly coordinateFrame:
-    | { readonly kind: 'machine'; readonly workOffsetMm: MotionPoint }
+    | {
+        readonly kind: 'machine';
+        readonly workOffsetMm: MotionPoint;
+        readonly nativeToBedOffsetMm?: Vec2;
+      }
     | { readonly kind: 'relative'; readonly jobOriginOffset: Vec2 };
   readonly framePerimeter: ReadonlyArray<Vec2>;
   readonly jobStart: Vec2 | null;
@@ -345,7 +350,10 @@ export function mapControllerPointToScene(
     );
   }
   return toSceneCoords(
-    { x: point.x + frame.workOffsetMm.x, y: point.y + frame.workOffsetMm.y },
+    {
+      x: point.x + frame.workOffsetMm.x + (frame.nativeToBedOffsetMm?.x ?? 0),
+      y: point.y + frame.workOffsetMm.y + (frame.nativeToBedOffsetMm?.y ?? 0),
+    },
     plan.device,
   );
 }
@@ -383,31 +391,17 @@ export function canvasCoordinateFrame(
   // the job-relative program at those "bed" coordinates lands it offset from
   // the artwork at a physically meaningless position (live repro 2026-07-17).
   const wcoRaw = machine.statusReport?.wco ?? machine.wcoCache ?? null;
+  const nativeFrame = resolveNativeBedFrame(prepared.project.device, machine);
   if (
     relativeView ||
     jobOrigin?.startFrom === 'verified-origin' ||
     (machine.workOriginActive === true && wcoRaw === null) ||
-    (isOriginAnchoredStart(jobOrigin) && !bedPositionVerified(prepared, machine))
+    nativeFrame === null
   ) {
     return { kind: 'relative', jobOriginOffset: prepared.jobOriginOffset };
   }
   const workOffsetMm = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalized(wcoRaw, reportInches);
-  return { kind: 'machine', workOffsetMm };
-}
-
-// User Origin and Current Position anchor the program to the operator's
-// origin, not to a bed location the canvas can trust.
-function isOriginAnchoredStart(jobOrigin: JobOriginPlacement | undefined): boolean {
-  return jobOrigin?.startFrom === 'user-origin' || jobOrigin?.startFrom === 'current-position';
-}
-
-// Bed coordinates are trustworthy only on a homing machine that has homed in
-// the current connection — the same evidence Absolute placement requires.
-function bedPositionVerified(
-  prepared: Extract<PreparedOutput, { readonly ok: true }>,
-  machine: MachineStartSnapshot,
-): boolean {
-  return prepared.project.device.homing.enabled && machine.homingState === 'confirmed';
+  return { kind: 'machine', workOffsetMm, nativeToBedOffsetMm: nativeFrame.nativeToBedOffsetMm };
 }
 
 function normalized(point: MotionPoint, reportInches: boolean): MotionPoint {

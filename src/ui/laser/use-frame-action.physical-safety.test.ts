@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import type { FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { useToastStore } from '../state/toast-store';
 import {
   completeFramedRunCandidateForTest,
@@ -264,6 +265,15 @@ describe('Frame source-of-truth contract', () => {
 
   it('keeps an interior no-go finding advisory and lets the completed Frame authorize', async () => {
     installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
+    const project = useStore.getState().project;
+    const device = {
+      ...project.device,
+      homing: { ...project.device.homing, enabled: true },
+    };
+    useStore.setState({ project: { ...project, device } });
+    // A physical Clamp intersection needs a verified native-to-bed reference;
+    // the other Frame cases intentionally also cover unknown mappings.
+    useLaserStore.setState(stockNativeEvidence(device, true));
     const bounds = currentMotionBounds();
     setNoGoZone({
       x: (bounds.minX + bounds.maxX) / 2 - 1,

@@ -1,0 +1,1768 @@
+{
+  "numTotalTestSuites": 47,
+  "numPassedTestSuites": 47,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 176,
+  "numPassedTests": 176,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790006374351,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls handles retired origin requests without success, placement changes or an unhandled rejection",
+          "status": "passed",
+          "title": "handles retired origin requests without success, placement changes or an unhandled rejection",
+          "duration": 53.47559999999976,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls shows advanced persistent controls and disables transient reset for known G54 origin",
+          "status": "passed",
+          "title": "shows advanced persistent controls and disables transient reset for known G54 origin",
+          "duration": 8.88799999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls confirms before setting persistent G54 origin",
+          "status": "passed",
+          "title": "confirms before setting persistent G54 origin",
+          "duration": 11.405399999999645,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables persistent origin controls until the machine is Idle",
+          "status": "passed",
+          "title": "disables persistent origin controls until the machine is Idle",
+          "duration": 6.412900000000263,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls returns to the known work zero with a beam-off jog",
+          "status": "passed",
+          "title": "returns to the known work zero with a beam-off jog",
+          "duration": 8.69970000000012,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow persistent origin controls"],
+          "fullName": "OriginRow persistent origin controls disables return-to-zero until the origin position is known and Idle",
+          "status": "passed",
+          "title": "disables return-to-zero until the origin position is known and Idle",
+          "duration": 8.341300000000047,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability offers Release motors on a no-homing machine once an origin is settled",
+          "status": "passed",
+          "title": "offers Release motors on a no-homing machine once an origin is settled",
+          "duration": 6.2534999999998035,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability leaves Release motors to the Position job card when no origin is settled",
+          "status": "passed",
+          "title": "leaves Release motors to the Position job card when no origin is settled",
+          "duration": 6.251299999999901,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow release motors reachability"],
+          "fullName": "OriginRow release motors reachability keeps Release motors on the row for a homing-enabled machine with no origin",
+          "status": "passed",
+          "title": "keeps Release motors on the row for a homing-enabled machine with no origin",
+          "duration": 7.28859999999986,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) upgrades Absolute Coordinates to User Origin once an origin exists",
+          "status": "passed",
+          "title": "upgrades Absolute Coordinates to User Origin once an origin exists",
+          "duration": 8.988199999999779,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Verified Origin selection",
+          "status": "passed",
+          "title": "keeps an explicit Verified Origin selection",
+          "duration": 4.560699999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set origin and the Start-from mode (ADR-327)"],
+          "fullName": "OriginRow Set origin and the Start-from mode (ADR-327) keeps an explicit Current Position selection",
+          "status": "passed",
+          "title": "keeps an explicit Current Position selection",
+          "duration": 5.352599999999256,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) pulses for Verified Origin with no origin on a no-homing machine",
+          "status": "passed",
+          "title": "pulses for Verified Origin with no origin on a no-homing machine",
+          "duration": 6.701200000000426,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "status": "passed",
+          "title": "keeps pulsing after a Z-only touch-off, which is not an XY origin",
+          "duration": 4.755799999999908,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stops pulsing once an XY origin exists",
+          "status": "passed",
+          "title": "stops pulsing once an XY origin exists",
+          "duration": 4.20549999999912,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["OriginRow Set-origin attention pulse (ADR-327)"],
+          "fullName": "OriginRow Set-origin attention pulse (ADR-327) stays quiet for Current Position, which reads the live head",
+          "status": "passed",
+          "title": "stays quiet for Current Position, which reads the live head",
+          "duration": 5.106600000000071,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006465125,
+      "endTime": 1790006465283.1067,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/OriginRow.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit does not reinterpret a cached millimetre position as inches after changing $13",
+          "status": "passed",
+          "title": "does not reinterpret a cached millimetre position as inches after changing $13",
+          "duration": 529.4840999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit never derives a large wrong-way jog from the previous unit system",
+          "status": "passed",
+          "title": "never derives a large wrong-way jog from the previous unit system",
+          "duration": 520.7053999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit discards queued reports on either side of the $13 ACK until verified settings finish",
+          "status": "passed",
+          "title": "discards queued reports on either side of the $13 ACK until verified settings finish",
+          "duration": 521.4788000000008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit does not repopulate a stale WCO-only report during a unit write",
+          "status": "passed",
+          "title": "does not repopulate a stale WCO-only report during a unit write",
+          "duration": 521.6677,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit recovers confirmed console $13 writes through a terminal settings read",
+          "status": "passed",
+          "title": "recovers confirmed console $13 writes through a terminal settings read",
+          "duration": 517.5726000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract false -> true, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract false -> true, console false",
+          "duration": 520.7533000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> false, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> false, console false",
+          "duration": 520.7821000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> false, console true",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> false, console true",
+          "duration": 516.4515000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> true, console false",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> true, console false",
+          "duration": 516.3466000000008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit refresh handles unit contract true -> true, console true",
+          "status": "passed",
+          "title": "refresh handles unit contract true -> true, console true",
+          "duration": 520.1283000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["2026-09-21 independent origin/coordinate audit"],
+          "fullName": "2026-09-21 independent origin/coordinate audit keeps coordinates unavailable after a rejected unit write until a settings read recovers",
+          "status": "passed",
+          "title": "keeps coordinates unavailable after a rejected unit write until a settings read recovers",
+          "duration": 522.6687999999995,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006455057,
+      "endTime": 1790006460785.6687,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-audit-20260921.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: +0, y: +0, z: +0 } in inch mode false",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: +0, y: +0, z: +0 } in inch mode false",
+          "duration": 3.3939000000000306,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: +0, y: +0, z: +0 } in inch mode true",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: +0, y: +0, z: +0 } in inch mode true",
+          "duration": 0.5896000000000186,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: 150, y: 250, z: 30 } in inch mode false",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: 150, y: 250, z: 30 } in inch mode false",
+          "duration": 0.3648000000000593,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: 150, y: 250, z: 30 } in inch mode true",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: 150, y: 250, z: 30 } in inch mode true",
+          "duration": 0.19309999999995853,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: -200, y: -100, z: -30 } in inch mode false",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: -200, y: -100, z: -30 } in inch mode false",
+          "duration": 0.4806999999998425,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: -200, y: -100, z: -30 } in inch mode true",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: -200, y: -100, z: -30 } in inch mode true",
+          "duration": 0.36789999999996326,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: 12.345, y: -67.891, z: 4.321 } in inch mode false",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: 12.345, y: -67.891, z: 4.321 } in inch mode false",
+          "duration": 0.25850000000014006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Set origin yields work XY zero at { x: 12.345, y: -67.891, z: 4.321 } in inch mode true",
+          "status": "passed",
+          "title": "Set origin yields work XY zero at { x: 12.345, y: -67.891, z: 4.321 } in inch mode true",
+          "duration": 0.2335000000000491,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 Reset transient origin restores stored G54, which can be far from machine zero",
+          "status": "passed",
+          "title": "Reset transient origin restores stored G54, which can be far from machine zero",
+          "duration": 0.5649000000000797,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 persistent XY writes survive a simulated parser reset, inches false",
+          "status": "passed",
+          "title": "persistent XY writes survive a simulated parser reset, inches false",
+          "duration": 0.5802000000001044,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 persistent XY writes survive a simulated parser reset, inches true",
+          "status": "passed",
+          "title": "persistent XY writes survive a simulated parser reset, inches true",
+          "duration": 0.18549999999981992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 persistent XY clear does not erase stored G54 Z or tool length compensation",
+          "status": "passed",
+          "title": "persistent XY clear does not erase stored G54 Z or tool length compensation",
+          "duration": 0.3967999999999847,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["independent GRBL coordinate oracle, 2026-09-21"],
+          "fullName": "independent GRBL coordinate oracle, 2026-09-21 manual zero Z leaves established G54 XY zero unchanged",
+          "status": "passed",
+          "title": "manual zero Z leaves established G54 XY zero unchanged",
+          "duration": 0.25329999999985375,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006487938,
+      "endTime": 1790006487946.3967,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/coordinate-origin-oracle-audit-20260921.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["CNC live controller-cap lifecycle"],
+          "fullName": "CNC live controller-cap lifecycle publishes a completed settings observation for future automatic settings",
+          "status": "passed",
+          "title": "publishes a completed settings observation for future automatic settings",
+          "duration": 2.4890000000000327,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["CNC live controller-cap lifecycle"],
+          "fullName": "CNC live controller-cap lifecycle clears the previous observation as soon as a replacement read begins",
+          "status": "passed",
+          "title": "clears the previous observation as soon as a replacement read begins",
+          "duration": 0.9520999999999731,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006500682,
+      "endTime": 1790006500685.9521,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/detected-settings-action.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["currentWorkZMm"],
+          "fullName": "currentWorkZMm reads WPos.z directly when reported",
+          "status": "passed",
+          "title": "reads WPos.z directly when reported",
+          "duration": 2.192299999999932,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["currentWorkZMm"],
+          "fullName": "currentWorkZMm derives work Z from MPos.z minus the cached work offset",
+          "status": "passed",
+          "title": "derives work Z from MPos.z minus the cached work offset",
+          "duration": 0.32359999999994216,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["currentWorkZMm"],
+          "fullName": "currentWorkZMm normalizes inch-mode WPos and MPos/WCO values to millimetres",
+          "status": "passed",
+          "title": "normalizes inch-mode WPos and MPos/WCO values to millimetres",
+          "duration": 0.4068999999999505,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["currentWorkZMm"],
+          "fullName": "currentWorkZMm is unknowable from MPos without a cached offset, or with no report",
+          "status": "passed",
+          "title": "is unknowable from MPos without a cached offset, or with no report",
+          "duration": 0.27899999999999636,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["inferCurrentMachinePosition"],
+          "fullName": "inferCurrentMachinePosition makes imperial and metric controller reports behaviorally equivalent",
+          "status": "passed",
+          "title": "makes imperial and metric controller reports behaviorally equivalent",
+          "duration": 1.5304999999998472,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["inferCurrentMachinePosition"],
+          "fullName": "inferCurrentMachinePosition prefers MPos when reported",
+          "status": "passed",
+          "title": "prefers MPos when reported",
+          "duration": 0.3010999999999058,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["inferCurrentMachinePosition"],
+          "fullName": "inferCurrentMachinePosition derives machine position from WPos plus the cached offset",
+          "status": "passed",
+          "title": "derives machine position from WPos plus the cached offset",
+          "duration": 0.1609000000000833,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["inferCurrentMachinePosition"],
+          "fullName": "inferCurrentMachinePosition prefers the same-frame WCO over a lagging cache",
+          "status": "passed",
+          "title": "prefers the same-frame WCO over a lagging cache",
+          "duration": 0.21199999999998909,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["inferCurrentMachinePosition"],
+          "fullName": "inferCurrentMachinePosition falls back to the cached WCO when the frame carries none",
+          "status": "passed",
+          "title": "falls back to the cached WCO when the frame carries none",
+          "duration": 0.2897000000000389,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006489261,
+      "endTime": 1790006489267.2898,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/infer-machine-position.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["handleLine detected controller settings"],
+          "fullName": "handleLine detected controller settings discards a settings read and its qualification when MPG takes ownership",
+          "status": "passed",
+          "title": "discards a settings read and its qualification when MPG takes ownership",
+          "duration": 8.912400000000162,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine detected controller settings"],
+          "fullName": "handleLine detected controller settings publishes detected settings both for the banner and for live Start readiness",
+          "status": "passed",
+          "title": "publishes detected settings both for the banner and for live Start readiness",
+          "duration": 2.249200000000201,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine detected controller settings"],
+          "fullName": "handleLine detected controller settings keeps review-only controller settings pending for the Machine Setup review banner",
+          "status": "passed",
+          "title": "keeps review-only controller settings pending for the Machine Setup review banner",
+          "duration": 0.7348000000001775,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes tags ack-driven refill writes with the job transcript source",
+          "status": "passed",
+          "title": "tags ack-driven refill writes with the job transcript source",
+          "duration": 2.1614999999997053,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes keeps a fully acked job busy until the post-job settle marker and stable Idle finish",
+          "status": "passed",
+          "title": "keeps a fully acked job busy until the post-job settle marker and stable Idle finish",
+          "duration": 2.0393999999996595,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes keeps post-job settle alive while fresh Run status proves buffered motion is still finishing",
+          "status": "passed",
+          "title": "keeps post-job settle alive while fresh Run status proves buffered motion is still finishing",
+          "duration": 4.133600000000115,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes releases the job lock once an errored stream settles to Idle, keeping the error notice",
+          "status": "passed",
+          "title": "releases the job lock once an errored stream settles to Idle, keeping the error notice",
+          "duration": 1.4000999999998385,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes marks a tool-change hold errored on a controller reboot (Codex audit)",
+          "status": "passed",
+          "title": "marks a tool-change hold errored on a controller reboot (Codex audit)",
+          "duration": 1.2955000000001746,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine streamer writes"],
+          "fullName": "handleLine streamer writes marks the streamer errored (Stop stays mounted) if an ack-triggered follow-up write fails",
+          "status": "passed",
+          "title": "marks the streamer errored (Stop stays mounted) if an ack-triggered follow-up write fails",
+          "duration": 1.1603000000000065,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine controller reset boundary"],
+          "fullName": "handleLine controller reset boundary clears the cached active WCS on a reset banner (C6)",
+          "status": "passed",
+          "title": "clears the cached active WCS on a reset banner (C6)",
+          "duration": 0.5563999999999396,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine controller reset boundary"],
+          "fullName": "handleLine controller reset boundary discards CNC live caps from the prior controller-settings epoch",
+          "status": "passed",
+          "title": "discards CNC live caps from the prior controller-settings epoch",
+          "duration": 0.3713999999999942,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine alarm terminates paused streams"],
+          "fullName": "handleLine alarm terminates paused streams cancels a drained paused stream on an ALARM:N line",
+          "status": "passed",
+          "title": "cancels a drained paused stream on an ALARM:N line",
+          "duration": 0.630500000000211,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine alarm terminates paused streams"],
+          "fullName": "handleLine alarm terminates paused streams cancels a drained paused stream on a status-only Alarm report",
+          "status": "passed",
+          "title": "cancels a drained paused stream on a status-only Alarm report",
+          "duration": 0.5136999999999716,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine axis-specific work-origin evidence"],
+          "fullName": "handleLine axis-specific work-origin evidence caches a Z-only WCO without promoting it to an XY custom origin",
+          "status": "passed",
+          "title": "caches a Z-only WCO without promoting it to an XY custom origin",
+          "duration": 0.37750000000005457,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine axis-specific work-origin evidence"],
+          "fullName": "handleLine axis-specific work-origin evidence does not restore coordinate evidence after a failed Home or explicit invalidation",
+          "status": "passed",
+          "title": "does not restore coordinate evidence after a failed Home or explicit invalidation",
+          "duration": 0.3318999999996777,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine status-only Alarm recovery state"],
+          "fullName": "handleLine status-only Alarm recovery state clears motion and custom-origin state when GRBL reports Alarm without ALARM:N",
+          "status": "passed",
+          "title": "clears motion and custom-origin state when GRBL reports Alarm without ALARM:N",
+          "duration": 0.3137000000001535,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["handleLine Sleep recovery state"],
+          "fullName": "handleLine Sleep recovery state clears stale alarm, motion, and custom-origin state when GRBL reports Sleep",
+          "status": "passed",
+          "title": "clears stale alarm, motion, and custom-origin state when GRBL reports Sleep",
+          "duration": 0.35849999999982174,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006396506,
+      "endTime": 1790006396534.3584,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-line-handler.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["safe-write transport epochs"],
+          "fullName": "safe-write transport epochs retires unresolved transport ownership when the serial port closes",
+          "status": "passed",
+          "title": "retires unresolved transport ownership when the serial port closes",
+          "duration": 27.4366,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["safe-write transport epochs"],
+          "fullName": "safe-write transport epochs does not let an old-session completion erase a new in-flight write",
+          "status": "passed",
+          "title": "does not let an old-session completion erase a new in-flight write",
+          "duration": 4.0034999999998035,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["safe-write transport epochs"],
+          "fullName": "safe-write transport epochs owns a fast terminal response that arrives before the transport promise resolves",
+          "status": "passed",
+          "title": "owns a fast terminal response that arrives before the transport promise resolves",
+          "duration": 1.4624000000003434,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["safe-write transport epochs"],
+          "fullName": "safe-write transport epochs owes exactly one terminal ack for a modal query write like any line",
+          "status": "passed",
+          "title": "owes exactly one terminal ack for a modal query write like any line",
+          "duration": 1.09900000000016,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["safe-write transport epochs"],
+          "fullName": "safe-write transport epochs does not reassert work-Z evidence when a reset overtakes deferred G92 Z0",
+          "status": "passed",
+          "title": "does not reassert work-Z evidence when a reset overtakes deferred G92 Z0",
+          "duration": 519.4777000000004,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006477550,
+      "endTime": 1790006478104.4778,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-safe-write-epoch.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["statusPositionPatch — manual air follows the controller"],
+          "fullName": "statusPositionPatch — manual air follows the controller turns the rail OFF when an explicit A: report shows coolant off",
+          "status": "passed",
+          "title": "turns the rail OFF when an explicit A: report shows coolant off",
+          "duration": 7.296399999999721,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["statusPositionPatch — manual air follows the controller"],
+          "fullName": "statusPositionPatch — manual air follows the controller turns the rail OFF on an Ov: frame without A:, which GRBL sends when nothing is energized",
+          "status": "passed",
+          "title": "turns the rail OFF on an Ov: frame without A:, which GRBL sends when nothing is energized",
+          "duration": 0.611699999999928,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["statusPositionPatch — manual air follows the controller"],
+          "fullName": "statusPositionPatch — manual air follows the controller turns the rail ON when the controller reports flood or mist coolant active",
+          "status": "passed",
+          "title": "turns the rail ON when the controller reports flood or mist coolant active",
+          "duration": 0.6501000000002932,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["statusPositionPatch — manual air follows the controller"],
+          "fullName": "statusPositionPatch — manual air follows the controller leaves the rail alone on frames that prove nothing about coolant",
+          "status": "passed",
+          "title": "leaves the rail alone on frames that prove nothing about coolant",
+          "duration": 0.44699999999966167,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006492909,
+      "endTime": 1790006492919.6501,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-status-position.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["console $$ settings-read release"],
+          "fullName": "console $$ settings-read release releases the settings-read operation when a console $$ is rejected by the controller",
+          "status": "passed",
+          "title": "releases the settings-read operation when a console $$ is rejected by the controller",
+          "duration": 552.6479999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["console $$ settings-read release"],
+          "fullName": "console $$ settings-read release releases the settings-read operation when a console $$ dump goes silent",
+          "status": "passed",
+          "title": "releases the settings-read operation when a console $$ dump goes silent",
+          "duration": 535.1035000000002,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006496902,
+      "endTime": 1790006497989.1035,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-console-settings-read.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands owns and confirms G54 before Frame can prepare against the canonical WCS",
+          "status": "passed",
+          "title": "owns and confirms G54 before Frame can prepare against the canonical WCS",
+          "duration": 520.4593,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands does not assume G54 when the controller rejects the owned selection",
+          "status": "passed",
+          "title": "does not assume G54 when the controller rejects the owned selection",
+          "duration": 520.8442,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands records inbound and outbound controller traffic in the transcript",
+          "status": "passed",
+          "title": "records inbound and outbound controller traffic in the transcript",
+          "duration": 507.7707999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands refreshes detected settings when $$ is sent from the console",
+          "status": "passed",
+          "title": "refreshes detected settings when $$ is sent from the console",
+          "duration": 519.9781999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands preserves setup evidence for read-only console queries",
+          "status": "passed",
+          "title": "preserves setup evidence for read-only console queries",
+          "duration": 507.7301000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands requires fresh position after console motion without discarding work-zero authority",
+          "status": "passed",
+          "title": "requires fresh position after console motion without discarding work-zero authority",
+          "duration": 1548.4825,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands invalidates a known all-off cache after an accessory-mutating console command",
+          "status": "passed",
+          "title": "invalidates a known all-off cache after an accessory-mutating console command",
+          "duration": 507.3777,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands does not revive a Frame permit after a manual accessory command and fresh Idle",
+          "status": "passed",
+          "title": "does not revive a Frame permit after a manual accessory command and fresh Idle",
+          "duration": 509.7452000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands invalidates only XY setup truth for an XY-only console origin command",
+          "status": "passed",
+          "title": "invalidates only XY setup truth for an XY-only console origin command",
+          "duration": 1554.9042,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands invalidates Z truth but preserves XY authority for a console tool-length change",
+          "status": "passed",
+          "title": "invalidates Z truth but preserves XY authority for a console tool-length change",
+          "duration": 1549.146499999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands blocks console commands during an active job except realtime status query",
+          "status": "passed",
+          "title": "blocks console commands during an active job except realtime status query",
+          "duration": 516.5624000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store console commands"],
+          "fullName": "laser-store console commands requires confirmation and Idle state while preserving position for non-positional settings",
+          "status": "passed",
+          "title": "requires confirmation and Idle state while preserving position for non-positional settings",
+          "duration": 1551.4408000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["job stream transcript source"],
+          "fullName": "job stream transcript source tags both halves of the mid-job exchange as job traffic end-to-end",
+          "status": "passed",
+          "title": "tags both halves of the mid-job exchange as job traffic end-to-end",
+          "duration": 517.8960000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["job stream transcript source"],
+          "fullName": "job stream transcript source keeps the operator log free of the acknowledgement flood",
+          "status": "passed",
+          "title": "keeps the operator log free of the acknowledgement flood",
+          "duration": 517.6088,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006399288,
+      "endTime": 1790006410639.609,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-console.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification waits for fresh Idle and issues exactly one owned settings read",
+          "status": "passed",
+          "title": "waits for fresh Idle and issues exactly one owned settings read",
+          "duration": 544.5707000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification parks connect qualification before settings traffic when fresh Idle reports MPG ownership",
+          "status": "passed",
+          "title": "parks connect qualification before settings traffic when fresh Idle reports MPG ownership",
+          "duration": 507.5685000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification keeps an empty settings read failed until the inline Retry succeeds",
+          "status": "passed",
+          "title": "keeps an empty settings read failed until the inline Retry succeeds",
+          "duration": 520.5596000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification does not let a stale settings read failure poison a newer qualification epoch",
+          "status": "passed",
+          "title": "does not let a stale settings read failure poison a newer qualification epoch",
+          "duration": 521.6343999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification does not let a stale settings write failure poison a newer qualification epoch",
+          "status": "passed",
+          "title": "does not let a stale settings write failure poison a newer qualification epoch",
+          "duration": 521.9096,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification does not verify a setting write against rows from a newer controller epoch",
+          "status": "passed",
+          "title": "does not verify a setting write against rows from a newer controller epoch",
+          "duration": 515.8792999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification automatically re-reads settings after Abort and allows a fresh job",
+          "status": "passed",
+          "title": "automatically re-reads settings after Abort and allows a fresh job",
+          "duration": 598.4349999999995,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["epoch-bound controller qualification"],
+          "fullName": "epoch-bound controller qualification Forget Controller clears live and recovery state while preserving the project",
+          "status": "passed",
+          "title": "Forget Controller clears live and recovery state while preserving the project",
+          "duration": 510.6347999999998,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006446244,
+      "endTime": 1790006450485.6348,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-controller-qualification.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["machine settings from Alarm"],
+          "fullName": "machine settings from Alarm completes the read-only settings query and preserves Alarm state",
+          "status": "passed",
+          "title": "completes the read-only settings query and preserves Alarm state",
+          "duration": 593.6174000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine settings from Alarm"],
+          "fullName": "machine settings from Alarm pauses the fast Alarm poll while the settings workflow owns the controller",
+          "status": "passed",
+          "title": "pauses the fast Alarm poll while the settings workflow owns the controller",
+          "duration": 560.5375999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["machine settings from Alarm"],
+          "fullName": "machine settings from Alarm owns the final modal read through its terminal response before polling resumes",
+          "status": "passed",
+          "title": "owns the final modal read through its terminal response before polling resumes",
+          "duration": 536.4641000000001,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006483179,
+      "endTime": 1790006484869.464,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-machine-settings-alarm.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings reads machine settings through the guarded serial write path",
+          "status": "passed",
+          "title": "reads machine settings through the guarded serial write path",
+          "duration": 526.8429999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings emits no build-info or modal continuation after MPG takeover during a settings read",
+          "status": "passed",
+          "title": "emits no build-info or modal continuation after MPG takeover during a settings read",
+          "duration": 518.3697000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings re-reads the active WCS once a post-reset settings re-qualification completes (C6)",
+          "status": "passed",
+          "title": "re-reads the active WCS once a post-reset settings re-qualification completes (C6)",
+          "duration": 517.6091999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings does not let an earlier console acknowledgement terminate a new settings read",
+          "status": "passed",
+          "title": "does not let an earlier console acknowledgement terminate a new settings read",
+          "duration": 516.4517999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings populates known and unknown settings rows when the $$ dump completes",
+          "status": "passed",
+          "title": "populates known and unknown settings rows when the $$ dump completes",
+          "duration": 518.9963000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings blocks read while a job is active",
+          "status": "passed",
+          "title": "blocks read while a job is active",
+          "duration": 520.7335000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings clears machine settings rows on disconnect",
+          "status": "passed",
+          "title": "clears machine settings rows on disconnect",
+          "duration": 505.60929999999917,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings writes one guarded common GRBL setting and re-reads $$",
+          "status": "passed",
+          "title": "writes one guarded common GRBL setting and re-reads $$",
+          "duration": 520.3874000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings emits no verification query after MPG takeover during a setting write",
+          "status": "passed",
+          "title": "emits no verification query after MPG takeover during a setting write",
+          "duration": 835.440599999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings blocks guarded writes without a current settings backup",
+          "status": "passed",
+          "title": "blocks guarded writes without a current settings backup",
+          "duration": 505.03340000000026,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings blocks guarded writes for unknown controller settings",
+          "status": "passed",
+          "title": "blocks guarded writes for unknown controller settings",
+          "duration": 504.0690999999988,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings blocks $32=0 at the serial write boundary for the active laser setup",
+          "status": "passed",
+          "title": "blocks $32=0 at the serial write boundary for the active laser setup",
+          "duration": 505.1832000000013,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings retains $32=0 firmware writes for the active CNC setup",
+          "status": "passed",
+          "title": "retains $32=0 firmware writes for the active CNC setup",
+          "duration": 509.28149999999914,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings applies the same laser/CNC $32 policy to confirmed Console setting writes",
+          "status": "passed",
+          "title": "applies the same laser/CNC $32 policy to confirmed Console setting writes",
+          "duration": 532.2142000000003,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store machine settings"],
+          "fullName": "laser-store machine settings rejects every non-canonical laser $32 Console value before serial write",
+          "status": "passed",
+          "title": "rejects every non-canonical laser $32 Console value before serial write",
+          "duration": 515.3019000000004,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006414152,
+      "endTime": 1790006422204.302,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-machine-settings.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'Home' writes nothing",
+          "status": "passed",
+          "title": "'Home' writes nothing",
+          "duration": 527.3013999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'Set Origin' writes nothing",
+          "status": "passed",
+          "title": "'Set Origin' writes nothing",
+          "duration": 517.3508000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'modal Console motion' writes nothing",
+          "status": "passed",
+          "title": "'modal Console motion' writes nothing",
+          "duration": 507.6377000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'modal Console macro' writes nothing",
+          "status": "passed",
+          "title": "'modal Console macro' writes nothing",
+          "duration": 522.3777999999993,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'Machine Settings read' writes nothing",
+          "status": "passed",
+          "title": "'Machine Settings read' writes nothing",
+          "duration": 519.5352999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'Machine Settings write' writes nothing",
+          "status": "passed",
+          "title": "'Machine Settings write' writes nothing",
+          "duration": 520.8362000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'manual Air on' writes nothing",
+          "status": "passed",
+          "title": "'manual Air on' writes nothing",
+          "duration": 511.6927999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'low-power Fire on' writes nothing",
+          "status": "passed",
+          "title": "'low-power Fire on' writes nothing",
+          "duration": 516.3837999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership 'realtime feed override' writes nothing",
+          "status": "passed",
+          "title": "'realtime feed override' writes nothing",
+          "duration": 521.0686999999998,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership Probe and Autofocus return a zero-write preflight failure",
+          "status": "passed",
+          "title": "Probe and Autofocus return a zero-write preflight failure",
+          "duration": 519.0738999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps realtime status Console traffic available",
+          "status": "passed",
+          "title": "keeps realtime status Console traffic available",
+          "duration": 530.0053000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps GRBL unlock Console traffic available",
+          "status": "passed",
+          "title": "keeps GRBL unlock Console traffic available",
+          "duration": 524.0173000000013,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps spindle/coolant fail-off Console traffic available",
+          "status": "passed",
+          "title": "keeps spindle/coolant fail-off Console traffic available",
+          "duration": 520.0378000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps exact spindle/coolant fail-off Console traffic available from Run",
+          "status": "passed",
+          "title": "keeps exact spindle/coolant fail-off Console traffic available from Run",
+          "duration": 521.7670999999991,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps exact spindle/coolant fail-off Console traffic available from Jog",
+          "status": "passed",
+          "title": "keeps exact spindle/coolant fail-off Console traffic available from Jog",
+          "duration": 516.2609999999986,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps dedicated unlock, Fire-off, and manual Air-off fail-off paths available",
+          "status": "passed",
+          "title": "keeps dedicated unlock, Fire-off, and manual Air-off fail-off paths available",
+          "duration": 517.875,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps the dedicated soft-reset recovery path available",
+          "status": "passed",
+          "title": "keeps the dedicated soft-reset recovery path available",
+          "duration": 525.3392999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership blocks Resume and tool-change Continue without hiding Pause or Abort",
+          "status": "passed",
+          "title": "blocks Resume and tool-change Continue without hiding Pause or Abort",
+          "duration": 514.4982,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership freezes an active stream on MPG takeover and never refills from later acknowledgements",
+          "status": "passed",
+          "title": "freezes an active stream on MPG takeover and never refills from later acknowledgements",
+          "duration": 524.0550999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership emits no persistent-origin continuation after MPG takeover",
+          "status": "passed",
+          "title": "emits no persistent-origin continuation after MPG takeover",
+          "duration": 530.0280000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps the active MPG latch across sparse Alarm reports until explicit release",
+          "status": "passed",
+          "title": "keeps the active MPG latch across sparse Alarm reports until explicit release",
+          "duration": 515.8886000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps the active MPG latch across sparse Sleep reports until explicit release",
+          "status": "passed",
+          "title": "keeps the active MPG latch across sparse Sleep reports until explicit release",
+          "duration": 519.8772000000008,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps the active MPG latch across a numbered Alarm line",
+          "status": "passed",
+          "title": "keeps the active MPG latch across a numbered Alarm line",
+          "duration": 513.3660999999993,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership uses a numbered Alarm as Home recovery evidence after a prior Run report",
+          "status": "passed",
+          "title": "uses a numbered Alarm as Home recovery evidence after a prior Run report",
+          "duration": 516.3377,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership releases the exact Home owner when MPG takeover invalidates pending Home",
+          "status": "passed",
+          "title": "releases the exact Home owner when MPG takeover invalidates pending Home",
+          "duration": 519.6810000000005,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership latches a first explicit MPG acquisition from a Alarm report",
+          "status": "passed",
+          "title": "latches a first explicit MPG acquisition from a Alarm report",
+          "duration": 510.47650000000067,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership latches a first explicit MPG acquisition from a Sleep report",
+          "status": "passed",
+          "title": "latches a first explicit MPG acquisition from a Sleep report",
+          "duration": 521.1751999999979,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership keeps exact Console and dedicated fail-off traffic available during an active takeover",
+          "status": "passed",
+          "title": "keeps exact Console and dedicated fail-off traffic available during an active takeover",
+          "duration": 521.5089000000007,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["latched grblHAL MPG machine-command ownership"],
+          "fullName": "latched grblHAL MPG machine-command ownership retains normal active-job blocking when no MPG takeover paused refill",
+          "status": "passed",
+          "title": "retains normal active-job blocking when no MPG takeover paused refill",
+          "duration": 511.306700000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Console fresh Idle ownership"],
+          "fullName": "Console fresh Idle ownership queries before modal dispatch and handles fresh Idle",
+          "status": "passed",
+          "title": "queries before modal dispatch and handles fresh Idle",
+          "duration": 516.6445999999996,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["Console fresh Idle ownership"],
+          "fullName": "Console fresh Idle ownership queries before modal dispatch and handles fresh Run",
+          "status": "passed",
+          "title": "queries before modal dispatch and handles fresh Run",
+          "duration": 519.1345000000001,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006426103,
+      "endTime": 1790006442197.1345,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-mpg-command-matrix.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["grblHAL MPG ownership at CNC Start"],
+          "fullName": "grblHAL MPG ownership at CNC Start blocks a latched owner before the queue fence",
+          "status": "passed",
+          "title": "blocks a latched owner before the queue fence",
+          "duration": 531.6833999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["grblHAL MPG ownership at CNC Start"],
+          "fullName": "grblHAL MPG ownership at CNC Start latches fresh acquisition, invalidates setup once, and requires explicit release",
+          "status": "passed",
+          "title": "latches fresh acquisition, invalidates setup once, and requires explicit release",
+          "duration": 543.6000000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["grblHAL MPG ownership at CNC Start"],
+          "fullName": "grblHAL MPG ownership at CNC Start allows CNC Start after explicit MPG release with a fresh attestation",
+          "status": "passed",
+          "title": "allows CNC Start after explicit MPG release with a fresh attestation",
+          "duration": 549.8229999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["grblHAL MPG ownership at CNC Start"],
+          "fullName": "grblHAL MPG ownership at CNC Start preserves the exact permit through the owned same-position queue-fence Run",
+          "status": "passed",
+          "title": "preserves the exact permit through the owned same-position queue-fence Run",
+          "duration": 548.3535000000002,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["grblHAL MPG ownership of Jog and Frame transport"],
+          "fullName": "grblHAL MPG ownership of Jog and Frame transport refuses Jog and Frame before writing while MPG owns motion control",
+          "status": "passed",
+          "title": "refuses Jog and Frame before writing while MPG owns motion control",
+          "duration": 512.3582999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["grblHAL MPG ownership of Jog and Frame transport"],
+          "fullName": "grblHAL MPG ownership of Jog and Frame transport terminates an active Frame and drops queued legs when MPG takes control",
+          "status": "passed",
+          "title": "terminates an active Frame and drops queued legs when MPG takes control",
+          "duration": 514.7148000000007,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006469617,
+      "endTime": 1790006472818.7148,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-mpg-ownership.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions rejects Set Origin when the G92 write fails",
+          "status": "passed",
+          "title": "rejects Set Origin when the G92 write fails",
+          "duration": 520.6895999999997,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions marks the work origin active only after the controller acknowledges Set Origin",
+          "status": "passed",
+          "title": "marks the work origin active only after the controller acknowledges Set Origin",
+          "duration": 515.4136999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions does not finish Set Origin until the work offset is known (post-Release/Wake)",
+          "status": "passed",
+          "title": "does not finish Set Origin until the work offset is known (post-Release/Wake)",
+          "duration": 570.7204999999994,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions warns that the origin is unconfirmed when no work offset arrives (B21)",
+          "status": "passed",
+          "title": "warns that the origin is unconfirmed when no work offset arrives (B21)",
+          "duration": 522.5492999999988,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)",
+          "status": "passed",
+          "title": "keeps a hand-set origin active when its offset is zero (machine 0,0 after Wake)",
+          "duration": 509.9459000000006,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions does not treat a zero WCO as a custom origin when none was set",
+          "status": "passed",
+          "title": "does not treat a zero WCO as a custom origin when none was set",
+          "duration": 517.8690999999999,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions preserves a known Z offset when Set Origin changes X/Y only",
+          "status": "passed",
+          "title": "preserves a known Z offset when Set Origin changes X/Y only",
+          "duration": 510.40020000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)",
+          "status": "passed",
+          "title": "Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)",
+          "duration": 521.8328000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions marks the XY origin persistent but invalidates Z cleared by G92.1",
+          "status": "passed",
+          "title": "marks the XY origin persistent but invalidates Z cleared by G92.1",
+          "duration": 521.5751999999993,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions requires an Idle status before advanced persistent origin writes",
+          "status": "passed",
+          "title": "requires an Idle status before advanced persistent origin writes",
+          "duration": 521.2495999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions clears the active work-origin flag when Reset Origin succeeds",
+          "status": "passed",
+          "title": "clears the active work-origin flag when Reset Origin succeeds",
+          "duration": 505.40020000000004,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions does not pretend Reset Origin cleared a known persistent G54 origin",
+          "status": "passed",
+          "title": "does not pretend Reset Origin cleared a known persistent G54 origin",
+          "duration": 516.9304999999986,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions clears persistent G54 origin through the advanced clear action",
+          "status": "passed",
+          "title": "clears persistent G54 origin through the advanced clear action",
+          "duration": 506.65639999999985,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions invalidates origin truth when a persistent-origin transaction fails after G92 clears",
+          "status": "passed",
+          "title": "invalidates origin truth when a persistent-origin transaction fails after G92 clears",
+          "duration": 521.9915000000001,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["laser-store origin actions"],
+          "fullName": "laser-store origin actions requires a known Idle state and no outstanding acknowledgement",
+          "status": "passed",
+          "title": "requires a known Idle state and no outstanding acknowledgement",
+          "duration": 507.81900000000314,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006385838,
+      "endTime": 1790006393629.819,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/laser-store-origin.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["manual motion fresh Idle transport fence"],
+          "fullName": "manual motion fresh Idle transport fence reuses only a fresh same-session position observation",
+          "status": "passed",
+          "title": "reuses only a fresh same-session position observation",
+          "duration": 4.354199999999992,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["manual motion fresh Idle transport fence"],
+          "fullName": "manual motion fresh Idle transport fence turns stale silence into an actionable status error",
+          "status": "passed",
+          "title": "turns stale silence into an actionable status error",
+          "duration": 16.008699999999862,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["manual motion fresh Idle transport fence"],
+          "fullName": "manual motion fresh Idle transport fence ignores delayed pre-query status and rejects a fresh non-Idle report",
+          "status": "passed",
+          "title": "ignores delayed pre-query status and rejects a fresh non-Idle report",
+          "duration": 0.631099999999833,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["manual motion fresh Idle transport fence"],
+          "fullName": "manual motion fresh Idle transport fence does not reuse a status report across reconnect epochs",
+          "status": "passed",
+          "title": "does not reuse a status report across reconnect epochs",
+          "duration": 0.5367999999998574,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["manual motion fresh Idle transport fence"],
+          "fullName": "manual motion fresh Idle transport fence permits motion after a matching fresh Idle report",
+          "status": "passed",
+          "title": "permits motion after a matching fresh Idle report",
+          "duration": 2.2526000000000295,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1790006486407,
+      "endTime": 1790006486431.2527,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/state/manual-motion-fresh-idle.test.ts"
+    }
+  ]
+}

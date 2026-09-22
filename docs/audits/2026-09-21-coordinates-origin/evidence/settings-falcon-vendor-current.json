@@ -1,0 +1,39 @@
+{
+  "sourceUrl": "https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip",
+  "retrievedUtc": "2026-09-21T15:56:47.1187594Z",
+  "sha256": "11B13328ACE21461C7CBA2E6350999813FB60A670B3CFF77930F0A44F988405B",
+  "device": {
+    "Name": "GRBL-LPC",
+    "DisplayName": "Falcon A1 Pro",
+    "Width": 358,
+    "Height": 268,
+    "HomeOnStartup": false,
+    "MirrorX": false,
+    "MirrorY": false
+  },
+  "settings": {
+    "BaudRate": 115200,
+    "S_Scale": 1000,
+    "AllowSettingsFetch": false,
+    "EnableGrblJCommand": false,
+    "SwapXYOutput": false,
+    "NegativeWorkspace": false,
+    "EnableZ": false,
+    "AirAssistM7": false
+  },
+  "macros": [
+    {
+      "Content": "$HZ1\n",
+      "Label": "Aotu Focus"
+    },
+    {
+      "Content": "$HX\n$HY\n",
+      "Label": "Home"
+    },
+    {
+      "Content": "$Hz\n",
+      "Label": "Z Home"
+    }
+  ],
+  "limitation": "Fresh vendor configuration evidence only; no hardware or current user settings were inspected."
+}

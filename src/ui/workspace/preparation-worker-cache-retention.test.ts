@@ -56,6 +56,30 @@ afterEach(() => {
 });
 
 describe('Preview request retention', () => {
+  it('separates explicit unknown, changed envelopes and absolute offsets in the shared Preview/ETA cache', async () => {
+    const project = createProject();
+    const bounds = { minX: -400, minY: -400, maxX: 0, maxY: 0 };
+    const options = [
+      {},
+      { contourEntryBounds: null },
+      { contourEntryBounds: bounds },
+      { contourEntryBounds: { ...bounds, maxX: 10 } },
+      { contourEntryBounds: bounds, absoluteProgramOffset: { x: -400, y: -400 } },
+      { contourEntryBounds: bounds, absoluteProgramOffset: { x: -350, y: -400 } },
+    ];
+    let previous: ReturnType<typeof prepareLargeJobOffThread> | undefined;
+    for (const [index, option] of options.entries()) {
+      const pending = prepareLargeJobOffThread(project, option);
+      expect(pending).not.toBe(previous);
+      expect(requests()).toHaveLength(index + 1);
+      expect(worker().requests[0]).toMatchObject(option);
+      expect(prepareJobEstimateOffThread(project, option)).toBe(pending);
+      worker().respond();
+      await expect(pending).resolves.toEqual(result);
+      previous = pending;
+    }
+  });
+
   it('releases the previous cached route before its replacement returns', async () => {
     const project = createProject();
     const first = prepareLargeJobOffThread(project);

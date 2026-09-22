@@ -1,0 +1,208 @@
+{
+  "numTotalTestSuites": 7,
+  "numPassedTestSuites": 7,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 15,
+  "numPassedTests": 15,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790033299730,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["coordinate-contract regressions"],
+          "fullName": "coordinate-contract regressions clips a center-origin contour runway at the actual centred bed edge",
+          "status": "passed",
+          "title": "clips a center-origin contour runway at the actual centred bed edge",
+          "duration": 17.10480000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coordinate-contract regressions"],
+          "fullName": "coordinate-contract regressions maps native negative GRBL MPos into the physical front-left bed",
+          "status": "passed",
+          "title": "maps native negative GRBL MPos into the physical front-left bed",
+          "duration": 1.8006999999997788,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["coordinate-contract regressions"],
+          "fullName": "coordinate-contract regressions avoids false out-of-bed warnings for verified native negative GRBL travel",
+          "status": "passed",
+          "title": "avoids false out-of-bed warnings for verified native negative GRBL travel",
+          "duration": 5.280300000000352,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033331698,
+      "endTime": 1790033331722.2803,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/coordinate-contract-reproductions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepared coordinate envelope across output boundaries"],
+          "fullName": "prepared coordinate envelope across output boundaries 'absolute' keeps direct, worker Save and archived output identical",
+          "status": "passed",
+          "title": "'absolute' keeps direct, worker Save and archived output identical",
+          "duration": 15.109200000000328,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared coordinate envelope across output boundaries"],
+          "fullName": "prepared coordinate envelope across output boundaries 'user-origin' keeps direct, worker Save and archived output identical",
+          "status": "passed",
+          "title": "'user-origin' keeps direct, worker Save and archived output identical",
+          "duration": 2.7748999999998887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared coordinate envelope across output boundaries"],
+          "fullName": "prepared coordinate envelope across output boundaries 'current-position' keeps direct, worker Save and archived output identical",
+          "status": "passed",
+          "title": "'current-position' keeps direct, worker Save and archived output identical",
+          "duration": 2.08829999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepared coordinate envelope across output boundaries"],
+          "fullName": "prepared coordinate envelope across output boundaries unknown physical bounds omit optional entry while keeping the burn and output available",
+          "status": "passed",
+          "title": "unknown physical bounds omit optional entry while keeping the burn and output available",
+          "duration": 2.1958999999997104,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033334351,
+      "endTime": 1790033334374.1958,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/io/gcode/coordinate-envelope-integration.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode' absolute preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "absolute preserves the physical anchor through Frame and streams its exact program",
+          "duration": 434.5784999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode' current-position preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "current-position preserves the physical anchor through Frame and streams its exact program",
+          "duration": 125.94340000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode' user-origin preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "user-origin preserves the physical anchor through Frame and streams its exact program",
+          "duration": 104.54029999999693,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon-compatible GRBL diode' verified-origin preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "verified-origin preserves the physical anchor through Frame and streams its exact program",
+          "duration": 93.57139999999708,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…' absolute preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "absolute preserves the physical anchor through Frame and streams its exact program",
+          "duration": 91.39700000000084,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…' current-position preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "current-position preserves the physical anchor through Frame and streams its exact program",
+          "duration": 76.14170000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…' user-origin preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "user-origin preserves the physical anchor through Frame and streams its exact program",
+          "duration": 94.53440000000046,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…'"],
+          "fullName": "Falcon coordinate flow: 'Creality Falcon A1 Pro (vendor comman…' verified-origin preserves the physical anchor through Frame and streams its exact program",
+          "status": "passed",
+          "title": "verified-origin preserves the physical anchor through Frame and streams its exact program",
+          "duration": 79.6326999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033328101,
+      "endTime": 1790033329202.6328,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/falcon-coordinate-flow.audit.test.ts"
+    }
+  ]
+}

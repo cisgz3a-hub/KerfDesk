@@ -1,0 +1,387 @@
+{
+  "numTotalTestSuites": 9,
+  "numPassedTestSuites": 9,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 32,
+  "numPassedTests": 32,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790033550643,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries clips at a centred bound instead of a positive-bed maximum",
+          "status": "passed",
+          "title": "clips at a centred bound instead of a positive-bed maximum",
+          "duration": 3.0761999999999716,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries clips diagonals at the first reached side",
+          "status": "passed",
+          "title": "clips diagonals at the first reached side",
+          "duration": 0.7548999999999069,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":201,\"y\":30}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":201,\"y\":30}",
+          "duration": 0.1871000000001004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":-201,\"y\":30}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":-201,\"y\":30}",
+          "duration": 0.12590000000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "duration": 0.10749999999984539,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":-201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":-201}",
+          "duration": 0.09769999999980428,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "status": "passed",
+          "title": "omits entry for an already outside start, even if backing toward the bed: {\"x\":30,\"y\":201}",
+          "duration": 0.09220000000004802,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries does not add a runway when the explicit physical envelope is unknown",
+          "status": "passed",
+          "title": "does not add a runway when the explicit physical envelope is unknown",
+          "duration": 0.12530000000015207,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries keeps archived jobs without metadata on their original positive-bed clamp",
+          "status": "passed",
+          "title": "keeps archived jobs without metadata on their original positive-bed clamp",
+          "duration": 1.994799999999941,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries uses explicit bounds for each Follow Shape loop and pass",
+          "status": "passed",
+          "title": "uses explicit bounds for each Follow Shape loop and pass",
+          "duration": 2.2229999999999563,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries invalidates placement evidence even when the selected anchor is already work zero",
+          "status": "passed",
+          "title": "invalidates placement evidence even when the selected anchor is already work zero",
+          "duration": 0.925899999999956,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries rotary scaling/rebasing transforms explicit envelope Y, reverse=false",
+          "status": "passed",
+          "title": "rotary scaling/rebasing transforms explicit envelope Y, reverse=false",
+          "duration": 1.2175000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["contour-entry envelope boundaries"],
+          "fullName": "contour-entry envelope boundaries rotary scaling/rebasing transforms explicit envelope Y, reverse=true",
+          "status": "passed",
+          "title": "rotary scaling/rebasing transforms explicit envelope Y, reverse=true",
+          "duration": 0.6579000000001543,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033557918,
+      "endTime": 1790033557929.658,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/contour-entry-envelope.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries keeps the artwork AABB free of entry motion",
+          "status": "passed",
+          "title": "keeps the artwork AABB free of entry motion",
+          "duration": 2.638300000000072,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries extends the motion envelope to the tangential entry point",
+          "status": "passed",
+          "title": "extends the motion envelope to the tangential entry point",
+          "duration": 0.3951000000001841,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries extends the motion envelope by a custom compiled distance",
+          "status": "passed",
+          "title": "extends the motion envelope by a custom compiled distance",
+          "duration": 0.2397000000000844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries covers Follow Shape (offset) fill entries the same way",
+          "status": "passed",
+          "title": "covers Follow Shape (offset) fill entries the same way",
+          "duration": 0.26559999999994943,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job bounds with ADR-239 contour entries"],
+          "fullName": "job bounds with ADR-239 contour entries leaves groups without an entry runway untouched",
+          "status": "passed",
+          "title": "leaves groups without an entry runway untouched",
+          "duration": 0.3043999999999869,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033559214,
+      "endTime": 1790033559218.3044,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds-contour-entry.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["generic Scan Line Frame motion envelope"],
+          "fullName": "generic Scan Line Frame motion envelope keeps burn bounds unchanged while including a tiny sweep entry and exit",
+          "status": "passed",
+          "title": "keeps burn bounds unchanged while including a tiny sweep entry and exit",
+          "duration": 3.2798000000002503,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generic Scan Line Frame motion envelope"],
+          "fullName": "generic Scan Line Frame motion envelope includes the exact outer runway extent for wide-gap split sweeps",
+          "status": "passed",
+          "title": "includes the exact outer runway extent for wide-gap split sweeps",
+          "duration": 4.205399999999827,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generic Scan Line Frame motion envelope"],
+          "fullName": "generic Scan Line Frame motion envelope matches emitted coordinates after reverse-row offset and controller rounding",
+          "status": "passed",
+          "title": "matches emitted coordinates after reverse-row offset and controller rounding",
+          "duration": 0.7296000000001186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generic Scan Line Frame motion envelope"],
+          "fullName": "generic Scan Line Frame motion envelope expands the Frame envelope of a compiled generic tiny triangle without changing burn bounds",
+          "status": "passed",
+          "title": "expands the Frame envelope of a compiled generic tiny triangle without changing burn bounds",
+          "duration": 9.892700000000332,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033555901,
+      "endTime": 1790033555918.8926,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds-generic-fill-runway.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["computeJobBounds"],
+          "fullName": "computeJobBounds returns null for an empty job",
+          "status": "passed",
+          "title": "returns null for an empty job",
+          "duration": 1.425799999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobBounds"],
+          "fullName": "computeJobBounds returns the AABB across all polylines",
+          "status": "passed",
+          "title": "returns the AABB across all polylines",
+          "duration": 1.3237999999996646,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobBounds"],
+          "fullName": "computeJobBounds expands CNC tool-center routes by the cutter radius",
+          "status": "passed",
+          "title": "expands CNC tool-center routes by the cutter radius",
+          "duration": 0.7471999999997934,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobBounds"],
+          "fullName": "computeJobBounds uses fill burn bounds without including overscan runway",
+          "status": "passed",
+          "title": "uses fill burn bounds without including overscan runway",
+          "duration": 0.8492999999998574,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobBounds"],
+          "fullName": "computeJobBounds includes profile raster scan offsets in motion bounds",
+          "status": "passed",
+          "title": "includes profile raster scan offsets in motion bounds",
+          "duration": 0.7291999999997643,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobMotionBounds"],
+          "fullName": "computeJobMotionBounds includes reverse raster scan-offset travel in the physical envelope",
+          "status": "passed",
+          "title": "includes reverse raster scan-offset travel in the physical envelope",
+          "duration": 0.34960000000000946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobMotionBounds"],
+          "fullName": "computeJobMotionBounds does not apply raster scan offsets to unidirectional image rows",
+          "status": "passed",
+          "title": "does not apply raster scan offsets to unidirectional image rows",
+          "duration": 0.38930000000027576,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobMotionBounds"],
+          "fullName": "computeJobMotionBounds includes reverse fill scan-offset burn and overscan motion in the physical envelope",
+          "status": "passed",
+          "title": "includes reverse fill scan-offset burn and overscan motion in the physical envelope",
+          "duration": 0.9182999999998174,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobMotionBounds"],
+          "fullName": "computeJobMotionBounds uses the full configured island runway for sensitive motion-policy bounds",
+          "status": "passed",
+          "title": "uses the full configured island runway for sensitive motion-policy bounds",
+          "duration": 0.7192000000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["computeJobMotionBounds"],
+          "fullName": "computeJobMotionBounds includes 4040 feed-matched J runways without changing burn bounds",
+          "status": "passed",
+          "title": "includes 4040 feed-matched J runways without changing burn bounds",
+          "duration": 1.4960000000000946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790033552930,
+      "endTime": 1790033552939.496,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/core/job/job-bounds.test.ts"
+    }
+  ]
+}

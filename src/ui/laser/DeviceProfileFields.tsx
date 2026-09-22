@@ -30,13 +30,18 @@ type DeviceRowsProps = {
 export function OriginSelect(props: {
   readonly value: Origin;
   readonly onChange: (next: Origin) => void;
+  readonly ariaLabel?: string;
+  readonly title?: string;
 }): JSX.Element {
   return (
     <select
       value={props.value}
       onChange={(e) => props.onChange(e.target.value as Origin)}
-      aria-label="Machine origin corner"
-      title="Where (0,0) sits on your machine. Match this to the corner your GRBL homes to — most Falcon / xTool diode lasers are front-left."
+      aria-label={props.ariaLabel ?? 'Machine origin corner'}
+      title={
+        props.title ??
+        "Sets the canvas-to-machine coordinate orientation and jog directions. Match the controller's coordinate layout. This does not set work zero or change homing settings."
+      }
     >
       {ORIGIN_OPTIONS.map((opt) => (
         <option key={opt.value} value={opt.value}>
@@ -44,6 +49,23 @@ export function OriginSelect(props: {
         </option>
       ))}
     </select>
+  );
+}
+
+export function HomingCornerSelect(props: {
+  readonly value: Origin;
+  readonly onChange: (next: Origin) => void;
+}): JSX.Element {
+  return (
+    <label style={inlineLabelStyle}>
+      <span>Recorded home</span>
+      <OriginSelect
+        value={props.value}
+        onChange={props.onChange}
+        ariaLabel="Recorded homing corner"
+        title="Record where this machine homes. The controller's firmware determines the actual homing direction; changing this record does not change firmware."
+      />
+    </label>
   );
 }
 
@@ -56,7 +78,7 @@ export function HomingEditor(props: {
     <>
       <label
         style={inlineLabelStyle}
-        title="If enabled, the Home button sends $H and waits for completion."
+        title="If enabled, the Home button runs this controller's homing command and waits for completion."
       >
         <input
           type="checkbox"
@@ -65,25 +87,15 @@ export function HomingEditor(props: {
             props.onChange({ enabled: e.target.checked, direction: props.direction })
           }
           aria-label="Homing enabled"
-          title="Enable this only when the controller supports GRBL $H homing."
+          title="Enable this only when the controller and machine support homing."
         />
-        <span>$H supported</span>
+        <span>Home enabled</span>
       </label>
       {props.enabled && (
-        <select
+        <HomingCornerSelect
           value={props.direction}
-          onChange={(e) =>
-            props.onChange({ enabled: props.enabled, direction: e.target.value as Origin })
-          }
-          aria-label="Homes to corner"
-          title="Which corner the controller homes to. Usually matches the machine origin."
-        >
-          {ORIGIN_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={(direction) => props.onChange({ enabled: props.enabled, direction })}
+        />
       )}
     </>
   );
@@ -117,7 +129,7 @@ export function BedRows(props: DeviceRowsProps): JSX.Element {
         onCommit={(bedWidth) => update({ bedWidth })}
         style={numInputStyle}
         ariaLabel="Bed width (mm)"
-        title="Usable machine bed width in millimeters. Match GRBL $130."
+        title="Usable X work area in millimeters. GRBL $130 reports configured travel; confirm the actual usable width on the machine."
       />
       <span style={timesStyle}>×</span>
       <ClearableNumberField
@@ -128,7 +140,7 @@ export function BedRows(props: DeviceRowsProps): JSX.Element {
         onCommit={(bedHeight) => update({ bedHeight })}
         style={numInputStyle}
         ariaLabel="Bed height (mm)"
-        title="Usable machine bed height in millimeters. Match GRBL $131."
+        title="Usable Y work area in millimeters. GRBL $131 reports configured travel; confirm the actual usable height on the machine."
       />
       <span style={unitStyle}>mm</span>
     </Row>

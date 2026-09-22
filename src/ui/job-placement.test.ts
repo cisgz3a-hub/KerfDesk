@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { stockNativeEvidence } from './state/native-bed-frame.test-support';
 import type { StatusReport } from '../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../core/devices';
 import {
@@ -324,7 +325,7 @@ describe('resolveExportJobPlacement (Save G-code)', () => {
     };
     expect(
       resolveExportJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, preflightMotionOffset: { x: 120, y: 80 } });
     expect(resolveJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine).ok).toBe(
       false,
     );
@@ -353,14 +354,16 @@ describe('trustedMotionOffsetForPreflight', () => {
     }
   });
 
-  it('trusts the user-origin offset when homing is enabled', () => {
+  it('trusts the user-origin offset with homing and a verified positive native envelope', () => {
     const resolved = resolveJobPlacement(
       { startFrom: 'user-origin', anchor: 'front-left' },
       customOrigin,
     );
     expect(resolved.ok).toBe(true);
     if (resolved.ok) {
-      expect(trustedMotionOffsetForPreflight(homed, resolved)).toEqual({ x: 120, y: 80 });
+      expect(
+        trustedMotionOffsetForPreflight(homed, resolved, stockNativeEvidence(homed, true)),
+      ).toEqual({ x: 120, y: 80 });
     }
   });
 

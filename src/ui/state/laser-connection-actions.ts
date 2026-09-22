@@ -211,7 +211,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     statusReport: null,
     statusObservation: null,
     detectedSettings: null,
-    controllerSettings: null,
+    ...{ controllerSettings: null, reportUnitsUnconfirmed: false },
     controllerSettingsObservation: null,
     ...emptyControllerBuildInfoState(),
     controllerQualification: qualifyingController(nextEpoch, 'controller-response'),

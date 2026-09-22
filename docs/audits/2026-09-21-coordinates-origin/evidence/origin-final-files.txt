@@ -1,0 +1,17 @@
+src/ui/state/coordinate-origin-audit-20260921.test.ts
+src/ui/state/coordinate-origin-oracle-audit-20260921.test.ts
+src/ui/state/laser-store-machine-settings.test.ts
+src/ui/state/laser-store-machine-settings-alarm.test.ts
+src/ui/state/laser-store-console-settings-read.test.ts
+src/ui/state/laser-store-console.test.ts
+src/ui/state/laser-status-position.test.ts
+src/ui/state/laser-line-handler.test.ts
+src/ui/state/detected-settings-action.test.ts
+src/ui/state/laser-store-mpg-command-matrix.test.ts
+src/ui/state/laser-store-mpg-ownership.test.ts
+src/ui/state/laser-store-origin.test.ts
+src/ui/state/laser-store-controller-qualification.test.ts
+src/ui/state/laser-safe-write-epoch.test.ts
+src/ui/state/infer-machine-position.test.ts
+src/ui/state/manual-motion-fresh-idle.test.ts
+src/ui/laser/OriginRow.test.tsx

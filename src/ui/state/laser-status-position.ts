@@ -35,7 +35,7 @@ export function statusPositionPatch(
           },
         };
   const airPatch = manualAirPatch(report);
-  if (state.positionEvidenceSuppressed === true) {
+  if (state.positionEvidenceSuppressed === true || state.reportUnitsUnconfirmed === true) {
     return {
       statusReport: { ...report, mPos: null, wPos: null, wco: null },
       ...ovPatch,

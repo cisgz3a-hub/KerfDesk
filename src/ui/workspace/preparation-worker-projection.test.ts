@@ -3,6 +3,7 @@ import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene
 import { prepareOutput } from '../../io/gcode';
 import type * as Gcode from '../../io/gcode';
 import { estimateLiveJobFromPrepared } from '../laser/live-job-estimate';
+import { coordinateEntryProject } from './runtime-coordinate.test-support';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
@@ -73,6 +74,40 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('preparation worker result projection', () => {
+  it.each([undefined, {}])(
+    'retains runtime contour bounds and absolute translation (snapshot %j)',
+    async (snapshot) => {
+      const source = coordinateEntryProject();
+      const options = {
+        absoluteProgramOffset: { x: -100, y: -100 },
+        contourEntryBounds: { minX: -100, minY: -100, maxX: 300, maxY: 300 },
+      };
+      const expected = estimateLiveJobFromPrepared(prepareOutput(source, options), undefined, {
+        unbounded: true,
+      });
+      expect(expected).not.toEqual(
+        estimateLiveJobFromPrepared(prepareOutput(source), undefined, { unbounded: true }),
+      );
+      mocks.prepare.mockImplementation(async (project, options) => prepareOutput(project, options));
+      mocks.snapshot.mockImplementation(async (project, options) =>
+        prepareOutput(project, options),
+      );
+      const request: PreparationWorkerRequest = {
+        id: 11,
+        project: source,
+        projection: 'estimate',
+        ...options,
+        ...(snapshot === undefined ? {} : { snapshot }),
+      };
+      await workerScope.onmessage?.(new MessageEvent('message', { data: request }));
+      expect(workerScope.postMessage).toHaveBeenCalledExactlyOnceWith({
+        id: 11,
+        kind: 'estimate',
+        estimate: expected,
+      });
+    },
+  );
+
   it.each([undefined, {}])(
     'returns the exact estimate without constructing or posting preview geometry (snapshot %j)',
     async (snapshot) => {

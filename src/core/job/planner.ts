@@ -42,7 +42,7 @@ import {
   type Block,
 } from '../motion-planner';
 import type { Vec2 } from '../scene';
-import { contourEntryPoint } from './contour-entry';
+import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
@@ -164,7 +164,7 @@ function buildBlocks(
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
         ? appendFillGroupBlocks(out, cursor, group, cutV, seek, device)
-        : appendCutGroupBlocks(out, cursor, group, cutV, seek, device);
+        : appendCutGroupBlocks(out, cursor, group, cutV, seek, device, job.contourEntryBounds);
   }
   // M5 (and any coolant stop) drains motion before the postamble seek, even
   // when that seek uses the same G1 feed and direction as the final burn.
@@ -274,10 +274,14 @@ function appendCutGroupBlocks(
   cutV: number,
   seek: SeekMotion,
   device: DeviceProfile,
+  entryBounds: ContourEntryBounds,
 ): Vec2 {
   let cursor = initialCursor;
   const entryRunwayMm = group.entryRunwayMm ?? 0;
-  const bed = { widthMm: device.bedWidth, heightMm: device.bedHeight };
+  const bed =
+    entryBounds === undefined
+      ? { widthMm: device.bedWidth, heightMm: device.bedHeight }
+      : entryBounds;
   for (let pass = 0; pass < group.passes; pass += 1) {
     // Ordinary vector passes re-arm with standalone M3/M4 S0. Clearing a
     // powered final move is a real planner drain, unlike S0 carried on G1.

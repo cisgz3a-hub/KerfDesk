@@ -14,7 +14,7 @@
 
 import type { Vec2 } from '../scene';
 import type { FillGroup, Group, Job } from './job';
-import { contourEntryPoint } from './contour-entry';
+import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import { offsetForEmittedFeed } from './scan-offset';
@@ -39,6 +39,8 @@ export type {
 export { sliceToolpath } from './toolpath-slice';
 
 export function buildToolpath(job: Job, options: BuildToolpathOptions = {}): Toolpath {
+  if (job.contourEntryBounds !== undefined)
+    options = { ...options, contourEntryBounds: job.contourEntryBounds };
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = options.startPoint ?? null;
   // One modal-Z state for the whole job, like the emitter's head tracker.
@@ -115,7 +117,7 @@ function appendFillGroupSteps(
 // the caller-provided bed used to bound it. Null when the group has no entry.
 type ContourEntryOptions = {
   readonly runwayMm: number;
-  readonly bed?: BuildToolpathOptions['bedSizeMm'];
+  readonly bed: ContourEntryBounds;
 };
 
 function contourEntryOptions(
@@ -123,7 +125,10 @@ function contourEntryOptions(
   options: BuildToolpathOptions,
 ): ContourEntryOptions | null {
   if (entryRunwayMm === undefined || entryRunwayMm <= 0) return null;
-  return { runwayMm: entryRunwayMm, bed: options.bedSizeMm };
+  return {
+    runwayMm: entryRunwayMm,
+    bed: options.contourEntryBounds === undefined ? options.bedSizeMm : options.contourEntryBounds,
+  };
 }
 
 function appendContourGroupSteps(

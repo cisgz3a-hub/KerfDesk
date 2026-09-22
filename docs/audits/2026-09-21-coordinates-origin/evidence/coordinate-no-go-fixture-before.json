@@ -1,0 +1,52 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 1,
+  "numPassedTests": 0,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790036528842,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Start no-go entry path"],
+          "fullName": "Start no-go entry path warns when the entry move from the live head position crosses a no-go zone",
+          "status": "failed",
+          "title": "warns when the entry move from the live head position crosses a no-go zone",
+          "duration": 70.23799999999937,
+          "failureMessages": [
+            "AssertionError: expected [ …(2) ] to include 'Line 8: motion crosses no-go zone \"Cl…'\n    at Proxy.<anonymous> (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+expect@4.1.11/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-no-go-zones.test.ts:46:31\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790036538468,
+      "endTime": 1790036538538.238,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-no-go-zones.test.ts"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 8,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035845728,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 76.99389999999948,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 12.066999999999098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 10.897699999999531,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "duration": 8.880999999999403,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "duration": 7.857699999998658,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames when calculated artwork bounds extend beyond the configured bed",
+          "status": "passed",
+          "title": "frames when calculated artwork bounds extend beyond the configured bed",
+          "duration": 7.641200000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract does not turn a trusted work offset into a calculated bed veto",
+          "status": "passed",
+          "title": "does not turn a trusted work offset into a calculated bed veto",
+          "duration": 7.530400000001464,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps a perimeter no-go finding advisory and still frames",
+          "status": "passed",
+          "title": "keeps a perimeter no-go finding advisory and still frames",
+          "duration": 8.127300000000105,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "status": "failed",
+          "title": "keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "duration": 27.023400000000038,
+          "failureMessages": [
+            "AssertionError: expected '[\"The controller-to-bed coordinate ma…' to contain 'Clamp'\n    at D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.physical-safety.test.ts:282:70\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///D:/LaserForge/audit-coordinates-origin-20260921/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035861930,
+      "endTime": 1790035862098.0234,
+      "status": "failed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.physical-safety.test.ts"
+    }
+  ]
+}

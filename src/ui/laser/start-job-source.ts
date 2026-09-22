@@ -116,7 +116,10 @@ async function prepareCurrentStartInBackground(args: {
   readonly useSnapshot: boolean;
   readonly signal?: AbortSignal;
 }): Promise<StartJobPreparation> {
-  const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal);
+  const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal, {
+    jobPlacement: args.jobPlacement,
+    ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
+  });
   try {
     const background = prepareStartOutputOffThread(
       {
@@ -363,6 +366,8 @@ function machineSnapshot(
     controllerSessionEpoch: laser.controllerSessionEpoch,
     controllerBuildInfo: laser.controllerBuildInfo,
     controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
+    controllerSettings: laser.controllerSettings,
+    controllerSettingsObservation: laser.controllerSettingsObservation,
     wcoCache: laser.wcoCache,
     activeWcs: laser.activeWcs,
     ovCache: laser.ovCache,
@@ -371,6 +376,7 @@ function machineSnapshot(
     settingsCapability: laser.capabilities.settings,
     activeControllerKind: laser.activeControllerKind,
     detectedControllerKind: laser.detectedControllerKind,
+    activeControllerCommandSet: laser.activeControllerCommandSet,
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(

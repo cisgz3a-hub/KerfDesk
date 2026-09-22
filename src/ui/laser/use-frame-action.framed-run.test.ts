@@ -8,6 +8,7 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { nativeBedCaptureFrameKey } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { idleControllerStatusForFrameTest } from './framed-run-testing';
 import type { ReviewedStartBundle } from './job-review';
@@ -373,8 +374,9 @@ describe('runFrameNow framed-run authorization', () => {
       },
     });
     useExperimentalLaserFeatures.getState().setFeature('printAndCut', true);
-    usePrintCutSessionStore.getState().capture('first', { x: 0, y: 0 }, 3);
-    usePrintCutSessionStore.getState().capture('second', { x: 10, y: 0 }, 3);
+    const frameKey = nativeBedCaptureFrameKey(project.device, useLaserStore.getState());
+    usePrintCutSessionStore.getState().capture('first', { x: 0, y: 0 }, 3, frameKey);
+    usePrintCutSessionStore.getState().capture('second', { x: 10, y: 0 }, 3, frameKey);
     const frame = vi.fn(
       async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {
         if (candidate === undefined) throw new Error('Frame candidate was not supplied');
@@ -385,8 +387,8 @@ describe('runFrameNow framed-run authorization', () => {
     useLaserStore.setState({ frame });
     await expect(runFrameNow()).resolves.toBe(true);
 
-    usePrintCutSessionStore.getState().capture('first', { x: 1, y: 0 }, 3);
-    usePrintCutSessionStore.getState().capture('first', { x: 0, y: 0 }, 3);
+    usePrintCutSessionStore.getState().capture('first', { x: 1, y: 0 }, 3, frameKey);
+    usePrintCutSessionStore.getState().capture('first', { x: 0, y: 0 }, 3, frameKey);
     expect(useLaserStore.getState().framedRun).toBeNull();
   });
 });

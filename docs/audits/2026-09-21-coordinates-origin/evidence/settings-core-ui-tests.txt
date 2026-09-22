@@ -1,0 +1,36 @@
+
+ RUN  v3.2.6 D:/LaserForge/audit-coordinates-origin-20260921
+
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.test.tsx (11 tests) 3208ms
+   ✓ DeviceSetupWizard > connects only after using the selected controller and baud  528ms
+   ✓ DeviceSetupWizard > atomically saves a laser profile and workspace at the end  778ms
+   ✓ DeviceSetupWizard > shows CNC-only machine settings and commits them with the profile  644ms
+   ✓ DeviceSetupWizard > saves a hybrid machine with both output contracts and one explicit active mode  452ms
+ ✓ src/ui/laser/DeviceSettings.test.tsx (14 tests) 851ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.cnc.test.tsx (2 tests) 851ms
+   ✓ DeviceSetupWizard router commit > applies accepted settings without replacing the user-selected firmware profile  659ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.catalog.test.tsx (3 tests) 394ms
+ ✓ src/ui/laser/device-setup/DeviceSetupWizard.detected-values.test.tsx (1 test) 279ms
+ ✓ src/ui/laser/device-setup/DeviceSetupMaxFeedInvariant.test.tsx (1 test) 107ms
+ ✓ src/core/devices/device-profile-patch.test.ts (15 tests) 45ms
+ ✓ src/core/devices/catalogue-output-contracts.test.ts (8 tests) 45ms
+ ✓ src/io/machine-profile/machine-profile-catalog-workflow.test.ts (1 test) 49ms
+ ✓ src/ui/laser/device-setup/device-setup-flow.test.ts (23 tests) 25ms
+ ✓ src/io/machine-profile/machine-profile-io.test.ts (14 tests) 33ms
+ ✓ src/core/controllers/grbl/parse-settings.test.ts (21 tests) 14ms
+ ✓ src/core/devices/profile-catalog.test.ts (10 tests) 16ms
+ ✓ src/core/devices/device-profile.test.ts (13 tests) 11ms
+ ✓ src/core/devices/profile-suggestions.test.ts (4 tests) 9ms
+ ✓ src/io/machine-profile/machine-profile-camera.test.ts (3 tests) 14ms
+ ✓ src/ui/state/machine-profile-actions.test.ts (5 tests) 11ms
+ ✓ src/ui/state/cnc-machine-profile-persistence.test.ts (3 tests) 8ms
+ ✓ src/ui/state/machine-setup-output-parity.test.ts (1 test) 269ms
+ ✓ src/ui/state/machine-setup-history.test.ts (1 test) 10ms
+ ✓ src/io/machine-profile/machine-profile-rotary.test.ts (2 tests) 8ms
+ ✓ src/io/machine-profile/machine-profile-command-set.test.ts (1 test) 9ms
+ ✓ src/ui/laser/device-setup/machine-setup-controller-guide.test.ts (4 tests) 7ms
+
+ Test Files  23 passed (23)
+      Tests  161 passed (161)
+   Start at  23:46:07
+   Duration  93.63s (transform 18.51s, setup 125ms, collect 52.59s, tests 6.27s, environment 23.43s, prepare 3.90s)

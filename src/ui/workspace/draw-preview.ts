@@ -19,6 +19,7 @@ import {
   prepareOutput,
   prepareOutputSnapshot,
   type PreparedOutput,
+  type PrepareOutputOptions,
   type PrepareOutputSnapshotOptions,
 } from '../../io/gcode';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
@@ -112,7 +113,7 @@ export function drawPreview(
 
 export function buildPreviewToolpath(
   project: Project,
-  options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
+  options: PrepareOutputOptions = {},
 ): PreviewToolpath {
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
   // shows the exact path ORDER the machine runs (roadmap P1-C). Cheap scoped
@@ -153,12 +154,9 @@ export function previewPreparationIssue(
  */
 export function buildPreviewToolpathUnbounded(
   project: Project,
-  options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
+  options: PrepareOutputOptions = {},
 ): PreviewToolpath {
-  const prepared = prepareOutput(project, {
-    ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
-    ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
-  });
+  const prepared = prepareOutput(project, options);
   return buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
   });
@@ -168,7 +166,13 @@ export async function buildPreviewToolpathSnapshot(
   project: Project,
   options: Pick<
     PrepareOutputSnapshotOptions,
-    'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope' | 'registration'
+    | 'clock'
+    | 'renderVariableText'
+    | 'jobOrigin'
+    | 'outputScope'
+    | 'registration'
+    | 'contourEntryBounds'
+    | 'absoluteProgramOffset'
   >,
 ): Promise<PreviewToolpath> {
   // Hydrate before the gates: this path can await, so a page-backed project

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { usePlatform } from './platform-context';
 import {
@@ -81,6 +82,7 @@ function saveContext(
     jobPlacement: app.jobPlacement,
     outputScope: currentOutputScope(app),
     machine: {
+      ...nativeBedEvidenceSnapshot(laser),
       statusReport: laser.statusReport,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,

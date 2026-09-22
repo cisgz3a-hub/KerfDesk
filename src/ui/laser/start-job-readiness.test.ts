@@ -17,6 +17,7 @@ import { prepareOutput } from '../../io/gcode';
 import { CNC_REQUIRES_GRBL_MESSAGE, prepareStartJob } from './start-job-readiness';
 import { CNC_NO_WORK_ZERO_START_MESSAGE } from './cnc-start-advisories';
 import { frameVerificationForProject } from './frame-verification-testing';
+import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -222,7 +223,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.gcode).toContain('M4 S0'); // ADR-257: dynamic-power cut default
-      expect(result.warnings).toEqual([]);
+      expect(result.warnings).toEqual([UNKNOWN_NATIVE_BED_MESSAGE]);
     }
   });
 
