@@ -27,7 +27,7 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
-import { encodeWireBytes, extractSerialLines } from './serial-wire';
+import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
 import { createWorkerSerialConnection } from './worker-serial-connection';
 import type { SerialWorkerResponse } from './serial-worker-protocol';
 
@@ -293,13 +293,13 @@ async function runReadLoop(
 ): Promise<void> {
   if (reader === undefined) return;
   const decoder = new TextDecoder('utf-8');
-  let buffer = '';
+  let framing = EMPTY_SERIAL_LINE_STATE;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      const extracted = extractSerialLines(buffer, decoder.decode(value, { stream: true }));
-      buffer = extracted.buffer;
+      const extracted = extractSerialLines(framing, decoder.decode(value, { stream: true }));
+      framing = extracted.state;
       for (const line of extracted.lines) dispatchLine(lineSubs, line);
     }
   } catch (err) {

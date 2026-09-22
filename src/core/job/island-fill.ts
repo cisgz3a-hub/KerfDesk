@@ -179,12 +179,17 @@ function polylineBounds(polyline: Polyline): Bounds | null {
 }
 
 function unionBounds(bounds: ReadonlyArray<Bounds>): Bounds {
-  return {
-    minX: Math.min(...bounds.map((box) => box.minX)),
-    minY: Math.min(...bounds.map((box) => box.minY)),
-    maxX: Math.max(...bounds.map((box) => box.maxX)),
-    maxY: Math.max(...bounds.map((box) => box.maxY)),
-  };
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const box of bounds) {
+    minX = Math.min(minX, box.minX);
+    minY = Math.min(minY, box.minY);
+    maxX = Math.max(maxX, box.maxX);
+    maxY = Math.max(maxY, box.maxY);
+  }
+  return { minX, minY, maxX, maxY };
 }
 
 function boundsCenter(bounds: Bounds): Vec2 {

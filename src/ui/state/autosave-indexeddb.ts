@@ -10,6 +10,7 @@ import {
   type StoredAutosaveSnapshotReference,
 } from './autosave-indexeddb-schema';
 import { clearAutosaveManifest, replaceAutosaveSnapshot } from './autosave-indexeddb-mutations';
+import { hasUnsupportedAutosaveEnvelope, requireSupportedAutosaveVersion } from './autosave-record';
 import {
   abortAutosaveTransaction,
   AUTOSAVE_MANIFEST_STORE,
@@ -95,6 +96,7 @@ export class IndexedDbAutosaveRepository {
     try {
       const manifests = transaction.objectStore(AUTOSAVE_MANIFEST_STORE);
       const existing = await autosaveRequest<unknown>(manifests.get(input.storageKey));
+      requireSupportedAutosaveVersion(existing);
       const current =
         existing === undefined
           ? emptyAutosaveManifest(input.storageKey, input.sessionId)
@@ -139,6 +141,7 @@ export class IndexedDbAutosaveRepository {
       transaction.objectStore(AUTOSAVE_MANIFEST_STORE).get(storageKey),
     );
     await autosaveTransactionFinished(transaction);
+    requireSupportedAutosaveVersion(value);
     return value === undefined ? 0 : parseAutosaveManifest(value).epoch;
   }
 
@@ -197,6 +200,7 @@ function corruptManifestSlot(value: unknown, index: number): AutosaveIndexedDbSl
     previousExpected: false,
     current: null,
     previous: null,
+    ...(hasUnsupportedAutosaveEnvelope(value) ? { unsupportedVersion: true } : {}),
   };
 }
 
@@ -206,6 +210,7 @@ async function readManifest(
   sessionId: string,
 ): Promise<StoredAutosaveManifest> {
   const value = await autosaveRequest<unknown>(store.get(storageKey));
+  requireSupportedAutosaveVersion(value);
   return value === undefined
     ? emptyAutosaveManifest(storageKey, sessionId)
     : parseAutosaveManifest(value);
@@ -226,8 +231,10 @@ async function resolveSlot(
     epoch: manifest.epoch,
     currentExpected: manifest.current !== null,
     previousExpected: manifest.previous !== null,
-    current,
-    previous,
+    current: current.record,
+    previous: previous.record,
+    ...(current.unsupportedVersion ? { currentUnsupportedVersion: true } : {}),
+    ...(previous.unsupportedVersion ? { previousUnsupportedVersion: true } : {}),
   };
 }
 
@@ -236,12 +243,13 @@ async function readSnapshot(
   storageKey: string,
   sessionId: string,
   reference: StoredAutosaveSnapshotReference | null,
-): Promise<AutosaveIndexedDbRecord | null> {
-  if (reference === null) return null;
+): Promise<{ record: AutosaveIndexedDbRecord | null; unsupportedVersion?: boolean }> {
+  if (reference === null) return { record: null };
   const value = await autosaveRequest<unknown>(
     store.get(autosaveSnapshotKey(storageKey, reference)),
   );
-  if (value === undefined) return null;
+  if (value === undefined) return { record: null };
+  if (hasUnsupportedAutosaveEnvelope(value)) return { record: null, unsupportedVersion: true };
   try {
     const snapshot = parseAutosaveSnapshot(value);
     const matchesManifest =
@@ -249,9 +257,9 @@ async function readSnapshot(
       snapshot.sessionId === sessionId &&
       snapshot.epoch === reference.epoch &&
       snapshot.savedAt === reference.savedAt;
-    return matchesManifest ? publicAutosaveRecord(snapshot) : null;
+    return { record: matchesManifest ? publicAutosaveRecord(snapshot) : null };
   } catch {
-    return null;
+    return { record: null };
   }
 }
 

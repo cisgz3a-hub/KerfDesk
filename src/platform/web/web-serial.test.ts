@@ -381,30 +381,35 @@ describe('webSerial byte-range validation', () => {
 });
 
 describe('extractSerialLines', () => {
+  const empty = { buffer: '', discarding: false };
+
   it('emits complete newline-terminated lines and strips trailing CR', () => {
-    expect(extractSerialLines('', 'ok\r\n')).toEqual({ lines: ['ok'], buffer: '' });
-    expect(extractSerialLines('', 'a\nb\n')).toEqual({ lines: ['a', 'b'], buffer: '' });
+    expect(extractSerialLines(empty, 'ok\r\n')).toEqual({ lines: ['ok'], state: empty });
+    expect(extractSerialLines(empty, 'a\nb\n')).toEqual({ lines: ['a', 'b'], state: empty });
   });
 
   it('holds a partial line across chunks', () => {
-    const first = extractSerialLines('', '<Idle');
-    expect(first).toEqual({ lines: [], buffer: '<Idle' });
-    expect(extractSerialLines(first.buffer, '|MPos>\n')).toEqual({
+    const first = extractSerialLines(empty, '<Idle');
+    expect(first).toEqual({ lines: [], state: { buffer: '<Idle', discarding: false } });
+    expect(extractSerialLines(first.state, '|MPos>\n')).toEqual({
       lines: ['<Idle|MPos>'],
-      buffer: '',
+      state: empty,
     });
   });
 
   it('drops an over-length partial so the buffer cannot grow without bound (DoS guard)', () => {
     // A device streaming bytes with no newline must not accumulate unbounded.
     const garbage = 'A'.repeat(70_000);
-    expect(extractSerialLines('', garbage)).toEqual({ lines: [], buffer: '' });
+    expect(extractSerialLines(empty, garbage)).toEqual({
+      lines: [],
+      state: { buffer: '', discarding: true },
+    });
     // A normal short partial is preserved.
-    expect(extractSerialLines('', 'short').buffer).toBe('short');
+    expect(extractSerialLines(empty, 'short').state.buffer).toBe('short');
   });
 
   it('drops an over-length newline-terminated record before emitting subscribers', () => {
     const hugeLine = `${'A'.repeat(70_000)}\nok\n`;
-    expect(extractSerialLines('', hugeLine)).toEqual({ lines: ['ok'], buffer: '' });
+    expect(extractSerialLines(empty, hugeLine)).toEqual({ lines: ['ok'], state: empty });
   });
 });

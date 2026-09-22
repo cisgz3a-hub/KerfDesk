@@ -65,8 +65,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// RX-13 was withdrawn: an oversized unterminated record must not turn its tail
-// into an acknowledgement. See the dated preservation note for the open B-19 defect.
 describe('webSerial raw receive framing', () => {
   it('RX-01: delivers one ok record for coalesced and byte-by-byte schedules', async () => {
     await expectRecords([fixtureBytes('ok\n')], ['ok']);
@@ -127,6 +125,20 @@ describe('webSerial raw receive framing', () => {
       [fixtureBytes('G'.repeat(ACCEPTED_RECORD_LENGTH)), fixtureBytes('\n')],
       ['G'.repeat(ACCEPTED_RECORD_LENGTH)],
     );
+  });
+
+  it('RX-13: discards an oversized record through its terminator across reads', async () => {
+    const oversized = 'A'.repeat(OVERSIZED_RECORD_LENGTH);
+    await expectRecords([fixtureBytes(`${oversized}ok\nok\n`)], ['ok']);
+    await expectRecords(
+      [fixtureBytes(oversized), fixtureBytes('o'), fixtureBytes('k\n'), fixtureBytes('ok\n')],
+      ['ok'],
+    );
+  });
+
+  it('retains an accepted-length CRLF record when CR and LF arrive in separate reads', async () => {
+    const record = 'G'.repeat(ACCEPTED_RECORD_LENGTH);
+    await expectRecords([fixtureBytes(`${record}\r`), fixtureBytes('\n')], [record]);
   });
 });
 

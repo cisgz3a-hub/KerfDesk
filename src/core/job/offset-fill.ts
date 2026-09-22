@@ -35,7 +35,7 @@ export function offsetFillContours(input: OffsetFillInput): OffsetFillResult {
   const out: Polyline[] = [];
   const passLimit = offsetPassLimit(source, spacing);
   for (let pass = 0; current.contours.length > 0 && pass < passLimit; pass += 1) {
-    out.push(...current.contours);
+    for (const contour of current.contours) out.push(contour);
     current = offsetBy(current.contours, -spacing);
   }
   // A failure can happen on the lookahead after the final emitted contour, so

@@ -1,5 +1,5 @@
-import type { AutosaveSnapshot } from './autosave-record';
-import { autosaveSnapshotFromRecord } from './autosave-record';
+import type { AutosaveRecord, AutosaveRecordReadResult, AutosaveSnapshot } from './autosave-record';
+import { readAutosaveRecord } from './autosave-record';
 import { autosaveSessionIdForStorageKey, readLocalAutosaveState } from './autosave-local-storage';
 import type { AutosaveIndexedDbSlot } from './autosave-indexeddb';
 import type { AutosaveDurableRepository } from './autosave-durable-repository';
@@ -16,6 +16,7 @@ export type AutosaveDurableWarning =
   | 'local-read-failed'
   | 'recovered-previous'
   | 'corrupt-slot'
+  | 'unsupported-version'
   | 'ownership-probe-failed';
 
 // A slot this read could not restore. Retirement must compare its observed
@@ -55,6 +56,7 @@ async function readCandidates(
   const local = readLocalAutosaveState();
   if (local.corrupt) warnings.push('corrupt-slot');
   if (local.failed) warnings.push('local-read-failed');
+  if (local.unsupportedVersion) warnings.push('unsupported-version');
   for (const { storageKey, raw } of local.unreadableSlots) {
     unreadable.push({
       storageKey,
@@ -67,6 +69,7 @@ async function readCandidates(
   try {
     for (const slot of await repository.readAllSlots()) {
       const candidate = indexedDbCandidate(slot, warnings);
+      if (candidate === 'unsupported-version') continue;
       if (candidate !== null) {
         candidates.push(candidate);
         continue;
@@ -116,20 +119,55 @@ function localCandidate(snapshot: AutosaveSnapshot): AutosaveDurableSnapshot {
 function indexedDbCandidate(
   slot: AutosaveIndexedDbSlot,
   warnings: AutosaveDurableWarning[],
-): AutosaveDurableSnapshot | null {
-  const current = slot.current && autosaveSnapshotFromRecord(slot.current, slot.storageKey);
-  const previous = slot.previous && autosaveSnapshotFromRecord(slot.previous, slot.storageKey);
-  if ((slot.currentExpected && current === null) || (slot.previousExpected && previous === null)) {
-    warnings.push('corrupt-slot');
+): AutosaveDurableSnapshot | 'unsupported-version' | null {
+  const current = readIndexedDbRecord(
+    slot.current,
+    slot.storageKey,
+    slot.unsupportedVersion === true || slot.currentUnsupportedVersion === true,
+  );
+  const previous = readIndexedDbRecord(
+    slot.previous,
+    slot.storageKey,
+    slot.previousUnsupportedVersion === true,
+  );
+  reportIndexedDbVersions(slot, current, previous, warnings);
+  // A previous snapshot must not silently replace an unreadable newer one.
+  // A compatible current snapshot is still recoverable when only its history
+  // needs a different reader; mutation guards keep that history intact.
+  if (current.kind === 'unsupported-version') return 'unsupported-version';
+  if (current.kind === 'ok') {
+    return { ...current.snapshot, backend: 'indexeddb', epoch: slot.epoch, ownership: 'unknown' };
   }
-  if (current !== null) {
-    return { ...current, backend: 'indexeddb', epoch: slot.epoch, ownership: 'unknown' };
-  }
-  if (previous !== null) {
+  if (previous.kind === 'ok') {
     warnings.push('recovered-previous');
-    return { ...previous, backend: 'indexeddb', epoch: slot.epoch, ownership: 'unknown' };
+    return { ...previous.snapshot, backend: 'indexeddb', epoch: slot.epoch, ownership: 'unknown' };
   }
-  return null;
+  return previous.kind === 'unsupported-version' ? 'unsupported-version' : null;
+}
+
+function readIndexedDbRecord(
+  record: AutosaveRecord | null,
+  storageKey: string,
+  unsupported: boolean,
+): AutosaveRecordReadResult {
+  if (unsupported) return { kind: 'unsupported-version' };
+  return record === null ? { kind: 'invalid' } : readAutosaveRecord(record, storageKey);
+}
+
+function reportIndexedDbVersions(
+  slot: AutosaveIndexedDbSlot,
+  current: AutosaveRecordReadResult,
+  previous: AutosaveRecordReadResult,
+  warnings: AutosaveDurableWarning[],
+): void {
+  if (current.kind === 'unsupported-version' || previous.kind === 'unsupported-version') {
+    warnings.push('unsupported-version');
+  }
+  if (
+    (slot.currentExpected && current.kind === 'invalid') ||
+    (slot.previousExpected && previous.kind === 'invalid')
+  )
+    warnings.push('corrupt-slot');
 }
 
 async function probeOwnership(

@@ -1,5 +1,6 @@
 import type { Project } from '../../core/scene';
-import { deserializeProject } from '../../io/project/deserialize-project';
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
+import { deserializeProject, deserializeProjectValue } from '../../io/project/deserialize-project';
 import { prepareProjectForAutosave } from '../../io/project/prepare-project-autosave';
 
 export const AUTOSAVE_SCHEMA_VERSION = 1 as const;
@@ -59,18 +60,64 @@ export function prepareAutosaveRecord(
   };
 }
 
-export function autosaveSnapshotFromRecord(
+export type AutosaveRecordReadResult =
+  | { readonly kind: 'ok'; readonly snapshot: AutosaveSnapshot }
+  | { readonly kind: 'unsupported-version' | 'invalid' };
+
+export function readAutosaveRecord(
   record: AutosaveRecord,
   storageKey: string,
-): AutosaveSnapshot | null {
+): AutosaveRecordReadResult {
   const result = deserializeProject(record.projectJson);
-  if (result.kind !== 'ok') return null;
+  if (result.kind !== 'ok') {
+    return { kind: result.kind === 'invalid' ? 'invalid' : 'unsupported-version' };
+  }
   return {
-    project: result.project,
-    savedAt: record.savedAt,
-    storageKey,
-    ...(record.sessionId === undefined ? {} : { sessionId: record.sessionId }),
+    kind: 'ok',
+    snapshot: {
+      project: result.project,
+      savedAt: record.savedAt,
+      storageKey,
+      ...(record.sessionId === undefined ? {} : { sessionId: record.sessionId }),
+    },
   };
+}
+
+export class UnsupportedAutosaveVersionError extends Error {
+  constructor() {
+    super('This autosave needs a different app version and has been retained.');
+    this.name = 'UnsupportedAutosaveVersionError';
+  }
+}
+
+export function hasUnsupportedAutosaveEnvelope(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const version = (value as Record<string, unknown>)['schemaVersion'];
+  return (
+    typeof version === 'number' && Number.isFinite(version) && version > AUTOSAVE_SCHEMA_VERSION
+  );
+}
+
+// Mutators inspect the persisted version too: a read-time warning alone would
+// still let interval writes, beforeunload, or manual-save cleanup destroy it.
+// Current project versions need no normalization on this mutation path.
+export function requireSupportedAutosaveVersion(value: unknown): void {
+  if (hasUnsupportedAutosaveEnvelope(value)) throw new UnsupportedAutosaveVersionError();
+  if (typeof value !== 'object' || value === null) return;
+  const json = (value as Record<string, unknown>)['projectJson'];
+  if (typeof json !== 'string') return;
+  let project: unknown;
+  try {
+    project = JSON.parse(json);
+  } catch {
+    return;
+  }
+  if (typeof project !== 'object' || project === null) return;
+  if ((project as Record<string, unknown>)['schemaVersion'] === PROJECT_SCHEMA_VERSION) return;
+  const result = deserializeProjectValue(project);
+  if (result.kind === 'schema-too-new' || result.kind === 'schema-too-old') {
+    throw new UnsupportedAutosaveVersionError();
+  }
 }
 
 export function isAutosaveRecord(value: unknown): value is AutosaveRecord {

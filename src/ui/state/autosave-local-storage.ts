@@ -1,9 +1,11 @@
 import type { Project } from '../../core/scene';
 import {
   AUTOSAVE_SCHEMA_VERSION,
-  autosaveSnapshotFromRecord,
+  hasUnsupportedAutosaveEnvelope,
   isAutosaveRecord,
   prepareAutosaveRecord,
+  readAutosaveRecord,
+  requireSupportedAutosaveVersion,
   type AutosaveRecord,
   type AutosaveScope,
   type AutosaveSnapshot,
@@ -31,6 +33,7 @@ export type LocalAutosaveReadResult = {
   readonly snapshots: AutosaveSnapshot[];
   readonly corrupt: boolean;
   readonly failed: boolean;
+  readonly unsupportedVersion: boolean;
   // Keep the observed bytes so retirement cannot delete a newer write at this key.
   readonly unreadableSlots: ReadonlyArray<{ readonly storageKey: string; readonly raw: string }>;
 };
@@ -41,6 +44,7 @@ export type AutosaveStorageTarget = { readonly storageKey: string };
 type LocalReadDiagnostics = {
   corrupt: boolean;
   failed: boolean;
+  unsupportedVersion: boolean;
   unreadableSlots: Array<{ readonly storageKey: string; readonly raw: string }>;
 };
 
@@ -64,6 +68,7 @@ export function writePreparedLocalAutosave(
 ): AutosaveWriteResult {
   if (!localAutosaveAvailable()) return { kind: 'unavailable', reason: 'storage-unavailable' };
   try {
+    requireSupportedLocalAutosaveVersion(storageKey);
     localStorage.setItem(storageKey, JSON.stringify(record));
     registerAutosaveKey(storageKey);
     return { kind: 'ok', savedAt: record.savedAt, storageKey };
@@ -86,9 +91,20 @@ export function readLocalAutosaveSnapshots(): AutosaveSnapshot[] {
 
 export function readLocalAutosaveState(): LocalAutosaveReadResult {
   if (!localAutosaveAvailable()) {
-    return { snapshots: [], corrupt: false, failed: true, unreadableSlots: [] };
+    return {
+      snapshots: [],
+      corrupt: false,
+      failed: true,
+      unsupportedVersion: false,
+      unreadableSlots: [],
+    };
   }
-  const diagnostics: LocalReadDiagnostics = { corrupt: false, failed: false, unreadableSlots: [] };
+  const diagnostics: LocalReadDiagnostics = {
+    corrupt: false,
+    failed: false,
+    unsupportedVersion: false,
+    unreadableSlots: [],
+  };
   const snapshots = localAutosaveCandidateKeys(diagnostics)
     .map((storageKey) => readAutosaveAtKey(storageKey, diagnostics))
     .filter((snapshot): snapshot is AutosaveSnapshot => snapshot !== null);
@@ -103,6 +119,7 @@ export function clearLocalAutosave(
   const errors: unknown[] = [];
   for (const storageKey of keys) {
     try {
+      requireSupportedLocalAutosaveVersion(storageKey);
       localStorage.removeItem(storageKey);
       unregisterAutosaveKey(storageKey);
     } catch (error) {
@@ -187,11 +204,31 @@ function readAutosaveAtKey(
   } catch {
     return markUnreadable(state, storageKey, raw);
   }
-  const snapshot =
-    isAutosaveRecord(record) && recordMatchesStorageKey(record, storageKey)
-      ? autosaveSnapshotFromRecord(record, storageKey)
-      : null;
-  return snapshot === null ? markUnreadable(state, storageKey, raw) : snapshot;
+  if (hasUnsupportedAutosaveEnvelope(record)) {
+    state.unsupportedVersion = true;
+    return null;
+  }
+  if (!isAutosaveRecord(record) || !recordMatchesStorageKey(record, storageKey)) {
+    return markUnreadable(state, storageKey, raw);
+  }
+  const result = readAutosaveRecord(record, storageKey);
+  if (result.kind === 'unsupported-version') {
+    state.unsupportedVersion = true;
+    return null;
+  }
+  return result.kind === 'ok' ? result.snapshot : markUnreadable(state, storageKey, raw);
+}
+
+export function requireSupportedLocalAutosaveVersion(storageKey: string): void {
+  const raw = localStorage.getItem(storageKey);
+  if (raw === null) return;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  requireSupportedAutosaveVersion(value);
 }
 
 function markUnreadable(state: LocalReadDiagnostics, storageKey: string, raw: string): null {

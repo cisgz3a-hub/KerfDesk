@@ -36,6 +36,9 @@ export type AutosaveIndexedDbSlot = {
   readonly previousExpected: boolean;
   readonly current: AutosaveIndexedDbRecord | null;
   readonly previous: AutosaveIndexedDbRecord | null;
+  readonly unsupportedVersion?: boolean;
+  readonly currentUnsupportedVersion?: boolean;
+  readonly previousUnsupportedVersion?: boolean;
 };
 
 export function emptyAutosaveManifest(

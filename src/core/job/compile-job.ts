@@ -122,14 +122,14 @@ function appendOperationCompilation(
         device,
         priorityObjectId,
       );
-      output.groups.push(...vector.groups);
-      output.diagnostics.push(...vector.diagnostics);
+      for (const group of vector.groups) output.groups.push(group);
+      for (const diagnostic of vector.diagnostics) output.diagnostics.push(diagnostic);
     }
     const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
       sceneObjects: completeSceneObjects,
     });
-    output.groups.push(...raster.groups);
-    output.diagnostics.push(...raster.diagnostics);
+    for (const group of raster.groups) output.groups.push(group);
+    for (const diagnostic of raster.diagnostics) output.diagnostics.push(diagnostic);
   }
 }
 

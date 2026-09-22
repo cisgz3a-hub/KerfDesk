@@ -2,6 +2,10 @@ import type { Layer, RasterImage } from '../../core/scene';
 import type { ToastVariant } from '../state/toast-store';
 import type { ConvertToBitmapDialogOptions } from '../raster/ConvertToBitmapDialog';
 import { buildBitmapFromVectors, type ConvertibleVector } from '../raster/vector-to-bitmap';
+import {
+  bitmapLayerSettingsSignature,
+  captureBitmapLayerSettings,
+} from '../raster/bitmap-operation-settings';
 import { useStore } from '../state';
 
 export type BitmapConversionOutcome =
@@ -18,11 +22,14 @@ export async function convertSelectedVectorsToBitmap(
 ): Promise<BitmapConversionOutcome> {
   const controller = new AbortController();
   const cancel = (): void => controller.abort();
-  const layerInputs = layers.map(({ id, color, mode }) => ({ id, color, mode }));
+  const layerInputs = captureBitmapLayerSettings(layers);
   const owner = {
     projectDocumentEpoch: useStore.getState().projectDocumentEpoch,
     sources: [...convertibles],
-    layers: options.renderType === 'use-cut-settings' ? layerInputs : undefined,
+    layerSignature:
+      options.renderType === 'use-cut-settings'
+        ? bitmapLayerSettingsSignature(layerInputs)
+        : undefined,
   };
   if (signal?.aborted) return { kind: 'cancelled' };
   if (!conversionOwnerIsCurrent(owner)) return { kind: 'stale' };
@@ -78,21 +85,15 @@ function isAbortError(error: unknown): boolean {
 function conversionOwnerIsCurrent(owner: {
   readonly projectDocumentEpoch: number;
   readonly sources: ReadonlyArray<ConvertibleVector>;
-  readonly layers: ReadonlyArray<Pick<Layer, 'id' | 'color' | 'mode'>> | undefined;
+  readonly layerSignature: string | undefined;
 }): boolean {
   const state = useStore.getState();
   if (state.projectDocumentEpoch !== owner.projectDocumentEpoch) return false;
-  if (owner.layers !== undefined) {
-    const current = state.project.scene.layers;
-    if (current.length !== owner.layers.length) return false;
-    if (
-      owner.layers.some((layer, index) => {
-        const next = current[index];
-        return next?.id !== layer.id || next.color !== layer.color || next.mode !== layer.mode;
-      })
-    )
-      return false;
-  }
+  if (
+    owner.layerSignature !== undefined &&
+    bitmapLayerSettingsSignature(state.project.scene.layers) !== owner.layerSignature
+  )
+    return false;
   if (owner.sources.length === 0) return false;
   const currentObjects = new Map(state.project.scene.objects.map((object) => [object.id, object]));
   return owner.sources.every((source) => currentObjects.get(source.id) === source);

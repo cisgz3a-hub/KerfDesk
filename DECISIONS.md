@@ -21552,3 +21552,50 @@ The audit record is `docs/audits/2026-09-22-laser-recovery-second-pass.md`.
 Acknowledged commands are not measured material progress. Material position, restored work zero,
 power response and minimised Chrome/Falcon streaming still require physical qualification. These
 changes do not establish the cause of the reported immediate minimisation pause.
+
+---
+
+## ADR-342 - Preserve record boundaries and effective operations across audit edge cases (2026-09-22)
+
+### Context
+
+The latest-100-PR audit reproduced thirteen defects at its frozen baseline. By the repair
+baseline, PRs #818, #822, #826 and #829 had corrected nine, including the delayed-archive
+disconnect race. Four remained: an oversized serial record could manufacture an acknowledgement
+across reads, an older build could erase a newer-schema autosave, dense contour lists exceeded
+JavaScript argument limits, and bitmap conversion omitted enabled Fill sub-layers.
+
+### Decision
+
+1. Both serial read loops carry explicit partial-record and discard state. Once a record exceeds
+   the existing length bound, discard its entire suffix through the next newline, regardless of
+   read boundaries. Allow the one terminal CR excluded by CRLF framing even when it arrives
+   separately. Neither a dropped suffix nor discarded bytes may reach acknowledgement handling.
+   Each connection starts with independent state; worker handover and refill ownership are unchanged.
+2. Treat an unsupported project schema as incompatible, not corrupt. Preserve its original bytes
+   in local storage and IndexedDB, including a protected previous generation. Guard mutation at
+   the write/clear boundary as well as recovery selection, so a later autosave cannot overwrite it.
+   Move current autosaving to a fresh owned session when necessary and disclose that the older
+   backup needs a compatible app. Genuine corruption still uses observed-record retirement.
+3. Append dense geometry iteratively and accumulate bounds without passing one argument per
+   contour. Apply the repair through collection, offset/island filling, compilation and ordering,
+   rather than moving the same argument-limit failure to a downstream step. Preserve the Sharp
+   fast path, existing winding/topology semantics and geometry algorithms. Do not impose a new
+   artwork-size refusal; normalisation cost and memory remain input-dependent.
+4. Use the compiler's effective enabled-operation expansion for bitmap **Use Cut Settings**,
+   including parent output, enabled sub-layers and applicable per-artwork mode settings. Fill
+   groups remain independent and overlap keeps the existing ink brightness. Asynchronous
+   conversion ownership includes the settings that determine the result, so changed sub-layers
+   cannot commit a stale conversion.
+5. Retain #829's repository-activation retry for interrupted post-accept archival. Strengthen its
+   regression at the actual storage-commit boundary with the production disconnect transition,
+   without manufacturing a later controller or laser-store event.
+
+### Evidence and limits
+
+The repair record is `docs/audits/2026-09-22-last-100-pr-repairs.md`. It separates failures on the
+audited/current baselines, targeted regressions, independent oracles, rendered browser checks,
+and repository verification. Serial browser tests use real module Workers and transferred streams
+with simulated ports. Dense geometry tests do not establish a universal memory or time bound.
+No controller, laser, spindle, material, deployment or installed-package qualification is implied.
+The Frame-first policy and the exact reviewed-artifact handoff remain unchanged.

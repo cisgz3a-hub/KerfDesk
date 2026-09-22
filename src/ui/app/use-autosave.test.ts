@@ -19,6 +19,7 @@ import {
   AUTOSAVE_FAILURE_MESSAGE,
   AUTOSAVE_RECOVERY_RETAINED_MESSAGE,
   AUTOSAVE_RECOVERY_STORAGE_MESSAGE,
+  AUTOSAVE_RECOVERY_VERSION_MESSAGE,
   createAutosaveFailureReporter,
   runAutosaveRecovery,
 } from './use-autosave';
@@ -38,6 +39,28 @@ describe('createAutosaveFailureReporter', () => {
 });
 
 describe('runAutosaveRecovery warnings', () => {
+  it('explains that an unsupported autosave was retained without offering to discard it', async () => {
+    const originalPushToast = useToastStore.getState().pushToast;
+    const pushToast = vi.fn();
+    const chooseRestore = vi.fn(() => false);
+    useToastStore.setState({ pushToast });
+    try {
+      await runAutosaveRecovery(chooseRestore, {
+        readLatest: async () => ({
+          snapshot: null,
+          warnings: ['unsupported-version'],
+          unreadable: [],
+        }),
+        write: async () => ({ kind: 'superseded' }),
+        clearRecovered: async () => ({ kind: 'ok' }),
+      });
+    } finally {
+      useToastStore.setState({ pushToast: originalPushToast });
+    }
+    expect(chooseRestore).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledExactlyOnceWith(AUTOSAVE_RECOVERY_VERSION_MESSAGE, 'warning');
+  });
+
   it('discloses corrupt storage and an ownership probe failure', async () => {
     const originalPushToast = useToastStore.getState().pushToast;
     const pushToast = vi.fn();

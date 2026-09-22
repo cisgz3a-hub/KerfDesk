@@ -1,4 +1,5 @@
 import type { RasterImage } from '../src/core/scene';
+import type { AppState } from '../src/ui/state/store';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import { toolbarCommand } from './fixtures/workspace-ui';
 
@@ -151,4 +152,63 @@ test('busy conversion prevents duplicate work, cancels with Escape, and can be r
   await expect(retry).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Trace Image...', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => window.__bitmapConversionTest.requests)).toBe(2);
+});
+
+test('Use Cut Settings sends enabled Fill sub-layers through the native worker into PNG pixels', async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const moduleUrl = '/src/ui/state/index.ts';
+    const { useStore } = (await import(moduleUrl)) as { useStore: { getState: () => AppState } };
+    const state = useStore.getState();
+    const source = state.project.scene.objects.find((object) => object.kind === 'imported-svg');
+    if (!source) throw new Error('Expected imported artwork');
+    const layer = state.project.scene.layers.find(
+      (candidate) =>
+        source.operationIds?.includes(candidate.id) ?? candidate.color === source.paths[0]?.color,
+    );
+    if (!layer) throw new Error('Expected source operation');
+    state.setLayerParam(layer.id, { mode: 'line' });
+    state.addLayerSubLayer(layer.id);
+    const subLayer = useStore
+      .getState()
+      .project.scene.layers.find((candidate) => candidate.id === layer.id)?.subLayers[0];
+    if (!subLayer) throw new Error('Expected added sub-layer');
+    useStore.getState().updateLayerSubLayer(layer.id, subLayer.id, { mode: 'fill' });
+  });
+  const dialog = await openDialog(page);
+  await dialog
+    .getByRole('combobox', { name: 'Convert render type' })
+    .selectOption('use-cut-settings');
+  await dialog.getByRole('button', { name: 'Convert', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const result = await page.evaluate(async () => {
+    const raster = window.__bitmapConversionTest.results[0];
+    if (!raster?.lumaBase64 || !raster.dataUrl) throw new Error('Expected native worker result');
+    const image = new Image();
+    image.src = raster.dataUrl;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas unavailable');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, image.width, image.height).data;
+    const luma = Uint8Array.from(atob(raster.lumaBase64), (char) => char.charCodeAt(0));
+    let ink = 0;
+    let mismatch = 0;
+    for (let index = 0; index < luma.length; index += 1) {
+      if (luma[index] === 127) ink += 1;
+      if (
+        pixels[index * 4] !== luma[index] ||
+        pixels[index * 4 + 1] !== luma[index] ||
+        pixels[index * 4 + 2] !== luma[index] ||
+        pixels[index * 4 + 3] !== 255
+      )
+        mismatch += 1;
+    }
+    return { width: image.width, height: image.height, ink, mismatch };
+  });
+  expect(result).toEqual({ width: 150, height: 100, ink: 15000, mismatch: 0 });
 });

@@ -106,6 +106,18 @@ describe('offsetFillContours', () => {
     offsetHarness.checked.mockReset().mockImplementation(actual);
   });
 
+  it('retains every contour when one successful offset pass exceeds the argument limit', () => {
+    const contours = Array.from({ length: 150_000 }, () => shrunk(0.5));
+    offsetHarness.checked.mockReturnValueOnce(offsetOk(contours)).mockReturnValueOnce(offsetOk([]));
+
+    const result = offsetFillContours({ polylines: [SQUARE], spacingMm: 1 });
+
+    expect(result.contours).toHaveLength(contours.length);
+    expect(result.contours.every((contour, index) => contour === contours[index])).toBe(true);
+    expect(result.termination).toEqual({ kind: 'complete' });
+    expect(offsetHarness.checked).toHaveBeenCalledTimes(2);
+  });
+
   it('reports offset-failed when the very first offset pass fails', () => {
     offsetHarness.checked.mockImplementation(() => OFFSET_FAILURE);
 

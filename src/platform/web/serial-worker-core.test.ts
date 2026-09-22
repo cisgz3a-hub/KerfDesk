@@ -110,6 +110,28 @@ describe('serial worker core (ADR-334)', () => {
     expect(h.core.armedStreamer()?.completed).toBe(2);
   });
 
+  it('never refills from the tail of an oversized record split across reads', async () => {
+    const h = harness();
+    arm(h);
+    h.push('A'.repeat(65_537));
+    await flush();
+    h.push('ok\n');
+    await flush();
+
+    expect(lines(h.posted)).toEqual([]);
+    expect(h.written).toEqual([]);
+    expect(h.core.armedStreamer()?.completed).toBe(0);
+
+    // Only a distinct, delimited acknowledgement may advance the job.
+    h.push('ok\n');
+    await flush();
+    expect(lines(h.posted)).toEqual(['ok']);
+    expect(h.written).toEqual(['G1 X2.000\n']);
+    expect(h.core.armedStreamer()?.completed).toBe(1);
+    h.endStream();
+    await h.core.readLoop();
+  });
+
   it('acknowledges the handover in both directions and stops writing once released', async () => {
     const h = harness();
 
