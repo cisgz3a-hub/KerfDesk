@@ -82,9 +82,27 @@ describe('Cloudflare production deploy gate', () => {
     expect(workflow).toContain('group: deploy-production-main');
     expect(workflow).toContain('queue: max');
     expect(workflow).not.toContain('cancel-in-progress:');
-    expect(workflow.indexOf('Reconfirm current main immediately before publication')).toBeLessThan(
-      workflow.indexOf('uses: cloudflare/wrangler-action@'),
+
+    // ADR-311 amendment 1: the two checks ask different questions, so both
+    // phase flags must be present and distinct. Passing `--phase=candidate`
+    // twice would silently restore the tip test that starved the lane.
+    expect(workflow).toContain('--phase=candidate');
+    expect(workflow).toContain('--phase=publication');
+    expect(workflow).toContain(
+      'git merge-base --is-ancestor "${DEPLOY_SHA}" refs/remotes/origin/main',
     );
+    expect(workflow).toContain('--checkout-on-main="${checkout_on_main}"');
+
+    // Anchored first: indexOf returns -1 for a renamed step, and -1 is less
+    // than any real index, so this ordering assertion used to pass whether the
+    // step existed or not.
+    const prePublishIndex = workflow.indexOf(
+      'Confirm the verified commit is still on main before publication',
+    );
+    const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@');
+    expect(prePublishIndex).toBeGreaterThanOrEqual(0);
+    expect(publishIndex).toBeGreaterThanOrEqual(0);
+    expect(prePublishIndex).toBeLessThan(publishIndex);
   });
 
   it('uses current-main control code when an obsolete candidate predates the resolver', () => {
@@ -102,7 +120,7 @@ describe('Cloudflare production deploy gate', () => {
     expect(workflow).toContain('node "${RUNNER_TEMP}/resolve-web-deploy-identity.mjs"');
     expect(workflow).not.toContain('node scripts/resolve-web-deploy-identity.mjs');
     expect(workflow).toContain('Record obsolete run as an intentional non-deployment');
-    expect(workflow).toContain('Record main advance during build as a non-deployment');
+    expect(workflow).toContain('Record a commit that left main as a non-deployment');
     expect(workflow).toContain(
       "steps.deployment_identity.outputs.eligible == 'true' && steps.pre_publish_identity.outputs.eligible == 'false'",
     );
