@@ -7377,7 +7377,7 @@ unavailable, changing the layout still works for the current session.
   particular panel focus the corresponding tab.
 - **Spacious** presents the two panels side by side, preserving independent
   horizontal resize, hide/show, and collapse/expand controls. Run order widened
-  the Artwork / Operations panel; **superseded 2026-09-22 by ADR-346** — the rail
+  the Artwork / Operations panel; **superseded 2026-09-22 by ADR-348** — the rail
   keeps one width and the view switch never resizes it.
 - Below 960 CSS px wide, the workspace always uses a single Compact sidebar,
   even with Spacious selected. The saved preference is retained and takes effect

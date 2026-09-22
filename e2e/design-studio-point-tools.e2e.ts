@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('draws Polyline and Arc through native mouse events with one-step undo', async ({ page }) => {
-  // Scoped: the application menu bar has its own Undo (ADR-346); this test is
+  // Scoped: the application menu bar has its own Undo (ADR-348); this test is
   // about the Studio's sketch history, not the project's.
   const studio = page.getByRole('dialog', { name: 'Design Studio' });
   const canvas = page.getByLabel('Design canvas, 0 entities');

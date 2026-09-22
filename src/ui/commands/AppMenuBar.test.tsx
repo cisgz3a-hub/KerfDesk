@@ -386,7 +386,7 @@ describe('AppMenuBar', () => {
       expect(document.activeElement?.textContent).toBe('Measure');
 
       // One focus stop per command: the per-row tutorial button that used to
-      // sit between them is gone (ADR-346).
+      // sit between them is gone (ADR-348).
       await act(async () => {
         document.activeElement?.dispatchEvent(
           new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),

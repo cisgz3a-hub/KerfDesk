@@ -1,4 +1,4 @@
-// The two pointer-following canvas overlays (ADR-346), composed in one place
+// The two pointer-following canvas overlays (ADR-348), composed in one place
 // so Workspace.tsx stays a layout shell: the ruler-strip cursor marks, and the
 // hover size readout.
 //

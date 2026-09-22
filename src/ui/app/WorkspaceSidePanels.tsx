@@ -224,7 +224,7 @@ function PanelToggle(props: {
   );
 }
 
-// One panel width, whatever view is showing (ADR-346). Switching the Artwork /
+// One panel width, whatever view is showing (ADR-348). Switching the Artwork /
 // Operations panel to Run order used to widen the whole rail, which moved the
 // canvas under the operator mid-task and overwrote any width they had dragged
 // for themselves.

@@ -1,4 +1,4 @@
-// Hover an object, see how big it is (ADR-346). Size used to be readable only
+// Hover an object, see how big it is (ADR-348). Size used to be readable only
 // once artwork was selected — from the numeric bar, or by dragging a handle
 // and watching the drag chip. Hovering answers "how wide is that one?" without
 // touching the scene at all.

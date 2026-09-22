@@ -2,7 +2,7 @@
 // transform so they respect zoom + pan. Drawn over the canvas content (origin
 // marker stays visible at the top-left corner where the rulers meet).
 //
-// Tick and label spacing follow the zoom (ADR-346, `ruler-steps.ts`): the
+// Tick and label spacing follow the zoom (ADR-348, `ruler-steps.ts`): the
 // labelled step is the smallest nice number whose labels stay ~62 px apart,
 // and minor ticks subdivide it while they stay ~5 px apart. A half-step tick
 // is drawn taller than the rest so the eye can halve a division without

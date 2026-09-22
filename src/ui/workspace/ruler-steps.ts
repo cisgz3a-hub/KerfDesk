@@ -1,4 +1,4 @@
-// Ruler tick/label spacing, chosen from the view scale (ADR-346).
+// Ruler tick/label spacing, chosen from the view scale (ADR-348).
 //
 // The rulers used to tick every 10 mm and label every 50 mm at every zoom.
 // Zoomed out that is a grey smear of ticks with labels colliding into each

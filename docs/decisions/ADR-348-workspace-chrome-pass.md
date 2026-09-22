@@ -1,4 +1,4 @@
-## ADR-346 - Workspace chrome pass: menu-bar Undo, one rail width, tutorials only on tools, zoom-aware rulers, hover size (2026-09-22)
+## ADR-348 - Workspace chrome pass: menu-bar Undo, one rail width, tutorials only on tools, zoom-aware rulers, hover size (2026-09-22)
 
 **Status:** Accepted. | **Date:** 2026-09-22
 

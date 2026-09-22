@@ -1,4 +1,4 @@
-// Live pointer position on both ruler strips (ADR-346).
+// Live pointer position on both ruler strips (ADR-348).
 //
 // DOM, not canvas, and deliberately: the scene redraw does not depend on
 // `cursorMm`, so painting the marker into the rulers would mean redrawing

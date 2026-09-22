@@ -133,7 +133,7 @@ function MenuItem(props: {
   const command = props.command;
   const commandHelp = commandHelpId(command.id);
   // One row, one action. The per-row tutorial icon that used to sit here put a
-  // book on EVERY command in every menu (ADR-346); lessons are reached from
+  // book on EVERY command in every menu (ADR-348); lessons are reached from
   // Learn and from the tool panels that teach a procedure.
   return (
     <button

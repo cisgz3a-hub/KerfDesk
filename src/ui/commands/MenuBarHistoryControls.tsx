@@ -1,4 +1,4 @@
-// Undo / Redo as standing menu-bar buttons, beside Help (ADR-346). Both
+// Undo / Redo as standing menu-bar buttons, beside Help (ADR-348). Both
 // actions existed only behind Edit → Undo and Ctrl+Z, which is a keyboard
 // fact a pointer-first operator has no way to discover mid-edit.
 //
