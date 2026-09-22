@@ -126,6 +126,30 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Promoted out of the options disclosure: scan direction is a per-job speed/
+   quality trade-off, so it sits under the essentials grid instead of behind a
+   click. Mirrors the .lf-laser-air-assist row, divided from the numbers above. */
+.lf-laser-scan-direction {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--lf-border);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.lf-laser-scan-direction input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.lf-laser-scan-direction strong {
+  font-weight: 600;
+}
+
 .lf-laser-options,
 .lf-cut-settings-disclosure {
   min-width: 0;

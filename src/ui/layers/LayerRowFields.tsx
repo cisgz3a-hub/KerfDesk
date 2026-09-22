@@ -31,7 +31,7 @@ export function LayerRowSettingsFields(props: {
   const { settings } = operationTarget;
   return (
     <>
-      <section className="lf-laser-essentials" aria-label="Power, speed and passes">
+      <section className="lf-laser-essentials" aria-label="Power, speed, passes and scan direction">
         <h4 className="lf-laser-section-title">Essential settings</h4>
         <div className="lf-laser-essentials__grid">
           <FieldRow label="Power" unit="%">
@@ -44,6 +44,7 @@ export function LayerRowSettingsFields(props: {
             <PassesInput layer={layer} operationTarget={operationTarget} />
           </FieldRow>
         </div>
+        <ScanDirectionField layer={layer} operationTarget={operationTarget} />
       </section>
       {!operationTarget.mixedFields?.mode ? (
         <details className="lf-laser-options">
@@ -56,7 +57,7 @@ export function LayerRowSettingsFields(props: {
               {settings.mode === 'line'
                 ? 'Entry motion'
                 : settings.mode === 'fill'
-                  ? 'Spacing & scan direction'
+                  ? 'Spacing & angle'
                   : 'Image treatment & detail'}
             </span>
           </summary>
@@ -121,9 +122,7 @@ function FillFields(props: {
   const { layer, operationTarget } = props;
   return (
     <>
-      <p className="lf-laser-help">
-        Closer lines create a denser fill. Scan in both directions to reduce travel.
-      </p>
+      <p className="lf-laser-help">Closer lines create a denser fill.</p>
       <FieldRow label="Scan angle">
         <HatchAngleInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>deg</span>
@@ -147,29 +146,59 @@ function FillFields(props: {
           </span>
         ) : null}
       </FieldRow>
-      <FieldRow label="Scan both ways">
-        <BidirectionalInput layer={layer} operationTarget={operationTarget} />
-      </FieldRow>
     </>
   );
 }
 
-function BidirectionalInput(props: {
+// Scan direction is the one process option that changes job time enough to sit
+// beside Power/Speed/Passes: operators flip it per job, so it stays on the
+// always-visible card rather than inside the collapsed options disclosure.
+// Fill and image keep their own stored flags, so this switches on the mode, and
+// renders nothing for line cuts or a selection with mixed modes.
+function ScanDirectionField(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
-}): JSX.Element {
+}): JSX.Element | null {
   const { layer, operationTarget } = props;
+  if (operationTarget.mixedFields?.mode === true) return null;
+  if (operationTarget.settings.mode === 'line') return null;
+  const image = operationTarget.settings.mode === 'image';
+  const title = image
+    ? 'Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift.'
+    : 'Scan alternating fill lines in both directions to reduce travel time.';
   return (
-    <input
-      type="checkbox"
-      {...mixedCheckboxProps(
-        operationTarget.settings.fillBidirectional,
-        operationTarget.mixedFields?.fillBidirectional,
-      )}
-      onChange={(e) => operationTarget.commit({ fillBidirectional: e.target.checked })}
-      aria-label={`Bidirectional fill for ${targetAriaContext(layer, operationTarget)}`}
-      title="Scan alternating fill lines in both directions to reduce travel time."
-    />
+    <label className="lf-laser-scan-direction" title={title}>
+      <input
+        type="checkbox"
+        {...mixedCheckboxProps(
+          image
+            ? operationTarget.settings.imageBidirectional
+            : operationTarget.settings.fillBidirectional,
+          image
+            ? operationTarget.mixedFields?.imageBidirectional
+            : operationTarget.mixedFields?.fillBidirectional,
+        )}
+        onChange={(e) =>
+          operationTarget.commit(
+            image
+              ? { imageBidirectional: e.target.checked }
+              : { fillBidirectional: e.target.checked },
+          )
+        }
+        aria-label={`${image ? 'Bidirectional image scan' : 'Bidirectional fill'} for ${targetAriaContext(
+          layer,
+          operationTarget,
+        )}`}
+        title={title}
+      />
+      <span>
+        <strong>Scan both ways</strong>
+        <span className="lf-laser-help">
+          Engrave on the return pass too. Cuts travel time; needs a calibrated scan offset to keep
+          edges aligned.
+        </span>
+      </span>
+    </label>
   );
 }
 
