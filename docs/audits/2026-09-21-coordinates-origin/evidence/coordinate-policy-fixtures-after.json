@@ -1,0 +1,269 @@
+{
+  "numTotalTestSuites": 5,
+  "numPassedTestSuites": 5,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 22,
+  "numPassedTests": 22,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035878025,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement places the selected anchor at the current machine position for Current Position jobs",
+          "status": "passed",
+          "title": "places the selected anchor at the current machine position for Current Position jobs",
+          "duration": 23.98869999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks User Origin when the operator has not set a custom origin",
+          "status": "passed",
+          "title": "blocks User Origin when the operator has not set a custom origin",
+          "duration": 0.4373000000000502,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement anchors a centered traced image to the custom work origin before emitting G-code",
+          "status": "passed",
+          "title": "anchors a centered traced image to the custom work origin before emitting G-code",
+          "duration": 3.6032000000000153,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat negative WCO as a physical overhang when homing is disabled",
+          "status": "passed",
+          "title": "does not treat negative WCO as a physical overhang when homing is disabled",
+          "duration": 3.0057999999999083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "status": "passed",
+          "title": "does not treat unhomed custom-origin overscan runway as absolute machine overhang",
+          "duration": 10.271099999999933,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "status": "passed",
+          "title": "warns when a homed custom work origin would push the adjusted job off the physical bed",
+          "duration": 4.49109999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "status": "passed",
+          "title": "allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed",
+          "duration": 4.954899999999952,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "status": "passed",
+          "title": "warns when homed custom-origin fill overscan WCO puts the runway physically off the bed",
+          "duration": 4.25649999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement blocks custom-origin Start when the physical origin location is not known",
+          "status": "passed",
+          "title": "blocks custom-origin Start when the physical origin location is not known",
+          "duration": 0.4599000000000615,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob job placement"],
+          "fullName": "prepareStartJob job placement warns naming fill overscan when a homed absolute fill job is too close to the bed edge",
+          "status": "passed",
+          "title": "warns naming fill overscan when a homed absolute fill job is too close to the bed edge",
+          "duration": 8.038699999999835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) blocks Start until a Frame is recorded, with the sole frame-first message",
+          "status": "passed",
+          "title": "blocks Start until a Frame is recorded, with the sole frame-first message",
+          "duration": 1.7075999999999567,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) allows Start after a matching Verified Frame",
+          "status": "passed",
+          "title": "allows Start after a matching Verified Frame",
+          "duration": 2.2025000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["prepareStartJob frame-first gate (ADR-228)"],
+          "fullName": "prepareStartJob frame-first gate (ADR-228) re-blocks when the origin moved since the Verified Frame",
+          "status": "passed",
+          "title": "re-blocks when the origin moved since the Verified Frame",
+          "duration": 0.9188000000001466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035895212,
+      "endTime": 1790035895281.9187,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/start-job-placement.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames absolute artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 80.77189999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames user-origin artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 13.482200000000375,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "status": "passed",
+          "title": "frames current-position artwork using the XYZ position in a four-axis Falcon report",
+          "duration": 11.20089999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 255, laserModeEnabled: true } in review and lets Frame decide",
+          "duration": 10.330299999999625,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "status": "passed",
+          "title": "keeps known-wrong live setting { maxPowerS: 1000, laserModeEnabled: false } in review and lets Frame decide",
+          "duration": 8.843700000001263,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract frames when calculated artwork bounds extend beyond the configured bed",
+          "status": "passed",
+          "title": "frames when calculated artwork bounds extend beyond the configured bed",
+          "duration": 7.336800000000949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract does not turn a trusted work offset into a calculated bed veto",
+          "status": "passed",
+          "title": "does not turn a trusted work offset into a calculated bed veto",
+          "duration": 7.358799999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps a perimeter no-go finding advisory and still frames",
+          "status": "passed",
+          "title": "keeps a perimeter no-go finding advisory and still frames",
+          "duration": 8.809299999998984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Frame source-of-truth contract"],
+          "fullName": "Frame source-of-truth contract keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "status": "passed",
+          "title": "keeps an interior no-go finding advisory and lets the completed Frame authorize",
+          "duration": 13.571799999999712,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035893328,
+      "endTime": 1790035893490.5718,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/use-frame-action.physical-safety.test.ts"
+    }
+  ]
+}

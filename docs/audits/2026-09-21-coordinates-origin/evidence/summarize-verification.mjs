@@ -98,6 +98,7 @@ cohorts.contourEntry = {
 cohorts.asyncPreparationOwnership = addJson('coordinate-owner-final-passing.json');
 cohorts.frameMetadata = addJson('frame-metadata-final.json');
 cohorts.secondPass = addJson('second-pass-coordinate-final.json');
+cohorts.physicalReferenceFixtures = addJson('coordinate-policy-fixtures-after.json');
 const entries = [...files.values()].sort((a, b) => a.name.localeCompare(b.name));
 const total = entries.reduce((sum, f) => sum + f.tests, 0);
 const summary = {

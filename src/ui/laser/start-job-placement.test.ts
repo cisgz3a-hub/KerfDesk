@@ -10,6 +10,7 @@ import {
 } from '../../core/scene';
 import type { JobPlacementSettings } from '../job-placement';
 import type { FrameVerification } from '../state/frame-verification';
+import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
@@ -245,12 +246,16 @@ describe('prepareStartJob job placement', () => {
     // Frame-first (ADR-228): placement-bounds findings inform the Job Review;
     // the watched Frame trace is the placement proof.
     const project = homedProjectWith(centeredTraceObject);
+    // These physical bounds examples use observed positive native travel.
+    // Enabling homing in the profile alone does not establish that mapping.
+    const coordinates = stockNativeEvidence(project.device, true);
     const wco = { x: 380, y: 390, z: 0 };
     const result = prepareStartJob(
       project,
-      readyController,
+      coordinates.controllerSettings,
       {
         ...readyMachine,
+        ...coordinates,
         workOriginActive: true,
         wcoCache: wco,
         frameVerification: userOriginVerification(project, wco),
@@ -266,12 +271,14 @@ describe('prepareStartJob job placement', () => {
 
   it('allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed', () => {
     const project = withHoming(fillOverscanProject());
+    const coordinates = stockNativeEvidence(project.device, true);
     const wco = { x: 100, y: 100, z: 0 };
     const result = prepareStartJob(
       project,
-      readyController,
+      coordinates.controllerSettings,
       {
         ...readyMachine,
+        ...coordinates,
         workOriginActive: true,
         wcoCache: wco,
         frameVerification: userOriginVerification(project, wco),
@@ -282,17 +289,20 @@ describe('prepareStartJob job placement', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.gcode).toContain('X-5.000');
+      expect(result.warnings.join('\n')).not.toMatch(/out of bed|mapping is unverified/i);
     }
   });
 
   it('warns when homed custom-origin fill overscan WCO puts the runway physically off the bed', () => {
     const project = withHoming(fillOverscanProject());
+    const coordinates = stockNativeEvidence(project.device, true);
     const wco = { x: 2, y: 100, z: 0 };
     const result = prepareStartJob(
       project,
-      readyController,
+      coordinates.controllerSettings,
       {
         ...readyMachine,
+        ...coordinates,
         workOriginActive: true,
         wcoCache: wco,
         frameVerification: userOriginVerification(project, wco),
@@ -325,10 +335,12 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
-  it('warns naming fill overscan when an absolute fill job is too close to the bed edge', () => {
-    const project = fillOverscanProject();
-    const result = prepareStartJob(project, readyController, {
+  it('warns naming fill overscan when a homed absolute fill job is too close to the bed edge', () => {
+    const project = withHoming(fillOverscanProject());
+    const coordinates = stockNativeEvidence(project.device, true);
+    const result = prepareStartJob(project, coordinates.controllerSettings, {
       ...readyMachine,
+      ...coordinates,
       frameVerification: frameVerificationForProject(project),
     });
 

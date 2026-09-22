@@ -90,6 +90,12 @@
       "tests": 22,
       "passed": 22,
       "failed": 0
+    },
+    "physicalReferenceFixtures": {
+      "files": 2,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0
     }
   },
   "files": [
@@ -748,7 +754,7 @@
       "name": "src/ui/laser/start-job-placement.test.ts",
       "tests": 13,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-policy-fixtures-after.json",
       "stage": "post-repair"
     },
     {
@@ -846,7 +852,7 @@
       "name": "src/ui/laser/use-frame-action.physical-safety.test.ts",
       "tests": 9,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-policy-fixtures-after.json",
       "stage": "post-repair"
     },
     {
