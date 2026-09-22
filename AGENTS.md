@@ -23,7 +23,7 @@ Keep this file small. It defines durable repository rules; task-specific details
 ## Read only what the task needs
 
 - Use `PROJECT.md` for product scope and current non-negotiables.
-- Use the relevant ADR in `DECISIONS.md` for an architectural decision.
+- Use the relevant ADR for an architectural decision: `DECISIONS.md` holds ADR-001 to ADR-343, `docs/decisions/` holds every decision after it (ADR-344). A NEW decision is always its own file under `docs/decisions/`; run `node scripts/check-adr-numbers.mjs` for the next free number.
 - Use the affected section of `WORKFLOW.md` for operator behavior and edge cases.
 - Search for the relevant section first; do not load every project manual at the start of every task.
 
