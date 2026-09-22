@@ -4,7 +4,7 @@ import { test, expect } from './fixtures/kerfdesk-test';
 
 const evidence = 'docs/audits/2026-09-21-interface';
 
-test('routine controls stay visible while setup, history, and tutorials remain reachable', async ({
+test('routine controls stay visible while setup, history, and Learn remain reachable', async ({
   page,
   kerfdesk,
 }) => {
@@ -33,14 +33,13 @@ test('routine controls stay visible while setup, history, and tutorials remain r
     .click();
   await expect(rail.getByText('No archived executions yet.', { exact: false })).toBeVisible();
   await history.click();
-  await rail.getByRole('button', { name: 'Tutorial: Jogging', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
+  const learn = page.getByRole('button', { name: 'Learn', exact: true });
+  await learn.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.locator('.lf-learn-library')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(rail.getByRole('button', { name: 'Tutorial: Jogging', exact: true })).toBeFocused();
+  await expect(learn).toBeFocused();
   mkdirSync(evidence, { recursive: true });
   await page.screenshot({ path: `${evidence}/machine-after.png` });
   await page.setViewportSize({ width: 640, height: 450 });

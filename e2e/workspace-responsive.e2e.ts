@@ -72,9 +72,8 @@ test('layout preference survives reload, constrains narrow windows and resets fr
   await expect(panels).toHaveAttribute('data-layout', 'spacious');
   await page.getByRole('button', { name: 'Machine', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
-  // Anchored: each menu row now also carries its lesson button, named
-  // "Tutorial: <command>". The anchor keeps this locator on the command row
-  // itself, the same way the rest of the suite anchors /^Connect/ and friends.
+  // Anchored at the start of the label, the same way the rest of the suite
+  // anchors /^Connect/ and friends.
   await page.getByRole('menuitem', { name: /^Reset Workspace Layout/i }).click();
   await expect(layout).toContainText('Auto layout');
   await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
