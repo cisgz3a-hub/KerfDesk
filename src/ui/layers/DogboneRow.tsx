@@ -3,7 +3,6 @@
 // square joinery seats into routed slots; a laser kerf has no such limit.
 // The bit diameter prefills from the machine's active bit.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { activeCncTool } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
@@ -38,7 +37,6 @@ export function DogboneRow(): JSX.Element | null {
     <section aria-label="Dogbone corners" className="lf-artwork-tool">
       <div className="lf-artwork-tool__heading">
         <h4>Corner relief · dogbones</h4>
-        <TutorialButton tutorialId="dogbone" compact label="Dogbone corners" />
       </div>
       <p className="lf-artwork-hint">
         Add clearance to inside corners so square parts can fit around a round bit’s cut.

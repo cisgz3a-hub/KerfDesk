@@ -17,7 +17,7 @@ export function RotarySetupDialog(props: {
   const [draft, setDraft] = useState<RotarySetup>(props.setup ?? DEFAULT_ROTARY_SETUP);
   const valid = validRotarySetup(draft);
   return (
-    <Dialog tutorialId="rotary" title="Rotary Setup" size="sm" onClose={props.onCancel}>
+    <Dialog title="Rotary Setup" size="sm" onClose={props.onCancel}>
       <RotarySetupFields draft={draft} onChange={setDraft} />
       <RotaryPreview draft={draft} valid={valid} />
       {!valid ? (

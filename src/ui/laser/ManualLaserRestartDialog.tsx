@@ -55,7 +55,7 @@ export function ManualLaserRestartDialog(props: {
     }
   };
   return (
-    <Dialog title="Choose laser restart point" size="lg" tutorialId="recovery" onClose={close}>
+    <Dialog title="Choose laser restart point" size="lg" onClose={close}>
       <p>{RESTART_HINT}</p>
       <LaserRecoveryCanvas
         route={route}

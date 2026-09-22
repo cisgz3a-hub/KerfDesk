@@ -17,7 +17,6 @@ export function WorkspaceSidePanels(): JSX.Element {
   const [machineOpen, setMachineOpen] = useState(true);
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
-  const runOrderOpen = useUiStore((state) => state.cutsLayersView === 'run-order');
   const panelId = useId();
   useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
 
@@ -27,13 +26,12 @@ export function WorkspaceSidePanels(): JSX.Element {
   }
 
   if (layout === 'compact') {
-    const wide = active === 'layers' && runOrderOpen;
     const collapsed = active === 'layers' ? !layersExpanded : !machinePanel.isExpanded;
     return (
       <section
         aria-label="Workspace side panels"
         data-layout="compact"
-        className={`lf-workspace-panels lf-workspace-panels--compact${wide ? ' lf-workspace-panels--run-order' : ''}`}
+        className="lf-workspace-panels lf-workspace-panels--compact"
         style={collapsed ? collapsedCompactPanelStyle : undefined}
       >
         <CompactPanelTabs
@@ -77,7 +75,7 @@ export function WorkspaceSidePanels(): JSX.Element {
       </div>
       <div className="lf-workspace-desktop-panels">
         {cutsOpen ? (
-          <ResizablePanel label="Cuts / Layers" wide={runOrderOpen} collapsed={!layersExpanded}>
+          <ResizablePanel label="Cuts / Layers" collapsed={!layersExpanded}>
             <CutsLayersPanel />
           </ResizablePanel>
         ) : null}
@@ -226,9 +224,12 @@ function PanelToggle(props: {
   );
 }
 
+// One panel width, whatever view is showing (ADR-346). Switching the Artwork /
+// Operations panel to Run order used to widen the whole rail, which moved the
+// canvas under the operator mid-task and overwrote any width they had dragged
+// for themselves.
 function ResizablePanel(props: {
   readonly label: string;
-  readonly wide?: boolean;
   readonly collapsed: boolean;
   readonly children: React.ReactNode;
 }): JSX.Element {
@@ -236,13 +237,7 @@ function ResizablePanel(props: {
     <div
       aria-label={`${props.label} resizable panel`}
       className="lf-workspace-resizable-panel"
-      style={
-        props.collapsed
-          ? collapsedResizablePanelStyle
-          : props.wide === true
-            ? { ...resizablePanelStyle, width: 400, minWidth: 320 }
-            : resizablePanelStyle
-      }
+      style={props.collapsed ? collapsedResizablePanelStyle : resizablePanelStyle}
     >
       {props.children}
     </div>

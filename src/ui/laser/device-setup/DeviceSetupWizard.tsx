@@ -72,7 +72,6 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   });
   return (
     <Dialog
-      tutorialId="machine-setup"
       title={state.machineKind === 'cnc' ? 'CNC Startup Setup' : 'Machine Setup'}
       size="xl"
       panelClassName="lf-setup-dialog"

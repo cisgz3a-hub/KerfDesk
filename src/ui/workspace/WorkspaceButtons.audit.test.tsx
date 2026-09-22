@@ -267,7 +267,7 @@ describe('viewport and preview individual outcomes', () => {
     expect(button('Jump to previous pass').disabled).toBe(true);
   });
 
-  it('preview travel toggle, tutorial and 3D entry dispatch without changing the route', async () => {
+  it('preview travel toggle and 3D entry dispatch without changing the route', async () => {
     const toolpath = { totalLength: 0, steps: [] };
     const open3D = vi.fn();
     await mount(
@@ -293,8 +293,6 @@ describe('viewport and preview individual outcomes', () => {
     expect(toolpath).toEqual({ totalLength: 0, steps: [] });
     await click('Open 3D cut preview');
     expect(open3D).toHaveBeenCalledOnce();
-    await click('Tutorial: Preview');
-    expect(useTutorialStore.getState().tutorialId).toBe('preview');
   });
 });
 

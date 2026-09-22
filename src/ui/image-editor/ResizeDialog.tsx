@@ -3,7 +3,6 @@
 // (Canvas Size). Physical mm size never changes on Image Size — only pixel
 // density — and the note says so.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import type { CanvasAnchor } from './editor-session-resize';
@@ -46,7 +45,6 @@ function ResizeBody(props: { readonly dialog: ResizeDialog }): JSX.Element {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >
           <strong style={{ fontSize: 13 }}>{title}</strong>
-          <TutorialButton tutorialId="image-transform" compact label="Image size" />
         </div>
         <DimensionField
           label="Width (px)"

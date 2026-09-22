@@ -1,5 +1,4 @@
 import { Icon, IconButton } from '../kit';
-import { TutorialButton } from '../tutorials/TutorialButton';
 
 export const COLLAPSED_RAIL_WIDTH_PX = 48;
 
@@ -8,7 +7,6 @@ export function RailPanelHeading(props: {
   readonly onCollapse: () => void;
   readonly collapseDisabled?: boolean;
   readonly collapseDisabledReason?: string;
-  readonly tutorialId?: string;
 }): JSX.Element {
   const label = `Collapse ${props.title} panel`;
   return (
@@ -16,9 +14,6 @@ export function RailPanelHeading(props: {
       <h2 className="lf-heading" style={headingStyle}>
         {props.title}
       </h2>
-      {props.tutorialId === undefined ? null : (
-        <TutorialButton tutorialId={props.tutorialId} compact label={props.title} />
-      )}
       <IconButton
         icon="chevron-right"
         size="sm"

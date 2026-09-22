@@ -27,7 +27,6 @@ export function PrintAndCutDialog(props: {
   };
   return (
     <Dialog
-      tutorialId="print-cut"
       title="Print and Cut"
       size="md"
       as="form"

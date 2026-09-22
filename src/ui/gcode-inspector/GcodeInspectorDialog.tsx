@@ -2,7 +2,6 @@
 // WORKFLOW.md F-M1). Used for opened FILES; the same view also renders
 // inline as a main-canvas mode (CanvasGcodeView).
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
@@ -33,7 +32,6 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
     >
       <header style={headerStyle}>
         <strong>{props.programName}</strong>
-        <TutorialButton tutorialId="gcode" />
         <button
           type="button"
           className="lf-btn"

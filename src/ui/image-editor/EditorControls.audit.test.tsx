@@ -2,7 +2,6 @@ import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { selectAllMask } from '../../core/image-select';
-import { useTutorialStore } from '../tutorials/tutorial-store';
 import { EditorOptionsBar } from './EditorOptionsBar';
 import { EditorToolStrip } from './EditorToolStrip';
 import {
@@ -85,8 +84,6 @@ describe('Image Studio control-by-control audit', () => {
       await clickControl(host, `Paint ${name}`);
       expect(editor.getState().foreground).toEqual({ r: expected, g: expected, b: expected });
     }
-    await clickControl(host, 'Tool tutorial');
-    expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'image-paint' });
   });
 
   it('switches both gradient shapes and wand contiguity through the options bar', async () => {

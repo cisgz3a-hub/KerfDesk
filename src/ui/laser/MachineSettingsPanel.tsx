@@ -1,4 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { Fragment, useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
@@ -65,7 +64,6 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
       >
         Read / Backup Controller Settings
       </summary>
-      <TutorialButton tutorialId="machine-setup" label="Controller settings tutorial" />
       <MachineSettingsNotice context={context} />
       <MachineSettingsActions
         onRead={handleRead}

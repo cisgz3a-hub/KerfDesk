@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useUiStore } from '../state/ui-store';
+import { TutorialButton } from '../tutorials/TutorialButton';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { Button } from './Button';
 import { Dialog, DialogActions } from './Dialog';
@@ -37,7 +38,8 @@ describe('kit Dialog', () => {
     const onClose = vi.fn();
     const onSubmit = vi.fn((event: React.FormEvent<HTMLFormElement>) => event.preventDefault());
     const h = await render(
-      <Dialog onClose={onClose} title="Array" tutorialId="array" as="form" onSubmit={onSubmit}>
+      <Dialog onClose={onClose} title="Array" as="form" onSubmit={onSubmit}>
+        <TutorialButton tutorialId="array" compact label="Array" />
         <input aria-label="Rows" defaultValue="2" />
         <button type="submit">Create array</button>
       </Dialog>,
@@ -60,7 +62,8 @@ describe('kit Dialog', () => {
 
   it('keeps the header tutorial in the keyboard cycle after focusing the first form control', async () => {
     const h = await render(
-      <Dialog onClose={() => undefined} title="Box Generator" tutorialId="box">
+      <Dialog onClose={() => undefined} title="Box Generator">
+        <TutorialButton tutorialId="box" compact label="Box Generator" />
         <input aria-label="Width" />
         <button type="button">Add to workspace</button>
       </Dialog>,
@@ -88,15 +91,14 @@ describe('kit Dialog', () => {
     expect(document.activeElement).toBe(last);
   });
 
-  it('offers a lesson on an aria-labelled dialog without inventing a visible title', async () => {
+  it('labels an aria-labelled dialog without inventing a visible title', async () => {
     const h = await render(
-      <Dialog onClose={() => undefined} ariaLabel="Image controls" tutorialId="image-adjust">
+      <Dialog onClose={() => undefined} ariaLabel="Image controls">
         <p>Image controls</p>
       </Dialog>,
     );
     expect(h.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Image controls');
     expect(h.querySelector('h2')).toBeNull();
-    expect(h.querySelector('[data-tutorial-id="image-adjust"]')).not.toBeNull();
     expect(document.activeElement).toBe(h.querySelector('[role="dialog"]'));
   });
 

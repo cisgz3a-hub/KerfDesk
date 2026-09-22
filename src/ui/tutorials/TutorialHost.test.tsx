@@ -327,7 +327,8 @@ describe('TutorialHost learning flow', () => {
     const toolBefore = useUiStore.getState().toolMode;
     await render(
       <>
-        <Dialog title="Array" tutorialId="array" as="form" onClose={onClose} onSubmit={onSubmit}>
+        <Dialog title="Array" as="form" onClose={onClose} onSubmit={onSubmit}>
+          <TutorialButton tutorialId="array" compact label="Array" />
           <input aria-label="Rows" defaultValue="2" />
           <button type="submit">Create array</button>
         </Dialog>
@@ -388,39 +389,5 @@ describe('TutorialHost learning flow', () => {
     await escape();
     expect(document.activeElement).toBe(summary);
     expect(useUiStore.getState().modalDepth).toBe(0);
-  });
-
-  it('makes a disabled command lesson usable without running that command or losing menu focus', async () => {
-    const invoke = vi.fn();
-    const command: AppCommand = {
-      id: 'tools.trace-image',
-      family: 'tools',
-      label: 'Trace Image...',
-      title: 'Select an image first',
-      enabled: false,
-      disabledReason: 'Select an image first.',
-      invoke,
-    };
-    await render(
-      <>
-        <AppMenuBar commands={[command]} machineKind="laser" />
-        <TutorialHost />
-      </>,
-    );
-    const summary = element<HTMLElement>('summary[data-menu-family-summary="tools"]');
-    await click(summary);
-    const action = element<HTMLButtonElement>('[data-help-id="command:tools.trace-image"]');
-    expect(action.disabled).toBe(true);
-    const tutorial = element<HTMLButtonElement>('[data-tutorial-id="trace"]');
-    expect(tutorial.disabled).toBe(false);
-    await click(tutorial);
-    expectStep('trace', 0);
-    expect(invoke).not.toHaveBeenCalled();
-    expect(summary.getAttribute('aria-expanded')).toBe('false');
-    await escape();
-    await escape();
-    expect(document.activeElement).toBe(summary);
-    expect(useUiStore.getState().modalDepth).toBe(0);
-    expect(invoke).not.toHaveBeenCalled();
   });
 });

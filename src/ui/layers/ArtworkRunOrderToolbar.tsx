@@ -1,5 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
-
 type ArtworkRunOrderToolbarProps = {
   readonly search: string;
   readonly total: number;
@@ -96,7 +94,6 @@ function RunOrderTools(
         >
           Number on canvas
         </button>
-        <TutorialButton tutorialId="operations" label="Run order tutorial" />
       </div>
       <label className="lf-run-order-search">
         <span>Find artwork</span>

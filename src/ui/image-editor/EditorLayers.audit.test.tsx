@@ -2,7 +2,6 @@ import { act } from 'react';
 import { beforeEach, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { selectAllMask } from '../../core/image-select';
-import { useTutorialStore } from '../tutorials/tutorial-store';
 import { createSession } from './editor-session';
 import { useImageEditorStore as editor } from './image-editor-store';
 import { LayersPanel } from './LayersPanel';
@@ -52,7 +51,7 @@ it('gates stack-edge actions and adds, reorders, duplicates, deletes and merges 
   expect(layerNames()).toHaveLength(1);
 });
 
-it('selects paint layers, toggles visibility, and opens the layers lesson', async () => {
+it('selects paint layers and toggles visibility', async () => {
   const host = await mountControl(<LayersPanel />);
   await clickControl(host, 'Add a transparent layer above the active one');
   await clickControl(host, 'Background');
@@ -62,8 +61,6 @@ it('selects paint layers, toggles visibility, and opens the layers lesson', asyn
   expect(editor.getState().session?.layers.at(-1)?.isVisible).toBe(false);
   await clickControl(host, 'Show this layer');
   expect(editor.getState().session?.layers.at(-1)?.isVisible).toBe(true);
-  await clickControl(host, 'Tutorial: Image layers');
-  expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'image-layers' });
 });
 
 it('jumps backward and forward through actual image pixels from History rows', async () => {
@@ -78,7 +75,5 @@ it('jumps backward and forward through actual image pixels from History rows', a
   if (!label) throw new Error('History label absent');
   await clickControl(host, label);
   expect(editor.getState().session?.doc.data[0]).toBe(0);
-  await clickControl(host, 'Tutorial: Image history');
-  expect(useTutorialStore.getState().tutorialId).toBe('image-layers');
   await act(async () => editor.getState().select(null));
 });

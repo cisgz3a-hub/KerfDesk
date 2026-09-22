@@ -20,7 +20,10 @@
 
 .lf-job-dock__status {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  /* Status text, then the estimate. The 28px lead column held the
+     per-dock tutorial button until ADR-346 removed it; leaving it in place
+     squeezed the readiness line into 28px and wrapped it one letter wide. */
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 8px;
   min-width: 0;

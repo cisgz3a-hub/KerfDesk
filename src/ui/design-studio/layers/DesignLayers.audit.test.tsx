@@ -9,7 +9,6 @@ import {
   mountControl,
 } from '../../image-editor/control-audit-test-support';
 import { resetStore } from '../../state/test-helpers';
-import { useTutorialStore } from '../../tutorials/tutorial-store';
 import { createDesignSession } from '../design-session';
 import { useDesignStudioStore as studio } from '../design-studio-store';
 import { DesignLayersCard } from './DesignLayersCard';
@@ -61,14 +60,12 @@ it('adds, selects, assigns, reorders and deletes carve layers with correct edge 
   expect(studio.getState().session?.history.present.entities[0]?.layerId).toBe(initial.id);
 });
 
-it('sets through depth from stock, toggles V-carve flat depth, and opens the matching lessons', async () => {
+it('sets through depth from stock and toggles V-carve flat depth', async () => {
   const host = await mountControl(
     <DesignLayersCard tools={[tool]} activeTool={tool} stockThicknessMm={12} />,
   );
   await clickControl(host, 'Through');
   expect(layers()[0]?.depthMm).toBe(12);
-  await clickControl(host, 'Tutorial: Carve layers');
-  expect(useTutorialStore.getState().tutorialId).toBe('operations');
   await act(async () =>
     studio
       .getState()
@@ -79,6 +76,4 @@ it('sets through depth from stock, toggles V-carve flat depth, and opens the mat
   expect(layers()[0]?.vCarveFlatDepthEnabled).toBe(true);
   await clickElement(flat);
   expect(layers()[0]?.vCarveFlatDepthEnabled).toBe(false);
-  await clickControl(host, 'Cut type tutorial');
-  expect(useTutorialStore.getState().tutorialId).toBe('cnc-vcarve');
 });

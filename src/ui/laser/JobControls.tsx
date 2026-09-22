@@ -2,7 +2,6 @@
 // Canonical live-job actions live in the App-shell LiveMotionBar (ADR-207).
 
 import type { ReactNode } from 'react';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -100,7 +99,6 @@ export function JobControls(props: Props): JSX.Element {
       {!props.dockedJobActions && (
         <div className="lf-machine-section-heading">
           <span style={sectionCaptionStyle}>Job</span>
-          <TutorialButton tutorialId="frame-start" compact label="Frame & Start" />
         </div>
       )}
       <SetupRow

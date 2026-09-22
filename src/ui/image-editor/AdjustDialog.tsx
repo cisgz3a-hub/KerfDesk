@@ -3,7 +3,6 @@
 // dialog grammar). A floating panel, not a modal backdrop, so the operator
 // can still pan/zoom the canvas to inspect the preview.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect } from 'react';
 import { lumaHistogram } from '../../core/image-adjust';
 import { maskBounds } from '../../core/image-select';
@@ -21,7 +20,6 @@ function AdjustmentHeading(props: { readonly label: string }): JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <strong style={{ fontSize: 13 }}>{props.label}</strong>
-      <TutorialButton tutorialId="image-tone" compact label="Image adjustments" />
     </div>
   );
 }

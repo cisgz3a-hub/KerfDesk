@@ -6,7 +6,6 @@ import {
 } from './console-command-availability';
 import { UserMacroPanel } from './user-macros/UserMacroPanel';
 import { useConsoleCommandDeckModel } from './use-console-command-deck-model';
-import { TutorialButton } from '../../tutorials/TutorialButton';
 
 export type ConsoleCommandDeckProps = {
   readonly ariaLabel?: string;
@@ -46,7 +45,6 @@ export function ConsoleCommandDeck({
         onSend={() => void model.send({ kind: 'manual-draft', input: model.command })}
       />
       <UserMacroPanel
-        help={<TutorialButton tutorialId="macros" />}
         isSending={model.isSending}
         isInputDisabled={model.isInputDisabled}
         onRun={(command, macro) =>

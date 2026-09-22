@@ -1,5 +1,4 @@
 // Shared read-only working surface for the canvas and the full Inspector.
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useRef, useState } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import { InspectorSidebar } from './InspectorSidebar';
@@ -151,7 +150,6 @@ function ViewerHeader(props: {
         </span>
       </div>
       <div className="gcode-viewer-header-actions">
-        <TutorialButton tutorialId="gcode" />
         {session.live.matched ? (
           <button
             type="button"

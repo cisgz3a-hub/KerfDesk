@@ -24,7 +24,6 @@ import {
   DragReadout,
   EmptyHint,
   MeasureReadoutOverlay,
-  PreviewScrubber,
   ZoomControls,
 } from './overlays';
 import { PreviewControlsPanel, PreviewStatusOverlays } from './preview-overlays';
@@ -41,9 +40,10 @@ import { useJobEstimate } from '../laser/use-job-estimate';
 import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { CanvasMotionBadge } from './canvas-motion-badge';
 import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
+import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
+import { WorkspacePreviewChrome } from './WorkspacePreviewChrome';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
-import { PreviewRenderStatus } from './PreviewRenderStatus';
 import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
 
 export function Workspace(): JSX.Element {
@@ -118,8 +118,8 @@ export function Workspace(): JSX.Element {
         routeLabel={routePreviewLabel}
         cncRemovalGrid={cncRemovalGrid}
       />
-      {previewMode && <PreviewScrubber />}
-      <PreviewRenderStatus pending={previewMode && previewBitmap.pending} />
+      <WorkspacePointerOverlays canvasSize={canvasSize} dragging={dragKind !== null} />
+      <WorkspacePreviewChrome previewMode={previewMode} rasterPending={previewBitmap.pending} />
       {!previewMode && <CanvasMotionBadge overlay={canvasMotionOverlay} />}
       {!previewMode && <ArtworkNumberingPrompt />}
       {!previewMode && <ZoomControls />}

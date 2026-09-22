@@ -12,7 +12,6 @@ export function OptimizationSettingsDialog(props: {
     setSettings((current) => ({ ...current, ...patch }));
   return (
     <Dialog
-      tutorialId="optimization"
       onClose={props.onCancel}
       title="Cut Planner"
       as="form"

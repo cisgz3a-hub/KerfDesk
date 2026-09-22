@@ -12,7 +12,6 @@
 // scripts opentype's getPath handles word-spacing and Unicode glyph
 // lookup; we just split on '\n' for line breaks.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
@@ -81,7 +80,6 @@ function DialogForm(props: {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
-        <TutorialButton tutorialId="text" />
       </div>
       <ContentField value={fields.values.content} onChange={fields.setContent} />
       <TextFormattingFields fields={fields} />

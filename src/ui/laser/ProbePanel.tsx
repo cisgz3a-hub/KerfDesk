@@ -2,7 +2,6 @@
 // CNC-only chrome around ProbeControls; the same controls are also hosted in
 // the CNC Machine rail and the Device-Setup wizard (F-CNC20 setup).
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { ProbeControls } from './ProbeControls';
@@ -21,7 +20,6 @@ export function ProbePanel(): JSX.Element | null {
         >
           Probe (touch plate)
         </summary>
-        <TutorialButton tutorialId="cnc-probe" />
         <ProbeControls />
       </details>
       {/* Outside the collapsed details: the confirmation gates CNC Start, so it

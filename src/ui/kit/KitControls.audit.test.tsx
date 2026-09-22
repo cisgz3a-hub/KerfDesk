@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { button, click, mount } from '../layers/control-audit-test-support';
-import { useTutorialStore } from '../tutorials/tutorial-store';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { RailSection } from './RailSection';
@@ -27,9 +26,9 @@ describe('artwork control audit: shared kit controls', () => {
     expect(action).toHaveBeenCalledTimes(2);
     expect(submit).not.toHaveBeenCalled();
   });
-  it('opens and closes a disclosure and opens its actual contextual lesson', async () => {
+  it('opens and closes a disclosure', async () => {
     const host = await mount(
-      <RailSection label="Materials" hint="Presets" tutorialId="materials">
+      <RailSection label="Materials" hint="Presets">
         Recipes
       </RailSection>,
     );
@@ -38,8 +37,6 @@ describe('artwork control audit: shared kit controls', () => {
     expect(details.open).toBe(false);
     await click(summary);
     expect(details.open).toBe(true);
-    await click(button(host, 'Tutorial'));
-    expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'materials' });
     await click(summary);
     expect(details.open).toBe(false);
   });

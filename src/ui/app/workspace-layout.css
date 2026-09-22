@@ -25,10 +25,6 @@
   max-width: min(430px, calc(100% - 100px));
 }
 
-.lf-workspace-panels--run-order {
-  width: clamp(320px, 34vw, 430px);
-}
-
 .lf-workspace-panel-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -11,7 +11,7 @@ export function ShortcutsDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   return (
-    <Dialog tutorialId="shortcuts" title="Keyboard Shortcuts" size="lg" onClose={props.onClose}>
+    <Dialog title="Keyboard Shortcuts" size="lg" onClose={props.onClose}>
       <div style={columnsStyle}>
         {shortcutFamilies(props.machineKind).map((entry) => (
           <section key={entry.family} style={familyStyle}>

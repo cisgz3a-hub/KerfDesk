@@ -1,4 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEffect, useRef, useState } from 'react';
 import type { Layer, LayerMode } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
@@ -11,7 +10,6 @@ import { CutSettingsFillFields } from './CutSettingsFillFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
 import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
-import { laserOperationTutorial } from './operation-tutorial';
 import './laser-operation-settings.css';
 
 type CutSettingsDialogProps = {
@@ -101,7 +99,7 @@ function CutSettingsBody(props: {
   const maxFeedProps = props.maxFeed === undefined ? {} : { maxFeed: props.maxFeed };
   return (
     <>
-      <Header layer={props.layer} mode={mode} />
+      <Header layer={props.layer} />
       {props.selectionCount !== undefined ? (
         <p className="lf-subheading">
           Values start from the first selected artwork. Only fields you change are applied to all{' '}
@@ -162,7 +160,7 @@ function hasDefaultHandlers(
   );
 }
 
-function Header({ layer, mode }: { readonly layer: Layer; readonly mode: LayerMode }): JSX.Element {
+function Header({ layer }: { readonly layer: Layer }): JSX.Element {
   return (
     <header className="lf-cut-settings-header">
       {/* The swatch background is scene data (the layer color), inline by
@@ -171,7 +169,6 @@ function Header({ layer, mode }: { readonly layer: Layer; readonly mode: LayerMo
       <div className="lf-cut-settings-header__text">
         <div className="lf-cut-settings-header__title">
           <h2 className="lf-dialog-title">Cut Settings</h2>
-          <TutorialButton tutorialId={laserOperationTutorial(mode)} />
         </div>
         <p className="lf-subheading">{layer.name} · Fine-tune this laser operation</p>
       </div>

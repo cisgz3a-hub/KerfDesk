@@ -26,7 +26,7 @@ beforeEach(() => {
   studio.setState({ session: createDesignSession(), stash: null });
 });
 
-it('arms all eight shipped tools and opens the lesson specific to each tool', async () => {
+it('arms all eight shipped tools', async () => {
   const host = await mountControl(
     <>
       <DesignToolRails />
@@ -34,22 +34,20 @@ it('arms all eight shipped tools and opens the lesson specific to each tool', as
     </>,
   );
   const choices = [
-    ['Select', 'select', 'design-edit'],
-    ['Line', 'line', 'studio-line'],
-    ['Polyline', 'path', 'studio-path'],
-    ['Rectangle', 'rect', 'studio-rectangle'],
-    ['Circle', 'circle', 'studio-circle'],
-    ['Arc', 'arc', 'studio-arc'],
-    ['Fillet', 'fillet', 'studio-fillet'],
-    ['Chamfer', 'chamfer', 'studio-chamfer'],
+    ['Select', 'select'],
+    ['Line', 'line'],
+    ['Polyline', 'path'],
+    ['Rectangle', 'rect'],
+    ['Circle', 'circle'],
+    ['Arc', 'arc'],
+    ['Fillet', 'fillet'],
+    ['Chamfer', 'chamfer'],
   ];
   expect(host.querySelectorAll('aside button')).toHaveLength(8);
-  for (const [label, kind, lesson] of choices) {
+  for (const [label, kind] of choices) {
     await clickControl(host, label!);
     expect(studio.getState().session?.tool).toBe(kind);
     expect(control(host, label!).getAttribute('aria-pressed')).toBe('true');
-    await clickControl(host, `${label} tutorial`);
-    expect(useTutorialStore.getState().tutorialId).toBe(lesson);
   }
 });
 
@@ -110,8 +108,6 @@ it('precision inspector duplicates with offset, toggles construction and deletes
   studio.getState().drawEntity(rect);
   studio.getState().setSelection([rect.id]);
   const host = await mountControl(<ShapeInspector />);
-  await clickControl(host, 'Precision tutorial');
-  expect(useTutorialStore.getState().tutorialId).toBe('design-precision');
   await clickControl(host, 'Guide');
   expect(studio.getState().session?.history.present.entities[0]?.construction).toBe(true);
   await clickControl(host, 'Guide');

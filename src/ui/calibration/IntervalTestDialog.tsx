@@ -68,7 +68,6 @@ export function IntervalTestDialog(props: {
   // missing (every other modal had it via use-dialog-a11y).
   return (
     <Dialog
-      tutorialId="interval-test"
       onClose={props.onCancel}
       title="Interval Test"
       as="form"

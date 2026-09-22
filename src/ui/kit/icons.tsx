@@ -38,7 +38,9 @@ export type IconName =
   | 'layers'
   | 'sliders'
   | 'panel-left'
-  | 'panel-right';
+  | 'panel-right'
+  | 'undo'
+  | 'redo';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   sliders: (
@@ -124,6 +126,20 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
     <>
       <rect x="2" y="3" width="12" height="10" rx="1.5" />
       <path d="M10 3v10" />
+    </>
+  ),
+  // Edit history: an arrow leaving the head and curving back on itself. The
+  // two are mirror images so the pair reads as one axis at canvas size.
+  undo: (
+    <>
+      <path d="M3 8h6.5a3 3 0 0 1 0 6H6" />
+      <path d="M6.5 4.5 3 8l3.5 3.5" />
+    </>
+  ),
+  redo: (
+    <>
+      <path d="M13 8H6.5a3 3 0 0 0 0 6H10" />
+      <path d="M9.5 4.5 13 8l-3.5 3.5" />
     </>
   ),
 };

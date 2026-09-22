@@ -12,7 +12,7 @@ import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 import { handleMenuKeyDown } from './menu-keyboard';
 import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
-import { CommandTutorialButton } from './CommandTutorialButton';
+import { MenuBarHistoryControls } from './MenuBarHistoryControls';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -22,41 +22,47 @@ export function AppMenuBar(props: {
 
   return (
     <AppMenuChrome>
-      <nav
-        ref={menu.menuBarRef}
-        role="menubar"
-        aria-label="Application menu"
-        style={menuBarStyle}
-        onKeyDown={(event) =>
-          handleMenuKeyDown(event, {
-            root: menu.menuBarRef.current,
-            openFamily: menu.openFamily,
-            setOpenFamily: menu.setOpenFamily,
-            setFocusedFamily: menu.setFocusedFamily,
-            pendingMenuFocus: menu.pendingMenuFocus,
-            pendingFamilyReturn: menu.pendingFamilyReturn,
-          })
-        }
-      >
-        {COMMAND_FAMILY_ORDER.map((family) => (
-          <MenuFamily
-            key={family}
-            family={family}
-            machineKind={props.machineKind}
-            commands={props.commands}
-            open={menu.openFamily === family}
-            tabIndex={menu.focusedFamily === family ? 0 : -1}
-            onFocus={() => menu.setFocusedFamily(family)}
-            onOpenChange={(open) =>
-              menu.setOpenFamily((current) => {
-                if (open) return family;
-                return current === family ? null : current;
-              })
-            }
-            onCommandRun={() => menu.setOpenFamily(null)}
-          />
-        ))}
-      </nav>
+      {/* The menus and the history buttons are ONE chrome section: on a narrow
+          window the header wraps between sections, and Undo must follow Help
+          onto the next line rather than being stranded on its own row. */}
+      <div className="lf-menu-bar-row">
+        <nav
+          ref={menu.menuBarRef}
+          role="menubar"
+          aria-label="Application menu"
+          style={menuBarStyle}
+          onKeyDown={(event) =>
+            handleMenuKeyDown(event, {
+              root: menu.menuBarRef.current,
+              openFamily: menu.openFamily,
+              setOpenFamily: menu.setOpenFamily,
+              setFocusedFamily: menu.setFocusedFamily,
+              pendingMenuFocus: menu.pendingMenuFocus,
+              pendingFamilyReturn: menu.pendingFamilyReturn,
+            })
+          }
+        >
+          {COMMAND_FAMILY_ORDER.map((family) => (
+            <MenuFamily
+              key={family}
+              family={family}
+              machineKind={props.machineKind}
+              commands={props.commands}
+              open={menu.openFamily === family}
+              tabIndex={menu.focusedFamily === family ? 0 : -1}
+              onFocus={() => menu.setFocusedFamily(family)}
+              onOpenChange={(open) =>
+                menu.setOpenFamily((current) => {
+                  if (open) return family;
+                  return current === family ? null : current;
+                })
+              }
+              onCommandRun={() => menu.setOpenFamily(null)}
+            />
+          ))}
+        </nav>
+        <MenuBarHistoryControls commands={props.commands} />
+      </div>
     </AppMenuChrome>
   );
 }
@@ -126,35 +132,35 @@ function MenuItem(props: {
 }): JSX.Element {
   const command = props.command;
   const commandHelp = commandHelpId(command.id);
+  // One row, one action. The per-row tutorial icon that used to sit here put a
+  // book on EVERY command in every menu (ADR-346); lessons are reached from
+  // Learn and from the tool panels that teach a procedure.
   return (
-    <div role="none" style={{ display: 'flex', alignItems: 'stretch' }}>
-      <button
-        type="button"
-        role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
-        {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
-        className="lf-menu-item"
-        disabled={!command.enabled}
-        title={controlHelp(commandHelp, command.disabledReason)}
-        data-help-id={commandHelp}
-        style={{ ...menuItemStyle, flex: 1 }}
-        onClick={(event) => {
-          if (command.id === 'help.tutorials') {
-            // The menu row disappears before the tutorial captures its return target.
-            event.currentTarget.closest('details')?.querySelector('summary')?.focus();
-          }
-          if (runCommand(command)) props.onCommandRun();
-        }}
-      >
-        <span style={checkmarkStyle} aria-hidden="true">
-          {command.active === true ? '✓' : ''}
-        </span>
-        <span style={menuLabelStyle}>{command.label}</span>
-        {command.shortcut !== undefined ? (
-          <span style={shortcutStyle}>{command.shortcut}</span>
-        ) : null}
-      </button>
-      <CommandTutorialButton command={command} onOpen={props.onCommandRun} />
-    </div>
+    <button
+      type="button"
+      role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
+      className="lf-menu-item"
+      disabled={!command.enabled}
+      title={controlHelp(commandHelp, command.disabledReason)}
+      data-help-id={commandHelp}
+      style={menuItemStyle}
+      onClick={(event) => {
+        if (command.id === 'help.tutorials') {
+          // The menu row disappears before the tutorial captures its return target.
+          event.currentTarget.closest('details')?.querySelector('summary')?.focus();
+        }
+        if (runCommand(command)) props.onCommandRun();
+      }}
+    >
+      <span style={checkmarkStyle} aria-hidden="true">
+        {command.active === true ? '✓' : ''}
+      </span>
+      <span style={menuLabelStyle}>{command.label}</span>
+      {command.shortcut !== undefined ? (
+        <span style={shortcutStyle}>{command.shortcut}</span>
+      ) : null}
+    </button>
   );
 }
 

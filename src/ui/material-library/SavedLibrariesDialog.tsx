@@ -51,7 +51,7 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
   };
 
   return (
-    <Dialog tutorialId="materials" onClose={props.onClose} title="Saved Libraries" size="lg">
+    <Dialog onClose={props.onClose} title="Saved Libraries" size="lg">
       <div style={toolbarStyle}>
         <Button
           variant="primary"

@@ -80,7 +80,6 @@ export function BoxFitTestDialog(props: {
   const result = generateFitCoupon(spec);
   return (
     <Dialog
-      tutorialId="box-fit"
       onClose={props.onCancel}
       title="Box Fit Test"
       as="form"

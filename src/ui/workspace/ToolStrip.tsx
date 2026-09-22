@@ -13,7 +13,6 @@ import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import './tool-strip.css';
 
 type Tool = {
@@ -41,14 +40,8 @@ export function ToolStrip(): JSX.Element {
   const setToolMode = useUiStore((s) => s.setToolMode);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
   const setLibraryDialogOpen = useUiStore((s) => s.setLibraryDialogOpen);
-  const activeTool = TOOLS.find((tool) => isActive(toolMode, tool.mode));
   return (
     <aside aria-label="Drawing tools" className="lf-rail lf-toolstrip">
-      <TutorialButton
-        tutorialId={workspaceToolTutorial(toolMode)}
-        compact
-        label={activeTool === undefined ? 'Drawing tools' : TOOL_HELP[activeTool.helpKey].label}
-      />
       {TOOLS.map((tool) => (
         <Fragment key={tool.helpKey}>
           {tool.helpKey === 'select' || tool.helpKey === 'text' ? (
@@ -98,23 +91,6 @@ export function ToolStrip(): JSX.Element {
       </button>
     </aside>
   );
-}
-
-function workspaceToolTutorial(tool: ToolMode): string {
-  switch (tool.kind) {
-    case 'node':
-      return 'nodes';
-    case 'cnc-tabs':
-      return 'cnc-tabs';
-    case 'position-laser':
-      return 'jog';
-    case 'draw':
-      return tool.shape === 'rect' ? 'rectangle' : tool.shape;
-    case 'select':
-    case 'text':
-    case 'measure':
-      return tool.kind;
-  }
 }
 
 function NodeCommandBar(props: {

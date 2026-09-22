@@ -27,12 +27,7 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
   const fromLine = selection?.key === selectionKey ? selection.fromLine : undefined;
   const start = useRecoveryStart(props, fromLine);
   return (
-    <Dialog
-      tutorialId="recovery"
-      title="Review interrupted laser job"
-      size="lg"
-      onClose={start.closeReadOnly}
-    >
+    <Dialog title="Review interrupted laser job" size="lg" onClose={start.closeReadOnly}>
       <RecoveryReviewContent capsule={props.capsule} />
       <LaserRecoveryRestartPicker
         key={selectionKey}

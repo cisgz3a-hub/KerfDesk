@@ -75,7 +75,7 @@ export function CncPassRecoveryWizard(props: {
     if (started) props.onClose();
   };
   return (
-    <Dialog tutorialId="recovery" title="CNC job recovery" size="lg" onClose={closeReadOnly}>
+    <Dialog title="CNC job recovery" size="lg" onClose={closeReadOnly}>
       <ExtractionGuidance capsule={props.capsule} />
       {model.kind === 'unavailable' ? (
         <div style={refusalStyle}>{model.reason}</div>
