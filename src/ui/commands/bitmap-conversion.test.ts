@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createProject,
   createLayer,
+  createLayerSubLayer,
+  captureLayerOperationSettings,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Project,
@@ -139,6 +141,55 @@ describe('Convert to Bitmap document ownership', () => {
     useStore.setState({ project: createProject() });
     expect(workerSignal?.aborted).toBe(false);
   });
+
+  it.each(['parent-output', 'sub-layer-enabled', 'sub-layer-mode'] as const)(
+    'aborts Use Cut Settings when %s changes during conversion',
+    async (change) => {
+      const source = svg('sub-layer.svg');
+      const primary = createLayer({ id: 'operation', color: '#000000', mode: 'line' });
+      const layer = {
+        ...primary,
+        subLayers: [
+          createLayerSubLayer(primary, {
+            id: 'fill',
+            label: 'Fill',
+            settings: { ...captureLayerOperationSettings(primary), mode: 'fill' },
+          }),
+        ],
+      };
+      const project = projectWith(source);
+      useStore.setState({ project: { ...project, scene: { ...project.scene, layers: [layer] } } });
+      const pending = deferred<RasterImage>();
+      const apply = vi.fn();
+      vi.mocked(buildBitmapFromVectors).mockReturnValue(pending.promise);
+      const conversion = convertSelectedVectorsToBitmap(
+        [source],
+        [layer],
+        { renderType: 'use-cut-settings', dpi: 254, brightnessPercent: 50 },
+        apply,
+        vi.fn(),
+      );
+      expect(
+        vi.mocked(buildBitmapFromVectors).mock.calls[0]?.[1]?.layers?.[0]?.subLayers?.[0]?.settings
+          .mode,
+      ).toBe('fill');
+      const workerSignal = vi.mocked(buildBitmapFromVectors).mock.calls[0]?.[2];
+      if (change === 'parent-output')
+        useStore.getState().setLayerParam(layer.id, { output: false });
+      else
+        useStore
+          .getState()
+          .updateLayerSubLayer(
+            layer.id,
+            'fill',
+            change === 'sub-layer-enabled' ? { enabled: false } : { mode: 'line' },
+          );
+      expect(workerSignal?.aborted).toBe(true);
+      pending.resolve(raster());
+      expect(await conversion).toEqual({ kind: 'stale' });
+      expect(apply).not.toHaveBeenCalled();
+    },
+  );
 
   it('does not replace same-id artwork in a project opened while conversion is pending', async () => {
     const sourceA = svg('project-a.svg');

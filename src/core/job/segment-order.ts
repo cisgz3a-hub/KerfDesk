@@ -61,7 +61,7 @@ function insideFirstNearestNeighborOrder<T extends CutSegment>(
   let cursor = startCursor;
   for (const [, bucket] of [...buckets.entries()].sort(([left], [right]) => right - left)) {
     const ordered = nearestNeighborOrderFrom(bucket, cursor, allowsReverse);
-    out.push(...ordered.segments);
+    for (const segment of ordered.segments) out.push(segment);
     cursor = ordered.cursor;
   }
   return out;

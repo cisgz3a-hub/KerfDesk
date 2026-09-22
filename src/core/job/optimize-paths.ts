@@ -93,7 +93,7 @@ function prioritizeLayerGroups(
     const sourceObjectId = groups[start]?.sourceObjectId;
     let end = start + 1;
     while (end < groups.length && groups[end]?.sourceObjectId === sourceObjectId) end += 1;
-    prioritized.push(...reverseLayerGroups(groups.slice(start, end)));
+    for (const group of reverseLayerGroups(groups.slice(start, end))) prioritized.push(group);
     start = end;
   }
   return prioritized;
@@ -137,7 +137,7 @@ function optimizeGroups(
       run.push(next);
       i += 1;
     }
-    out.push(...optimizeIslandFillGroups(run, settings, scanningOffsets));
+    for (const island of optimizeIslandFillGroups(run, settings, scanningOffsets)) out.push(island);
   }
   return out;
 }

@@ -2723,7 +2723,10 @@ into **one** bitmap spanning the selection's combined bounds
 (LightBurn-faithful, ADR-029 amendment ii): Fill All renders
 each path's fill rule first, then even-odd across objects — a shape nested inside another
 object's shape becomes a hole. Use Cut Settings combines independent operation fills
-without cancelling their overlap. Text retains its nonzero fill and SVG import retains
+at the requested brightness without cancelling or darkening their overlap. It includes enabled
+Fill sub-layers and respects operation
+output and the artwork's effective mode; changing those settings while conversion runs
+invalidates that pending conversion. Text retains its nonzero fill and SVG import retains
 explicit fill rules. In all modes,
 every source vector is deleted, and the whole swap is one undo
 entry. The result is labeled `N objects (bitmap)`.
@@ -5194,6 +5197,10 @@ and lifts the command's CNC-only gate.)*
    Cleanup of an unreadable slot compares the bytes or IndexedDB epoch observed by that read.
    A newer successful backup at the same key survives cleanup, and foreign live or unverified
    session slots remain protected.
+   A backup from an unsupported project version is preserved rather than treated as corrupt,
+   including when it is the previous generation. The app explains that a compatible version
+   is needed to restore it. Current work autosaves in a fresh session if its existing slot is
+   protected, so subsequent writes or clears cannot silently replace the incompatible backup.
 3. **Preview output**, **Save G-code**, **Frame**, and **Start** use the exact same
    `prepareOutput` artifact. Deterministic inert comments identify source kind and
    digest, physical dimensions/resolution, mapping/depth/polarity, roughing and

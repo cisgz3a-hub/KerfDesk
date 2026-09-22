@@ -15,7 +15,6 @@ import {
   type ColoredPath,
   type DitherAlgorithm,
   type ImportedSvg,
-  type LayerMode,
   type Polyline,
   type RasterImage,
   type SceneObject,
@@ -34,6 +33,9 @@ import {
 import type { BitmapFields } from './luma-bitmap';
 import { bitmapFillGroups, type BitmapFillObject } from './bitmap-fill-groups';
 import { estimateBitmapGeometryResources } from './bitmap-conversion-resources';
+import type { BitmapLayerSetting } from './bitmap-operation-settings';
+
+export type { BitmapLayerSetting } from './bitmap-operation-settings';
 
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
@@ -41,11 +43,6 @@ const CURVE_TOLERANCE_PIXELS = 0.25;
 
 export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
-export type BitmapLayerSetting = {
-  readonly id?: string;
-  readonly color: string;
-  readonly mode: LayerMode;
-};
 export type BitmapConversionOptions = {
   readonly dpi?: number;
   readonly renderType?: ConvertToBitmapRenderType;
@@ -176,6 +173,7 @@ function bakeConvertibleTransform(
   budget: { remaining: number },
 ): BitmapFillObject {
   return {
+    ...(o.operationOverride === undefined ? {} : { operationOverride: o.operationOverride }),
     paths: o.paths.map((path) => {
       const operationIds = path.operationIds ?? o.operationIds;
       const polylines = flattenBitmapPath(path, o.transform, toleranceMm, budget);

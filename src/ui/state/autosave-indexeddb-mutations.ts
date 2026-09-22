@@ -11,12 +11,30 @@ import {
   AUTOSAVE_SNAPSHOT_STORE,
   autosaveRequest,
 } from './autosave-indexeddb-runtime';
+import { requireSupportedAutosaveVersion } from './autosave-record';
+
+// Keep this check in the same readwrite transaction as the mutation. A
+// version from a newer window must not be replaced between checking and writing.
+export async function requireSupportedAutosaveSnapshots(
+  transaction: IDBTransaction,
+  manifest: StoredAutosaveManifest,
+): Promise<void> {
+  const snapshots = transaction.objectStore(AUTOSAVE_SNAPSHOT_STORE);
+  for (const reference of [manifest.current, manifest.previous]) {
+    if (reference === null) continue;
+    const value = await autosaveRequest<unknown>(
+      snapshots.get(autosaveSnapshotKey(manifest.storageKey, reference)),
+    );
+    requireSupportedAutosaveVersion(value);
+  }
+}
 
 export async function replaceAutosaveSnapshot(
   transaction: IDBTransaction,
   current: StoredAutosaveManifest,
   record: AutosaveIndexedDbRecord,
 ): Promise<StoredAutosaveManifest> {
+  await requireSupportedAutosaveSnapshots(transaction, current);
   const epoch = nextAutosaveEpoch(current.epoch);
   const snapshot: StoredAutosaveSnapshot = parseAutosaveSnapshot({
     ...record,
@@ -46,6 +64,7 @@ export async function clearAutosaveManifest(
   transaction: IDBTransaction,
   current: StoredAutosaveManifest,
 ): Promise<StoredAutosaveManifest> {
+  await requireSupportedAutosaveSnapshots(transaction, current);
   const snapshots = transaction.objectStore(AUTOSAVE_SNAPSHOT_STORE);
   for (const reference of [current.current, current.previous]) {
     if (reference !== null) {

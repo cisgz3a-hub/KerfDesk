@@ -18,7 +18,7 @@ import { pumpInboundLine } from '../../core/controllers/grbl/stream-pump';
 import { classifyResponse } from '../../core/controllers/grbl/response';
 import { detectControllerFromBanner } from '../../core/controllers/detect-controller';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
-import { encodeWireBytes, extractSerialLines } from './serial-wire';
+import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 
 export type SerialWorkerCoreDeps = {
@@ -163,15 +163,15 @@ function invalidatesRefill(line: string): boolean {
 
 async function runReadLoop(state: WorkerState, deps: SerialWorkerCoreDeps): Promise<void> {
   const decoder = new TextDecoder('utf-8');
-  let buffer = '';
+  let framing = EMPTY_SERIAL_LINE_STATE;
   try {
     for (;;) {
       const reader = state.reader;
       if (reader === null) break;
       const { value, done } = await reader.read();
       if (done) break;
-      const extracted = extractSerialLines(buffer, decoder.decode(value, { stream: true }));
-      buffer = extracted.buffer;
+      const extracted = extractSerialLines(framing, decoder.decode(value, { stream: true }));
+      framing = extracted.state;
       for (const line of extracted.lines) {
         if (state.barrier !== null) await state.barrier;
         if (state.closed) break;

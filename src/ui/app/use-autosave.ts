@@ -35,6 +35,8 @@ export const AUTOSAVE_RECOVERY_STORAGE_MESSAGE =
   'Autosave recovery storage could not be fully read. Any available local recovery was still checked.';
 export const AUTOSAVE_RECOVERY_RETAINED_MESSAGE =
   'The source autosave belongs to another or unverified window, so CurveDesk retained it instead of deleting it.';
+export const AUTOSAVE_RECOVERY_VERSION_MESSAGE =
+  'An autosave needs a different app version. It has been kept unchanged; reopen it using the version that saved it.';
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 
@@ -165,6 +167,9 @@ export async function runAutosaveRecovery(
 }
 
 function reportRecoveryWarnings(result: AutosaveDurableReadResult): void {
+  if (result.warnings.includes('unsupported-version')) {
+    useToastStore.getState().pushToast(AUTOSAVE_RECOVERY_VERSION_MESSAGE, 'warning');
+  }
   if (result.warnings.includes('recovered-previous')) {
     useToastStore.getState().pushToast(AUTOSAVE_RECOVERY_DEGRADED_MESSAGE, 'warning');
   }
@@ -186,7 +191,9 @@ function reportCleanupResult(result: AutosaveDurableClearResult): void {
     .getState()
     .pushToast(
       result.kind === 'retained'
-        ? AUTOSAVE_RECOVERY_RETAINED_MESSAGE
+        ? result.reason === 'unsupported-version'
+          ? AUTOSAVE_RECOVERY_VERSION_MESSAGE
+          : AUTOSAVE_RECOVERY_RETAINED_MESSAGE
         : 'Autosave cleanup did not complete; an older recovery prompt may appear again.',
       'warning',
     );

@@ -2,12 +2,14 @@ import type { Project } from '../../core/scene';
 import { clearAutosave } from './autosave';
 import type { AutosaveWriteFailure } from './autosave-record';
 import type { AutosaveWriteResult } from './autosave-record';
+import { UnsupportedAutosaveVersionError } from './autosave-record';
 import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
 import {
   autosaveStorageKeyForSession,
   clearLocalAutosave,
   currentAutosaveSessionId,
   replaceAutosaveSessionId,
+  requireSupportedLocalAutosaveVersion,
   type LocalAutosaveClearResult,
   writePreparedLocalAutosave,
 } from './autosave-local-storage';
@@ -42,7 +44,7 @@ export type AutosaveDurableWriteResult =
 export type AutosaveDurableClearResult =
   | { readonly kind: 'ok' }
   | { readonly kind: 'conflict' }
-  | { readonly kind: 'retained'; readonly reason: 'live' | 'unsupported' }
+  | { readonly kind: 'retained'; readonly reason: 'live' | 'unsupported' | 'unsupported-version' }
   | { readonly kind: 'failed'; readonly error: unknown };
 
 type AutosaveOwnedSession = {
@@ -80,20 +82,33 @@ export class AutosaveDurableService {
   }
 
   write(project: Project, savedAt: number = Date.now()): Promise<AutosaveDurableWriteResult> {
-    return this.enqueue(async () => this.writeNow(project, savedAt));
+    return this.enqueue(async () => {
+      const result = await this.writeNow(project, savedAt);
+      if (result.kind !== 'failed' || !(result.error instanceof UnsupportedAutosaveVersionError)) {
+        return result;
+      }
+      // A reload can retain the newer build's session ID. Give this build a
+      // fresh slot, preserving the original record and continuing crash recovery.
+      const session = await this.session();
+      this.sessionIdHint = this.rotateSessionId();
+      this.sessionPromise = null;
+      // Publish and claim the new identity before giving up the old guard.
+      // Synchronous unload/clear calls must never reuse a released session.
+      await this.session();
+      await session.guard?.release();
+      return this.writeNow(project, savedAt);
+    });
   }
 
   clearCurrent(): Promise<AutosaveDurableClearResult> {
-    const invalidatedSessionId = this.sessionIdHint;
     const localClears = [clearAutosave()];
     return this.enqueue(async () => {
       const session = await this.session();
       // Repeat inside the queue: an earlier IndexedDB write can fail after the
       // immediate clear and recreate this slot through the local fallback.
       localClears.push(clearAutosave({ sessionId: session.sessionId }));
-      if (session.sessionId !== invalidatedSessionId) {
-        localClears.push(clearAutosave({ sessionId: invalidatedSessionId }));
-      }
+      // Rotation may have released the old session to another window. Only
+      // the session this queued operation still owns can be cleared here.
       return combineClearResults(await this.clearNow(session.sessionId), localClears);
     });
   }
@@ -103,23 +118,27 @@ export class AutosaveDurableService {
     retainedStorageKey?: string,
   ): Promise<AutosaveDurableClearResult> {
     if (snapshot.storageKey === retainedStorageKey) return { kind: 'ok' };
-    const session = await this.session();
-    if (snapshot.sessionId === undefined || snapshot.sessionId === session.sessionId) {
-      return this.enqueue(async () => this.clearSnapshotNow(snapshot));
-    }
-    const result = await this.locks.runIfAbandoned(snapshot.sessionId, async () =>
-      this.enqueue(async () => this.clearSnapshotNow(snapshot)),
-    );
-    if (result.kind === 'reconciled') return result.value;
-    if (result.kind === 'failed') return { kind: 'failed', error: result.error };
-    return { kind: 'retained', reason: result.kind };
+    return this.enqueue(async () => {
+      // Earlier queued writes can rotate this session. Decide ownership when
+      // cleanup actually runs, then hold any abandoned-session lock through it.
+      const session = await this.session();
+      if (snapshot.sessionId === undefined || snapshot.sessionId === session.sessionId) {
+        return this.clearSnapshotNow(snapshot);
+      }
+      const result = await this.locks.runIfAbandoned(snapshot.sessionId, async () =>
+        this.clearSnapshotNow(snapshot),
+      );
+      if (result.kind === 'reconciled') return result.value;
+      if (result.kind === 'failed') return { kind: 'failed', error: result.error };
+      return { kind: 'retained', reason: result.kind };
+    });
   }
 
   async readLatest(): Promise<AutosaveDurableReadResult> {
     await this.tail;
     const session = await this.session();
     const result = await readLatestDurableAutosave(this.repository, this.locks, session.sessionId);
-    await this.retireUnreadable(result.unreadable, session.sessionId);
+    await this.retireUnreadable(result.unreadable);
     return result;
   }
 
@@ -127,19 +146,17 @@ export class AutosaveDurableService {
   // ownership. A current-window autosave may finish while the scan awaits
   // IndexedDB or another session's lock; that newer backup must survive (M15).
   // Foreign live or unverified windows retain their slots as before.
-  private async retireUnreadable(
-    slots: ReadonlyArray<AutosaveUnreadableSlot>,
-    currentSessionId: string,
-  ): Promise<void> {
+  private async retireUnreadable(slots: ReadonlyArray<AutosaveUnreadableSlot>): Promise<void> {
     for (const slot of slots) {
       try {
-        if (slot.sessionId === undefined || slot.sessionId === currentSessionId) {
-          await this.enqueue(async () => this.retireNow(slot));
-          continue;
-        }
-        await this.locks.runIfAbandoned(slot.sessionId, async () =>
-          this.enqueue(async () => this.retireNow(slot)),
-        );
+        await this.enqueue(async () => {
+          const session = await this.session();
+          if (slot.sessionId === undefined || slot.sessionId === session.sessionId) {
+            await this.retireNow(slot);
+            return;
+          }
+          await this.locks.runIfAbandoned(slot.sessionId, async () => this.retireNow(slot));
+        });
       } catch {
         // Cleanup is best effort: a slot that resists retirement is reported
         // again next launch, which is strictly better than failing recovery.
@@ -173,6 +190,14 @@ export class AutosaveDurableService {
   private async writeNow(project: Project, savedAt: number): Promise<AutosaveDurableWriteResult> {
     const session = await this.session();
     const storageKey = autosaveStorageKeyForSession(session.sessionId);
+    try {
+      requireSupportedLocalAutosaveVersion(storageKey);
+    } catch (error) {
+      if (error instanceof UnsupportedAutosaveVersionError) {
+        return { kind: 'failed', reason: 'storage-error', error };
+      }
+      // A blocked localStorage read need not prevent a durable IndexedDB write.
+    }
     const prepared = await prepareAutosaveRecordOffThread(
       project,
       savedAt,
@@ -193,6 +218,9 @@ export class AutosaveDurableService {
       this.epochs.set(storageKey, result.epoch);
       return { kind: 'ok', savedAt, storageKey, backend: 'indexeddb' };
     } catch (indexedDbError) {
+      if (indexedDbError instanceof UnsupportedAutosaveVersionError) {
+        return { kind: 'failed', reason: 'storage-error', error: indexedDbError };
+      }
       return localFallback(prepared.record, storageKey, indexedDbError);
     }
   }
@@ -209,6 +237,9 @@ export class AutosaveDurableService {
       this.epochs.set(storageKey, result.epoch);
       return { kind: 'ok' };
     } catch (error) {
+      if (error instanceof UnsupportedAutosaveVersionError) {
+        return { kind: 'retained', reason: 'unsupported-version' };
+      }
       return { kind: 'failed', error };
     }
   }
@@ -230,6 +261,9 @@ export class AutosaveDurableService {
       this.epochs.set(snapshot.storageKey, result.epoch);
       return combineClearResults({ kind: 'ok' }, [local]);
     } catch (error) {
+      if (error instanceof UnsupportedAutosaveVersionError) {
+        return { kind: 'retained', reason: 'unsupported-version' };
+      }
       return { kind: 'failed', error };
     }
   }
@@ -278,6 +312,9 @@ function combineClearResults(
       result.kind === 'failed' ? result.error : new Error('Local autosave cleanup is unavailable.'),
     ];
   });
+  if (localErrors.some((error) => error instanceof UnsupportedAutosaveVersionError)) {
+    return { kind: 'retained', reason: 'unsupported-version' };
+  }
   if (localErrors.length === 0) return durable;
   return {
     kind: 'failed',
@@ -300,6 +337,7 @@ function localFallback(
   const local: AutosaveWriteResult = writePreparedLocalAutosave(record, storageKey);
   if (local.kind === 'ok') return { ...local, backend: 'local' };
   if (local.kind === 'unavailable') return local;
+  if (local.error instanceof UnsupportedAutosaveVersionError) return local;
   return {
     ...local,
     error: new AggregateError([indexedDbError, local.error], 'Both autosave backends failed.'),

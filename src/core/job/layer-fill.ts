@@ -217,7 +217,7 @@ function appendFillPathContours(
       appendContours(out, openContours);
       return;
     }
-    originalClosedContours.push(...closed);
+    appendContours(originalClosedContours, closed);
     const resolved =
       (path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd')) === 'nonzero'
         ? normalizeClosedPolylinesNonZeroChecked(closed)
@@ -226,20 +226,19 @@ function appendFillPathContours(
       batchNormalizationFailed = true;
       continue;
     }
-    normalizedBatches.push(...resolved.value);
+    appendContours(normalizedBatches, resolved.value);
   }
   if (batchNormalizationFailed) {
     // Do not reinterpret a mixed raw/normalized object as non-zero. Preserve
     // the established raw-contour fallback and let the layer-wide even-odd
     // hatching policy own the degraded case.
-    out.push(...originalClosedContours, ...openContours);
+    appendContours(out, originalClosedContours);
+    appendContours(out, openContours);
     return;
   }
   const resolvedObject = normalizeClosedPolylinesNonZeroChecked(normalizedBatches);
-  out.push(
-    ...(resolvedObject.kind === 'ok' ? resolvedObject.value : normalizedBatches),
-    ...openContours,
-  );
+  appendContours(out, resolvedObject.kind === 'ok' ? resolvedObject.value : normalizedBatches);
+  appendContours(out, openContours);
 }
 
 function canHatchTraceDirectly(
