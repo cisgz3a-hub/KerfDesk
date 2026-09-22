@@ -37,6 +37,15 @@ export function laserSecondPassChainsEqual(
   );
 }
 
+/** Retention key and Frame execution signature of a painted pass: the exact
+ * source run plus the exact selection, so a permit names the bytes it authorizes. */
+export function laserSecondPassExecutionSignature(
+  sourceRunId: string,
+  selection: LaserSecondPassSelection,
+): string {
+  return `laser-second-pass:${sourceRunId}:${selectionKey(selection)}`;
+}
+
 export function selectionKey(selection: LaserSecondPassSelection): string {
   return JSON.stringify([
     selection.version,

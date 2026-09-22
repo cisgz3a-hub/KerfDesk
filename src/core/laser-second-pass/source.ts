@@ -12,6 +12,7 @@ export type SourceSegment = LaserSecondPassSegment & {
   readonly air: number;
   readonly entry: SourceTravelStyle;
 };
+type SourceDirection = { readonly dx: number; readonly dy: number };
 type SourceState = {
   x: number | undefined;
   y: number | undefined;
@@ -28,7 +29,16 @@ type SourceState = {
   group: number;
   entry: SourceTravelStyle;
   lastTravel: SourceTravelStyle;
+  /** Unit direction of the previous movement with length. */
+  lastDirection: SourceDirection | null;
+  /** The previous movement was a laser-off feed move leaving the line before it. */
+  afterDarkTurn: boolean;
 };
+
+/** Sine of the widest angle still read as one straight sweep. Emitted coordinates
+ * carry three decimals, so a short runway can differ from the burn it feeds by a
+ * few milliradians; a row change or a reversal is orders of magnitude larger. */
+const SWEEP_TURN_SINE = 0.05;
 
 function initialState(initial: LaserSecondPassPoint | undefined): SourceState {
   if (initial !== undefined && (!Number.isFinite(initial.x) || !Number.isFinite(initial.y))) {
@@ -50,6 +60,8 @@ function initialState(initial: LaserSecondPassPoint | undefined): SourceState {
     group: 0,
     entry: { rapid: true, feed: 0 },
     lastTravel: { rapid: true, feed: 0 },
+    lastDirection: null,
+    afterDarkTurn: false,
   };
 }
 
@@ -121,6 +133,46 @@ function motionLength(from: LaserSecondPassPoint, to: LaserSecondPassPoint, powe
   return length;
 }
 
+function movementDirection(
+  from: LaserSecondPassPoint | null,
+  to: LaserSecondPassPoint | null,
+  power: number,
+): SourceDirection | null {
+  if (from === null || to === null) return null;
+  const length = motionLength(from, to, power);
+  return length === 0 ? null : { dx: (to.x - from.x) / length, dy: (to.y - from.y) / length };
+}
+
+function continuesDirection(previous: SourceDirection | null, next: SourceDirection): boolean {
+  if (previous === null) return false;
+  const dot = previous.dx * next.dx + previous.dy * next.dy;
+  const cross = previous.dx * next.dy - previous.dy * next.dx;
+  return dot > 0 && Math.abs(cross) <= SWEEP_TURN_SINE;
+}
+
+/** Sweeps end at rapids, mode/air words and feed changes, and also where a
+ * laser-off feed move leaves the current line: that move repositions the head
+ * (a controlled-dark row change) rather than feeding a burn. The move after
+ * such a turn starts its own sweep unless it continues the turned line, in
+ * which case the turn was a runway and stays with the burn it leads into. */
+function beginSweepIfNeeded(
+  state: SourceState,
+  direction: SourceDirection | null,
+  power: number,
+): void {
+  const turns = direction !== null && !continuesDirection(state.lastDirection, direction);
+  const darkTurn = turns && !state.rapid && power === 0;
+  if (state.breakGroup || darkTurn || (state.afterDarkTurn && turns)) {
+    state.group += 1;
+    state.entry = state.lastTravel;
+    state.breakGroup = false;
+  }
+  if (direction !== null) {
+    state.lastDirection = direction;
+    state.afterDarkTurn = darkTurn;
+  }
+}
+
 function sourceMovement(state: SourceState, block: SourceBlock): SourceSegment | null {
   const from = knownPoint(state.x, state.y);
   state.x = axisTarget(block.x, state.x, state);
@@ -128,21 +180,18 @@ function sourceMovement(state: SourceState, block: SourceBlock): SourceSegment |
   const power = state.enabled && !state.rapid ? state.power : 0;
   if (!state.rapid && state.feed <= 0)
     throw new Error('A source feed move has no known positive feed.');
-  if (state.breakGroup) {
-    state.group += 1;
-    state.entry = state.lastTravel;
-    state.breakGroup = false;
-  }
+  const to = knownPoint(state.x, state.y);
+  const direction = movementDirection(from, to, power);
+  beginSweepIfNeeded(state, direction, power);
   state.lastTravel = { rapid: state.rapid, feed: state.feed };
   if (state.rapid) state.breakGroup = true;
-  const to = knownPoint(state.x, state.y);
   if (from === null || to === null) {
     if (power > 0)
       throw new Error('The first engraving move needs the original starting X and Y position.');
     state.breakGroup = true;
     return null;
   }
-  if (motionLength(from, to, power) === 0) return null;
+  if (direction === null) return null;
   return {
     from,
     to,

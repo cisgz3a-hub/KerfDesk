@@ -1,12 +1,32 @@
-import type { MotionBlock } from '../../core/job/motion-manifest';
+import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { Vec2 } from '../../core/scene';
-import { mapControllerPointToScene, type CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { mapControllerPointToScene } from '../state/canvas-motion-plan';
+import {
+  PACKED_POINT_WIDTH,
+  packedBlockCount,
+  packedBlockKind,
+  packedBlockPointCount,
+  packedBlockPointOffset,
+  packedBlockRawLineIndex,
+  packedBlockSendableLineIndex,
+  packedPoint,
+  type PackedMotionManifest,
+} from '../state/recovery/packed-motion-manifest';
+import type { RecoveryPreviewRoute } from './laser-recovery-preview-route';
 
 export type RecoveryPreviewView = {
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
+};
+
+/** One original movement, materialised only for the highlighted selection. */
+export type RecoveryMovement = {
+  readonly blockIndex: number;
+  /** One-based line in the sealed program, as the operator enters it. */
+  readonly rawLine: number;
+  readonly points: ReadonlyArray<MotionPoint>;
 };
 
 export const RECOVERY_PREVIEW_SEGMENT_LIMIT = 2_000;
@@ -19,15 +39,17 @@ type RecoveryPreviewIndex = {
   readonly scaleY: number;
 };
 
-const previewIndexes = new WeakMap<CanvasMotionPlan, RecoveryPreviewIndex>();
+type SegmentVisitor = (x1: number, y1: number, x2: number, y2: number, block: number) => void;
 
-/** Borrow the archived manifest. Never clone its potentially millions of points. */
-export function recoveryPreviewBounds(plan: CanvasMotionPlan): RecoveryPreviewView | null {
+const previewIndexes = new WeakMap<RecoveryPreviewRoute, RecoveryPreviewIndex>();
+
+/** Borrow the packed route. Never clone its potentially millions of points. */
+export function recoveryPreviewBounds(route: RecoveryPreviewRoute): RecoveryPreviewView | null {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  const { bounds } = recoveryPreviewIndex(plan);
+  const { bounds } = recoveryPreviewIndex(route);
   for (let index = 0; index < bounds.length; index += 4) {
     minX = Math.min(minX, bounds[index] ?? Infinity);
     minY = Math.min(minY, bounds[index + 1] ?? Infinity);
@@ -45,13 +67,13 @@ type PreviewSegment = { readonly from: Vec2; readonly to: Vec2 };
 /** A deterministic bounded reservoir, resampled for the visible area after zoom.
  * Display simplification never changes hit testing or the selected raw line. */
 export function recoveryPreviewPath(
-  plan: CanvasMotionPlan,
+  route: RecoveryPreviewRoute,
   view: RecoveryPreviewView,
 ): { readonly path: string; readonly sampled: boolean; readonly shown: number } {
   const segments: PreviewSegment[] = [];
   let visible = 0;
   walkProcessSegments(
-    plan,
+    route,
     (x1, y1, x2, y2) => {
       if (!intersectsView(x1, y1, x2, y2, view)) return;
       visible += 1;
@@ -78,7 +100,7 @@ export function recoveryPreviewPath(
 /** Source-line distance breaks coincident-pass ties; every original segment is
  * tested, including movements omitted from the bounded display. */
 export function pickRecoveryMovement(
-  plan: CanvasMotionPlan,
+  route: RecoveryPreviewRoute,
   point: Vec2,
   toleranceMm: number,
   preferredRawLine: number,
@@ -86,10 +108,10 @@ export function pickRecoveryMovement(
   let distance = toleranceMm * toleranceMm;
   let rawLine: number | null = null;
   walkProcessSegments(
-    plan,
+    route,
     (x1, y1, x2, y2, block) => {
       const candidate = segmentDistanceSquared(point, x1, y1, x2, y2);
-      const line = block.rawLineIndex + 1;
+      const line = packedBlockRawLineIndex(route.manifest, block) + 1;
       const nearerLine =
         rawLine === null ||
         Math.abs(line - preferredRawLine) < Math.abs(rawLine - preferredRawLine);
@@ -108,28 +130,43 @@ export function pickRecoveryMovement(
   return rawLine;
 }
 
-export function firstRecoveryMovement(plan: CanvasMotionPlan, rawLine: number): MotionBlock | null {
-  const blocks = plan.manifest.blocks;
+export function firstRecoveryMovement(
+  route: RecoveryPreviewRoute,
+  rawLine: number,
+): RecoveryMovement | null {
+  const manifest = route.manifest;
+  const count = packedBlockCount(manifest);
   let low = 0;
-  let high = blocks.length;
+  let high = count;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if ((blocks[middle]?.rawLineIndex ?? Infinity) < rawLine - 1) low = middle + 1;
+    if (packedBlockRawLineIndex(manifest, middle) < rawLine - 1) low = middle + 1;
     else high = middle;
   }
-  for (let index = low; index < blocks.length; index += 1) {
-    const block = blocks[index];
-    if (block?.kind === 'process') return block;
+  for (let index = low; index < count; index += 1) {
+    if (packedBlockKind(manifest, index) !== 'process') continue;
+    const offset = packedBlockPointOffset(manifest, index);
+    const pointCount = packedBlockPointCount(manifest, index);
+    const points: MotionPoint[] = [];
+    for (let point = 0; point < pointCount; point += 1) {
+      points.push(packedPoint(manifest, offset + point));
+    }
+    return { blockIndex: index, rawLine: packedBlockRawLineIndex(manifest, index) + 1, points };
   }
   return null;
 }
 
-export function acknowledgedRecoveryMovement(plan: CanvasMotionPlan, ackedLines: number): number {
+export function acknowledgedRecoveryMovement(
+  route: RecoveryPreviewRoute,
+  ackedLines: number,
+): number {
+  const manifest = route.manifest;
+  const count = packedBlockCount(manifest);
   let previous = 1;
-  for (const block of plan.manifest.blocks) {
-    if (block.kind !== 'process') continue;
-    previous = block.rawLineIndex + 1;
-    if (block.sendableLineIndex >= ackedLines) return previous;
+  for (let index = 0; index < count; index += 1) {
+    if (packedBlockKind(manifest, index) !== 'process') continue;
+    previous = packedBlockRawLineIndex(manifest, index) + 1;
+    if (packedBlockSendableLineIndex(manifest, index) >= ackedLines) return previous;
   }
   return previous;
 }
@@ -151,36 +188,38 @@ export function zoomRecoveryPreview(
 }
 
 function walkProcessSegments(
-  plan: CanvasMotionPlan,
-  visit: (x1: number, y1: number, x2: number, y2: number, block: MotionBlock) => void,
+  route: RecoveryPreviewRoute,
+  visit: SegmentVisitor,
   view: RecoveryPreviewView,
 ): void {
-  const index = recoveryPreviewIndex(plan);
-  const blocks = plan.manifest.blocks;
+  const index = recoveryPreviewIndex(route);
+  const manifest = route.manifest;
+  const count = packedBlockCount(manifest);
   for (let chunk = 0; chunk < index.bounds.length / 4; chunk += 1) {
     if (!previewChunkVisible(index.bounds, chunk, view)) continue;
-    const limit = Math.min(blocks.length, (chunk + 1) * BLOCKS_PER_PREVIEW_CHUNK);
+    const limit = Math.min(count, (chunk + 1) * BLOCKS_PER_PREVIEW_CHUNK);
     for (let at = chunk * BLOCKS_PER_PREVIEW_CHUNK; at < limit; at += 1) {
-      const block = blocks[at];
-      if (block?.kind === 'process') visitBlockSegments(block, index, visit);
+      if (packedBlockKind(manifest, at) === 'process')
+        visitBlockSegments(manifest, at, index, visit);
     }
   }
 }
 
 function visitBlockSegments(
-  block: MotionBlock,
+  manifest: PackedMotionManifest,
+  block: number,
   mapping: RecoveryPreviewIndex,
-  visit: (x1: number, y1: number, x2: number, y2: number, block: MotionBlock) => void,
+  visit: SegmentVisitor,
 ): void {
-  for (let index = 1; index < block.points.length; index += 1) {
-    const from = block.points[index - 1];
-    const to = block.points[index];
-    if (from === undefined || to === undefined) continue;
+  const data = manifest.pointData;
+  const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
+  const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
+  for (let at = start + PACKED_POINT_WIDTH; at < end; at += PACKED_POINT_WIDTH) {
     visit(
-      from.x * mapping.scaleX + mapping.offset.x,
-      from.y * mapping.scaleY + mapping.offset.y,
-      to.x * mapping.scaleX + mapping.offset.x,
-      to.y * mapping.scaleY + mapping.offset.y,
+      (data[at - PACKED_POINT_WIDTH] ?? 0) * mapping.scaleX + mapping.offset.x,
+      (data[at - PACKED_POINT_WIDTH + 1] ?? 0) * mapping.scaleY + mapping.offset.y,
+      (data[at] ?? 0) * mapping.scaleX + mapping.offset.x,
+      (data[at + 1] ?? 0) * mapping.scaleY + mapping.offset.y,
       block,
     );
   }
@@ -202,36 +241,41 @@ function previewChunkVisible(
 
 /** One compact box per 256 source blocks. Zoomed raster views and clicks skip
  * offscreen rows without storing another copy of their endpoints. */
-function recoveryPreviewIndex(plan: CanvasMotionPlan): RecoveryPreviewIndex {
-  const cached = previewIndexes.get(plan);
+function recoveryPreviewIndex(route: RecoveryPreviewRoute): RecoveryPreviewIndex {
+  const cached = previewIndexes.get(route);
   if (cached !== undefined) return cached;
-  const offset = mapControllerPointToScene({ x: 0, y: 0, z: 0 }, plan);
+  const offset = mapControllerPointToScene({ x: 0, y: 0, z: 0 }, route);
   // Origin transforms are axis mirrors plus translation. Derive signs directly
   // so subtracting two large translated coordinates cannot erase a unit vector.
-  const scaleX = plan.device.origin.endsWith('right') ? -1 : 1;
-  const scaleY = plan.device.origin.startsWith('front') || plan.device.origin === 'center' ? -1 : 1;
-  const blocks = plan.manifest.blocks;
-  const bounds = new Float64Array(Math.ceil(blocks.length / BLOCKS_PER_PREVIEW_CHUNK) * 4);
+  const scaleX = route.device.origin.endsWith('right') ? -1 : 1;
+  const scaleY =
+    route.device.origin.startsWith('front') || route.device.origin === 'center' ? -1 : 1;
+  const manifest = route.manifest;
+  const count = packedBlockCount(manifest);
+  const bounds = new Float64Array(Math.ceil(count / BLOCKS_PER_PREVIEW_CHUNK) * 4);
   for (let at = 0; at < bounds.length; at += 4) {
     bounds[at] = Infinity;
     bounds[at + 1] = Infinity;
     bounds[at + 2] = -Infinity;
     bounds[at + 3] = -Infinity;
   }
-  blocks.forEach((block, blockIndex) => {
-    if (block.kind !== 'process') return;
-    const at = Math.floor(blockIndex / BLOCKS_PER_PREVIEW_CHUNK) * 4;
-    for (const point of block.points) {
-      const x = point.x * scaleX + offset.x;
-      const y = point.y * scaleY + offset.y;
+  const data = manifest.pointData;
+  for (let block = 0; block < count; block += 1) {
+    if (packedBlockKind(manifest, block) !== 'process') continue;
+    const at = Math.floor(block / BLOCKS_PER_PREVIEW_CHUNK) * 4;
+    const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
+    const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
+    for (let point = start; point < end; point += PACKED_POINT_WIDTH) {
+      const x = (data[point] ?? 0) * scaleX + offset.x;
+      const y = (data[point + 1] ?? 0) * scaleY + offset.y;
       bounds[at] = Math.min(bounds[at] ?? Infinity, x);
       bounds[at + 1] = Math.min(bounds[at + 1] ?? Infinity, y);
       bounds[at + 2] = Math.max(bounds[at + 2] ?? -Infinity, x);
       bounds[at + 3] = Math.max(bounds[at + 3] ?? -Infinity, y);
     }
-  });
+  }
   const result = { bounds, offset, scaleX, scaleY };
-  previewIndexes.set(plan, result);
+  previewIndexes.set(route, result);
   return result;
 }
 

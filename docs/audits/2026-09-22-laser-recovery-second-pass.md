@@ -233,3 +233,21 @@ History remains bounded (20 terminal runs / 100 MiB, 64 MiB per artifact); if an
 remaining stored artifact's actual coverage is selectable. Brush drafts for up to 20 sources are
 local to this browser/device. No unsupported command is silently ignored to make a pass appear
 successful.
+
+## Post-merge follow-up (2026-09-22, ADR-341 Amendment 1)
+
+A read-only audit of the merged PR (#829, `c0272ad25`) found the gaps below; each is corrected
+with a regression test in the follow-up change.
+
+| Finding | Evidence | Correction |
+| --- | --- | --- |
+| The parser defined a sweep as ending only at G0, an M word or a feed change. Controlled-dark rasters join rows with `G1 … S0` travel at the profile travel feed; when that equals the layer speed every row was one sweep and a small painted spot replayed the whole image dark. | Real Falcon image prepared with `controlledLaserOffTravelFeedMmPerMin` equal to the layer speed: the derived program visited every row. | A laser-off feed move that leaves the current line starts a new sweep; the next move joins it only if it continues that line (a runway). Oracle tests cover bidirectional, unidirectional, runway-less and diagonal-runway cases plus the real emitter. |
+| Every selected sweep was wrapped in `M5` and `M4 S0`. GRBL-family firmware synchronises the planner on each spindle-state change even in laser mode, so dense selections paid one buffer drain per row. | Emitted program inspection. | The mode word is written only when the beam mode changes; positioning already carries `S0`. Painted passes archived with the earlier bytes no longer reproduce and are refused by the existing lineage check; original archives are unaffected. |
+| The restart picker rebuilt an object-per-point manifest from the sealed program synchronously inside render, on the UI thread. | Source inspection; the rest of the PR packs the same points to avoid this cost. | A worker parses the program and transfers a packed route; the picker culls, draws and hit-tests the packed form. The line field works while it prepares; failure falls back to line numbers. |
+| The second-pass branch of the execution-signature check compared a candidate field with itself. | Source inspection. | The permit signature is bound to the sealed lineage of its last stage. |
+| Framing a painted pass silently replaced an armed ordinary canvas Frame; the prompt copy named only engraving. | Source inspection. | A toast reports the replaced Frame; copy names cutting deeper as well. |
+
+The packed-manifest hydration helper `executionArtifactCanvasPlan` remains: it is exercised by
+tests and is the documented reader for archived packed plans. Physical Falcon behaviour is still
+unverified; the software contract is covered by the focused suites and the existing browser
+workflows.

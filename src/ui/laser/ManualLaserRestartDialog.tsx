@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Dialog, DialogActions } from '../kit';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
+import { recoveryRouteFromCanvasPlan } from './laser-recovery-preview-route';
 import type { PreparedRecoverySource } from './start-job-source';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 
@@ -16,6 +17,11 @@ export function ManualLaserRestartDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const maximumLine = props.source.canvasPlan.fingerprint.lines;
+  // The preparation already parsed this program; packing it is a linear copy.
+  const route = useMemo(
+    () => recoveryRouteFromCanvasPlan(props.source.canvasPlan),
+    [props.source.canvasPlan],
+  );
   const [fromLine, setFromLine] = useState(Math.min(props.initialLine, maximumLine));
   const [starting, setStarting] = useState(false);
   const [failure, setFailure] = useState('');
@@ -52,7 +58,7 @@ export function ManualLaserRestartDialog(props: {
     <Dialog title="Choose laser restart point" size="lg" tutorialId="recovery" onClose={close}>
       <p>{RESTART_HINT}</p>
       <LaserRecoveryCanvas
-        plan={props.source.canvasPlan}
+        route={route}
         ackedLines={0}
         fromLine={fromLine}
         disabled={starting}

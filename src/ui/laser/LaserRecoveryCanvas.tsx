@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { mapControllerPointToScene, type CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { mapControllerPointToScene } from '../state/canvas-motion-plan';
 import {
   acknowledgedRecoveryMovement,
   firstRecoveryMovement,
@@ -9,28 +9,26 @@ import {
   zoomRecoveryPreview,
   type RecoveryPreviewView,
 } from './laser-recovery-picker-model';
+import type { RecoveryPreviewRoute } from './laser-recovery-preview-route';
 
 type Props = {
-  readonly plan: CanvasMotionPlan;
+  /** Null when the saved job has no positioned route to show. */
+  readonly route: RecoveryPreviewRoute | null;
   readonly ackedLines: number;
   readonly fromLine: number | undefined;
   readonly disabled: boolean;
   readonly onSelect: (line: number) => void;
 };
 
+type ViewportProps = Omit<Props, 'route'> & {
+  readonly route: RecoveryPreviewRoute;
+  readonly fit: RecoveryPreviewView;
+};
+
 export function LaserRecoveryCanvas(props: Props): JSX.Element {
-  const fit = useMemo(() => {
-    // Older archives can have a marker-only canvas plan. A missing optional
-    // preview must not prevent numeric recovery of their sealed G-code.
-    if (
-      !Array.isArray(props.plan.manifest?.blocks) ||
-      props.plan.device === undefined ||
-      props.plan.coordinateFrame === undefined
-    )
-      return null;
-    return recoveryPreviewBounds(props.plan);
-  }, [props.plan]);
-  if (fit === null || props.plan.capability === 'unavailable') {
+  const { route } = props;
+  const fit = useMemo(() => (route === null ? null : recoveryPreviewBounds(route)), [route]);
+  if (route === null || fit === null || route.capability === 'unavailable') {
     return (
       <p style={hintStyle}>
         A positioned route preview is unavailable for this saved job. Use its original G-code line
@@ -38,23 +36,23 @@ export function LaserRecoveryCanvas(props: Props): JSX.Element {
       </p>
     );
   }
-  return <RecoveryViewport {...props} fit={fit} />;
+  return <RecoveryViewport {...props} route={route} fit={fit} />;
 }
 
-function RecoveryViewport(props: Props & { readonly fit: RecoveryPreviewView }): JSX.Element {
+function RecoveryViewport(props: ViewportProps): JSX.Element {
   const [view, setView] = useState(props.fit);
   const [missed, setMissed] = useState(false);
   const ref = useRef<SVGSVGElement | null>(null);
-  const route = useMemo(() => recoveryPreviewPath(props.plan, view), [props.plan, view]);
+  const drawn = useMemo(() => recoveryPreviewPath(props.route, view), [props.route, view]);
   const preferred = useMemo(
-    () => acknowledgedRecoveryMovement(props.plan, props.ackedLines),
-    [props.plan, props.ackedLines],
+    () => acknowledgedRecoveryMovement(props.route, props.ackedLines),
+    [props.route, props.ackedLines],
   );
   const pick = (event: PointerEvent<SVGSVGElement>): void => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     const line = pickRecoveryMovement(
-      props.plan,
+      props.route,
       {
         x: view.x + ((event.clientX - rect.left) / rect.width) * view.width,
         y: view.y + ((event.clientY - rect.top) / rect.height) * view.height,
@@ -91,18 +89,18 @@ function RecoveryViewport(props: Props & { readonly fit: RecoveryPreviewView }):
         {...handlers}
       >
         <path
-          d={route.path}
+          d={drawn.path}
           fill="none"
           stroke="var(--lf-text-muted)"
           strokeWidth={1}
           vectorEffect="non-scaling-stroke"
         />
-        <SelectedRecoveryMovement plan={props.plan} fromLine={props.fromLine} view={view} />
+        <SelectedRecoveryMovement route={props.route} fromLine={props.fromLine} view={view} />
       </svg>
       <p style={hintStyle}>
         Scroll or use +/− to zoom. Drag to pan; click a burn line to select it. The circle marks the
         beam-off entry at the beginning of that movement. Clicking only selects; Start is separate.
-        {route.sampled
+        {drawn.sampled
           ? ' Overview detail is reduced for this large job; zoom in for more detail. Selection uses the complete saved route.'
           : ''}
       </p>
@@ -116,23 +114,23 @@ function RecoveryViewport(props: Props & { readonly fit: RecoveryPreviewView }):
 }
 
 function SelectedRecoveryMovement(props: {
-  readonly plan: CanvasMotionPlan;
+  readonly route: RecoveryPreviewRoute;
   readonly fromLine: number | undefined;
   readonly view: RecoveryPreviewView;
 }): JSX.Element | null {
-  const block =
-    props.fromLine === undefined ? null : firstRecoveryMovement(props.plan, props.fromLine);
-  const start = block?.points[0];
-  if (block === null || start === undefined) return null;
-  const first = mapControllerPointToScene(start, props.plan);
-  const points = block.points
+  const movement =
+    props.fromLine === undefined ? null : firstRecoveryMovement(props.route, props.fromLine);
+  const start = movement?.points[0];
+  if (movement === null || start === undefined) return null;
+  const first = mapControllerPointToScene(start, props.route);
+  const points = movement.points
     .map((point) => {
-      const scene = mapControllerPointToScene(point, props.plan);
+      const scene = mapControllerPointToScene(point, props.route);
       return `${scene.x},${scene.y}`;
     })
     .join(' ');
   return (
-    <g data-testid="selected-recovery-movement" data-raw-line={block.rawLineIndex + 1}>
+    <g data-testid="selected-recovery-movement" data-raw-line={movement.rawLine}>
       <polyline
         points={points}
         fill="none"
@@ -151,7 +149,7 @@ function SelectedRecoveryMovement(props: {
       />
       <title>
         Beam-off entry at X {first.x.toFixed(3)}, Y {first.y.toFixed(3)}; selected movement line{' '}
-        {block.rawLineIndex + 1}
+        {movement.rawLine}
       </title>
     </g>
   );

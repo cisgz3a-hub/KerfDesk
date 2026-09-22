@@ -26,8 +26,8 @@ export function SecondPassWorkbench(props: {
       onClose={model.close}
     >
       <p className="second-pass-intro">
-        Brush over the parts you want darker, then erase any spill. Preview the engraving, Frame its
-        path, and Start when you are ready.
+        Brush over the parts you want darker or cut deeper, then erase any spill. Preview the pass,
+        Frame its path, and Start when you are ready.
       </p>
       <p className="second-pass-hint">
         Saved run: {new Date(props.source.createdAtIso).toLocaleString()} ·{' '}

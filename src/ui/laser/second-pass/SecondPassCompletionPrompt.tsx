@@ -57,8 +57,8 @@ export function SecondPassCompletionPrompt(props: {
     <Dialog title="Job complete" size="sm" onClose={() => dismiss(runId)}>
       <p>Would you like to darken selected areas?</p>
       <p>
-        Paint the parts you want to engrave again, erase any spill, and adjust power for each area.
-        Keep the workpiece and work origin in their original positions.
+        Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
+        for each area. Keep the workpiece and work origin in their original positions.
       </p>
       <p>You can also open Paint a second pass later from the Machine panel.</p>
       <DialogActions>

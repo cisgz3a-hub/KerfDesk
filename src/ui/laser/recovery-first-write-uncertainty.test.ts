@@ -24,7 +24,7 @@ import {
 } from '../state/recovery/testing';
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
-import { laserRecoveryPreviewPlan } from './laser-recovery-preview-plan';
+import { laserRecoveryPreviewMapping } from './laser-recovery-preview-route';
 import { prepareStartJob } from './start-job-readiness';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareArchivedRecoverySource } from './start-job-source';
@@ -83,7 +83,7 @@ describe('recovery source and first-write authority', () => {
     const runtime = rebuildCanvasPlanForGcode(source.canvasPlan, source.gcode);
     const point = { x: 5, y: 5, z: 0 };
     expect(mapControllerPointToScene(point, runtime)).toEqual(
-      mapControllerPointToScene(point, laserRecoveryPreviewPlan(altered)),
+      mapControllerPointToScene(point, laserRecoveryPreviewMapping(altered)),
     );
     expect(runtime.device).toEqual(artifact.prepared.project.device);
   });

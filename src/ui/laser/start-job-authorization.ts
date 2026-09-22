@@ -2,6 +2,7 @@ import type { JobCheckpoint } from '../../core/recovery';
 import type { FramedRunControllerSnapshot } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
+import { laserSecondPassExecutionSignature } from '../state/recovery/laser-second-pass-lineage';
 import { checkpointStartIssue } from './start-job-checkpoint-policy';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { framedRunStartClaimIsCurrent, type FramedRunStartClaim } from './framed-run-start-claim';
@@ -81,8 +82,15 @@ function startExecutionInputsMatch(args: CurrentStartAuthorizationArgs): boolean
   if (candidate?.authorizationContext !== 'laser-second-pass') {
     return currentReplayExecutionSignature() === args.expectedExecutionSignature;
   }
-  const source = candidate.preparedStart.laserSecondPassChain?.at(-1);
-  return source !== undefined && candidate.executionSignature === args.expectedExecutionSignature;
+  // A painted pass owns immutable derived bytes, so the open canvas is not one
+  // of its inputs. Its identity is the sealed lineage: the permit's signature
+  // must still name the source run and the exact selection of its last stage.
+  const stage = candidate.preparedStart.laserSecondPassChain?.at(-1);
+  return (
+    stage !== undefined &&
+    candidate.executionSignature ===
+      laserSecondPassExecutionSignature(stage.sourceRunId, stage.selection)
+  );
 }
 
 export function controllerStartPreparationStillCurrent(

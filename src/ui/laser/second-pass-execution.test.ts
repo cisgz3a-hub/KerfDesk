@@ -17,6 +17,7 @@ import {
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { idleControllerStatusForFrameTest } from './framed-run-testing';
 import {
   captureJobReviewModels,
@@ -28,12 +29,14 @@ import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-bind
 import * as recoveryBinding from './recovery-artifact-binding';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 import {
+  CANVAS_FRAME_REPLACED_MESSAGE,
   frameLaserSecondPass,
   invalidateLaserSecondPassFrame,
   startLaserSecondPass,
 } from './second-pass-execution';
 import { createSecondPassExecutionFixture } from './second-pass-execution-testing';
 import { registerVerifiedLaserSecondPassPreparation } from './second-pass-preparation-proof';
+import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -334,6 +337,34 @@ describe('exact second-pass Frame and Start ownership', () => {
     expect(useLaserStore.getState().framedRun).toBe(successor);
     invalidateLaserSecondPassFrame(successor);
     await expect(startLaserSecondPass(successor, repository)).resolves.toBe(false);
+  });
+
+  it('tells the operator when the second-pass Frame replaces an armed canvas Frame', async () => {
+    const fixture = await sourceFixture();
+    useToastStore.setState({ toasts: [] });
+    const messages = () => useToastStore.getState().toasts.map((toast) => toast.message);
+    const first = await frameLaserSecondPass(fixture.source, fixture.prepared, fixture.selection);
+    expect(first).not.toBeNull();
+    expect(messages()).not.toContain(CANVAS_FRAME_REPLACED_MESSAGE);
+    // An ordinary canvas permit has no authorization context and is signed by
+    // the live canvas, which keeps the invalidation subscription from expiring it.
+    const ordinary = {
+      ...first,
+      candidate: {
+        ...first?.candidate,
+        authorizationContext: undefined,
+        executionSignature: currentReplayExecutionSignature(),
+      },
+    } as unknown as NonNullable<typeof first>;
+    useLaserStore.setState({ framedRun: ordinary });
+    const second = await frameLaserSecondPass(fixture.source, fixture.prepared, fixture.selection);
+    expect(second).not.toBeNull();
+    expect(useLaserStore.getState().framedRun).toBe(second);
+    expect(messages()).toContain(CANVAS_FRAME_REPLACED_MESSAGE);
+    // Its own permit is only its own: replacing it again stays quiet.
+    useToastStore.setState({ toasts: [] });
+    await frameLaserSecondPass(fixture.source, fixture.prepared, fixture.selection);
+    expect(messages()).not.toContain(CANVAS_FRAME_REPLACED_MESSAGE);
   });
 
   it('preserves transform ordering through disconnect recovery and another selected pass', async () => {
