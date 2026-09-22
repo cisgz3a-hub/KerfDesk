@@ -569,6 +569,8 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 #### Edge — preview of very large scene
 - > 120,000 path segments: warning shown above viewport: `Large scene - display simplified for performance`; the canvas renders a bounded display sample instead of walking every source point on each redraw.
+- ≥ 4,000 display segments in one object: the object is painted once into a cached bitmap and blitted on later redraws (pan, selection, snap guides, moving it or other objects); a zoom shows the bitmap scaled and repaints it exactly 150 ms after the zoom settles (ADR-346).
+- ≥ 20,000 display segments in one object: its output strokes draw as 1 px hairlines instead of 1.5 px. Display only; emitted output is unaffected (ADR-346).
 - Generated G-code and saved project geometry are unaffected — simplification is visual only.
 
 #### Raster engrave preview (image-mode layers) — ADR-028

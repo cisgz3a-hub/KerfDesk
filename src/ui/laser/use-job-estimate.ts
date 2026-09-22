@@ -36,6 +36,33 @@ import {
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
+// Two panels mount this hook (Workspace and the job action controls), and
+// each one recomputed the synchronous estimate on its own after every edit —
+// a 90k-segment trace costs ~300 ms per estimate (the duration planner emits
+// and times the whole program), so the UI thread paid that twice per edit.
+// Memoize per immutable Project identity and exact inputs so the second mount
+// reads the first one's result (ADR-346).
+const memoizedEstimates = new WeakMap<Project, Map<string, LiveJobEstimate>>();
+
+function memoizedLiveEstimate(
+  project: Project,
+  outputScope: OutputScope,
+  jobOrigin: JobOriginPlacement | undefined,
+  options: LiveJobEstimateOptions,
+): LiveJobEstimate {
+  const key = JSON.stringify({ outputScope, jobOrigin: jobOrigin ?? null, options });
+  let byKey = memoizedEstimates.get(project);
+  if (byKey === undefined) {
+    byKey = new Map();
+    memoizedEstimates.set(project, byKey);
+  }
+  const cached = byKey.get(key);
+  if (cached !== undefined) return cached;
+  const estimate = estimateLiveJob(project, outputScope, jobOrigin, options);
+  byKey.set(key, estimate);
+  return estimate;
+}
+
 type Settled = {
   readonly project: Project | null;
   readonly outputScopeKey: string;
@@ -255,7 +282,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
 function initialEstimate(inputs: EstimateInputs, asyncSnapshot: boolean): LiveJobEstimate {
   if (inputs.initialRegistration === null) return invalidPrintCutEstimate();
   if (asyncSnapshot) return { kind: 'too-large' };
-  return estimateLiveJob(inputs.project, inputs.outputScope, inputs.jobOrigin, {
+  return memoizedLiveEstimate(inputs.project, inputs.outputScope, inputs.jobOrigin, {
     ...inputs.coordinateOptions,
     ...(inputs.initialPosition === undefined ? {} : { initialPosition: inputs.initialPosition }),
   });
@@ -292,7 +319,7 @@ function recomputeEstimate(args: RecomputeEstimateArgs): void {
       ? invalidPrintCutEstimate()
       : usesSnapshot
         ? { kind: 'too-large' }
-        : estimateLiveJob(project, outputScope, jobOrigin, options),
+        : memoizedLiveEstimate(project, outputScope, jobOrigin, options),
   );
   void estimate.then((value) => {
     if (args.isCancelled()) return;

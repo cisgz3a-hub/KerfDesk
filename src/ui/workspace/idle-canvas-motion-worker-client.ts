@@ -5,6 +5,7 @@
 // cloning. Every terminal response retires its heap before releasing the lane.
 
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import { packProjectMessage } from '../packed-project-transfer';
 import { reserveWorkerMemory } from '../worker-memory-lane';
 import type { IdleCanvasMotionPlanRequest } from './idle-canvas-motion-plan';
 import type {
@@ -104,8 +105,16 @@ function startWorker(active: Pending, request: IdleCanvasMotionPlanRequest): voi
     created.onmessageerror = (): void => {
       failRequest(active, new Error('idle canvas motion worker response was not cloneable'));
     };
-    const message: IdleCanvasMotionWorkerRequest = { id: active.id, request };
-    created.postMessage(message);
+    // Dense geometry crosses as transferred buffers rather than a structured
+    // clone of the whole object graph (packed-project-transfer.ts).
+    const packed = packProjectMessage(request.project);
+    const message: IdleCanvasMotionWorkerRequest = {
+      id: active.id,
+      request:
+        packed.message === request.project ? request : { ...request, project: packed.message },
+    };
+    if (packed.transfer.length === 0) created.postMessage(message);
+    else created.postMessage(message, packed.transfer);
   } catch (error) {
     failRequest(active, error instanceof Error ? error : new Error(String(error)));
   }

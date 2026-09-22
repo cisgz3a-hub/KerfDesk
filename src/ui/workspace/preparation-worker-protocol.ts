@@ -4,7 +4,7 @@
 
 import type { PackedToolpath } from '../../core/job/packed-toolpath';
 import type { PreviewToolpath } from './preview-status';
-import type { Project } from '../../core/scene';
+import type { ProjectMessage } from '../packed-project-transfer';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
   LargeJobEstimate,
@@ -17,7 +17,8 @@ export type PreparationProjection = 'preview' | 'estimate';
 
 export type PreparationWorkerRequest = LargeJobPreparationOptions & {
   readonly id: number;
-  readonly project: Project;
+  /** A plain Project, or its geometry packed into transferred buffers (ADR-346). */
+  readonly project: ProjectMessage;
   /** Omitted preserves the full Preview API. */
   readonly projection?: PreparationProjection;
 };

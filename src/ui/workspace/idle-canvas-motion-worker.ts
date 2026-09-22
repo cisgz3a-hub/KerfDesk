@@ -6,6 +6,7 @@
 
 import { buildIdleCanvasMotionPlanFromRequest } from './idle-canvas-motion-plan';
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
+import { unpackProjectMessage } from '../packed-project-transfer';
 import {
   acceptCanvasCompilationBridgeConnection,
   runCanvasCompilationTasks,
@@ -20,16 +21,16 @@ self.onmessage = async (event: MessageEvent<IdleCanvasMotionWorkerRequest>): Pro
   const { id, request } = event.data;
   let response: IdleCanvasMotionWorkerResponse;
   try {
-    response = {
-      id,
-      kind: 'ok',
-      plan: await buildIdleCanvasMotionPlanFromRequest(request, (project, options) =>
+    // The project may have arrived as packed geometry (ADR-346).
+    const plan = await buildIdleCanvasMotionPlanFromRequest(
+      { ...request, project: unpackProjectMessage(request.project) },
+      (project, options) =>
         prepareOutputAsync(project, options, {
           jobId: `idle-canvas:${id}`,
           runCncTasks: runCanvasCompilationTasks,
         }),
-      ),
-    };
+    );
+    response = { id, kind: 'ok', plan };
   } catch (error) {
     response = {
       id,

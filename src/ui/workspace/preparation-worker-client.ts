@@ -32,6 +32,7 @@
 
 import { PackedToolpathSteps } from '../../core/job/packed-toolpath-steps';
 import type { Project } from '../../core/scene';
+import { packProjectMessage } from '../packed-project-transfer';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
   LargeJobEstimate,
@@ -427,14 +428,18 @@ function dispatchReservedRequest(): void {
   nextRequestId += 1;
   const active: ActiveRequest = { ...next, id: nextRequestId };
   activeRequest = active;
+  // Geometry crosses as transferred buffers: structured-cloning a dense
+  // trace's object graph cost ~0.5-1.2 s of UI-thread time per request.
+  const packed = packProjectMessage(active.project);
   const request: PreparationWorkerRequest = {
     id: active.id,
-    project: active.project,
+    project: packed.message,
     ...active.options,
     ...(active.projection === 'estimate' ? { projection: 'estimate' as const } : {}),
   };
   try {
-    worker.postMessage(request);
+    if (packed.transfer.length === 0) worker.postMessage(request);
+    else worker.postMessage(request, packed.transfer);
   } catch (err) {
     activeRequest = null;
     retireWorker();

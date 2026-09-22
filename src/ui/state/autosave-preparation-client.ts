@@ -1,9 +1,11 @@
 import type { Project } from '../../core/scene';
+import { packProjectMessage, type ProjectMessage } from '../packed-project-transfer';
 import { reserveWorkerMemory } from '../worker-memory-lane';
 import { prepareAutosaveRecord, type AutosavePreparation } from './autosave-record';
 
 export type AutosavePreparationRequest = {
-  readonly project: Project;
+  /** A plain Project, or its geometry packed into transferred buffers (ADR-346). */
+  readonly project: ProjectMessage;
   readonly savedAt: number;
   readonly sessionId: string;
   readonly storageKey: string;
@@ -28,8 +30,12 @@ export async function prepareAutosaveRecordOffThread(
   });
 }
 
+type LocalAutosavePreparationRequest = Omit<AutosavePreparationRequest, 'project'> & {
+  readonly project: Project;
+};
+
 function prepareWithWorker(
-  request: AutosavePreparationRequest,
+  request: LocalAutosavePreparationRequest,
   resolve: (result: AutosavePreparation) => void,
   release: () => void,
 ): void {
@@ -60,7 +66,13 @@ function prepareWithWorker(
   worker.onmessageerror = () =>
     finish(preparationFailure(new Error('Autosave worker response could not be read.')));
   try {
-    worker.postMessage(request);
+    // A dense trace's geometry is transferred as buffers instead of being
+    // structured-cloned on the canvas thread every interval (ADR-346).
+    const packed = packProjectMessage(request.project);
+    const message: AutosavePreparationRequest =
+      packed.message === request.project ? request : { ...request, project: packed.message };
+    if (packed.transfer.length === 0) worker.postMessage(message);
+    else worker.postMessage(message, packed.transfer);
   } catch (error) {
     finish(preparationFailure(error));
   }

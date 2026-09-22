@@ -1,9 +1,15 @@
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
+import type { ProjectMessage } from '../packed-project-transfer';
 import type { IdleCanvasMotionPlanRequest } from './idle-canvas-motion-plan';
+
+/** The plan request on the wire: its project may travel packed (ADR-346). */
+export type IdleCanvasMotionWireRequest = Omit<IdleCanvasMotionPlanRequest, 'project'> & {
+  readonly project: ProjectMessage;
+};
 
 export type IdleCanvasMotionWorkerRequest = {
   readonly id: number;
-  readonly request: IdleCanvasMotionPlanRequest;
+  readonly request: IdleCanvasMotionWireRequest;
 };
 
 export type IdleCanvasMotionWorkerResponse =
