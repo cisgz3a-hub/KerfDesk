@@ -73,7 +73,6 @@ export function ScanOffsetCalibrationDialog(props: {
     };
   return (
     <Dialog
-      tutorialId="scan-offset"
       onClose={props.onCancel}
       title="Scan Offset Test"
       as="form"

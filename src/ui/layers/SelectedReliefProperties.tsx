@@ -4,7 +4,6 @@
 // project with exactly one relief selected (the laser Shape Properties
 // panel is the mirror case — ADR-101 §3).
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 // Deep import: core/relief's public barrel is a ratcheted over-cap legacy
 // barrel and may only shrink; keep the established exports intact.
@@ -35,7 +34,6 @@ function ReliefHeading(): JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <h3 style={headingStyle}>Relief</h3>
-      <TutorialButton tutorialId="cnc-relief" compact label="Relief" />
     </div>
   );
 }

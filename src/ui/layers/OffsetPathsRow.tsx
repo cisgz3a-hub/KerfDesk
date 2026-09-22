@@ -4,7 +4,6 @@
 // laser-only Shape Properties gate. The result is a NEW object; the
 // sources stay (VCarve/Offsetter convention).
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
@@ -30,7 +29,6 @@ export function OffsetPathsRow(): JSX.Element | null {
     <section aria-label="Offset paths" className="lf-artwork-tool">
       <div className="lf-artwork-tool__heading">
         <h4>Offset outlines</h4>
-        <TutorialButton tutorialId="offset" compact label="Offset paths" />
       </div>
       <p className="lf-artwork-hint">Keep the original and add a larger or smaller outline.</p>
       <label className="lf-artwork-tool__field">

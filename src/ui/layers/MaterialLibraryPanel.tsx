@@ -1,4 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 import { starterLibraryEntryForProfileId } from '../../core/material-library';
 import type { Layer } from '../../core/scene';
@@ -232,7 +231,6 @@ function Header(): JSX.Element {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <h2 style={headingStyle}>Material Library</h2>
-        <TutorialButton tutorialId="materials" compact label="Material library" />
       </div>
       <SavedLibrariesButton />
     </div>

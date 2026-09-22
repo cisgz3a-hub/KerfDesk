@@ -3,7 +3,6 @@
 // plus the six list actions. History entries carry a layer scope (ADR-246),
 // so switching layers keeps undo — Ctrl+Z follows strokes across layers.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useState } from 'react';
 import { resampleBuffer } from '../../core/image-resample';
 import {
@@ -40,7 +39,6 @@ export function LayersPanel(): JSX.Element | null {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <strong style={headerStyle}>Layers</strong>
-        <TutorialButton tutorialId="image-layers" compact label="Image layers" />
       </div>
       <LayerActions
         canMoveUp={activeIndex >= 0 && activeIndex < session.layers.length - 1}

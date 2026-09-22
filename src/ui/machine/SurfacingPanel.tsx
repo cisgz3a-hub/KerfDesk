@@ -47,7 +47,6 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
 
   return (
     <RailSection
-      tutorialId="cnc-surfacing"
       label="Surface spoilboard"
       hint="Generate a serpentine facing program to flatten the spoilboard or stock top."
     >

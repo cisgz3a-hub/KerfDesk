@@ -10,7 +10,7 @@ export function UndoHistoryDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   return (
-    <Dialog tutorialId="projects" title="Undo History" size="md" onClose={props.onClose}>
+    <Dialog title="Undo History" size="md" onClose={props.onClose}>
       <div style={summaryGridStyle}>
         <HistorySummary label="Current project" value={projectSummary(props.current)} />
         <HistorySummary label="Undo history" value={availableLabel(props.undoStack.length)} />

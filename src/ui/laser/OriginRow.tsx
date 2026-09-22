@@ -1,7 +1,6 @@
 // OriginRow — Set / Reset work origin (ADR-021) + Release motors (ADR-053 P4),
 // extracted from JobControls.tsx when it hit the ADR-015 size cap.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { type JobStartMode } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -173,7 +172,6 @@ export function OriginRow(props: {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
         <span style={sectionCaptionStyle}>Origin</span>
-        <TutorialButton tutorialId="origin" compact label="Origin" />
       </div>
       <div style={actionGridStyle}>
         <SetOriginButton

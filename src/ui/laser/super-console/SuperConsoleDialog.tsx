@@ -22,7 +22,6 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
   const view = useSuperConsoleView(transcript);
   return (
     <Dialog
-      tutorialId="console"
       onClose={props.onClose}
       title="Super console"
       size="xl"

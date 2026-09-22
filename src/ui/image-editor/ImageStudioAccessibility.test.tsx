@@ -118,7 +118,7 @@ describe('Image Studio reachability', () => {
     if (last === undefined) throw new Error('Resize dialog focus controls missing');
     await act(async () => last.focus());
     await pressKey(dialog, 'Tab');
-    expect(document.activeElement).toBe(dialog.querySelector('[data-tutorial-id]'));
+    expect(document.activeElement).toBe(focusables[0]);
     await pressKey(dialog, 'Tab', true);
     expect(document.activeElement).toBe(last);
 
@@ -194,7 +194,7 @@ describe('Image Studio reachability', () => {
     if (last === undefined) throw new Error('Text dialog focus controls missing');
     last.focus();
     await pressKey(dialog, 'Tab');
-    expect(document.activeElement).toBe(dialog.querySelector('[data-tutorial-id]'));
+    expect(document.activeElement).toBe(focusables[0]);
     await pressKey(dialog, 'Tab', true);
     expect(document.activeElement).toBe(last);
 
@@ -254,7 +254,7 @@ describe('Image Studio reachability', () => {
     if (last === undefined) throw new Error('Color Picker focus controls missing');
     last.focus();
     await pressKey(dialog, 'Tab');
-    expect(document.activeElement).toBe(dialog.querySelector('[data-tutorial-id]'));
+    expect(document.activeElement).toBe(focusables[0]);
     await pressKey(dialog, 'Tab', true);
     expect(document.activeElement).toBe(last);
 

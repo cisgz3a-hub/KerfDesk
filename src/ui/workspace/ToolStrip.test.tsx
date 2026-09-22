@@ -44,23 +44,6 @@ afterEach(async () => {
 });
 
 describe('ToolStrip', () => {
-  it('teaches the selected drawing tool without changing the tool or artwork', async () => {
-    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'rect' });
-    const project = useStore.getState().project;
-    const h = await render(<ToolStrip />);
-    const lesson = h.querySelector<HTMLButtonElement>('[data-tutorial-id="rectangle"]');
-    expect(lesson?.getAttribute('aria-label')).toBe('Tutorial: Draw rectangle');
-    await act(async () => lesson?.click());
-    expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'rectangle' });
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'rect' });
-    expect(useStore.getState().project).toBe(project);
-
-    await act(async () => {
-      h.querySelector<HTMLButtonElement>('[data-help-id="tool:node"]')?.click();
-    });
-    expect(h.querySelector('[data-tutorial-id="nodes"]')).not.toBeNull();
-  });
-
   it('arms text placement directly and shows the active text tool', async () => {
     const h = await render(<ToolStrip />);
     const text = h.querySelector('button[data-help-id="tool:text"]');

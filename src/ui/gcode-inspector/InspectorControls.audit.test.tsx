@@ -8,7 +8,6 @@ import {
 } from '../image-editor/control-audit-test-support';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { useTutorialStore } from '../tutorials/tutorial-store';
 import { InspectorView } from './InspectorView';
 import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
@@ -105,8 +104,6 @@ it('ready Inspector routes every camera control, source toggle and travel/direct
   expect(scene.setDirectionArrows).toHaveBeenLastCalledWith(expect.anything());
   await clickControl(host, 'Jump the playhead to line 3');
   expect(host.textContent).toContain('Line 3');
-  await clickControl(host, 'Tutorial');
-  expect(useTutorialStore.getState().tutorialId).toBe('gcode');
 });
 
 it('all preview transport buttons dispatch their exact action and empty programs disable stepping and play', async () => {

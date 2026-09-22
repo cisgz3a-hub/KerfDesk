@@ -4,7 +4,6 @@
 
 import { useId, useRef } from 'react';
 import { Dialog } from '../kit';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import {
   useViewerDialogScene,
   type ViewerDialogSceneBuilder,
@@ -21,7 +20,6 @@ export function Viewer3DDialogShell(props: {
   readonly ariaLabel: string;
   readonly canvasAriaLabel: string;
   readonly title: string;
-  readonly tutorialId?: string;
   readonly onClose: () => void;
   // Must be referentially stable (useCallback) — it is the effect dependency.
   // Null means a background preparation task has not produced its mesh yet.
@@ -56,7 +54,6 @@ export function Viewer3DDialogShell(props: {
     >
       <div className="lf-viewer3d-dialog__header">
         <h2 className="lf-viewer3d-dialog__title">{props.title}</h2>
-        {props.tutorialId === undefined ? null : <TutorialButton tutorialId={props.tutorialId} />}
         <button type="button" onClick={props.onClose} title="Close the 3D viewer">
           Close
         </button>

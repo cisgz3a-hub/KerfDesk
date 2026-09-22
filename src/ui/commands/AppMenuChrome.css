@@ -18,6 +18,33 @@
   letter-spacing: -0.3px;
 }
 
+/* The menus and Undo / Redo are one wrapping section, so the pair follows Help
+   onto the next line when the header wraps instead of stranding on its own
+   row. The 8px gap is tighter than the chrome's 20px section gap: these read
+   as buttons beside the menus, not as a third section of the bar. */
+.lf-menu-bar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.lf-menu-history {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.lf-menu-history-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+}
+
 .lf-menu-build {
   margin-left: auto;
   color: var(--lf-text-muted);

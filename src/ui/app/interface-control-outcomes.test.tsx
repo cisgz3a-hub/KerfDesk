@@ -119,7 +119,7 @@ describe('individual shell control outcomes', () => {
     expect(host.textContent).toBe('Export closed');
   });
 
-  it('rail collapse and expand change the visible surface and retain contextual help', async () => {
+  it('rail collapse and expand change the visible surface', async () => {
     function Rail(): JSX.Element {
       const [collapsed, setCollapsed] = useState(false);
       return collapsed ? (
@@ -129,16 +129,10 @@ describe('individual shell control outcomes', () => {
           onExpand={() => setCollapsed(false)}
         />
       ) : (
-        <RailPanelHeading
-          title="Artwork"
-          tutorialId="layers"
-          onCollapse={() => setCollapsed(true)}
-        />
+        <RailPanelHeading title="Artwork" onCollapse={() => setCollapsed(true)} />
       );
     }
     await mount(<Rail />);
-    await click('Tutorial: Artwork');
-    expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: 'layers' });
     await click('Collapse Artwork panel');
     expect(host.querySelector('h2')).toBeNull();
     await click('Expand Artwork panel');

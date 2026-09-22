@@ -8,7 +8,6 @@ import { NumberField } from '../../common/NumberField';
 import { CncTilingDisclosure, cncTilingAfterEdit } from '../../machine/CncTilingDisclosure';
 import { Row, unitStyle } from '../device-settings-shared';
 import { DeviceSetupRegistrationFields } from './DeviceSetupRegistrationFields';
-import { TutorialButton } from '../../tutorials/TutorialButton';
 
 export function DeviceSetupCncTilingFields(props: {
   readonly tiling: CncTiling | undefined;
@@ -22,7 +21,6 @@ export function DeviceSetupCncTilingFields(props: {
   };
   return (
     <div style={stackStyle}>
-      <TutorialButton tutorialId="cnc-tiling" />
       <label style={checkRowStyle}>
         <input
           type="checkbox"

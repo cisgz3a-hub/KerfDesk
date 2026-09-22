@@ -5,7 +5,6 @@ import { useStore } from '../state';
 import type { ArtworkNumberingState } from '../state/artwork-run-order-ui';
 import { useUiStore } from '../state/ui-store';
 import { canvasTheme } from '../theme/canvas-theme';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { ArtworkRunOrderList } from './ArtworkRunOrderList';
 import { ArtworkRunOrderToolbar } from './ArtworkRunOrderToolbar';
 import { artworkRunOrderRows, type ArtworkRunOrderRowModel } from './artwork-run-order-view-model';
@@ -21,7 +20,6 @@ export function ArtworkRunOrderPanel(): JSX.Element {
         </span>
         <strong>Choose what runs first</strong>
         <p>Import or draw artwork, then arrange it here. Each run has a number you can change.</p>
-        <TutorialButton tutorialId="operations" label="Run order tutorial" />
       </section>
     );
   }

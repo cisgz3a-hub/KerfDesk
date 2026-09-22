@@ -1,4 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { DEFAULT_PROJECT_VARIABLE_DATA } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -19,7 +18,6 @@ export function VariableTextFields(props: {
   const firstColumn = variables.csv?.headers[0];
   return (
     <section aria-label="Variable text" style={sectionStyle}>
-      <TutorialButton tutorialId="variable-text" label="Variable text tutorial" />
       <label style={toggleStyle}>
         <input
           type="checkbox"

@@ -39,7 +39,6 @@ export function ArrayDialog(props: {
   };
   return (
     <Dialog
-      tutorialId="array"
       title="Array"
       size="sm"
       as="form"

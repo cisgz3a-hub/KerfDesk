@@ -3,7 +3,6 @@ import { createLayer, IDENTITY_TRANSFORM, type RasterImage } from '../../core/sc
 import { clickControl, control, mountControl } from '../image-editor/control-audit-test-support';
 import { Viewer3DToolbar } from '../cnc-viewer3d/Viewer3DToolbar';
 import { Viewer3DDialogShell } from '../relief-viewer/Viewer3DDialogShell';
-import { useTutorialStore } from '../tutorials/tutorial-store';
 import { ConvertToBitmapDialog } from './ConvertToBitmapDialog';
 import { AdjustImageDialog } from './AdjustImageDialog';
 
@@ -32,20 +31,17 @@ it('every CNC display mode selects its semantic mode and PNG requests export', a
   expect(save).toHaveBeenCalledTimes(1);
 });
 
-it('3D viewer lesson remains available while building and Close invokes the dialog owner', async () => {
+it('keeps Close working while the 3D viewer is still building', async () => {
   const close = vi.fn();
   const host = await mountControl(
     <Viewer3DDialogShell
       ariaLabel="Audit viewer"
       canvasAriaLabel="Audit surface"
       title="Audit"
-      tutorialId="cnc-relief"
       buildScene={null}
       onClose={close}
     />,
   );
-  await clickControl(host, 'Tutorial');
-  expect(useTutorialStore.getState().tutorialId).toBe('cnc-relief');
   await clickControl(host, 'Close');
   expect(close).toHaveBeenCalledTimes(1);
 });

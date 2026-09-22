@@ -385,12 +385,8 @@ describe('AppMenuBar', () => {
       expect(openFamilyLabels(host)).toEqual(['Tools']);
       expect(document.activeElement?.textContent).toBe('Measure');
 
-      await act(async () => {
-        document.activeElement?.dispatchEvent(
-          new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),
-        );
-      });
-      expect(document.activeElement?.getAttribute('aria-label')).toBe('Tutorial: Measure');
+      // One focus stop per command: the per-row tutorial button that used to
+      // sit between them is gone (ADR-348).
       await act(async () => {
         document.activeElement?.dispatchEvent(
           new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }),

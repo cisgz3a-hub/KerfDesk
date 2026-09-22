@@ -51,7 +51,7 @@ export function GcodeSaveDialog(props: { readonly onClose: () => void }): JSX.El
     void handleSaveGcode(ctx, options).finally(props.onClose);
   };
   return (
-    <Dialog tutorialId="gcode" title="Save G-code" onClose={props.onClose} size="sm">
+    <Dialog title="Save G-code" onClose={props.onClose} size="sm">
       <div className="lf-dialog-body">
         <p>{preparationMessage(preparation)}</p>
       </div>

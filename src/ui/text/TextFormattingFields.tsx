@@ -1,4 +1,3 @@
-import { TutorialButton } from '../tutorials/TutorialButton';
 import type { TextAlignment } from '../../core/scene';
 import { findFontEntry } from '../../core/text';
 import { FontImportButton } from './FontImportButton';
@@ -37,7 +36,6 @@ export function TextFormattingFields(props: {
         <FontImportButton importFont={fields.importFont} />
         <FontUsageHint fontKey={values.fontKey} />
       </Field>
-      <TutorialButton tutorialId="text-layout" label="Text layout tutorial" />
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={fields.setAlignment} />
       </Field>

@@ -36,7 +36,6 @@ export function Cut3DPreviewDialog(props: {
   );
   return (
     <Viewer3DDialogShell
-      tutorialId="preview"
       ariaLabel="Cut 3D preview"
       canvasAriaLabel="Cut 3D preview surface"
       title={`Cut preview — ${formatDisplayMillimetres(widthMm)} × ${formatDisplayMillimetres(heightMm)} mm stock`}

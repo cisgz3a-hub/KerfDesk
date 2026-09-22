@@ -12,7 +12,6 @@ import { useExecutionSignatureAppState } from './use-execution-signature-app-sta
 import { useFrameAction } from './use-frame-action';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
-import { TutorialButton } from '../tutorials/TutorialButton';
 
 type Props = {
   readonly disabled: boolean;
@@ -47,7 +46,6 @@ export function JobActionControls(props: Props): JSX.Element {
     return (
       <>
         <div className="lf-job-dock__status" data-ready={model.framedReady}>
-          <TutorialButton tutorialId="frame-start" compact label="Frame & Start" />
           {status}
           <span className="lf-job-dock__estimate">{estimate}</span>
         </div>

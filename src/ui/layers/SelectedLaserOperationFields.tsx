@@ -1,26 +1,12 @@
-import { captureLayerOperationSettings, type Layer, type LayerMode } from '../../core/scene';
+import { captureLayerOperationSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
 import { LayerRowSettingsFields } from './LayerRowFields';
 import { hasMixedFields, type MixedOperationFields } from './selected-operation-mixed';
 import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
-import { TutorialButton } from '../tutorials/TutorialButton';
-import { laserOperationTutorial } from './operation-tutorial';
 import { LaserProcessField } from './LaserProcessField';
 import './laser-operation-settings.css';
-
-function ProcessTutorial(props: {
-  readonly mode: LayerMode;
-  readonly mixed: boolean;
-}): JSX.Element {
-  return (
-    <TutorialButton
-      tutorialId={props.mixed ? 'operations' : laserOperationTutorial(props.mode)}
-      label="Process tutorial"
-    />
-  );
-}
 
 export function LaserOperationFields(props: {
   readonly operation: Layer;
@@ -62,9 +48,6 @@ export function LaserOperationFields(props: {
         mixed={props.mixedFields.mode === true}
         ariaLabel={`Mode for ${props.ariaContext}`}
         onChange={(mode) => commit({ mode })}
-        help={
-          <ProcessTutorial mode={props.operation.mode} mixed={props.mixedFields.mode === true} />
-        }
       />
       <LayerRowSettingsFields layer={props.operation} operationTarget={target} />
       <AirAssistField

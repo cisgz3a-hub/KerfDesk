@@ -5,7 +5,6 @@
 // controller's jog-cancel command. Bare arrow keys nudge the selected canvas
 // object and no longer jog the machine (F104); Z-focus keys stay on the pad.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { useCallback, useMemo, useState } from 'react';
 import { jogAxisSignsForOrigin, machineBoundsForDevice } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
@@ -70,7 +69,6 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
     <div className="lf-jog-panel" style={containerStyle}>
       <div className="lf-machine-section-heading">
         <span>Position the head</span>
-        <TutorialButton tutorialId="jog" compact label="Jogging" />
       </div>
       <JogSettingsRow
         disabled={disabled}

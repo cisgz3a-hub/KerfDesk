@@ -9,7 +9,6 @@
 // machineNoun keeps the hover copy machine-aware ("laser" / "router",
 // ADR-101 §7) while this component stays presentational.
 
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { assertNever } from '../../core/scene';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
@@ -40,7 +39,6 @@ export function ConnectionBar(props: Props): JSX.Element {
           disabled={disabled}
         />
         <StatusDot connection={connection} />
-        <TutorialButton tutorialId="connection" compact label="Connection" />
         {connection.kind === 'failed' && <span style={errorStyle}>Failed: {connection.error}</span>}
       </div>
       <QualificationNotice

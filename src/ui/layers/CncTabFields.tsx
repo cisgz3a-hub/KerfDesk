@@ -3,7 +3,6 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { NumberField, Row } from './CncLayerPrimitives';
 import { CncTabPositionControls } from './CncTabPositionControls';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { RailSection } from '../kit';
 
 // The collapsed summary keeps the tab state visible beside the cut essentials.
@@ -32,7 +31,6 @@ export function CncTabFields(props: {
           aria-label={`Holding tabs for ${layer.color}`}
           title="Leave small bridges on the deepest passes so cut-out parts stay attached."
         />
-        <TutorialButton tutorialId="cnc-tabs" compact label="Holding tabs" />
       </Row>
       {settings.tabsEnabled ? (
         <>

@@ -4,7 +4,6 @@
 // from FormData on Back and Next (reusing the layer cut-settings reader); identity is
 // controlled in the reducer so Back/Next preserve it.
 
-import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useReducer } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
@@ -88,7 +87,6 @@ export function MaterialPresetWizard(props: {
           <h2 className="lf-dialog-title">
             {existing === null ? 'New material' : 'Edit material'}
           </h2>
-          <TutorialButton tutorialId="materials" />
         </div>
         <p className="lf-subheading">
           Step {stepNumber(state.step)} of {WIZARD_STEPS.length} — {stepHeading(state.step)}

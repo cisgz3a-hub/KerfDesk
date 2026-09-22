@@ -29,8 +29,6 @@ import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { CncSetupReferenceFields } from './CncSetupReferenceFields';
 import { CncOperationToolFields } from './CncOperationToolFields';
-import { TutorialButton } from '../tutorials/TutorialButton';
-import { cncOperationTutorial } from './operation-tutorial';
 import './cnc-operation-settings.css';
 
 export function CncLayerFields(props: {
@@ -112,10 +110,6 @@ function CncCutDepthSection(props: {
     <section className="lf-cnc-settings-card" aria-label="Cut & depth">
       <div className="lf-cnc-settings-heading">
         <h4>Cut &amp; depth</h4>
-        <TutorialButton
-          tutorialId={cncOperationTutorial(settings.cutType)}
-          label="Cut type tutorial"
-        />
       </div>
       <Row label="Cut type">
         <select

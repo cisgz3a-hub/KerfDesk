@@ -7,7 +7,6 @@ import { Icon } from '../kit';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { TutorialButton } from '../tutorials/TutorialButton';
 import { ArtworkPanelTabs } from './ArtworkPanelTabs';
 import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
@@ -40,11 +39,7 @@ export function CutsLayersPanel(): JSX.Element {
       aria-label="Artwork / Operations panel"
       className="lf-rail lf-pane-form lf-artwork-panel"
     >
-      <RailPanelHeading
-        title="Artwork / Operations"
-        tutorialId="operations"
-        onCollapse={() => togglePanel('layers')}
-      />
+      <RailPanelHeading title="Artwork / Operations" onCollapse={() => togglePanel('layers')} />
       <MachineModeToggle />
       <ArtworkPanelTabs
         active={activeView}
@@ -92,7 +87,6 @@ function EmptyArtwork(): JSX.Element {
       <h3>Your artwork starts here</h3>
       <p>Import or draw artwork to create its first operation.</p>
       <p className="lf-artwork-hint">Then choose how to cut, engrave or carve it.</p>
-      <TutorialButton tutorialId="operations" label="See how operations work" />
     </section>
   );
 }

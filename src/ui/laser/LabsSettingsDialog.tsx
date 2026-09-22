@@ -32,7 +32,7 @@ export function LabsSettingsDialog(props: { readonly onClose: () => void }): JSX
   const setFeature = useExperimentalLaserFeatures((state) => state.setFeature);
   const resetFeatures = useExperimentalLaserFeatures((state) => state.resetFeatures);
   return (
-    <Dialog tutorialId="labs" title="Labs" size="sm" onClose={props.onClose}>
+    <Dialog title="Labs" size="sm" onClose={props.onClose}>
       <p style={noticeStyle}>
         These machine workflows are still being hardware-validated. They are off by default and
         remain subject to normal device and safety checks.
