@@ -54,9 +54,7 @@ describe('artwork control audit: cut settings', () => {
   });
 
   it.each([
-    ['fill', 'Bidirectional fill', 'fillBidirectional'],
     ['image', 'Negative image', 'negativeImage'],
-    ['image', 'Bidirectional image scan', 'imageBidirectional'],
     ['image', 'Pass-through image', 'passThrough'],
   ] as const)(
     'commits the %s %s inline toggle to the selected operation',
@@ -65,8 +63,28 @@ describe('artwork control audit: cut settings', () => {
       useStore.getState().setLayerParam(layer(1).id, { mode });
       const before = layer(1)[field];
       const host = await mount(<CutsLayersPanel />);
-      await openDisclosure(host, mode === 'fill' ? 'Fill options' : 'Image options');
+      await openDisclosure(host, 'Image options');
       await click(input(host, `input[aria-label="${label} for selected objects"]`));
+      expect(layer(1)[field]).toBe(!before);
+    },
+  );
+
+  // Scan direction is a per-job speed/quality trade-off, so it has to stay on
+  // the always-visible card. No disclosure is opened before the click, and the
+  // control must not sit inside one.
+  it.each([
+    ['fill', 'Bidirectional fill', 'fillBidirectional'],
+    ['image', 'Bidirectional image scan', 'imageBidirectional'],
+  ] as const)(
+    'exposes the %s scan-direction toggle without opening a disclosure',
+    async (mode, label, field) => {
+      arrangeTwo();
+      useStore.getState().setLayerParam(layer(1).id, { mode });
+      const before = layer(1)[field];
+      const host = await mount(<CutsLayersPanel />);
+      const checkbox = input(host, `input[aria-label="${label} for selected objects"]`);
+      expect(checkbox.closest('details')).toBeNull();
+      await click(checkbox);
       expect(layer(1)[field]).toBe(!before);
     },
   );

@@ -65,9 +65,6 @@ export function LayerImageFields(props: {
       <FieldRow label="Invert brightness">
         <NegativeImageCheckbox {...controlProps} />
       </FieldRow>
-      <FieldRow label="Scan both ways">
-        <BidirectionalImageCheckbox {...controlProps} />
-      </FieldRow>
       <FieldRow label="Use original pixels">
         <PassThroughCheckbox {...controlProps} />
       </FieldRow>
@@ -289,25 +286,6 @@ function NegativeImageCheckbox(props: {
       onChange={(event) => commit({ negativeImage: event.target.checked })}
       aria-label={`Negative image for ${labelContext}`}
       title="Invert image brightness before engraving this layer."
-    />
-  );
-}
-
-function BidirectionalImageCheckbox(props: {
-  readonly labelContext: string;
-  readonly settings: LayerOperationSettings;
-  readonly mixedFields?: MixedOperationFields;
-  readonly reconcileKey?: unknown;
-  readonly commit: (patch: Partial<LayerOperationSettings>) => void;
-}): JSX.Element {
-  const { labelContext, settings, commit } = props;
-  return (
-    <input
-      type="checkbox"
-      {...mixedCheckboxProps(settings.imageBidirectional, props.mixedFields?.imageBidirectional)}
-      onChange={(event) => commit({ imageBidirectional: event.target.checked })}
-      aria-label={`Bidirectional image scan for ${labelContext}`}
-      title="Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift."
     />
   );
 }
