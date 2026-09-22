@@ -16,6 +16,7 @@ import { isCanvasCompilationBridgeConnection } from '../workspace/canvas-compila
 import { idleControllerStatusForFrameTest } from './framed-run-testing';
 import { resetOutputPreparationWorkerForTests } from './output-preparation-worker-client';
 import { BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE } from './output-preparation-errors';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type {
   OutputPreparationEnvelope,
   OutputPreparationResponse,
@@ -43,6 +44,11 @@ class ControlledWorker {
   respond(response: OutputPreparationResponse): void {
     this.onmessage?.({
       data: { requestId: this.posted.at(-1)?.requestId, response },
+    } as MessageEvent<OutputPreparationResult>);
+  }
+  report(progress: OutputCompilationProgress): void {
+    this.onmessage?.({
+      data: { requestId: this.posted.at(-1)?.requestId, progress },
     } as MessageEvent<OutputPreparationResult>);
   }
 }
@@ -220,5 +226,30 @@ describe('Frame preparation ownership', () => {
     await expect(retry).resolves.toBe(true);
     expect(useFramePreparationStore.getState().pending).toBe(false);
     expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the owned compilation's progress and clears it with the Frame", async () => {
+    const completeFrame = installMockFrame();
+    const first = runFrameNow();
+    await vi.waitFor(() => expect(latest()?.posted).toHaveLength(1));
+    const worker = latest();
+    expect(useFramePreparationStore.getState()).toMatchObject({ pending: true, progress: null });
+    const progress: OutputCompilationProgress = {
+      phase: 'planning',
+      mode: 'parallel',
+      completed: 7,
+      active: 2,
+      queued: 22,
+      total: 31,
+    };
+    worker.report(progress);
+    expect(useFramePreparationStore.getState().progress).toEqual(progress);
+    await finishCompilation(worker);
+    completeFrame();
+    await expect(first).resolves.toBe(true);
+    expect(useFramePreparationStore.getState()).toEqual({ pending: false, progress: null });
+    // Nothing owns a Frame now, so a late report has no control to describe.
+    worker.report(progress);
+    expect(useFramePreparationStore.getState().progress).toBeNull();
   });
 });

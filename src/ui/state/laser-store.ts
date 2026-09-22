@@ -21,6 +21,7 @@ import type { MachineKind } from '../../core/scene';
 import type { SerialConnection, SerialPortIdentity } from '../../platform/types';
 import { autofocusActions } from './laser-autofocus-actions';
 import { consoleActions } from './laser-console-actions';
+import { statusRequestActions } from './laser-status-request';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import type { ControllerBuildInfoState } from './laser-controller-build-info';
@@ -484,6 +485,9 @@ export const useLaserStore = create<LaserState>((set, get) => {
     ...settingsActions,
     retryControllerQualification: settingsActions.readMachineSettings,
     ...consoleActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...statusRequestActions(get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
     ),
     ...controllerRecoveryActions(

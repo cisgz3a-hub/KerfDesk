@@ -74,6 +74,9 @@ import {
 export async function runStartJobFlow(
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
+  // Start with no permit prepares and Frames the job, so a repeat press joins
+  // that one preparation through runFrameNow. A permitted Start keeps its own
+  // single-owner permit claim (start-job-authorization) and is not coalesced.
   await runFreshFramedJobFlow(repository);
 }
 

@@ -48,6 +48,9 @@ export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNorm
   const queueIssue = await frameControllerQueueIssue();
   if (queueIssue !== null) return normalizationFailure([queueIssue], warning);
   const afterSelectionSequence = useLaserStore.getState().statusSequence;
+  // Ask for the post-G54 report now. Waiting for the periodic poll instead
+  // cost up to a full idle-poll period (~1 s) on every Frame that selected G54.
+  void useLaserStore.getState().requestControllerStatus();
   if (!(await waitForFreshIdleFramePosition(afterSelectionSequence))) {
     return normalizationFailure(
       [

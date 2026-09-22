@@ -40,6 +40,7 @@ import {
   ownCurrentStartPreparation,
   STALE_START_PREPARATION_MESSAGE,
 } from './start-preparation-owner';
+import { publishFramePreparationProgress } from '../state/frame-preparation-store';
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -142,7 +143,7 @@ async function prepareCurrentStartInBackground(args: {
             }
           : {}),
       },
-      undefined,
+      publishFramePreparationProgress,
       owner.signal,
     );
     if (background === null) {
