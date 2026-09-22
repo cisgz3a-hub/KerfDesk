@@ -1,5 +1,4 @@
 import { rotaryAppliesTo } from '../../core/job';
-import type { MotionPoint } from '../../core/job/motion-manifest';
 import { reportedWorkPositionMm, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { ExecutionArtifactV1 } from '../state/recovery';
 import {
