@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
 import { recoveryRepository, type RecoveryRepository } from '../../state/recovery';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
 import { useRecoveryRepositorySnapshot } from '../../state/use-recovery-repository';
@@ -16,8 +17,16 @@ export function SecondPassControl(props: {
     .filter((record) => record.terminalKind === 'completed')
     .slice()
     .reverse();
-  const runId = selectedCompletedRun(records, selected, snapshot.lastCompletedReceipt?.runId);
+  const latest = snapshot.lastCompletedReceipt;
+  const runId = selectedCompletedRun(records, selected, latest?.runId);
   if (props.machineKind !== 'laser' || !runId) return null;
+  // Only the latest completion carries its program's controller family here;
+  // an older selection is checked when its archive opens.
+  const unsupported =
+    latest != null &&
+    runId === latest.runId &&
+    !laserSecondPassSupportsController(latest.artifact.prepared.project.device.controllerKind);
+  if (unsupported && records.length <= 1) return null;
   return (
     <div style={{ display: 'grid', gap: 6 }}>
       {records.length > 1 ? (
@@ -40,14 +49,21 @@ export function SecondPassControl(props: {
           </select>
         </label>
       ) : null}
-      <button
-        className="lf-btn lf-btn--sm"
-        title="Open the saved engraving to paint or erase areas for another pass."
-        disabled={props.busy}
-        onClick={() => openEditor(runId)}
-      >
-        Paint a second pass…
-      </button>
+      {unsupported ? (
+        <p style={{ margin: 0, fontSize: 11, color: 'var(--lf-text-muted)' }} role="note">
+          Painted second passes support jobs generated for GRBL, grblHAL and FluidNC. Choose another
+          completed job.
+        </p>
+      ) : (
+        <button
+          className="lf-btn lf-btn--sm"
+          title="Open the saved engraving to paint or erase areas for another pass."
+          disabled={props.busy}
+          onClick={() => openEditor(runId)}
+        >
+          Paint a second pass…
+        </button>
+      )}
     </div>
   );
 }

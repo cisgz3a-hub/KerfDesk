@@ -98,6 +98,16 @@ function button(label: string): HTMLButtonElement {
   return value;
 }
 
+/** The archive read settles outside React's act scope, so poll for the editor. */
+async function expectOpenedSource(runId: string): Promise<void> {
+  const opened = () => host.querySelector('[data-testid="opened-source"]')?.textContent;
+  const deadline = Date.now() + 2000;
+  while (opened() !== runId && Date.now() < deadline) {
+    await act(async () => new Promise<void>((resolve) => setTimeout(resolve, 5)));
+  }
+  expect(opened()).toBe(runId);
+}
+
 describe('completed-job second pass offer', () => {
   it('does not prompt for hydrated history, but opens once for a newly completed laser run', async () => {
     await complete('saved');
@@ -123,7 +133,7 @@ describe('completed-job second pass offer', () => {
     });
     expect(host.textContent).toContain('Would you like to darken selected areas?');
     await act(async () => button('Darken selected areas…').click());
-    expect(host.querySelector('[data-testid="opened-source"]')?.textContent).toBe('newer');
+    await expectOpenedSource('newer');
     expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1);
     expect(useUiStore.getState().modalDepth).toBe(1);
   });
@@ -196,10 +206,10 @@ describe('completed-job second pass offer', () => {
     });
     await offer('new');
     await act(async () => button('Darken selected areas…').click());
-    expect(host.querySelector('[data-testid="opened-source"]')?.textContent).toBe('new');
+    await expectOpenedSource('new');
     await act(async () => button('Close editor').click());
     await act(async () => button('Paint a second pass…').click());
-    expect(host.querySelector('[data-testid="opened-source"]')?.textContent).toBe('old');
+    await expectOpenedSource('old');
   });
 
   it('keeps an opened editor mounted when the Machine rail is collapsed', async () => {
@@ -207,7 +217,7 @@ describe('completed-job second pass offer', () => {
     await render(true);
     await act(async () => button('Paint a second pass…').click());
     await render(false);
-    expect(host.querySelector('[data-testid="opened-source"]')?.textContent).toBe('saved');
+    await expectOpenedSource('saved');
   });
 
   it('cancels an archive opening on close and ignores its late result', async () => {
@@ -261,7 +271,7 @@ describe('completed-job second pass offer', () => {
           await offer('saved');
           await act(async () => button('Darken selected areas…').click());
         } else await act(async () => button('Paint a second pass…').click());
-        expect(host.querySelector('[data-testid="opened-source"]')).not.toBeNull();
+        await expectOpenedSource('saved');
         await act(async () => button('Close editor').click());
         expect(document.activeElement).toBe(opener);
       } finally {
@@ -287,5 +297,36 @@ describe('completed-job second pass offer', () => {
     await act(async () => resolve({ ok: true, value: artifact }));
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(useLaserSecondPassUiStore.getState().editorRequest).toBeNull();
+  });
+});
+
+describe('controller families the transformer cannot read', () => {
+  function marlinProject(): Project {
+    const base = createProject();
+    return { ...base, device: { ...base.device, controllerKind: 'marlin', maxPowerS: 255 } };
+  }
+
+  it('withholds the darkening offer and the rail entry for a completed Marlin run', async () => {
+    await complete('marlin', marlinProject());
+    await render(true);
+    await offer('marlin');
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(useLaserSecondPassUiStore.getState().completionRunId).toBeNull();
+    expect(host.textContent).not.toContain('Paint a second pass…');
+  });
+
+  it('keeps older completed jobs reachable when only the latest run is unsupported', async () => {
+    await complete('grbl');
+    await complete('marlin', marlinProject());
+    await render(true);
+    expect(host.textContent).toContain('support jobs generated for GRBL, grblHAL and FluidNC');
+    const select = host.querySelector('select');
+    if (select === null) throw new Error('Expected the completed-job selector.');
+    await act(async () => {
+      select.value = 'grbl';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => button('Paint a second pass…').click());
+    await expectOpenedSource('grbl');
   });
 });

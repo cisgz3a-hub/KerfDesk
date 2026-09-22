@@ -1,5 +1,6 @@
 import { iterateLines } from '../util';
 import { readSourceBlock, type SourceBlock } from './source-block';
+import { detectLaserSourceFamily, unsupportedLaserSourceMessage } from './source-family';
 import type {
   LaserSecondPassPoint,
   LaserSecondPassSegment,
@@ -164,7 +165,13 @@ function beginSweepIfNeeded(
   const darkTurn = turns && !state.rapid && power === 0;
   if (state.breakGroup || darkTurn || (state.afterDarkTurn && turns)) {
     state.group += 1;
-    state.entry = state.lastTravel;
+    // No travel precedes the first sweep. When the program's own opening move
+    // is a controlled laser-off feed move, position the derived pass the same
+    // way instead of introducing a rapid into a program that has none.
+    state.entry =
+      state.group === 1 && !state.rapid && power === 0
+        ? { rapid: false, feed: state.feed }
+        : state.lastTravel;
     state.breakGroup = false;
   }
   if (direction !== null) {
@@ -225,6 +232,10 @@ export function visitLaserSecondPassSource(
   initial: LaserSecondPassPoint | undefined,
   visit: (segment: SourceSegment) => void,
 ): void {
+  // Native Marlin and Smoothieware programs would otherwise fail on their first
+  // prelude line; name the controller instead of reporting an unreadable word.
+  const unsupported = unsupportedLaserSourceMessage(detectLaserSourceFamily(sourceGcode));
+  if (unsupported !== null) throw new Error(unsupported);
   const state = initialState(initial);
   let lineNumber = 0;
   for (const line of iterateLines(sourceGcode)) {
