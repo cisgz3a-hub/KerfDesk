@@ -7,7 +7,7 @@ import type { AppCommand } from '../commands/command-types';
 import { Dialog } from '../kit/Dialog';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
-import { findTutorial, TUTORIALS } from './tutorial-catalog';
+import { findTutorial } from './tutorial-catalog';
 import { readTutorialProgress } from './tutorial-progress';
 import { useTutorialStore } from './tutorial-store';
 import { TutorialButton } from './TutorialButton';
@@ -66,12 +66,17 @@ async function search(value: string): Promise<void> {
   });
 }
 
-async function selectMachine(value: string): Promise<void> {
-  const select = element<HTMLSelectElement>('select[title="Filter tutorials by machine type"]');
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+function topic(category: string): HTMLDetailsElement {
+  const result = [...document.querySelectorAll<HTMLDetailsElement>('.lf-learn-topic')].find(
+    (item) => item.querySelector('summary')?.textContent?.includes(category),
+  );
+  if (result === undefined) throw new Error(`Missing tutorial topic: ${category}`);
+  return result;
+}
+
+async function expandTopic(category: string): Promise<void> {
+  const section = topic(category);
+  if (!section.open) await click(element('summary', section));
 }
 
 async function escape(): Promise<void> {
@@ -84,9 +89,11 @@ async function escape(): Promise<void> {
 
 function expectStep(id: string, index: number): void {
   const tutorial = lesson(id);
-  expect(element('.lf-learn-lesson-heading h1').textContent).toBe(tutorial.title);
+  expect(element('h1.lf-learn-lesson-heading').textContent).toBe(tutorial.title);
   expect(element('.lf-learn-step-detail h2').textContent).toBe(tutorial.steps[index]?.title);
-  expect(element('[aria-current="step"]').textContent).toContain(tutorial.steps[index]?.title);
+  expect(element('.lf-learn-step-count').textContent).toBe(
+    `Step ${index + 1} of ${tutorial.steps.length}`,
+  );
 }
 
 beforeEach(() => {
@@ -104,12 +111,12 @@ afterEach(async () => {
   root = null;
   vi.restoreAllMocks();
   localStorage.clear();
-  useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useTutorialStore.setState({ isOpen: false, tutorialId: null, trail: [] });
   useUiStore.setState({ modalDepth: 0, toolMode: { kind: 'select' } });
 });
 
 describe('TutorialHost learning flow', () => {
-  it('opens the contextual lesson, navigates, restarts and records completion in the library', async () => {
+  it('guides the reader through the lesson and returns to work when Done is pressed', async () => {
     await render(
       <>
         <TutorialButton tutorialId="rectangle" />
@@ -126,37 +133,27 @@ describe('TutorialHost learning flow', () => {
     expect(document.activeElement).toBe(element('.lf-learn-step-detail h2'));
     await click(button('Read the previous step'));
     expectStep('rectangle', 0);
-    await click(button('Read the next step'));
-    await click(button('Restart from step one'));
-    expectStep('rectangle', 0);
 
     const tutorial = lesson('rectangle');
     for (let step = 1; step < tutorial.steps.length; step += 1) {
       await click(button('Read the next step'));
       expectStep('rectangle', step);
     }
-    await click(button('Mark this lesson complete on this device'));
-    expect(button('Mark this lesson complete on this device').disabled).toBe(true);
-    expect(element('.lf-learn-done[role="status"]').textContent).toContain('Lesson complete');
+    expect(document.querySelector('button[title="Read the next step"]')).toBeNull();
+    const done = button('Finish tutorial and return to your work');
+    expect(done.textContent).toBe('Done');
+    await click(done);
+    expect(document.querySelector('.lf-learn')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+    expect(useUiStore.getState().modalDepth).toBe(0);
     expect(readTutorialProgress()['rectangle']).toEqual({
       step: tutorial.steps.length - 1,
       completed: true,
     });
 
-    await escape();
-    expect(document.querySelector('.lf-learn-library')).not.toBeNull();
-    await escape();
-    expect(document.querySelector('.lf-learn')).toBeNull();
     await click(opener);
-    expectStep('rectangle', tutorial.steps.length - 1);
-    await click(button('Return to the tutorial library (Escape)'));
-    const card = button(`Open tutorial: ${tutorial.title}`);
-    expect(card.querySelector('.lf-learn-completed')?.textContent).toContain('Completed');
-    expect(element('.lf-learn-progress-count').textContent).toContain('1 of');
-    await click(card);
-    await click(button('Restart from step one'));
     expectStep('rectangle', 0);
-    expect(readTutorialProgress()['rectangle']).toEqual({ step: 0, completed: true });
+    expect(button('Read the previous step').disabled).toBe(true);
   });
 
   it('resumes saved progress after closing and safely clamps a saved step from an older lesson', async () => {
@@ -191,7 +188,7 @@ describe('TutorialHost learning flow', () => {
     expectStep('rectangle', lesson('rectangle').steps.length - 1);
   });
 
-  it('combines search, category and machine filters and resets all three after no results', async () => {
+  it('keeps topics folded until needed and searches across both machine types', async () => {
     await render(
       <>
         <TutorialButton />
@@ -201,39 +198,126 @@ describe('TutorialHost learning flow', () => {
     await click(element('[data-tutorial-id="library"]'));
     const cnc = lesson('cnc-vcarve');
     const laser = lesson('laser-cut');
-    expect(document.querySelector(`button[title="Open tutorial: ${cnc.title}"]`)).toBeNull();
-    expect(button(`Open tutorial: ${laser.title}`)).toBeDefined();
-
-    await click(button('Show cnc tutorials'));
-    expect(element<HTMLSelectElement>('select').value).toBe('cnc');
-    expect(button(`Open tutorial: ${cnc.title}`)).toBeDefined();
-    await selectMachine('laser');
-    expect(button('Show all tutorials').getAttribute('aria-pressed')).toBe('true');
-    expect(button(`Open tutorial: ${laser.title}`)).toBeDefined();
-    expect(document.querySelector(`button[title="Open tutorial: ${cnc.title}"]`)).toBeNull();
-
-    await selectMachine('cnc');
-    expect(button(`Open tutorial: ${cnc.title}`)).toBeDefined();
-    expect(document.querySelector(`button[title="Open tutorial: ${laser.title}"]`)).toBeNull();
-    await click(button('Show cnc tutorials'));
-    expect(button('Show cnc tutorials').getAttribute('aria-pressed')).toBe('true');
-    for (const card of document.querySelectorAll('.lf-learn-card-meta')) {
-      expect(card.firstElementChild?.textContent).toBe('CNC');
+    expect(button(`Open tutorial: ${lesson('first-project').title}`)).toBeDefined();
+    expect(document.querySelectorAll('.lf-learn-topic').length).toBeGreaterThan(0);
+    for (const section of document.querySelectorAll<HTMLDetailsElement>('.lf-learn-topic')) {
+      expect(section.open).toBe(false);
+      expect(section.querySelector('.lf-learn-lesson-link')).toBeNull();
     }
+    expect(document.querySelector(`button[title="Open tutorial: ${cnc.title}"]`)).toBeNull();
+    expect(document.querySelector(`button[title="Open tutorial: ${laser.title}"]`)).toBeNull();
+
+    await expandTopic(cnc.category);
+    expect(button(`Open tutorial: ${cnc.title}`)).toBeDefined();
+    await click(element('summary', topic(cnc.category)));
+    expect(topic(cnc.category).querySelector('.lf-learn-lesson-link')).toBeNull();
+
     await search(cnc.title);
     expect(button(`Open tutorial: ${cnc.title}`)).toBeDefined();
-    expect(document.querySelectorAll('.lf-learn-card')).toHaveLength(1);
-    await search('no-such-tool-7391');
-    expect(element('.lf-learn-empty h3').textContent).toBe('No matching lessons');
-    expect(document.querySelectorAll('.lf-learn-card')).toHaveLength(0);
-
-    await click(button('Clear search and all tutorial filters'));
-    expect(element<HTMLInputElement>('input[type="search"]').value).toBe('');
-    expect(element<HTMLSelectElement>('select').value).toBe('all');
-    expect(button('Show all tutorials').getAttribute('aria-pressed')).toBe('true');
-    expect(document.querySelectorAll('.lf-learn-card')).toHaveLength(TUTORIALS.length);
+    await search(laser.title);
     expect(button(`Open tutorial: ${laser.title}`)).toBeDefined();
+    await search('no-such-tool-7391');
+    expect(element('.lf-learn-empty h2').textContent).toBe('No matching tutorials');
+    expect(document.querySelectorAll('.lf-learn-lesson-link')).toHaveLength(0);
+
+    await click(button('Clear tutorial search'));
+    expect(element<HTMLInputElement>('input[type="search"]').value).toBe('');
+    expect(button(`Open tutorial: ${lesson('first-project').title}`)).toBeDefined();
+    expect(document.querySelector('.lf-learn-empty')).toBeNull();
+  });
+
+  it('returns to the same topic or search after reading a lesson', async () => {
+    await render(
+      <>
+        <TutorialButton />
+        <TutorialHost />
+      </>,
+    );
+    await click(element('[data-tutorial-id="library"]'));
+    const rectangle = lesson('rectangle');
+    await expandTopic(rectangle.category);
+    await click(button(`Open tutorial: ${rectangle.title}`));
+    expectStep('rectangle', 0);
+    await click(button('Return to the tutorial library'));
+    expect(topic(rectangle.category).open).toBe(true);
+    expect(button(`Open tutorial: ${rectangle.title}`)).toBeDefined();
+
+    const cnc = lesson('cnc-vcarve');
+    await search(cnc.title);
+    await click(button(`Open tutorial: ${cnc.title}`));
+    expectStep('cnc-vcarve', 0);
+    await click(button('Return to the tutorial library'));
+    expect(element<HTMLInputElement>('input[type="search"]').value).toBe(cnc.title);
     expect(button(`Open tutorial: ${cnc.title}`)).toBeDefined();
+    await search('');
+    expect(topic(rectangle.category).open).toBe(true);
+  });
+
+  it('keeps topics reachable before keyboard focus wraps within the library', async () => {
+    await render(
+      <>
+        <TutorialButton />
+        <TutorialHost />
+      </>,
+    );
+    await click(element('[data-tutorial-id="library"]'));
+    const dialog = element('.lf-learn-backdrop');
+    const markVisible = (): void => {
+      // jsdom has no layout; expose the controls that this library visibly renders.
+      for (const control of dialog.querySelectorAll('button, input, summary')) {
+        Object.defineProperty(control, 'offsetParent', { configurable: true, value: dialog });
+      }
+    };
+    const pressTab = async (control: HTMLElement, shiftKey = false): Promise<KeyboardEvent> => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => {
+        control.focus();
+        control.dispatchEvent(event);
+      });
+      return event;
+    };
+    markVisible();
+
+    // Tab's native movement is not simulated by jsdom. It must remain unblocked
+    // here so the browser can reach the topic summaries after the starter button.
+    const starter = button(`Open tutorial: ${lesson('first-project').title}`);
+    expect((await pressTab(starter)).defaultPrevented).toBe(false);
+
+    const lastTopic = element('.lf-learn-topic:last-child > summary');
+    const close = button('Close tutorials and return to your work');
+    expect((await pressTab(lastTopic)).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(close);
+    expect((await pressTab(close, true)).defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(lastTopic);
+
+    const category = lesson('rectangle').category;
+    await expandTopic(category);
+    markVisible();
+    const lastLesson = element('.lf-learn-lessons li:last-child button', topic(category));
+    expect((await pressTab(lastLesson)).defaultPrevented).toBe(false);
+  });
+
+  it('keeps extra help folded until the reader asks for it', async () => {
+    await render(
+      <>
+        <TutorialButton tutorialId="rectangle" />
+        <TutorialHost />
+      </>,
+    );
+    await click(element('[data-tutorial-id="rectangle"]'));
+    const notes = element<HTMLDetailsElement>('details.lf-learn-notes');
+    const summary = element('summary', notes);
+    expect(summary.textContent).toBe('More help');
+    expect(notes.open).toBe(false);
+    await click(summary);
+    expect(notes.open).toBe(true);
+    expect(notes.textContent).toContain(lesson('rectangle').tip);
+    expectStep('rectangle', 0);
   });
 
   it('keeps a nested dialog draft and project intact and restores its tutorial opener on Escape', async () => {
@@ -258,9 +342,8 @@ describe('TutorialHost learning flow', () => {
     expect(useUiStore.getState().modalDepth).toBe(2);
     expect(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).toHaveLength(2);
     await click(button('Read the next step'));
-    await click(button('Show the result illustration'));
-    expect(button('Show the result illustration').getAttribute('aria-pressed')).toBe('true');
-    await click(button('Return to the tutorial library (Escape)'));
+    await click(button('Return to the tutorial library'));
+    await expandTopic(lesson('text').category);
     await click(button(`Open tutorial: ${lesson('text').title}`));
     expect(useUiStore.getState().modalDepth).toBe(2);
     await escape();

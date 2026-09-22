@@ -1,5 +1,22 @@
 # Visual tutorial verification
 
+## Simplified reader (22 September 2026)
+
+Implemented in `codex/simplify-tutorials-20260922`, initially based on main `692c6f1be` and integrated with `4f1a33bc3`, in `D:/LaserForge/simplify-tutorials-20260922`. The primary checkout's unrelated work was preserved. This section supersedes the earlier browser checks for removed filters, playback, restart, related links and completion counters; the sections below retain the original implementation evidence.
+
+- **79 unique tests across seven focused suites passed**, combining the tutorial catalog, progress, image assets, reader flows, image loading/fallback, PWA image delivery and Cut Settings draft preservation. The final reader suite includes a regression for reaching folded topics through the modal's keyboard focus trap. The catalog renderer was rerun after correcting the beginner illustrations.
+- Tutorial-source ESLint, Prettier, diff checks, the file-size backstop, public-export ratchet and ADR numbering passed. The soft-size report remains informational.
+- `pnpm build:web` passed, including TypeScript checking and production/PWA bundling. It reported chunk-size advisories for the larger application bundles.
+- Browser checks at `http://127.0.0.1:5287/` covered the library and reader at 1280 × 720 and 390 × 844. The phone reader had no horizontal overflow; Back/Next remained visible below the scrollable content. More help opens deliberately and closes when the step changes.
+- Keyboard checks confirmed Tab reaches the first topic from the starter lesson, Enter expands a topic, and Tab/Shift+Tab wrap between Close and the last topic. Done restored focus to the original Learn button. Search was preserved on returning from a lesson, including the previously expanded topic when search was cleared.
+- The registration picture loaded in the real reader, the first-project image matches drawing a rectangle, and no browser JavaScript errors were observed. Tests cover automatic diagram fallback and retry on a later step or reopening.
+
+After integration with current main, **189 tests across ten focused suites passed**. These include all 93 lessons through search and contextual entry, every forward/backward step, completion, reopening, focus restoration, project/history isolation, image fallback, content fidelity and delivery. The simpler reader preserves arrow-key stepping and one-level Escape navigation. A browser check confirmed ArrowRight advances the written step, Escape returns to the library, and a second Escape closes the dialog and restores focus to Learn. Lesson copy now uses the current Settings → Artwork and Operation tabs.
+
+These are local verification results. No deployment or machine operation is claimed here.
+
+## Original implementation (19 September 2026)
+
 Implementation: `codex/visual-tutorials-20260919`, initially based on main `7d4b82812f4ee059edb6f077b8ec6870d06356e2`, refreshed through main `f16e0feadbbe9c3c35a2c26871e051f985ff2f64`. Checked locally on Windows with Chrome on 19 September 2026. No deployment or machine operation was performed during these local checks.
 
 ## Integration review

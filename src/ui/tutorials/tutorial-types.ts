@@ -14,6 +14,9 @@ export type TutorialMachine = 'all' | 'laser' | 'cnc';
 /** Small, local illustrations. They never read or modify the working project. */
 export type TutorialVisual =
   | 'workspace'
+  | 'workspace-basics'
+  | 'project-file'
+  | 'project-notes'
   | 'import'
   | 'select'
   | 'nodes'

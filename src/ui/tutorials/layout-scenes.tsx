@@ -11,6 +11,7 @@ export function ArrangeScene({
   phase,
   kind,
 }: SceneProps & { readonly kind: 'align' | 'distribute' | 'array' | 'nest' }): JSX.Element {
+  if (kind === 'align' && phase === 2) return <CenteredArtworkScene />;
   const layouts = arrangementPositions(phase);
   const referenceIndex = kind === 'align' ? 2 : 0;
   return (
@@ -59,6 +60,34 @@ export function ArrangeScene({
               array: 'Repeat with controlled spacing',
               nest: 'Pack within the available area',
             }[kind]}
+      </Label>
+    </g>
+  );
+}
+
+function CenteredArtworkScene(): JSX.Element {
+  return (
+    <g>
+      <rect
+        x="150"
+        y="65"
+        width="220"
+        height="140"
+        rx="3"
+        fill={TEAL_LIGHT}
+        stroke={TEAL}
+        strokeWidth="2"
+      />
+      <path d="M260 46V224M131 135H389" stroke={MUTED} strokeDasharray="5 4" />
+      <rect x="215" y="107.5" width="90" height="55" rx="3" fill={TEAL} />
+      <text x="260" y="140" textAnchor="middle" fontSize="14" fill="white">
+        Design
+      </text>
+      <Label x={260} y={36}>
+        Reference shape
+      </Label>
+      <Label x={260} y={251}>
+        Both centres line up
       </Label>
     </g>
   );

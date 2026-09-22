@@ -15,6 +15,7 @@ import { VariableTextScene } from './variable-text-scenes';
 import { BoxFitScene, CncInlayScene, CncTilingScene } from './production-example-scenes';
 import { IntervalTestScene, ProbeScene, ScanOffsetScene } from './calibration-scenes';
 import { CameraScene, ImageScene } from './image-scenes';
+import { ProjectFileScene, ProjectNotesScene, WorkspaceBasicsScene } from './project-scenes';
 import {
   CutScene,
   DrillScene,
@@ -39,6 +40,9 @@ import type { TutorialVisual } from './tutorial-types';
 
 const SCENES: Record<TutorialVisual, (props: SceneProps) => JSX.Element> = {
   workspace: WorkspaceScene,
+  'workspace-basics': WorkspaceBasicsScene,
+  'project-file': ProjectFileScene,
+  'project-notes': ProjectNotesScene,
   import: ImportScene,
   select: SelectScene,
   nodes: NodeScene,

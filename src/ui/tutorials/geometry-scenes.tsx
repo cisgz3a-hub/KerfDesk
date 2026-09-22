@@ -36,7 +36,7 @@ export function ShapeScene({
         <path d="M256 143 200 86" stroke={MUTED} />
       </g>
     ),
-    polygon: <polygon points="255,54 361,110 336,204 174,204 150,110" {...attrs} />,
+    polygon: <polygon points="151,133 203,58 307,58 359,133 307,208 203,208" {...attrs} />,
     star: <polygon points={STAR} transform="translate(255 133) scale(1.5)" {...attrs} />,
     line: <path d="M130 195 375 75" fill="none" stroke={TEAL} strokeWidth="4" />,
     polyline: (
@@ -103,18 +103,18 @@ export function SelectScene({ phase }: SceneProps): JSX.Element {
             ? 'translate(94 73)'
             : phase === 1
               ? 'translate(212 90)'
-              : 'translate(247 74) rotate(12 75 55)'
+              : 'translate(247 62) rotate(12 78 63)'
         }
       >
         <rect
-          width={phase === 2 ? 150 : 130}
-          height="105"
+          width={phase === 2 ? 156 : 130}
+          height={phase === 2 ? 126 : 105}
           rx="3"
           fill={TEAL_LIGHT}
           stroke={TEAL}
           strokeWidth="2"
         />
-        <Handles x={-5} y={-5} w={phase === 2 ? 160 : 140} h={115} />
+        <Handles x={-5} y={-5} w={phase === 2 ? 166 : 140} h={phase === 2 ? 136 : 115} />
       </g>
       {phase > 0 ? <Arrow x={148} y={215} width={172} /> : null}
       <Pointer x={phase === 0 ? 165 : 335} y={phase === 0 ? 122 : 163} />

@@ -4,7 +4,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'first-project',
     title: 'Make your first project',
-    summary: 'Follow the route from artwork to a saved, previewed job.',
+    summary: 'Draw a shape, check the preview and save your project.',
     category: 'Getting started',
     machine: 'all',
     minutes: 4,
@@ -13,73 +13,74 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
     visual: 'workspace',
     steps: [
       {
-        title: 'Add something simple',
+        title: 'Draw a shape',
         instruction:
-          'Start a new project. Use the rectangle tool to draw a small shape, or use Import to bring in an existing design.',
-        focus: 'Draw or Import',
-        result: 'The canvas contains the artwork you want to make.',
-        visual: 'import',
+          'Choose File → New. Choose Draw rectangle on the left toolbar. Drag on the canvas to draw a small rectangle.',
+        focus: 'Draw rectangle',
+        result: 'Your rectangle appears on the canvas.',
+        visual: 'rectangle',
+        examplePhase: 2,
       },
       {
-        title: 'Set its size and purpose',
+        title: 'Set the size and operation',
         instruction:
-          'Select the artwork and enter its dimensions. In Artwork / Operations → Settings, choose what the machine should do, such as a laser Line or a CNC Profile.',
+          'Select the rectangle. In Settings → Artwork, set its size. Open Operation and choose a laser Line or CNC Profile.',
         focus: 'Artwork and operation',
-        result: 'The geometry and its manufacturing operation are both defined.',
+        result: 'The shape has a size and an operation.',
         visual: 'layers',
       },
       {
-        title: 'Inspect the output',
+        title: 'Check the preview',
         instruction:
-          'Open Preview. Check the size, position, paths and enabled output. Follow the relevant operation tutorial to refine its settings.',
+          'Open Preview. Check the size, position and paths. Check that only the artwork you want is included.',
         focus: 'Preview',
-        result: 'You can compare the planned output with the design before connecting or running.',
+        result: 'You can check the planned paths.',
         visual: 'preview',
       },
       {
         title: 'Save your work',
         instruction:
-          'Use File → Save As to save the editable project. Continue with Machine setup and Frame and Start when you are ready to prepare a physical run.',
+          'Choose File → Save As. Give the project a name and save it. Read Machine setup and Frame and Start before preparing a physical run.',
         focus: 'Save As',
-        result: 'Your artwork and project settings are available for a later session.',
-        visual: 'library',
+        result: 'You can reopen and edit your project later.',
+        visual: 'project-file',
       },
     ],
-    tip: 'You can learn drawing, editing and previewing without a connected machine. Tutorial illustrations are examples, not material settings.',
+    tip: 'You can draw and use Preview without a connected machine. Tutorial pictures are examples, not material settings.',
     keywords: ['beginner', 'first', 'start', 'new', 'workflow'],
     related: ['import', 'operations', 'preview', 'frame-start'],
   },
   {
     id: 'projects',
     title: 'Open and save projects',
-    summary: 'Keep an editable project and make separate copies when a design changes.',
+    summary: 'Save your work so you can edit it later.',
     category: 'Getting started',
     machine: 'all',
     minutes: 2,
     location: 'File menu or top toolbar',
     prerequisites: 'A new project, or a saved KerfDesk project file to open.',
-    visual: 'library',
+    visual: 'project-file',
     steps: [
       {
         title: 'Start or continue',
         instruction:
-          'Use File → New for a blank project. Use File → Open to continue a saved KerfDesk project. Import adds artwork to the project you already have.',
+          'Choose File → New for a blank project. Choose File → Open to continue a saved project. Import adds artwork to your current project.',
         focus: 'New · Open · Import',
-        result: 'You are working in the intended document.',
+        result: 'Your project is open on the canvas.',
       },
       {
         title: 'Save the editable version',
         instruction:
-          'Choose File → Save As, select a location and give the project a recognisable name. Finish the save dialog offered by your browser or desktop app.',
+          'Choose File → Save As. Give the project a clear name. Finish the save dialog in your browser or desktop app.',
         focus: 'Save As',
         result: 'The editable project is stored in a file.',
       },
       {
-        title: 'Keep progress and alternatives',
+        title: 'Save as you work',
         instruction:
-          'Use Save or Ctrl+S as you work. Use Save As with a different filename before making a variation you want to keep separately.',
+          'Use Save or Ctrl+S as you work. Use Save As with a new filename to keep a separate copy.',
         focus: 'Save or save a copy',
-        result: 'You can reopen the design or return to an earlier named version.',
+        result: 'Your changes are saved in the chosen file.',
       },
     ],
     tip: 'A G-code export is machine output. Keep the project file as well so the artwork and settings remain editable.',
@@ -89,7 +90,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'import',
     title: 'Import artwork',
-    summary: 'Bring vectors, pictures or a supported model into the current project.',
+    summary: 'Add a design or picture from a file.',
     category: 'Getting started',
     machine: 'all',
     minutes: 3,
@@ -100,14 +101,14 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the file',
         instruction:
-          'Open Import and choose your artwork. SVG and DXF describe vector geometry; PNG and JPG contain image pixels. STL belongs to the CNC model workflow.',
+          'Open Import and choose your file. Use SVG or DXF for outlines, PNG or JPG for pictures, or STL for a CNC model.',
         focus: 'Import picker',
-        result: 'The importer uses the workflow for the selected file type.',
+        result: 'Your file opens in the matching import tool.',
       },
       {
         title: 'Check the real size',
         instruction:
-          'Select the imported artwork. Check its width, height and position on the canvas; resize it to the required physical dimensions.',
+          'Select the imported artwork. Check its width and height in millimetres. Resize and position it to fit your material.',
         focus: 'Dimensions in millimetres',
         result: 'The design fits your intended material area.',
         visual: 'select',
@@ -115,57 +116,57 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose its next step',
         instruction:
-          'Assign a suitable operation to vectors. In laser mode, Adjust Image prepares a bitmap for engraving. In either machine mode, Trace Image turns its features into editable vectors. Use the CNC relief workflow for an STL model.',
+          'For vectors, choose an operation. Use Adjust Image in laser mode to prepare pictures, Trace Image to make editable outlines, or CNC relief for STL models.',
         focus: 'Artwork / Operations',
-        result: 'The imported content follows the right process for the result you need.',
+        result: 'You have a next step for the imported artwork.',
         visual: 'layers',
       },
     ],
-    tip: 'A photograph does not become a cutting outline just by importing it. Trace a clear outline when you need vector geometry.',
+    tip: 'Importing a picture does not create a cutting outline. Use Trace Image when you need editable paths.',
     keywords: ['import', 'svg', 'dxf', 'png', 'jpg', 'stl', 'artwork'],
     related: ['trace', 'image-adjust', 'cnc-relief'],
   },
   {
     id: 'workspace',
     title: 'Find your way around',
-    summary: 'Use the canvas, side panels and zoom controls comfortably.',
+    summary: 'Find the tools and move around the canvas.',
     category: 'Getting started',
     machine: 'all',
     minutes: 2,
     location: 'Main workspace and Window menu',
     prerequisites: 'An open project.',
-    visual: 'workspace',
+    visual: 'workspace-basics',
     steps: [
       {
-        title: 'Learn the three areas',
+        title: 'Find the tools',
         instruction:
-          'Use the left toolbar to draw and edit. Use the canvas to position artwork. Use Artwork / Operations to inspect settings and the machine panel to prepare machine actions.',
+          'Use the left toolbar to draw. Place artwork on the canvas. Find settings in Artwork / Operations and machine controls in the machine panel.',
         focus: 'Tools · canvas · settings',
-        result: 'You know where each part of the workflow lives.',
+        result: 'You know where to draw and find settings.',
       },
       {
         title: 'Zoom and pan',
         instruction:
-          'Use + and − to zoom, F or 0 to fit the bed, and Shift+F to fit your selection. Hold Space while dragging, or right-drag, to pan.',
+          'Use + and − to zoom. Hold Space while dragging to move the view. Press F to see the whole bed again.',
         focus: 'Fit and pan',
         result: 'You can inspect a small detail and return to the whole bed.',
       },
       {
         title: 'Make room',
         instruction:
-          'Collapse a side panel when you need more canvas. F12 toggles both panels; Window → Reset Workspace Layout restores the standard visible layout.',
+          'Collapse a side panel for more canvas space. Choose Window → Reset Workspace Layout to restore the usual layout.',
         focus: 'Window → Reset Workspace Layout',
-        result: 'The workspace adapts without changing your artwork.',
+        result: 'You have more room to see your artwork.',
       },
     ],
-    tip: 'Zooming changes the view only. Use the artwork size fields when you want to change physical dimensions.',
+    tip: 'Zoom changes the view. It does not change the size of your artwork.',
     keywords: ['workspace', 'canvas', 'zoom', 'pan', 'panels', 'layout', 'fit'],
     related: ['select', 'shortcuts', 'operations'],
   },
   {
     id: 'shortcuts',
     title: 'Use keyboard shortcuts',
-    summary: 'Learn a few repeatable actions and open the full reference when needed.',
+    summary: 'Learn a few keys for common tasks.',
     category: 'Getting started',
     machine: 'all',
     minutes: 2,
@@ -178,7 +179,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
         instruction:
           'Click Keyboard Shortcuts in the top toolbar. Browse the File, Tools, Edit, Transform and View groups, then the final group named after your machine.',
         focus: 'Keyboard Shortcuts',
-        result: 'The current shortcut reference is visible in one place.',
+        result: 'You can look up a shortcut when you need it.',
       },
       {
         title: 'Practise three useful keys',
@@ -198,9 +199,9 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Finish or leave a tool',
         instruction:
-          'Escape cancels the active drawing action. In the pen tool, Enter finishes an open path. In canvas text editing, Ctrl or Command plus Enter finishes text; plain Enter adds a line.',
+          'Press Escape to cancel drawing. Press Enter to finish an open pen path. For text, Ctrl or Command plus Enter finishes; Enter adds a line.',
         focus: 'Finish depends on the tool',
-        result: 'You leave each editing mode deliberately.',
+        result: 'You can finish or cancel the current edit.',
       },
     ],
     tip: 'Image Studio and Design Studio have their own tool shortcuts. Read the active tool hint because the same letter can mean something different there.',
@@ -210,7 +211,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'design-library',
     title: 'Use the Design Library',
-    summary: 'Find a ready-made vector, inspect its details and add it to your design.',
+    summary: 'Find a ready-made design and add it to the canvas.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
@@ -227,15 +228,14 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       },
       {
         title: 'Inspect a design',
-        instruction:
-          'Choose a card. Review its preview, details and exact licence information before using it in your project.',
+        instruction: 'Choose a design. Check its preview and licence before using it.',
         focus: 'Design details',
-        result: 'You understand what you are adding and its usage terms.',
+        result: 'You know what the design looks like and how you may use it.',
       },
       {
         title: 'Add and prepare it',
         instruction:
-          'Use the add control for the chosen design. On the canvas, resize and position it, then inspect its operation settings.',
+          'Add the design to the canvas. Set its size and position. Check its operation settings.',
         focus: 'Add to canvas',
         result: 'The design becomes editable vector artwork in your project.',
       },
@@ -247,13 +247,13 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'project-notes',
     title: 'Keep project notes',
-    summary: 'Store the details you will need when repeating or handing over a job.',
+    summary: 'Save useful details with your project.',
     category: 'Getting started',
     machine: 'all',
     minutes: 2,
     location: 'Window → Project Notes',
     prerequisites: 'An open project.',
-    visual: 'history',
+    visual: 'project-notes',
     steps: [
       {
         title: 'Open the notebook',
@@ -263,11 +263,11 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
         result: 'You can read or edit the project record.',
       },
       {
-        title: 'Write useful context',
+        title: 'Write a few notes',
         instruction:
-          'Record material identity, thickness, intended size and results of any real tests. Include changes that helped or still need checking.',
+          'Write down the material, thickness and intended size. Add any test results and things you still need to check.',
         focus: 'Notes',
-        result: 'A future session has practical context rather than just a filename.',
+        result: 'You have a record to use next time.',
       },
       {
         title: 'Save notes and project',
