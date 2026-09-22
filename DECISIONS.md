@@ -2,6 +2,13 @@
 
 > Architecturally significant decisions only. A future maintainer should understand the *why* without needing to ask.
 >
+> **Where new decisions go (ADR-344).** This file is the HISTORICAL record, ADR-001 to
+> ADR-343, and is no longer appended to. Write a new decision as its own file under
+> [`docs/decisions/`](./docs/decisions/), named `ADR-<number>-<slug>.md`. Appending every
+> entry here made a merge conflict the normal outcome of two branches landing decisions the
+> same day. Numbering stays global across both: run `node scripts/check-adr-numbers.mjs`,
+> which reads both and prints the next free number.
+>
 > **Current Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for the exact
 > current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
 > warning surface. Older gate ADRs below that mandated Start blocks are stamped

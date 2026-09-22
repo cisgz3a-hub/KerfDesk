@@ -45,13 +45,13 @@ machine move. See `CLAUDE.md` — "We only build with verified research".
 1. Read [`CLAUDE.md`](./CLAUDE.md) — file-size limits, naming, anti-patterns, checklists. The file-size, module-boundary, and type-strictness rules are enforced by ESLint and CI; naming, anti-patterns, and the checklists are enforced at maintainer review.
 2. Read [`PROJECT.md`](./PROJECT.md) — the current phase and scope. Anything outside the current phase needs a `PROJECT.md` revision and a `DECISIONS.md` entry before code lands.
 3. Read [`WORKFLOW.md`](./WORKFLOW.md) — if your change touches UI, the success / error / empty / edge states for the affected flow must already be documented (or you must update this file first).
-4. Read [`DECISIONS.md`](./DECISIONS.md) — architectural changes (module boundaries, state shape, build setup) require a new ADR.
+4. Read [`DECISIONS.md`](./DECISIONS.md) (ADR-001 to ADR-343) and [`docs/decisions/`](./docs/decisions/) (everything after) — architectural changes (module boundaries, state shape, build setup) require a new ADR.
 5. Read [`SECURITY.md`](./SECURITY.md) before reporting or testing a security-sensitive issue.
 
 ## Process gates
 
 - **Scope changes:** require a `PROJECT.md` revision.
-- **Architectural changes:** require a new ADR in `DECISIONS.md` (format: match ADR-017's structure — Context, Decision, Alternatives considered, Consequences, Verification).
+- **Architectural changes:** require a new ADR as its own file under `docs/decisions/`, named `ADR-<number>-<slug>.md` (ADR-344 — `DECISIONS.md` is the frozen historical record and is not appended to). Format: match ADR-017's structure — Context, Decision, Alternatives considered, Consequences, Verification. Get the number from `node scripts/check-adr-numbers.mjs`, which prints the next free one and is cheaper than grepping.
 - **New runtime dependencies:** require a `RESEARCH_LOG.md` entry (license, version, source, alternatives, evaluation date) before the PR that imports the library can merge. ADR-017 governs this policy.
 - **G-code output changes:** require an explicit `Snapshot change acknowledged: <reason>` line in the PR description.
 
