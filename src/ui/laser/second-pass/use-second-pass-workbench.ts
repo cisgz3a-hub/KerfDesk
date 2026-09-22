@@ -8,6 +8,7 @@ import { loadSecondPassDraft, saveSecondPassDraft } from './second-pass-draft';
 import type { SecondPassDrawing } from './second-pass-preview';
 import { SecondPassWorkerClient, type SecondPassPreview } from './second-pass-worker-client';
 import { SECOND_PASS_BUSY, secondPassExecutionActions } from './second-pass-workbench-actions';
+import { defaultSecondPassBrushDiameterMm } from './second-pass-brush-default';
 
 type Strokes = LaserSecondPassSelection['strokes'];
 export function useSecondPassWorkbench(source: ExecutionArtifactV1, onClose: () => void) {
@@ -126,13 +127,7 @@ function useOpenSecondPassWorker(
       .then((value) => {
         if (!active) return;
         setDrawing(value);
-        setDiameter(
-          Math.max(
-            0.1,
-            Math.min(value.bounds.maxX - value.bounds.minX, value.bounds.maxY - value.bounds.minY) /
-              12,
-          ),
-        );
+        setDiameter(defaultSecondPassBrushDiameterMm(value.bounds));
       })
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : String(reason));
