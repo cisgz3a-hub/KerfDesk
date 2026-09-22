@@ -215,15 +215,18 @@ export type DeviceProfile = {
   // hobby controllers leave these pins unwired or use M7 only when compiled in.
   readonly airAssistCommand: AirAssistCommand;
   // Vendor firmware that cannot be trusted to restart air assist inside a
-  // running program. Creality's A1 family delays the real shutoff after M9 by
-  // `$152`, and its shipped build has dropped the pump seconds after a fresh
-  // M8 — the documented "air works while engraving but stops when it cycles
-  // over to cutting". For such a machine the emitter holds air on across an
-  // Air-off operation that sits between two Air-on ones instead of cycling
-  // M9/M8 over it (ADR-335). Absent keeps the plain per-operation cycling that
-  // stock GRBL, grblHAL, FluidNC, Marlin and Smoothieware each honour
-  // immediately, and is also how to get per-operation air back on an A1 once
-  // `$152=0` is set on the controller.
+  // running program. Creality's A1 family idles the pump (and powers the laser
+  // module down) `$152` seconds after it decides work has finished — 0..100,
+  // default 30, 100 = never (Creality wiki, GRBL configuration parameters) —
+  // and its shipped 1.0.6 build has dropped the pump seconds after a fresh M8
+  // (LightBurn staff: confirmed firmware bug, fixed in 1.0.7) — the documented
+  // "air works while engraving but stops when it cycles over to cutting". For
+  // such a machine the emitter holds air on across an Air-off operation that
+  // sits between two Air-on ones instead of cycling M9/M8 over it (ADR-335).
+  // Absent keeps the plain per-operation cycling that stock GRBL, grblHAL,
+  // FluidNC, Marlin and Smoothieware each honour immediately, and is also how
+  // to get per-operation air back on an A1 once `$152=100` is set on the
+  // controller or the firmware is updated.
   readonly airAssistRestartUnreliable?: boolean;
   // Optional Z metadata. XY bed dimensions are used for bounds checks today;
   // Z is informational/setup-facing until a dedicated Z workflow is enabled.

@@ -18,16 +18,84 @@ export type GcodeWordMatch = {
   readonly matchedLength: number;
 };
 
+// A hand-rolled scan of GCODE_WORD_PATTERN. The pattern is executed for every
+// motion line by the preflight scanners, the manifest parser and the timeline,
+// and a dense fill is hundreds of thousands of lines; `matchAll` allocated an
+// iterator plus a match array per word. This loop recognises exactly the same
+// tokens (`word-scan.parity.test.ts` pins it against the regex on random
+// input): a letter, optional blanks, an optional sign, then either digits with
+// an optional fraction or a bare fraction.
 export function scanGcodeWords(line: string): ReadonlyArray<GcodeWordMatch> {
   const out: GcodeWordMatch[] = [];
-  for (const match of line.matchAll(GCODE_WORD_PATTERN)) {
+  const length = line.length;
+  let index = 0;
+  while (index < length) {
+    const letterCode = line.charCodeAt(index);
+    if (!isAsciiLetter(letterCode)) {
+      index += 1;
+      continue;
+    }
+    let cursor = index + 1;
+    while (cursor < length && isBlank(line.charCodeAt(cursor))) cursor += 1;
+    const numberStart = cursor;
+    if (cursor < length && isSign(line.charCodeAt(cursor))) cursor += 1;
+    const numberEnd = scanNumberEnd(line, cursor);
+    if (numberEnd < 0) {
+      index += 1;
+      continue;
+    }
     out.push({
-      letter: (match[1] ?? '').toUpperCase(),
-      value: Number.parseFloat(match[2] ?? '0'),
-      matchedLength: match[0].length,
+      letter: String.fromCharCode(letterCode).toUpperCase(),
+      value: Number.parseFloat(line.slice(numberStart, numberEnd)),
+      matchedLength: numberEnd - index,
     });
+    index = numberEnd;
   }
   return out;
+}
+
+/** End of `\d+\.?\d*` or `\.\d+` starting at `start`, or -1 when neither matches. */
+function scanNumberEnd(line: string, start: number): number {
+  const digitsEnd = scanDigits(line, start);
+  if (digitsEnd > start) return scanOptionalFraction(line, digitsEnd);
+  return scanBareFraction(line, start);
+}
+
+function scanDigits(line: string, start: number): number {
+  let cursor = start;
+  while (cursor < line.length && isDigit(line.charCodeAt(cursor))) cursor += 1;
+  return cursor;
+}
+
+/** `\.?\d*` after the integer digits: a dot alone is still part of the number. */
+function scanOptionalFraction(line: string, cursor: number): number {
+  if (cursor < line.length && line.charCodeAt(cursor) === DOT) return scanDigits(line, cursor + 1);
+  return cursor;
+}
+
+/** `\.\d+`: a dot needs at least one digit to be a number on its own. */
+function scanBareFraction(line: string, cursor: number): number {
+  if (cursor >= line.length || line.charCodeAt(cursor) !== DOT) return -1;
+  const fractionEnd = scanDigits(line, cursor + 1);
+  return fractionEnd > cursor + 1 ? fractionEnd : -1;
+}
+
+const DOT = 46;
+
+function isAsciiLetter(code: number): boolean {
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isDigit(code: number): boolean {
+  return code >= 48 && code <= 57;
+}
+
+function isBlank(code: number): boolean {
+  return code === 32 || code === 9;
+}
+
+function isSign(code: number): boolean {
+  return code === 43 || code === 45;
 }
 
 /**

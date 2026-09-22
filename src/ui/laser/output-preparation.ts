@@ -5,6 +5,7 @@ import type {
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
 import { prepareOutputSnapshot, type PrepareOutputOptions } from '../../io/gcode';
 import { prepareOutputForStructuredClone } from '../../io/gcode/prepared-output-persistence';
+import { archiveCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import { emitPreparedRdFile } from '../../io/rd';
 import type { Project } from '../../core/scene';
 import { emitSavePreparedOutput } from './save-output-emission';
@@ -159,7 +160,12 @@ async function prepareStartOutput(
           },
         );
   return result.ok
-    ? { ...result, prepared: prepareOutputForStructuredClone(result.prepared) }
+    ? {
+        ...result,
+        prepared: prepareOutputForStructuredClone(result.prepared),
+        // Packed for the boundary; the client unpacks it (TransferredStartJobPreparation).
+        canvasPlan: archiveCanvasMotionPlan(result.canvasPlan),
+      }
     : result;
 }
 

@@ -26,7 +26,6 @@ import {
 import { controllerHandshakeOwnership, runControllerHandshake } from './laser-controller-handshake';
 import { recoveryRepository } from './recovery';
 import {
-  streamStalledNotice,
   writeFailedNotice,
   type LaserSafetyAction,
   type LaserSafetyNotice,
@@ -41,7 +40,6 @@ import {
 import { disconnectedStatePatch } from './laser-disconnected-state';
 import {
   buildPortClosePatch,
-  detectStreamStall,
   disconnectStopCommands,
   initialLaserState,
   pushLog,
@@ -51,6 +49,7 @@ import {
   containLostStreamHeartbeat,
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
+import { observeStreamHoldTick } from './laser-stream-hold';
 import {
   canSendQueuedStatusQuery,
   controllerOperationOwnsPolling,
@@ -429,9 +428,9 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     pollTick++;
     const s = get();
     if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;
-    const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
-    refs.stallProbe = stall.probe;
-    if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
+    // A controller that answers `?` but stops acknowledging sent lines is
+    // named in the live bar and the log rather than declared stalled (ADR-344).
+    observeStreamHoldTick(set, s, refs, Date.now());
     // Start owns this boundary: queue-fence must converge to zero without
     // background writes, and CNC live-status sends its own freshness query.
     // Polling here can otherwise keep pendingTransportWrites continuously

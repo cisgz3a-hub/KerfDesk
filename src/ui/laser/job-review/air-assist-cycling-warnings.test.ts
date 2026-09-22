@@ -77,7 +77,8 @@ describe('detectAirAssistCyclingWarnings (ADR-335)', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('Score lines');
-    expect(warnings[0]).toContain('$152=0');
+    expect(warnings[0]).toContain('$152=100');
+    expect(warnings[0]).not.toContain('$152=0');
     expect(warnings[0]).toContain('Air assist stays on');
   });
 

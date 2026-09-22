@@ -21,6 +21,19 @@ export type PackedMotionManifest = Omit<MotionManifest, 'blocks'> & {
   readonly pointData: Float64Array;
 };
 
+/** Bytes the packed encoding of `manifest` occupies, without allocating it.
+ * One pass over the block list; no point is visited. A plain (unpacked)
+ * manifest is charged at least this much by the artifact estimator, so the
+ * figure is a lower bound on any archive that embeds the manifest. */
+export function packedMotionManifestBytes(manifest: MotionManifest): number {
+  let pointCount = 0;
+  for (const block of manifest.blocks) pointCount += block.points.length;
+  return (
+    (manifest.blocks.length * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) *
+    Float64Array.BYTES_PER_ELEMENT
+  );
+}
+
 export type PackMotionManifestOptions = {
   /** Archives must fit the per-artifact budget; transient previews need not. */
   readonly enforceArchiveBudget?: boolean;
@@ -32,9 +45,7 @@ export function packMotionManifest(
 ): PackedMotionManifest {
   let pointCount = 0;
   for (const block of manifest.blocks) pointCount += block.points.length;
-  const bytes =
-    (manifest.blocks.length * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) *
-    Float64Array.BYTES_PER_ELEMENT;
+  const bytes = packedMotionManifestBytes(manifest);
   // Bound allocations before constructing either buffer. The complete artifact
   // is measured again with these exact stored buffers before persistence.
   if (options.enforceArchiveBudget !== false) assertExecutionArtifactSizeWithinBudget({}, bytes);

@@ -18,7 +18,35 @@ export const M7_AIR_ASSIST_UNVERIFIED_MESSAGE =
  * combined blocks remain visible (for example `N10 G1 X5 M7`).
  */
 export function gcodeUsesM7(gcode: string): boolean {
-  return gcode.split(/\r?\n/).some((line) => executableWords(line).some(isM7Word));
+  // Every spelling of the word carries a letter M and a digit 7, so a line
+  // without both cannot contain one. Motion lines of a dense job have no M
+  // word at all, and tokenizing each of them was the whole cost of this scan.
+  let start = 0;
+  const length = gcode.length;
+  while (start <= length) {
+    let end = gcode.indexOf('\n', start);
+    if (end < 0) end = length;
+    if (
+      lineMayHoldM7(gcode, start, end) &&
+      executableWords(gcode.slice(start, end)).some(isM7Word)
+    ) {
+      return true;
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
+function lineMayHoldM7(gcode: string, start: number, end: number): boolean {
+  let sawM = false;
+  let sawSeven = false;
+  for (let index = start; index < end; index += 1) {
+    const code = gcode.charCodeAt(index);
+    if (code === 77 || code === 109) sawM = true;
+    else if (code === 55) sawSeven = true;
+    if (sawM && sawSeven) return true;
+  }
+  return false;
 }
 
 export function evaluateM7AirAssistReadiness(

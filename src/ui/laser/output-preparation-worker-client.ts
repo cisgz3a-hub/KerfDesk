@@ -38,7 +38,10 @@ import type {
   SaveOutputPreparationRequest,
   StartOutputPreparationRequest,
   TiledOutputPreparationRequest,
+  TransferredStartJobPreparation,
 } from './output-preparation-protocol';
+import { registerCanvasProgramSource } from '../state/canvas-program-source';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
 import type { PreparedOutput } from '../../io/gcode';
 import type { SaveOutputEmission } from './save-output-emission';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
@@ -72,8 +75,23 @@ export function prepareStartOutputOffThread(
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'start') throw new Error('Background Start preparation returned no job.');
-    return response.result;
+    return hydrateTransferredStartPreparation(response.result);
   });
+}
+
+/**
+ * Unpack the manifest the worker packed for the boundary and re-attach the
+ * process-local program source the worker registered on its own copy of the
+ * plan (a WeakMap entry cannot cross a structured clone). A plan that arrived
+ * plain passes through untouched.
+ */
+export function hydrateTransferredStartPreparation(
+  result: TransferredStartJobPreparation,
+): StartJobPreparation {
+  if (!result.ok) return result;
+  const canvasPlan = executionArtifactCanvasPlan({ canvasPlan: result.canvasPlan });
+  registerCanvasProgramSource(canvasPlan, result.gcode);
+  return { ...result, canvasPlan };
 }
 
 /**

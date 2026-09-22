@@ -8,6 +8,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { hydrateTransferredStartPreparation } from './output-preparation-worker-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
@@ -138,7 +139,7 @@ beforeEach(() => {
     prepareOutputRequestForTest(request, onProgress === undefined ? {} : { onProgress }).then(
       (response) => {
         if (response.kind !== 'start') throw new Error('Frame test adapter returned no job.');
-        return response.result;
+        return hydrateTransferredStartPreparation(response.result);
       },
     ),
   );

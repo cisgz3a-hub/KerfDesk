@@ -37,6 +37,7 @@ import { buildEffectiveOperationReview } from './job-review-effective-operations
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
+import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
@@ -122,6 +123,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.project.device,
         args.project.scene.layers,
       ),
+      ...detectAirAssistStandbyWarnings(args.prepared.prepared.job, args.project.device),
       ...detectParkOutsideFrameWarningsFromMetrics(
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,

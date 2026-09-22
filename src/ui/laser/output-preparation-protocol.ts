@@ -4,6 +4,7 @@ import type { OutputScope, Project } from '../../core/scene';
 import type { EmitGcodeOptions, PreparedOutput, PrepareOutputOptions } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
+import type { ArchivedCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import type { JobOriginPlacement } from '../../core/job';
 import type { SaveOutputEmission } from './save-output-emission';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
@@ -69,12 +70,26 @@ export type OutputPreparationRequest =
   | TiledOutputPreparationRequest;
 
 /**
+ * A Start preparation as it crosses the worker boundary. The motion manifest
+ * travels packed (two Float64Arrays instead of one object per point): the
+ * structured clone of a dense fill's point objects took seconds on each side
+ * of the boundary, the packed form copies in milliseconds. The client unpacks
+ * it before any caller sees the result, so `StartJobPreparation` is unchanged
+ * everywhere else (ADR-344).
+ */
+export type TransferredStartJobPreparation =
+  | (Omit<Extract<StartJobPreparation, { readonly ok: true }>, 'canvasPlan'> & {
+      readonly canvasPlan: ArchivedCanvasMotionPlan;
+    })
+  | Extract<StartJobPreparation, { readonly ok: false }>;
+
+/**
  * Worker response for one preparation. Save callers must branch on
  * `result.kind` because `preparation-failed` and `emission-refused` carry no
  * writable G-code.
  */
 export type OutputPreparationResponse =
-  | { readonly kind: 'start'; readonly result: StartJobPreparation }
+  | { readonly kind: 'start'; readonly result: TransferredStartJobPreparation }
   | { readonly kind: 'save'; readonly result: SaveOutputEmission }
   | { readonly kind: 'rd'; readonly result: EmitRdResult }
   | { readonly kind: 'tiles'; readonly result: TiledOutputPreparation }

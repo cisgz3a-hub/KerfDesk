@@ -26,6 +26,7 @@ import {
   isArchivedCanvasMotionPlan,
   type ArchivedCanvasMotionPlan,
 } from './execution-artifact-canvas';
+import { packedMotionManifestBytes } from './packed-motion-manifest';
 import {
   isExecutionProvenance,
   type ExecutionProvenance,
@@ -174,6 +175,7 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
   );
 
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
+  assertArchiveMayFit(args);
   const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
   assertExecutionArtifactSizeWithinBudget({ ...args, canvasPlan }, 0, true);
   const prepared = prepareOutputForStructuredClone(args.prepared);
@@ -220,6 +222,22 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     ...artifact,
     estimatedArtifactBytes: measureExecutionArtifactBytesWithinBudget(artifact),
   };
+}
+
+// Settle the hopeless case before any allocation: the program text and the
+// packed manifest alone can exceed the budget, and this runs on the main
+// thread right after the first window of the job is on the wire. Packing the
+// points and building the full artifact only to measure it cost a dense fill
+// over a second of acknowledgement latency at every Start (ADR-344).
+function assertArchiveMayFit(
+  args: Pick<CreateExecutionArtifactArgs, 'gcode' | 'canvasPlan'>,
+): void {
+  const manifest = args.canvasPlan.manifest;
+  assertExecutionArtifactSizeWithinBudget(
+    { gcode: args.gcode },
+    manifest === undefined ? 0 : packedMotionManifestBytes(manifest),
+    true,
+  );
 }
 
 function archivedObservationForArtifact(args: {
