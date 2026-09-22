@@ -425,11 +425,11 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   const marlinCard = page.locator('article').filter({ hasText: 'Generic Marlin laser 300' });
   await expect(marlinCard).toContainText('Profile controller is marlin, but detected grbl-v1.1.');
   await expect(
-    marlinCard.getByRole('button', { name: 'Use Generic Marlin laser 300×200' }),
+    marlinCard.getByRole('radio', { name: 'Use Generic Marlin laser 300×200' }),
   ).toBeEnabled();
 
   await setup.getByLabel('Search machine profiles').fill('xTool D1 Pro');
-  await page.getByRole('button', { name: 'Use xTool D1 Pro (20 W)', exact: true }).click();
+  await page.getByRole('radio', { name: 'Use xTool D1 Pro (20 W)', exact: true }).check();
   await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
   await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
