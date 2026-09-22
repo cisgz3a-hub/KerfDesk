@@ -163,8 +163,11 @@ async function prepareStartOutput(
     ? {
         ...result,
         prepared: prepareOutputForStructuredClone(result.prepared),
-        // Packed for the boundary; the client unpacks it (TransferredStartJobPreparation).
-        canvasPlan: archiveCanvasMotionPlan(result.canvasPlan),
+        // Packed for the boundary, not archived: the client unpacks it
+        // (TransferredStartJobPreparation). The archive budget belongs to the
+        // archive, which is written later and is best-effort; enforcing it
+        // here would turn a large job into a Start refusal (ADR-345).
+        canvasPlan: archiveCanvasMotionPlan(result.canvasPlan, { enforceArchiveBudget: false }),
       }
     : result;
 }

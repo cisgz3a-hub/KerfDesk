@@ -62,7 +62,11 @@ standby immediately: the opposite of what it intended.
 - A Start preparation crosses the worker boundary with its motion manifest
   packed in the ADR-118 archive encoding. The client unpacks it and re-registers
   the program source before any caller sees the result, so `StartJobPreparation`
-  is unchanged everywhere else.
+  is unchanged everywhere else. That packing does **not** apply the archive
+  size budget: the handoff is not an archive, the archive is written later and
+  is best-effort, and enforcing the budget on the handoff would make a large
+  job unpreparable — a size-based Start refusal of exactly the kind
+  ADR-241/243/244 removed.
 - Job Review's re-prepare on Confirm reuses the displayed compile when it is
   provably what a fresh compile would return: the same project object, the same
   execution signature, the same machine inputs the compile reads, current
