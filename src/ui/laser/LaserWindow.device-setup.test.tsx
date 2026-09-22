@@ -221,8 +221,9 @@ describe('LaserWindow device-setup nudge', () => {
         search.value = 'Neotronics 4040';
         Simulate.change(search);
       });
-      const restore = button(host, 'Use Neotronics 4040 Max / LT-4LDS-V2 20W');
-      expect(restore.disabled).toBe(false);
+      const restore = host.querySelector('input[aria-label^="Use Neotronics 4040 Max"]');
+      if (!(restore instanceof HTMLInputElement)) throw new Error('Profile card missing');
+      expect(restore.checked).toBe(false);
       await act(async () => restore.click());
 
       expect(useStore.getState().project.device.gcodeDialect.dialectId).toBe('grbl-dynamic');

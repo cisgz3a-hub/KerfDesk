@@ -383,7 +383,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await setup.getByText('Controller and connection settings', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
   await setup.getByLabel('Search machine profiles').fill('Creality Falcon A1 Pro');
-  await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
+  await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).check();
   await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
   await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();

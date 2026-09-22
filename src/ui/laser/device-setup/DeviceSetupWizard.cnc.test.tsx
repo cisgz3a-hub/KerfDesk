@@ -103,7 +103,7 @@ describe('DeviceSetupWizard router commit', () => {
         });
       });
       await openSetupDisclosure(view.host, 'Connect and detect');
-      expect(view.host.textContent).toContain('No mapped values have been read');
+      expect(view.host.textContent).toContain('KerfDesk reads its work area');
       expect(view.host.textContent).not.toContain('Use detected values');
       await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).not.toBe('750');
