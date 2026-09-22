@@ -122,7 +122,9 @@ function LessonNotes({
   const photoNote = photo?.frames[phase]?.caption ?? photo?.frames[0].caption;
   return (
     <details className="lf-learn-notes">
-      <summary tabIndex={0}>More help</summary>
+      <summary tabIndex={0} title="Show or hide extra guidance for this lesson">
+        More help
+      </summary>
       <dl>
         <dt>Where to find it</dt>
         <dd>{tutorial.location}</dd>

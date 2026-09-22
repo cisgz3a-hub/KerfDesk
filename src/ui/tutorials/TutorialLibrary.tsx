@@ -87,6 +87,7 @@ function TutorialTopics({
         <details className="lf-learn-topic" key={category} open={topic === category}>
           <summary
             tabIndex={0}
+            title={`Show or hide ${category.toLowerCase()} tutorials`}
             onClick={(event) => {
               event.preventDefault();
               setTopic(topic === category ? null : category);
