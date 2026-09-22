@@ -45,6 +45,7 @@ export function autofocusActions(
           workZReferenceEpoch: state.workZReferenceEpoch + 1,
           frameVerification: null,
           framedRun: null,
+          frameTrace: null,
           trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
           log: pushLog(
             state,
@@ -70,6 +71,7 @@ async function runOwnedAutofocus(
     autofocusBusy: true,
     controllerOperation: { kind: 'autofocus', phase: 'preflight', idleReports: 0 },
     framedRun: null,
+    frameTrace: null,
     frameVerification: null,
   });
   try {

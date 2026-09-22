@@ -55,7 +55,7 @@ import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
-import type { FramedRunPermit, FramedRunStartClaim } from './framed-run';
+import type { FramedRunPermit, FramedRunStartClaim, FrameTrace } from './framed-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
 import type {
@@ -79,8 +79,8 @@ import {
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
-  type StallProbe,
 } from './laser-store-helpers';
+import type { StallProbe } from './laser-stream-stall';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
@@ -262,6 +262,12 @@ export type LaserState = LaserStoreActions &
      * Ordinary permits await Start-time review; transient candidates may carry
      * review evidence from birth. A pending candidate lives on motionOperation. */
     readonly framedRun: FramedRunPermit | null;
+    /** A clean Frame that traced the job's bounds before its exact program
+     * existed (ADR-353). Not a Start authorization: the Frame flow binds the
+     * exact program to it and mints `framedRun`, or it expires under the same
+     * drift rules as a permit. Optional so hand-built test states stay valid;
+     * absent reads as null. */
+    readonly frameTrace?: FrameTrace | null;
     /** Atomic owner while ordinary Start hands one exact permit to the store. */
     readonly framedRunStartClaim: FramedRunStartClaim | null;
     /**

@@ -5,7 +5,9 @@ export function framedRunInterruptionPatch(
   state: LaserState,
   report: StatusReport,
   startOwnsSettleDwell = false,
-): Partial<Pick<LaserState, 'framedRun' | 'frameVerification' | 'controllerOperation'>> {
+): Partial<
+  Pick<LaserState, 'framedRun' | 'frameTrace' | 'frameVerification' | 'controllerOperation'>
+> {
   if (state.framedRun === null || report.state === 'Idle') {
     return {};
   }
@@ -27,7 +29,7 @@ export function framedRunInterruptionPatch(
   // A permit is a one-way authorization. Any controller-owned motion/hold/
   // mode transition after completion consumes the physical proof even when a
   // later Idle happens to report the same coordinates.
-  return { framedRun: null, frameVerification: null };
+  return { framedRun: null, frameTrace: null, frameVerification: null };
 }
 
 /** A stamped CNC dwell Run remains exempt only for the exact report sequence

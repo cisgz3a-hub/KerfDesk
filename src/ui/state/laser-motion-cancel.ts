@@ -28,7 +28,7 @@ export async function runCancelJog(
   // Cancel intent itself expires a completed Frame permit, even when no live
   // motion owner exists (for example a key/button release after a zero-length
   // jog). Authorization never survives a realtime cancel attempt.
-  set({ frameVerification: null, framedRun: null });
+  set({ frameVerification: null, framedRun: null, frameTrace: null });
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
     const cancelError = await writeJogCancel(context);

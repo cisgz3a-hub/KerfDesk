@@ -18,7 +18,7 @@ export function buildFrameDispatchPlan(
   get: () => LaserState,
   bounds: Parameters<LaserState['frame']>[0],
   feed: number,
-  candidate: Parameters<LaserState['frame']>[2],
+  candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
 ): CncFrameMotionPlan {
   const state = get();
   const feeds = frameMotionFeeds(feed, state.controllerSettings);
