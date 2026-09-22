@@ -400,6 +400,8 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
     name: 'Paint second-pass areas on the saved engraving',
   });
   await expect(canvas).toBeVisible({ timeout: 30_000 });
+  // The suggested brush is a readable number, not floating-point noise.
+  await expect(workbench.getByLabel('Brush diameter (mm)')).toHaveValue(/^\d+(\.\d{1,2})?$/);
   await workbench.screenshot({ path: testInfo.outputPath('image-resumed-darken.png') });
   await workbench.getByRole('button', { name: 'Close', exact: true }).click();
   expect(refusals()).toEqual([]);
