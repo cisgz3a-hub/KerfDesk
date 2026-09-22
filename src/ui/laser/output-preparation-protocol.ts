@@ -75,7 +75,7 @@ export type OutputPreparationRequest =
  * structured clone of a dense fill's point objects took seconds on each side
  * of the boundary, the packed form copies in milliseconds. The client unpacks
  * it before any caller sees the result, so `StartJobPreparation` is unchanged
- * everywhere else (ADR-344).
+ * everywhere else (ADR-345).
  */
 export type TransferredStartJobPreparation =
   | (Omit<Extract<StartJobPreparation, { readonly ok: true }>, 'canvasPlan'> & {

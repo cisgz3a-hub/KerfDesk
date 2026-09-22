@@ -88,7 +88,7 @@ async function initialBundle() {
   };
 }
 
-// The review only re-prepares when an input it depends on changed (ADR-344);
+// The review only re-prepares when an input it depends on changed (ADR-345);
 // a replaced project object is the smallest such change, and it keeps these
 // cancellation races on the asynchronous path they exist to cover.
 function touchProject(): void {

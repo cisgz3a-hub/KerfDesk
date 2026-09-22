@@ -12,7 +12,7 @@
 // for the case that never resolves.
 //
 // Nothing here writes to the controller or refuses anything (rule 7 /
-// ADR-228): it is telemetry about a wait the app was already doing (ADR-344).
+// ADR-228): it is telemetry about a wait the app was already doing (ADR-345).
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { LaserSafetyNotice } from './laser-safety-notice';

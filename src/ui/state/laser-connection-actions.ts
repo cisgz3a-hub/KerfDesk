@@ -429,7 +429,7 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     const s = get();
     if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;
     // A controller that answers `?` but stops acknowledging sent lines is
-    // named in the live bar and the log rather than declared stalled (ADR-344).
+    // named in the live bar and the log rather than declared stalled (ADR-345).
     observeStreamHoldTick(set, s, refs, Date.now());
     // Start owns this boundary: queue-fence must converge to zero without
     // background writes, and CNC live-status sends its own freshness query.

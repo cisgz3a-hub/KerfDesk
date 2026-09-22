@@ -5,7 +5,7 @@ const WORD_BOUNDARY_AFTER_NUMBER = String.raw`(?=$|\s|[A-DF-Za-df-z])`;
 // line, and a dense fill is hundreds of thousands of lines. Building the
 // RegExp on every call put the regex compiler on the hot path; the compiled
 // pattern is exactly the one the source strings describe, so caching it by
-// word (or command) changes nothing but the cost (ADR-344).
+// word (or command) changes nothing but the cost (ADR-345).
 const wordPatterns = new Map<string, RegExp>();
 const commandPatterns = new Map<string, RegExp>();
 

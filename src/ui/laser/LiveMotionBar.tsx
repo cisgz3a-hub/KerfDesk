@@ -195,7 +195,7 @@ function describeLiveMotion(
 // so the bar said JOB RUNNING over a stopped machine with no reason given
 // (ADR-333). A host-requested pause is excluded: that one has its own
 // heading and its own Resume control. A controller that is merely not
-// acknowledging sent lines is the third, quieter case (ADR-344).
+// acknowledging sent lines is the third, quieter case (ADR-345).
 function describeActiveJob(
   streamProgress: LiveStreamProgress,
   pauseResumeTransition: PauseResumeTransition | null,

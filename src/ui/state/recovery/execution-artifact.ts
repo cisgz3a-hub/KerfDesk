@@ -228,7 +228,7 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
 // packed manifest alone can exceed the budget, and this runs on the main
 // thread right after the first window of the job is on the wire. Packing the
 // points and building the full artifact only to measure it cost a dense fill
-// over a second of acknowledgement latency at every Start (ADR-344).
+// over a second of acknowledgement latency at every Start (ADR-345).
 function assertArchiveMayFit(
   args: Pick<CreateExecutionArtifactArgs, 'gcode' | 'canvasPlan'>,
 ): void {

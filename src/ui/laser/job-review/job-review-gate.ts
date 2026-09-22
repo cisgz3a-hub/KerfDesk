@@ -252,7 +252,7 @@ type RebuiltStart =
 // was prepared from, re-running it can only reproduce the same bytes — and for
 // a dense fill that reproduction cost as much as the Frame did, at every
 // Confirm. Anything time-bound (variable text, registration) still recompiles;
-// so does any change the staleness owner would cancel on (ADR-344).
+// so does any change the staleness owner would cancel on (ADR-345).
 async function preparedForRebuild(
   previousBundle: ReviewedStartBundle,
   app: ReturnType<typeof useStore.getState>,

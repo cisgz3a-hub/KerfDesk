@@ -11,7 +11,7 @@
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
 // vendor contract forbids `$$`), so the remedy is named rather than checked.
 //
-// Advisory only (rule 7 / ADR-228, ADR-344): it never refuses a Start.
+// Advisory only (rule 7 / ADR-228, ADR-345): it never refuses a Start.
 
 import type { DeviceProfile } from '../../../core/devices';
 import type { Job } from '../../../core/job';

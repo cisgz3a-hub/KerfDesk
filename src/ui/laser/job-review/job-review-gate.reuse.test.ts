@@ -1,6 +1,6 @@
 // Job Review's re-prepare on Confirm reuses the displayed compile when every
 // input it depends on is unchanged, and still recompiles when one is not
-// (ADR-344). Split from job-review-gate.test.ts at the file-size cap.
+// (ADR-345). Split from job-review-gate.test.ts at the file-size cap.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
