@@ -1,6 +1,6 @@
-import type { RecoveryCapsule } from '../state/recovery';
+import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
-import { laserRecoveryPreviewPlan } from './laser-recovery-preview-plan';
+import { useLaserRecoveryPreviewRoute } from './use-laser-recovery-preview-route';
 
 export function LaserRecoveryRestartPicker(props: {
   readonly capsule: RecoveryCapsule;
@@ -15,8 +15,9 @@ export function LaserRecoveryRestartPicker(props: {
         Choose where to restart
       </h3>
       {artifact.kind === 'exact-execution' ? (
-        <LaserRecoveryCanvas
-          plan={laserRecoveryPreviewPlan(artifact)}
+        <SealedRoutePreview
+          key={artifact.runId}
+          artifact={artifact}
           ackedLines={props.capsule.ackedLines}
           fromLine={props.fromLine}
           disabled={props.disabled}
@@ -67,6 +68,43 @@ export function LaserRecoveryRestartPicker(props: {
         pass.
       </p>
     </section>
+  );
+}
+
+/** The sealed program is parsed off the UI thread. Until the route arrives the
+ * numeric line field is the operator's control; a failure keeps it available. */
+function SealedRoutePreview(props: {
+  readonly artifact: ExecutionArtifactV1;
+  readonly ackedLines: number;
+  readonly fromLine: number | undefined;
+  readonly disabled: boolean;
+  readonly onSelect: (line: number) => void;
+}): JSX.Element {
+  const preview = useLaserRecoveryPreviewRoute(props.artifact);
+  if (preview.status === 'preparing') {
+    return (
+      <p role="status" style={hintStyle}>
+        Preparing the saved route preview in the background. The G-code line field below already
+        works; the clickable route appears when it is ready.
+      </p>
+    );
+  }
+  if (preview.status === 'failed') {
+    return (
+      <p role="alert" style={hintStyle}>
+        The saved route preview could not be prepared ({preview.message}). Use the original G-code
+        line numbers below; recovery still replays the exact saved program.
+      </p>
+    );
+  }
+  return (
+    <LaserRecoveryCanvas
+      route={preview.route}
+      ackedLines={props.ackedLines}
+      fromLine={props.fromLine}
+      disabled={props.disabled}
+      onSelect={props.onSelect}
+    />
   );
 }
 

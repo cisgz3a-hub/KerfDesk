@@ -102,6 +102,92 @@ describe('selective pass construction', () => {
     expect(result.gcode.split('\n').filter((line) => /^M[789]$/.test(line))).toEqual(['M8', 'M9']);
   });
 
+  it('re-arms the beam only when its mode changes instead of toggling M5 around every sweep', () => {
+    const beamWords = (gcode: string) => gcode.split('\n').filter((line) => /^M[345]\b/.test(line));
+    const repeated = ready(SOURCE + SOURCE, selection([stroke(5, 1)]));
+    expect(beamWords(repeated.gcode)).toEqual(['M5', 'M4 S0', 'M5']);
+    const mixed = `${SOURCE.replace('M5\n', '')}G0 X15 Y3 S0\nM3 S0\nG1 X10 F800 S0\nX0 S400\nX-5 S0\nM5\n`;
+    const both = ready(
+      mixed,
+      selection([stroke(5, 1), { ...stroke(5, 1), points: [{ x: 5, y: 3 }] }]),
+    );
+    expect(beamWords(both.gcode)).toEqual(['M5', 'M4 S0', 'M5', 'M3 S0', 'M5']);
+    // Repositioning between sweeps stays dark through S0 while the mode remains armed.
+    expect(both.gcode).toContain('G0X15Y3S0');
+    expect(simulateProgram(both.gcode).filter((motion) => motion.power > 0)).toHaveLength(2);
+  });
+
+  it('separates controlled-dark raster rows joined at the engraving feed', () => {
+    const rows = ['G21', 'G90', 'M4 S0'];
+    for (let row = 0; row < 6; row += 1) {
+      const reverse = row % 2 === 1;
+      rows.push(
+        `G1 X${reverse ? 12 : -2} Y${row} F600 S0`,
+        `G1 X${reverse ? 10 : 0} S0`,
+        `X${reverse ? 0 : 10} S200`,
+        `X${reverse ? -2 : 12} S0`,
+      );
+    }
+    rows.push('M5');
+    const result = ready(
+      rows.join('\n'),
+      selection([{ ...stroke(5, 1), points: [{ x: 5, y: 3 }] }]),
+    );
+    const motions = simulateProgram(result.gcode);
+    expect(new Set(motions.map((motion) => motion.to.y))).toEqual(new Set([3]));
+    expect(result.gcode).not.toMatch(/^G0/m);
+    expect(result.gcode).toContain('G1X12Y3F600S0');
+    expect(motions.filter((motion) => motion.power > 0)).toEqual([
+      { from: { x: 6, y: 3 }, to: { x: 4, y: 3 }, feed: 600, power: 200, mode: 4, rapid: false },
+    ]);
+    expect(result.motionBounds).toEqual({ minX: -2, minY: 3, maxX: 12, maxY: 3 });
+  });
+
+  it('treats a reversed laser-off return at the engraving feed as a new sweep', () => {
+    const rows = ['G21', 'G90', 'M4 S0'];
+    for (let row = 0; row < 4; row += 1) {
+      rows.push(`G1 X-2 Y${row} F600 S0`, 'G1 X0 S0', 'X10 S200', 'X12 S0');
+    }
+    rows.push('M5');
+    const result = ready(
+      rows.join('\n'),
+      selection([{ ...stroke(5, 1), points: [{ x: 5, y: 2 }] }]),
+    );
+    const motions = simulateProgram(result.gcode);
+    expect(new Set(motions.map((motion) => motion.to.y))).toEqual(new Set([2]));
+    expect(motions.filter((motion) => motion.power > 0)).toEqual([
+      { from: { x: 4, y: 2 }, to: { x: 6, y: 2 }, feed: 600, power: 200, mode: 4, rapid: false },
+    ]);
+  });
+
+  it('keeps a laser-off row change out of the sweep it leads to when no runway follows', () => {
+    const source =
+      'G21\nG90\nM4 S0\nG1 X0 Y0 F600 S0\nX10 S200\nG1 X0 Y1 S0\nX10 S200\nG1 X0 Y2 S0\nX10 S200\nM5\n';
+    const result = ready(source, selection([{ ...stroke(5, 1), points: [{ x: 5, y: 1 }] }]));
+    expect(
+      simulateProgram(result.gcode).map((motion) => [
+        motion.from.x,
+        motion.from.y,
+        motion.to.x,
+        motion.to.y,
+        motion.power,
+      ]),
+    ).toEqual([
+      [0, 0, 0, 1, 0],
+      [0, 1, 4, 1, 0],
+      [4, 1, 6, 1, 200],
+      [6, 1, 10, 1, 0],
+    ]);
+  });
+
+  it('keeps a diagonal runway with the burn it feeds despite three-decimal rounding', () => {
+    const source = 'G21\nG90\nM4 S0\nG0 X9.292 Y9.293 S0\nG1 X10 Y10 F600 S0\nX20 Y20 S300\nM5\n';
+    const result = ready(source, selection([{ ...stroke(15, 1), points: [{ x: 15, y: 15 }] }]));
+    expect(result.gcode).toContain('G0X9.292Y9.293S0');
+    expect(result.gcode).toContain('G1X10Y10F600S0');
+    expect(simulateProgram(result.gcode).filter((motion) => motion.power > 0)).toHaveLength(1);
+  });
+
   it('supports inch and relative modal source in absolute mm output', () => {
     const source = 'G20 G90\nM4 S0\nG0 X1 Y2\nG91\nG1 X1 F2 S200\nM5\n';
     const brush = selection([{ ...stroke(38.1, 2.54), points: [{ x: 38.1, y: 50.8 }] }]);

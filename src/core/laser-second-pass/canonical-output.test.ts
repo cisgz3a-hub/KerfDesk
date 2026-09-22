@@ -100,7 +100,9 @@ function checkIndependentExposure(source: string, selection: LaserSecondPassSele
   return result.gcode;
 }
 
-function imageProject(controlledDark: boolean): Project {
+type RowTravel = 'rapid' | 'controlled' | 'engraving-feed';
+
+function imageProject(travel: RowTravel): Project {
   const base = createProject();
   const profile = profileCatalogEntryById('creality-falcon-a1-pro-grblhal')?.profile;
   if (profile === undefined) throw new Error('Falcon profile fixture missing');
@@ -124,7 +126,9 @@ function imageProject(controlledDark: boolean): Project {
     ...base,
     device: {
       ...profile,
-      ...(controlledDark ? { controlledLaserOffTravelFeedMmPerMin: 800 } : {}),
+      ...(travel === 'rapid'
+        ? {}
+        : { controlledLaserOffTravelFeedMmPerMin: travel === 'controlled' ? 800 : 1200 }),
       scanningOffsets: [{ speedMmPerMin: 1200, offsetMm: 0.175 }],
     },
     scene: {
@@ -148,10 +152,10 @@ function imageProject(controlledDark: boolean): Project {
 }
 
 describe('second pass from the real prepared-output composition', () => {
-  it.each([false, true])(
-    'preserves Falcon image tones, bidirectionality, two passes, and corrected pixel edges (controlled dark %s)',
-    (controlledDark) => {
-      const source = canonicalSource(imageProject(controlledDark));
+  it.each(['rapid', 'controlled', 'engraving-feed'] as const)(
+    'preserves Falcon image tones, bidirectionality, two passes, and corrected pixel edges (row travel %s)',
+    (travel) => {
+      const source = canonicalSource(imageProject(travel));
       const parser = parseLaserSecondPassSource(source);
       expect(parser.kind, parser.kind === 'error' ? parser.message : undefined).toBe('ready');
       const originalBurn = simulateProgram(source).filter((move) => move.power > 0);
@@ -160,9 +164,46 @@ describe('second pass from the real prepared-output composition', () => {
       expect(originalBurn.some((move) => move.to.x > move.from.x)).toBe(true);
       const derived = checkIndependentExposure(source, routeBrush(originalBurn));
       expect(derived.split('\n').filter((line) => /^M[789]$/.test(line))).toEqual(['M8', 'M9']);
-      if (controlledDark) expect(derived).not.toMatch(/^G0/m);
+      expect(derived.split('\n').filter((line) => /^M[345]\b/.test(line))).toEqual([
+        'M5',
+        'M4 S0',
+        'M5',
+      ]);
+      if (travel !== 'rapid') expect(derived).not.toMatch(/^G0/m);
     },
   );
+
+  it('omits unselected rows when controlled-dark row changes share the engraving feed', () => {
+    const source = canonicalSource(imageProject('engraving-feed'));
+    const burn = simulateProgram(source).filter((move) => move.power > 0);
+    const rowsY = [...new Set(burn.map((move) => move.from.y))].sort((a, b) => a - b);
+    expect(rowsY.length).toBeGreaterThan(2);
+    const target = rowsY[1];
+    if (target === undefined) throw new Error('Expected a second raster row.');
+    const darkest = burn
+      .filter((move) => move.from.y === target)
+      .reduce((best, move) => (move.power > best.power ? move : best));
+    const result = buildLaserSecondPassProgram(source, {
+      version: 1,
+      maxPowerS: 1000,
+      strokes: [
+        {
+          id: 'row',
+          mode: 'paint',
+          radiusMm: 0.1,
+          powerScale: 1,
+          points: [{ x: (darkest.from.x + darkest.to.x) / 2, y: target }],
+        },
+      ],
+    });
+    expect(result.kind, result.kind === 'error' ? result.message : undefined).toBe('ready');
+    if (result.kind !== 'ready') throw new Error(result.message);
+    const motions = simulateProgram(result.gcode);
+    expect(motions.some((move) => move.power > 0)).toBe(true);
+    // Every emitted move, including the beam-off approach, stays on the painted row.
+    expect(new Set(motions.map((move) => move.to.y))).toEqual(new Set([target]));
+    expect(result.gcode).not.toMatch(/^G0/m);
+  });
 
   it('supports native filled rectangles and curved vector artwork from emitted linear motion', () => {
     const base = createProject();

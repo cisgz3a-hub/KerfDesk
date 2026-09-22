@@ -8,6 +8,8 @@ import { assertExecutionArtifactSizeWithinBudget } from './execution-artifact-si
 
 const ENCODING = 'packed-motion-manifest-v1';
 const BLOCK_WIDTH = 10;
+/** Doubles per stored point: x, y, z. */
+export const PACKED_POINT_WIDTH = 3;
 const KINDS: ReadonlyArray<MotionBlockKind> = ['travel', 'process', 'plunge', 'park'];
 
 /** All numbers retain their original IEEE-754 doubles. Each block stores raw
@@ -19,16 +21,25 @@ export type PackedMotionManifest = Omit<MotionManifest, 'blocks'> & {
   readonly pointData: Float64Array;
 };
 
-export function packMotionManifest(manifest: MotionManifest): PackedMotionManifest {
+export type PackMotionManifestOptions = {
+  /** Archives must fit the per-artifact budget; transient previews need not. */
+  readonly enforceArchiveBudget?: boolean;
+};
+
+export function packMotionManifest(
+  manifest: MotionManifest,
+  options: PackMotionManifestOptions = {},
+): PackedMotionManifest {
   let pointCount = 0;
   for (const block of manifest.blocks) pointCount += block.points.length;
   const bytes =
-    (manifest.blocks.length * BLOCK_WIDTH + pointCount * 3) * Float64Array.BYTES_PER_ELEMENT;
+    (manifest.blocks.length * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) *
+    Float64Array.BYTES_PER_ELEMENT;
   // Bound allocations before constructing either buffer. The complete artifact
   // is measured again with these exact stored buffers before persistence.
-  assertExecutionArtifactSizeWithinBudget({}, bytes);
+  if (options.enforceArchiveBudget !== false) assertExecutionArtifactSizeWithinBudget({}, bytes);
   const blockData = new Float64Array(manifest.blocks.length * BLOCK_WIDTH);
-  const pointData = new Float64Array(pointCount * 3);
+  const pointData = new Float64Array(pointCount * PACKED_POINT_WIDTH);
   let pointOffset = 0;
   manifest.blocks.forEach((block, index) => {
     blockData.set(
@@ -47,7 +58,7 @@ export function packMotionManifest(manifest: MotionManifest): PackedMotionManife
       index * BLOCK_WIDTH,
     );
     for (const point of block.points) {
-      pointData.set([point.x, point.y, point.z], pointOffset * 3);
+      pointData.set([point.x, point.y, point.z], pointOffset * PACKED_POINT_WIDTH);
       pointOffset += 1;
     }
   });
@@ -67,12 +78,13 @@ export function isPackedMotionManifest(
   const blockData = value['blockData'];
   const pointData = value['pointData'];
   if (!isFloat64Array(blockData) || !isFloat64Array(pointData)) return false;
-  if (blockData.length % BLOCK_WIDTH !== 0 || pointData.length % 3 !== 0) return false;
+  if (blockData.length % BLOCK_WIDTH !== 0 || pointData.length % PACKED_POINT_WIDTH !== 0)
+    return false;
   if (!hasValidSummary(value, limits?.sendableLines)) return false;
   if (!pointData.every(Number.isFinite)) return false;
   return validBlocks(
     blockData,
-    pointData.length / 3,
+    pointData.length / PACKED_POINT_WIDTH,
     value.totalRouteMm,
     value.sendableLineCount,
     limits?.rawLines,
@@ -170,6 +182,42 @@ function validRouteRange(data: Float64Array, index: number, route: number): bool
   );
 }
 
+/** Columnar readers: consumers such as the restart picker walk a packed route
+ * directly instead of materialising one object per point. Callers pass indices
+ * from `packedBlockCount`; the layout stays private to this module. */
+export function packedBlockCount(packed: PackedMotionManifest): number {
+  return packed.blockData.length / BLOCK_WIDTH;
+}
+
+export function packedBlockRawLineIndex(packed: PackedMotionManifest, block: number): number {
+  return packed.blockData[block * BLOCK_WIDTH] as number;
+}
+
+export function packedBlockSendableLineIndex(packed: PackedMotionManifest, block: number): number {
+  return packed.blockData[block * BLOCK_WIDTH + 1] as number;
+}
+
+export function packedBlockKind(packed: PackedMotionManifest, block: number): MotionBlockKind {
+  return KINDS[packed.blockData[block * BLOCK_WIDTH + 2] as number] as MotionBlockKind;
+}
+
+export function packedBlockPointOffset(packed: PackedMotionManifest, block: number): number {
+  return packed.blockData[block * BLOCK_WIDTH + 3] as number;
+}
+
+export function packedBlockPointCount(packed: PackedMotionManifest, block: number): number {
+  return packed.blockData[block * BLOCK_WIDTH + 4] as number;
+}
+
+export function packedPoint(packed: PackedMotionManifest, point: number): MotionPoint {
+  const at = point * PACKED_POINT_WIDTH;
+  return {
+    x: packed.pointData[at] as number,
+    y: packed.pointData[at + 1] as number,
+    z: packed.pointData[at + 2] as number,
+  };
+}
+
 export function unpackMotionManifest(packed: PackedMotionManifest): MotionManifest {
   if (!isPackedMotionManifest(packed)) throw new Error('The archived motion manifest is invalid.');
   const blocks: MotionBlock[] = [];
@@ -179,11 +227,7 @@ export function unpackMotionManifest(packed: PackedMotionManifest): MotionManife
     const offset = data[index + 3] as number;
     const count = data[index + 4] as number;
     for (let point = offset; point < offset + count; point += 1) {
-      points.push({
-        x: packed.pointData[point * 3] as number,
-        y: packed.pointData[point * 3 + 1] as number,
-        z: packed.pointData[point * 3 + 2] as number,
-      });
+      points.push(packedPoint(packed, point));
     }
     blocks.push({
       rawLineIndex: data[index] as number,

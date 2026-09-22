@@ -18,7 +18,11 @@ import {
 } from '../state/recovery';
 import { isCurrentExecutionArtifact } from '../state/recovery/execution-artifact';
 import { executionArtifactIntegrityIsValid } from '../state/recovery/execution-artifact-integrity';
-import { isLaserSecondPassChain, selectionKey } from '../state/recovery/laser-second-pass-lineage';
+import {
+  isLaserSecondPassChain,
+  laserSecondPassExecutionSignature,
+} from '../state/recovery/laser-second-pass-lineage';
+import { useToastStore } from '../state/toast-store';
 import { recoveryArtifactPreparedOutput } from './recovery-artifact-binding';
 import { dispatchLaserSecondPassFrame, prepareTransientFrameController } from './use-frame-action';
 import { runFramedPermitStart } from './start-job-flow';
@@ -40,6 +44,9 @@ export async function frameLaserSecondPass(
   selection: LaserSecondPassSelection,
 ): Promise<FramedRunPermit | null> {
   try {
+    // Capture before any preparation step: whatever clears the canvas permit
+    // from here on, the operator ends this Frame without it.
+    const replacesCanvasFrame = holdsOrdinaryCanvasFrame();
     const sourceSnapshot = captureLaserSecondPassSource(source);
     const outputScope = structuredClone(source.outputScope);
     const frozen = await bindSecondPassSource(source, prepared, selection);
@@ -62,7 +69,7 @@ export async function frameLaserSecondPass(
       canvasPlan: { ...frozen.canvasPlan, manifest: geometry.manifest },
       metrics: { ...frozen.metrics, duration: geometry.duration },
     };
-    return dispatchLaserSecondPassFrame(
+    const permit = await dispatchLaserSecondPassFrame(
       {
         app: useStore.getState(),
         project,
@@ -76,12 +83,26 @@ export async function frameLaserSecondPass(
       },
       outputScope,
     );
+    if (permit !== null && replacesCanvasFrame) {
+      useToastStore.getState().pushToast(CANVAS_FRAME_REPLACED_MESSAGE, 'info');
+    }
+    return permit;
   } catch (error) {
     jobAwareAlert(
       `Cannot frame the second pass:\n\n${error instanceof Error ? error.message : String(error)}`,
     );
     return null;
   }
+}
+
+export const CANVAS_FRAME_REPLACED_MESSAGE =
+  'The second-pass Frame replaced the earlier Frame of the canvas job. Frame the canvas job again before starting it.';
+
+/** The store holds one permit. Framing a painted pass consumes an armed
+ * ordinary Frame, which the operator would otherwise discover only at Start. */
+function holdsOrdinaryCanvasFrame(): boolean {
+  const permit = useLaserStore.getState().framedRun;
+  return permit !== null && permit.candidate.authorizationContext === undefined;
 }
 
 function assertUnchangedSecondPassSource(
@@ -151,7 +172,7 @@ async function bindSecondPassSource(
     laserSecondPassChain: chain,
     canvasPlan: {
       ...verified.canvasPlan,
-      retentionKey: `laser-second-pass:${source.runId}:${selectionKey(frozenSelection)}`,
+      retentionKey: laserSecondPassExecutionSignature(source.runId, frozenSelection),
     },
   };
 }

@@ -18,6 +18,8 @@ export type ProgramWriter = {
   group: number;
   feed: number;
   air: number;
+  /** Beam mode currently armed in the output; null until the first sweep. */
+  mode: 3 | 4 | null;
   burnLengthMm: number;
   clamped: boolean;
 };
@@ -70,6 +72,7 @@ export function createProgramWriter(
     group: -1,
     feed: 0,
     air: 0,
+    mode: null,
     burnLengthMm: 0,
     clamped: false,
   };
@@ -89,8 +92,17 @@ function setAir(writer: ProgramWriter, air: number): void {
   writer.air = air;
 }
 
+/** GRBL-family firmware drains the planner on every M3/M4/M5 state change, even
+ * in laser mode. Every positioning move already carries S0, which keeps the beam
+ * dark in both modes, so the mode word is written only when the mode changes. */
+function armBeamMode(writer: ProgramWriter, mode: 3 | 4): void {
+  if (writer.mode === mode) return;
+  if (writer.mode !== null) writer.lines.push('M5');
+  writer.lines.push(`M${mode} S0`);
+  writer.mode = mode;
+}
+
 function beginGroup(writer: ProgramWriter, segment: SourceSegment): void {
-  if (writer.group !== -1) writer.lines.push('M5');
   setAir(writer, segment.air);
   if (!samePoint(writer.position, segment.from)) {
     const coordinates = `X${decimal(segment.from.x)}Y${decimal(segment.from.y)}`;
@@ -100,7 +112,7 @@ function beginGroup(writer: ProgramWriter, segment: SourceSegment): void {
       writer.lines.push(`G1${coordinates}F${decimal(segment.entry.feed)}S0`);
     }
   }
-  writer.lines.push(`M${segment.mode} S0`);
+  armBeamMode(writer, segment.mode);
   writer.group = segment.group;
   writer.position = segment.from;
   writer.feed = 0;

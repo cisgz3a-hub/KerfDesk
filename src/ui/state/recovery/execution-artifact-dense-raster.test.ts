@@ -10,12 +10,13 @@ import {
 } from '../../../core/scene';
 import { recoveryArtifactPreparedProgramMatches } from '../../laser/recovery-artifact-binding';
 import { pickRecoveryMovement } from '../../laser/laser-recovery-picker-model';
-import { laserRecoveryPreviewPlan } from '../../laser/laser-recovery-preview-plan';
+import { buildLaserRecoveryPreviewRoute } from '../../laser/laser-recovery-preview-route';
 import { prepareStartJob } from '../../laser/start-job-readiness';
 import { classifyCanvasPreparation } from '../../workspace/canvas-preparation-policy';
 import { mapControllerPointToScene } from '../canvas-motion-plan';
 import { executionArtifactCanvasPlan } from './execution-artifact-canvas';
 import { MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES } from './execution-artifact-size';
+import { unpackMotionManifest } from './packed-motion-manifest';
 import { MemoryRecoveryStorageBackend } from './recovery-backend';
 import { MemoryRecoveryGenerationStore } from './recovery-generation';
 import { RecoveryRepository } from './recovery-repository';
@@ -111,9 +112,11 @@ describe('dense Falcon image recovery archive', () => {
       },
       source.canvasPlan,
     );
-    const selectablePlan = laserRecoveryPreviewPlan(capsule.artifact);
-    expectExactRoute(selectablePlan.manifest, source.canvasPlan.manifest);
-    expect(pickRecoveryMovement(selectablePlan, point, 0.01, block.rawLineIndex + 1)).toBe(
+    // The picker route is derived from the sealed program, not the stored plan,
+    // and consumed in packed form; unpacking it must reproduce every point.
+    const selectable = buildLaserRecoveryPreviewRoute(capsule.artifact);
+    expectExactRoute(unpackMotionManifest(selectable.manifest), source.canvasPlan.manifest);
+    expect(pickRecoveryMovement(selectable, point, 0.01, block.rawLineIndex + 1)).toBe(
       block.rawLineIndex + 1,
     );
   }, 60_000);

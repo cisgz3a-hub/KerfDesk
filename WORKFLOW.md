@@ -1601,7 +1601,10 @@ authorization, Frame proof, controller command, or safety boundary.
   the actual boundary. Clicking, zooming, closing and cancelling send no machine commands.
   Final Start repositions with the beam off, then replays that movement and the remaining job.
   The selected line is recorded in the new recovery run, which can itself be recovered after
-  another interruption. Numeric line selection remains available.
+  another interruption. Numeric line selection remains available. The route preview is derived
+  from the sealed program in a background worker (ADR-341 Amendment 1): the dialog opens at once,
+  the line field works while a large image route is prepared, and a preview failure leaves the
+  line field and the exact replay unaffected.
 - The automatic suggestion is acknowledged transport progress, not a measured physical stop.
   Buffered commands may be ahead of the engraving. Inspect the material and select an earlier
   movement or scan line if necessary; overlapping engraving may become darker. Coincident
@@ -1659,13 +1662,23 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Preview second pass** compiles off the UI thread. Its coloured burn paths show the
   actual selected output; faint paths show the saved engraving for context. The painted
   mask is a selection, not a physical prediction of material darkness. Entire unselected
-  sweeps are omitted. Intersecting sweeps can traverse unpainted areas with S0 to retain
-  their run-in/run-out motion; all repositioning commands turn the beam off.
+  sweeps are omitted. A sweep ends at a rapid, a beam or air word, a feed change, or a
+  laser-off feed move that leaves the current line (a controlled-dark row change, even when it
+  runs at the engraving feed); a laser-off move that continues the line is a runway and stays
+  with its burn. Intersecting sweeps can traverse unpainted areas with S0 to retain their
+  run-in/run-out motion. Every repositioning command carries S0 while the beam mode stays
+  armed; the mode word is written only when the mode changes and the program ends with one M5,
+  so the controller does not stop and drain around every selected sweep. Painted passes
+  archived before 2026-09-22 were emitted with per-sweep beam words; they stay in history but
+  no longer reproduce byte-exactly, so recovering them or painting from them is refused with the
+  lineage message. The original engravings they came from are unaffected.
 - **Frame second pass** traces the exact derived motion bounds and returns to its captured
   position. **Start second pass** opens one immutable Job Review with current controller
   facts, selected-pass metrics and acknowledgements. Editing the painted output invalidates
-  that Frame. Closing the workbench revokes only its own permit. Frame and Start are explicit
-  machine actions; painting, erasing, zooming and previewing move nothing.
+  that Frame. Closing the workbench revokes only its own permit. The store holds one Frame
+  permit, so framing a second pass while a canvas job is already framed replaces that Frame
+  and says so in a notification. Frame and Start are explicit machine actions; painting,
+  erasing, zooming and previewing move nothing.
 - Keep the workpiece and work origin unchanged from the saved engraving. Source placement
   is fixed, including jobs originally started from Current Position; a later parked head
   cannot re-anchor the painted pass. Fresh controller evidence qualifies the approach and

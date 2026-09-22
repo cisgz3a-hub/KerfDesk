@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Dialog, DialogActions } from '../kit';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
+import { recoveryRouteFromCanvasPlan } from './laser-recovery-preview-route';
 import type { PreparedRecoverySource } from './start-job-source';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 
@@ -16,6 +17,11 @@ export function ManualLaserRestartDialog(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const maximumLine = props.source.canvasPlan.fingerprint.lines;
+  // The preparation already parsed this program; packing it is a linear copy.
+  const route = useMemo(
+    () => recoveryRouteFromCanvasPlan(props.source.canvasPlan),
+    [props.source.canvasPlan],
+  );
   const [fromLine, setFromLine] = useState(Math.min(props.initialLine, maximumLine));
   const [starting, setStarting] = useState(false);
   const [failure, setFailure] = useState('');
@@ -52,7 +58,7 @@ export function ManualLaserRestartDialog(props: {
     <Dialog title="Choose laser restart point" size="lg" tutorialId="recovery" onClose={close}>
       <p>{RESTART_HINT}</p>
       <LaserRecoveryCanvas
-        plan={props.source.canvasPlan}
+        route={route}
         ackedLines={0}
         fromLine={fromLine}
         disabled={starting}
@@ -66,25 +72,35 @@ export function ManualLaserRestartDialog(props: {
       />
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}
-      <DialogActions>
-        <button
-          type="button"
-          title="Close the restart preview without starting the job."
-          disabled={starting}
-          onClick={close}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          title="Review recovery, then move with the beam off to replay the selected movement and remaining job."
-          disabled={starting}
-          onClick={() => void start()}
-        >
-          {starting ? 'Starting recovery…' : 'Start selected remainder'}
-        </button>
-      </DialogActions>
+      <ManualRestartActions starting={starting} onCancel={close} onStart={() => void start()} />
     </Dialog>
+  );
+}
+
+function ManualRestartActions(props: {
+  readonly starting: boolean;
+  readonly onCancel: () => void;
+  readonly onStart: () => void;
+}): JSX.Element {
+  return (
+    <DialogActions>
+      <button
+        type="button"
+        title="Close the restart preview without starting the job."
+        disabled={props.starting}
+        onClick={props.onCancel}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        title="Review recovery, then move with the beam off to replay the selected movement and remaining job."
+        disabled={props.starting}
+        onClick={props.onStart}
+      >
+        {props.starting ? 'Starting recovery…' : 'Start selected remainder'}
+      </button>
+    </DialogActions>
   );
 }
 
