@@ -1889,7 +1889,7 @@ Connecting a controller is optional, so a complete setup can be saved offline.
 1. **Machine** — choose **Laser only**, **CNC only**, or **Laser + CNC** from capability cards;
    hybrids also choose the active mode after Save. **Set up automatically** follows: it states what
    the selected controller family reported, lists those values, and carries **Use detected values**
-   (ADR-346). While nothing is connected it says that connecting the controller below reads those
+   (ADR-347). While nothing is connected it says that connecting the controller below reads those
    values into the draft, and that offline setup still works; a file-only controller has no lane.
    Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable

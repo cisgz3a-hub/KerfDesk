@@ -1,6 +1,6 @@
 // Catalog picker. The whole card is the control: each profile is one option
 // in a radio group, matching the machine-type cards above it, so choosing a
-// machine never depends on hitting a small button (ADR-346). "Profile details"
+// machine never depends on hitting a small button (ADR-347). "Profile details"
 // stays outside the label so reading the evidence does not select the profile.
 
 import { useState } from 'react';

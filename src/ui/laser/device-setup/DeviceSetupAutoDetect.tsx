@@ -1,4 +1,4 @@
-// The automatic lane on the Machine stage (ADR-346). Connecting already runs
+// The automatic lane on the Machine stage (ADR-347). Connecting already runs
 // the controller's read-only settings query, so by the time setup opens the
 // values usually exist — they were just buried inside a collapsed disclosure.
 // This shows what the machine reported and offers the one explicit action that

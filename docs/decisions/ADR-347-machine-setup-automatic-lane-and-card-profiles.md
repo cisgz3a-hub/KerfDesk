@@ -1,4 +1,4 @@
-## ADR-346 - Machine Setup leads with what the controller already reported, and a profile is chosen by its whole card (2026-09-22)
+## ADR-347 - Machine Setup leads with what the controller already reported, and a profile is chosen by its whole card (2026-09-22)
 
 **Status:** Accepted. | **Date:** 2026-09-22
 

@@ -1,7 +1,7 @@
 // Optional Machine-stage connection, using the selected driver and baud.
 // Identity/settings reads do not move the machine or write its configuration.
 // What a read returned, and the action that copies it into the draft, live in
-// the Set up automatically lane above this section (ADR-346).
+// the Set up automatically lane above this section (ADR-347).
 
 import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';
