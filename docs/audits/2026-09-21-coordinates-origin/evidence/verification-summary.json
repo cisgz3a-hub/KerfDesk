@@ -96,6 +96,18 @@
       "tests": 22,
       "passed": 22,
       "failed": 0
+    },
+    "noGoReferenceFixture": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "completeTimingFixture": {
+      "files": 1,
+      "tests": 1,
+      "passed": 1,
+      "failed": 0
     }
   },
   "files": [
@@ -740,7 +752,7 @@
       "name": "src/ui/laser/start-job-no-go-zones.test.ts",
       "tests": 1,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "coordinate-no-go-fixture-after.json",
       "stage": "post-repair"
     },
     {
@@ -761,7 +773,7 @@
       "name": "src/ui/laser/start-job-preparation-timing.test.ts",
       "tests": 1,
       "status": "passed",
-      "evidence": "frame-start-final-results.json",
+      "evidence": "timing-fixture-final.json",
       "stage": "post-repair"
     },
     {

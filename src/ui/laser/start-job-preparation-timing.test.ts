@@ -38,10 +38,12 @@ describe('Review and Start timing handoff', () => {
       ],
     };
     const gcode = `G4 P7\n${grblStrategy.emit(job, device)}`;
-    const prepared = { ok: true, project: createProject(device), job } as Extract<
-      PreparedOutput,
-      { ok: true }
-    >;
+    const prepared: Extract<PreparedOutput, { ok: true }> = {
+      ok: true,
+      project: createProject(device),
+      job,
+      jobOriginOffset: { x: 0, y: 0 },
+    };
     const result = okPreparation(
       gcode,
       [],
