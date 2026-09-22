@@ -21629,3 +21629,79 @@ Native negative GRBL machine coordinates were also treated as positive profile-b
 Independent before-fix regressions reproduced the report-unit motion error and both Z-confirmation paths. The audit adds physical-origin/anchor algebra, a small independent GRBL offset oracle and full simulated Falcon Frame/Start flows. Commands, results and remaining issues are recorded in `docs/audits/2026-09-21-coordinates-origin/README.md`.
 
 The repair converts the three original defect characterisations into correctness regressions and adds independent native-frame, physical edge, worker/Save/archive and Absolute-offset checks. No machine was operated and no saved user profile was changed. The existing hardware qualification boundary and Frame-only ordinary Start policy remain unchanged.
+---
+
+## ADR-311 Amendment 1 - publication asks whether the commit is still ON main, not whether it is still the tip (2026-09-22)
+
+**Status:** Accepted. | **Date:** 2026-09-22
+
+### Context
+
+Clause 4 of ADR-311 requires a candidate to publish "only while its validated SHA equals
+the fetched current `main` tip", checked twice — before the build and immediately before
+the provider command — with "candidates overtaken during a build" becoming provider-free
+no-ops.
+
+The second check cannot be satisfied at this repository's merge rate. The deploy job re-runs
+`pnpm release:check` and takes roughly 50 minutes; main merged every 60-85 minutes through
+2026-09-21/22. Production therefore stopped updating entirely: the last run that actually
+executed the provider command was `377e692ba` at 2026-09-21T12:59Z, and the **seven**
+`workflow_run` deployments after it all skipped publication and still reported success. The
+site sat on `377e692ba` while each run refused to publish a strictly newer commit — the
+freshness rule made production staler, which inverts its own purpose. It was found only
+because the maintainer noticed the site had not picked up ADR-339's light theme.
+
+### Decision
+
+The two checks ask different questions, and only the first keeps the tip test.
+
+- **Candidate phase (before the build)** is unchanged: build only main's exact tip, so an
+  obsolete historical rerun never burns a build slot.
+- **Publication phase (immediately before the provider command)** now requires only that the
+  verified commit is still ON main — `git merge-base --is-ancestor <sha> origin/main`. A
+  newer tip is no longer a reason to withhold a commit that main still contains.
+- A commit that has **left** main — reverted, rebased away, or force-pushed over — is still
+  an explicit provider-free no-op. That is the property clause 4 was actually protecting.
+- `resolve-web-deploy-identity.mjs` takes an explicit `--phase` and `--checkout-on-main`.
+  The boolean accepts only `true`/`false` and throws otherwise, so an unset or misspelled
+  shell variable can never silently decide a production publication.
+
+Everything else in clause 4 stands: the resolver is still read from the protected-main
+workflow revision rather than the candidate checkout, all candidates still share the
+serialized `queue: max` lane, and manual dispatch still has no historical-ref input.
+
+### Consequences
+
+- Production can trail main by a commit or two. The newer commit publishes from its own
+  queued run, and the serialized lane keeps those runs in order. Trailing slightly is
+  strictly better than the previous behaviour, which was not publishing at all.
+- A skipped publication now means something actionable — the commit left main — rather than
+  the routine outcome it had become.
+- The duplicated `pnpm release:check` inside the deploy (CI already ran the identical suite
+  on the identical SHA for `workflow_run`) is what makes the job ~50 minutes and lose the
+  race in the first place. Removing it would make publication near-immediate, but it changes
+  what is verified before a production publish, so it is left for its own decision rather
+  than folded into this one.
+
+### Alternatives rejected
+
+- **Leave the gate and merge less often:** rejected — the pipeline should not impose a
+  merge-rate ceiling, and the failure was silent for seven runs.
+- **Relax the candidate phase too:** rejected — building a commit already known to be
+  superseded wastes the lane's serialized slot for ~50 minutes.
+- **Publish whatever is at main's tip at publication time:** rejected — that would publish a
+  tree this run never built or verified.
+
+### Verification
+
+- `scripts/resolve-web-deploy-identity.test.mjs` covers both phases: an overtaken commit that
+  is still on main publishes, one that has left main does not, an obsolete candidate is still
+  refused before any build, an unknown phase throws rather than defaulting to publish, and a
+  non-boolean `--checkout-on-main` throws. 11 tests, and `pnpm test:release-integrity` is
+  green at 136.
+- The resolver CLI was exercised exactly as the workflow invokes it, including the
+  `GITHUB_OUTPUT` it writes, for all three verdicts.
+- `.github/workflows/deploy.yml` parses, and `pnpm check:action-pins` still verifies 7 pinned
+  actions.
+- **NOT verified:** the amended lane has not yet published to Cloudflare Pages — that can
+  only be observed on the next `workflow_run` deployment after this lands.

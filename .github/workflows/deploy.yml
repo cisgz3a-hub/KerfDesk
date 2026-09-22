@@ -84,6 +84,7 @@ jobs:
             > "${control_resolver}"
           node "${control_resolver}" \
             --event-name="${EVENT_NAME}" \
+            --phase=candidate \
             --checkout-sha="$(git rev-parse HEAD)" \
             --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
             --validated-sha="${VALIDATED_SHA}" \
@@ -119,24 +120,37 @@ jobs:
         if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm release:check
 
-      - name: Reconfirm current main immediately before publication
+      - name: Confirm the verified commit is still on main before publication
         id: pre_publish_identity
         if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          # Still ON main is the question here, not still THE TIP of main. A tip
+          # test at this point cannot be satisfied in practice: the gate above
+          # runs ~50 minutes while main merges every ~60-85, so publication was
+          # skipped on almost every run and production fell further behind than
+          # the commit being refused.
+          if git merge-base --is-ancestor "${DEPLOY_SHA}" refs/remotes/origin/main; then
+            checkout_on_main=true
+          else
+            checkout_on_main=false
+          fi
           node "${RUNNER_TEMP}/resolve-web-deploy-identity.mjs" \
             --event-name="${EVENT_NAME}" \
-            --checkout-sha="${{ steps.deployment_identity.outputs.sha }}" \
+            --phase=publication \
+            --checkout-sha="${DEPLOY_SHA}" \
             --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
             --validated-sha="${VALIDATED_SHA}" \
+            --checkout-on-main="${checkout_on_main}" \
             --github-output="${GITHUB_OUTPUT}"
 
-      - name: Record main advance during build as a non-deployment
+      - name: Record a commit that left main as a non-deployment
         if: ${{ steps.deployment_identity.outputs.eligible == 'true' && steps.pre_publish_identity.outputs.eligible == 'false' }}
         shell: bash
         env:
@@ -150,7 +164,7 @@ jobs:
             echo
             echo "${FRESHNESS_REASON}"
             echo
-            echo 'Main advanced during the build, so no provider command was executed.'
+            echo 'The verified commit is no longer on main, so no provider command was executed.'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish to Cloudflare Pages
