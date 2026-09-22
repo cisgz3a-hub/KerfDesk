@@ -78,7 +78,7 @@ The A1 Pro command contract is materially different: vendor X/Y Home, tool-off f
 
 The initial audit's deduplicated inventory contained **126 files / 1,372 passing correctness checks**, plus **3 characterisations reproducing the coordinate-model defects**. All three characterisations have now been converted to regression tests that require correct behaviour. The machine-readable [verification summary](evidence/verification-summary.json) records the latest available result for each unique file, run stage and source log; repeated runs are not added together.
 
-The final focused inventory contains **169 files / 1,887 passing correctness checks** and **zero open-defect characterisations**. It includes the native-frame repair (12 files / 645 tests), contour-envelope repair (17 / 253), preview/estimate/worker integration (16 / 111), and asynchronous preparation ownership (8 / 182). These counts overlap; 1,887 is the deduplicated total, not the sum of cohorts. [Native-coordinate repair details](native-coordinate-repair.md) explain the evidence required to map a controller position to the configured bed.
+The final focused inventory contains **171 files / 1,909 passing correctness checks** and **zero open-defect characterisations**. It includes the native-frame repair (12 files / 645 tests), contour-envelope repair (17 / 253), preview/estimate/worker integration (16 / 111), asynchronous preparation ownership (8 / 182), and second-pass reference handling (2 / 22). These counts overlap; 1,909 is the deduplicated total, not the sum of cohorts. [Native-coordinate repair details](native-coordinate-repair.md) explain the evidence required to map a controller position to the configured bed.
 
 Initial audit cohorts:
 

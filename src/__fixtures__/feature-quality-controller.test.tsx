@@ -7,6 +7,7 @@ import { createProject } from '../core/scene';
 import { createStreamer, step } from '../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../platform/types';
 import { useLaserStore } from '../ui/state/laser-store';
+import { stockNativeEvidence } from '../ui/state/native-bed-frame.test-support';
 import { useStore } from '../ui/state/store';
 import { respondToTestGrblHandshake } from '../ui/state/laser-test-start-helpers';
 import { dispatchPositionLaser } from '../ui/workspace/position-laser-click';
@@ -161,8 +162,21 @@ describe('feature controller and workspace regressions', () => {
     const writes: string[] = [];
     const connection = await connect(writes);
     const project = createProject();
-    const device = { ...project.device, origin: 'rear-left' as const };
+    const device = {
+      ...project.device,
+      origin: 'rear-left' as const,
+      homing: { ...project.device.homing, enabled: true },
+    };
     useStore.setState({ project: { ...project, device } });
+    const evidence = stockNativeEvidence(device, true);
+    const sessionEpoch = useLaserStore.getState().controllerSessionEpoch;
+    useLaserStore.setState({
+      ...evidence,
+      controllerSessionEpoch: sessionEpoch,
+      controllerSettingsObservation: { sessionEpoch, observedAt: 1 },
+      controllerBuildInfo: { ...evidence.controllerBuildInfo, protocolVersion: '1.1f' },
+      controllerBuildInfoObservation: { sessionEpoch, observedAt: 1 },
+    });
     connection.emitLine('<Idle|MPos:50.000,70.000,0.000|WCO:40.000,50.000,0.000|FS:0,0>');
     dispatchPositionLaser({ x: 100, y: 100 }, device);
     await flush();

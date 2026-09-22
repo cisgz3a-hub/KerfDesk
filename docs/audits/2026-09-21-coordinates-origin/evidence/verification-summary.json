@@ -6,9 +6,9 @@
     "correctnessChecks": 1372,
     "openDefectCharacterisations": 3
   },
-  "uniqueFiles": 169,
-  "assertions": 1887,
-  "correctnessChecks": 1887,
+  "uniqueFiles": 171,
+  "assertions": 1909,
+  "correctnessChecks": 1909,
   "openDefectCharacterisations": 0,
   "parsedLogs": {
     "originBaseline": 19,
@@ -83,6 +83,12 @@
       "files": 1,
       "tests": 11,
       "passed": 11,
+      "failed": 0
+    },
+    "secondPass": {
+      "files": 2,
+      "tests": 22,
+      "passed": 22,
       "failed": 0
     }
   },
@@ -631,6 +637,20 @@
       "tests": 2,
       "status": "passed",
       "evidence": "frame-start-final-results.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/second-pass-execution.test.ts",
+      "tests": 10,
+      "status": "passed",
+      "evidence": "second-pass-coordinate-final.json",
+      "stage": "post-repair"
+    },
+    {
+      "name": "src/ui/laser/second-pass-preparation-proof.test.ts",
+      "tests": 12,
+      "status": "passed",
+      "evidence": "second-pass-coordinate-final.json",
       "stage": "post-repair"
     },
     {

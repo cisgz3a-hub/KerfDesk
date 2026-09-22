@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { stdout } from 'node:process';
+import { stripVTControlCharacters } from 'node:util';
 const evidence = 'docs/audits/2026-09-21-coordinates-origin/evidence';
 const files = new Map();
 const canonical = (name) => name.replaceAll('\\', '/').replace(/^.*?\/src\//, 'src/');
 function addLog(name, stage) {
-  const log = fs.readFileSync(path.join(evidence, name), 'utf8').replace(/\x1b\[[0-9;]*m/g, '');
+  const log = stripVTControlCharacters(fs.readFileSync(path.join(evidence, name), 'utf8'));
   let matched = 0;
   for (const m of log.matchAll(/(?:✓|✔)\s+(src\/\S+\.test\.tsx?)\s+\((\d+) tests?\)/g)) {
     files.set(canonical(m[1]), {
@@ -95,6 +97,7 @@ cohorts.contourEntry = {
 };
 cohorts.asyncPreparationOwnership = addJson('coordinate-owner-final-passing.json');
 cohorts.frameMetadata = addJson('frame-metadata-final.json');
+cohorts.secondPass = addJson('second-pass-coordinate-final.json');
 const entries = [...files.values()].sort((a, b) => a.name.localeCompare(b.name));
 const total = entries.reduce((sum, f) => sum + f.tests, 0);
 const summary = {
@@ -113,4 +116,4 @@ fs.writeFileSync(
   path.join(evidence, 'verification-summary.json'),
   JSON.stringify(summary, null, 2) + '\n',
 );
-console.log(JSON.stringify({ ...summary, files: undefined }, null, 2));
+stdout.write(`${JSON.stringify({ ...summary, files: undefined }, null, 2)}\n`);

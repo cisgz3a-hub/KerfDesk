@@ -2,13 +2,13 @@ import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import { deriveMachineEnvelope } from '../../core/controllers/grbl/machine-envelope';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
+import type { ControllerCommandSet } from '../../core/devices/device-profile';
 import {
   nativeBedFrame,
   type NativeBedFrame,
   type NativeXyBounds,
 } from '../../core/devices/native-bed-frame';
 import type { SessionObservationStamp } from './laser-controller-observation';
-import type { LaserState } from './laser-store';
 
 export type NativeBedEvidence = {
   readonly controllerSessionEpoch?: number;
@@ -17,12 +17,13 @@ export type NativeBedEvidence = {
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
   readonly activeControllerKind?: ControllerKind;
-  readonly activeControllerCommandSet?: LaserState['activeControllerCommandSet'];
+  readonly activeControllerCommandSet?: ControllerCommandSet | null | undefined;
   readonly detectedControllerKind?: ControllerKind | null;
   readonly homingState?: string;
 };
 
-export function nativeBedEvidenceSnapshot(source: LaserState): NativeBedEvidence {
+// Shared placement types must not depend on the live store's application graph.
+export function nativeBedEvidenceSnapshot(source: Required<NativeBedEvidence>): NativeBedEvidence {
   return {
     controllerSessionEpoch: source.controllerSessionEpoch,
     controllerSettings: source.controllerSettings,

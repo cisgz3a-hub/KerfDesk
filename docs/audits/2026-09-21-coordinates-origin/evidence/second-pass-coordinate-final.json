@@ -1,0 +1,269 @@
+{
+  "numTotalTestSuites": 5,
+  "numPassedTestSuites": 5,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 22,
+  "numPassedTests": 22,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1790035302036,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership uses the verified worker result and captured bounds without recompiling, native mapping known=false",
+          "status": "passed",
+          "title": "uses the verified worker result and captured bounds without recompiling, native mapping known=false",
+          "duration": 165.52980000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership uses the verified worker result and captured bounds without recompiling, native mapping known=true",
+          "status": "passed",
+          "title": "uses the verified worker result and captured bounds without recompiling, native mapping known=true",
+          "duration": 54.71060000000216,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership Frames only the clipped immutable program, then starts and archives it after review",
+          "status": "passed",
+          "title": "Frames only the clipped immutable program, then starts and archives it after review",
+          "duration": 114.58829999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership keeps cancel and duplicate Start from dispatching a second program",
+          "status": "passed",
+          "title": "keeps cancel and duplicate Start from dispatching a second program",
+          "duration": 34.49699999999939,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses controller movement while the worker binds the Frame approach",
+          "status": "passed",
+          "title": "refuses controller movement while the worker binds the Frame approach",
+          "duration": 22.208699999999226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership keeps the original current-position placement when framing from a different head position",
+          "status": "passed",
+          "title": "keeps the original current-position placement when framing from a different head position",
+          "duration": 23.53729999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses a revoked permit across the durable handoff and leaves no transmitted job",
+          "status": "passed",
+          "title": "refuses a revoked permit across the durable handoff and leaves no transmitted job",
+          "duration": 23.29820000000109,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership retains the attempted second-pass archive when its first write may have reached the controller",
+          "status": "passed",
+          "title": "retains the attempted second-pass archive when its first write may have reached the controller",
+          "duration": 35.077000000001135,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership refuses changed preview bytes and only revokes the exact owned permit on cancellation",
+          "status": "passed",
+          "title": "refuses changed preview bytes and only revokes the exact owned permit on cancellation",
+          "duration": 25.84100000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["exact second-pass Frame and Start ownership"],
+          "fullName": "exact second-pass Frame and Start ownership preserves transform ordering through disconnect recovery and another selected pass",
+          "status": "passed",
+          "title": "preserves transform ordering through disconnect recovery and another selected pass",
+          "duration": 118.3721000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035324009,
+      "endTime": 1790035324627.372,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/second-pass-execution.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'recovery history' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'recovery history' after worker verification",
+          "duration": 108.28390000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'inherited painted history' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'inherited painted history' after worker verification",
+          "duration": 20.363999999999578,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'original controller observation' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'original controller observation' after worker verification",
+          "duration": 16.38760000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'output scope in place' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'output scope in place' after worker verification",
+          "duration": 14.959600000000137,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'original placement in place' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'original placement in place' after worker verification",
+          "duration": 14.654300000000148,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'canonical profile in place' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'canonical profile in place' after worker verification",
+          "duration": 13.755199999999604,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership rejects changed 'provenance in place' after worker verification",
+          "status": "passed",
+          "title": "rejects changed 'provenance in place' after worker verification",
+          "duration": 13.565599999999904,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership retains canonical worker metadata after the public preview objects change",
+          "status": "passed",
+          "title": "retains canonical worker metadata after the public preview objects change",
+          "duration": 15.16070000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership does not serialize the raster scene while capturing or matching proof metadata",
+          "status": "passed",
+          "title": "does not serialize the raster scene while capturing or matching proof metadata",
+          "duration": 13.860200000000077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass verified preparation ownership"],
+          "fullName": "second-pass verified preparation ownership refuses source drift during asynchronous Frame geometry qualification before motion",
+          "status": "passed",
+          "title": "refuses source drift during asynchronous Frame geometry qualification before motion",
+          "duration": 17.53939999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass worker source ownership"],
+          "fullName": "second-pass worker source ownership does not register a source changed while its worker copy was being verified",
+          "status": "passed",
+          "title": "does not register a source changed while its worker copy was being verified",
+          "duration": 15.76760000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["second-pass worker source ownership"],
+          "fullName": "second-pass worker source ownership does not register a preview against changed source metadata during compilation",
+          "status": "passed",
+          "title": "does not register a preview against changed source metadata during compilation",
+          "duration": 12.589100000000144,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790035329257,
+      "endTime": 1790035329535.589,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/audit-coordinates-origin-20260921/src/ui/laser/second-pass-preparation-proof.test.ts"
+    }
+  ]
+}
