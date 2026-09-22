@@ -246,6 +246,43 @@ describe('second pass from the real prepared-output composition', () => {
     checkIndependentExposure(source, routeBrush(burn));
   });
 
+  it.each([
+    [
+      'Marlin inline',
+      { controllerKind: 'marlin', gcodeDialect: { dialectId: 'marlin-inline' } },
+      'Marlin (inline laser mode)',
+    ],
+    [
+      'Marlin fan',
+      { controllerKind: 'marlin', gcodeDialect: { dialectId: 'marlin-fan' } },
+      'Marlin (fan-controlled laser)',
+    ],
+    ['Smoothieware', { controllerKind: 'smoothieware' }, 'Smoothieware'],
+  ])('refuses %s output with a message naming the controller', (_name, device, label) => {
+    const project = imageProject('rapid');
+    const source = canonicalSource({
+      ...project,
+      device: { ...project.device, ...device } as Project['device'],
+    });
+    const parsed = parseLaserSecondPassSource(source);
+    expect(parsed.kind).toBe('error');
+    if (parsed.kind === 'error') {
+      expect(parsed.message).toContain(label);
+      expect(parsed.message).toContain('GRBL, grblHAL and FluidNC');
+      // Naming the controller beats failing on an unreadable prelude word.
+      expect(parsed.message).not.toContain('Source line');
+    }
+    const built = buildLaserSecondPassProgram(source, {
+      version: 1,
+      maxPowerS: 1000,
+      strokes: [
+        { id: 'any', mode: 'paint', radiusMm: 5, powerScale: 1, points: [{ x: 42, y: 32 }] },
+      ],
+    });
+    expect(built.kind).toBe('error');
+    if (built.kind === 'error') expect(built.message).toContain(label);
+  });
+
   it('handles a dense raster without collecting or replaying unselected rows', () => {
     const rows: string[] = ['G21', 'G90', 'M4S0'];
     for (let row = 0; row < 15000; row += 1) {

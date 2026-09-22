@@ -180,6 +180,23 @@ describe('selective pass construction', () => {
     ]);
   });
 
+  it('enters the first sweep with the source travel style, not an invented rapid', () => {
+    // The archived start position makes the opening runway a real segment. No
+    // travel precedes it, so its sweep must not be entered with a rapid that a
+    // controlled-dark program never used.
+    const source = 'G21\nG90\nM4 S0\nG1 X-2 Y0 F600 S0\nX10 S200\nM5\n';
+    const brush = { ...selection([stroke(5, 0.3)]), initialPosition: { x: -10, y: 0 } };
+    const result = ready(source, brush);
+    expect(result.gcode).not.toMatch(/^G0/m);
+    expect(result.gcode).toContain('G1X-10Y0F600S0');
+    // A rapid-led program keeps its rapid approach unchanged.
+    const rapidLed = ready(SOURCE, {
+      ...selection([stroke(5, 1)]),
+      initialPosition: { x: -9, y: 0 },
+    });
+    expect(rapidLed.gcode).toContain('G0X-5Y0S0');
+  });
+
   it('keeps a diagonal runway with the burn it feeds despite three-decimal rounding', () => {
     const source = 'G21\nG90\nM4 S0\nG0 X9.292 Y9.293 S0\nG1 X10 Y10 F600 S0\nX20 Y20 S300\nM5\n';
     const result = ready(source, selection([{ ...stroke(15, 1), points: [{ x: 15, y: 15 }] }]));

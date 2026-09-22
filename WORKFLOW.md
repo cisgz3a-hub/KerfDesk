@@ -1692,7 +1692,10 @@ authorization, Frame proof, controller command, or safety boundary.
   exact run and fingerprint. Storage failure is disclosed and preserves prior saved drafts.
   Drafts and bounded execution history are different: history
   still retains at most 20 terminal runs within 100 MiB, with its existing protected slots.
-- Supported inputs are the generated flat XY laser image, fill and vector programs. Native
+- Supported inputs are the flat XY laser image, fill and vector programs KerfDesk generates
+  for GRBL, grblHAL and FluidNC. Marlin and Smoothieware programs are refused with a message
+  naming the controller, and their completed runs get no darkening prompt and no Machine-panel
+  entry; where older completions remain, the panel says so and keeps the selector. Native
   external arcs, coordinate-changing commands, Z/rotary motion, dwell and stationary M3
   exposure cannot yet be transformed faithfully and produce a specific preparation error.
   No physical result, browser-minimisation behaviour or Falcon qualification follows from

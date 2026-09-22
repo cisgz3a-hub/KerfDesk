@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
+import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
 import { Dialog, DialogActions } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
-import type { RecoveryRepository } from '../../state/recovery';
+import type { ExecutionArtifactV1, RecoveryRepository } from '../../state/recovery';
 import { isModalOpen, useUiStore } from '../../state/ui-store';
 import { useRecoveryRepositorySnapshot } from '../../state/use-recovery-repository';
 import { jobControlsBusy } from '../job-controls-busy';
+
+/** Only a flat laser run whose program the transformer can read is offered;
+ * a Marlin or Smoothieware completion would lead straight to a refusal. */
+function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
+  return (
+    artifact.machineKind === 'laser' &&
+    laserSecondPassSupportsController(artifact.prepared.project.device.controllerKind)
+  );
+}
 
 export function SecondPassCompletionPrompt(props: {
   repository: RecoveryRepository;
@@ -27,32 +37,22 @@ export function SecondPassCompletionPrompt(props: {
   const returnFocusTo = useRef<HTMLElement | null>(null);
   const receipt = snapshot.lastCompletedReceipt;
   const matching = receipt?.runId === runId;
+  const offerable = receipt != null && matching && secondPassOfferable(receipt.artifact);
 
   useEffect(() => {
     if (!runId) return;
-    if (
-      (activeRunId !== null && activeRunId !== runId) ||
-      (matching && receipt.artifact.machineKind !== 'laser')
-    ) {
+    if ((activeRunId !== null && activeRunId !== runId) || (matching && !offerable)) {
       dismiss(runId);
-    } else if (matching && !busy && !modalOpen && !request) {
+    } else if (offerable && !busy && !modalOpen && !request) {
       if (presentedRunId !== runId)
         returnFocusTo.current = document.activeElement as HTMLElement | null;
       setPresentedRunId(runId);
     }
-  }, [runId, activeRunId, matching, receipt, busy, modalOpen, request, dismiss, presentedRunId]);
+  }, [runId, activeRunId, matching, offerable, busy, modalOpen, request, dismiss, presentedRunId]);
 
   // modalOpen gates the initial presentation only: this Dialog itself then
   // registers as a modal. Hydrated receipts alone never set completionRunId.
-  if (
-    !runId ||
-    runId !== presentedRunId ||
-    !matching ||
-    receipt.artifact.machineKind !== 'laser' ||
-    busy ||
-    request
-  )
-    return null;
+  if (!runId || runId !== presentedRunId || !offerable || busy || request) return null;
   return (
     <Dialog title="Job complete" size="sm" onClose={() => dismiss(runId)}>
       <p>Would you like to darken selected areas?</p>
