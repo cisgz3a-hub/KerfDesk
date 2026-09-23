@@ -223,6 +223,7 @@ describe('Artwork panel navigation', () => {
     expect(outputGroup.querySelector('[role="status"]')?.textContent).toContain(
       'excluded from output',
     );
+    expect(host.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(selection()).toEqual({ primary: 'chosen', additional: [] });
   });
 

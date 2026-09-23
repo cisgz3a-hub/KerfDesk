@@ -109,12 +109,17 @@
 }
 
 .lf-laser-essentials--compact .lf-laser-field__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+  column-gap: 4px;
   font-size: 13px;
 }
 
 .lf-laser-essentials--compact .lf-laser-field__label small {
   display: inline;
-  margin-left: 4px;
+  margin-left: 0;
   font-size: 12px;
 }
 

@@ -120,11 +120,6 @@ function SelectedOperationEditor(props: {
           This artwork has its own settings. The values shown here are used for its output.
         </p>
       ) : null}
-      {!props.active.output ? (
-        <p className="lf-artwork-hint lf-operation-scope" role="status">
-          Excluded from output. Turn on Include in output below to use this operation in the job.
-        </p>
-      ) : null}
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
