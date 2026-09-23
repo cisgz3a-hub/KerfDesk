@@ -290,7 +290,7 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
   await kerfdesk.emitSerialLine(IDLE);
   await expect(complete).toContainText('Would you like to darken selected areas?');
   await expect(page.getByRole('dialog')).toHaveCount(1);
-  await complete.getByRole('button', { name: 'Done', exact: true }).click();
+  await complete.getByRole('button', { name: 'Not now', exact: true }).click();
   await expect(complete).toHaveCount(0);
 
   await page.reload();
