@@ -177,7 +177,11 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
   assertArchiveMayFit(args);
   const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
-  assertExecutionArtifactSizeWithinBudget({ ...args, canvasPlan }, 0, true);
+  // No budget walk here: the measurement below walks the finished artifact,
+  // which holds the same job, and enforces the same budget. Walking the inputs
+  // first doubled a node-per-motion-point traversal that runs while the first
+  // window of the job is on the wire (ADR-349); assertArchiveMayFit has already
+  // refused the hopeless case before any allocation.
   const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);
   const device = prepared.project.device;

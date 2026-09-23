@@ -1,17 +1,11 @@
-export const MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES = 64 * 1024 * 1024;
+// Verbatim copy of the estimator before ADR-349 reordered its plain-container
+// path. The parity fuzz pins the new walk to it, byte for byte.
 
 const OBJECT_OVERHEAD_BYTES = 16;
 const ENTRY_OVERHEAD_BYTES = 8;
 const PRIMITIVE_BYTES = 24;
 
-/** Conservative, allocation-free structured-clone size estimate. String
- * lengths use the maximum UTF-8 bytes per UTF-16 code unit, and traversal
- * stops as soon as the caller's limit is exceeded. Views charge their entire
- * backing buffer because structured clone copies that buffer, with shared
- * backings counted once. Map, Set, Blob, and other supported structured-clone
- * containers are accounted explicitly; unknown containers fail closed rather
- * than disappearing from the estimate. */
-export function estimateExecutionArtifactBytes(
+export function legacyEstimateExecutionArtifactBytes(
   value: unknown,
   stopAfterBytes = Number.MAX_SAFE_INTEGER,
   allowTransientFunctions = false,
@@ -50,13 +44,6 @@ function executionArtifactValueBytes(
   const primitiveBytes = executionArtifactPrimitiveBytes(value, allowTransientFunctions);
   if (primitiveBytes !== null) return primitiveBytes;
   const objectValue = value as object;
-  // Plain objects and arrays are nearly every node of a job (one per motion
-  // point), and none of them can be a buffer, a view or another clone type, so
-  // they skip those checks. The walk runs while the first window of a job is
-  // already on the wire (ADR-349).
-  if (isPlainCloneContainer(objectValue)) {
-    return plainContainerBytes(objectValue, pending, seenContainers);
-  }
   const binaryBytes = executionArtifactBinaryBytes(objectValue, seenContainers, seenBackingBuffers);
   return binaryBytes ?? cloneContainerBytes(objectValue, pending, seenContainers);
 }
@@ -107,25 +94,13 @@ function cloneContainerBytes(
   seenContainers.add(value);
   const structuredCloneBytes = supportedCloneContainerBytes(value, pending);
   if (structuredCloneBytes !== null) return structuredCloneBytes;
-  return Number.MAX_SAFE_INTEGER;
-}
-
-// Object.keys, not Object.entries: the same own enumerable keys in the same
-// order, without allocating a [key, value] pair per property.
-function plainContainerBytes(
-  value: object,
-  pending: unknown[],
-  seenContainers: WeakSet<object>,
-): number {
-  if (seenContainers.has(value)) return 0;
-  seenContainers.add(value);
+  if (!isPlainCloneContainer(value)) return Number.MAX_SAFE_INTEGER;
   let bytes = Array.isArray(value)
     ? boundedAdd(OBJECT_OVERHEAD_BYTES, value.length * ENTRY_OVERHEAD_BYTES)
     : OBJECT_OVERHEAD_BYTES;
-  const record = value as Record<string, unknown>;
-  for (const key of Object.keys(record)) {
+  for (const [key, child] of Object.entries(value)) {
     bytes = boundedAdd(bytes, key.length * 3 + ENTRY_OVERHEAD_BYTES);
-    pending.push(record[key]);
+    pending.push(child);
   }
   return bytes;
 }
@@ -174,73 +149,14 @@ function backingBufferBytes(buffer: ArrayBufferLike, seenBackingBuffers: WeakSet
   return boundedAdd(buffer.byteLength, OBJECT_OVERHEAD_BYTES);
 }
 
-const SHARED_ARRAY_BUFFER: typeof SharedArrayBuffer | null =
-  typeof SharedArrayBuffer === 'undefined' ? null : SharedArrayBuffer;
-
 function isSharedArrayBuffer(value: object): value is SharedArrayBuffer {
-  return SHARED_ARRAY_BUFFER !== null && value instanceof SHARED_ARRAY_BUFFER;
+  return typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer;
 }
 
 function isPlainCloneContainer(value: object): boolean {
   if (Array.isArray(value)) return true;
   const prototype: unknown = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-}
-
-export function assertExecutionArtifactSizeWithinBudget(
-  value: unknown,
-  additionalBinaryBytes = 0,
-  allowTransientFunctions = false,
-): void {
-  measureExecutionArtifactBytesWithinBudget(value, additionalBinaryBytes, allowTransientFunctions);
-}
-
-/** Enforce the archive budget and return the measurement in ONE traversal.
- *
- * The returned total is the complete estimate, never an early-exit lower
- * bound: the walk stops early only once it passes the remaining budget, and
- * that is exactly the case this throws on. Callers that need both the guard
- * and the recorded size must use this instead of asserting and then
- * estimating again — the traversal visits one node per motion-manifest point,
- * so a second pass costs real time before the first wire write. */
-export function measureExecutionArtifactBytesWithinBudget(
-  value: unknown,
-  additionalBinaryBytes = 0,
-  allowTransientFunctions = false,
-): number {
-  if (
-    !Number.isSafeInteger(additionalBinaryBytes) ||
-    additionalBinaryBytes < 0 ||
-    additionalBinaryBytes > MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES
-  ) {
-    throw new Error('Execution artifact exceeds the safe archive size.');
-  }
-  const remaining = MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - additionalBinaryBytes;
-  const bytes = estimateExecutionArtifactBytes(value, remaining, allowTransientFunctions);
-  if (bytes > remaining) {
-    throw new Error('Execution artifact exceeds the safe archive size.');
-  }
-  return bytes;
-}
-
-const memoizedArtifactBytes = new WeakMap<object, number>();
-
-/** Identity-memoized full estimate for an immutable archived artifact.
- *
- * Snapshot hydration re-measures every retained execution-history artifact on
- * every refresh, and a refresh runs after each recovery mutation — including
- * the one that arms a fresh Start. The retained set is bounded by run count
- * and bytes, not by node count, so twenty traced jobs cost seconds of
- * main-thread work per refresh. Archived artifacts are immutable and the
- * snapshot coordinator deliberately hands the same object references back
- * across refreshes, so caching on identity returns the identical number
- * without re-walking. */
-export function memoizedExecutionArtifactBytes(artifact: object): number {
-  const cached = memoizedArtifactBytes.get(artifact);
-  if (cached !== undefined) return cached;
-  const bytes = estimateExecutionArtifactBytes(artifact);
-  memoizedArtifactBytes.set(artifact, bytes);
-  return bytes;
 }
 
 function boundedAdd(total: number, value: number): number {
