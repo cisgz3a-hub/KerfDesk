@@ -943,7 +943,7 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   );
   const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
   await expect(complete).toContainText('Would you like to darken selected areas?');
-  await complete.getByRole('button', { name: 'Done', exact: true }).click();
+  await complete.getByRole('button', { name: 'Not now', exact: true }).click();
   await dismissNotifications(page);
   const paintButton = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
   await expect(paintButton).toBeEnabled();

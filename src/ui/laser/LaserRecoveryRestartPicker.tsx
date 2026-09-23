@@ -1,5 +1,8 @@
+import { useMemo } from 'react';
+import type { AutomaticRestart } from '../../core/recovery/automatic-restart-line';
 import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
+import { automaticRecoveryRestart, automaticRestartHint } from './laser-recovery-automatic-restart';
 import { useLaserRecoveryPreviewRoute } from './use-laser-recovery-preview-route';
 
 export function LaserRecoveryRestartPicker(props: {
@@ -7,8 +10,15 @@ export function LaserRecoveryRestartPicker(props: {
   readonly fromLine: number | undefined;
   readonly disabled: boolean;
   readonly onChange: (line: number | undefined) => void;
+  /** The automatic restart, when the caller has already derived it. */
+  readonly automatic?: AutomaticRestart | null;
 }): JSX.Element {
   const artifact = props.capsule.artifact;
+  const given = props.automatic;
+  const automatic = useMemo(
+    () => (given !== undefined ? given : automaticRecoveryRestart(props.capsule)),
+    [given, props.capsule],
+  );
   return (
     <section aria-labelledby="laser-recovery-restart-title" style={{ marginTop: 14 }}>
       <h3 id="laser-recovery-restart-title" style={{ fontSize: 13, margin: '0 0 5px' }}>
@@ -42,25 +52,25 @@ export function LaserRecoveryRestartPicker(props: {
           max={artifact.fingerprint.lines}
           step={1}
           value={props.fromLine ?? ''}
-          placeholder="Automatic"
+          placeholder={automatic === null ? 'Automatic' : `Automatic: ${automatic.line}`}
           disabled={props.disabled}
-          style={{ width: 110 }}
+          style={{ width: 150 }}
           onChange={(event) =>
             changeRawLine(event.target.value, artifact.fingerprint.lines, props.onChange)
           }
         />
         <button
           type="button"
-          title="Use acknowledged command progress as the restart estimate; it does not prove where engraving physically stopped."
+          title="Go back to the automatic restart line, taken from acknowledged command progress (or the line the controller rejected); it does not prove where engraving physically stopped."
           disabled={props.disabled || props.fromLine === undefined}
           onClick={() => props.onChange(undefined)}
         >
-          Use transport estimate
+          Use automatic line
         </button>
       </div>
       <p style={hintStyle}>
         {props.fromLine === undefined
-          ? 'Automatic uses acknowledged command progress, which can be ahead of the physical cut. Inspect the work and choose an earlier movement if needed.'
+          ? automaticRestartHint(automatic)
           : `Recovery replays line ${props.fromLine} and every later line. A canvas choice starts at the beginning of the selected G-code movement, not partway along it.`}{' '}
         For image and fill engraving, choose an earlier scan line if the last row is incomplete;
         replayed areas may become darker. Overlapping passes share the same position, so check the

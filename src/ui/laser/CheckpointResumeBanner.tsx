@@ -1,10 +1,11 @@
 // Optional, newest-only recovery capsule. Archived jobs are observational
 // until the operator explicitly reaches a final supervised Start action.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import type { WorkCoordinateOffset } from '../state/origin-actions';
 import {
   RECOVERY_CLAIM_LEASE_MS,
   recoveryClaimIsExpired,
@@ -16,6 +17,7 @@ import {
 import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
+import { frameRemainingRecoveryArea } from './laser-recovery-frame';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 
 export function CheckpointResumeBanner(props: {
@@ -59,20 +61,55 @@ export function CheckpointResumeBanner(props: {
         <CncPassRecoveryWizard capsule={capsule} onClose={() => setReviewOpen(false)} />
       ) : null}
       {reviewOpen && capsule.artifact.machineKind === 'laser' ? (
-        <LaserRecoveryReviewDialog
+        <LaserRecoveryReview
           capsule={capsule}
+          repository={repository}
           onClose={() => setReviewOpen(false)}
-          onStart={(saved, fromLine) =>
-            runLaserRecoveryCapsuleFlow(
-              saved,
-              repository,
-              fromLine === undefined ? {} : { fromLine },
-            )
-          }
         />
       ) : null}
     </>
   );
+}
+
+/** The laser review with the live controller facts it compares against.
+ * Mounted only while open, so a closed banner never re-renders on status
+ * reports (ADR-352). */
+function LaserRecoveryReview(props: {
+  readonly capsule: RecoveryCapsule;
+  readonly repository: RecoveryRepository;
+  readonly onClose: () => void;
+}): JSX.Element {
+  const liveWorkOffsetMm = useLiveWorkOffsetMm();
+  return (
+    <LaserRecoveryReviewDialog
+      capsule={props.capsule}
+      onClose={props.onClose}
+      onStart={(saved, fromLine) =>
+        runLaserRecoveryCapsuleFlow(
+          saved,
+          props.repository,
+          fromLine === undefined ? {} : { fromLine },
+        )
+      }
+      liveWorkOffsetMm={liveWorkOffsetMm}
+      onFrameRemaining={(bounds) => frameRemainingRecoveryArea(props.capsule, bounds)}
+    />
+  );
+}
+
+/** The controller's reported work offset in mm; null until it reports one
+ * (the cache is cleared on every connect, disconnect and reset). Selecting the
+ * numbers, not the object, ignores repeated identical reports. */
+function useLiveWorkOffsetMm(): WorkCoordinateOffset | null {
+  const x = useLaserStore((state) => state.wcoCache?.x ?? null);
+  const y = useLaserStore((state) => state.wcoCache?.y ?? null);
+  const z = useLaserStore((state) => state.wcoCache?.z ?? null);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
+  return useMemo(() => {
+    if (x === null || y === null || z === null) return null;
+    const scale = reportInches ? 25.4 : 1;
+    return { x: x * scale, y: y * scale, z: z * scale };
+  }, [x, y, z, reportInches]);
 }
 
 function selectBannerSlots({ recoveryCapsule, pendingStart }: RecoveryRepositorySnapshot) {

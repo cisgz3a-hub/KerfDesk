@@ -31,6 +31,7 @@ import {
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
+import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
 import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
@@ -128,6 +129,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),
+      ...detectArchiveCapacityWarnings(args.prepared),
       ...(args.streamThroughput === undefined
         ? []
         : detectStreamThroughputWarnings({
@@ -192,6 +194,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.laserModeStartSnapshot.controllerBuildInfo,
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
+      ...detectArchiveCapacityWarnings(prepared),
       ...secondPassThroughputWarnings(args),
     ]),
     resolvedOriginLabel: describeJobOrigin(prepared.jobOrigin),
@@ -200,7 +203,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
     outputQualityFacts: [
       {
         label: 'Saved motion',
-        value: 'Original speed, direction, and runways retained.',
+        value: 'Original speed, direction and runways. Rows are replayed only around the paint.',
         tone: 'default',
       },
       {
