@@ -6,6 +6,7 @@ import {
 } from '../../core/controllers/grbl/corner-probe-geometry';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { SerialConnection } from '../../platform/types';
+import { cncAccessoryStartIssue } from './cnc-accessory-readiness';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import {
   mpgCommandBlockMessage,
@@ -27,7 +28,7 @@ export function probeLines(request: ProbeRequest): ReadonlyArray<string> {
   if (probeRequestBlockReason(request) !== null) return [];
   const motionLines =
     request.kind === 'z' ? buildZProbeLines(request.params) : buildCornerProbeLines(request.params);
-  // Current status must already prove spindle speed 0. These commands also
+  // Current status must already prove the spindle is off. These commands also
   // force the commanded spindle/coolant state off before probe motion queues.
   return ['M5', 'M9', ...motionLines];
 }
@@ -144,12 +145,44 @@ function probeProtocolBlockReason(
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle to probe (currently ${state.statusReport.state})`;
   }
-  if (state.statusReport.spindle === null) {
-    return 'Spindle state is not known. Wait for a status report that proves the spindle is off.';
-  }
-  if (state.statusReport.spindle !== 0) return 'Spindle must be off before probing.';
+  const spindleBlock = spindleOffBlockReason(state.statusReport.spindle, state.accessoryCache);
+  if (spindleBlock !== null) return spindleBlock;
   if (refs.driver.commands.settleDwell.length === 0) {
     return 'This controller has no planner-settle command for a qualified probe cycle.';
+  }
+  return null;
+}
+
+const SPINDLE_ON_REASON = 'Spindle must be off before probing.';
+const SPINDLE_UNKNOWN_REASON =
+  'Spindle state is not known yet. Probing needs a status report that proves the spindle is ' +
+  'off: an FS: spindle speed of 0, or an Ov: override field without A:S or A:C. If the ' +
+  'controller never reports either, enable its override (Ov:) status field.';
+
+// A current `FS:` speed is the direct proof. Builds without a variable
+// spindle print `F:` (feed only) instead, so the speed is never known there:
+// GRBL 1.1 without VARIABLE_SPINDLE, grblHAL with an on/off spindle. Both
+// still report the accessory state: `A:` rides with `Ov:` and names S/C while
+// the spindle turns, so an `Ov:` without `A:S`/`A:C` proves it is off, and a
+// spindle change forces the next report to carry it. The accessory cache
+// holds that observation.
+// https://github.com/gnea/grbl/blob/master/grbl/report.c
+// https://github.com/grblHAL/core/blob/master/report.c
+function spindleOffBlockReason(
+  speed: number | null,
+  accessories: LaserState['accessoryCache'],
+): string | null {
+  if (speed !== null) return speed === 0 ? null : SPINDLE_ON_REASON;
+  if (accessories == null) return SPINDLE_UNKNOWN_REASON;
+  if (accessories.spindleCw || accessories.spindleCcw) return SPINDLE_ON_REASON;
+  // A secondary spindle, an encoder fault or a pending firmware tool change
+  // leave the spindle state unproven; say which.
+  if (
+    accessories.secondarySpindlePresent === true ||
+    accessories.spindleEncoderFault === true ||
+    accessories.toolChangePending === true
+  ) {
+    return cncAccessoryStartIssue('cnc', accessories) ?? SPINDLE_UNKNOWN_REASON;
   }
   return null;
 }
