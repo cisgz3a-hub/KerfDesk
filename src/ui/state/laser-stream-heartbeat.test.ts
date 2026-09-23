@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import {
   ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS,
+  ACTIVE_STREAM_SCHEDULING_GRACES,
   detectActiveStreamHeartbeatLoss,
 } from './laser-stream-heartbeat';
 
@@ -59,23 +60,70 @@ describe('detectActiveStreamHeartbeatLoss', () => {
     expect(fault.lost).toBe(true);
   });
 
-  it('does not renew that query window across repeated delayed ticks with no status reply', () => {
+  it('does not renew that query window indefinitely across delayed ticks with no reply', () => {
+    let result = detectActiveStreamHeartbeatLoss(streamingJob(), observation(4), null, 1_000);
+    const delayed: boolean[] = [];
+    for (let tick = 1; tick <= ACTIVE_STREAM_SCHEDULING_GRACES + 1; tick += 1) {
+      result = detectActiveStreamHeartbeatLoss(
+        streamingJob(),
+        observation(4),
+        result.probe,
+        1_000 + tick * 60_000,
+      );
+      delayed.push(result.lost);
+    }
+
+    expect(delayed).toEqual([
+      ...Array.from({ length: ACTIVE_STREAM_SCHEDULING_GRACES }, () => false),
+      true,
+    ]);
+  });
+
+  // ADR-356: after the operator waits out a page stall, the reply to the
+  // resumed query can sit behind a backlog of acknowledgements and a second
+  // long task. Neither is the controller going silent.
+  it('does not abort when a second host stall lands before the resumed query is answered', () => {
     const first = detectActiveStreamHeartbeatLoss(streamingJob(), observation(4), null, 1_000);
     const resumed = detectActiveStreamHeartbeatLoss(
       streamingJob(),
       observation(4),
       first.probe,
-      61_000,
+      21_000,
     );
-    const nextDelayedTick = detectActiveStreamHeartbeatLoss(
+    const secondStall = detectActiveStreamHeartbeatLoss(
       streamingJob(),
       observation(4),
       resumed.probe,
-      121_000,
+      21_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS + 500,
     );
 
     expect(resumed.lost).toBe(false);
-    expect(nextDelayedTick.lost).toBe(true);
+    expect(secondStall.lost).toBe(false);
+  });
+
+  it('restarts the window when an acknowledgement arrives without a status report', () => {
+    const job = streamingJob();
+    const first = detectActiveStreamHeartbeatLoss(job, observation(4), null, 1_000);
+    const acked = { ...job, completed: job.completed + 1 };
+    const later = detectActiveStreamHeartbeatLoss(
+      acked,
+      observation(4),
+      first.probe,
+      1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS,
+    );
+
+    expect(later.lost).toBe(false);
+    expect(later.probe?.at).toBe(1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS);
+  });
+
+  it('still declares loss when neither a report nor an acknowledgement arrives while polling', () => {
+    const job = streamingJob();
+    let result = detectActiveStreamHeartbeatLoss(job, observation(4), null, 1_000);
+    for (let now = 1_250; now <= 1_000 + ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS; now += 250) {
+      result = detectActiveStreamHeartbeatLoss(job, observation(4), result.probe, now);
+    }
+
+    expect(result.lost).toBe(true);
   });
 
   it('restarts the window for every fresh same-session status report', () => {
