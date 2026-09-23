@@ -1566,5 +1566,5 @@ above are no longer current output behavior.
 - Verification on 2026-09-24: the runtime advisory audit reports zero advisories; the unchanged
   licence gate passes 56 production packages across nine licences. PDF.js's unused optional Node
   canvas edge is removed with an exact parent/version pnpm override, keeping native canvas out
-  of the runtime closure. PDF resource gzip contribution is 2,201,132 bytes before decoder chunks;
+  of the runtime closure. PDF resource gzip contribution is 2,201,129 bytes before decoder chunks;
   ADR-352 records the alternatives and retained offline precache tradeoff.

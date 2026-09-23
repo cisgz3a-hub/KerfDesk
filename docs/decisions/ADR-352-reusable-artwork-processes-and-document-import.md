@@ -79,12 +79,13 @@ The unused PDF.js optional Node canvas dependency is removed through the exact p
 pnpm override. Browser rendering uses canvas supplied by Chromium; removing that edge keeps
 unused native binaries out of the resolved production closure without relaxing the licence gate.
 
-PDF resource files contribute 2,201,132 bytes when individually gzipped (CMaps 982,956;
-fonts/licences 1,048,180; JavaScript image codecs/licences 169,996), before the decoder chunks.
+PDF resource files contribute 2,201,129 bytes when individually gzipped (CMaps 982,956;
+fonts/licences 1,048,177; JavaScript image codecs/licences 169,996), before the decoder chunks.
 This exceeds the historical 1-MB total bundle target. A hand-written PDF decoder, a renderer-only
 browser embed, and first-use CDN/resource fetches were considered: they cannot provide the
 required path conversion, complete page rendering and established offline guarantee together.
-The accepted tradeoff is local precaching, with decoder execution deferred until import. The
+The accepted tradeoff is local precaching, including resource licences and the combined notices,
+with decoder execution deferred until import. The
 production build and startup module/worker inspection remain separate verification steps.
 
 ### Verification and boundaries

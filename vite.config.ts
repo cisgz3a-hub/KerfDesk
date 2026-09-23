@@ -108,7 +108,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}'],
+        globPatterns: [
+          '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}',
+          'pdf-resources/**/LICENSE*',
+          'third-party-notices.txt',
+        ],
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
         globIgnores: ['**/node_modules/**/*', '**/tutorial-images/**'],
