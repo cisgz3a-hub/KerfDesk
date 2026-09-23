@@ -27,9 +27,12 @@ concurrency:
 # Required for actions/checkout — read access is enough; the deploy
 # itself authenticates via the Pages-only PAGES_CLOUDFLARE_API_TOKEN, not
 # GITHUB_TOKEN. The renamed credential prevents historical desktop workflows
-# from reusing the web-deploy token for R2.
+# from reusing the web-deploy token for R2. `actions: read` lets the candidate
+# phase read which commits passed CI and what this lane last published
+# (ADR-311 Amendment 2); it cannot change any run.
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
@@ -75,19 +78,35 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW_CONTROL_SHA: ${{ github.workflow_sha }}
+          # Read-only Actions API access for the lane evidence (see permissions).
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           control_resolver="${RUNNER_TEMP}/resolve-web-deploy-identity.mjs"
+          control_evidence="${RUNNER_TEMP}/web-deploy-lane-evidence.mjs"
+          lane_evidence="${RUNNER_TEMP}/web-deploy-lane-evidence.json"
           git merge-base --is-ancestor "${WORKFLOW_CONTROL_SHA}" refs/remotes/origin/main
           git show "${WORKFLOW_CONTROL_SHA}:scripts/resolve-web-deploy-identity.mjs" \
             > "${control_resolver}"
+          git show "${WORKFLOW_CONTROL_SHA}:scripts/web-deploy-lane-evidence.mjs" \
+            > "${control_evidence}"
+          checkout_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git rev-parse refs/remotes/origin/main)"
+          # ADR-311 Amendment 2: a commit main has moved past still builds when
+          # no newer commit has passed CI and production serves an ancestor of
+          # it. A lookup failure is recorded, never fatal, and keeps tip-only.
+          node "${control_evidence}" \
+            --candidate-sha="${checkout_sha}" \
+            --current-main-sha="${current_main_sha}" \
+            --output="${lane_evidence}"
           node "${control_resolver}" \
             --event-name="${EVENT_NAME}" \
             --phase=candidate \
-            --checkout-sha="$(git rev-parse HEAD)" \
-            --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
+            --checkout-sha="${checkout_sha}" \
+            --current-main-sha="${current_main_sha}" \
             --validated-sha="${VALIDATED_SHA}" \
+            --lane-evidence="${lane_evidence}" \
             --github-output="${GITHUB_OUTPUT}"
 
       - name: Record obsolete run as an intentional non-deployment

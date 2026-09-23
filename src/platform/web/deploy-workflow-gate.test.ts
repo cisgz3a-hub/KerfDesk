@@ -105,6 +105,31 @@ describe('Cloudflare production deploy gate', () => {
     expect(prePublishIndex).toBeLessThan(publishIndex);
   });
 
+  // ADR-311 Amendment 2: a candidate main has moved past builds only on lane
+  // evidence gathered by protected-main code with read-only Actions access.
+  // Dropping the evidence would silently restore the tip-only candidate rule
+  // that starved production on 2026-09-23.
+  it('gathers lane evidence with protected-main code and read-only Actions access', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const permissions = /^permissions:\n((?: {2}.+\n)+)/mu.exec(workflow)?.[1] ?? '';
+
+    expect(permissions).toContain('contents: read');
+    expect(permissions).toContain('actions: read');
+    expect(permissions).not.toContain('write');
+    expect(workflow).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(workflow).toContain(
+      'git show "${WORKFLOW_CONTROL_SHA}:scripts/web-deploy-lane-evidence.mjs"',
+    );
+    expect(workflow).not.toContain('node scripts/web-deploy-lane-evidence.mjs');
+
+    const evidenceIndex = workflow.indexOf('node "${control_evidence}"');
+    const resolverIndex = workflow.indexOf('node "${control_resolver}"');
+    expect(evidenceIndex).toBeGreaterThanOrEqual(0);
+    expect(resolverIndex).toBeGreaterThan(evidenceIndex);
+    expect(workflow.slice(evidenceIndex, resolverIndex)).toContain('--output="${lane_evidence}"');
+    expect(workflow.slice(resolverIndex)).toContain('--lane-evidence="${lane_evidence}"');
+  });
+
   it('uses current-main control code when an obsolete candidate predates the resolver', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
 

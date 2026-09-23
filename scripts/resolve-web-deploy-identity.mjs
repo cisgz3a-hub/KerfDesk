@@ -1,28 +1,35 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const FULL_SHA = /^[0-9a-f]{40}$/iu;
 const PHASES = new Set(['candidate', 'publication']);
+const PRODUCTION_RELATIONS = new Set(['older', 'same', 'other']);
 
 /**
  * The deploy lane asks this twice, and the two phases ask DIFFERENT questions.
  *
- * `candidate` (before the build): is this commit worth building at all? Only
- * main's tip is, so an obsolete historical rerun never burns a build slot.
+ * `candidate` (before the build): is this commit worth building at all? Main's
+ * tip always is. A commit main has moved past is worth building only while
+ * nothing supersedes it: no newer commit on main has passed CI (that commit's
+ * own run is queued behind this one) and production serves an ancestor of it
+ * (`web-deploy-lane-evidence.mjs` gathers both). An obsolete historical rerun
+ * fails both tests and never burns a build slot.
  *
  * `publication` (after the build): is this commit still safe to publish? It is,
  * as long as it has not LEFT main — a newer tip is not a reason to withhold it.
  *
- * Requiring the tip in BOTH phases is what starved the lane. The verification
- * gate runs ~50 minutes while main merges every ~60-85, so nearly every run
- * lost the race and skipped publication while still reporting success. The site
- * then sat on a commit far OLDER than the one each run was refusing to publish
- * — the freshness check made the site staler, which is the opposite of its job.
+ * Requiring the tip is what starved the lane, first at publication (ADR-311
+ * Amendment 1) and then at the candidate phase (Amendment 2). CI runs for tens
+ * of minutes; when main merged again before it finished, the run found its
+ * commit behind the tip and built nothing, and the newer commit's CI was then
+ * overtaken by the next merge in turn. The site sat on a commit hours older
+ * than the ones each run refused — the freshness check made the site staler,
+ * which is the opposite of its job.
  *
- * Publishing an ancestor of the current tip means production can trail main by
- * a commit or two; the newer commit publishes from its own queued run, and the
- * concurrency lane (`queue: max`) keeps those runs in order.
+ * Production can therefore trail main by a commit or two; the newer commit
+ * publishes from its own queued run, and the concurrency lane (`queue: max`)
+ * keeps those runs in order.
  */
 export function resolveWebDeployIdentity({
   eventName,
@@ -31,6 +38,7 @@ export function resolveWebDeployIdentity({
   currentMainSha,
   validatedSha,
   checkoutOnMain,
+  laneEvidence,
 }) {
   const checkout = normalizedSha(checkoutSha, 'checked-out SHA');
   const currentMain = normalizedSha(currentMainSha, 'current main SHA');
@@ -41,11 +49,7 @@ export function resolveWebDeployIdentity({
     return { eligible: true, sha: checkout, reason: tipReason(eventName) };
   }
   if (phase === 'publication') return publicationVerdict(checkout, currentMain, checkoutOnMain);
-  return {
-    eligible: false,
-    sha: checkout,
-    reason: obsoleteReason(eventName, checkout, currentMain),
-  };
+  return candidateVerdict(eventName, checkout, currentMain, laneFacts(laneEvidence));
 }
 
 function assertKnownEvent(eventName, checkout, validatedSha) {
@@ -67,10 +71,71 @@ function tipReason(eventName) {
     : 'Manual dispatch checked out the current main tip.';
 }
 
-function obsoleteReason(eventName, checkout, currentMain) {
-  return eventName === 'workflow_run'
-    ? `Validated commit ${checkout} is obsolete; current main is ${currentMain}.`
-    : `Manual checkout ${checkout} is obsolete; current main is ${currentMain}.`;
+function candidateVerdict(eventName, checkout, currentMain, lane) {
+  const subject = `${eventName === 'workflow_run' ? 'Validated commit' : 'Manual checkout'} ${checkout}`;
+  const behind = `${subject} is behind current main ${currentMain}`;
+  const skip = (reason) => ({ eligible: false, sha: checkout, reason });
+  if (lane.unavailable !== null) {
+    return skip(
+      `${behind}, and the lane evidence is unavailable (${lane.unavailable}), so it does not build.`,
+    );
+  }
+  if (!lane.candidateOnMain) {
+    return skip(
+      `${subject} is no longer on main (current main is ${currentMain}), so it does not build.`,
+    );
+  }
+  if (lane.newerValidatedSha !== null) {
+    return skip(
+      `${behind} and superseded: ${lane.newerValidatedSha} already passed CI and deploys from its own run.`,
+    );
+  }
+  if (lane.productionSha === null) {
+    return skip(
+      `${behind}, and the commit production serves is unknown (${lane.productionEvidence}), so it does not build.`,
+    );
+  }
+  if (lane.productionRelation === 'same') {
+    return skip(`${behind}, and production already serves it.`);
+  }
+  if (lane.productionRelation === 'other') {
+    return skip(
+      `${behind}, and production serves ${lane.productionSha}, which it does not descend from.`,
+    );
+  }
+  return {
+    eligible: true,
+    sha: checkout,
+    reason: `${behind}, but no newer commit has passed CI and production serves the older ${lane.productionSha}, so it builds; newer commits deploy from their own runs.`,
+  };
+}
+
+// Only well-formed evidence can widen what builds: a malformed field throws,
+// exactly as `--checkout-on-main` does, while a lookup the evidence script
+// could not make arrives as `unavailable` and keeps the tip-only rule.
+function laneFacts(evidence) {
+  if (evidence === null || typeof evidence !== 'object') {
+    throw new Error("Lane evidence is required for a candidate that is not main's tip.");
+  }
+  if (evidence.unavailable !== null && evidence.unavailable !== undefined) {
+    const unavailable = singleLine(evidence.unavailable);
+    if (unavailable === '')
+      throw new Error('Lane evidence is marked unavailable without a reason.');
+    return { unavailable };
+  }
+  const productionSha = optionalSha(evidence.productionSha, 'production SHA');
+  const productionRelation = productionSha === null ? null : evidence.productionRelation;
+  if (productionSha !== null && !PRODUCTION_RELATIONS.has(productionRelation)) {
+    throw new Error(`production relation is not older, same or other: ${productionRelation}`);
+  }
+  return {
+    unavailable: null,
+    candidateOnMain: parsedBoolean(evidence.candidateOnMain, 'candidate-on-main'),
+    newerValidatedSha: optionalSha(evidence.newerValidatedSha, 'newer validated SHA'),
+    productionSha,
+    productionRelation,
+    productionEvidence: singleLine(evidence.productionEvidence ?? 'no record') || 'no record',
+  };
 }
 
 function publicationVerdict(checkout, currentMain, checkoutOnMain) {
@@ -96,6 +161,10 @@ function normalizedSha(value, label) {
   return normalized;
 }
 
+function optionalSha(value, label) {
+  return value === null || value === undefined ? null : normalizedSha(value, label);
+}
+
 // Only the two literals, because an unrecognised value here would otherwise
 // decide a production publication by accident.
 function parsedBoolean(value, label) {
@@ -108,12 +177,18 @@ function parsedBoolean(value, label) {
   throw new Error(`${label} is not a boolean: ${value}`);
 }
 
+// A reason lands in GITHUB_OUTPUT as one `reason=` line.
+function singleLine(value) {
+  return String(value).replace(/\s+/gu, ' ').trim();
+}
+
 function argument(name) {
   const prefix = `--${name}=`;
   return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length);
 }
 
 function runCli() {
+  const laneEvidencePath = argument('lane-evidence');
   const result = resolveWebDeployIdentity({
     eventName: argument('event-name'),
     phase: argument('phase') ?? 'candidate',
@@ -121,6 +196,10 @@ function runCli() {
     currentMainSha: argument('current-main-sha'),
     validatedSha: argument('validated-sha'),
     checkoutOnMain: argument('checkout-on-main'),
+    laneEvidence:
+      laneEvidencePath === undefined
+        ? undefined
+        : JSON.parse(readFileSync(resolve(laneEvidencePath), 'utf8')),
   });
   const githubOutput = argument('github-output');
   if (githubOutput !== undefined) {
