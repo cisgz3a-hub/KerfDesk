@@ -58,9 +58,16 @@ afterEach(async () => {
 describe.each([FALCON_COMPATIBLE_PROFILE, FALCON_A1_PRO_GRBLHAL_PROFILE])(
   'Falcon coordinate flow: $name',
   (device) => {
-    it.each(['absolute', 'current-position', 'user-origin', 'verified-origin'] as const)(
+    it.each([
+      'absolute',
+      'absolute-offset',
+      'current-position',
+      'user-origin',
+      'verified-origin',
+    ] as const)(
       '%s preserves the physical anchor through Frame and streams its exact program',
-      async (startFrom) => {
+      async (scenario) => {
+        const startFrom = scenario === 'absolute-offset' ? 'absolute' : scenario;
         const base = createProject(device);
         const project = {
           ...base,
@@ -100,7 +107,11 @@ describe.each([FALCON_COMPATIBLE_PROFILE, FALCON_A1_PRO_GRBLHAL_PROFILE])(
         await vi.advanceTimersByTimeAsync(1500);
         expect(sim.state().mpos).toEqual({ x: 120, y: 80, z: 0 });
 
-        if (startFrom === 'user-origin' || startFrom === 'verified-origin') {
+        if (
+          startFrom === 'user-origin' ||
+          startFrom === 'verified-origin' ||
+          scenario === 'absolute-offset'
+        ) {
           const settingOrigin = useLaserStore.getState().setOriginHere();
           await vi.advanceTimersByTimeAsync(1500);
           await settingOrigin;
@@ -119,12 +130,20 @@ describe.each([FALCON_COMPATIBLE_PROFILE, FALCON_A1_PRO_GRBLHAL_PROFILE])(
         if (permit === null) throw new Error('Frame issued no permit');
         const bounds = permit.candidate.preparedStart.metrics.frameJobBounds;
         const expected =
-          startFrom === 'absolute'
-            ? { minX: 30, maxX: 50, minY: device.bedHeight - 50, maxY: device.bedHeight - 40 }
-            : startFrom === 'current-position'
-              ? { minX: 110, maxX: 130, minY: 75, maxY: 85 }
-              : { minX: -10, maxX: 10, minY: -5, maxY: 5 };
+          scenario === 'absolute-offset'
+            ? { minX: -90, maxX: -70, minY: device.bedHeight - 130, maxY: device.bedHeight - 120 }
+            : startFrom === 'absolute'
+              ? { minX: 30, maxX: 50, minY: device.bedHeight - 50, maxY: device.bedHeight - 40 }
+              : startFrom === 'current-position'
+                ? { minX: 110, maxX: 130, minY: 75, maxY: 85 }
+                : { minX: -10, maxX: 10, minY: -5, maxY: 5 };
         expect(bounds).toEqual(expected);
+        if (scenario === 'absolute-offset') {
+          expect(sim.state().g92).toEqual({ x: 120, y: 80, z: 0 });
+          expect(bounds!.minX + 120).toBe(30);
+          expect(bounds!.minY + 80).toBe(device.bedHeight - 50);
+          expect(frameLines.some((line) => /G92|G10/.test(line))).toBe(false);
+        }
 
         const repository = new RecoveryRepository({
           backend: new MemoryRecoveryStorageBackend(),

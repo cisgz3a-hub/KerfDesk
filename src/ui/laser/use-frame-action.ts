@@ -22,7 +22,11 @@ import {
   frameControllerQueueIssue,
   normalizeFrameWorkCoordinateSystem,
 } from './frame-controller-readiness';
-import { waitForFreshIdleFramePosition } from './frame-position-readiness';
+import {
+  waitForAbsoluteFrameOffset,
+  waitForFreshIdleFramePosition,
+} from './frame-position-readiness';
+import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
 import { prepareCurrentStartJob } from './start-job-source';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
@@ -128,6 +132,13 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
+    return null;
+  }
+  if (!(await waitForAbsoluteFrameOffset(useStore.getState().jobPlacement))) {
+    reportFramePreparationRefusal(
+      [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
+      wcsNormalization.warning,
+    );
     return null;
   }
   const app = useStore.getState();

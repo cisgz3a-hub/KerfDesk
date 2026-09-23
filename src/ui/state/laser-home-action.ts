@@ -101,18 +101,17 @@ export async function runHomeAction(
     trustedPositionEpoch: (expectedPositionEpoch = (state.trustedPositionEpoch ?? 0) + 1),
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     wcoCache: null,
-    workOriginActive:
-      state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
+    // Home establishes machine position, not the absence of G92/G54 offsets.
+    // Keep a prior origin unresolved until a fresh accepted WCO proves it.
+    workOriginActive: state.workOriginActive || state.workOriginSource !== 'none',
     workOriginSource:
-      state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown'
-        ? 'unknown'
-        : 'none',
+      state.workOriginActive || state.workOriginSource !== 'none' ? 'unknown' : 'none',
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
-    log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
+    log: pushLog(state, '[lf2] Homing started. Invalidated origin and frame evidence.'),
   }));
   const epochs = {
     session: expectedSessionEpoch,
