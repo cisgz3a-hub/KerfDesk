@@ -173,7 +173,7 @@ test.describe('workspace shell acceptance', () => {
     );
     await expect(page.getByRole('region', { name: 'Job actions' })).toBeVisible();
     await page.getByRole('menuitem', { name: 'Window', exact: true }).click();
-    for (const name of ['Cuts / Layers Panel', 'Machine Controls Panel']) {
+    for (const name of ['Artwork Panel', 'Machine Controls Panel']) {
       await expect(page.getByRole('menuitemcheckbox', { name, exact: true })).toBeChecked();
     }
     await page.keyboard.press('Escape');
