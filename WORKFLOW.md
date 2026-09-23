@@ -1682,6 +1682,21 @@ authorization, Frame proof, controller command, or safety boundary.
   extend an unanswered query; normal two-second silence still requests fail-dark containment.
   This prevents a demonstrated false disconnect and does not establish that a particular
   browser, USB adapter or controller keeps streaming while minimised.
+- ADR-356 amends that watchdog. A processed acknowledgement counts as fresh controller output
+  as well as a status report, because after a page stall the reply to the resumed query can
+  wait behind a backlog of acknowledgements. Each further gap may re-open the query window at
+  most three times for one unchanged observation, so repeated delays still cannot extend an
+  unanswered query indefinitely, and two seconds of on-schedule silence still requests
+  fail-dark containment.
+- The live bar's "controller holding program" state, its log line and the 90-second
+  unacknowledged-lines notice count only time the page was running. After a poll gap of two
+  seconds or more the wait restarts from the resumed tick, so a page stall is not reported
+  as the controller holding the program (ADR-356).
+- After any page stall, the controller output that queued up meanwhile is handed to the app
+  in slices of about 8 ms, with input, drawing and the status poll running in between,
+  instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
+  keeps the page answering during catch-up; it does not make a stalled page keep feeding
+  the controller, which still depends on the page unless the transport runs in a worker.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
