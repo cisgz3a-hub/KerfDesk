@@ -50,6 +50,8 @@ exclusion no longer describes the authorized product.
    preserve their original grid, all eight orientations and independent density axes, converted
    to 8-bit RGB over white for engraving. Missing density uses the existing 254-DPI default.
    Unsupported TIFF variants fail visibly instead of yielding incomplete pixels.
+   Page images use the browser's actual canvas integer representation and drawing context;
+   a guessed pixel-edge threshold does not refuse an otherwise representable import.
 7. **HPGL/PLT is clean-room geometry import.** It follows the primary HP reference,
    40 plotter units/mm, ordered pen paths and explicit scale reference points. Unsupported text,
    clipping, PCL wrappers or drawing styles reject the whole file with a source diagnostic.

@@ -19,11 +19,16 @@ export function pageCanvas(width: number, height: number): HTMLCanvasElement {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new Error('The page dimensions must be positive and finite.');
   }
-  if (width > 16384 || height > 16384) {
-    throw new Error('This resolution exceeds the browser canvas edge limit. Choose a lower DPI.');
-  }
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(width);
   canvas.height = Math.ceil(height);
+  // Canvas dimensions use unsigned integers. Check the browser's actual
+  // representation and context instead of imposing a guessed edge limit.
+  if (canvas.width !== Math.ceil(width) || canvas.height !== Math.ceil(height)) {
+    throw new Error('The browser cannot represent a canvas at this page size.');
+  }
+  if (canvas.getContext('2d') === null) {
+    throw new Error('The browser could not create a canvas at this page size.');
+  }
   return canvas;
 }
