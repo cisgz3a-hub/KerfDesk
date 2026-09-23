@@ -7,6 +7,7 @@ export function validateOptimization(value: unknown): string | null {
     optionalBoolean(value, 'optimization.reduceTravelMoves'),
     optionalLiteral(value, 'optimization.travelPolicy', ['nearest-neighbor', 'source-order']),
     optionalBoolean(value, 'optimization.insideFirst'),
+    optionalBoolean(value, 'optimization.removeOverlappingLines'),
     optionalLiteral(value, 'optimization.layerPriority', [
       'project-order',
       'reverse-project-order',

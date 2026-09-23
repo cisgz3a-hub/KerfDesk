@@ -58,18 +58,13 @@ function PlannerFields(props: {
           ['source-order', 'Keep source order'],
         ]}
       />
-      <label style={checkboxRowStyle}>
-        <input
-          name="insideFirst"
-          type="checkbox"
-          className="lf-checkbox"
-          checked={settings.insideFirst}
-          disabled={keepsSourceOrder}
-          title={orderingControlTitle ?? 'Cut enclosed paths before their containing paths.'}
-          onChange={(event) => update({ insideFirst: event.currentTarget.checked })}
-        />
-        <span>Inside paths first</span>
-      </label>
+      <InsideFirstField
+        checked={settings.insideFirst}
+        disabled={keepsSourceOrder}
+        title={orderingControlTitle ?? 'Cut enclosed paths before their containing paths.'}
+        update={update}
+      />
+      <OverlapRemovalField checked={settings.removeOverlappingLines} update={update} />
       <PlannerSelect
         label="Layer priority"
         name="layerPriority"
@@ -116,12 +111,53 @@ function PlannerFields(props: {
   );
 }
 
+function InsideFirstField(props: {
+  readonly checked: boolean;
+  readonly disabled: boolean;
+  readonly title: string;
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <label style={checkboxRowStyle}>
+      <input
+        name="insideFirst"
+        type="checkbox"
+        className="lf-checkbox"
+        checked={props.checked}
+        disabled={props.disabled}
+        title={props.title}
+        onChange={(event) => props.update({ insideFirst: event.currentTarget.checked })}
+      />
+      <span>Inside paths first</span>
+    </label>
+  );
+}
+
+function OverlapRemovalField(props: {
+  readonly checked: boolean;
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <label style={checkboxRowStyle}>
+      <input
+        name="removeOverlappingLines"
+        type="checkbox"
+        className="lf-checkbox"
+        checked={props.checked}
+        title="Cut shared Line spans once within each operation. Separate operations and pass counts are preserved."
+        onChange={(event) => props.update({ removeOverlappingLines: event.currentTarget.checked })}
+      />
+      <span>Remove overlapping lines</span>
+    </label>
+  );
+}
+
 function SourceOrderPrecedenceNote(): JSX.Element {
   return (
     <p style={precedenceNoteStyle} role="status">
       Keep source order preserves path sequence and direction inside each operation. Inside paths
       first, Path direction, and Planning start are saved but bypassed. Layer priority still
-      applies.
+      applies. Overlap removal, when enabled, also applies.
     </p>
   );
 }

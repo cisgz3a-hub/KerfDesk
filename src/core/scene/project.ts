@@ -28,6 +28,8 @@ export type ProjectOptimizationSettings = {
   readonly reduceTravelMoves: boolean;
   readonly travelPolicy: 'nearest-neighbor' | 'source-order';
   readonly insideFirst: boolean;
+  /** Opt-in removal of coincident laser Line spans within each operation. */
+  readonly removeOverlappingLines: boolean;
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
@@ -58,6 +60,7 @@ export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
+  removeOverlappingLines: false,
   layerPriority: 'project-order',
   pathDirection: 'allow-reverse',
   startPoint: 'machine-origin',
