@@ -8,8 +8,8 @@
 // capacity a grblHAL controller offers — its extended `$I` is not stock proof
 // and the Falcon vendor contract forbids `$I` anyway — and the Start boundary
 // bounds the character-counting window by it (ADR-331). A stock GRBL 1.1
-// controller idles at `Bf:15,128`; the maintainer's Falcon A1 Pro (grblHAL) at
-// `Bf:512,65535`.
+// controller idles at `Bf:15,128`; a maintainer's Falcon A1 Pro (profiled as
+// grblHAL, firmware build unconfirmed) reported `Bf:512,65535`.
 
 import type { StatusReport } from '../../core/controllers/grbl';
 import { hasUnsettledStreamAcks } from './laser-store-helpers';
