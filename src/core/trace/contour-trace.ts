@@ -54,6 +54,7 @@ const CONTOUR_COLOR = '#000000';
  *  the permanent dispatch predicate that replaced the temporary potrace A/B
  *  gate (ADR-123). */
 export function isBinaryContourPreset(options: TraceOptions): boolean {
+  if (options.photoDetail !== undefined) return false;
   if (options.traceMode === 'centerline' || options.traceMode === 'edge') return false;
   if (options.numberOfColors !== 2) return false;
   return options.fixedPalette?.length === 2;

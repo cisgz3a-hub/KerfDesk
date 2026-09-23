@@ -359,7 +359,7 @@ function traceInWorker(
     const transferredData = new Uint8ClampedArray(image.data);
     const request: TraceWorkerRequest = {
       id,
-      image: { width: image.width, height: image.height, data: transferredData },
+      image: { ...image, width: image.width, height: image.height, data: transferredData },
       options,
     };
     try {

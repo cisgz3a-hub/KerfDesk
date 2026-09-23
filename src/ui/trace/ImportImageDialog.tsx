@@ -17,12 +17,7 @@ import {
 import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import {
-  CNC_TRACE_PRESET_NAME,
-  DEFAULT_TRACE_PRESET_NAME,
-  type TraceFillStyle,
-  type TraceOutput,
-} from './dialog-parts';
+import type { TraceFillStyle, TraceOutput } from './dialog-parts';
 import { readRasterSourceFile } from '../import/paged-raster-source';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PreparedTrace } from './prepared-trace';
@@ -32,7 +27,8 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
-import { fairTracedImageForCnc } from './fair-traced-image-for-cnc';
+import { fairTracedImageForCnc, shouldFairTracedImageForCnc } from './fair-traced-image-for-cnc';
+import { useTracePreset } from './use-trace-preset';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import {
   captureTraceCommitOwner,
@@ -89,11 +85,13 @@ type TraceCommitContext = {
   readonly settlePreview?: (outcome: TracePreviewSettlement) => void;
 };
 
-function DialogBody(props: {
+type DialogBodyProps = {
   readonly seed: RasterImage;
   readonly requestToken: string;
   readonly replaceTraceId?: string;
-}): JSX.Element {
+};
+
+function DialogBody(props: DialogBodyProps): JSX.Element {
   const { seed } = props;
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
@@ -103,21 +101,17 @@ function DialogBody(props: {
   const file = useTraceSourceFile(seed, pushToast);
   // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
   // starting selection, not a restriction — every preset stays selectable.
-  const [preset, setPreset] = useState<string>(
-    machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
-  );
+  const boundarySelection = useBoundarySelection();
+  const { preset, selectPreset } = useTracePreset(machineKind, boundarySelection.setBoundaryMode);
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
-  const boundarySelection = useBoundarySelection();
   const [busy, setBusy] = useState(false);
   const captureLifetime = useTraceCommitLifetime(props.requestToken);
   const previewControl = useRef<TracePreviewCommitControl>(null);
-  // Layer the LightBurn-style trace settings on top of the preset.
-  // Image-level edits stay in Adjust Image, so Trace Image keeps one
-  // authoritative vector workflow: cutoff, threshold, ignore,
-  // smoothness, and optimize.
+  // Layer each style's controls on its preset: detection and contour controls
+  // for line artwork, or detail and tone controls for photographic shading.
   //
   // useMemo is load-bearing — useTracePreview depends on `options` as
   // a useEffect dep, so a fresh object reference every render would
@@ -162,7 +156,7 @@ function DialogBody(props: {
       onClose={close}
       onSubmit={onSubmit}
       presetName={preset}
-      onPresetChange={setPreset}
+      onPresetChange={selectPreset}
       settings={{
         preset: presetOptions,
         overrides: traceSettings,
@@ -170,6 +164,7 @@ function DialogBody(props: {
         onChange: setTraceSettings,
       }}
       output={{
+        photoShading: options.photoDetail !== undefined,
         machineKind,
         traceOutput,
         onTraceOutputChange: setTraceOutput,
@@ -178,7 +173,12 @@ function DialogBody(props: {
         onTraceFillStyleChange: setTraceFillStyle,
       }}
       preview={
-        <TracePreviewPanel preview={preview} seed={seed} boundarySelection={boundarySelection} />
+        <TracePreviewPanel
+          preview={preview}
+          seed={seed}
+          boundarySelection={boundarySelection}
+          photoShading={options.photoDetail !== undefined}
+        />
       }
       deleteSource={deleteSourceAfterTrace}
       onDeleteSourceChange={setDeleteSourceAfterTrace}
@@ -250,6 +250,7 @@ function useTraceSourceFile(
 }
 
 function TracePreviewPanel(props: {
+  readonly photoShading: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
   readonly boundarySelection: ReturnType<typeof useBoundarySelection>;
@@ -266,7 +267,11 @@ function TracePreviewPanel(props: {
         onBoundaryClear={selection.clearBoundary}
       />
       {selection.boundary !== null ? (
-        <BoundaryModePicker value={selection.boundaryMode} onChange={selection.setBoundaryMode} />
+        <BoundaryModePicker
+          value={selection.boundaryMode}
+          onChange={selection.setBoundaryMode}
+          allowEnhance={!props.photoShading}
+        />
       ) : null}
     </>
   );
@@ -410,14 +415,19 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       );
       return;
     }
+    // Photo ribbon width encodes tone; generic contour fairing changes that
+    // coverage and can erase narrow highlights. Keep its reviewed geometry.
     // CNC conditioning uses the exact live placement that the store will
     // apply. Transform-only source changes are intentionally accepted, so
     // fairing before this point would use stale physical units.
-    const commitTraced =
-      liveProject.machine?.kind === 'cnc'
-        ? fairTracedImageForCnc(traced, positionTraceOverRasterSource(liveSource, traced).transform)
-        : traced;
-    const outputArgs = { ...args, ...(notices === undefined ? {} : { notices }) };
+    const commitTraced = shouldFairTracedImageForCnc(liveProject.machine?.kind, args.options)
+      ? fairTracedImageForCnc(traced, positionTraceOverRasterSource(liveSource, traced).transform)
+      : traced;
+    const outputArgs = {
+      ...args,
+      photoShading: args.options.photoDetail !== undefined,
+      ...(notices === undefined ? {} : { notices }),
+    };
     if (await commitTraceOutput(outputArgs, ctx, commitTraced, liveProject)) ctx.close();
   } catch (err) {
     reportTraceCommitError(args.seed.source, err, ctx);

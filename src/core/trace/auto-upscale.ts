@@ -167,7 +167,7 @@ export function upscaleBy(image: RawImageData, factor: number): RawImageData {
       }
     }
   }
-  return { width: outWidth, height: outHeight, data };
+  return { ...image, width: outWidth, height: outHeight, data };
 }
 
 // 2x convenience wrapper retained for the existing thin-stroke callers/tests.

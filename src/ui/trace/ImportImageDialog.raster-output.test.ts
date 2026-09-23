@@ -139,6 +139,17 @@ const PRESET_OUTPUTS = [
 ] as const;
 
 describe('Trace Image raster output', () => {
+  it('preserves partial pixel coverage when committing Photo shading as a raster scan', async () => {
+    const source = sourceRaster();
+    const project = projectWith(source, imageOperation());
+    const ctx = context(() => project);
+    await commit(commitArgs(source, 'Photo shading'), ctx);
+    expect(buildBitmapFromVectors).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ renderType: 'fill-all', preserveCoverage: true }),
+    );
+    expect(ctx.commitRasterizedTrace).toHaveBeenCalledTimes(1);
+  });
   it.each(PRESET_OUTPUTS)(
     'keeps the %s trace result in %s form and rasterizes it as %s',
     async (preset, expectedTraceMode, expectedRenderType) => {
