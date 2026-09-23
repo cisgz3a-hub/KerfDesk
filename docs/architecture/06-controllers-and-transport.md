@@ -37,16 +37,22 @@ cutting accessory.
 
 | Family | ADR | Status |
 |---|---|---|
-| GRBL v1.1+ | ADR-006 | **Hardware-verified** — Falcon A1 Pro, maintainer, 2026-07-02 |
-| grblHAL | ADR-094 I.2 | **Hardware-verified** — same machine, GrblHAL 1.1f |
+| GRBL v1.1+ | ADR-006 | **Not qualified** — used informally on a Neotronics 4040 (GRBL-family firmware, exact build unconfirmed) |
+| grblHAL | ADR-094 I.2 | **Not qualified** — used informally on a Creality Falcon A1 Pro (GRBL-family firmware, exact build unconfirmed; its profile picks grblHAL as a compatibility choice) |
 | FluidNC | ADR-094 I.2 | Simulator only; settings read-only |
 | Marlin | ADR-095 (`:3871`) | Simulator only — queued `M114`, stream-side pause, `G28 X Y`, `M400` settle |
 | Smoothieware | ADR-096 (`:3899`) | Simulator only — fractional `S` (e.g. `S0.500` at 0–1.0 scale) |
 | Ruida | ADR-097 (`:3923`) | **Experimental** `.rd` export, `transport: 'file-only'`, never accepted by real hardware |
 
-The hardware truth table at `PROJECT.md:195-200` records an important secondary conclusion: because
-the Falcon's normal `grbl-v1.1` profile drives it through the **rewritten** driver path unchanged, the
-2026-07-02 pass also proves the ADR-094 driver refactor is byte-identical on real hardware.
+No machine is qualified. This table used to mark both GRBL rows hardware-verified on the
+maintainer's Falcon A1 Pro (2026-07-02), and inferred from that pass that the ADR-094 driver
+refactor was byte-identical on real hardware. ADR-322 (`DECISIONS.md:20209`) withdrew that claim:
+the 2026-09-19 audit found no reproducible physical evidence for it. Software tests do not qualify a
+controller or machine (`PROJECT.md:244-247`). The Falcon A1 Pro profile's evidence note says the
+vendor labels the connection GRBL-LPC, the exact firmware build is not independently established,
+and the grblHAL family selection is not hardware qualification
+(`src/core/devices/falcon-profiles.ts:45-50`). The Neotronics 4040 profile likewise asks the
+operator to confirm the GRBL build (`src/core/devices/device-profile.ts:410`).
 
 Simulator verification is not a weak substitute — `src/__fixtures__/controllers/` holds scripted
 firmware simulators driving the **real** laser-store (`PROJECT.md:170-171`). What it cannot prove is

@@ -22,7 +22,7 @@ fidelity**. Be specific about what that means:
 
 | Area | Status |
 |---|---|
-| GRBL-family streaming | **Hardware-verified on one machine** — a Creality Falcon A1 Pro running GrblHAL 1.1f, 2026-07-02. No stock GRBL v1.1 board has been tested. |
+| GRBL-family streaming | **Not qualified.** Used informally on a Creality Falcon A1 Pro and a Neotronics 4040, both running GRBL-family firmware (exact builds unconfirmed). |
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
 | Laser raster/image engrave | Code + tests only; never burned on a machine |
@@ -33,8 +33,11 @@ fidelity**. Be specific about what that means:
 The automated suite proves **structure and determinism** — byte-identical G-code across fuzz
 seeds, path counts, invariant predicates. It does not prove **fidelity**: that a fill, an engrave
 or a V-carve actually *looks* like the source. Output can be geometrically wrong and still pass
-everything. There is currently no machine available to this project for verification, so treat
-every unproven row above as unproven rather than pending.
+everything. No machine is qualified, and passing software tests does not qualify one (see ADR-322
+in [`DECISIONS.md`](DECISIONS.md) and the
+[correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)). There is
+currently no machine available to this project for verification, so treat every unproven row above
+as unproven rather than pending.
 
 **Check your output in an independent G-code viewer before running it, keep the work area clear,
 and stay at the machine.** The in-app Abort is a software stop, not a safety-rated E-stop —
@@ -156,12 +159,17 @@ capability-gated per firmware.
 
 | Family | Transport | Verification |
 |---|---|---|
-| grblHAL | WebSerial | **Hardware-verified** — Falcon A1 Pro, GrblHAL 1.1f, 2026-07-02 |
-| GRBL v1.1 | WebSerial | The `grbl-v1.1` profile was driven through that same Falcon, which is what proves the driver refactor is byte-identical on real hardware — but no stock GRBL v1.1 controller has been tested |
+| grblHAL | WebSerial | **Not qualified.** Used informally on a Creality Falcon A1 Pro, whose KerfDesk profile uses this family as a compatibility choice. The vendor labels the connection GRBL-LPC; the exact firmware build is unconfirmed. |
+| GRBL v1.1 | WebSerial | **Not qualified.** Used informally on a Neotronics 4040 (GRBL-family firmware, exact build unconfirmed). The catalogue's Neotronics 4040 profile uses this family. |
 | FluidNC | WebSerial | Simulator only (settings read-only) |
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
 | Ruida | File export only | `.rd` round-trip proven; never accepted by hardware |
+
+No controller family or machine is qualified. An earlier claim that the Falcon was
+hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
+the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
+[`DECISIONS.md`](DECISIONS.md).
 
 Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
 `marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Twelve laser device profiles and

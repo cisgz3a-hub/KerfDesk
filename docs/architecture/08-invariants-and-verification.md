@@ -113,8 +113,8 @@ check on the program text, **not a photograph** — so it does not discharge the
 
 | Area | Status |
 |---|---|
-| GRBL v1.1 + grblHAL streaming | **VERIFIED** — Falcon A1 Pro, GrblHAL 1.1f, maintainer, 2026-07-02 |
-| ADR-094 driver refactor byte-identity | **VERIFIED** — implied by the above (`PROJECT.md:195-200`) |
+| GRBL v1.1 + grblHAL streaming | **NOT QUALIFIED** — used informally on a Creality Falcon A1 Pro and a Neotronics 4040 (GRBL-family firmware, exact builds unconfirmed) |
+| ADR-094 driver refactor byte-identity | **NOT QUALIFIED** on hardware — the earlier claim rested on the withdrawn Falcon verification claim |
 | FluidNC / Marlin / Smoothieware | Simulator only |
 | Ruida `.rd` | Encode→decode round-trip proven; **never accepted by real hardware** |
 | Laser F.2 raster burn | **PENDING** — never burned on the Falcon |
@@ -122,6 +122,10 @@ check on the program text, **not a photograph** — so it does not discharge the
 | All CNC Phase H | **CLAIMED** — code + tests landed, no hardware pass |
 | Phase K box fit | **CLAIMED** — no box has been cut and assembled |
 | Desktop Preview launch/install | **CLAIMED** until real-OS verification |
+
+No machine is qualified. ADR-322 (`DECISIONS.md:20209`) withdrew the former Falcon
+hardware-verification claim after the 2026-09-19 audit found no reproducible physical evidence for
+it. Software tests do not qualify a controller or machine (`PROJECT.md:244-247`).
 
 `PROJECT.md:55` states the packaging equivalent explicitly: *passing builds and automated tests prove
 only packaging integrity.*
