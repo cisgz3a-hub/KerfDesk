@@ -30,7 +30,13 @@ import type { DisplayPolylineCache } from './display-polylines';
 import { drawObjectDisplay, isVectorSceneObject, resolveObjectDisplay } from './object-display';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawCncRemoval } from './draw-cnc-removal';
-import { drawRasterImage, pruneRasterImageCaches, rasterDisplayDataUrl } from './draw-raster';
+import {
+  burnedImageAdjustments,
+  drawRasterImage,
+  liveAdjustedDisplayKeys,
+  pruneRasterImageCaches,
+  rasterDisplayDataUrl,
+} from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawCncStock } from './draw-stock';
 import { drawReliefObject, scheduleReliefPreviews } from './draw-relief';
@@ -98,7 +104,13 @@ export function drawScene(
   opts: DrawOpts,
 ): void {
   ctx.clearRect(0, 0, canvasW, canvasH);
-  pruneRasterImageCaches(liveRasterDataUrls(project));
+  pruneRasterImageCaches(
+    liveRasterDataUrls(project),
+    liveAdjustedDisplayKeys(
+      project.scene.objects,
+      sceneLayerVisibility.lookup(project.scene.layers),
+    ),
+  );
   const view = computeView(
     canvasW,
     canvasH,
@@ -287,12 +299,10 @@ function drawObjects(
     // an orphan color with no layer stays visible so artwork never
     // silently disappears.
     if (obj.kind === 'raster-image' && isVisible) {
-      drawRasterImage(
-        ctx,
-        obj,
-        view,
-        onRasterBitmapReady === undefined ? undefined : { onBitmapReady: onRasterBitmapReady },
-      );
+      drawRasterImage(ctx, obj, view, {
+        adjustments: burnedImageAdjustments(obj, layerByColor),
+        ...(onRasterBitmapReady === undefined ? {} : { onBitmapReady: onRasterBitmapReady }),
+      });
     }
     // H.4: reliefs render as grayscale depth maps (light = top, dark = floor).
     if (obj.kind === 'relief') drawReliefObject(ctx, obj, layerByColor, view);

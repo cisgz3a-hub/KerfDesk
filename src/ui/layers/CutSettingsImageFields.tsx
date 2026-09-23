@@ -53,7 +53,9 @@ export function CutSettingsImageFields(props: {
         onChange={props.onImageLinesPerMmChange}
       />
       <p className="lf-laser-help">
-        Line interval and DPI describe the same scan density. Changing one updates the other.
+        Line interval and DPI describe the same scan density. Changing one updates the other. A
+        smaller line interval (higher DPI) burns more energy per area at the same power and speed,
+        so lower power or raise speed when you tighten it.
       </p>
       <Field label="Dot Width">
         <NumberInput
@@ -63,6 +65,7 @@ export function CutSettingsImageFields(props: {
           max={props.deferArtworkBounds ? 1 : dotWidthCorrectionMax(props.imageLinesPerMm)}
           step={0.001}
           label="dot width correction"
+          title="Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -169,7 +172,7 @@ function ImageDensityFields(props: {
           }
           style={numberStyle}
           aria-label="Cut settings line interval"
-          title="Distance between raster scan lines. Smaller values engrave denser images."
+          title="Distance between raster scan lines. Smaller values pack rows closer and burn more energy per area at the same power and speed."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -204,6 +207,7 @@ function NumberInput(props: {
   readonly max?: number;
   readonly step?: number;
   readonly label?: string;
+  readonly title?: string;
 }): JSX.Element {
   return (
     <input
@@ -216,7 +220,7 @@ function NumberInput(props: {
       defaultValue={props.value}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
-      title={`Set image cut setting ${props.label ?? props.name}.`}
+      title={props.title ?? `Set image cut setting ${props.label ?? props.name}.`}
     />
   );
 }

@@ -17,7 +17,7 @@ export { applyLumaAdjustments, maybeInvertLuma } from './luma-adjust';
 export { rasterPreviewRgba } from './preview-data';
 
 export type { LumaRaster } from './luma-resample';
-export { pixelExtentForMm, resampleLumaNearest, whiteLuma } from './luma-resample';
+export { pixelExtentForMm, resampleLuma, whiteLuma } from './luma-resample';
 
 export type { ImageMaskInput } from './image-mask';
 export { applyImageMaskToLuma, hasClosedImageMaskGeometry } from './image-mask';

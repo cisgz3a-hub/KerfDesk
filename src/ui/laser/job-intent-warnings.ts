@@ -19,6 +19,9 @@ import {
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
+import { rasterEnergyWarnings } from './raster-energy-warnings';
+import { rasterThresholdWarnings } from './raster-threshold-warnings';
+import { stackedCopyWarnings } from './stacked-copy-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
 // ADR-234's feed-matched entry runway derives its length from the layer's
@@ -34,7 +37,12 @@ export function detectJobIntentWarnings(
   compiledJob?: Job,
 ): ReadonlyArray<string> {
   const job = compiledJob ?? compileJob(project.scene, project.device);
+  // Image-fidelity advisories (ADR-359) lead: Save shows only its newest few
+  // toasts, and these must not push the older machine warnings out of view.
   const warnings = [
+    ...rasterEnergyWarnings(job, project),
+    ...rasterThresholdWarnings(job, project),
+    ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
     ...compileDiagnosticWarnings(job),
   ];
