@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../core/controllers';
+import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 import type { SerialConnection } from '../../platform/types';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { outboundTranscriptEntry, type TranscriptSource } from './laser-transcript';
@@ -88,6 +89,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     const writeSource =
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     if (source === 'job' && action === undefined) return writeJobRefill(set, refs, conn, line);
+    refuseUnencodableLine(set, get, line);
     const owedAcks = owedTerminalAcks(line, writeSource);
     const writeEpoch = refs.writeEpoch ?? 0;
     const motionOperationId = currentMotionOperationId(get, action);
@@ -111,6 +113,22 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+// A line the wire cannot carry is refused before anything is reserved for it.
+// The transport would reject it before a single byte left the host, so no
+// acknowledgement can ever answer it and nothing reached the machine: record
+// the refusal, owe nothing, and raise no E-stop notice. The quarantine in
+// recordWriteFailure stays for failures that really are ambiguous (audit
+// transport-1).
+function refuseUnencodableLine(set: SetFn, get: GetFn, line: string): void {
+  const refusal = wireEncodingError(line);
+  if (refusal === null) return;
+  set({
+    lastWriteError: refusal.message,
+    log: pushLog(get(), `[lf2] Serial write refused before sending: ${refusal.message}`),
+  });
+  throw refusal;
 }
 
 // A refill (one per acknowledged line) owes no untracked ack and belongs to no
