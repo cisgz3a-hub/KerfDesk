@@ -18,6 +18,7 @@ import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
 import { clampJogFeed, type JogVector } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useJogShortcuts } from './use-jog-shortcuts';
 import { useZeroZAction } from './use-zero-z-action';
 
@@ -44,18 +45,20 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 
   const sendVector = useCallback(
     (vector: JogVector): void => {
-      void jog(vector).catch(() => undefined);
+      void jog(vector).catch(controllerActionFailureHandler('Jog'));
     },
     [jog],
   );
   const sendFocus = useCallback(
     (direction: 1 | -1): void => {
-      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(() => undefined);
+      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(
+        controllerActionFailureHandler('Z jog'),
+      );
     },
     [focusFeed, focusStep, jog],
   );
   const cancelContinuousJog = useCallback((): void => {
-    void cancelJog().catch(() => undefined);
+    void cancelJog().catch(controllerActionFailureHandler('Stop jog'));
   }, [cancelJog]);
   const handleZeroZ = useZeroZAction();
 

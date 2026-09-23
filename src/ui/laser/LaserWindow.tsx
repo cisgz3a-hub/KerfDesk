@@ -30,6 +30,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { clearStartBlockers } from './start-blocker-invalidation';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useToastStore } from '../state/toast-store';
 import './LaserWindow.css';
 
@@ -86,14 +87,12 @@ export function LaserWindow({
           controllerKind={controllerKind}
           homingEnabled={homingEnabled}
           canUnlock={control.canUnlock}
-          onHome={() => void control.home().catch(() => undefined)}
+          onHome={control.runHome}
           onConfigureHoming={openHomingSetup}
-          onUnlock={() => void control.unlockAlarm().catch(() => undefined)}
+          onUnlock={control.runUnlock}
         />
       )}
-      {controllerDisplay.sleep && (
-        <SleepBanner onWake={() => void control.wakeController().catch(() => undefined)} />
-      )}
+      {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(
@@ -154,14 +153,24 @@ function useControllerActions(): {
   readonly unlockAlarm: ReturnType<typeof useLaserStore.getState>['unlockAlarm'];
   readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
   readonly canUnlock: boolean;
+  // Banner click handlers: a refusal becomes a toast instead of silence.
+  readonly runHome: () => void;
+  readonly runUnlock: () => void;
+  readonly runWake: () => void;
 } {
+  const home = useLaserStore((s) => s.home);
+  const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
+  const wakeController = useLaserStore((s) => s.wakeController);
   return {
     connect: useLaserStore((s) => s.connect),
     disconnect: useLaserStore((s) => s.disconnect),
-    home: useLaserStore((s) => s.home),
-    unlockAlarm: useLaserStore((s) => s.unlockAlarm),
-    wakeController: useLaserStore((s) => s.wakeController),
+    home,
+    unlockAlarm,
+    wakeController,
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
+    runHome: () => void home().catch(controllerActionFailureHandler('Home')),
+    runUnlock: () => void unlockAlarm().catch(controllerActionFailureHandler('Unlock')),
+    runWake: () => void wakeController().catch(controllerActionFailureHandler('Wake')),
   };
 }
 
