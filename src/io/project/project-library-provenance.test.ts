@@ -13,9 +13,9 @@ const PROVENANCE: NonNullable<ImportedSvg['libraryProvenance']> = {
   schemaVersion: 1,
   assetId: 'laser-kerf-comb',
   title: 'Laser kerf comb',
-  sourceName: 'CurveDesk',
+  sourceName: 'KerfDesk',
   licenseId: 'MIT',
-  creator: 'CurveDesk contributors',
+  creator: 'KerfDesk contributors',
   licenseUrl: 'https://opensource.org/license/mit',
   assetHash: 'sha256:abc123',
 };

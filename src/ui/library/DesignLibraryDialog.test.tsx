@@ -229,7 +229,7 @@ describe('DesignLibraryDialog', () => {
     await click(h.querySelector('button[aria-label="View details for Kerf Comb"]'));
     expect(useStore.getState().project.scene.objects.length).toBe(before);
     expect(h.textContent).toContain('Suggested uses');
-    expect(h.textContent).toContain('CurveDesk');
+    expect(h.querySelector('.lf-library-detail')?.textContent).toContain('KerfDesk contributors');
     expect(h.textContent).toContain('MIT');
 
     await click(
@@ -244,7 +244,7 @@ describe('DesignLibraryDialog', () => {
       expect(inserted.libraryProvenance).toMatchObject({
         schemaVersion: 1,
         assetId: 'laser-kerf-comb',
-        sourceName: 'CurveDesk',
+        sourceName: 'KerfDesk',
         licenseId: 'MIT',
       });
       expect(inserted).not.toHaveProperty('operationOverride');
