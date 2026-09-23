@@ -102,6 +102,21 @@ describe('selectPreviewJobPlacement', () => {
     expect(selectPreviewJobPlacement(settings, parked)).not.toEqual(before);
   });
 
+  it('resolves a reconnect into Alarm instead of holding the disconnected failure', () => {
+    const settings: JobPlacementSettings = { startFrom: 'current-position', anchor: 'center' };
+    expect(selectPreviewJobPlacement(settings, { ...idle, statusReport: null }).ok).toBe(false);
+
+    const alarm = { ...idle, statusReport: report('Alarm', 30) };
+    const resolved = resolvePreviewJobPlacement(settings, machineOf(alarm));
+    expect(resolved.ok).toBe(true);
+    const fromAlarm = selectPreviewJobPlacement(settings, alarm);
+    expect(fromAlarm).toEqual(resolved);
+    // Homing then moves the head, and the resolved placement holds through it.
+    expect(selectPreviewJobPlacement(settings, { ...idle, statusReport: report('Home', 0) })).toBe(
+      fromAlarm,
+    );
+  });
+
   it('never holds a mode whose placement does not follow the head', () => {
     const settings: JobPlacementSettings = { startFrom: 'absolute', anchor: 'center' };
     selectPreviewJobPlacement(settings, idle);

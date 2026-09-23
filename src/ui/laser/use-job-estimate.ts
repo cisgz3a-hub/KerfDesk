@@ -103,7 +103,11 @@ export function useJobEstimate(): LiveJobEstimate {
   const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
   const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
   const initialPosition = useEstimateInitialPosition();
-  const jobRunning = useLaserStore(selectJobRunning);
+  // Preview draws this estimate (its scrub timeline and total), so there an edit
+  // made during a run still re-estimates; the held placement keeps the moving
+  // head out of the key either way.
+  const previewMode = useStore((s) => s.previewMode);
+  const frozen = useLaserStore(selectJobRunning) && !previewMode;
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -125,15 +129,15 @@ export function useJobEstimate(): LiveJobEstimate {
     initialRegistration,
     initialPosition,
     initiallyAsync,
-    jobRunning,
+    frozen,
   });
 }
 
 // While a job runs, the badge shows the run's own timing, yet a Current Position
 // estimate re-keyed with the moving head and recompiled the whole job each
-// debounce (on the UI thread for a scene under the preparation budget). Leave
-// the settled estimate alone until the job ends; inputs that changed meanwhile
-// then settle once.
+// debounce (on the UI thread for a scene under the preparation budget). Outside
+// Preview, leave the settled estimate alone until the job ends; inputs that
+// changed meanwhile then settle once.
 function selectJobRunning(state: LaserState): boolean {
   const lifecycle = state.liveCanvasRun?.lifecycle;
   return (
@@ -184,7 +188,7 @@ type EstimateInputs = Omit<Settled, 'project' | 'estimate'> & {
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly initialRegistration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly initiallyAsync: boolean;
-  readonly jobRunning: boolean;
+  readonly frozen: boolean;
 };
 
 function initialSettledEstimate(inputs: EstimateInputs): Settled {
@@ -215,7 +219,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     coordinateOptions,
     jobOrigin,
     initialPosition,
-    jobRunning,
+    frozen,
   } = inputs;
   // Compute cheap jobs synchronously; background jobs begin pending.
   const [settled, setSettled] = useState<Settled>(() => initialSettledEstimate(inputs));
@@ -233,7 +237,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
   );
   useEffect(() => {
     if (
-      jobRunning ||
+      frozen ||
       (settled.project === project &&
         settled.outputScopeKey === outputScopeKey &&
         settled.registrationKey === registrationKey &&
@@ -287,7 +291,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     coordinateOptions,
     jobOrigin,
     initialPosition,
-    jobRunning,
+    frozen,
   ]);
   return settled.estimate;
 }

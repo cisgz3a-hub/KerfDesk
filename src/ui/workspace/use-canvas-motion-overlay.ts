@@ -17,6 +17,7 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import { canvasMachineRevision } from './canvas-machine-revision';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
@@ -82,13 +83,25 @@ export function useCanvasMotionOverlay(
   // literal per render repainted it on every Workspace render (drags, drafts,
   // parent re-renders) although nothing it draws had changed.
   const visiblePlan = idlePlan?.plan ?? null;
+  const colorScheme = useCanvasColorScheme();
   return useMemo(() => {
+    // The draw reads its palette from canvasTheme's scheme-dependent getters, so
+    // a theme switch must hand the layer a new object or it keeps the old colors.
+    void colorScheme;
     if (previewMode || canvasCovered) return null;
     if (liveRun !== null && !staleTerminalRun) {
       return { plan: liveRun.plan, run: liveRun, showStartMarkers };
     }
     return visiblePlan === null ? null : { plan: visiblePlan, run: null, showStartMarkers };
-  }, [previewMode, canvasCovered, liveRun, staleTerminalRun, visiblePlan, showStartMarkers]);
+  }, [
+    previewMode,
+    canvasCovered,
+    liveRun,
+    staleTerminalRun,
+    visiblePlan,
+    showStartMarkers,
+    colorScheme,
+  ]);
 }
 
 type IdlePlanInput = {

@@ -114,6 +114,7 @@ beforeEach(() => {
 
 afterEach(() => {
   useStore.getState().newProject();
+  useStore.setState({ previewMode: false });
   useLaserStore.setState({
     statusReport: null,
     motionOperation: null,
@@ -232,6 +233,41 @@ describe('useJobEstimate head position', () => {
     await act(async () => {
       useLaserStore.setState({ streamer: null, statusReport: reportAtX(0) });
     });
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(2);
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenLastCalledWith(
+      useStore.getState().project,
+      expect.objectContaining({
+        jobOrigin: expect.objectContaining({ currentPosition: { x: 0, y: 0 } }),
+      }),
+    );
+
+    await unmount();
+  });
+
+  it('re-estimates an edit made during a run while Preview draws the estimate', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: reportAtX(0) });
+    useStore.setState({ project: overBudgetRasterProject(), previewMode: true });
+    const unmount = await renderProbe();
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    const streamer = { ...createStreamer('G1 X1'), status: 'streaming' as const };
+    act(() => useLaserStore.setState({ streamer }));
+    for (let poll = 1; poll <= 40; poll += 1) {
+      await act(async () => {
+        useLaserStore.setState({ statusReport: reportAtX(poll * 5, 'Run') });
+        await vi.advanceTimersByTimeAsync(STATUS_POLL_INTERVAL_MS);
+      });
+    }
+    await settleDebounce();
+    // The held placement keeps the moving head out of the key.
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    // Preview times its scrub against the rebuilt toolpath, so the edit cannot
+    // wait for the run to end.
+    act(() => useStore.setState({ project: { ...useStore.getState().project } }));
     await settleDebounce();
     expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(2);
     expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenLastCalledWith(

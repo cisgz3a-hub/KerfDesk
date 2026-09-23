@@ -51,7 +51,10 @@ export function selectPreviewJobPlacement(
 ): ResolvedJobPlacement {
   const held = heldPlacements.get(settings);
   const followsHead = settings.startFrom === 'current-position';
-  if (followsHead && held !== undefined && headInMotion(state)) return held.placement;
+  // Only a resolved placement is worth holding. A failure left by a disconnect
+  // would otherwise outlast the reconnect, which lands in Alarm (not settled)
+  // until homing, although that report already gives the head's position.
+  if (followsHead && held?.placement.ok === true && headInMotion(state)) return held.placement;
   const inputs = placementInputs(followsHead, state);
   if (held !== undefined && sameInputs(held.inputs, inputs)) return held.placement;
   const resolved = resolvePreviewJobPlacement(settings, placementMachine(state));
