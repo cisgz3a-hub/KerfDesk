@@ -18,6 +18,7 @@ import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/ex
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { RunAgainControl } from './RunAgainControl';
+import { SecondPassCompletionPrompt } from './second-pass/SecondPassCompletionPrompt';
 import { SecondPassControl } from './second-pass/SecondPassControl';
 
 (
@@ -79,6 +80,7 @@ describe('recovery panels during a running job', () => {
     });
     expect(renders.get('archive')).toBeGreaterThan(0);
     expect(renders.get('second-pass')).toBeGreaterThan(0);
+    expect(renders.get('completion-prompt')).toBeGreaterThan(0);
   });
 });
 
@@ -100,6 +102,9 @@ async function render(repository: RecoveryRepository): Promise<void> {
         </Profiler>
         <Profiler id="second-pass" onRender={countRender}>
           <SecondPassControl busy={false} machineKind="laser" repository={repository} />
+        </Profiler>
+        <Profiler id="completion-prompt" onRender={countRender}>
+          <SecondPassCompletionPrompt repository={repository} />
         </Profiler>
       </>,
     );

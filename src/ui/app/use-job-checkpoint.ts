@@ -145,8 +145,11 @@ class JobCheckpointTracker {
     const interruption = checkpointInterruption(streamer.status, state.safetyNotice);
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
-    if (interruption !== null && !this.terminalQueued) {
-      this.queueInterruption(runId, streamer.completed, interruption);
+    if (interruption !== null) {
+      // A terminal streamer still counts the trailing oks for lines GRBL had
+      // buffered. The interruption records the exact ack it saw; a progress
+      // write carrying a later ack would only raise it or fail as a no-op.
+      if (!this.terminalQueued) this.queueInterruption(runId, streamer.completed, interruption);
       return;
     }
 
@@ -158,6 +161,9 @@ class JobCheckpointTracker {
 
   private queueInterruption(runId: RunId, ackedLines: number, interruption: JobInterruption): void {
     this.terminalQueued = true;
+    // Progress waiting ahead of a terminal must stay at the ack it had: raising
+    // it after this point would let it overtake the terminal's exact ack.
+    this.waitingProgress = null;
     this.enqueue(async () => {
       try {
         if (!this.terminalStillOwned(runId)) return;
@@ -299,6 +305,7 @@ class JobCheckpointTracker {
     const pending = this.pendingMissingTerminal;
     if (pending === null || this.queuedMissingTerminal === pending) return;
     this.queuedMissingTerminal = pending;
+    this.waitingProgress = null;
     this.enqueue(async () => {
       let retryAfterActivation = false;
       try {

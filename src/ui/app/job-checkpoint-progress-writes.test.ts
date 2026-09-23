@@ -89,6 +89,36 @@ describe('checkpoint progress writes', () => {
     expect(reportFailure).not.toHaveBeenCalled();
   });
 
+  it('keeps the exact interrupted ack when trailing oks arrive behind a slow write', async () => {
+    const { repo, reportFailure } = harness();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => NOW, repo, reportFailure);
+    await stage(repo, 'run-errored');
+    await repo.activateFreshRun('run-errored', NOW);
+    const base = beginStream('run-errored');
+    const original = repo.updateProgress.bind(repo);
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(repo, 'updateProgress').mockImplementation(async (runId, ackedLines, updatedAtIso) => {
+      if (ackedLines === 25) await held;
+      return original(runId, ackedLines, updatedAtIso);
+    });
+
+    // Write 25 is held and 50 waits behind it when GRBL rejects line 61. The
+    // lines it had already buffered still answer ok, so the terminal streamer's
+    // count keeps climbing after the interruption is queued.
+    await acknowledge(base, 1, 60);
+    const errored: StreamerState = { ...base, status: 'errored' };
+    await acknowledge(errored, 61, 80);
+    release();
+
+    await vi.waitFor(() => expect(repo.getSnapshot().recoveryCapsule?.ackedLines).toBe(61));
+    await vi.waitFor(() => expect(repo.getSnapshot().activeRun).toBeNull());
+    expect(reportFailure).not.toHaveBeenCalled();
+  });
+
   it('stops writing progress for a run the repository does not own until it activates', async () => {
     const { backend, repo, reportFailure } = harness();
     await repo.initialize();
