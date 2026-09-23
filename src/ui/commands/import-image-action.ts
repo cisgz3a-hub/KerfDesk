@@ -22,6 +22,7 @@ import {
   tryDecodeQualifiedPng,
 } from '../import/qualified-png-raster';
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
+import { freezeGif, isGif } from '../import/freeze-gif';
 
 /** Imports the file into the scene; resolves with the created object (null
  * when skipped or failed) so callers like Image Studio can chain onto it. */
@@ -29,6 +30,7 @@ export async function importImageFile(
   file: File,
   importRasterImage: (object: SceneObject) => void,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  options: { readonly signal?: AbortSignal } = {},
 ): Promise<SceneObject | null> {
   // F-A3: advise (never refuse) before importing a very large file — both the
   // toolbar picker and drag-drop route through here.
@@ -37,31 +39,45 @@ export async function importImageFile(
   let controls: PngImportControls | null = null;
   let rollback: (() => Promise<string | null>) | null = null;
   try {
+    assertImportActive(options.signal);
+    const gif = isGif(file);
+    file = await staticImage(file);
     // Storage ownership and worker ownership are distinct. A compressed PNG
     // can remain portable while still requiring the queued worker because its
     // encoded edge exceeds the browser canvas boundary.
     const pageBacked = shouldPageBackPng(file);
     const dimensionQualified = !pageBacked && (await shouldDecodeDimensionQualifiedPng(file));
     controls =
-      pageBacked || dimensionQualified ? createPngImportControls(file.name, pushToast) : null;
+      pageBacked || dimensionQualified
+        ? createPngImportControls(file.name, pushToast, options.signal)
+        : null;
     const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
-    if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
-      pushToast(loaded.cleanupWarning, 'warning');
-    }
+    warnImageCleanup(loaded, pushToast);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
+    assertImportActive(options.signal);
     const imported = await importedRasterObject(file, loaded);
+    assertImportActive(options.signal);
     importRasterImage(imported.object);
     rollback = null;
     pushToast(
       `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)} · ${describeImportDensity(imported.geometry)})`,
       'success',
     );
+    if (gif) pushToast('GIF imported as a still image of its first frame.', 'info');
     return imported.object;
   } catch (err) {
     return handleFailedImport(file.name, err, rollback, pushToast);
   } finally {
     controls?.dispose();
   }
+}
+
+function staticImage(file: File): Promise<File> {
+  return isGif(file) ? freezeGif(file) : Promise.resolve(file);
+}
+
+function assertImportActive(signal: AbortSignal | undefined): void {
+  signal?.throwIfAborted();
 }
 
 type ImageDimensions = { readonly width: number; readonly height: number };
@@ -84,6 +100,15 @@ type LoadedImageSamples =
       readonly density: ImageDensity | null;
       readonly rollback: () => Promise<string | null>;
     };
+
+function warnImageCleanup(
+  loaded: LoadedImageSamples,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): void {
+  if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
+    pushToast(loaded.cleanupWarning, 'warning');
+  }
+}
 
 async function importedRasterObject(
   file: File,
@@ -189,8 +214,12 @@ type PngImportControls = {
 function createPngImportControls(
   name: string,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  signal?: AbortSignal,
 ): PngImportControls {
   const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  if (signal?.aborted === true) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
   let lastPhase = '';
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') controller.abort();
@@ -205,7 +234,10 @@ function createPngImportControls(
         pushToast(pngProgressMessage(name, progress), 'info');
       },
     },
-    dispose: () => window.removeEventListener('keydown', handleKeyDown),
+    dispose: () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      signal?.removeEventListener('abort', abort);
+    },
   };
 }
 
