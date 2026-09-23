@@ -23,7 +23,8 @@ export const desktopCloseController = new DesktopCloseController(
           : null,
     };
   },
-  () => useLaserStore.getState().stopJob(),
+  // Recovery records this stop as the app closing, not as an operator Abort.
+  () => useLaserStore.getState().stopJob('app-closing'),
 );
 
 interface CloseRequest {

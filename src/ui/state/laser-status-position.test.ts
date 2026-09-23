@@ -72,3 +72,60 @@ describe('statusPositionPatch — manual air follows the controller', () => {
     expect('airAssistOn' in spindleOnly).toBe(false);
   });
 });
+
+// Consumers select these caches by reference; an equal-but-fresh object from
+// every Ov:/A:/WCO frame re-rendered them on polls that changed nothing.
+describe('statusPositionPatch — cache identity', () => {
+  const ov = { feed: 100, rapid: 100, spindle: 100 };
+  const wco = { x: 5, y: 6, z: 0 };
+
+  function stateWithCaches() {
+    return {
+      ...useLaserStore.getState(),
+      positionEvidenceSuppressed: false,
+      reportUnitsUnconfirmed: false,
+      ovCache: { ...ov },
+      accessoryCache: { ...allOff },
+      wcoCache: { ...wco },
+    };
+  }
+
+  it('keeps each cache when the frame repeats its values', () => {
+    const state = stateWithCaches();
+    const patch = statusPositionPatch(state, {
+      ...idleReport,
+      ov: { ...ov },
+      accessories: { ...allOff },
+      accessoryReportPresent: true,
+      wco: { ...wco },
+    });
+    expect(patch.ovCache).toBe(state.ovCache);
+    expect(patch.accessoryCache).toBe(state.accessoryCache);
+    expect(patch.wcoCache).toBe(state.wcoCache);
+  });
+
+  it('replaces a cache when any of its values changes', () => {
+    const state = stateWithCaches();
+    const patch = statusPositionPatch(state, {
+      ...idleReport,
+      ov: { ...ov, feed: 110 },
+      accessories: { ...allOff, flood: true },
+      accessoryReportPresent: true,
+      wco: { ...wco, x: 7 },
+    });
+    expect(patch.ovCache).toEqual({ ...ov, feed: 110 });
+    expect(patch.accessoryCache).toEqual({ ...allOff, flood: true });
+    expect(patch.wcoCache).toEqual({ ...wco, x: 7 });
+  });
+
+  it('replaces the accessory cache when a latched flag appears', () => {
+    const state = stateWithCaches();
+    const patch = statusPositionPatch(state, {
+      ...idleReport,
+      accessories: { ...allOff, toolChangePending: true },
+      accessoryReportPresent: true,
+    });
+    expect(patch.accessoryCache).not.toBe(state.accessoryCache);
+    expect(patch.accessoryCache?.toolChangePending).toBe(true);
+  });
+});

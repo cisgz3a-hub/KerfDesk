@@ -109,6 +109,13 @@ export const canvasTheme = {
   get motionLabelInk() {
     return themed('#dc2626', '#fca5a5');
   },
+  // Planned starts are distinct from the red controller-reported head.
+  get frameStart() {
+    return themed('#075985', '#7dd3fc');
+  },
+  get jobStart() {
+    return themed('#7e22ce', '#d8b4fe');
+  },
   // Live burn progress (draw-canvas-motion-route, draw-burn-trail).
   //
   // The completed trail used one saturated red at a fixed device width, so a
@@ -118,8 +125,8 @@ export const canvasTheme = {
   // alpha, so overlapping burns settle at a single uniform scorch instead of
   // accumulating, and the artwork still reads through a fully covered region.
   //
-  // Warm amber rather than red: red stays reserved for the safety chrome
-  // (frame/job markers, approach, head ring), so scorch never reads as a
+  // Warm amber rather than red: red stays reserved for controller chrome
+  // (approach, head ring), so scorch never reads as a
   // machine-state warning.
   get burnScorch() {
     return themed('#c2410c', '#fb923c');

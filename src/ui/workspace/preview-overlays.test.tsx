@@ -284,7 +284,9 @@ describe('PreviewControlsPanel', () => {
   it('combines playback controls and stats in one bottom panel', async () => {
     const host = await renderCombinedPanel();
 
-    expect(host.querySelectorAll('.lf-chip')).toHaveLength(1);
+    expect(
+      host.querySelectorAll('[aria-label="Preview route controls and statistics"]'),
+    ).toHaveLength(1);
     expect(host.textContent).toContain('Play');
     expect(host.textContent).toContain('Route');
     expect(host.textContent).toContain('Cut');

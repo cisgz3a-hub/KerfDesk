@@ -1,5 +1,7 @@
+import { LASER_RESUME_TRANSFORM_VERSION } from '../../core/controllers/grbl/resume-program';
 import { streamingModeForController } from '../../core/devices';
-import { fingerprintGcode, fingerprintsEqual, rawResumeLine } from '../../core/recovery';
+import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
+import { automaticRestart } from '../../core/recovery/automatic-restart-line';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -75,8 +77,10 @@ async function planLaserRecovery(
   }
   const source = await recoverySource(capsule);
   if (source === null) return null;
-  const fromLine = requestedFromLine ?? rawResumeLine(source.gcode, capsule.ackedLines);
-  const resume = buildLaserResumeProgram(source.gcode, fromLine);
+  const fromLine =
+    requestedFromLine ??
+    automaticRestart(source.gcode, capsule.ackedLines, capsule.interruption).line;
+  const resume = buildLaserResumeProgram(source.gcode, fromLine, LASER_RESUME_TRANSFORM_VERSION);
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
@@ -230,7 +234,12 @@ async function buildLaserRecoveryArtifact(
     runId: recoveryRunId,
     gcode: planned.resumeGcode,
     prepared: planned.source.prepared,
-    laserResumeChain: [...planned.source.laserResumeChain, { fromLine: planned.resumeFromLine }],
+    laserResumeChain: [
+      ...planned.source.laserResumeChain,
+      // The transform is recorded so this archive replays byte-identically
+      // after a later transform ships (ADR-341 Amendment 3).
+      { fromLine: planned.resumeFromLine, version: LASER_RESUME_TRANSFORM_VERSION },
+    ],
     ...(planned.source.laserSecondPassChain === undefined
       ? {}
       : { laserSecondPassChain: planned.source.laserSecondPassChain }),

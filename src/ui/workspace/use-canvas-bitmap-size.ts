@@ -28,6 +28,17 @@ const FALLBACK: CanvasBitmapSize = {
   height: CANVAS_FALLBACK_HEIGHT,
 };
 
+/**
+ * False until the hook has measured the element. Layout effects run child
+ * first, so on mount a child layer sees the 800×600 placeholder before the
+ * measured size lands; a layer whose paint is costly (the live burn route)
+ * skips that first paint instead of doing it twice. Identity, not value: a
+ * panel that really measures 800×600 is stored as a fresh object.
+ */
+export function isMeasuredCanvasBitmapSize(size: CanvasBitmapSize): boolean {
+  return size !== FALLBACK;
+}
+
 export function useCanvasBitmapSize(
   ref: React.RefObject<HTMLCanvasElement | null>,
 ): CanvasBitmapSize {
@@ -44,7 +55,9 @@ export function useCanvasBitmapSize(
       // good size rather than collapsing the bitmap to 0×0.
       if (width < 1 || height < 1) return;
       setSize((current) =>
-        current.width === width && current.height === height ? current : { width, height },
+        current !== FALLBACK && current.width === width && current.height === height
+          ? current
+          : { width, height },
       );
     };
 

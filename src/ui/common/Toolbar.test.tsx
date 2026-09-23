@@ -182,7 +182,10 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
       expect(name?.querySelector('.lf-toolbar-project-title')?.textContent).toBe(
         'Welcome sign.kerf',
       );
-      expect(name?.getAttribute('title')).toContain('unsaved changes');
+      expect(name?.getAttribute('title')).toContain('Unsaved changes');
+      expect(name?.querySelector('.lf-toolbar-project-caption')?.textContent).toBe(
+        'Unsaved changes',
+      );
       expect(name?.querySelector('[aria-label="Unsaved changes"]')).not.toBeNull();
     } finally {
       if (root !== null) await act(async () => root?.unmount());

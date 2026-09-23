@@ -30,11 +30,11 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
 export const AUTOSAVE_RECOVERY_DEGRADED_MESSAGE =
-  'The newest autosave was unavailable; CurveDesk recovered the previous complete snapshot.';
+  'The newest autosave was unavailable; KerfDesk recovered the previous complete snapshot.';
 export const AUTOSAVE_RECOVERY_STORAGE_MESSAGE =
   'Autosave recovery storage could not be fully read. Any available local recovery was still checked.';
 export const AUTOSAVE_RECOVERY_RETAINED_MESSAGE =
-  'The source autosave belongs to another or unverified window, so CurveDesk retained it instead of deleting it.';
+  'The source autosave belongs to another or unverified window, so KerfDesk retained it instead of deleting it.';
 export const AUTOSAVE_RECOVERY_VERSION_MESSAGE =
   'An autosave needs a different app version. It has been kept unchanged; reopen it using the version that saved it.';
 

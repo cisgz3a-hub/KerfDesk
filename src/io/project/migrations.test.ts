@@ -37,11 +37,12 @@ describe('migrateToCurrent', () => {
       4: (raw) => ({ ...raw, addedAtV4: true }),
       5: (raw) => ({ ...raw, addedAtV5: true }),
       6: (raw) => ({ ...raw, addedAtV6: true }),
+      7: (raw) => ({ ...raw, addedAtV7: true }),
     };
     const result = migrateToCurrent({ schemaVersion: 0 }, 0, registry);
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.steps).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(result.steps).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
       expect(result.raw['addedAtV0']).toBe(true);
       expect(result.raw['addedAtV1']).toBe(true);
       expect(result.raw['addedAtV2']).toBe(true);
@@ -82,7 +83,7 @@ describe('migrateToCurrent', () => {
     );
     expect(result).toMatchObject({
       kind: 'ok',
-      steps: [1, 2, 3, 4, 5, 6],
+      steps: [1, 2, 3, 4, 5, 6, 7],
       raw: {
         schemaVersion: PROJECT_SCHEMA_VERSION,
         scene: {

@@ -171,7 +171,7 @@ baseTest(
     await expect(dialog).toHaveAccessibleName('Machine Setup');
 
     await dialog.getByRole('radio', { name: /CNC only/ }).check();
-    await expect(dialog).toHaveAccessibleName('CNC Startup Setup');
+    await expect(dialog).toHaveAccessibleName('CNC Machine Setup');
     await dialog.getByLabel('Built-in CNC machine').selectOption('genmitsu-3018');
     await dialog.getByRole('button', { name: 'Load into draft', exact: true }).click();
     await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
@@ -182,11 +182,11 @@ baseTest(
     await dialog.getByText('Accessories and calibration', { exact: true }).click();
     await expect(dialog).toContainText('Z axis and probe');
     await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Save CNC startup setup', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Save CNC machine setup', exact: true }).click();
 
     await expect(page.getByLabel('Router controls')).toBeVisible();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
-    const reopened = page.getByRole('dialog', { name: 'CNC Startup Setup' });
+    const reopened = page.getByRole('dialog', { name: 'CNC Machine Setup' });
     await reopened.getByRole('button', { name: 'Go to step 2: Essentials', exact: true }).click();
     await expect(reopened.getByRole('spinbutton', { name: 'Safe Z', exact: true })).toHaveValue(
       '9',
@@ -502,7 +502,7 @@ kerfDeskTest(
     await page.goto('/');
     await page.getByRole('button', { name: 'Open...' }).click();
     const probe = page.getByTestId('canvas-motion-probe');
-    await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
+    await expect(probe).toHaveAttribute('aria-label', /Frame start planned; Job start planned/);
     await connectAndHome(page, kerfdesk);
 
     // ADR-228/ADR-237: Start is available only after the exact compiled job has

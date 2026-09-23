@@ -26,7 +26,7 @@ export function AdaptivePocketFields(props: {
         min={0.05}
         max={diameterMm / 2}
         step={0.05}
-        title="Compile-time geometric radial-engagement limit for adaptive roughing. CurveDesk does not measure live cutting force or spindle/axis load and does not change feed automatically."
+        title="Compile-time geometric radial-engagement limit for adaptive roughing. KerfDesk does not measure live cutting force or spindle/axis load and does not change feed automatically."
         onCommit={(adaptiveOptimalLoadMm) => props.onCommit({ adaptiveOptimalLoadMm })}
       />
       <p role="note" style={feedbackBoundaryStyle}>

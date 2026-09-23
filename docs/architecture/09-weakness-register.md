@@ -1,11 +1,12 @@
 # 9 — Weakness register and Phase 2 grid
 
-> ## Standing constraint: there is no machine to test on
+> ## Standing constraint: no machine is available to this project for verification
 >
 > Confirmed by the maintainer, 2026-07-25. **No hardware verification is available on this project, and
 > that is a terminal limitation rather than a pending task.** Every "HARDWARE CLAIMED" marker in this
 > document set, in `PROJECT.md`'s Phase H table, and in `docs/hardware/laser-9-acceptance-protocol.md`
-> should be read as *permanently* unproven, not as awaiting a test someone will run.
+> should be read as *permanently* unproven, not as awaiting a test someone will run. Informal use on a
+> Falcon A1 Pro and a Neotronics 4040 (README Status) is not verification and does not change this.
 >
 > Do not close a finding by recommending a cut. The substitutes, best first:
 >
@@ -39,8 +40,8 @@ here was fixed in this session — this document set is **audit-only** per CLAUD
 > Seven ledger entries are open, including **D-03**, which reclassifies our `M3 S0` preamble pre-arm as a
 > shipping divergence with **no ADR**. Original finding retained below for context.
 
-ADR-027 (`DECISIONS.md:1272`) makes LightBurn canonical and declares **`LIGHTBURN-STUDY.md`** the
-authoritative behavior reference (`:1293`) and the running divergence ledger (`:1295`).
+ADR-027 (`DECISIONS.md:1283`) makes LightBurn canonical and declares **`LIGHTBURN-STUDY.md`** the
+authoritative behavior reference (`:1304`) and the running divergence ledger (`:1306`).
 `src/core/output/grbl-strategy.ts:13` cites "LIGHTBURN-STUDY §8" to justify the `M3 S0` preamble
 divergence.
 
@@ -66,13 +67,13 @@ Full analysis: [03-coordinates-and-origin.md](03-coordinates-and-origin.md).
 
 The suite asserts structure and determinism, never appearance
 ([08](08-invariants-and-verification.md)). The one perceptual harness (ADR-025) uses IoU, documented as
-blind to the outline-vs-centerline gap (`PROJECT.md:113`) and, per project memory, blind to waviness.
+blind to the outline-vs-centerline gap (`PROJECT.md:150`) and, per project memory, blind to waviness.
 So no automated check would catch a fill hatching at the wrong angle, a raster burning inverted, or a
 V-carve cutting the wrong depth law — provided each stayed deterministic.
 
 ### W-04 — Nearly all CNC is hardware-CLAIMED · **P1 for anything sold**
 
-`PROJECT.md:138` labels every Phase H sub-phase "Built … hardware pass still CLAIMED". H.15–H.18 (rest
+`PROJECT.md:175` labels every Phase H sub-phase "Built … hardware pass still CLAIMED". H.15–H.18 (rest
 machining, adaptive clearing, inlay pairs, drag tabs) are the least-verified and most mechanically
 aggressive code in the repo. The 2026-07-05 CNC release audit concluded **not sellable** with 7
 hand-confirmed criticals and 34 unverified majors.
@@ -106,7 +107,7 @@ Carried from project memory; each needs confirmation against the current tree:
   emit `M7`/`M8`/`M9` transitions (`grbl-strategy.ts:421-431`) but was not traced end-to-end.
 - `.lbrn` export drops cut settings.
 - `linesPerMm < 1` floor not fixed (CNC lead/ramp audit 2026-07-24).
-- Trace `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (`PROJECT.md:113`).
+- Trace `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (`PROJECT.md:150`).
 
 ### W-09 — Ruida is shipped but never accepted by hardware · **P3, scope honesty**
 
@@ -117,11 +118,11 @@ cannot be claimed to work.
 ### W-10 — Asymmetries with no ADR · **P3**
 
 - Image overscan is a **fixed 5 mm**, not per-layer, while fill overscan is per-layer
-  (`PROJECT.md:403`). **UNDECIDED — no ADR** found for the asymmetry.
+  (`PROJECT.md:524`). **UNDECIDED — no ADR** found for the asymmetry.
 - `lucide-static` has no ADR entry despite ADR-017 requiring evaluation of every dependency and
-  `PROJECT.md:342` requiring a `RESEARCH_LOG.md` entry for each.
+  `PROJECT.md:459` requiring a `RESEARCH_LOG.md` entry for each.
 - ADR-054..091 remain **reserved but unused**; several shipped parity features (kerf offset, tabs,
-  cross-hatch, offset fill) landed with **no dedicated ADR**, and `PROJECT.md:544` records that earlier
+  cross-hatch, offset fill) landed with **no dedicated ADR**, and `PROJECT.md:681` records that earlier
   citations of ADR-052/053 for them were simply **wrong**.
 
 ## The Phase 2 comparison grid
@@ -134,7 +135,7 @@ Fill one row per subsystem. Verdicts per [README.md](README.md).
 | Layer identity | Explicit operation IDs (ADR-211) | colour-as-layer | | | |
 | Fill overscan | per-layer generic every-sweep runway; legacy ADR-033 bypass retained | | n/a | | |
 | Scanning offset | per-speed table (ADR-052) | has equivalent | n/a | | |
-| Dither algorithms | 3 (`DECISIONS.md:1283`) | 10 | n/a | | |
+| Dither algorithms | 3 (`DECISIONS.md:1294`) | 10 | n/a | | |
 | Image overscan | fixed 5 mm | | n/a | | |
 | Power mode M3/M4 | per-mode + per-layer override (ADR-036/190) | | n/a | | |
 | Trace engine | own measured-boundary (ADR-128) | | n/a | | |

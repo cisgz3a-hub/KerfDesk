@@ -5,6 +5,7 @@ import { useRef } from 'react';
 import {
   CANVAS_FALLBACK_HEIGHT,
   CANVAS_FALLBACK_WIDTH,
+  isMeasuredCanvasBitmapSize,
   useCanvasBitmapSize,
 } from './use-canvas-bitmap-size';
 
@@ -15,7 +16,15 @@ import {
 function Probe(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const size = useCanvasBitmapSize(ref);
-  return <canvas ref={ref} width={size.width} height={size.height} data-testid="c" />;
+  return (
+    <canvas
+      ref={ref}
+      width={size.width}
+      height={size.height}
+      data-measured={String(isMeasuredCanvasBitmapSize(size))}
+      data-testid="c"
+    />
+  );
 }
 
 type RoCallback = () => void;
@@ -102,6 +111,16 @@ describe('useCanvasBitmapSize', () => {
     const canvas = container.querySelector('canvas');
     expect(canvas?.width).toBe(CANVAS_FALLBACK_WIDTH);
     expect(canvas?.height).toBe(CANVAS_FALLBACK_HEIGHT);
+  });
+
+  it('reports the unmeasured placeholder, and a real 800x600 panel as measured', () => {
+    measured = { width: 0, height: 0 };
+    act(() => root.render(<Probe />));
+    expect(container.querySelector('canvas')?.dataset['measured']).toBe('false');
+
+    measured = { width: CANVAS_FALLBACK_WIDTH, height: CANVAS_FALLBACK_HEIGHT };
+    act(() => roCallbacks.forEach((cb) => cb()));
+    expect(container.querySelector('canvas')?.dataset['measured']).toBe('true');
   });
 
   it('disconnects the observer on unmount', () => {

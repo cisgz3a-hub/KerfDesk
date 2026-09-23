@@ -21,7 +21,7 @@ export function JobReviewCncOwnerActions(): JSX.Element {
     <section aria-label="Edit CNC settings" style={sectionStyle}>
       <span style={copyStyle}>Need to change something?</span>
       <Button onClick={handleEditArtwork}>Edit Artwork settings</Button>
-      <Button onClick={handleEditStartup}>Edit Startup Setup</Button>
+      <Button onClick={handleEditStartup}>Edit Machine Setup</Button>
     </section>
   );
 }

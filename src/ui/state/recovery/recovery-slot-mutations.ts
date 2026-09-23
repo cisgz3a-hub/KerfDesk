@@ -82,6 +82,10 @@ export function interruptRunMutation(
 ): SlotMutation<boolean> {
   const active = slots.activeRun;
   if (slots.recoveryCapsule?.runId === runId) return unchanged(slots, true);
+  // A repeated interruption after a later run replaced this run's capsule: the
+  // tracker records an errored stream once when it errors and again when the
+  // stream disappears. The history already holds it, so this is not a failure.
+  if (interruptionRecorded(slots, runId)) return unchanged(slots, true);
   if (active?.runId !== runId) return unchanged(slots, false);
   const revision = slots.revision + 1;
   const finalAcked = Math.max(active.ackedLines, clampProgress(ackedLines, active.sendableLines));
@@ -353,6 +357,12 @@ export function promoteStaleActiveRunMutation(
 
 function unchanged<T>(slots: PersistedRecoverySlots, value: T): SlotMutation<T> {
   return { slots, value };
+}
+
+function interruptionRecorded(slots: PersistedRecoverySlots, runId: RunId): boolean {
+  return slots.executionHistory.some(
+    (record) => record.runId === runId && record.terminalKind === 'interrupted',
+  );
 }
 
 function slotsReferenceRun(slots: PersistedRecoverySlots, runId: RunId): boolean {

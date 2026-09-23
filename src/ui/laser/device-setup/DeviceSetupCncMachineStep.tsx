@@ -48,7 +48,7 @@ function CncParameterRows(props: {
   const { machine, updateParams } = props;
   return (
     <>
-      <MachineSetupFieldAnchor field="safe-z" label="Safe Z in Startup Setup">
+      <MachineSetupFieldAnchor field="safe-z" label="Safe Z in Machine Setup">
         <MachineNumberRow
           label="Safe Z"
           unit="mm"
@@ -59,7 +59,7 @@ function CncParameterRows(props: {
           onCommit={(safeZMm) => updateParams({ safeZMm })}
         />
       </MachineSetupFieldAnchor>
-      <MachineSetupFieldAnchor field="spindle-max" label="Spindle maximum in Startup Setup">
+      <MachineSetupFieldAnchor field="spindle-max" label="Spindle maximum in Machine Setup">
         <MachineNumberRow
           label="Spindle maximum"
           unit="RPM"
@@ -70,7 +70,7 @@ function CncParameterRows(props: {
           onCommit={(spindleMaxRpm) => updateParams({ spindleMaxRpm })}
         />
       </MachineSetupFieldAnchor>
-      <MachineSetupFieldAnchor field="spinup" label="Spin-up delay in Startup Setup">
+      <MachineSetupFieldAnchor field="spinup" label="Spin-up delay in Machine Setup">
         <MachineNumberRow
           label="Spin-up delay"
           unit="s"
@@ -81,7 +81,7 @@ function CncParameterRows(props: {
           onCommit={(spindleSpinupSec) => updateParams({ spindleSpinupSec })}
         />
       </MachineSetupFieldAnchor>
-      <MachineSetupFieldAnchor field="coolant" label="Coolant in Startup Setup">
+      <MachineSetupFieldAnchor field="coolant" label="Coolant in Machine Setup">
         <Row label="Coolant">
           <select
             value={machine.params.coolant ?? 'off'}
@@ -109,7 +109,7 @@ function ParkRows(props: {
   readonly updateParams: (patch: Partial<CncMachineParams>) => void;
 }): JSX.Element {
   return (
-    <MachineSetupFieldAnchor field="park" label="Park position in Startup Setup">
+    <MachineSetupFieldAnchor field="park" label="Park position in Machine Setup">
       <MachineNumberRow
         label="Park X"
         unit="mm"

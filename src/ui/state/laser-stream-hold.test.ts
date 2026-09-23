@@ -41,6 +41,7 @@ function probeAt(at: number, state: LaserState): StallProbe {
     queuedCount: streamer.queued.length - streamer.queueIndex,
     statusReport: state.statusReport,
     at,
+    checkedAt: at,
   };
 }
 

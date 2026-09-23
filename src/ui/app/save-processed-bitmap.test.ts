@@ -4,6 +4,49 @@ import type { FileSaveRequest, PlatformAdapter, SaveTarget } from '../../platfor
 import { handleSaveProcessedBitmap } from './save-processed-bitmap';
 
 describe('handleSaveProcessedBitmap', () => {
+  it('exports pass-through greys using the power range while ignoring image preparation', async () => {
+    const base = rasterProject();
+    const raster = base.scene.objects[0];
+    if (raster?.kind !== 'raster-image') throw new Error('missing raster');
+    const encodePng = vi.fn(async () => new Blob(['png'], { type: 'image/png' }));
+    const project: Project = {
+      ...base,
+      scene: {
+        layers: base.scene.layers.map((layer) => ({
+          ...layer,
+          negativeImage: true,
+          power: 100,
+          minPower: 20,
+          ditherAlgorithm: 'jarvis',
+        })),
+        objects: [
+          {
+            ...raster,
+            brightness: 100,
+            contrast: 100,
+            gamma: 0.1,
+            lumaBase64: Buffer.from([64, 192]).toString('base64'),
+          },
+        ],
+      },
+    };
+    await handleSaveProcessedBitmap({
+      platform: mockPlatform(async () => ({
+        displayName: 'pixels.png',
+        write: async () => undefined,
+      })),
+      project,
+      selectedObjectId: 'R1',
+      pushToast: vi.fn(),
+      encodePng,
+    });
+    expect(encodePng).toHaveBeenCalledWith(
+      new Uint8ClampedArray([51, 51, 51, 255, 154, 154, 154, 255]),
+      2,
+      1,
+    );
+  });
+
   it('saves the selected image as a PNG blob', async () => {
     const written: Array<Blob | string> = [];
     const requests: FileSaveRequest[] = [];

@@ -42,7 +42,7 @@ function buttonByName(container: HTMLElement, name: string): HTMLButtonElement {
 
 async function expandHud(container: HTMLElement): Promise<HTMLButtonElement> {
   const expand = container.querySelector(
-    'button[aria-label="Expand stock reference from Startup Setup"]',
+    'button[aria-label="Expand stock reference from Machine Setup"]',
   );
   if (!(expand instanceof HTMLButtonElement)) throw new Error('expand button missing');
   await act(async () => expand.click());
@@ -52,7 +52,7 @@ async function expandHud(container: HTMLElement): Promise<HTMLButtonElement> {
 describe('CncStockCanvasHud', () => {
   it('stays off the laser canvas and starts folded with the current CNC stock summary', async () => {
     const laserHost = await renderHud('laser');
-    expect(laserHost.querySelector('[aria-label="Stock from Startup Setup"]')).toBeNull();
+    expect(laserHost.querySelector('[aria-label="Stock from Machine Setup"]')).toBeNull();
 
     await act(async () => root?.unmount());
     laserHost.remove();
@@ -63,13 +63,13 @@ describe('CncStockCanvasHud', () => {
     expect(cncHost.textContent).toContain('400 x 400 x 6.35 mm');
     expect(cncHost.querySelector('input')).toBeNull();
     expect(
-      cncHost.querySelector('button[aria-label="Expand stock reference from Startup Setup"]'),
+      cncHost.querySelector('button[aria-label="Expand stock reference from Machine Setup"]'),
     ).not.toBeNull();
   });
 
   it('expands into read-only facts and collapses back to the compact state', async () => {
     const container = await renderHud('cnc');
-    const panel = container.querySelector('[aria-label="Stock from Startup Setup"]');
+    const panel = container.querySelector('[aria-label="Stock from Machine Setup"]');
     if (!(panel instanceof HTMLElement)) throw new Error('stock reference missing');
     expect(panel.style.width).toBe('176px');
 
@@ -83,12 +83,12 @@ describe('CncStockCanvasHud', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('opens the exact Startup Setup stock editor without changing the project', async () => {
+  it('opens the exact Machine Setup stock editor without changing the project', async () => {
     const container = await renderHud('cnc');
     const projectBefore = useStore.getState().project;
     await expandHud(container);
 
-    await act(async () => buttonByName(container, 'Edit in Startup Setup').click());
+    await act(async () => buttonByName(container, 'Edit in Machine Setup').click());
 
     expect(useStore.getState().project).toBe(projectBefore);
     expect(useMachineSetupDialogStore.getState().state).toMatchObject({

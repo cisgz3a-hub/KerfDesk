@@ -10,10 +10,10 @@ export function CncSetupReferenceFields(): JSX.Element | null {
   return (
     <RailSection
       label="Stock & machine reference"
-      hint="Review stock, machine limits, clearance and output values from Startup Setup."
+      hint="Review stock, machine limits, clearance and output values from Machine Setup."
     >
       <p className="lf-cnc-settings-hint">
-        These values come from Startup Setup. Select one to see what it controls or edit it there.
+        These values come from Machine Setup. Select one to see what it controls or edit it there.
       </p>
       {machineReferenceRows(machine).map((row) => (
         <SetupOwnedValueRow key={row.label} {...row} />
@@ -29,41 +29,41 @@ function machineReferenceRows(machine: CncMachineConfig): ReadonlyArray<Referenc
       label: 'Stock',
       value: stockLabel(machine),
       description:
-        'These are the current job stock dimensions saved in Startup Setup. Artwork cut depth remains an operation setting.',
+        'These are the current job stock dimensions saved in Machine Setup. Artwork cut depth remains an operation setting.',
       setupField: 'stock',
     },
     {
       label: 'Tiling',
       value: tilingLabel(machine),
       description:
-        'This current-job tiling plan is configured in Startup Setup. It controls tiled export, not this artwork operation.',
+        'This current-job tiling plan is configured in Machine Setup. It controls tiled export, not this artwork operation.',
       setupField: 'tiling',
     },
     {
       label: 'Spin-up delay',
       value: `${formatNumber(machine.params.spindleSpinupSec)} s`,
       description:
-        'This Startup Setup delay is emitted after spindle start and before the first plunge.',
+        'This Machine Setup delay is emitted after spindle start and before the first plunge.',
       setupField: 'spinup',
     },
     {
       label: 'Coolant',
       value: coolantLabel(machine.params.coolant),
-      description: 'This machine-wide coolant output is selected in Startup Setup for the job.',
+      description: 'This machine-wide coolant output is selected in Machine Setup for the job.',
       setupField: 'coolant',
     },
     {
       label: 'Safe Z',
       value: `${formatNumber(machine.params.safeZMm)} mm`,
       description:
-        'This is the Startup Setup clearance height above the stock top for rapid travel between cuts.',
+        'This is the Machine Setup clearance height above the stock top for rapid travel between cuts.',
       setupField: 'safe-z',
     },
     {
       label: 'Park position',
       value: parkLabel(machine),
       description:
-        'This is the Startup Setup park position used after the job and during planned bit changes.',
+        'This is the Machine Setup park position used after the job and during planned bit changes.',
       setupField: 'park',
     },
   ];

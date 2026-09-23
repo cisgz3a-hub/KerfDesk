@@ -19,6 +19,7 @@ import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
@@ -43,23 +44,6 @@ import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 
 export function App(): JSX.Element {
-  // Recovery stays in a nonblocking banner. Background autosave protects
-  // edits throughout the session; global handlers catch asynchronous errors.
-  usePolylineFairingUpgrade();
-  useSingleArtworkSelection();
-  useAutosave();
-  useMaterialLibraryPersistence();
-  useCncLibraryPersistence();
-  useLayerDefaultsPersistence();
-  useGlobalErrorHandlers();
-  useJobShortcuts();
-  useShortcuts();
-  useSpacePan();
-  useActiveJobWakeLock();
-  useJobCheckpoint();
-  useUnloadStop();
-  useUnsavedChangesGuard();
-  useWindowTitle();
   return (
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
@@ -101,49 +85,74 @@ export function App(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <AppLifecycle />
     </div>
   );
 }
 
+// App-wide hooks live in a leaf that renders nothing. Nothing below App is
+// memoised, so a hook that re-rendered App re-rendered every rail, dialog host
+// and the workspace with it — which the status poll and each cursor hover did
+// while the shortcut hooks subscribed from here. Mounted last so its effects
+// still run after every sibling's, as they did from App itself.
+function AppLifecycle(): null {
+  // Recovery stays in a nonblocking banner. Background autosave protects
+  // edits throughout the session; global handlers catch asynchronous errors.
+  usePolylineFairingUpgrade();
+  useSingleArtworkSelection();
+  useAutosave();
+  useMaterialLibraryPersistence();
+  useCncLibraryPersistence();
+  useLayerDefaultsPersistence();
+  useGlobalErrorHandlers();
+  useJobShortcuts();
+  useShortcuts();
+  useSpacePan();
+  useActiveJobWakeLock();
+  useJobCheckpoint();
+  useUnloadStop();
+  useUnsavedChangesGuard();
+  useWindowTitle();
+  return null;
+}
+
 // The main canvas has two modes (ADR-255): the design view, and a G-code 3D
-// PREVIEW of what this project compiles to. The switch is on the canvas
+// PREVIEW of what this project compiles to. The switch is above the canvas
 // because it is a glance, not a workbench — the toolbar's "Inspect G-code
 // (3D)" opens the in-depth screen. Both stay usable during a job, where
 // watching the running program is the point.
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
-  return (
-    <div style={canvasAreaStyle} data-toast-workspace>
-      {/* G-code owns the canvas, so Workspace is unmounted rather than merely
-          covered. Its cleanup cancels idle motion/preview workers and makes a
-          late heavy result incapable of committing or drawing underneath. */}
-      {showGcode ? <CanvasGcodeView active /> : <Workspace />}
+  const accessories = (
+    <>
       <WorkspaceCameraOverlay />
       <RegistrationJigPanel />
       <CameraPanel />
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
-      <div style={canvasSwitchStyle}>
-        <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
-      </div>
-    </div>
+    </>
+  );
+  return (
+    <WorkspaceViewport
+      controls={<CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />}
+      content={
+        showGcode ? (
+          <div className="lf-workspace-stage">
+            <CanvasGcodeView active />
+          </div>
+        ) : (
+          <Workspace />
+        )
+      }
+    >
+      {/* G-code owns the canvas, so Workspace is unmounted rather than merely
+          covered. Its cleanup cancels idle motion/preview workers and makes a
+          late heavy result incapable of committing or drawing underneath. */}
+      {accessories}
+    </WorkspaceViewport>
   );
 }
-
-// Top-CENTRE, deliberately: the rulers own the left edge and the motion
-// badge owns top-right (canvas-motion-badge.tsx, top/right 12) — anchoring
-// either side buries one of them. Its own elevation so it reads as a
-// control rather than part of the drawing.
-const canvasSwitchStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 30,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  zIndex: 4,
-  boxShadow: 'var(--lf-shadow)',
-  borderRadius: 'var(--lf-radius-lg)',
-};
 
 const shellStyle: React.CSSProperties = {
   display: 'flex',
@@ -156,14 +165,5 @@ const mainStyle: React.CSSProperties = {
   flex: 1,
   minHeight: 0,
   minWidth: 0,
-  overflow: 'hidden',
-};
-const canvasAreaStyle: React.CSSProperties = {
-  // flex:1 + minWidth:0 lets the workspace shrink to whatever the side rails
-  // leave. overflow:hidden prevents the inner canvas (with width: 100%) from
-  // forcing the flexbox open when sized between paint frames.
-  flex: 1,
-  minWidth: 0,
-  position: 'relative',
   overflow: 'hidden',
 };

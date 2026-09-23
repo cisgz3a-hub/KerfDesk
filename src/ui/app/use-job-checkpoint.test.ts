@@ -88,7 +88,7 @@ describe('installJobCheckpointTracking', () => {
     expect(repo.getSnapshot().activeRun?.ackedLines).toBe(25);
   });
 
-  it('retries progress after a failed repository result instead of advancing its watermark', async () => {
+  it('retries failed progress at the next interval, never per acknowledgement', async () => {
     const repo = repository();
     const reportFailure = vi.fn();
     await repo.initialize();
@@ -116,9 +116,15 @@ describe('installJobCheckpointTracking', () => {
     expect(repo.getSnapshot().activeRun?.ackedLines).toBe(0);
     expect(reportFailure).toHaveBeenCalledWith(failureResult);
 
+    // A persistently failing disk must not turn every acknowledgement into a
+    // read-write transaction; the failed ack stays queued until the next interval.
     useLaserStore.setState({ streamer: { ...base, completed: 26 } });
-    await waitForAck(repo, 26);
-    expect(updateProgress).toHaveBeenCalledWith('run-progress-retry', 26, LATER);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(updateProgress).toHaveBeenCalledOnce();
+
+    useLaserStore.setState({ streamer: { ...base, completed: 50 } });
+    await waitForAck(repo, 50);
+    expect(updateProgress).toHaveBeenCalledWith('run-progress-retry', 50, LATER);
   });
 
   it('retries a terminal interruption after a failed repository result', async () => {
@@ -179,9 +185,9 @@ describe('installJobCheckpointTracking', () => {
 
     useLaserStore.setState({ streamer: { ...base, completed: 25 } });
     await vi.waitFor(() => expect(reportFailure).toHaveBeenCalledWith(failure));
-    useLaserStore.setState({ streamer: { ...base, completed: 26 } });
+    useLaserStore.setState({ streamer: { ...base, completed: 50 } });
 
-    await waitForAck(repo, 26);
+    await waitForAck(repo, 50);
     expect(reportFailure).toHaveBeenCalledOnce();
   });
 

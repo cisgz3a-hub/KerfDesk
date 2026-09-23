@@ -20,20 +20,23 @@ export function statusPositionPatch(
   > {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
   // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
-  const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
+  const ovPatch =
+    report.ov === null || report.ov === undefined
+      ? {}
+      : { ovCache: unchangedOr(state.ovCache, report.ov) };
   // A: is intermittent with Ov:. Preserve the last state on frames carrying
   // neither field; the parser turns Ov-without-A into a known all-off value.
   const accessoryPatch =
     report.accessories === null || report.accessories === undefined
       ? {}
       : {
-          accessoryCache: {
+          accessoryCache: unchangedOr(state.accessoryCache, {
             ...report.accessories,
             ...(state.accessoryCache?.secondarySpindlePresent === true
               ? { secondarySpindlePresent: true }
               : {}),
             ...exceptionalAccessoryLatch(state.accessoryCache, report.accessoryReportPresent),
-          },
+          }),
         };
   const airPatch = manualAirPatch(report);
   if (state.positionEvidenceSuppressed === true || state.reportUnitsUnconfirmed === true) {
@@ -61,7 +64,7 @@ export function statusPositionPatch(
     ...ovPatch,
     ...accessoryPatch,
     ...airPatch,
-    wcoCache: report.wco,
+    wcoCache: unchangedOr(state.wcoCache, report.wco),
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
   };
@@ -75,6 +78,21 @@ function hasActiveXyOrigin(state: LaserState, wco: WorkCoordinateOffset): boolea
   const deliberateOrigin =
     state.workOriginSource === 'g92' || state.workOriginSource === 'g54-persistent';
   return hasCustomXyOrigin({ x, y, z }) || deliberateOrigin;
+}
+
+// The caches keep their identity while the controller repeats the same values.
+// Every consumer selects them by reference, so a fresh-but-equal object from
+// each Ov:/A:/WCO frame re-rendered those consumers on polls that changed
+// nothing. The shallow comparison is exact only for flat scalar values, which
+// FlatCache enforces: a nested field added later fails to compile here rather
+// than silently comparing by reference.
+type FlatCache = Readonly<Record<string, number | boolean | string | null | undefined>>;
+
+function unchangedOr<T extends FlatCache>(previous: T | null | undefined, next: T): T {
+  if (previous === null || previous === undefined) return next;
+  const keys = Object.keys(next);
+  if (keys.length !== Object.keys(previous).length) return next;
+  return keys.every((key) => Object.is(previous[key], next[key])) ? previous : next;
 }
 
 // Manual Air mirrors the controller's own coolant state whenever a frame

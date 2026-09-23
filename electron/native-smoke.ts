@@ -108,12 +108,26 @@ function argumentValue(argv: ReadonlyArray<string>, prefix: string): string | nu
   return value === undefined ? null : value.slice(prefix.length);
 }
 
+// The toolbar keeps only its primary commands on screen; the rest (Save As
+// among them) exist in the DOM only while "More commands" is open. Reach a
+// command the way an operator does: on the toolbar, else through More.
+// Toolbar.native-smoke-reach.test.tsx pins this contract in the fast suite.
 const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const button = (label) => {
-    const match = [...document.querySelectorAll('button')].find(
+  const findButton = (label) =>
+    [...document.querySelectorAll('button')].find(
       (candidate) => candidate.getAttribute('aria-label') === label,
     );
+  const commandButton = async (label) => {
+    let match = findButton(label);
+    if (!(match instanceof HTMLButtonElement)) {
+      const more = findButton('More commands');
+      if (more instanceof HTMLButtonElement) {
+        more.click();
+        await delay(50);
+        match = findButton(label);
+      }
+    }
     if (!(match instanceof HTMLButtonElement)) throw new Error(label + ' button missing');
     return match;
   };
@@ -140,10 +154,10 @@ const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
       }),
     }),
   });
-  button('Import...').click();
+  (await commandButton('Import...')).click();
   for (let attempt = 0; attempt < 40 && !saved.includes('native-smoke.svg'); attempt += 1) {
     await delay(50);
-    button('Save As...').click();
+    (await commandButton('Save As...')).click();
     await delay(50);
   }
   if (!saved.includes('native-smoke.svg')) throw new Error('imported SVG was absent from saved project');

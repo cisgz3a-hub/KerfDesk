@@ -10,6 +10,9 @@ import { persistedRecoveryArtifactRunIds } from './recovery-artifact-retention';
 export type RecoverySlotMutation<T> = {
   readonly slots: PersistedRecoverySlots;
   readonly value: T;
+  /** The stored record already says exactly this, so the backend may skip
+   * rewriting it. Set only by `storedSlotsUnchanged`. */
+  readonly unchanged?: boolean;
 };
 
 export type RecoveryStorageBackend = {
@@ -78,7 +81,7 @@ export class MemoryRecoveryStorageBackend implements RecoveryStorageBackend {
   async mutateSlots<T>(mutate: (current: unknown) => RecoverySlotMutation<T>): Promise<T> {
     this.maybeFail('mutate-slots');
     const mutation = mutate(clone(this.slots));
-    this.slots = clone(mutation.slots);
+    if (mutation.unchanged !== true) this.slots = clone(mutation.slots);
     return mutation.value;
   }
 
@@ -89,7 +92,7 @@ export class MemoryRecoveryStorageBackend implements RecoveryStorageBackend {
     this.maybeFail('mutate-slots');
     if (!this.artifacts.has(runId)) return { artifactExists: false };
     const mutation = mutate(clone(this.slots));
-    this.slots = clone(mutation.slots);
+    if (mutation.unchanged !== true) this.slots = clone(mutation.slots);
     return { artifactExists: true, value: mutation.value };
   }
 

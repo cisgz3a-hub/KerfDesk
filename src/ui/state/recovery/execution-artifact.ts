@@ -36,7 +36,12 @@ import {
   assertExecutionArtifactSizeWithinBudget,
   measureExecutionArtifactBytesWithinBudget,
 } from './execution-artifact-size';
-import { isLaserSecondPassChain, type LaserSecondPassChain } from './laser-second-pass-lineage';
+import {
+  isLaserResumeStep,
+  isLaserSecondPassChain,
+  type LaserResumeStep,
+  type LaserSecondPassChain,
+} from './laser-second-pass-lineage';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
@@ -106,7 +111,7 @@ export type ExecutionArtifactV1 = {
   readonly prepared: PreparedExecutionOutput;
   /** Ordered, deterministic resume transforms applied after emitting `prepared`.
    * Absent for ordinary starts and CNC recovery jobs. */
-  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserResumeChain?: ReadonlyArray<LaserResumeStep>;
   readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly canvasPlan: ArchivedCanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
@@ -146,7 +151,7 @@ type CreateExecutionArtifactBase = {
   readonly runId: RunId;
   readonly gcode: string;
   readonly prepared: PreparedExecutionOutput;
-  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserResumeChain?: ReadonlyArray<LaserResumeStep>;
   readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
@@ -177,7 +182,11 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
   assertArchiveMayFit(args);
   const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
-  assertExecutionArtifactSizeWithinBudget({ ...args, canvasPlan }, 0, true);
+  // No budget walk here: the measurement below walks the finished artifact,
+  // which holds the same job, and enforces the same budget. Walking the inputs
+  // first doubled a node-per-motion-point traversal that runs while the first
+  // window of the job is on the wire (ADR-352); assertArchiveMayFit has already
+  // refused the hopeless case before any allocation.
   const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);
   const device = prepared.project.device;
@@ -290,11 +299,18 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
  * decode. Legacy exact artifacts are retained only as untrusted historical
  * data and are never authorized for runtime execution. */
 export function isCurrentExecutionArtifact(value: unknown): value is CurrentExecutionArtifactV2 {
+  return isExecutionArtifact(value) && executionArtifactIsCurrent(value);
+}
+
+/** The schema half of `isCurrentExecutionArtifact`, for a caller that already
+ * holds an artifact which passed `isExecutionArtifact`. */
+export function executionArtifactIsCurrent(
+  artifact: ExecutionArtifactV1,
+): artifact is CurrentExecutionArtifactV2 {
   return (
-    isExecutionArtifact(value) &&
-    value.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
-    value.provenance?.schemaVersion === 2 &&
-    value.provenance.archivedControllerObservationSha256 !== undefined
+    artifact.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
+    artifact.provenance?.schemaVersion === 2 &&
+    artifact.provenance.archivedControllerObservationSha256 !== undefined
   );
 }
 
@@ -302,13 +318,7 @@ function hasValidLaserResumeChain(value: Record<string, unknown>): boolean {
   const chain = value['laserResumeChain'];
   if (chain === undefined) return true;
   if (value['machineKind'] !== 'laser' || !Array.isArray(chain)) return false;
-  return chain.every(
-    (step) =>
-      isRecord(step) &&
-      typeof step['fromLine'] === 'number' &&
-      Number.isInteger(step['fromLine']) &&
-      step['fromLine'] >= 1,
-  );
+  return chain.every(isLaserResumeStep);
 }
 
 export function isLegacyFingerprintArtifact(
