@@ -61,7 +61,10 @@ async function acknowledge(base: StreamerState, from: number, to: number): Promi
   }
 }
 
-describe('checkpoint progress writes', () => {
+// Each acknowledgement yields a real macrotask so the tracker's IndexedDB-shaped
+// writes interleave as they do live; a few hundred of them take seconds on a
+// loaded runner, well past the 5 s default.
+describe('checkpoint progress writes', { timeout: 30_000 }, () => {
   it('coalesces acknowledgements behind the write in flight into one latest write', async () => {
     const { repo, reportFailure } = harness();
     await repo.initialize();
