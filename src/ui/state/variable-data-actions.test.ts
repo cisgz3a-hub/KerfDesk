@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createProject } from '../../core/scene';
 import { useStore } from './store';
+import { fixtureState } from './variable-array-test-fixture';
 
 describe('variable data advancement', () => {
   beforeEach(() => {
@@ -9,7 +10,7 @@ describe('variable data advancement', () => {
 
   it('advances CSV and serial after the configured successful export', () => {
     const project = {
-      ...createProject(),
+      ...fixtureState().project,
       variables: {
         advancement: 'after-successful-export' as const,
         recordIndex: 0,
@@ -70,7 +71,7 @@ describe('variable data advancement', () => {
 
   it('wraps automatic advancement and supports Previous and Reset', () => {
     const project = {
-      ...createProject(),
+      ...fixtureState().project,
       variables: {
         advancement: 'after-successful-export' as const,
         recordIndex: 2,

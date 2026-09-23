@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CommandFamily } from './command-registry';
-import { familySummary, menuItems } from './menu-keyboard';
+import { familySummary, isMenuAbortShortcut, menuItems } from './menu-keyboard';
 
 export function useMenuBarState() {
   const [openFamily, setOpenFamily] = useState<CommandFamily | null>(null);
@@ -9,16 +9,16 @@ export function useMenuBarState() {
   const pendingMenuFocus = useRef<'first' | 'last' | null>(null);
   const pendingFamilyReturn = useRef<CommandFamily | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openFamily === null || pendingMenuFocus.current === null) return;
     const menu = menuBarRef.current?.querySelector(`[data-family-menu="${openFamily}"]`);
     const items = menuItems(menu);
     const target = pendingMenuFocus.current === 'last' ? items[items.length - 1] : items[0];
     pendingMenuFocus.current = null;
-    target?.focus();
+    (target ?? (menuBarRef.current && familySummary(menuBarRef.current, openFamily)))?.focus();
   }, [openFamily]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openFamily !== null || pendingFamilyReturn.current === null) return;
     const root = menuBarRef.current;
     if (root === null) return;
@@ -45,10 +45,11 @@ function installOutsideClose(
 ): (() => void) | undefined {
   if (openFamily === null) return undefined;
   const outside = (event: PointerEvent | KeyboardEvent): void => {
-    if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
+    if (event instanceof KeyboardEvent && isMenuAbortShortcut(event)) return;
     const target = event.target;
-    if (target instanceof Node && menuBarRef.current?.contains(target)) return;
-    close(null);
+    const root = menuBarRef.current;
+    if (target instanceof Node && root?.contains(target)) return;
+    handleOutsideInput(event, root, openFamily, close);
   };
   document.addEventListener('pointerdown', outside, true);
   document.addEventListener('keydown', outside, true);
@@ -56,4 +57,19 @@ function installOutsideClose(
     document.removeEventListener('pointerdown', outside, true);
     document.removeEventListener('keydown', outside, true);
   };
+}
+
+function handleOutsideInput(
+  event: PointerEvent | KeyboardEvent,
+  root: HTMLElement | null,
+  family: CommandFamily,
+  close: (family: null) => void,
+): void {
+  // A dismissing press must not also select, draw, or nudge behind the menu.
+  event.stopPropagation();
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Tab') event.preventDefault();
+  if (root !== null) familySummary(root, family)?.focus();
+  if (!(event instanceof KeyboardEvent) || event.key === 'Escape' || event.key === 'Tab') {
+    close(null);
+  }
 }

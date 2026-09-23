@@ -48,6 +48,13 @@ function validateSequence(value: unknown): string | null {
 export function validateVariableTemplate(value: unknown, path: string): string | null {
   if (value === undefined) return null;
   if (!isObject(value) || !Array.isArray(value['tokens'])) return invalid(path);
+  const offset = value['sequenceOffset'];
+  if (
+    offset !== undefined &&
+    (!isNonNegativeInteger(offset) || Number(offset) >= Number.MAX_SAFE_INTEGER)
+  ) {
+    return invalid(`${path}.sequenceOffset`);
+  }
   if (value['tokens'].length > MAX_VARIABLE_TOKENS) return `\`${path}\` has too many tokens`;
   for (let index = 0; index < value['tokens'].length; index += 1) {
     const tokenError = validateToken(value['tokens'][index], `${path}.tokens[${index}]`);

@@ -143,7 +143,7 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).not.toContain('Material & stock');
     expect(buttonByText('Approve settings').disabled).toBe(false);
     expect(host.textContent).not.toContain('Edit Artwork settings');
-    expect(host.textContent).not.toContain('Edit Startup Setup');
+    expect(host.textContent).not.toContain('Edit Machine Setup');
     expect(buttonByText('Start job').disabled).toBe(false);
     expect(host.querySelector('form')).toBeNull();
   });
@@ -292,7 +292,7 @@ describe('JobReviewDialog', () => {
     expect(host.textContent).toContain('Stock');
     expect(host.textContent).toContain('Safe Z');
     expect(buttonByText('Edit Artwork settings')).toBeInstanceOf(HTMLButtonElement);
-    expect(buttonByText('Edit Startup Setup')).toBeInstanceOf(HTMLButtonElement);
+    expect(buttonByText('Edit Machine Setup')).toBeInstanceOf(HTMLButtonElement);
     expect(host.textContent).not.toContain('Approve settings');
     expect(host.textContent).toContain('1. 3.175 mm (1/8") end mill');
     expect(host.textContent).toContain('2. 60° V-bit');
@@ -320,7 +320,7 @@ describe('JobReviewDialog', () => {
     expect(useUiStore.getState().railPanelFocusRequest?.panel).toBe('layers');
   });
 
-  it('leaves CNC review for the Startup Setup owner', async () => {
+  it('leaves CNC review for the Machine Setup owner', async () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     }));
@@ -331,7 +331,7 @@ describe('JobReviewDialog', () => {
     });
     await render();
 
-    await act(async () => buttonByText('Edit Startup Setup').click());
+    await act(async () => buttonByText('Edit Machine Setup').click());
 
     expect(useJobReviewStore.getState().state.kind).toBe('idle');
     expect(useJobReviewStore.getState().pendingSignal).toBe('cancel');

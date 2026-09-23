@@ -92,17 +92,18 @@ describe('drawCanvasMotionOverlay', () => {
         offsetY: 0,
       },
     );
-    expect(recording.labels).toContain('FRAME START');
-    expect(recording.labels).toContain('JOB START');
+    expect(recording.labels).toContain('Frame start');
+    expect(recording.labels).toContain('Job start');
     expect(recording.labelAlphas).toEqual(
       expect.arrayContaining([
-        { label: 'FRAME START', alpha: 0.5 },
-        { label: 'JOB START', alpha: 0.5 },
+        { label: 'Frame start', alpha: 1 },
+        { label: 'Job start', alpha: 1 },
       ]),
     );
-    // Marker dots stay fully opaque; only the label plate behind them dims.
-    expect(recording.fillAlphas).toEqual([1, 0.2, 1, 0.2]);
+    expect(recording.fillAlphas.every((alpha) => alpha === 1)).toBe(true);
     expect(recording.fillStyles).toContain(canvasTheme.motionLabelPlate);
+    expect(recording.strokeStyles).toContain(canvasTheme.frameStart);
+    expect(recording.strokeStyles).toContain(canvasTheme.jobStart);
     expect(recording.dashes).toContainEqual([5, 5]);
   });
 
@@ -166,9 +167,24 @@ describe('drawCanvasMotionOverlay', () => {
       { scale: 1, offsetX: 0, offsetY: 0 },
     );
 
-    expect(recording.labels).not.toContain('FRAME START');
-    expect(recording.labels).not.toContain('JOB START');
+    expect(recording.labels).not.toContain('Frame start');
+    expect(recording.labels).not.toContain('Job start');
     expect(recording.dashes).toContainEqual([5, 5]);
+  });
+
+  it('labels both retained planned starts as updating without moving the points', () => {
+    const canvasPlan = plan();
+    const before = structuredClone([canvasPlan.framePerimeter, canvasPlan.jobStart]);
+    const recording = recordingContext();
+    drawCanvasMotionOverlay(
+      recording.ctx,
+      { plan: canvasPlan, run: null, planIsCurrent: false },
+      { scale: 2, offsetX: 30, offsetY: 30 },
+    );
+    expect(recording.labels.filter((label) => label === 'Updating…')).toHaveLength(2);
+    expect(recording.labels).toContain('Frame start');
+    expect(recording.labels).toContain('Job start');
+    expect([canvasPlan.framePerimeter, canvasPlan.jobStart]).toEqual(before);
   });
 
   it('caches the full route and only appends newly confirmed Path2D segments', () => {

@@ -15,6 +15,7 @@ import type {
   OutputPreparationRequest,
   OutputPreparationResponse,
   StartOutputPreparationRequest,
+  OutputSnapshotRequest,
 } from './output-preparation-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { runCanvasCompilationTasks } from '../workspace/canvas-compilation-worker-pool';
@@ -74,7 +75,7 @@ async function prepareTilesOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await asyncPreparer(context)(project, request.options);
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   return {
     kind: 'tiles',
     result: finalizeTiledOutput(
@@ -91,7 +92,7 @@ async function prepareRdOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await asyncPreparer(context)(project, request.options);
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   return { kind: 'rd', result: emitPreparedRdFile(prepared) };
 }
 
@@ -100,17 +101,7 @@ async function prepareSaveOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepare = asyncPreparer(context);
-  const prepared =
-    request.snapshot === undefined
-      ? await prepare(project, request.options)
-      : await prepareOutputSnapshot(project, {
-          ...request.options,
-          clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
-          renderVariableText,
-          ...request.snapshot,
-          prepare,
-        });
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   const machineWarnings = prepared.ok
     ? detectMachineJobWarnings(
         prepared.project,
@@ -178,6 +169,23 @@ function fixedSnapshotClock(evaluatedAtIso: string): () => Date {
     throw new Error('Output snapshot evaluation time is invalid.');
   }
   return () => new Date(timestamp.getTime());
+}
+
+function prepareWithOptionalSnapshot(
+  project: Project,
+  request: { readonly options: PrepareOutputOptions; readonly snapshot?: OutputSnapshotRequest },
+  context: OutputPreparationContext,
+) {
+  const prepare = asyncPreparer(context);
+  return request.snapshot === undefined
+    ? prepare(project, request.options)
+    : prepareOutputSnapshot(project, {
+        ...request.options,
+        ...request.snapshot,
+        clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
+        renderVariableText,
+        prepare,
+      });
 }
 
 function asyncPreparer(context: OutputPreparationContext) {

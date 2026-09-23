@@ -1,5 +1,5 @@
-// Workspace overlays — UI chrome that sits above the canvas: empty-state
-// hint (F-A2), drag-to-import zone (F-A3), drag-readout chip (F-A6),
+// Workspace overlays — UI chrome that sits above the canvas:
+// drag-to-import zone (F-A3), drag-readout chip (F-A6),
 // preview scrubber (F-A8). Extracted from Workspace.tsx to keep that file
 // under the 250-line soft cap per CLAUDE.md.
 
@@ -10,14 +10,6 @@ import { useUiStore } from '../state/ui-store';
 import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { computeView } from './view-transform';
-
-export function EmptyHint(): JSX.Element {
-  return (
-    <div style={emptyHintStyle} aria-hidden="true">
-      Drag an SVG or image here, or use File → Import
-    </div>
-  );
-}
 
 export function DragOverlay(): JSX.Element {
   return (
@@ -237,18 +229,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-const emptyHintStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-  color: 'var(--lf-text-muted)',
-  fontStyle: 'italic',
-  fontSize: 14,
-  fontFamily: 'system-ui, sans-serif',
-};
 const dragOverlayStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 12,
@@ -289,10 +269,6 @@ const measureReadoutStyle: React.CSSProperties = {
   border: '1px solid var(--lf-accent)',
 };
 const scrubberContainerStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 24,
-  right: 24,
-  bottom: 12,
   display: 'flex',
   alignItems: 'center',
   gap: 10,
@@ -302,7 +278,7 @@ const scrubberContainerStyle: React.CSSProperties = {
 const scrubberInputStyle: React.CSSProperties = { flex: 1 };
 const scrubberLabelStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
-  fontSize: 11,
+  fontSize: 12,
   minWidth: 40,
   textAlign: 'right',
 };

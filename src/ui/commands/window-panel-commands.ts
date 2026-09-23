@@ -44,8 +44,8 @@ export function windowPanelCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
     ...enabled(
       'window.toggle-layers-panel',
       'window',
-      'Cuts / Layers Panel',
-      'Show or hide the Cuts / Layers panel',
+      'Artwork Panel',
+      'Show or hide the Artwork panel',
       ctx.toggleLayersPanel,
     ),
     active: ctx.layersPanelOpen,

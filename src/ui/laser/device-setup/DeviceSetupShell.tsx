@@ -172,8 +172,8 @@ function SetupActions(props: ShellProps): JSX.Element {
 function saveButtonLabel(props: ShellProps): string {
   if (props.saving) return 'Saving and verifying…';
   if (props.firmwareWriteCount === 0) {
-    return props.state.machineKind === 'cnc' ? 'Save CNC startup setup' : 'Save machine setup';
+    return props.state.machineKind === 'cnc' ? 'Save CNC machine setup' : 'Save machine setup';
   }
-  const label = props.state.machineKind === 'cnc' ? 'CNC startup setup' : 'setup';
+  const label = props.state.machineKind === 'cnc' ? 'CNC machine setup' : 'setup';
   return `Save ${label} and write ${props.firmwareWriteCount} setting${props.firmwareWriteCount === 1 ? '' : 's'}`;
 }

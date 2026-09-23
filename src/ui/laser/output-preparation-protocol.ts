@@ -51,6 +51,7 @@ export type RdOutputPreparationRequest = {
   readonly kind: 'rd';
   readonly project: Project;
   readonly options: EmitRdOptions;
+  readonly snapshot?: OutputSnapshotRequest;
 };
 
 export type TiledOutputPreparationRequest = {
@@ -60,6 +61,7 @@ export type TiledOutputPreparationRequest = {
   readonly savedName: string | null;
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
+  readonly snapshot?: OutputSnapshotRequest;
 };
 
 export type OutputPreparationRequest =

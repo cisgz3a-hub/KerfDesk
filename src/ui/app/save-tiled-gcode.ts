@@ -23,10 +23,13 @@ import { controllerReadinessAdvisories } from './controller-readiness-advisories
 import type { TileFile } from './tile-emission';
 import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
+import { advanceExportVariables, type ExportVariableAdvancement } from './advance-export-variables';
+import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
+import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
-export type SaveTiledGcodeCtx = {
+export type SaveTiledGcodeCtx = ExportVariableAdvancement & {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly savedName: string | null;
@@ -46,6 +49,7 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
 }
 
 async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
+  const snapshot = captureProjectOutputSnapshot(ctx.project);
   const options = ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope };
   // Web pickers consume transient user activation. Reserve one directory now,
   // but do not mint a file target until every tile has prepared and preflighted.
@@ -53,7 +57,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   // directory method and keep their post-preparation per-file picker flow.
   const directory = await reserveTileDirectory(ctx);
   if (directory === null) return true;
-  const preparation = await prepareTiledOutput(ctx, options);
+  const preparation = await prepareTiledOutput(ctx, options, snapshot);
   if (preparation === null) {
     jobAwareAlert(`Cannot export tiles:\n\n• ${BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE}`);
     return true;
@@ -90,6 +94,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   pushWarnings(ctx, preparation.machineWarnings);
   pushWarnings(ctx, preparation.tileAdvisories);
   const saved = await saveTileFiles(ctx, preparation.files, directory);
+  advanceAfterCompleteTileSet(ctx, saved, preparation.files.length);
   ctx.pushToast(
     saved === preparation.files.length
       ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
@@ -104,16 +109,26 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   return true;
 }
 
+function advanceAfterCompleteTileSet(
+  ctx: SaveTiledGcodeCtx,
+  saved: number,
+  expected: number,
+): void {
+  if (saved === expected && saved > 0) advanceExportVariables(ctx);
+}
+
 async function prepareTiledOutput(
   ctx: SaveTiledGcodeCtx,
   options: { readonly outputScope?: OutputScope },
+  snapshot: OutputSnapshotRequest | undefined,
 ): Promise<TiledOutputPreparation | null> {
-  if (costlyCanvasPreparation(ctx.project, options.outputScope)) {
+  if (snapshot !== undefined || costlyCanvasPreparation(ctx.project, options.outputScope)) {
     const background = prepareTiledOutputOffThread({
       kind: 'tiles',
       project: ctx.project,
       options,
       savedName: ctx.savedName,
+      ...(snapshot === undefined ? {} : { snapshot }),
       ...(ctx.controllerSettings === undefined
         ? {}
         : { controllerSettings: ctx.controllerSettings }),

@@ -43,10 +43,7 @@ export function useCanvasMotionOverlay(
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
   const framePreparing = useFramePreparationStore((state) => state.pending);
   const machineRevision = useLaserStore(canvasMachineRevision);
-  const laser = useMemo(
-    () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
-    [machineRevision],
-  );
+  const laser = useCanvasMachineSnapshot(machineRevision);
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
@@ -75,10 +72,9 @@ export function useCanvasMotionOverlay(
     canvasCovered,
   });
 
-  const currentIdlePlan = idlePlan?.current === true ? idlePlan.plan : null;
   const staleTerminalRun = shouldClearTerminalRun(
     liveRun,
-    currentIdlePlan,
+    idlePlan?.current === true ? idlePlan.plan : null,
     project.scene.objects.length === 0,
   );
   useClearStaleTerminalRun(liveRun, staleTerminalRun);
@@ -87,6 +83,7 @@ export function useCanvasMotionOverlay(
   // literal per render repainted it on every Workspace render (drags, drafts,
   // parent re-renders) although nothing it draws had changed.
   const visiblePlan = idlePlan?.plan ?? null;
+  const visiblePlanIsCurrent = idlePlan?.current === true;
   const colorScheme = useCanvasColorScheme();
   return useMemo(() => {
     // The draw reads its palette from canvasTheme's scheme-dependent getters, so
@@ -94,15 +91,28 @@ export function useCanvasMotionOverlay(
     void colorScheme;
     if (previewMode || canvasCovered) return null;
     if (liveRun !== null && !staleTerminalRun) {
-      return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+      return {
+        plan: liveRun.plan,
+        run: liveRun,
+        showStartMarkers,
+        planIsCurrent: isActiveCanvasLifecycle(liveRun) || visiblePlanIsCurrent,
+      };
     }
-    return visiblePlan === null ? null : { plan: visiblePlan, run: null, showStartMarkers };
+    return visiblePlan === null
+      ? null
+      : {
+          plan: visiblePlan,
+          run: null,
+          showStartMarkers,
+          planIsCurrent: visiblePlanIsCurrent,
+        };
   }, [
     previewMode,
     canvasCovered,
     liveRun,
     staleTerminalRun,
     visiblePlan,
+    visiblePlanIsCurrent,
     showStartMarkers,
     colorScheme,
   ]);
@@ -320,6 +330,15 @@ function useClearStaleTerminalRun(liveRun: LiveCanvasRun | null, stale: boolean)
     if (useLaserStore.getState().liveCanvasRun !== liveRun) return;
     useLaserStore.setState({ liveCanvasRun: null });
   }, [liveRun, stale]);
+}
+
+function useCanvasMachineSnapshot(
+  machineRevision: string,
+): ReturnType<typeof canvasMachineSnapshot> {
+  return useMemo(
+    () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
+    [machineRevision],
+  );
 }
 
 function canvasMachineSnapshot(

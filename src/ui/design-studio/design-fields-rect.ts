@@ -16,7 +16,7 @@ export function rectFields(entity: RectEntity): ReadonlyArray<EntityField> {
       editable: true,
       min: 0,
     }),
-    derivedField('area', 'Area', widthMm * heightMm, 'mm2'),
+    derivedField('area', 'Area', rectAreaMm2(widthMm, heightMm, cornerRadiusMm), 'mm2'),
     derivedField(
       'perimeter',
       'Perimeter',
@@ -24,6 +24,12 @@ export function rectFields(entity: RectEntity): ReadonlyArray<EntityField> {
       'mm',
     ),
   ];
+}
+
+function rectAreaMm2(widthMm: number, heightMm: number, radiusMm: number): number {
+  const r = Math.min(radiusMm, widthMm / 2, heightMm / 2);
+  // Replace the four radius-sized corner squares with four quarter-circles.
+  return widthMm * heightMm - (4 - Math.PI) * r * r;
 }
 
 // Straight runs plus the four corner quarter-arcs, which together make exactly one

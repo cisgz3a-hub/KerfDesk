@@ -57,7 +57,11 @@ export async function transmitPreparedStart(input: {
   });
   // Observe before the first possible stream transition. A short program may
   // settle while startJob or recovery persistence is still awaiting a write.
-  const advancement = armVariableStreamAdvancement(input.args.project, input.runId);
+  const advancement = armVariableStreamAdvancement(
+    input.args.project,
+    input.runId,
+    input.args.outputScope,
+  );
   let startAccepted = false;
   try {
     // startJob repeats this synchronous gate after its final await and

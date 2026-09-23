@@ -591,7 +591,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   kerfdesk,
 }) => {
   const probe = page.getByTestId('canvas-motion-probe');
-  await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
+  await expect(probe).toHaveAttribute('aria-label', /Frame start planned; Job start planned/);
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);

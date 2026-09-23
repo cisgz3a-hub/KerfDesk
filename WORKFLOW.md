@@ -344,11 +344,28 @@ Identical to the format-specific import flows except:
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Preview, save, compilation, Frame, and Start consume the
-   resulting ordinary scene objects through the existing exact-artifact path. This mode creates no
+7. Array settings remain transient. Grid can optionally **Advance variables per copy** (F-D6);
+   its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
+   compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
 
 ---
+
+### F-A6b. Repair vector artwork (ADR-350)
+
+1. Select closed vector artwork and choose **Tools → Union silhouette...** to combine its filled
+   regions. Choose the result operation from the selection. The dialog explains that the chosen
+   operation's base settings replace source artwork overrides. Apply replaces the sources as one
+   selected object in one undo step. Existing **Weld** continues to preserve operation partitions.
+2. Select one or more vector artworks and choose **Tools → Join paths...** to repair compatible
+   open contours. **Maximum gap (mm)** defaults to 0.05. The dialog reports joins, closures and
+   remaining open paths before applying. Original endpoints stay in place; a nonzero gap receives
+   a straight connector. Canonical cubic and elliptical geometry remains editable.
+3. Operation identities, colour, override intent, fill rule and transformed stroke metadata must
+   match. Ambiguous endpoint branches and manually tabbed contours stay unchanged. Unaffected
+   tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
+4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
+   unchanged on invalid or empty results. They do not operate a machine.
 
 ### F-A7. Artwork Operations panel
 
@@ -609,6 +626,32 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 - Save G-code button is disabled (see F-A7 edge).
 
 ---
+
+### F-A9a. Export artwork as SVG (ADR-350)
+
+1. Select the artwork to exchange, then choose **File → Export selected artwork as SVG...**.
+   With nothing selected, **Export artwork as SVG...** includes the whole scene, including
+   output-disabled artwork.
+2. The export captures the source selection and one clock before choosing a destination.
+   It resolves current variable text, outlines text, preserves physical millimetre size and
+   canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
+   Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
+   report an error without claiming a successful partial export. A write error reports its reason.
+4. The SVG works as artwork interchange. KerfDesk's current SVG importer still ignores embedded
+   raster images, so re-importing a mixed image/vector SVG is not a complete project round trip.
+   Use the project format to preserve editable text and machining data.
+
+### F-A9b. Remove overlapping laser lines (ADR-350)
+
+1. Open **Tools → Cut Planner** and enable **Remove overlapping lines**. It defaults off and is
+   saved with the project.
+2. Within each compiled laser Line settings group, the earliest ordered contour retains coincident
+   spans, including partial and reversed overlap. Comparison uses final emitted coordinate
+   precision after placement. Removed intervals remain laser-off gaps.
+3. Separate operations and pass counts, deliberate retracing within one contour, materialized
+   kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
+   the existing reviewed artifact and Frame just like other output changes.
 
 ### F-A10. Pre-flight check (before G-code save)
 
@@ -2106,58 +2149,39 @@ settings and Job Review keep their existing read-only setup references.
   approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
-### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
-
-*Not implemented yet. This section records the accepted target workflow for staged delivery under
-ADR-279.*
+### F-D6. Distinct variable values in a Grid array (ADR-350, amending ADR-279)
 
 **Success:**
 
-1. Select one design unit whose text may contain the shipped bounded offline fields.
-2. Open **Variable-data imposition** and choose a grid layout. Slot 1 uses the current CSV record and
-   serial value; each later slot advances by the existing `Advance by` value. Grid order is
-   row-major. Circular imposition remains deferred until its variable-width collision behavior is
-   specified.
-3. KerfDesk materializes every slot against one captured clock before showing the result. Layout
-   uses the maximum rendered envelope across the batch, so a longer later value cannot silently
-   overlap its neighbour.
-4. Preview, Save Project, and Frame do not consume records; Save Project also does not persist the
-   transient imposition. Successful Save G-code export, including tiled G-code and experimental
-   file-only `.rd`, applies the exact post-batch state once only for `after-successful-export`; a
-   completed stream applies it once only for `after-successful-stream`; `manual` changes on neither
-   trigger. Failed, cancelled, stale, mismatched-policy, or retried preparation consumes nothing.
-5. For machine output, complete Frame for the exact current job as usual. Frame remains the only
-   guard. This flow adds no block, refusal, gate, cap, clamp, delay, hide, disable, rewrite, or
-   confirmation to preview, project save, import/export, Apply, output, Frame, or Start beyond the
-   existing factual compile-integrity, transport, and handoff preconditions. Imposition concerns
-   appear in the editor or Job Review.
+1. Select a design containing variable text, open **Arrange → Array...**, choose **Grid**, and
+   enable **Advance variables per copy**. The option defaults off. Circular and Point Rotation
+   arrays retain ordinary copying.
+2. Slots advance in row-major order using the existing record/serial stride and wrap settings.
+   Existing relative slot spans and token-level serial offsets are preserved. All text renders
+   against one captured clock before spacing uses the largest rendered envelope in the batch.
+3. **Create array** commits one undo step and consumes no production records. Each text copy stores
+   its sequence offset; project schema 8 preserves it through save/reopen and text edits. Generator
+   parameters remain transient. Objects remain editable and can be moved individually.
+4. Later variable changes regenerate values while retaining manual positions. Preview the layout
+   again when new values are wider. There is no automatic layout reflow.
+5. Successful G-code or experimental file-only Ruida export, or completion of all tile writes,
+   advances once only under **after-successful-export**. The existing owned, settled stream event
+   advances once only under **after-successful-stream**. **Manual** advances under neither event.
+6. Advancement follows the captured emitted scope and enabled operation bindings, through the
+   greatest emitted sequence offset plus one. Noncontiguous selected copies do not reuse emitted
+   serials, and later unselected copies are not consumed. Visually hidden but output-enabled artwork
+   still counts because visibility does not disable output.
+7. Preview, project save, SVG artwork export and Frame do not advance records. A completed Frame
+   for the exact reviewed job remains the sole ordinary Start policy gate.
 
-**Error:**
+**Errors and cancellation:**
 
-- A missing field, malformed embedded CSV value, or materialization failure identifies the affected
-  slot and leaves the project and variable cursor unchanged.
-- A prepared artifact whose source project or variable state changed is stale and cannot apply its
-  saved post-batch cursor. Re-prepare from the current state.
-
-**Empty:**
-
-- With no selected design unit, explain that one design must be selected; do not create an empty
-  batch.
-- A design with no CSV tokens can still batch serial and date/time fields without an embedded CSV.
-  A CSV field with no embedded dataset or addressed row reports the affected slot and leaves the
-  variable cursor unchanged.
-
-**Edge:**
-
-- The batch sequences ordered slot indices independently of final geometry. The original grid rows,
-  columns, and spacing remain available until every slot has been measured; only then are final
-  placements calculated. Grid layout materializes every valid requested placement without a policy
-  count cap; imposition adds no second size rule.
-- Date/time values use one captured clock for the whole batch.
-- Phase one is transient and offline. It does not add live databases, barcode/QR generation,
-  camera-detected placement, persisted imposition schema, or a new machine policy gate.
-- Record wrap, serial wrap, and `Advance by` semantics reuse the existing variable-sequence rules;
-  the batch plan records the exact next state rather than recalculating it after output.
+- Missing data or failed text materialization identifies the affected copy and leaves the project
+  and cursor unchanged. Creation cancelled or made stale by an intervening edit consumes nothing.
+- Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
+  advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
+- Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
+  embedded record. This feature adds no live data source or barcode/QR generator.
 
 ## Phase E flows
 

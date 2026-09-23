@@ -50,6 +50,17 @@ function projectWithVariables(): Project {
 }
 
 describe('project variable persistence', () => {
+  it.each([-1, 0.5, Number.MAX_SAFE_INTEGER, Infinity, '2'])(
+    'rejects unrepresentable per-copy sequence offset %s',
+    (sequenceOffset) => {
+      const raw = JSON.parse(serializeProject(projectWithVariables()));
+      raw.scene.objects[0].variableTemplate.sequenceOffset = sequenceOffset;
+      expect(deserializeProject(JSON.stringify(raw))).toMatchObject({
+        kind: 'invalid',
+        reason: expect.stringContaining('sequenceOffset'),
+      });
+    },
+  );
   it.each([
     ['date-time', 'format', ['date-iso']],
     ['date-time', 'format', { toString: null }],

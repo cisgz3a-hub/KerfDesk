@@ -8,6 +8,36 @@ const NEEDS_SELECTION = 'Select two or more unlocked closed vector shapes first.
 
 export function vectorBooleanCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    ctx.canUnionSilhouette
+      ? enabled(
+          'tools.union-silhouette',
+          'tools',
+          'Union silhouette...',
+          'Combine shapes into one silhouette using a chosen result operation',
+          ctx.unionSilhouette,
+        )
+      : disabled(
+          'tools.union-silhouette',
+          'tools',
+          'Union silhouette...',
+          'Select unlocked closed vector shapes first.',
+          ctx.unionSilhouette,
+        ),
+    ctx.canJoinPaths
+      ? enabled(
+          'tools.join-paths',
+          'tools',
+          'Join paths...',
+          'Join nearby endpoints with matching operations and settings',
+          ctx.joinPaths,
+        )
+      : disabled(
+          'tools.join-paths',
+          'tools',
+          'Join paths...',
+          'Select unlocked vector artwork with open paths.',
+          ctx.joinPaths,
+        ),
     ctx.canCombineSelection
       ? enabled(
           'tools.subtract',

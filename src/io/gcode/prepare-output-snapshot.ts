@@ -107,7 +107,7 @@ type MaterializedProject =
   | { readonly ok: true; readonly project: Project }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
-async function materializeVariableText(
+export async function materializeVariableText(
   project: Project,
   context: VariableEvaluationContext,
   renderer: VariableTextRenderer,
