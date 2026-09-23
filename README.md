@@ -25,8 +25,8 @@ fidelity**. Be specific about what that means:
 | GRBL-family streaming | **Not qualified.** Used informally on a Creality Falcon A1 Pro and a Neotronics 4040, both running GRBL-family firmware (exact builds unconfirmed). |
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
-| Laser raster/image engrave | Code + tests only; never burned on a machine |
-| **The entire CNC / router surface** | Code + tests only; **never cut on a machine** |
+| Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
+| **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
 | Desktop launch / install | Packaging builds pass; real-OS qualification pending |
 
@@ -172,8 +172,8 @@ the 2026-09-19 audit found no reproducible evidence for it; see ADR-322 in
 [`DECISIONS.md`](DECISIONS.md).
 
 Output dialects: `grbl-compatible`, `grbl-dynamic`, `grbl-raster`, `neotronics-4040-safe`, plus
-`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Twelve laser device profiles and
-eight CNC machine presets ship in the catalog.
+`marlin-inline` (LASER_FEATURE) and `marlin-fan` (fan-mosfet). Eighteen device profiles and nine
+CNC machine presets ship in the catalog.
 
 Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and

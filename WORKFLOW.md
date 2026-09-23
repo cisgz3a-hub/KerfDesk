@@ -2395,8 +2395,8 @@ Hardware burn on the Falcon (must be confirmed by user):
    bidirectional burn shows ghosted or staggered vertical edges, lower speed and repeat scan-offset
    calibration before trusting that mode.
 
-When this checklist passes, mark F.2.f complete in the hardware
-verification inventory and tag the build as the first Phase F.2 release.
+When this checklist passes, mark F.2.f complete in `PROJECT.md` Phase
+F.2 and tag the build as the first Phase F.2 release.
 
 ### F-F3. Set work origin to the current head position (Phase F.3)
 
@@ -2543,9 +2543,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 
-When this checklist passes on the Falcon, promote Phase F.3's
-"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
-Shipped" and update the hardware verification inventory.
+When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
+("Code shipped; hardware verification pending") with the recorded result and update the F.3
+row of the hardware status table in `docs/architecture/08-invariants-and-verification.md`.
 
 #### No-homing positioning guide (ADR-193)
 
@@ -6347,7 +6347,7 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       and desktop packaging introduces no target-specific laser/CNC divergence.
 
 Until every applicable box is checked on the named real OS and hardware, that
-desktop artifact stays **CLAIMED** in the hardware verification inventory.
+desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance item 7.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

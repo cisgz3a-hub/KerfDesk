@@ -27,13 +27,13 @@ The chain both machine kinds share, and the exact point where they diverge.
 ```
 
 **`Job`, `Plan`, `Output`, and emitted G-code are pure derivations from `Project` and are never
-persisted as project truth** (`PROJECT.md:416`). This is the single most important architectural
+persisted as project truth** (`PROJECT.md:545`). This is the single most important architectural
 fact: nothing downstream of the Scene is ever saved, so a reopened project recompiles from
 scratch and cannot inherit a stale toolpath.
 
 ## Stage 1 — Scene
 
-`SceneObject` is an extensible discriminated union (ADR-014, `DECISIONS.md:441`) with six
+`SceneObject` is an extensible discriminated union (ADR-014, `DECISIONS.md:444`) with six
 variants, verified from the exhaustive switch at `src/core/job/compile-job.ts:331-357`:
 
 `imported-svg` · `text` · `traced-image` · `raster-image` · `shape` · `relief`
@@ -44,11 +44,11 @@ switch over the union ends in `assertNever`, so adding a seventh variant is a co
 every site rather than a silent no-op.
 
 **Operation binding.** Artwork binds to named operations by explicit `operationIds`, not by
-colour (ADR-211, `DECISIONS.md:9013`). Geometry colour is now only *appearance* plus a
-schema-v2 migration fallback (`PROJECT.md:412`). This is a deliberate divergence from
+colour (ADR-211, `DECISIONS.md:9502`). Geometry colour is now only *appearance* plus a
+schema-v2 migration fallback (`PROJECT.md:533`). This is a deliberate divergence from
 LightBurn's colour-is-identity model and a prime cross-reference target.
 
-**Run order** comes from `scene.artworkOrder`, independent of canvas stacking (`PROJECT.md:397`).
+**Run order** comes from `scene.artworkOrder`, independent of canvas stacking (`PROJECT.md:518`).
 
 ## Stage 2 — Compile (the fork)
 
@@ -107,7 +107,7 @@ G-code from external tools too, and they catch a regression introduced anywhere 
 because they read what will actually be sent.
 
 **Non-negotiable #4 — no partial output**: pipeline failure writes no file and sends no stream
-(`PROJECT.md:306`).
+(`PROJECT.md:423`).
 
 ## What is shared vs forked
 
@@ -140,6 +140,6 @@ as inverse-time.
    they order *across* artwork or only within a single object?
 4. **Recompile-on-open.** Do `.lbrn` / Easel projects cache toolpaths? If so, what invalidates
    the cache, and does that expose a case we silently recompute differently?
-5. **Preview = output.** ADR-040 (`DECISIONS.md:2190`) claims one shared prepared-output
+5. **Preview = output.** ADR-040 (`DECISIONS.md:2259`) claims one shared prepared-output
    pipeline for preview/save/start/estimate. Confirm whether LightBurn's preview is the same
    artifact it sends or a separate re-plan.
