@@ -17,7 +17,12 @@ export type RouteReconciliationInput = {
   readonly manifest: MotionManifest;
   readonly previous: RouteReconciliationState;
   readonly reportedPosition: MotionPoint;
-  /** Acknowledged lines are an upper bound only; they never advance progress. */
+  /**
+   * Acknowledged lines bound where the head can be: nothing past them has
+   * reached the planner, and nothing more than one execution window before
+   * them is still in it. They never advance progress on their own; only a
+   * positional match does.
+   */
   readonly acceptedSendableLines: number;
   readonly executingLineNumber?: number | null;
   readonly toleranceMm?: number;
@@ -35,9 +40,10 @@ const lineNumberPresenceCache = new WeakMap<MotionManifest, boolean>();
  * 16 and grblHAL 100 by default (`$398`, raisable). The sender never learns
  * the real depth, and firmware also acks lines that take no planner slot
  * (sub-step moves, error replies), so this errs far above both. Too small would
- * skip the executing block and confirm route the head has not reached; too
- * large only costs scan time, and only while the match is frozen, because a
- * matched run already starts scanning at confirmed progress.
+ * skip the executing block and confirm route the head has not reached. Too
+ * large costs scan time while the match is frozen, and lets matched progress
+ * trail the head further in dense rasters, where rows within tolerance of the
+ * head but thousands of blocks behind it still match.
  */
 export const EXECUTION_WINDOW_BLOCKS = 4096;
 
