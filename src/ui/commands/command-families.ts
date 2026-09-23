@@ -69,6 +69,13 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveGcode,
       'Ctrl+Shift+E',
     ),
+    enabled(
+      'file.export-svg',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as SVG...' : 'Export artwork as SVG...',
+      'Export selected artwork, or all artwork when nothing is selected, as SVG',
+      ctx.exportSvg,
+    ),
     ...gcodeInspectorCommands(ctx),
   ];
 }

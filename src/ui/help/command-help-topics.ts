@@ -55,6 +55,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Export the current job as GRBL G-code.',
   },
+  'file.export-svg': {
+    family: 'file',
+    tooltip:
+      'Export selected artwork as SVG, or all artwork when nothing is selected. Text is outlined and images are embedded; production serials do not advance.',
+  },
   'edit.undo': {
     family: 'edit',
     tooltip: 'Undo the most recent scene edit.',

@@ -77,6 +77,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     inspectCurrentGcode: vi.fn(),
     multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),
+    exportSvg: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),

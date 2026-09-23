@@ -58,6 +58,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     importImage: vi.fn(),
     importHeightMap: vi.fn(),
     saveGcode: vi.fn(),
+    exportSvg: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),
