@@ -79,11 +79,17 @@ test('photo shading retains portrait tones through the real worker, preview and 
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
-        const ctx = canvas.getContext('2d')!;
+        const ctx = canvas.getContext('2d');
+        if (ctx === null) throw new Error('Missing portrait comparison canvas context');
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, size, size);
         ctx.drawImage(image, 0, 0, size, size);
         return ctx.getImageData(0, 0, size, size).data;
+      }
+      function pixelByte(pixels: Uint8ClampedArray, index: number): number {
+        const value = pixels[index];
+        if (value === undefined) throw new Error('Portrait comparison pixel is out of bounds');
+        return value;
       }
       const source = await pixels(`data:image/png;base64,${portrait}`, 512);
       const sized = svg
@@ -102,12 +108,15 @@ test('photo shading retains portrait tones through the real worker, preview and 
             for (let dx = 0; dx < 16; dx += 1) {
               const i = ((y + dy) * 512 + x + dx) * 4;
               truth +=
-                (source[i]! * 0.2126 + source[i + 1]! * 0.7152 + source[i + 2]! * 0.0722) / 255;
+                (pixelByte(source, i) * 0.2126 +
+                  pixelByte(source, i + 1) * 0.7152 +
+                  pixelByte(source, i + 2) * 0.0722) /
+                255;
             }
           }
           for (let dy = 0; dy < 64; dy += 1) {
             for (let dx = 0; dx < 64; dx += 1) {
-              actual += rendered[((y * 4 + dy) * 2048 + x * 4 + dx) * 4]! / 255;
+              actual += pixelByte(rendered, ((y * 4 + dy) * 2048 + x * 4 + dx) * 4) / 255;
             }
           }
           error += Math.abs(truth / 256 - actual / 4096);
@@ -128,8 +137,8 @@ test('photo shading retains portrait tones through the real worker, preview and 
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('traced-image'),
   );
-  expect(saved).toBeDefined();
-  const project = JSON.parse(saved!) as Project;
+  if (saved === undefined) throw new Error('Missing saved vector photo project');
+  const project = JSON.parse(saved) as Project;
   const traced = project.scene.objects.find((object) => object.kind === 'traced-image');
   expect(traced?.kind).toBe('traced-image');
   if (traced?.kind !== 'traced-image') throw new Error('Photo trace was not saved');
@@ -185,7 +194,8 @@ test('photo Raster scan keeps partial tones through the conversion worker and PN
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('raster-image'),
   );
-  const project = JSON.parse(saved!) as Project;
+  if (saved === undefined) throw new Error('Missing saved raster photo project');
+  const project = JSON.parse(saved) as Project;
   const raster = project.scene.objects.find((object) => object.kind === 'raster-image');
   if (raster?.kind !== 'raster-image' || raster.lumaBase64 === undefined) {
     throw new Error('Missing saved photo raster');
@@ -203,10 +213,12 @@ test('photo Raster scan keeps partial tones through the conversion worker and PN
     const canvas = document.createElement('canvas');
     canvas.width = raster.pixelWidth;
     canvas.height = raster.pixelHeight;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) throw new Error('Missing PNG comparison canvas context');
     ctx.drawImage(image, 0, 0);
     const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    const expected = atob(raster.lumaBase64!);
+    if (raster.lumaBase64 === undefined) throw new Error('Missing saved photo luminance');
+    const expected = atob(raster.lumaBase64);
     for (let i = 0; i < expected.length; i += 1) {
       if (pixels[i * 4] !== expected.charCodeAt(i)) return false;
     }
