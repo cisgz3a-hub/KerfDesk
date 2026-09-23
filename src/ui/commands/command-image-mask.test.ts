@@ -32,6 +32,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasConvertibleSelection: false,
     canConvertSelectionToPath: false,
     canWeldSelection: false,
+    canUnionSilhouette: false,
     canJoinPaths: false,
     canCombineSelection: false,
     hasFillableSelection: false,

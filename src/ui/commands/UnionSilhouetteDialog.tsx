@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { pathUsesOperation, type Scene } from '../../core/scene';
+import type { Scene } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { unionSilhouetteOperations } from './selection-command-state';
 
 export function UnionSilhouetteDialog(props: {
   readonly scene: Scene;
@@ -8,30 +9,9 @@ export function UnionSilhouetteDialog(props: {
   readonly onCancel: () => void;
   readonly onApply: (operationId: string) => void;
 }): JSX.Element {
-  const selected = props.scene.objects.filter((object) => props.selectedIds.includes(object.id));
-  const operations = props.scene.layers.filter((operation) =>
-    selected.some(
-      (object) =>
-        'paths' in object &&
-        object.paths.some((path) => pathUsesOperation(object, path, operation)),
-    ),
-  );
+  const operations = unionSilhouetteOperations(props.scene, props.selectedIds);
   const [chosenId, setChosenId] = useState(operations[0]?.id ?? '');
-  const validSelection =
-    selected.length > 0 &&
-    selected.length === props.selectedIds.length &&
-    selected.every(
-      (object) =>
-        object.locked !== true &&
-        'paths' in object &&
-        object.paths.length > 0 &&
-        object.paths.every((path) =>
-          path.curves === undefined
-            ? path.polylines.length > 0 && path.polylines.every((line) => line.closed)
-            : path.curves.length > 0 && path.curves.every((curve) => curve.closed),
-        ),
-    );
-  const canApply = validSelection && operations.some((operation) => operation.id === chosenId);
+  const canApply = operations.some((operation) => operation.id === chosenId);
   return (
     <Dialog
       title="Union silhouette"

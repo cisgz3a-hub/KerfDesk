@@ -104,6 +104,32 @@ describe('usable silhouette and path repair controls', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it('rechecks whole-selection eligibility while the union dialog is open', async () => {
+    const before = load([
+      repairArtwork('a', [repairRectangle(0, 0, 10, 10)]),
+      repairArtwork('b', [repairRectangle(5, 0, 10, 10)]),
+    ]);
+    await act(async () => root.render(<VectorRepairDialogHost kind="union" onClose={vi.fn()} />));
+    expect(submit().disabled).toBe(false);
+    await act(async () =>
+      useStore.setState({
+        project: {
+          ...before,
+          scene: {
+            ...before.scene,
+            objects: before.scene.objects.map((object) =>
+              object.id === 'b' ? { ...object, locked: true } : object,
+            ),
+          },
+        },
+      }),
+    );
+    expect(submit().disabled).toBe(true);
+    await act(async () => useStore.setState({ project: before }));
+    expect(submit().disabled).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('rejects blank/negative tolerance and explains mismatched operations without mutation', async () => {
     const before = load([
       repairArtwork('a', [repairLine({ x: 0, y: 0 }, { x: 10, y: 0 })]),
@@ -126,7 +152,7 @@ describe('usable silhouette and path repair controls', () => {
     const unionSilhouette = vi.fn();
     const joinPaths = vi.fn();
     const commands = buildAppCommands(
-      baseCtx({ canWeldSelection: true, canJoinPaths: true, unionSilhouette, joinPaths }),
+      baseCtx({ canUnionSilhouette: true, canJoinPaths: true, unionSilhouette, joinPaths }),
     );
     expect(runCommand(commandById(commands, 'tools.union-silhouette'))).toBe(true);
     expect(runCommand(commandById(commands, 'tools.join-paths'))).toBe(true);

@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
 import { mockPlatform } from '../../__fixtures__/file-actions';
+import { repairArtwork, repairRectangle } from '../../__fixtures__/vector-repair-fixtures';
+import { createLayer, type RasterImage } from '../../core/scene';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -93,6 +95,40 @@ describe('useAppCommands store subscriptions', () => {
     render();
     latest.find((command) => command.id === 'file.save-gcode')?.invoke();
     expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+  });
+
+  it('disables Union for a mixed selection while keeping Weld available for its vector subset', () => {
+    const vector = repairArtwork('vector', [repairRectangle(0, 0, 10, 10)]);
+    const bitmap: RasterImage = {
+      kind: 'raster-image',
+      id: 'bitmap',
+      source: 'image.png',
+      bounds: vector.bounds,
+      transform: vector.transform,
+      color: '#000000',
+      pixelWidth: 1,
+      pixelHeight: 1,
+      linesPerMm: 1,
+      dither: 'grayscale',
+      dataUrl: 'data:image/png;base64,AQID',
+    };
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [vector, bitmap],
+          layers: [createLayer({ id: 'cut', color: '#000000' })],
+        },
+      },
+      selectedObjectId: vector.id,
+      additionalSelectedIds: new Set([bitmap.id]),
+    }));
+    render();
+    expect(latest.find((command) => command.id === 'tools.union-silhouette')?.enabled).toBe(false);
+    expect(latest.find((command) => command.id === 'tools.weld')?.enabled).toBe(true);
+    act(() => useStore.setState({ additionalSelectedIds: new Set() }));
+    expect(latest.find((command) => command.id === 'tools.union-silhouette')?.enabled).toBe(true);
   });
 });
 

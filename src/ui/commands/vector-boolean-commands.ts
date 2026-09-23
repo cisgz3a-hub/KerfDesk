@@ -8,7 +8,7 @@ const NEEDS_SELECTION = 'Select two or more unlocked closed vector shapes first.
 
 export function vectorBooleanCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
-    ctx.canWeldSelection
+    ctx.canUnionSilhouette
       ? enabled(
           'tools.union-silhouette',
           'tools',

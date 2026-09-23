@@ -151,6 +151,7 @@ export type AppCommandContext = {
   readonly hasConvertibleSelection: boolean;
   readonly canConvertSelectionToPath: boolean;
   readonly canWeldSelection: boolean;
+  readonly canUnionSilhouette: boolean;
   readonly canJoinPaths: boolean;
   // ADR-103 G1: booleans need >= 2 unlocked closed-contour vector objects.
   readonly canCombineSelection: boolean;

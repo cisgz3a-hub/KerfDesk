@@ -39,6 +39,7 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     hasConvertibleSelection: false,
     canConvertSelectionToPath: false,
     canWeldSelection: false,
+    canUnionSilhouette: false,
     canJoinPaths: false,
     canCombineSelection: false,
     hasFillableSelection: false,
