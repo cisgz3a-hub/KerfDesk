@@ -36,7 +36,9 @@ describe('tutorial picture delivery', () => {
     expect(options.workbox?.globIgnores).toContain('**/tutorial-images/**');
     expect(options.workbox?.globIgnores).toContain('**/node_modules/**/*');
     expect(options.workbox?.globPatterns).toEqual([
-      '**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}',
+      '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}',
+      'pdf-resources/**/LICENSE*',
+      'third-party-notices.txt',
     ]);
     expect(options.includeAssets).not.toEqual(
       expect.arrayContaining([expect.stringContaining('tutorial-images')]),

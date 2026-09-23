@@ -15,11 +15,15 @@ describe('PWA precache coverage', () => {
         match[1]?.toLowerCase(),
       ).filter((extension): extension is string => extension !== undefined),
     );
-    const globPattern = viteConfig.match(/globPatterns:\s*\[\s*['"]([^'"]+)['"]\s*\]/)?.[1] ?? '';
+    const globPatternsSource = viteConfig.match(/globPatterns:\s*\[([^\]]*)\]/)?.[1] ?? '';
+    const globPatterns = Array.from(
+      globPatternsSource.matchAll(/['"]([^'"]+)['"]/g),
+      (match) => match[1] ?? '',
+    );
 
     expect(fontAssetExtensions).toContain('ttf');
     for (const extension of fontAssetExtensions) {
-      expect(globPattern).toContain(extension);
+      expect(globPatterns).toEqual(expect.arrayContaining([expect.stringContaining(extension)]));
     }
   });
 });

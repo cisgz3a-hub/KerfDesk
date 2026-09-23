@@ -46,7 +46,7 @@ describe('Artwork panel navigation', () => {
     async (machineKind) => {
       if (machineKind === 'cnc') {
         useStore.getState().setMachineKind('cnc');
-        // A remembered Laser-only view must still produce a usable CNC tab stop.
+        // A remembered Materials view remains selected as CNC Recipes.
         useUiStore.getState().setCutsLayersView('materials');
       }
       const before = useStore.getState();
@@ -55,11 +55,24 @@ describe('Artwork panel navigation', () => {
       expect([...tablist.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(
         machineKind === 'laser'
           ? ['Settings', 'Run order', 'Materials']
-          : ['Settings', 'Run order'],
+          : ['Settings', 'Run order', 'Recipes'],
       );
-      const lastView = machineKind === 'laser' ? 'materials' : 'run-order';
+      const lastView = 'materials';
       const first = required<HTMLButtonElement>(tablist, '#cuts-layers-layers-tab');
-      await act(async () => first.focus());
+      if (machineKind === 'cnc') {
+        const remembered = required<HTMLButtonElement>(tablist, '#cuts-layers-materials-tab');
+        expect(remembered.getAttribute('aria-selected')).toBe('true');
+        expect(remembered.tabIndex).toBe(0);
+        expect(tablist.querySelectorAll('[role="tab"][tabindex="0"]')).toHaveLength(1);
+        expect(useUiStore.getState().cutsLayersView).toBe('materials');
+        const panel = required(host, '#cuts-layers-materials-panel');
+        expect(panel.getAttribute('aria-labelledby')).toBe(remembered.id);
+        await act(async () => remembered.focus());
+        await pressKey(remembered, 'Home');
+      } else {
+        await act(async () => first.focus());
+      }
+      expect(document.activeElement).toBe(first);
       expect(first.getAttribute('aria-selected')).toBe('true');
       expect(first.tabIndex).toBe(0);
       const steps: ReadonlyArray<readonly [string, CutsLayersView]> = [
