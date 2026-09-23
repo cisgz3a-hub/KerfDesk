@@ -1,4 +1,4 @@
-// Verbatim copy of the estimator before ADR-349 reordered its plain-container
+// Verbatim copy of the estimator before ADR-352 reordered its plain-container
 // path. The parity fuzz pins the new walk to it, byte for byte.
 
 const OBJECT_OVERHEAD_BYTES = 16;

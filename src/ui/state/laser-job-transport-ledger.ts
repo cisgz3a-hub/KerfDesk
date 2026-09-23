@@ -2,7 +2,7 @@
 // acknowledged line. Counting them in the store's pendingTransportWrites made
 // that field flip 0 -> 1 -> 0 on every ack, so every laser-store subscriber
 // was woken twice more per line and any component selecting the counter
-// re-rendered twice per line, mid-burn (ADR-349). They are counted here
+// re-rendered twice per line, mid-burn (ADR-352). They are counted here
 // instead. The count is keyed on the write epoch: every site that zeroes the
 // store counter advances the epoch first, so a session change forgets these
 // writes exactly as it forgets the store's, and a late completion from a dead

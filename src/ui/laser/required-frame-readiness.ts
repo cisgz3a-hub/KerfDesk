@@ -39,7 +39,7 @@ type PreparedOk = Extract<PreparedOutput, { readonly ok: true }>;
 
 // Job Review checks the same immutable compile when it opens and again at
 // Confirm, and walking a dense fill for its envelope cost ~0.2 s each time,
-// between the Confirm click and the first byte (ADR-349).
+// between the Confirm click and the first byte (ADR-352).
 const frameBoundsByPrepared = new WeakMap<PreparedOk, JobBounds | null>();
 
 function preparedFrameBounds(prepared: PreparedOk): JobBounds | null {

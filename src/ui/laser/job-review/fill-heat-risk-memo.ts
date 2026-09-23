@@ -2,7 +2,7 @@ import { analyzeFillHeatRisk, type Job, type ScanOffsetPoint } from '../../../co
 
 // The review model is built when Job Review opens and rebuilt at Confirm from
 // the same immutable compile; replanning every fill sweep cost ~0.2 s of that
-// Confirm on a dense fill (ADR-349).
+// Confirm on a dense fill (ADR-352).
 const fillHeatRiskByJob = new WeakMap<
   Job,
   WeakMap<ReadonlyArray<ScanOffsetPoint>, ReturnType<typeof analyzeFillHeatRisk>>

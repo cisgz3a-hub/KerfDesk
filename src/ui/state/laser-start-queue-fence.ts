@@ -2,7 +2,7 @@ import { liveJobTransportWritesInFlight } from './laser-job-transport-ledger';
 import type { LaserState } from './laser-store';
 
 /** Controller writes still in transport: the store's counted writes plus the
- * job refills kept off the store so they do not wake it per line (ADR-349). */
+ * job refills kept off the store so they do not wake it per line (ADR-352). */
 export function pendingTransportWriteCount(
   state: Pick<LaserState, 'pendingTransportWrites'>,
 ): number {

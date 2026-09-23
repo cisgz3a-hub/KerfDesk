@@ -40,7 +40,7 @@ interface RunProbe {
 }
 
 // A measurement, not a gate: it takes minutes and its numbers depend on the
-// machine. Run it with KERFDESK_BIG_JOB_PERF=1 (ADR-349 records the method).
+// machine. Run it with KERFDESK_BIG_JOB_PERF=1 (ADR-352 records the method).
 test.skip(process.env['KERFDESK_BIG_JOB_PERF'] !== '1', 'opt-in performance measurement');
 
 test('big job streaming keeps the workspace responsive', async ({ page }, testInfo) => {

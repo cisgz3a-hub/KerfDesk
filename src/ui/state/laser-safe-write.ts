@@ -115,7 +115,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
 
 // A refill (one per acknowledged line) owes no untracked ack and belongs to no
 // motion operation, so its only store-visible bookkeeping was the transport
-// counter, which now lives on the job transport ledger (ADR-349). Its
+// counter, which now lives on the job transport ledger (ADR-352). Its
 // transcript entry is held back with the acknowledgement it answers
 // (ADR-333), so an ordinary refill performs no store write at all. A failure
 // is recorded exactly as before, minus the store counter it never took.

@@ -38,7 +38,7 @@ const fieldsBesideReportEqual = watchedFieldsEqual<LaserState, (typeof FRAMED_RU
 
 // Without a permit the readiness answer is fixed (Frame first) and the row
 // reads only the controller state from the report, so a poll that merely moves
-// the head, four a second for a whole job, need not re-render it (ADR-349).
+// the head, four a second for a whole job, need not re-render it (ADR-352).
 export function framedRunFieldsEqual(a: LaserState, b: LaserState): boolean {
   if (a === b) return true;
   if (a.framedRun !== null || b.framedRun !== null) return allFieldsEqual(a, b);

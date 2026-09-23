@@ -180,7 +180,7 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
   // No budget walk here: the measurement below walks the finished artifact,
   // which holds the same job, and enforces the same budget. Walking the inputs
   // first doubled a node-per-motion-point traversal that runs while the first
-  // window of the job is on the wire (ADR-349); assertArchiveMayFit has already
+  // window of the job is on the wire (ADR-352); assertArchiveMayFit has already
   // refused the hopeless case before any allocation.
   const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);

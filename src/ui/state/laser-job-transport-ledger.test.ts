@@ -51,7 +51,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void; reject: (e: 
   return { promise, resolve, reject };
 }
 
-describe('job refill transport ledger (ADR-349)', () => {
+describe('job refill transport ledger (ADR-352)', () => {
   it('keeps a per-ack refill off the store while the fence still sees it in transport', async () => {
     const pending = deferred();
     const { set, get, refs, safeWrite } = harness(() => pending.promise);

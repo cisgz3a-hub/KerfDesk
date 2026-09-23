@@ -53,7 +53,7 @@ function executionArtifactValueBytes(
   // Plain objects and arrays are nearly every node of a job (one per motion
   // point), and none of them can be a buffer, a view or another clone type, so
   // they skip those checks. The walk runs while the first window of a job is
-  // already on the wire (ADR-349).
+  // already on the wire (ADR-352).
   if (isPlainCloneContainer(objectValue)) {
     return plainContainerBytes(objectValue, pending, seenContainers);
   }
