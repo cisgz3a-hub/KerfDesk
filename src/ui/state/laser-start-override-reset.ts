@@ -1,4 +1,4 @@
-// A new laser job starts at 100% feed, rapid and power (ADR-352).
+// A new laser job starts at 100% feed, rapid and power (ADR-355).
 //
 // Live override percentages are per-run adjustments held by the CONTROLLER,
 // not by the project. They outlive the job they were set in: a completed job

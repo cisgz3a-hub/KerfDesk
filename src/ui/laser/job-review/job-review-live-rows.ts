@@ -54,7 +54,7 @@ export function controllerReviewSummary(args: ControllerReviewArgs): string {
   if (!args.isConnected) return 'not connected';
   const state = args.statusReport?.state ?? 'no status yet';
   if (overridesAreBaseline(args.overrides)) return `${state}`;
-  // A laser Start resets leftover overrides (ADR-352); CNC keeps its own
+  // A laser Start resets leftover overrides (ADR-355); CNC keeps its own
   // override policy and only flags them.
   return args.machineKind === 'laser'
     ? `${state} · overrides reset to 100% at Start`

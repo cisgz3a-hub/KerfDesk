@@ -97,7 +97,7 @@ describe('laser-store profile streaming options', () => {
     });
     await connectWith(connection);
     // A controller that has reported baseline overrides needs no Start reset
-    // (ADR-352), so the first write is the program itself.
+    // (ADR-355), so the first write is the program itself.
     useLaserStore.setState({ ovCache: { feed: 100, rapid: 100, spindle: 100 } });
     writes.length = 0;
 

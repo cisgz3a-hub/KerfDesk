@@ -5,7 +5,7 @@ import {
 } from './fixtures/workspace-ui';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
-// ADR-352, from an operator report: run a raster, nudge the live overrides,
+// ADR-355, from an operator report: run a raster, nudge the live overrides,
 // Abort, clear the canvas, import a new image, type new speed and power, and
 // the new job burns like the old one. The program was always right; the
 // controller still held the old override percentages. A laser Start must now

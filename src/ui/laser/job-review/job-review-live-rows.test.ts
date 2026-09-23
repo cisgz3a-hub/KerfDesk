@@ -110,7 +110,7 @@ describe('Job Review machine facts', () => {
   });
 });
 
-describe('Job Review override facts (ADR-352)', () => {
+describe('Job Review override facts (ADR-355)', () => {
   const leftover = { feed: 60, rapid: 100, spindle: 80 };
   const reviewArgs = (
     machineKind: 'laser' | 'cnc',

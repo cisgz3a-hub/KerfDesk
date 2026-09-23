@@ -153,7 +153,7 @@ async function runStartJob(
     options.assertFinalStartAuthorized?.();
     completion.assertCurrent();
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
-    const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-352
+    const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-355
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };

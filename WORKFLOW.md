@@ -959,7 +959,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    refresh without invalidating the completed physical Frame.
 8. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
    mutation, or evidence drift drops the candidate and issues no permit.
-9. **A laser job starts at 100% feed, rapid and power (ADR-352).** Live override percentages belong
+9. **A laser job starts at 100% feed, rapid and power (ADR-355).** Live override percentages belong
    to the controller, not the project: they outlive the job they were set in, and on grblHAL with
    `$676` bit 3 clear the feed override even survives the soft reset **ABORT JOB** sends. When the
    controller reports anything other than 100%, or has not reported yet, Start puts the three

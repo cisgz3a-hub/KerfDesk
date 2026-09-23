@@ -94,7 +94,7 @@ async function connectReporting(connection: FakeConnection, status: string): Pro
   await flush();
 }
 
-describe('laser Start resets leftover overrides (ADR-352)', () => {
+describe('laser Start resets leftover overrides (ADR-355)', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
