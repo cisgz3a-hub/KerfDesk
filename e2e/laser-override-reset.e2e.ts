@@ -168,9 +168,15 @@ async function dismissNotifications(page: Page): Promise<void> {
 
 async function fillAndCommit(page: Page, name: string, value: string): Promise<void> {
   const input = page.getByRole('spinbutton', { name });
-  await input.fill(value);
-  await input.press('Tab');
-  await expect(input).toHaveValue(value);
+  // A just-imported image can still be settling: its final bounds land after
+  // the field first appears, and that re-render mid-fill appends the typed
+  // value to the incoming one (CI saw "12" + "10" = "1210"). Retry until the
+  // edit sticks; a field that never accepts the value still fails.
+  await expect(async () => {
+    await input.fill(value);
+    await input.press('Tab');
+    await expect(input).toHaveValue(value, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 function writeEvents(
