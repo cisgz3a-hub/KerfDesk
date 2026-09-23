@@ -41,6 +41,9 @@ type PendingMissingTerminal =
 
 type TrackingFailureReporter = (error: unknown) => void;
 
+/** The one progress write allowed to wait behind the write in flight. */
+type WaitingProgress = { readonly runId: RunId; ackedLines: number };
+
 const TRACKING_FAILURE_MESSAGE =
   'Job recovery tracking hit an unexpected error. The current job is unaffected, and progress will remain eligible for retry.';
 
@@ -82,6 +85,8 @@ class JobCheckpointTracker {
   private deferredArchiveHandoff: CheckpointArchiveHandoff | null = null;
   private activatedArchiveHandoff: CheckpointArchiveHandoff | null = null;
   private supersededTerminalRunId: RunId | null = null;
+  private untrackedRunId: RunId | null = null;
+  private waitingProgress: WaitingProgress | null = null;
   private queue: Promise<void>;
   private readonly reportQueueFailure: TrackingFailureReporter;
 
@@ -233,29 +238,39 @@ class JobCheckpointTracker {
     // ADR-337 archives after acceptance. Until activation, the pending intent
     // owns this run and updateProgress has no active slot to advance yet.
     if (progressDeferredOrSettled(this.repository, runId, queuedAck)) return;
+    // A run the repository does not own (untracked Start, another window,
+    // Forget) answers every write with a no-op. Stay quiet until it activates
+    // instead of chaining read-write transactions for the rest of the job.
+    if (runId === this.untrackedRunId && !activeInRepository(this.repository, runId)) return;
+    // A failed or no-op write keeps its ack queued-high: the next attempt waits
+    // for the next interval, so failure never writes faster than success.
     this.highestQueuedAck = Math.max(this.highestQueuedAck, queuedAck);
-    this.enqueue(async () => {
-      try {
-        const updated = await this.repository.updateProgress(runId, queuedAck, this.nowIso());
-        if (
-          updated.ok &&
-          !updated.value &&
-          progressDeferredOrSettled(this.repository, runId, queuedAck)
-        )
-          return;
-        if (!updated.ok || !updated.value) {
-          this.reportQueueFailure(updated);
-          return;
-        }
-        if (this.watermarkRunId === runId) {
-          this.lastPersistedAck = Math.max(this.lastPersistedAck, queuedAck);
-        }
-      } finally {
-        if (this.watermarkRunId === runId && queuedAck >= this.highestQueuedAck) {
-          this.highestQueuedAck = this.lastPersistedAck;
-        }
-      }
+    const waiting = this.waitingProgress;
+    if (waiting?.runId === runId) {
+      // Overwrite the one write still waiting rather than queueing another: a
+      // slow disk then lags by one transaction, never by a backlog.
+      waiting.ackedLines = Math.max(waiting.ackedLines, queuedAck);
+      return;
+    }
+    const slot: WaitingProgress = { runId, ackedLines: queuedAck };
+    this.waitingProgress = slot;
+    this.enqueue(() => {
+      if (this.waitingProgress === slot) this.waitingProgress = null;
+      return this.commitProgress(slot.runId, slot.ackedLines);
     });
+  }
+
+  private async commitProgress(runId: RunId, ackedLines: number): Promise<void> {
+    const updated = await this.repository.updateProgress(runId, ackedLines, this.nowIso());
+    if (updated.ok && updated.value) {
+      if (this.watermarkRunId === runId) {
+        this.lastPersistedAck = Math.max(this.lastPersistedAck, ackedLines);
+      }
+      return;
+    }
+    if (updated.ok && progressDeferredOrSettled(this.repository, runId, ackedLines)) return;
+    if (updated.ok) this.untrackedRunId = runId;
+    this.reportQueueFailure(updated);
   }
 
   private enqueue(work: () => Promise<void>): void {
@@ -358,6 +373,10 @@ function progressDeferredOrSettled(
   return (
     snapshot.recoveryCapsule?.runId === runId && snapshot.recoveryCapsule.ackedLines >= ackedLines
   );
+}
+
+function activeInRepository(repository: RecoveryRepository, runId: RunId): boolean {
+  return repository.getSnapshot().activeRun?.runId === runId;
 }
 
 function onceTrackingFailureReporter(

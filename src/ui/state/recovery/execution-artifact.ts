@@ -290,11 +290,18 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
  * decode. Legacy exact artifacts are retained only as untrusted historical
  * data and are never authorized for runtime execution. */
 export function isCurrentExecutionArtifact(value: unknown): value is CurrentExecutionArtifactV2 {
+  return isExecutionArtifact(value) && executionArtifactIsCurrent(value);
+}
+
+/** The schema half of `isCurrentExecutionArtifact`, for a caller that already
+ * holds an artifact which passed `isExecutionArtifact`. */
+export function executionArtifactIsCurrent(
+  artifact: ExecutionArtifactV1,
+): artifact is CurrentExecutionArtifactV2 {
   return (
-    isExecutionArtifact(value) &&
-    value.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
-    value.provenance?.schemaVersion === 2 &&
-    value.provenance.archivedControllerObservationSha256 !== undefined
+    artifact.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
+    artifact.provenance?.schemaVersion === 2 &&
+    artifact.provenance.archivedControllerObservationSha256 !== undefined
   );
 }
 

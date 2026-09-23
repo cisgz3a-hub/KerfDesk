@@ -10,8 +10,9 @@ import {
   recoveryRepository,
   type RecoveryCapsule,
   type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
 } from '../state/recovery';
-import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
@@ -21,14 +22,16 @@ export function CheckpointResumeBanner(props: {
   readonly repository?: RecoveryRepository;
 }): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const snapshot = useRecoveryRepositorySnapshot(repository);
-  const capsule = snapshot.recoveryCapsule;
+  const { recoveryCapsule: capsule, pendingStart } = useRecoveryRepositorySelection(
+    selectBannerSlots,
+    repository,
+  );
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
   const [reviewOpen, setReviewOpen] = useState(false);
   // A pending Start may already have reached the controller. Never offer the
   // older capsule during the short owner lease; it returns only if arming is
   // cancelled, otherwise the candidate commits or reconciles as newest.
-  if (jobActive || snapshot.pendingStart !== null || capsule === null) return null;
+  if (jobActive || pendingStart !== null || capsule === null) return null;
 
   // A claim only blocks Review while its lease is live. A crash between claiming
   // and arming leaves an abandoned claim; once it outlives the lease Review
@@ -76,6 +79,10 @@ export function CheckpointResumeBanner(props: {
       ) : null}
     </>
   );
+}
+
+function selectBannerSlots({ recoveryCapsule, pendingStart }: RecoveryRepositorySnapshot) {
+  return { recoveryCapsule, pendingStart };
 }
 
 function RecoveryDescription({
