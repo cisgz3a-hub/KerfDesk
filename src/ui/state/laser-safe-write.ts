@@ -21,6 +21,7 @@ import {
   activeJobCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
+  setupBlockingJobCommandBlockMessage,
 } from './laser-store-helpers';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
@@ -64,7 +65,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     // Setup-only lines (GRBL `$` commands) are blocked while a job is active;
     // the active driver decides what counts as setup-only for its firmware.
     const blockedMessage = refs.driver.isSetupOnlyPayload(line)
-      ? activeJobCommandBlockMessage(get())
+      ? setupPayloadBlockMessage(get(), action)
       : null;
     if (blockedMessage !== null) {
       set({
@@ -113,6 +114,24 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+// A job makes `$` lines off limits, with one exception: the operator's jog
+// inside a drained, fresh-Idle tool-change hold. GRBL's native jog is itself a
+// `$J=` line (https://github.com/gnea/grbl/wiki/Grbl-v1.1-Jogging), the M0 is
+// held host-side so the controller really is Idle and accepts it, and runJog
+// has already admitted the move through this same setup-motion gate. Before,
+// the strict gate refused that jog here, so the touch-off the hold asks for
+// was impossible without aborting (audit drivers-2). Every other action keeps
+// the strict gate: Frame, Home, Unlock, `$$` and setting writes stay refused
+// for the whole job, and Start never unblocks at a tool change.
+function setupPayloadBlockMessage(
+  state: LaserState,
+  action: LaserSafetyAction | undefined,
+): string | null {
+  return action === 'jog'
+    ? setupBlockingJobCommandBlockMessage(state)
+    : activeJobCommandBlockMessage(state);
 }
 
 // A line the wire cannot carry is refused before anything is reserved for it.
