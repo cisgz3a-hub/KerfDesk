@@ -96,6 +96,9 @@ describe('laser-store profile streaming options', () => {
       writes.push(data);
     });
     await connectWith(connection);
+    // A controller that has reported baseline overrides needs no Start reset
+    // (ADR-352), so the first write is the program itself.
+    useLaserStore.setState({ ovCache: { feed: 100, rapid: 100, spindle: 100 } });
     writes.length = 0;
 
     await startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
