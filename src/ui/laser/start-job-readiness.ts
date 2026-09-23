@@ -1,10 +1,10 @@
 import {
   findOversizedLine,
-  isSendableGcodeLine,
   type OverrideValues,
   type StatusReport,
 } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
+import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
@@ -403,7 +403,7 @@ function preparedProgramIntegrityIssue(
   rxBufferBytes: number,
   preflight: { readonly issues: ReadonlyArray<{ readonly message: string }> },
 ): ReadonlyArray<string> | null {
-  if (!gcode.split('\n').some(isSendableGcodeLine)) {
+  if (!hasSendableGcodeLine(gcode)) {
     return nonExecutableProgramMessages(preflight);
   }
   const oversized = findOversizedLine(gcode, rxBufferBytes);

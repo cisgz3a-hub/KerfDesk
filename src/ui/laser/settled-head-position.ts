@@ -12,7 +12,7 @@
 // on yet - so the estimate samples the head only once it is settled and holds
 // that sample while it moves.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -41,6 +41,11 @@ export function isHeadSettled(state: HeadSettlementState): boolean {
   );
 }
 
+const HEAD_IN_MOTION = 'in-motion' as const;
+
+type SettledHeadState = HeadSettlementState &
+  Pick<LaserState, 'workOriginActive' | 'wcoCache' | 'controllerSettings'>;
+
 /**
  * The last settled work position in mm, held unchanged while the head moves.
  * Undefined while no controller report exists (the estimate then carries no
@@ -48,29 +53,36 @@ export function isHeadSettled(state: HeadSettlementState): boolean {
  * on its coordinates, so identical polls never re-arm consumers' debounces.
  */
 export function useSettledHeadPosition(): MotionPoint | undefined {
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const workOriginActive = useLaserStore((state) => state.workOriginActive);
-  const wcoCache = useLaserStore((state) => state.wcoCache);
-  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  const settled = useLaserStore(isHeadSettled);
-  const reported = settled
-    ? reportedWorkPositionMm({ statusReport, workOriginActive, wcoCache }, reportInches)
-    : null;
-  const x = reported?.x;
-  const y = reported?.y;
-  const z = reported?.z;
-  const sample = useMemo(
-    () => (x === undefined || y === undefined || z === undefined ? undefined : { x, y, z }),
-    [x, y, z],
+  // One derived selection instead of the raw report: the report is a fresh
+  // object on every poll, which re-rendered the whole Workspace four times a
+  // second through a job whose head sample this hook holds anyway.
+  const sample = useLaserStore(settledHeadSample);
+  const [held, setHeld] = useState<MotionPoint | undefined>(
+    sample === HEAD_IN_MOTION ? undefined : sample,
   );
-  const disconnected = statusReport === null;
-  const [held, setHeld] = useState<MotionPoint | undefined>(sample);
   useEffect(() => {
     // In motion with a live controller: keep the pre-motion sample.
-    if (!settled && !disconnected) return;
+    if (sample === HEAD_IN_MOTION) return;
     setHeld((current) => (samePoint(current, sample) ? current : sample));
-  }, [settled, disconnected, sample]);
+  }, [sample]);
   return held;
+}
+
+let lastSettledPoint: MotionPoint | undefined;
+
+/** Undefined with no report, HEAD_IN_MOTION while anything moves the head, else
+ * the settled position — the same point object for as long as it stays put. */
+function settledHeadSample(
+  state: SettledHeadState,
+): MotionPoint | undefined | typeof HEAD_IN_MOTION {
+  if (state.statusReport === null) return undefined;
+  if (!isHeadSettled(state)) return HEAD_IN_MOTION;
+  const reported = reportedWorkPositionMm(state, state.controllerSettings?.reportInches === true);
+  if (reported === null) return undefined;
+  if (!samePoint(lastSettledPoint, reported)) {
+    lastSettledPoint = { x: reported.x, y: reported.y, z: reported.z };
+  }
+  return lastSettledPoint;
 }
 
 function samePoint(left: MotionPoint | undefined, right: MotionPoint | undefined): boolean {

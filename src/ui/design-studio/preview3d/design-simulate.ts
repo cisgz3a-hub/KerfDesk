@@ -63,7 +63,7 @@ export function routeDesignCarveSimulation(
         result: {
           kind: 'failed',
           reason:
-            'Background bit simulation is unavailable. Reopen CurveDesk or enable worker support, then try again.',
+            'Background bit simulation is unavailable. Reopen KerfDesk or enable worker support, then try again.',
         },
       }
     : { kind: 'background', pending };

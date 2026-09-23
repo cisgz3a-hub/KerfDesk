@@ -1,12 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { helpProps } from '../help/help-topics';
 import { useLaserStore } from '../state/laser-store';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
 import { ConsoleCommandDeck } from './console/ConsoleCommandDeck';
 import { useTranscriptCopy } from './console/use-transcript-copy';
 
-export function ConsolePanel(): JSX.Element {
-  const transcript = useLaserStore((state) => state.transcript);
+// `active` is false while the docked console's section is collapsed. The
+// transcript publishes several times a second during a job, so a hidden
+// console holds the last transcript it showed instead of re-rendering for
+// nobody, and stays mounted so its filters and unsent draft survive.
+export function ConsolePanel({ active = true }: { readonly active?: boolean } = {}): JSX.Element {
+  const shown = useRef<ReadonlyArray<SerialTranscriptEntry>>([]);
+  const transcript = useLaserStore((state) => (active ? state.transcript : shown.current));
+  shown.current = transcript;
   const clearTranscript = useLaserStore((state) => state.clearTranscript);
   const [showStatus, setShowStatus] = useState(false);
   const [showStream, setShowStream] = useState(false);

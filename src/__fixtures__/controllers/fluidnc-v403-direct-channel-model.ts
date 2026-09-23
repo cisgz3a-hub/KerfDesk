@@ -60,7 +60,7 @@ type MutableDirectChannel = {
 /**
  * Executes a bounded firmware-side model of pinned FluidNC v4.0.3's direct
  * UartChannel, Lineedit, realtime interception, and UTF-8 decoder seams.
- * It intentionally does not model CurveDesk host encoding or acknowledgement.
+ * It intentionally does not model KerfDesk host encoding or acknowledgement.
  * @throws RangeError for editor controls outside the explicitly bounded model.
  */
 export function simulateFluidncV403DirectChannel(

@@ -305,6 +305,13 @@ describe('second pass from the real prepared-output composition', () => {
     if (result.kind !== 'ready') throw new Error(result.message);
     expect(result.burnLengthMm).toBeCloseTo(0.4, 12);
     expect(result.gcode.length).toBeLessThan(400);
-    expect(result.motionBounds).toEqual({ minX: -1, minY: 7450, maxX: 11, maxY: 7450 });
-  }, 15000);
+    // Writer 2 replays the painted X1.8..X2.2 plus the row's own 1 mm runway
+    // on each side; writer 1 replayed the whole row, overscan to overscan.
+    expect(result.motionBounds.minX).toBeCloseTo(0.8, 12);
+    expect(result.motionBounds.maxX).toBeCloseTo(3.2, 12);
+    expect([result.motionBounds.minY, result.motionBounds.maxY]).toEqual([7450, 7450]);
+    const whole = buildLaserSecondPassProgram(rows.join('\n'), selection, { writerVersion: 1 });
+    if (whole.kind !== 'ready') throw new Error(whole.message);
+    expect(whole.motionBounds).toEqual({ minX: -1, minY: 7450, maxX: 11, maxY: 7450 });
+  }, 30000);
 });

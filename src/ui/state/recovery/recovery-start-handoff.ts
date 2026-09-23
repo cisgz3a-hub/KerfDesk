@@ -149,10 +149,16 @@ export class RecoveryStartHandoff {
         ? 'exact-execution'
         : await this.host.materializeIntentArtifact(pending.runId, pending.intent);
     if (artifactKind === null) return ok(false);
+    const estimatedArtifactBytes =
+      artifactKind === 'exact-execution' ? await this.archivedBytes(pending.runId) : undefined;
     const reconciled = await this.host.mutate(
       'reconcile uncertain Start handoff',
       (slots) =>
-        reconcilePendingStartMutation(slots, this.host.nowIso(), { ...pending, artifactKind }),
+        reconcilePendingStartMutation(slots, this.host.nowIso(), {
+          ...pending,
+          artifactKind,
+          ...(estimatedArtifactBytes === undefined ? {} : { estimatedArtifactBytes }),
+        }),
       pending.intent === undefined ? undefined : pending.runId,
     );
     if (!reconciled.ok && reconciled.error === 'not-found') {
@@ -162,5 +168,14 @@ export class RecoveryStartHandoff {
       return refreshed.ok ? ok(false) : refreshed;
     }
     return reconciled;
+  }
+
+  /** The archive's recorded size for the history record; hydration re-measures
+   * the artifact itself, so an unreadable archive simply records nothing. */
+  private async archivedBytes(runId: RunId): Promise<number | undefined> {
+    const record = await this.host.exactArtifactRecord(runId);
+    if (!record.ok) return undefined;
+    const artifact = record.value.artifact;
+    return artifact.kind === 'exact-execution' ? artifact.estimatedArtifactBytes : undefined;
   }
 }

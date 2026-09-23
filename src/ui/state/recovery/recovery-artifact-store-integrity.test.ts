@@ -87,7 +87,7 @@ describe('recovery artifact store trust boundaries', () => {
       estimatedArtifactBytes: 1,
       untrustedNestedField: {
         nested: {
-          payload: 'x'.repeat(Math.floor(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES / 3) + 1),
+          payload: 'x'.repeat(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES + 1),
         },
       },
     } as ExecutionArtifactV1;
@@ -167,7 +167,7 @@ describe('recovery artifact store trust boundaries', () => {
       ...current,
       estimatedArtifactBytes: 1,
       untrustedNestedField: new Map([
-        ['hidden', 'x'.repeat(Math.floor(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES / 3) + 1)],
+        ['hidden', 'x'.repeat(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES + 1)],
       ]),
     } as ExecutionArtifactV1;
 

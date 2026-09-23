@@ -271,7 +271,7 @@ describe('parseStatusReport grblHAL MPG ownership', () => {
 });
 
 describe('parseStatusReport Bf buffer state (ADR-331)', () => {
-  it('parses planner blocks free and RX bytes free from a grblHAL Falcon report', () => {
+  it('parses planner blocks free and RX bytes free from a captured Falcon A1 Pro report', () => {
     expect(
       parseStatusReport('<Idle|MPos:191.500,106.500,-21.100,0.000|Bf:512,65535|FS:0,0>')?.buffer,
     ).toEqual({ plannerBlocksFree: 512, rxBytesFree: 65535 });

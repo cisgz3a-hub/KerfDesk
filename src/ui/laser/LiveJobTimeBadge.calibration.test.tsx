@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, Profiler } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
@@ -128,6 +128,45 @@ describe('live countdown calibration handoff', () => {
     );
     expect(host.textContent).toBe('Estimating · ~24s remaining');
     await act(async () => vi.advanceTimersByTime(5000));
+    expect(host.textContent).toBe('Estimating · ~24s remaining');
+  });
+
+  // The run's timing object is replaced on each status poll. The badge used to
+  // commit with the previous tick's time and then again from an effect that
+  // refreshed it; it now reads the clock in the one render.
+  it('commits once per live timing update', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    const gcode = grblStrategy.emit(JOB, DEVICE);
+    const timing = canvasJobTimingPlan(gcode, DEVICE, ORIGIN, {
+      controllerSessionEpoch: 7,
+      positionEpoch: 11,
+      activeControllerKind: 'grbl-v1.1',
+      detectedControllerKind: 'grbl-v1.1',
+    });
+    if (timing.kind !== 'ok') throw new Error(timing.reason);
+    useLaserStore.setState(liveCanvasStartPatch(canvasPlan(gcode), Date.now(), timing));
+    let commits = 0;
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () =>
+      root?.render(
+        <Profiler id="badge" onRender={() => (commits += 1)}>
+          <LiveJobTimeBadge estimate={{ kind: 'empty' }} />
+        </Profiler>,
+      ),
+    );
+    commits = 0;
+
+    vi.setSystemTime(1500);
+    const run = useLaserStore.getState().liveCanvasRun;
+    if (run === null || run === undefined || run.timing === undefined) throw new Error('no run');
+    await act(async () =>
+      useLaserStore.setState({ liveCanvasRun: { ...run, timing: { ...run.timing! } } }),
+    );
+
+    expect(commits).toBe(1);
     expect(host.textContent).toBe('Estimating · ~24s remaining');
   });
 });

@@ -5,7 +5,7 @@ The single most unusual thing about this codebase, and the one rule with no exce
 ## The rule
 
 **CLAUDE.md collaboration rule 7** and **PROJECT.md non-negotiable #21**, under **ADR-228**
-(`DECISIONS.md:9934`), clarified by **ADR-230/231/232**:
+(`DECISIONS.md:10550`), clarified by **ADR-230/231/232**:
 
 > A completed Frame for the exact current job — bounds signature plus origin identity — is the **sole
 > ordinary Start authorization** on both laser and CNC. The Job Review dialog is the single warning
@@ -16,12 +16,12 @@ The single most unusual thing about this codebase, and the one rule with no exce
 A *guard* is defined expansively (CLAUDE.md rule 7): anything that blocks, refuses, gates, caps,
 clamps, delays, hides, disables, rewrites, or adds confirmation before an otherwise available action.
 No new guard may be created — **not for "safety", not for "defense in depth", not with tests or an ADR,
-not ever.** ADR-206 (`:8785`) additionally requires explicit maintainer permission for any new guard,
+not ever.** ADR-206 (`:9234`) additionally requires explicit maintainer permission for any new guard,
 and #21 says that permission should be **presumed denied**.
 
 This is unusual enough to state plainly: the rule exists because the codebase accumulated guards faster
 than it accumulated correctness. Project memory records **22 unauthorized guard PRs** as the dominant
-defect class of a two-day audit (2026-07-15), and ADR-208/209 (`:8867`, `:8825`) exist purely to
+defect class of a two-day audit (2026-07-15), and ADR-208/209 (`:9316`, `:9274`) exist purely to
 *remove* previously-added obstructive policies.
 
 ## The three permitted refusals
@@ -70,11 +70,11 @@ Note the inches handling at line 195: if `controllerSettings.reportInches` is tr
 scaled by 25.4 before comparison. A unit-reporting mismatch would otherwise read as a position change.
 
 **4. The permit is one-use.** `FramedRunStartClaim` (`framed-run.ts:108`) is *"One synchronous owner for
-an exact permit crossing the final Start handoff."* ADR-230 (`:10136`) names it exact-artifact
+an exact permit crossing the final Start handoff."* ADR-230 (`:10677`) names it exact-artifact
 authorization with a one-use Start permit; `framed-run-start-consumption.ts` and
 `framed-run-invalidation.ts` implement claiming and invalidation.
 
-**5. Review happens at Start, not at Frame.** ADR-237 (`:10540`): an ordinary Frame issues a
+**5. Review happens at Start, not at Frame.** ADR-237 (`:11175`): an ordinary Frame issues a
 **review-pending** permit and is dialog-free; Start opens the single Job Review. The exception is a
 transient camera Frame, reviewed before dispatch and carrying `FramedRunReviewEvidence` from birth
 (`framed-run.ts:38-47`, `:64-66`).
@@ -90,7 +90,7 @@ scolding (`framed-run.ts:112-115`):
 
 ## Why this design is defensible
 
-ADR-231 (`:10203`) and ADR-232 (`:10248`) carry the argument: **a valid Frame proves physically safe
+ADR-231 (`:10752`) and ADR-232 (`:10819`) carry the argument: **a valid Frame proves physically safe
 motion and the live output contract**, and physical Frame completion is the *spatial* source of truth.
 A calculated bounds check knows only the configured bed rectangle; it does not know about the clamp, the
 jig, or the workpiece sitting 3 mm off where the operator thought. The Frame moves the actual head
@@ -101,7 +101,7 @@ physically possible — strictly stronger evidence than arithmetic on a bed dime
 
 Stated honestly rather than defended:
 
-1. **ADR-172 blocks CNC Start on missing work Z** (`:7593`), classified as handoff consistency,
+1. **ADR-172 blocks CNC Start on missing work Z** (`:8007`), classified as handoff consistency,
    category (c). That classification is arguable — one could call it a policy judgment about whether
    the operator has done their setup. It is the closest thing to a surviving policy guard.
 2. **Reference-identity comparison** in `sameControllerSetup` means a benign background re-read of

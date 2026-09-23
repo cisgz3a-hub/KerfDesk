@@ -2,6 +2,7 @@ import {
   buildLaserSecondPassProgram,
   type LaserSecondPassSelection,
 } from '../../core/laser-second-pass';
+import { LASER_SECOND_PASS_WRITER_VERSION } from '../../core/laser-second-pass/build-program';
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import { estimateJobDuration } from '../../core/job';
 import { buildMotionManifest, type MotionPoint } from '../../core/job/motion-manifest';
@@ -159,6 +160,9 @@ async function bindSecondPassSource(
     sourceFingerprint: { ...source.fingerprint },
     resumeChainBefore: (source.laserResumeChain ?? []).map((step) => ({ ...step })),
     selection: frozenSelection,
+    // The preview was built by the current writer; the archive names it so
+    // the stage replays byte-identically later (ADR-341 Amendment 3).
+    writerVersion: LASER_SECOND_PASS_WRITER_VERSION,
   };
   const chain = [...structuredClone(source.laserSecondPassChain ?? []), stage];
   if (

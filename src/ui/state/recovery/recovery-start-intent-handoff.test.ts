@@ -82,6 +82,41 @@ describe('start intent handoff', () => {
     });
   });
 
+  it('records an archive-backed reconciled run in the history, where its archive is read', () => {
+    const artifactArmed: PendingStartRecord = {
+      runId: 'run-a',
+      kind: 'fresh',
+      sendableLines: 6,
+      armedAtIso: NOW,
+    };
+    const slots = { ...emptyRecoverySlots(0), pendingStart: artifactArmed };
+    const reconciled = reconcilePendingStartMutation(slots, LATER, {
+      runId: 'run-a',
+      armedAtIso: NOW,
+      artifactKind: 'exact-execution',
+      estimatedArtifactBytes: 4_321,
+    });
+
+    expect(reconciled.slots.executionHistory).toEqual([
+      {
+        runId: 'run-a',
+        terminalKind: 'interrupted',
+        startedAtIso: NOW,
+        terminalAtIso: LATER,
+        ackedLines: 0,
+        sendableLines: 6,
+        estimatedArtifactBytes: 4_321,
+        interruption: { kind: 'unknown', message: START_INTENT_INTERRUPTION_MESSAGE },
+      },
+    ]);
+    expect(parseRecoverySlots(JSON.parse(JSON.stringify(reconciled.slots)), 0).accepted).toBe(true);
+  });
+
+  it('adds no history record for a fingerprint-only stand-in, which has no archive', () => {
+    const armed = armFreshStartIntentMutation(emptyRecoverySlots(0), 'run-a', intent(), NOW);
+    expect(reconcilePendingStartMutation(armed.slots, LATER).slots.executionHistory).toEqual([]);
+  });
+
   it('round-trips an armed intent through the persisted slot parser', () => {
     const armed = armFreshStartIntentMutation(emptyRecoverySlots(0), 'run-a', intent(), NOW);
 

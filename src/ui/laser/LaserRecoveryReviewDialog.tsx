@@ -1,13 +1,21 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { assertNever } from '../../core/scene';
+import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { RecoveryCapsule } from '../state/recovery';
 import { Dialog, DialogActions } from '../kit';
+import { automaticRecoveryRestart } from './laser-recovery-automatic-restart';
+import type { RecoveryWorkBounds } from './laser-recovery-picker-model';
+import { LaserRecoveryPlacement } from './LaserRecoveryPlacement';
 import { LaserRecoveryRestartPicker } from './LaserRecoveryRestartPicker';
 
 export type LaserRecoveryReviewDialogProps = {
   readonly capsule: RecoveryCapsule;
   readonly onClose: () => void;
   readonly onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>;
+  /** The controller's current work offset in mm, supplied by the host. */
+  readonly liveWorkOffsetMm?: WorkCoordinateOffset | null;
+  /** Traces the remaining area with the current origin; supplied by the host. */
+  readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
 };
 
 /**
@@ -26,13 +34,24 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
   const selectionKey = `${props.capsule.runId}:${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
   const fromLine = selection?.key === selectionKey ? selection.fromLine : undefined;
   const start = useRecoveryStart(props, fromLine);
+  const automatic = useMemo(() => automaticRecoveryRestart(props.capsule), [props.capsule]);
   return (
     <Dialog title="Review interrupted laser job" size="lg" onClose={start.closeReadOnly}>
       <RecoveryReviewContent capsule={props.capsule} />
+      <LaserRecoveryPlacement
+        capsule={props.capsule}
+        liveWorkOffsetMm={props.liveWorkOffsetMm}
+        restartLine={fromLine ?? automatic?.line}
+        disabled={start.state === 'starting'}
+        {...(props.onFrameRemaining === undefined
+          ? {}
+          : { onFrameRemaining: props.onFrameRemaining })}
+      />
       <LaserRecoveryRestartPicker
         key={selectionKey}
         capsule={props.capsule}
         fromLine={fromLine}
+        automatic={automatic}
         disabled={start.state === 'starting'}
         onChange={(line) => setSelection({ key: selectionKey, fromLine: line })}
       />

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { IDBFactory as FakeIDBFactory } from 'fake-indexeddb';
+import { IDBFactory as FakeIDBFactory, IDBObjectStore as FakeIDBObjectStore } from 'fake-indexeddb';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import { DEFAULT_OUTPUT_SCOPE, createProject } from '../../../core/scene';
 import type { PreparedOutput } from '../../../io/gcode';
@@ -16,6 +16,7 @@ import {
   MIGRATED_LEGACY_EXACT_ARTIFACT_ORIGIN,
 } from './recovery-model';
 import { RecoveryRepository } from './recovery-repository';
+import { createCurrentTestExecutionArtifact } from './testing/execution-artifact-test-fixture';
 
 const DATABASE_NAME = 'laserforge-job-recovery-v1';
 const NOW = '2026-07-19T03:00:00.000Z';
@@ -136,6 +137,34 @@ describe('IndexedDbRecoveryStorageBackend', () => {
       }),
     ).toBe(true);
     expect(await backend.artifactExists(artifact.runId)).toBe(false);
+  });
+
+  it('commits a no-op progress checkpoint without rewriting the stored slots', async () => {
+    const backend = new IndexedDbRecoveryStorageBackend(new FakeIDBFactory());
+    const repository = new RecoveryRepository({
+      backend,
+      generationStore: new MemoryRecoveryGenerationStore(),
+      legacyStorage: { read: () => null, clear: () => undefined },
+      nowIso: () => NOW,
+    });
+    await repository.initialize();
+    const runId = 'run-noop-put';
+    await repository.stageArtifact(await createCurrentTestExecutionArtifact({ runId }));
+    await repository.activateFreshRun(runId, NOW);
+    const put = vi.spyOn(FakeIDBObjectStore.prototype, 'put');
+
+    expect(await repository.updateProgress(runId, 2, NOW)).toEqual({ ok: true, value: true });
+    expect(put).toHaveBeenCalledOnce();
+    // An ack already on disk, or a run these slots do not own, changes nothing:
+    // the transaction reads and commits without cloning a record back.
+    expect(await repository.updateProgress(runId, 2, NOW)).toEqual({ ok: true, value: true });
+    expect(await repository.updateProgress('run-not-active', 3, NOW)).toEqual({
+      ok: true,
+      value: false,
+    });
+    expect(put).toHaveBeenCalledOnce();
+    expect(repository.getSnapshot().activeRun?.ackedLines).toBe(2);
+    put.mockRestore();
   });
 
   it('aborts and rejects when a cursor visitor throws synchronously', async () => {

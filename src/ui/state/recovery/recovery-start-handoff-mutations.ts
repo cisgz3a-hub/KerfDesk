@@ -1,5 +1,6 @@
 import type { JobCheckpoint } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RecoveryArtifactV1, RunId } from './execution-artifact';
+import { appendBoundedExecutionHistory } from './execution-history';
 import type { PersistedRecoverySlots } from './recovery-model';
 import type { SlotMutation } from './recovery-slot-mutations';
 import { START_INTENT_INTERRUPTION_MESSAGE as START_HANDOFF_UNCERTAIN_MESSAGE } from './start-intent';
@@ -120,6 +121,8 @@ export function reconcilePendingStartMutation(
     readonly runId: RunId;
     readonly armedAtIso: string;
     readonly artifactKind: RecoveryArtifactV1['kind'];
+    /** The archive's own size estimate, when an exact archive backs the run. */
+    readonly estimatedArtifactBytes?: number;
   },
 ): SlotMutation<boolean> {
   const pending = slots.pendingStart;
@@ -131,6 +134,12 @@ export function reconcilePendingStartMutation(
     return unchanged(slots, false);
   }
   const revision = slots.revision + 1;
+  // The archive may have committed before the app died. Hydration must use
+  // that exact kind, or the stand-in written when no archive exists.
+  const artifactKind =
+    backing?.artifactKind ??
+    (pending.intent === undefined ? 'exact-execution' : 'legacy-fingerprint-only');
+  const interruption = { kind: 'unknown' as const, message: START_HANDOFF_UNCERTAIN_MESSAGE };
   return {
     slots: {
       ...slots,
@@ -139,21 +148,30 @@ export function reconcilePendingStartMutation(
       pendingStart: null,
       recoveryCapsule: {
         runId: pending.runId,
-        // The archive may have committed before the app died. Hydration must
-        // use that exact kind, or the stand-in written when no archive exists.
-        artifactKind:
-          backing?.artifactKind ??
-          (pending.intent === undefined ? 'exact-execution' : 'legacy-fingerprint-only'),
+        artifactKind,
         revision,
         ackedLines: 0,
         sendableLines: pending.sendableLines,
-        interruption: {
-          kind: 'unknown',
-          message: START_HANDOFF_UNCERTAIN_MESSAGE,
-        },
+        interruption,
         updatedAtIso,
       },
       lastCompletedReceipt: null,
+      // An exact archive is readable (for lineage replay and painted passes)
+      // only through the run history, like every other interrupted run.
+      ...(artifactKind === 'exact-execution'
+        ? {
+            executionHistory: appendBoundedExecutionHistory(slots, {
+              runId: pending.runId,
+              terminalKind: 'interrupted',
+              startedAtIso: pending.armedAtIso,
+              terminalAtIso: updatedAtIso,
+              ackedLines: 0,
+              sendableLines: pending.sendableLines,
+              estimatedArtifactBytes: backing?.estimatedArtifactBytes ?? 0,
+              interruption,
+            }),
+          }
+        : {}),
     },
     value: true,
   };

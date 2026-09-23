@@ -3,12 +3,7 @@
 // still read stores directly; compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
-import {
-  analyzeFillHeatRisk,
-  formatDuration,
-  type Job,
-  type ScanOffsetPoint,
-} from '../../../core/job';
+import { formatDuration, type Job, type ScanOffsetPoint } from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
   machineKindOf,
@@ -34,7 +29,9 @@ import {
   originTileValue,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
+import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
+import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
 import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
@@ -132,6 +129,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),
+      ...detectArchiveCapacityWarnings(args.prepared),
       ...(args.streamThroughput === undefined
         ? []
         : detectStreamThroughputWarnings({
@@ -196,6 +194,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.laserModeStartSnapshot.controllerBuildInfo,
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
+      ...detectArchiveCapacityWarnings(prepared),
       ...secondPassThroughputWarnings(args),
     ]),
     resolvedOriginLabel: describeJobOrigin(prepared.jobOrigin),
@@ -204,7 +203,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
     outputQualityFacts: [
       {
         label: 'Saved motion',
-        value: 'Original speed, direction, and runways retained.',
+        value: 'Original speed, direction and runways. Rows are replayed only around the paint.',
         tone: 'default',
       },
       {
@@ -286,7 +285,7 @@ function fillRunwayTiles(
   job: Job,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): ReadonlyArray<JobReviewStatTile> {
-  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
+  const coverage = memoizedFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount === 0) return [];
   const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
   return [

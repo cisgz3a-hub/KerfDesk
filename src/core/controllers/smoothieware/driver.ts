@@ -50,7 +50,7 @@ export const smoothiewareDriver: ControllerDriver = {
   realtime: {
     statusQuery: RT_STATUS,
     // Smoothieware handles !/~ only on its USB CDC transport and only when
-    // enable_feed_hold is configured. CurveDesk has no session-bound evidence
+    // enable_feed_hold is configured. KerfDesk has no session-bound evidence
     // for either prerequisite, so the generic driver must not claim these bytes
     // as controller realtime commands.
     hold: null,

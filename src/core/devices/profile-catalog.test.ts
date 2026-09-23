@@ -62,8 +62,8 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       throw new Error('Falcon profiles missing');
 
     expect(specific.profile.controllerKind).toBe('grblhal');
-    // ADR-331: grblHAL rings are >= 1 KiB; the stock 120-byte window starved
-    // the Falcon's 512-block planner on dense raster jobs.
+    // ADR-331: grblHAL rings are >= 1 KiB; the stock 120-byte window can starve
+    // a 512-block planner on dense raster jobs (simulator-shown).
     expect(specific.profile.rxBufferBytes).toBe(1024);
     expect(profileCatalogEntryById('generic-grblhal')?.profile.rxBufferBytes).toBe(1024);
     expect(fallback.profile.rxBufferBytes).toBe(120);

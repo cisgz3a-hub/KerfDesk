@@ -35,6 +35,7 @@ import { startControllerCommand, type ControllerLifecycleRefs } from './laser-in
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { finishedJobStateReset } from './laser-session-reset';
+import type { JobStopReason } from './job-stop-request';
 import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
@@ -112,21 +113,15 @@ export function jobActions(
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
   const context: JobActionContext = { set, get, refs, safeWrite, driver };
-  const stopJob = (): Promise<void> => runStopJob(context);
+  // The fail-dark stop records no request: the safety notice it follows
+  // already names the cause for recovery.
+  const failDarkStop = (): Promise<void> => runStopJob(context);
   return {
     continueToolChange: () => runContinueToolChange(set, get, refs, safeWrite),
     startJob: (gcode, options = {}) => runStartJob(context, gcode, options),
-    pauseJob: () =>
-      runConfirmedPauseJob({
-        ...context,
-        failDarkStop: stopJob,
-      }),
-    resumeJob: () =>
-      runConfirmedResumeJob({
-        ...context,
-        failDarkStop: stopJob,
-      }),
-    stopJob,
+    pauseJob: () => runConfirmedPauseJob({ ...context, failDarkStop }),
+    resumeJob: () => runConfirmedResumeJob({ ...context, failDarkStop }),
+    stopJob: (reason) => runStopJob(context, reason === 'app-closing' ? 'app-closing' : 'operator'),
   };
 }
 
@@ -250,7 +245,7 @@ async function prepareStartBoundary(
   return effectiveOptions;
 }
 
-async function runStopJob(context: JobActionContext): Promise<void> {
+async function runStopJob(context: JobActionContext, reason?: JobStopReason): Promise<void> {
   // Abort changes the stream's status, so this side owns the writes again
   // before anything else happens (ADR-334).
   await releaseHostedRefill(context.refs);
@@ -270,6 +265,11 @@ async function runStopJob(context: JobActionContext): Promise<void> {
     set((state) => ({
       ...invalidateControllerSessionEvidence(state),
       streamer: state.streamer === null ? null : markErrored(state.streamer),
+      // Recovery reads this beside the errored stream so the saved cause is
+      // the requested stop, not an unexplained end (ADR-341 Amendment 3).
+      ...(reason === undefined || state.streamer === null
+        ? {}
+        : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
     }));
     armResetCleanup(refs, safeWrite, cleanupLines);
     try {

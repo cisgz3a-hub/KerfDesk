@@ -9,12 +9,8 @@
 // and a native dialog there would freeze the ack pump and Abort button.
 
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
-import {
-  fingerprintGcode,
-  fingerprintsEqual,
-  rawResumeLine,
-  type JobCheckpoint,
-} from '../../core/recovery';
+import { fingerprintGcode, fingerprintsEqual, type JobCheckpoint } from '../../core/recovery';
+import { automaticRestart } from '../../core/recovery/automatic-restart-line';
 import { machineKindOf } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -40,7 +36,7 @@ import {
   completedReceiptIsCurrent,
   replayCompilationMatches,
 } from './start-job-execution-tracking';
-import { createStartIntent } from '../state/recovery/start-intent';
+import { armFreshStartHandoff } from './start-handoff-arming';
 import {
   completedReplayInvalidationHandler,
   discardChangedCompletedReplay,
@@ -344,35 +340,6 @@ async function completedReplayCanContinue(
   return receipt === null || completedReceiptIsCurrent(receipt, repository);
 }
 
-/** Arm the durable Start handoff from the cheap intent (ADR-337).
- *
- * Unavailable recovery storage is NOT a Start gate: rule 7 refuses only when
- * transport cannot accept work, output cannot be produced or streamed, or the
- * reviewed artifact cannot be handed off consistently. A run whose durable
- * record could not be written still goes to the machine, and
- * `activateAcceptedFreshRun` tells the operator afterwards that it has no
- * forensic record — the same posture staging had before this decision. */
-async function armFreshStartHandoff(
-  args: PreparedStartArgs,
-  runId: ReturnType<typeof createRunId>,
-): Promise<{ readonly armed: boolean; readonly blocked: boolean }> {
-  const intent = createStartIntent({
-    gcode: args.prepared.gcode,
-    machineKind: args.machineKind,
-    outputScope: args.outputScope,
-    ...(args.prepared.jobOrigin === undefined ? {} : { jobOrigin: args.prepared.jobOrigin }),
-    nowIso: new Date().toISOString(),
-  });
-  const armed = await args.repository.armFreshStartIntent(runId, intent);
-  if (armed.ok && armed.value) return { armed: true, blocked: false };
-  await args.repository.cancelPendingStart(runId);
-  if (!armed.ok) return { armed: false, blocked: false };
-  reportStartBlockers([
-    'Another job Start is already being prepared. Wait for it to finish and try again.',
-  ]);
-  return { armed: false, blocked: true };
-}
-
 // Resume a stopped/errored laser job from a chosen 1-based RAW line. CNC
 // recovery is intentionally blocked before compile and again in the core
 // builder because acknowledgement position is not physical machine state.
@@ -429,7 +396,11 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
     );
     return;
   }
-  const fromLine = rawResumeLine(prepared.gcode, checkpoint.ackedLines);
+  const fromLine = automaticRestart(
+    prepared.gcode,
+    checkpoint.ackedLines,
+    checkpoint.interruption,
+  ).line;
   await streamResumeFromRawLine(
     prepared.project,
     prepared.gcode,

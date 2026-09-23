@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
@@ -9,32 +9,53 @@ import { BoardAnchorOverlay } from './BoardAnchorOverlay';
 import { BoardCapturePhase } from './BoardCapturePhase';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
-import { useBoardCapture, type BoardRegistrationEpoch } from './use-board-capture';
+import {
+  useBoardCapture,
+  type BoardCapture,
+  type BoardRegistrationEpoch,
+} from './use-board-capture';
 import { useBoardCaptureHandlers, type BoardCaptureHandlers } from './use-board-capture-handlers';
 import { useBoardVerification, type BoardVerificationController } from './use-board-verification';
 import { useCaptureGating } from './use-capture-gating';
 
 const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 
+// The panel is always mounted beside the canvas, and its body follows the live
+// controller (status report, transport writes, status sequence): mounted while
+// closed, it re-rendered twice per acknowledged line of a running job for a
+// panel nobody could see. This gate reads only `open`. It owns the capture
+// session, so closing and reopening resumes it, and keeps the body mounted
+// after a close until the body has declined to stay open
+// (useKeepBoardPanelOpenWhileBusy): a close never tears down a busy session.
 export function BoardCapturePanel(): JSX.Element | null {
   const open = useUiStore((state) => state.boardCapturePanelOpen);
+  const capture = useBoardCapture();
+  const [bodyMounted, setBodyMounted] = useState(open);
+  const release = useCallback(() => setBodyMounted(false), []);
+  if (open && !bodyMounted) setBodyMounted(true);
+  if (!open && !bodyMounted) return null;
+  return <BoardCapturePanelBody open={open} capture={capture} onRelease={release} />;
+}
+
+function BoardCapturePanelBody({
+  open,
+  capture,
+  onRelease,
+}: {
+  readonly open: boolean;
+  readonly capture: BoardCapture;
+  readonly onRelease: () => void;
+}): JSX.Element | null {
   const close = useUiStore((state) => state.closeBoardCapturePanel);
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const wcoCache = useLaserStore((state) => state.wcoCache);
-  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  const controllerSessionEpoch = useLaserStore((state) => state.controllerSessionEpoch);
-  const trustedPositionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
-  const workOriginVersion = useLaserStore((state) => state.workOriginVersion ?? 0);
+  const livePosition = useLiveMachinePosition();
+  const currentEpoch = useCurrentRegistrationEpoch();
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
   const setOriginHere = useLaserStore((state) => state.setOriginHere);
   const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
   const device = useStore((state) => state.project.device);
   const addCapturedBoard = useStore((state) => state.addCapturedBoard);
   const updateCapturedBoard = useStore((state) => state.updateCapturedBoard);
-  const capture = useBoardCapture();
   const { connected, disabled } = useCaptureGating();
-  const currentEpoch = { controllerSessionEpoch, trustedPositionEpoch, workOriginVersion };
-  const livePosition = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const feed = Math.min(device.maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
   const { geometry, registrationEpoch, outlineId, committed } = capture.state;
   const outlineValid = useStore((state) =>
@@ -59,7 +80,7 @@ export function BoardCapturePanel(): JSX.Element | null {
     onCorrect: handlers.onCorrectBoardPoint,
   });
   const panelLocked = sessionDisabled || verification.saving || verification.cancelling;
-  useKeepBoardPanelOpenWhileBusy(open, verification, handlers.busy);
+  useKeepBoardPanelOpenWhileBusy(open, verification, handlers.busy, onRelease);
   const reset = (): void => {
     if (panelLocked || useLaserStore.getState().motionOperation !== null) return;
     verification.cancel();
@@ -94,6 +115,20 @@ export function BoardCapturePanel(): JSX.Element | null {
       />
     </>
   );
+}
+
+function useLiveMachinePosition(): ReturnType<typeof inferCurrentMachinePosition> {
+  const statusReport = useLaserStore((state) => state.statusReport);
+  const wcoCache = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
+  return inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
+}
+
+function useCurrentRegistrationEpoch(): BoardRegistrationEpoch {
+  const controllerSessionEpoch = useLaserStore((state) => state.controllerSessionEpoch);
+  const trustedPositionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
+  const workOriginVersion = useLaserStore((state) => state.workOriginVersion ?? 0);
+  return { controllerSessionEpoch, trustedPositionEpoch, workOriginVersion };
 }
 
 function BoardCapturePanelContent(props: {
@@ -187,6 +222,7 @@ function useKeepBoardPanelOpenWhileBusy(
   open: boolean,
   verification: BoardVerificationController,
   captureBusy: boolean,
+  onRelease: () => void,
 ): void {
   const wasOpen = useRef(open);
   useEffect(() => {
@@ -206,7 +242,8 @@ function useKeepBoardPanelOpenWhileBusy(
     if (verification.activeTarget !== null) {
       verification.cancel();
     }
-  }, [captureBusy, open, verification]);
+    onRelease();
+  }, [captureBusy, open, verification, onRelease]);
 }
 
 function PanelHeader(props: {

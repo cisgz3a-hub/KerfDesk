@@ -9,7 +9,12 @@ import {
   rewriteLaserResumeTail,
   type LaserResumeModalState,
   type LaserResumeMotion,
+  type LaserResumeTransformVersion,
 } from './laser-resume-reentry';
+
+export type { LaserResumeTransformVersion };
+/** The transform new resumes use; archived resume steps record their own. */
+export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 2;
 
 export type ResumeProgram = {
   readonly kind: 'ok';
@@ -41,6 +46,8 @@ export type ResumeOptions = {
   readonly safeZMm: number;
   readonly spindleSpinupSec: number;
   readonly plungeMmPerMin: number;
+  /** Laser transform to reproduce; the current one unless replaying an archive. */
+  readonly laserTransform?: LaserResumeTransformVersion;
 };
 
 type GcodeWord = { readonly letter: string; readonly value: number };
@@ -60,6 +67,7 @@ export function buildResumeProgram(
   if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length) {
     return { kind: 'error', reason: `Line must be between 1 and ${lines.length}.` };
   }
+  const transform = options.laserTransform ?? LASER_RESUME_TRANSFORM_VERSION;
   const state: LaserResumeModalState = {
     units: 'G21',
     spindle: 'M5',
@@ -69,6 +77,8 @@ export function buildResumeProgram(
     feed: null,
     x: null,
     y: null,
+    mist: false,
+    flood: false,
   };
   for (let i = 0; i < fromLine - 1; i += 1) {
     const issue = applyLine(state, lines[i] ?? '');
@@ -78,8 +88,8 @@ export function buildResumeProgram(
   if (originalTail.every((line) => stripComments(line).trim() === '')) {
     return { kind: 'error', reason: 'Nothing left to run from that line.' };
   }
-  const preamble = buildPreamble(state);
-  const tail = rewriteLaserResumeTail(state, originalTail);
+  const preamble = buildPreamble(state, transform);
+  const tail = rewriteLaserResumeTail(state, originalTail, transform);
   return {
     kind: 'ok',
     lines: [...preamble, ...tail],
@@ -158,9 +168,19 @@ function applyMWord(state: LaserResumeModalState, value: number): void {
   if (value === 3) state.spindle = 'M3';
   if (value === 4) state.spindle = 'M4';
   if (value === 5) state.spindle = 'M5';
+  // Coolant outputs drive laser air assist: M7 mist, M8 flood, M9 both off.
+  if (value === 7) state.mist = true;
+  if (value === 8) state.flood = true;
+  if (value === 9) {
+    state.mist = false;
+    state.flood = false;
+  }
 }
 
-function buildPreamble(state: LaserResumeModalState): ReadonlyArray<string> {
+function buildPreamble(
+  state: LaserResumeModalState,
+  transform: LaserResumeTransformVersion,
+): ReadonlyArray<string> {
   // Pin the WCS and feed mode before re-positioning, exactly as the job preamble
   // does (grbl-strategy.ts): a resume re-executes from a mid-program line, and a
   // stale modal G55-G59 would send the re-entry move — and the rest of the job —
@@ -174,21 +194,35 @@ function buildPreamble(state: LaserResumeModalState): ReadonlyArray<string> {
     'G90',
     state.wcs,
     'G94',
-    ...laserResumeBody(state),
+    ...laserResumeBody(state, transform),
   ];
 }
 
 // Laser re-entry: hard-off first, position with explicit S0, then re-arm at S0.
 // Replay restores positive power only on actual burn motion. No spin-up dwell:
 // a G4 with M3 active fires the stationary beam. No Z words: laser jobs must
-// never command the Z axis on resume.
-function laserResumeBody(state: LaserResumeModalState): string[] {
+// never command the Z axis on resume. Transform 2 also re-issues the air assist
+// the interrupted program had switched on (M7/M8 are coolant outputs, and a
+// controller reset turns them off), before the re-entry move so the air is
+// flowing when the beam first fires (ADR-341 Amendment 3).
+function laserResumeBody(
+  state: LaserResumeModalState,
+  transform: LaserResumeTransformVersion,
+): string[] {
   const lines = ['M5'];
+  if (transform >= 2) lines.push(...airWords(state));
   const move = positionMove(state);
   if (move !== null) lines.push(move);
   if (state.spindle !== 'M5') lines.push(`${state.spindle} S0`);
   if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
   return lines;
+}
+
+function airWords(state: LaserResumeModalState): string[] {
+  const words: string[] = [];
+  if (state.mist) words.push('M7');
+  if (state.flood) words.push('M8');
+  return words;
 }
 
 function positionMove(state: LaserResumeModalState): string | null {

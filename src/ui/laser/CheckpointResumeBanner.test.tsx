@@ -35,6 +35,7 @@ let host: HTMLDivElement | null = null;
 
 afterEach(() => {
   act(() => root?.unmount());
+  vi.useRealTimers();
   host?.remove();
   root = null;
   host = null;
@@ -166,6 +167,41 @@ describe('CheckpointResumeBanner', () => {
 
     expect(button('Review recovery').disabled).toBe(false);
     expect(host?.textContent).not.toContain('another recovery cannot start');
+  });
+
+  // The idle rail no longer re-renders on every status poll, so the lease
+  // running out must re-render the banner by itself: no store or repository
+  // write happens between the two assertions.
+  it('re-enables Review when a live claim lease runs out while the banner is shown', async () => {
+    const repository = await interruptedRepository();
+    const capsule = repository.getSnapshot().recoveryCapsule;
+    await repository.claimRecovery({
+      runId: capsule?.runId ?? '',
+      revision: capsule?.revision ?? -1,
+      attemptId: 'crashed-attempt',
+      claimedAtIso: LATER,
+    });
+    vi.useFakeTimers({ now: Date.parse(LATER) + 1_000 });
+    const repositoryBefore = repository.getSnapshot();
+    const laserBefore = useLaserStore.getState();
+    const appBefore = useStore.getState();
+    render(repository);
+    expect(button('Review recovery').disabled).toBe(true);
+    expect(host?.textContent).toContain('another recovery cannot start');
+
+    act(() => {
+      vi.advanceTimersByTime(RECOVERY_CLAIM_LEASE_MS - 2_000);
+    });
+    expect(button('Review recovery').disabled).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(button('Review recovery').disabled).toBe(false);
+    expect(host?.textContent).not.toContain('another recovery cannot start');
+    expect(repository.getSnapshot()).toBe(repositoryBefore);
+    expect(useLaserStore.getState()).toBe(laserBefore);
+    expect(useStore.getState()).toBe(appBefore);
   });
 
   it('does not offer the older capsule while a newer Start handoff is pending', async () => {

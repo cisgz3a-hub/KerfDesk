@@ -153,8 +153,8 @@ describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
     await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'grblhal' });
     connection.emitLine("GrblHAL 1.1f ['$' or '$HELP' for help]");
     await flushConnect();
-    // The live-verified Falcon A1 Pro idle frame: 512 planner blocks free,
-    // 64 KiB of receive ring free.
+    // Bf values a maintainer's Falcon A1 Pro reported on 2026-07-19 (ADR-331); the
+    // rest of this frame, the banner and the handshake are synthetic grblHAL.
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000,0.000|Bf:512,65535|FS:0,0>');
     await flushConnect();
 
