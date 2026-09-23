@@ -888,6 +888,19 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. App opens at 115200 baud, registers line + close handlers, starts the 250 ms status poll.
 5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
 
+#### Background streaming (ADR-350)
+1. Compatible GRBL-family connections use background streaming by default. The selected USB
+   port is opened inside a dedicated worker so its read and refill loop can continue while the
+   Chrome window is minimised or busy.
+2. If the worker cannot identify the selected port uniquely or is unavailable before opening,
+   the app uses the selected window port and warns: "Background streaming is unavailable for
+   this connection. Keep KerfDesk visible while sending the job."
+3. Machine Setup's **Background streaming** preference can be turned off explicitly. Reconnect
+   to apply a change. Marlin and Smoothieware keep their existing transport.
+4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
+   the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
+5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
 

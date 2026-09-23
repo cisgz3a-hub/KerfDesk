@@ -23,6 +23,8 @@ import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-
 
 export type SerialWorkerCoreDeps = {
   readonly post: (message: SerialWorkerResponse) => void;
+  /** Notify an owning native transport before potentially stalled cleanup. */
+  readonly onClosing?: () => void;
 };
 
 export type SerialWorkerCore = {
@@ -31,6 +33,8 @@ export type SerialWorkerCore = {
   readonly armedStreamer: () => StreamerState | null;
   /** Resolves once the read loop has ended, for assertions. */
   readonly readLoop: () => Promise<void> | null;
+  /** Releases both stream locks before reporting the transport closed. */
+  readonly close: () => Promise<void>;
 };
 
 type WorkerState = {
@@ -42,6 +46,7 @@ type WorkerState = {
   resume: (() => void) | null;
   armId: number | null;
   closed: boolean;
+  closing: Promise<void> | null;
 };
 
 export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorkerCore {
@@ -54,11 +59,13 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
     resume: null,
     armId: null,
     closed: false,
+    closing: null,
   };
   return {
     handle: (request) => handleRequest(state, deps, request),
     armedStreamer: () => state.streamer,
     readLoop: () => state.loop,
+    close: () => closeCore(state, deps),
   };
 }
 
@@ -106,7 +113,7 @@ function handleRequest(
       resumeLines(state);
       return;
     case 'close':
-      void releaseStreams(state);
+      void closeCore(state, deps);
       return;
   }
 }
@@ -182,7 +189,21 @@ async function runReadLoop(state: WorkerState, deps: SerialWorkerCoreDeps): Prom
     // A yanked cable and a cancelled reader end the loop the same way; the
     // main thread decides what a closed port means.
   }
-  deps.post({ kind: 'closed' });
+  await closeCore(state, deps);
+}
+
+function closeCore(state: WorkerState, deps: SerialWorkerCoreDeps): Promise<void> {
+  if (state.closing !== null) return state.closing;
+  state.closed = true;
+  state.streamer = null;
+  resumeLines(state);
+  // The owner may call close again while reacting to the early notification.
+  // Keep its promise stable before any callback or stream cancellation runs.
+  state.closing = Promise.resolve()
+    .then(() => releaseStreams(state))
+    .then(() => deps.post({ kind: 'closed' }));
+  deps.onClosing?.();
+  return state.closing;
 }
 
 // Mirrors the main-thread teardown: the reader and writer locks must be
@@ -190,9 +211,6 @@ async function runReadLoop(state: WorkerState, deps: SerialWorkerCoreDeps): Prom
 async function releaseStreams(state: WorkerState): Promise<void> {
   const reader = state.reader;
   const writer = state.writer;
-  state.closed = true;
-  state.streamer = null;
-  resumeLines(state);
   state.reader = null;
   state.writer = null;
   if (reader !== null) {

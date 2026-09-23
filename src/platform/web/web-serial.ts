@@ -28,8 +28,7 @@ import type {
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
 import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
-import { createWorkerSerialConnection } from './worker-serial-connection';
-import type { SerialWorkerResponse } from './serial-worker-protocol';
+import { tryOpenNativeSerialConnection } from './native-serial-connection';
 
 // Re-exported: the wire primitives moved to `serial-wire.ts` so the worker
 // transport shares them byte for byte (ADR-334).
@@ -77,12 +76,18 @@ function makePortRef(port: SerialPort): SerialPortRef {
   return {
     ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
-      await openWithRetry(port, req.baudRate);
       if (req.hostedStreaming === true) {
-        const hosted = tryWorkerHostedConnection(port);
+        const hosted = await tryOpenNativeSerialConnection({
+          port,
+          options: { baudRate: req.baudRate, bufferSize: SERIAL_BUFFER_BYTES },
+        });
         if (hosted !== null) return hosted;
       }
-      return makeConnection(port);
+      await openWithRetry(port, req.baudRate);
+      return {
+        ...makeConnection(port),
+        ...(req.hostedStreaming === true ? { backgroundStreamingUnavailable: true } : {}),
+      };
     },
     forget: async () => {
       try {
@@ -92,46 +97,6 @@ function makePortRef(port: SerialPort): SerialPortRef {
       }
     },
   };
-}
-
-// The worker-hosted transport (ADR-334), or null when this runtime cannot give
-// it to us: no Worker, a blocked module worker, or a runtime that refuses to
-// transfer the port's streams. Every one of those falls back to the
-// main-thread connection rather than failing the connect, so opting in can
-// never cost the operator their machine.
-function tryWorkerHostedConnection(port: SerialPort): SerialConnection | null {
-  if (typeof Worker === 'undefined') return null;
-  let worker: Worker;
-  try {
-    worker = new Worker(new URL('./serial-stream-worker.ts', import.meta.url), {
-      type: 'module',
-    });
-  } catch (err) {
-    console.warn('Serial worker could not start; streaming stays on the main thread:', err);
-    return null;
-  }
-  const handlers = new Set<(message: SerialWorkerResponse) => void>();
-  worker.onmessage = (event: MessageEvent<SerialWorkerResponse>) => {
-    for (const handler of handlers) handler(event.data);
-  };
-  try {
-    return createWorkerSerialConnection({
-      bridge: {
-        postMessage: (message, transfer) =>
-          worker.postMessage(message, (transfer ?? []) as Transferable[]),
-        onMessage: (handler) => {
-          handlers.add(handler);
-          return () => handlers.delete(handler);
-        },
-        terminate: () => worker.terminate(),
-      },
-      port,
-    });
-  } catch (err) {
-    console.warn('Serial streams could not be handed to the worker:', err);
-    worker.terminate();
-    return null;
-  }
 }
 
 function serialPortIdentity(port: SerialPort): SerialPortIdentity | null {

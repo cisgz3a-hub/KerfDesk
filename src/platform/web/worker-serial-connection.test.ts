@@ -218,6 +218,34 @@ describe('worker serial connection (ADR-334)', () => {
     expect(h.terminated()).toBe(1);
   });
 
+  it('cannot re-arm a closing connection through late stop and handover replies', async () => {
+    const h = harness();
+    const refill = h.connection.hostedStreaming;
+    if (refill === undefined) throw new Error('expected a hosted-refill transport');
+    const arming = refill.arm(armedStreamer);
+    h.emit({ kind: 'ready', id: 1 });
+    h.emit({ kind: 'armed', id: 1 });
+    await arming;
+    const closing = h.connection.close();
+    await Promise.resolve();
+    h.emit({ kind: 'refill-stopped' });
+    const sentBeforeRetry = h.sent.length;
+    const retry = refill.arm(armedStreamer);
+    h.emit({ kind: 'ready', id: 2 });
+    h.emit({ kind: 'armed', id: 2 });
+    h.emit({ kind: 'released', id: 2 });
+    try {
+      expect(h.sent).toHaveLength(sentBeforeRetry);
+      expect(refill.isArmed()).toBe(false);
+      await expect(h.connection.write('G1 X900\n')).rejects.toThrow('not writable');
+    } finally {
+      h.emit({ kind: 'closed' });
+      await Promise.all([closing, retry]);
+    }
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(1);
+  });
+
   it('treats an unsolicited close as a dropped cable', async () => {
     const h = harness();
     const closed: number[] = [];

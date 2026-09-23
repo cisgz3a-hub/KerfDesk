@@ -220,4 +220,24 @@ describe('serial worker core (ADR-334)', () => {
     // A cancelled reader ends the loop rather than hanging it.
     await h.core.readLoop();
   });
+
+  it('does not announce EOF closure before an asynchronous writable abort releases its lock', async () => {
+    let releaseAbort = (): void => undefined;
+    const aborting = new Promise<void>((resolve) => {
+      releaseAbort = resolve;
+    });
+    const readable = new ReadableStream<Uint8Array>({ start: (controller) => controller.close() });
+    const writable = new WritableStream<Uint8Array>({ abort: () => aborting });
+    const posted: SerialWorkerResponse[] = [];
+    const core = createSerialWorkerCore({ post: (message) => posted.push(message) });
+    core.handle({ kind: 'attach', readable, writable });
+    await flush();
+    expect(posted).not.toContainEqual({ kind: 'closed' });
+    expect(writable.locked).toBe(true);
+    releaseAbort();
+    await core.readLoop();
+    await core.close();
+    expect(readable.locked || writable.locked).toBe(false);
+    expect(posted.filter((message) => message.kind === 'closed')).toHaveLength(1);
+  });
 });

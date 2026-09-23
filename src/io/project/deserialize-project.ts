@@ -298,16 +298,14 @@ function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[nu
 }
 
 /**
- * Profile flags that are only ever stored as `true`: the worker transport
- * (ADR-334) and the unreliable air restart (ADR-335).
- *
- * Absent must stay absent rather than become `false`, so a project that never
- * chose one round-trips unchanged, and every consumer compares against `true`
- * so a junk value carried in from an edited file reads as off.
+ * Preserve an explicit worker-transport opt-out as well as opt-in. Absent stays
+ * absent so old projects use the compatible driver's default. The unreliable
+ * air restart flag remains true-only; malformed values gain no authority.
  */
-function optionalDeviceFlags(dev: Record<string, unknown>): Record<string, true> {
+function optionalDeviceFlags(dev: Record<string, unknown>): Record<string, boolean | undefined> {
   return {
-    ...(dev['workerHostedStreaming'] === true ? { workerHostedStreaming: true as const } : {}),
+    workerHostedStreaming:
+      typeof dev['workerHostedStreaming'] === 'boolean' ? dev['workerHostedStreaming'] : undefined,
     ...(dev['airAssistRestartUnreliable'] === true
       ? { airAssistRestartUnreliable: true as const }
       : {}),

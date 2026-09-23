@@ -8,7 +8,7 @@
 // Handover establishes a line-delivery barrier before sampling the renderer.
 // A timed-out handover closes the transport; it never creates a second writer.
 
-import type { SerialConnection } from '../types';
+import type { HostedStreamRefill, SerialConnection } from '../types';
 import { createWorkerRefillHandover } from './worker-refill-handover';
 import {
   isSerialWorkerResponse,
@@ -21,6 +21,9 @@ import {
 export type SerialWorkerBridge = {
   readonly postMessage: (message: SerialWorkerRequest, transfer?: ReadonlyArray<unknown>) => void;
   readonly onMessage: (handler: (message: SerialWorkerResponse) => void) => () => void;
+  readonly onError?: (handler: () => void) => () => void;
+  /** Native EOF can precede an OS close that never settles. Bound that cleanup. */
+  readonly onClosing?: (handler: () => void) => () => void;
   readonly terminate: () => void;
 };
 
@@ -39,6 +42,7 @@ type PendingWrite = { readonly resolve: () => void; readonly reject: (error: Err
 
 type Session = {
   closed: boolean;
+  closing: boolean;
   nextWriteId: number;
   handover: ReturnType<typeof createWorkerRefillHandover> | null;
   closedSignal: (() => void) | null;
@@ -52,70 +56,148 @@ export function createWorkerSerialConnection(args: {
   readonly bridge: SerialWorkerBridge;
   readonly port: WorkerSerialPort;
   readonly timeoutMs?: number;
+  /** A native worker already owns the port; start its reader after subscribing. */
+  readonly start?: () => void;
 }): SerialConnection {
   const { bridge, port } = args;
   const timeoutMs = args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS;
   const session = createSession();
+  let closingPort: Promise<void> | null = null;
+  const closePort = (): Promise<void> => (closingPort ??= port.close());
+  let unsubscribeError = (): void => undefined;
+  let unsubscribeClosing = (): void => undefined;
   const unsubscribe = bridge.onMessage((message) => {
     if (isSerialWorkerResponse(message)) routeResponse(session, message);
+    if (message.kind === 'closed') {
+      terminate();
+      void closePort().catch(() => undefined);
+    }
   });
-  attachStreams(bridge, port, unsubscribe);
   let terminated = false;
   const terminate = (): void => {
     if (terminated) return;
     terminated = true;
     unsubscribe();
+    unsubscribeError();
+    unsubscribeClosing();
     bridge.terminate();
+  };
+  const fail = (): void => {
+    // Termination retires the native worker's port as well as its refill queue.
+    // A crashed worker must reject writes and notify the store exactly once.
+    terminate();
+    fireClose(session);
+    void closePort().catch(() => undefined);
   };
   session.handover = createWorkerRefillHandover({
     post: (message) => bridge.postMessage(message),
     timeoutMs,
     onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
-    fail: () => {
-      // An unanswered handover leaves ownership uncertain. Stop the worker
-      // before notifying the store, so no fallback can duplicate its writes.
-      terminate();
-      fireClose(session);
-      void port.close().catch(() => undefined);
-    },
+    fail,
   });
-  const hostedStreaming = session.handover.refill;
-  const shutDown = async (): Promise<void> => {
-    if (!session.closed) {
-      // The worker holds the stream locks, so it must let go before the port
-      // can be closed here.
-      await settleWithin(timeoutMs, (done) => {
-        session.closedSignal = done;
-        bridge.postMessage({ kind: 'close' });
-      });
-      session.closedSignal = null;
-      fireClose(session);
-    }
-    terminate();
-  };
+  const shutDown = createShutdown(session, bridge, timeoutMs, fail, terminate);
+  unsubscribeClosing =
+    bridge.onClosing?.(() => {
+      void shutDown()
+        .then(closePort)
+        .catch(() => undefined);
+    }) ?? unsubscribeClosing;
+  unsubscribeError = bridge.onError?.(fail) ?? unsubscribeError;
+  try {
+    if (session.closed) throw new Error('Serial worker failed before starting.');
+    if (args.start === undefined) attachStreams(bridge, port, unsubscribe);
+    else args.start();
+  } catch (error) {
+    fail();
+    throw error;
+  }
+  return connectionApi({
+    session,
+    bridge,
+    port,
+    shutDown,
+    closePort,
+    fail,
+    hostedStreaming: session.handover.refill,
+  });
+}
 
+function createShutdown(
+  session: Session,
+  bridge: SerialWorkerBridge,
+  timeoutMs: number,
+  fail: () => void,
+  terminate: () => void,
+): () => Promise<void> {
+  let closing: Promise<void> | null = null;
+  return () => {
+    session.closing = true;
+    session.handover?.close();
+    // Install the promise before posting: an in-process bridge can acknowledge
+    // or re-enter close synchronously. The final acknowledgement means the
+    // worker released its streams and native port; otherwise the deadline wins.
+    closing ??= Promise.resolve().then(async () => {
+      if (!session.closed) {
+        await settleWithin(timeoutMs, (done) => {
+          session.closedSignal = done;
+          try {
+            bridge.postMessage({ kind: 'close' });
+          } catch {
+            fail();
+            done();
+          }
+        });
+        session.closedSignal = null;
+        fireClose(session);
+      }
+      terminate();
+    });
+    return closing;
+  };
+}
+
+function connectionApi({
+  session,
+  bridge,
+  port,
+  shutDown,
+  closePort,
+  fail,
+  hostedStreaming,
+}: {
+  readonly session: Session;
+  readonly bridge: SerialWorkerBridge;
+  readonly port: WorkerSerialPort;
+  readonly shutDown: () => Promise<void>;
+  readonly closePort: () => Promise<void>;
+  readonly fail: () => void;
+  readonly hostedStreaming: HostedStreamRefill;
+}): SerialConnection {
   return {
     write: async (data) => {
-      if (session.closed) throw new Error('Serial port not writable.');
+      if (session.closed || session.closing) throw new Error('Serial port not writable.');
       const id = session.nextWriteId++;
       return new Promise<void>((resolve, reject) => {
         session.pendingWrites.set(id, { resolve, reject });
-        bridge.postMessage({ kind: 'write', id, data });
+        try {
+          bridge.postMessage({ kind: 'write', id, data });
+        } catch {
+          fail();
+        }
       });
     },
     onLine: (handler) => subscribe(session.lineSubs, handler),
     onClose: (handler) => subscribe(session.closeSubs, handler),
     close: async () => {
-      if (session.closed) return;
       await shutDown();
-      await port.close().catch((err: unknown) => {
+      await closePort().catch((err: unknown) => {
         console.warn('port.close() rejected:', err);
       });
     },
     forget: async () => {
       await hostedStreaming.release();
       await shutDown();
-      await port.close().catch(() => undefined);
+      await closePort().catch(() => undefined);
       await port.forget?.().catch((err: unknown) => {
         console.warn('port.forget() rejected:', err);
       });
@@ -127,6 +209,7 @@ export function createWorkerSerialConnection(args: {
 function createSession(): Session {
   return {
     closed: false,
+    closing: false,
     nextWriteId: 1,
     handover: null,
     closedSignal: null,
@@ -212,7 +295,13 @@ function fireClose(session: Session): void {
   for (const write of session.pendingWrites.values())
     write.reject(new Error('Serial port closed before the write completed.'));
   session.pendingWrites.clear();
-  for (const handler of session.closeSubs) handler();
+  for (const handler of session.closeSubs) {
+    try {
+      handler();
+    } catch (error) {
+      console.error('Serial close handler threw; continuing transport cleanup:', error);
+    }
+  }
 }
 
 function subscribe<T>(subscribers: Set<T>, handler: T): () => void {
