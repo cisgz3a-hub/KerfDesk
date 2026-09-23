@@ -26,7 +26,7 @@ const OPERATION_LABELS: Readonly<Record<LibraryOperation, string>> = {
 };
 
 const SOURCE_LABELS: Readonly<Record<LibrarySourceKind, string>> = {
-  owned: 'CurveDesk originals',
+  owned: 'KerfDesk originals',
   tabler: 'Tabler Icons',
   lucide: 'Lucide',
   cc0: 'CC0 / public domain',

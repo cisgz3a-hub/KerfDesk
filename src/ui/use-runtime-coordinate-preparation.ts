@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { DeviceProfile } from '../core/devices';
 import { runtimeCoordinatePreparationOptions, type ResolvedJobPlacement } from './job-placement';
 import { useLaserStore } from './state/laser-store';
-import { nativeBedEvidenceSnapshot } from './state/native-bed-frame';
+import { selectNativeBedEvidence } from './state/native-bed-frame';
 
 export type RuntimeCoordinatePreparation = ReturnType<typeof runtimeCoordinatePreparationOptions>;
 
@@ -12,12 +12,18 @@ export function useRuntimeCoordinatePreparation(
   device: DeviceProfile,
   placement: ResolvedJobPlacement,
 ): RuntimeCoordinatePreparation {
-  const key = useLaserStore((state) =>
-    JSON.stringify(
-      placement.ok
-        ? runtimeCoordinatePreparationOptions(device, placement, nativeBedEvidenceSnapshot(state))
-        : { contourEntryBounds: null },
-    ),
+  // Select the evidence by identity and derive from it during render: deriving
+  // inside the selector stringified the options on every store set, three
+  // mounts at a time, for the whole of a streamed job.
+  const evidence = useLaserStore(selectNativeBedEvidence);
+  const key = useMemo(
+    () =>
+      JSON.stringify(
+        placement.ok
+          ? runtimeCoordinatePreparationOptions(device, placement, evidence)
+          : { contourEntryBounds: null },
+      ),
+    [device, placement, evidence],
   );
   return useMemo(() => JSON.parse(key) as RuntimeCoordinatePreparation, [key]);
 }

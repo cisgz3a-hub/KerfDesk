@@ -1,8 +1,13 @@
 import { useState, type CSSProperties } from 'react';
 import { usePlatformOptional } from '../app/platform-context';
-import { recoveryRepository, type RecoveryRepository, type RunId } from '../state/recovery';
+import {
+  recoveryRepository,
+  type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
+  type RunId,
+} from '../state/recovery';
 import type { ExecutionHistoryRecord } from '../state/recovery/recovery-model';
-import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { exportExecutionArtifact } from './export-execution-artifact';
 
 type ArchiveStatus = {
@@ -15,7 +20,7 @@ export function ExecutionArchivePanel(props: {
 }): JSX.Element {
   const repository = props.repository ?? recoveryRepository;
   const platform = usePlatformOptional();
-  const snapshot = useRecoveryRepositorySnapshot(repository);
+  const snapshot = useRecoveryRepositorySelection(selectArchiveSlots, repository);
   const [exportingRunId, setExportingRunId] = useState<RunId | null>(null);
   const [status, setStatus] = useState<ArchiveStatus | null>(null);
   const records = [...snapshot.executionHistory].reverse();
@@ -87,6 +92,10 @@ export function ExecutionArchivePanel(props: {
       )}
     </details>
   );
+}
+
+function selectArchiveSlots({ loaded, executionHistory }: RecoveryRepositorySnapshot) {
+  return { loaded, executionHistory };
 }
 
 function ExecutionArchiveRow(props: {

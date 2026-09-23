@@ -4,10 +4,10 @@
 Sources: `src/core/cnc/compile-cnc-job.ts` (424 lines), `src/core/output/cnc-grbl-strategy.ts`
 (442 lines).
 
-CNC is governed by **ADR-098** (`DECISIONS.md:4306`), which made router mode a first-class product
+CNC is governed by **ADR-098** (`DECISIONS.md:4561`), which made router mode a first-class product
 track with three scope conditions: all parsers clean-room, `clipper2-ts` the only geometry
 dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation from
-laser mode is **ADR-101** gate-and-hide (`DECISIONS.md:4400`).
+laser mode is **ADR-101** gate-and-hide (`DECISIONS.md:4689`).
 
 ## The motion contract
 
@@ -63,10 +63,10 @@ Work-Z readiness is unusually heavily gated for this codebase, across four ADRs:
 
 | ADR | Rule |
 |---|---|
-| ADR-171 (`DECISIONS.md:7559`) | Work-Z readiness uses source-qualified, epoch-bound evidence |
-| ADR-172 (`:7593`) | **Missing qualified work Z blocks CNC Start** |
-| ADR-173 (`:7624`) | Work-Z evidence is bound to the compiled tool plan |
-| ADR-203 (`:8676`) | Work-Z recovers only from owned, fresh controller offset readback |
+| ADR-171 (`DECISIONS.md:7973`) | Work-Z readiness uses source-qualified, epoch-bound evidence |
+| ADR-172 (`:8007`) | **Missing qualified work Z blocks CNC Start** |
+| ADR-173 (`:8038`) | Work-Z evidence is bound to the compiled tool plan |
+| ADR-203 (`:9125`) | Work-Z recovers only from owned, fresh controller offset readback |
 
 ADR-172 is one of the few remaining hard Start blocks. Under the frame-first rule (non-negotiable
 #21) it survives as a *handoff-consistency* refusal rather than a policy guard — the reviewed
@@ -96,7 +96,7 @@ Two details that matter for correctness:
 
 **Successive-depth optimization** (`cnc-grbl-strategy.ts:20-23`, `appendContourPass:295-301`): when
 the next pass plunges at the *same* XY the head already occupies, the retract + rapid pair is
-skipped and the bit feeds straight down. **ADR-253** (`DECISIONS.md:11820`) then added an opt-in
+skipped and the bit feeds straight down. **ADR-253** (`DECISIONS.md:12651`) then added an opt-in
 `retractBetweenPasses` that lifts clear before replunging instead — because stepping Z down in place
 re-cuts through chips.
 
@@ -116,7 +116,7 @@ strategy.
 > edge finish, and dimensional accuracy remain unverified on hardware. Full analysis in
 > [03-coordinates-and-origin.md](03-coordinates-and-origin.md).
 
-**Hole mirroring** — ADR-252 (`DECISIONS.md:7755`). A hole's material lies *outside* its boundary, so
+**Hole mirroring** — ADR-252 (`DECISIONS.md:12585`). A hole's material lies *outside* its boundary, so
 its climb direction is the mirror of the outer boundary's. The code comment
 (`motion-polish.ts:46-49`) records what the pre-ADR-252 bug did: forcing one winding on every contour
 cut holes the wrong way round **and** destroyed the winding opposition ADR-250 reads to find holes,
@@ -132,7 +132,7 @@ in comments: the resume index must be the vertex where the ramp *actually* reach
 `source[1]` (lines 154-156), and a ramp longer than the path finishes vertically at the end point
 (lines 187-189).
 
-**Lead-in/out** — **ADR-250** (`DECISIONS.md:11585`) adds arc/line leads to closed profile cuts,
+**Lead-in/out** — **ADR-250** (`DECISIONS.md:12313`) adds arc/line leads to closed profile cuts,
 default-on for profile-outside/inside, no-op elsewhere. Applied at `compile-cnc-job.ts:119-124` via
 `applyProfileLeadPasses`, bounded by `machineBoundsForDevice`.
 
@@ -175,23 +175,23 @@ by `toolChangePause`, set only for KerfDesk-emitted CNC jobs (`streamer.ts:75-78
 
 ## Recovery
 
-**ADR-215** (`DECISIONS.md:9273`): CNC recovery rewinds to a **pass boundary** and re-enters as a new
-sealed job. **ADR-136** (`:6862`) requires that rewind target be a retract-first safe boundary. The
+**ADR-215** (`DECISIONS.md:9762`): CNC recovery rewinds to a **pass boundary** and re-enters as a new
+sealed job. **ADR-136** (`:7210`) requires that rewind target be a retract-first safe boundary. The
 mechanism is `emitCncJobWithPassSpans` (`cnc-grbl-strategy.ts:71`), which emits the ordinary program
 while recording each pass's raw-line span. Its doc comment (lines 65-70) states the critical
 constraint: byte-identity holds for the same job **and the same emit options** — a current-position
 job's `finishPosition` changes its park lines, so resume mapping must re-emit with the run's own
 options.
 
-**ADR-143** (`:7079`) disabled executable checkpoint and start-from-line recovery. **ADR-180**
-(`:7718`) made generic same-session Resume manual-recovery-only; per project memory that block was
+**ADR-143** (`:7482`) disabled executable checkpoint and start-from-line recovery. **ADR-180**
+(`:8132`) made generic same-session Resume manual-recovery-only; per project memory that block was
 intentional, was later enabled by the maintainer (#392), and amendment 2 (#397, merged as
 `3baf5ea5`) made Pause park the spindle via the safety-door byte — **stopping the spindle in place
 with no retract**, because `PARKING_ENABLE` is off in stock GRBL. **NOT hardware-verified.**
 
 ## What is NOT verified for the CNC chain
 
-Per `PROJECT.md:138`, every Phase H sub-phase is **"Built = code + tests landed, hardware pass still
+Per `PROJECT.md:175`, every Phase H sub-phase is **"Built = code + tests landed, hardware pass still
 CLAIMED"**. Specifically unverified:
 
 - **All of H.15–H.18** (rest machining, adaptive clearing, inlay pairs, drag tabs) — hardware CLAIMED.

@@ -2,12 +2,12 @@ import type { LibraryEntry } from './design-library-types';
 
 const OWNED_PROVENANCE = {
   sourceKind: 'owned',
-  sourceName: 'CurveDesk',
-  creator: 'CurveDesk contributors',
+  sourceName: 'KerfDesk',
+  creator: 'KerfDesk contributors',
   license: 'MIT',
   licenseId: 'MIT',
   licenseUrl: 'https://opensource.org/license/mit',
-  notice: 'Authored for CurveDesk in this repository.',
+  notice: 'Authored for KerfDesk in this repository.',
 } as const;
 
 function svg(width: number, height: number, body: string): string {

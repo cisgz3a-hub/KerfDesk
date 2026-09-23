@@ -65,7 +65,7 @@ export function CncBitCatalogPanel(
       hint="Browse researched cutter families and common nominal envelope sizes."
     >
       <p style={noticeStyle}>
-        Selectable generic entries are operator-matched nominal cutting envelopes that CurveDesk can
+        Selectable generic entries are operator-matched nominal cutting envelopes that KerfDesk can
         model. A family reference documents the cutter type, not each generated size, shank,
         center-cut or plunge capability, entry strategy, or automatic feed. It supplies flute
         metadata only for an explicitly single/double O-flute family, whose evidenced one/two-flute

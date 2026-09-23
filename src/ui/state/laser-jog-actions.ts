@@ -26,6 +26,7 @@ import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -241,7 +242,7 @@ function assertMotionOperationOwner(
 
 function assertMotionQueueSettled(set: SetFn, get: GetFn, action: string): void {
   const state = get();
-  if (state.pendingUntrackedAcks === 0 && (state.pendingTransportWrites ?? 0) === 0) return;
+  if (state.pendingUntrackedAcks === 0 && pendingTransportWriteCount(state) === 0) return;
   const message = `Wait for the previous controller write and acknowledgement to settle before ${action}.`;
   set({ lastWriteError: message, log: pushLog(state, `[lf2] Motion command blocked: ${message}`) });
   throw new Error(message);

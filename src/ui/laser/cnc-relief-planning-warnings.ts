@@ -100,7 +100,7 @@ function oversizedReliefGridWarnings(project: Project, plan: CncReliefPlan): Rea
       `${format(plan.cellSizeMm)} mm ${plan.stage} grid: ${plan.widthCells} x ${plan.heightCells} ` +
       `(${cellCount.toLocaleString('en-US')} cells), above the ${MAX_HEIGHTMAP_CELLS.toLocaleString(
         'en-US',
-      )}-cell advisory threshold. CurveDesk did not coarsen the requested grid; compilation can use substantial memory and time. Check the preview before running.`,
+      )}-cell advisory threshold. KerfDesk did not coarsen the requested grid; compilation can use substantial memory and time. Check the preview before running.`,
   ];
 }
 
