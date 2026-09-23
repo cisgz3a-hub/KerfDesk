@@ -170,6 +170,12 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 
 ### Phase G — v0.7 "Drawing tools" [Built (B1–B7); P2 follow-ups pending]
 
+**Reusable work and interchange (ADR-352).** Personal artwork entries preserve editable content,
+fonts/pixels, dependencies and operation copies. Protected templates open complete saved projects
+as new unsaved work. Native material libraries also carry complete ordered laser/CNC process
+recipes, including disabled steps and referenced cutters. Grid, Circular and Point Rotation can
+all prepare distinct variable values per copy; later text changes preserve manual placement.
+
 On-canvas parametric shape creation — the first geometry that does NOT enter via import. Closes the largest LightBurn-parity gap (J1 "draw a sign from nothing" was impossible; J3 batch effectively impossible). See ADR-051.
 
 - New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
@@ -672,8 +678,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
-- ~~DXF~~ and PDF import. **DXF moved in-scope by Phase H.6 (clean-room
-  parser, ADR-098)**; PDF import remains out of scope.
+- DXF, PDF/PDF-compatible AI, HPGL/PLT and BMP/GIF/TIFF import are in scope
+  under ADR-098 and ADR-352. PDF uses explicit page selection and complete-path
+  conversion or a whole-page rendered image. Legacy non-PDF AI, unsupported
+  HPGL drawing commands and unsupported TIFF encodings remain explicit errors.
 - In-app AI depth inference and bundled model weights remain out of scope until P2R.5 receives its
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
   under ADR-291/P2R.1 once their provenance and relative-not-metric UI lands; today's ADR-290 path

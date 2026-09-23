@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { pdfResources } from './scripts/pdf-resources';
 
 import {
   appVersion,
@@ -56,6 +57,7 @@ function fileSystemAllowList(): ReadonlyArray<string> {
 export default defineConfig({
   plugins: [
     react(),
+    pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
     // ADR-060: an auto-reload could interrupt a live burn). injectRegister
     // false: PwaUpdateWatcher registers the SW via the virtual:pwa-register/react
@@ -106,7 +108,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}'],
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
         globIgnores: ['**/node_modules/**/*', '**/tutorial-images/**'],

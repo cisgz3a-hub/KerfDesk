@@ -31,7 +31,7 @@ export const FILE_COMMAND_HELP: Readonly<
   },
   'file.import': {
     family: 'file',
-    tooltip: 'Import SVG, DXF, PNG, JPG, or STL artwork through one ordered picker.',
+    tooltip: 'Import SVG, DXF, PDF/compatible AI, HPGL/PLT, images or STL artwork.',
   },
   'file.import-svg': {
     family: 'file',
@@ -43,7 +43,8 @@ export const FILE_COMMAND_HELP: Readonly<
   },
   'file.import-image': {
     family: 'file',
-    tooltip: 'Import a PNG or JPG image for engraving or tracing.',
+    tooltip:
+      'Import PNG, JPG, BMP, GIF or TIFF for engraving or tracing. GIF uses its first frame.',
   },
   'file.import-height-map': {
     family: 'file',

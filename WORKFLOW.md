@@ -200,13 +200,41 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 ### F-A4. Import artwork — via File menu
 
 Identical to the format-specific import flows except:
-- Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PNG/JPG, or STL input.
+- Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PDF/compatible AI,
+  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF, or STL input.
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
+
+**Document pages and additional formats (ADR-352):**
+
+- PDF/compatible AI opens a page picker with a preview and physical size. Choose **Editable paths**
+  for complete simple vector pages, or **Image for engraving or tracing** with a chosen DPI.
+  Editable strokes become centrelines; choose the operation's Line/Fill settings after import.
+  Text, clips, effects and embedded images use the whole-page image route so content is not
+  silently dropped. Unlock protected PDFs first; export legacy Illustrator files as SVG/PDF.
+- TIFF also uses the page picker, preserving the selected page's original pixels and orientation.
+  Its embedded X/Y density sets size; missing density uses 254 DPI. Engraving pixels are 8-bit
+  RGB over white. Unsupported encodings are reported so the file can be exported as PNG.
+- BMP honours embedded density. GIF imports a still image of the first/default frame.
+- HPGL/PLT imports supported pen geometry at 40 plotter units/mm. Scaling needs explicit reference
+  points. Unsupported drawing commands reject the file with their source location. Pen colours
+  are display assignments; filled boundaries need the chosen Fill operation.
+- Cancelling a page imports nothing. Replacing the project while a file is being read discards
+  its completion. Successful mixed imports keep their original order without gaps for failures.
 
 ---
 
 ### F-A5. Selection
+
+Reusable designs (ADR-352): open **Design Library → My artwork**, select artwork on the canvas and
+save it with a name/category. Search or filter saved entries, insert independent editable copies,
+or exchange .lfart library files using Import/Export. Copies retain saved positions, groups,
+fonts, full pixels, dependencies and their own operation settings. Inserting is one undo step.
+Variable text with a different dataset needs a new or matching project.
+
+Use **File → Save template** for a complete reusable project, including unused operations and
+notes. **File → Open template** starts a dirty new project. Its first ordinary Save asks for a
+destination and cannot overwrite the template source.
 
 #### Single object — click
 1. Click on an object's visible geometry.
@@ -344,7 +372,7 @@ Identical to the format-specific import flows except:
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Grid can optionally **Advance variables per copy** (F-D6);
+7. Array settings remain transient. Every mode can optionally **Advance variables per copy** (F-D6);
    its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
    compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
@@ -859,7 +887,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
-- `Cmd/Ctrl+I` — Import SVG, DXF, PNG/JPG, or STL through the unified picker
+- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
@@ -2149,16 +2177,18 @@ settings and Job Review keep their existing read-only setup references.
   approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
-### F-D6. Distinct variable values in a Grid array (ADR-350, amending ADR-279)
+### F-D6. Distinct variable values in arrays (ADR-350/351, amending ADR-279)
 
 **Success:**
 
-1. Select a design containing variable text, open **Arrange → Array...**, choose **Grid**, and
-   enable **Advance variables per copy**. The option defaults off. Circular and Point Rotation
-   arrays retain ordinary copying.
-2. Slots advance in row-major order using the existing record/serial stride and wrap settings.
+1. Select a design containing variable text, open **Arrange → Array...**, choose any array mode,
+   and enable **Advance variables per copy**. The option defaults off.
+2. Grid slots advance in row-major order using the existing record/serial stride and wrap settings.
    Existing relative slot spans and token-level serial offsets are preserved. All text renders
    against one captured clock before spacing uses the largest rendered envelope in the batch.
+   Circular uses each evaluated copy's centre on the requested ring, retaining its radius even
+   when wider values overlap. Point Rotation uses one pivot from the first evaluated selection.
+   Both rotate in the existing signed, exclusive-endpoint order shown in the dialog.
 3. **Create array** commits one undo step and consumes no production records. Each text copy stores
    its sequence offset; project schema 8 preserves it through save/reopen and text edits. Generator
    parameters remain transient. Objects remain editable and can be moved individually.
@@ -2991,6 +3021,16 @@ maintainer's perceptual pass (CLAUDE.md §2); green tests are not
 fidelity proof.
 
 ### F-ML1. Material library — save, load, and session persistence
+
+**Process recipes (ADR-352).** Open **Materials** in laser mode or **Recipes** in CNC mode.
+Select one artwork, name its process and choose **Save selected process**. The recipe includes
+ordered operations, disabled/visible states, effective laser settings and referenced CNC cutters.
+Select one or more destination artworks and choose **Apply recipe to selection** to replace only
+their operation bindings with independent copies. Undo restores the prior process. Geometry,
+image edits, stock, machine settings, origin and clearance stay with the current project.
+Path-specific recipes require matching path count/order; the panel reports incompatible targets.
+Native library version 2 exports/imports recipes and accepts older version-1 libraries. Existing
+single-preset Apply/Link keeps its established behavior. CNC still follows its tool/clearing order.
 
 **Superseded (ADR-093, 2026-06-26).** The manual Save... / Load... /
 Unload rail controls and the single-library `localStorage` slot

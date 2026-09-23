@@ -43,6 +43,7 @@ export async function pageArtworkObject(
     file,
     (object) => {
       options.signal.throwIfAborted();
+      if (object.kind !== 'raster-image') throw new Error('Could not create a page image.');
       // Commit inside the raster callback, before the importer releases its
       // rollback ownership of temporary pages. Stale documents must throw here.
       options.commit({

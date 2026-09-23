@@ -27,11 +27,12 @@ export type ImageDensity = {
 };
 
 export function densityFromBytes(bytes: Uint8Array): ImageDensity | null {
-  return pngDensity(bytes) ?? jpegDensity(bytes);
+  return pngDensity(bytes) ?? jpegDensity(bytes) ?? bmpDensity(bytes);
 }
 
 export function normalizeImageDensity(dpi: number | null): number | null {
-  if (dpi === null || dpi < MIN_VALID_DPI || dpi > MAX_VALID_DPI) return null;
+  if (dpi === null || !Number.isFinite(dpi) || dpi < MIN_VALID_DPI || dpi > MAX_VALID_DPI)
+    return null;
   return dpi;
 }
 
@@ -46,6 +47,14 @@ export async function readImageDensity(file: File): Promise<ImageDensity | null>
 
 function viewOf(bytes: Uint8Array): DataView {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
+function bmpDensity(bytes: Uint8Array): ImageDensity | null {
+  if (bytes.length < 54 || bytes[0] !== 0x42 || bytes[1] !== 0x4d) return null;
+  const view = viewOf(bytes);
+  const dibSize = view.getUint32(14, true);
+  if (dibSize < 40 || dibSize + 14 > bytes.length) return null;
+  return normalizedDensity(view.getInt32(38, true) * 0.0254, view.getInt32(42, true) * 0.0254);
 }
 
 // PNG pHYs. Chunks are [len:u32][type:4][data:len][crc:4] after the 8-byte

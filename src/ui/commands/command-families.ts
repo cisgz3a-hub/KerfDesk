@@ -43,7 +43,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'file.import',
       'file',
       'Import...',
-      'Import SVG, DXF, PNG, JPG, or STL artwork',
+      'Import SVG, DXF, PDF/AI, HPGL/PLT, images or STL artwork',
       ctx.importArtwork,
       'Ctrl+I',
     ),
@@ -53,7 +53,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'file.import-image',
       'file',
       'Import Image...',
-      'Import PNG/JPG image',
+      'Import PNG, JPG, BMP, GIF or TIFF image',
       ctx.importImage,
     ),
     enabled(

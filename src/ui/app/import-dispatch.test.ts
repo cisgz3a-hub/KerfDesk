@@ -175,7 +175,22 @@ describe('dispatchImportFilesInOrder', () => {
     await handleUnifiedArtworkImport(platform, ctx);
 
     expect(pickFilesForOpen).toHaveBeenCalledWith({
-      accept: ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'],
+      accept: [
+        '.svg',
+        '.dxf',
+        '.pdf',
+        '.ai',
+        '.hpgl',
+        '.plt',
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.bmp',
+        '.gif',
+        '.tif',
+        '.tiff',
+        '.stl',
+      ],
       multiple: true,
     });
     expect(calls.order).toEqual(['svg:vector.svg', 'image:photo.png']);

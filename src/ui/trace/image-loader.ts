@@ -6,6 +6,7 @@
 // blob and awaits this loader before kicking off tracing.
 
 import type { RawImageData } from '../../core/trace';
+import { freezeGif, isGif } from '../import/freeze-gif';
 
 // Cap on the longest image edge after decode, in pixels. Two competing
 // forces: trace runtime is O(width × height × colors) (imagetracerjs and
@@ -70,6 +71,7 @@ export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
 ): Promise<RawImageData> {
+  if (isGif(file)) file = await freezeGif(file);
   const headerDimensions = await readHeaderImageDimensions(file);
   if (headerDimensions !== null) {
     assertSafeDecodeDimensions(headerDimensions);
@@ -158,6 +160,7 @@ function compositeChannel(value: number | undefined, opacity: number): number {
 export async function readImageNaturalSize(
   file: File,
 ): Promise<{ readonly width: number; readonly height: number }> {
+  if (isGif(file)) file = await freezeGif(file);
   const headerDimensions = await readHeaderImageDimensions(file);
   if (headerDimensions !== null) {
     assertSafeDecodeDimensions(headerDimensions);

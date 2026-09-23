@@ -5,11 +5,28 @@ import { importImageFile } from '../commands/import-image-action';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { importDxfFiles } from './dxf-import-action';
+import { importHpglFile } from './hpgl-import-action';
 import { openGcodeFileInInspector } from './gcode-open-action';
 import { importStlFiles } from './stl-import-action';
 import { importSvgFiles } from './svg-import-action';
+import { requestPagedArtwork } from '../import/request-paged-artwork';
 
-export const ARTWORK_IMPORT_EXTENSIONS = ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'] as const;
+export const ARTWORK_IMPORT_EXTENSIONS = [
+  '.svg',
+  '.dxf',
+  '.pdf',
+  '.ai',
+  '.hpgl',
+  '.plt',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.bmp',
+  '.gif',
+  '.tif',
+  '.tiff',
+  '.stl',
+] as const;
 
 export type ImportDispatchActions = {
   readonly getProjectDocumentEpoch: () => number;
@@ -19,7 +36,7 @@ export type ImportDispatchActions = {
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
 
-type ImportFileKind = 'svg' | 'dxf' | 'image' | 'stl' | 'gcode';
+type ImportFileKind = 'svg' | 'dxf' | 'pdf' | 'tiff' | 'hpgl' | 'image' | 'stl' | 'gcode';
 type RecognizedImportFile = { readonly file: File; readonly kind: ImportFileKind };
 
 /**
@@ -57,7 +74,7 @@ async function dispatchOwnedImportFiles(
       continue;
     }
     try {
-      await dispatchOneFile(file, kind, ownedActions, nextSuccessIndex);
+      await dispatchOneFile(file, kind, ownedActions, nextSuccessIndex, owner);
       if (kind === 'gcode') openedGcode = true;
     } catch (error) {
       ownedActions.pushToast(
@@ -85,7 +102,7 @@ function recognizedImportFiles(
   );
   if (files.length > 0 && recognized.length === 0) {
     actions.pushToast(
-      `${sourceLabel} ignored — no SVG, DXF, image (PNG/JPG), STL, or G-code files in the selection`,
+      `${sourceLabel} ignored — no supported artwork or G-code files in the selection`,
       'warning',
     );
     return null;
@@ -93,7 +110,7 @@ function recognizedImportFiles(
   const ignored = files.length - recognized.length;
   if (ignored > 0) {
     actions.pushToast(
-      `Ignored ${ignored} file(s) — only SVG, DXF, PNG, JPG, STL, and G-code import`,
+      `Ignored ${ignored} unsupported file(s). Import SVG, DXF, PDF, compatible AI, HPGL/PLT, images, STL or G-code.`,
       'warning',
     );
   }
@@ -188,13 +205,30 @@ async function dispatchOneFile(
   kind: ImportFileKind,
   actions: ImportDispatchActions,
   nextSuccessIndex: () => number,
+  owner: ImportDocumentOwner,
 ): Promise<void> {
+  if (kind === 'pdf' || kind === 'tiff') {
+    await requestPagedArtwork(file, kind, owner.isCurrent, (object) => {
+      if (object.kind === 'raster-image') actions.importRasterImage(object, nextSuccessIndex());
+      else actions.importSvgObject(object, nextSuccessIndex());
+      actions.pushToast('Added artwork: ' + file.name, 'success');
+    });
+    return;
+  }
   if (kind === 'svg') {
     await importSvgFiles([file], actions.importSvgObject, actions.pushToast, { nextSuccessIndex });
     return;
   }
   if (kind === 'dxf') {
     await importDxfFiles([file], {
+      importObject: actions.importSvgObject,
+      pushToast: actions.pushToast,
+      nextSuccessIndex,
+    });
+    return;
+  }
+  if (kind === 'hpgl') {
+    await importHpglFile(file, {
       importObject: actions.importSvgObject,
       pushToast: actions.pushToast,
       nextSuccessIndex,
@@ -229,7 +263,7 @@ async function fileFromPlatformHandle(handle: FileHandle): Promise<File> {
     return new File([blob], handle.name, { type: blob.type });
   }
   const kind = importFileKind({ name: handle.name, type: '' });
-  if (kind === 'svg' || kind === 'dxf') {
+  if (kind === 'svg' || kind === 'dxf' || kind === 'hpgl') {
     return new File([await handle.text()], handle.name, { type: 'text/plain' });
   }
   throw new Error('the platform did not provide binary file data');
@@ -237,11 +271,37 @@ async function fileFromPlatformHandle(handle: FileHandle): Promise<File> {
 
 export function importFileKind(file: Pick<File, 'name' | 'type'>): ImportFileKind | null {
   const name = file.name.toLowerCase();
-  if (name.endsWith('.svg')) return 'svg';
-  if (name.endsWith('.dxf')) return 'dxf';
-  if (file.type === 'image/png' || file.type === 'image/jpeg') return 'image';
-  if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image';
-  if (name.endsWith('.stl')) return 'stl';
-  if (name.endsWith('.nc') || name.endsWith('.gcode') || name.endsWith('.tap')) return 'gcode';
-  return null;
+  return (
+    IMPORT_KINDS_BY_EXTENSION[name.slice(name.lastIndexOf('.') + 1)] ??
+    IMPORT_KINDS_BY_MIME[file.type] ??
+    null
+  );
 }
+
+const IMPORT_KINDS_BY_EXTENSION: Readonly<Record<string, ImportFileKind>> = {
+  svg: 'svg',
+  dxf: 'dxf',
+  pdf: 'pdf',
+  ai: 'pdf',
+  hpgl: 'hpgl',
+  plt: 'hpgl',
+  tif: 'tiff',
+  tiff: 'tiff',
+  png: 'image',
+  jpg: 'image',
+  jpeg: 'image',
+  bmp: 'image',
+  gif: 'image',
+  stl: 'stl',
+  nc: 'gcode',
+  gcode: 'gcode',
+  tap: 'gcode',
+};
+const IMPORT_KINDS_BY_MIME: Readonly<Record<string, ImportFileKind>> = {
+  'application/pdf': 'pdf',
+  'image/tiff': 'tiff',
+  'image/png': 'image',
+  'image/jpeg': 'image',
+  'image/bmp': 'image',
+  'image/gif': 'image',
+};
