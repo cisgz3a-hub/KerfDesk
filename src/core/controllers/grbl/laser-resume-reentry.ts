@@ -102,11 +102,12 @@ function invokesModalMotion(words: ReadonlyArray<GcodeWord>): boolean {
   );
 }
 
+/** Inserts the motion word at the start of the line's words, after any leading
+ * whitespace and `N` line number, in the line's own spacing style. */
 function withMotionWord(rawLine: string, motion: Exclude<LaserResumeMotion, null>): string {
-  const start = rawLine.length - rawLine.trimStart().length;
-  const body = rawLine.slice(start);
-  const separator = /\s/.test(stripComments(body).trim()) ? ' ' : '';
-  return `${rawLine.slice(0, start)}${motion}${separator}${body}`;
+  const lead = /^\s*(?:[Nn]\d+\s*)?/.exec(rawLine)?.[0] ?? '';
+  const separator = /\s/.test(stripComments(rawLine).trim()) ? ' ' : '';
+  return `${lead}${motion}${separator}${rawLine.slice(lead.length)}`;
 }
 
 function rewriteReplayLine(

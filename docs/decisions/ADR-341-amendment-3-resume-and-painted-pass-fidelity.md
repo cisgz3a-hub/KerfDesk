@@ -74,6 +74,10 @@ resume builder's output with itself, so they could not see these defects:
    program and its packed motion data alone exceed the 64 MiB archive budget.
 7. **Reconciling an archive-backed Start appends its history record**, an interruption
    at zero acknowledged lines, exactly as a stale active run is promoted.
+   **Recording an interruption the history already holds succeeds.** The tracker
+   records an errored stream when it errors and again when the stream disappears; if
+   the next job's activation cleared the capsule in between, the repeat was refused
+   and surfaced as a false "recovery tracking hit an unexpected error" warning.
 8. **Smaller corrections.** The completion offer opens with focus on its surface and its
    dismiss button reads **Not now**. Abort and the app closing record why KerfDesk stopped
    the stream, tied to that stream's epoch, and are saved as cancellations with truthful

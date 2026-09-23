@@ -452,6 +452,8 @@ test('a recovery review open in another window closes when this window resumes t
   kerfdesk,
 }) => {
   test.setTimeout(180_000);
+  // Window A answers its native recovery confirmations; unanswered ones are dismissed.
+  const refusalsA = collectRefusals(page);
   await connectAndHome(page, kerfdesk);
   const baselineLines = await startHeld(page, kerfdesk);
   await acknowledgeExactly(page, kerfdesk, baselineLines, 2);
@@ -470,6 +472,7 @@ test('a recovery review open in another window closes when this window resumes t
   await expect(reviewB).toBeVisible();
   await page.bringToFront();
   expect((await recoverAndDrain(page, kerfdesk)).length).toBeGreaterThan(0);
+  expect(refusalsA()).toEqual([]);
   // The stale review cannot be started: it closes with the record it showed.
   await other.page.bringToFront();
   await expect(reviewB).toHaveCount(0);

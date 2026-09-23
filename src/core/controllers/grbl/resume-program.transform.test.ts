@@ -80,6 +80,13 @@ describe('laser resume transform 2 (current)', () => {
     expect(resume(compact, 7, 2).lines.slice(-2)).toEqual(['  G1X30S100 ; row end', 'M5']);
   });
 
+  it('keeps a leading line number first', () => {
+    const numbered =
+      'G21\nG90\nM4 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F900 S300\nN6 X20 S200\nN7X30S100\nM5';
+    expect(resume(numbered, 6, 2).lines.slice(-3)).toEqual(['N6 G1 X20 S200', 'N7X30S100', 'M5']);
+    expect(resume(numbered, 7, 2).lines.slice(-2)).toEqual(['N7G1X30S100', 'M5']);
+  });
+
   it('leaves a tail alone when its first movement names its own motion', () => {
     const vector = 'G21\nG90\nM3 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F900 S500\nG1 X10 Y10\nM5';
     expect(resume(vector, 6, 2).lines.slice(-2)).toEqual(['G1 X10 Y10 S500', 'M5']);

@@ -256,7 +256,9 @@ function expectOffersOnlyForSettledRuns(
 }
 
 describe('checkpoint tracker under randomized lifecycles and storage latency', () => {
-  it.each(Array.from({ length: 12 }, (_, index) => 101 + index * 37))(
+  // 32 seeds: a repeated interruption after the next run's activation failed
+  // about one seed in fifty, which twelve seeds rarely reached (ADR-341 Amd 3).
+  it.each(Array.from({ length: 32 }, (_, index) => 101 + index * 37))(
     'seed %i: one terminal per run, completion offered only for settled runs',
     async (seed) => {
       const random = mulberry32(seed);
