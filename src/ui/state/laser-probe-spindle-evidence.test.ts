@@ -68,8 +68,14 @@ async function probeAfterStatus(statusLines: ReadonlyArray<string>): Promise<{
 describe('probe preflight with feed-only (F:) status reports', () => {
   it.each([
     ['an Ov: frame without A:', '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100>'],
-    ['an explicit empty A: (grblHAL after a switch-off)', '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100|A:>'],
-    ['coolant only (M9 leads the probe cycle)', '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100|A:F>'],
+    [
+      'an explicit empty A: (grblHAL after a switch-off)',
+      '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100|A:>',
+    ],
+    [
+      'coolant only (M9 leads the probe cycle)',
+      '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100|A:F>',
+    ],
   ])('starts the probe cycle when %s proves the spindle off', async (_label, proof) => {
     const { writes, outcome } = await probeAfterStatus([
       proof,
@@ -84,7 +90,10 @@ describe('probe preflight with feed-only (F:) status reports', () => {
       '<Idle|MPos:0.000,0.000,5.000|F:0|Ov:100,100,100|A:S>',
       '<Idle|MPos:0.000,0.000,5.000|F:0>',
     ]);
-    expect(outcome).toEqual({ kind: 'preflight-failed', reason: 'Spindle must be off before probing.' });
+    expect(outcome).toEqual({
+      kind: 'preflight-failed',
+      reason: 'Spindle must be off before probing.',
+    });
     expect(writes).toEqual([]);
   });
 
@@ -102,7 +111,10 @@ describe('probe preflight with feed-only (F:) status reports', () => {
       '<Idle|MPos:0.000,0.000,5.000|FS:0,0|Ov:100,100,100>',
       '<Idle|MPos:0.000,0.000,5.000|FS:0,12000>',
     ]);
-    expect(outcome).toEqual({ kind: 'preflight-failed', reason: 'Spindle must be off before probing.' });
+    expect(outcome).toEqual({
+      kind: 'preflight-failed',
+      reason: 'Spindle must be off before probing.',
+    });
     expect(writes).toEqual([]);
   });
 });

@@ -56,84 +56,123 @@ export function runGrblLines(
 }
 
 export function executeGrblLine(model: GrblLaserPowerModel, raw: string): void {
-  const line = raw
-    .replace(/\([^)]*\)/g, '')
-    .replace(/;.*$/, '')
-    .trim()
-    .toUpperCase();
-  if (line === '' || line.startsWith('$')) return;
+  const line = parserLine(raw);
+  if (line === null) return;
   const block = parseBlock(model, line);
   const blockFeed = block.feed ?? model.feed;
-  const axisCommandIsMotion =
-    block.explicitMotion || (block.axisWords && !block.nonModalAxisCommand);
+  const axisCommandIsMotion = isAxisMotionCommand(block);
   if (axisCommandIsMotion && LASERCUT_MODES.includes(block.motion) && blockFeed === 0) {
     model.errors.push(`error:22 on "${raw.trim()}"`);
     return;
   }
   const flags = laserFlags(model, block, axisCommandIsMotion);
-  const blockSpeed = block.speed ?? model.speed;
   model.feed = blockFeed;
-  // [4. Set spindle speed]
-  if (model.speed !== blockSpeed || flags.forceSync) {
-    if (model.spindle !== 'off' && !flags.isMotion) {
-      model.beam = commandedPower(model, model.spindle, flags.laserDisable ? 0 : blockSpeed);
-    }
-    model.speed = blockSpeed;
-  }
+  applySpindleSpeed(model, block.speed ?? model.speed, flags);
   const plannerSpeed = flags.laserDisable ? 0 : model.speed;
-  // [7. Spindle control]
-  const blockSpindle = block.spindle ?? model.spindle;
-  if (model.spindle !== blockSpindle) {
-    model.beam = commandedPower(model, blockSpindle, plannerSpeed);
-    model.spindle = blockSpindle;
-  }
+  applySpindleControl(model, block.spindle ?? model.spindle, plannerSpeed);
+  applyMotionAndProgramEnd(model, block, flags.isMotion, plannerSpeed);
+}
+
+/** The block the g-code parser sees, or null for a blank or `$` line. */
+function parserLine(raw: string): string | null {
+  const line = raw
+    .replace(/\([^)]*\)/g, '')
+    .replace(/;.*$/, '')
+    .trim()
+    .toUpperCase();
+  return line === '' || line.startsWith('$') ? null : line;
+}
+
+function isAxisMotionCommand(block: ParsedBlock): boolean {
+  return block.explicitMotion || (block.axisWords && !block.nonModalAxisCommand);
+}
+
+function applyMotionAndProgramEnd(
+  model: GrblLaserPowerModel,
+  block: ParsedBlock,
+  isMotion: boolean,
+  plannerSpeed: number,
+): void {
   model.motion = block.motion;
-  if (flags.isMotion) model.beam = commandedPower(model, model.spindle, plannerSpeed);
-  if (block.programEnd) {
-    model.motion = 'G1';
-    model.spindle = 'off';
-    model.beam = 0;
+  if (isMotion) model.beam = commandedPower(model, model.spindle, plannerSpeed);
+  if (!block.programEnd) return;
+  model.motion = 'G1';
+  model.spindle = 'off';
+  model.beam = 0;
+}
+
+type LaserFlags = ReturnType<typeof laserFlags>;
+
+// gc_execute_line [4. Set spindle speed].
+function applySpindleSpeed(
+  model: GrblLaserPowerModel,
+  blockSpeed: number,
+  flags: LaserFlags,
+): void {
+  if (model.speed === blockSpeed && !flags.forceSync) return;
+  if (model.spindle !== 'off' && !flags.isMotion) {
+    model.beam = commandedPower(model, model.spindle, flags.laserDisable ? 0 : blockSpeed);
+  }
+  model.speed = blockSpeed;
+}
+
+// gc_execute_line [7. Spindle control].
+function applySpindleControl(
+  model: GrblLaserPowerModel,
+  blockSpindle: SpindleMode,
+  plannerSpeed: number,
+): void {
+  if (model.spindle === blockSpindle) return;
+  model.beam = commandedPower(model, blockSpindle, plannerSpeed);
+  model.spindle = blockSpindle;
+}
+
+type MutableBlock = { -readonly [K in keyof ParsedBlock]: ParsedBlock[K] };
+
+function parseBlock(model: GrblLaserPowerModel, line: string): ParsedBlock {
+  const block: MutableBlock = {
+    motion: model.motion,
+    explicitMotion: false,
+    axisWords: false,
+    nonModalAxisCommand: false,
+    speed: undefined,
+    feed: undefined,
+    spindle: undefined,
+    programEnd: false,
+  };
+  for (const word of line.match(/[A-Z][-+]?[0-9.]+/g) ?? []) {
+    applyWord(block, word[0] ?? '', Number(word.slice(1)));
+  }
+  return block;
+}
+
+function applyWord(block: MutableBlock, letter: string, value: number): void {
+  if (letter === 'G') applyGWord(block, value);
+  else if (letter === 'M') applyMWord(block, value);
+  else if (letter === 'S') block.speed = value;
+  else if (letter === 'F') block.feed = value;
+  else if ('XYZABC'.includes(letter)) block.axisWords = true;
+}
+
+function applyGWord(block: MutableBlock, value: number): void {
+  if (value === 0 || value === 1 || value === 2 || value === 3) {
+    block.motion = `G${value}` as GrblMotionMode;
+    block.explicitMotion = true;
+  } else if (Math.floor(value) === 38) {
+    block.motion = 'G38';
+    block.explicitMotion = true;
+  } else if (value === 80) {
+    block.motion = 'G80';
+  } else if ([10, 28, 30, 92].includes(Math.floor(value))) {
+    block.nonModalAxisCommand = true;
   }
 }
 
-function parseBlock(model: GrblLaserPowerModel, line: string): ParsedBlock {
-  let motion = model.motion;
-  let explicitMotion = false;
-  let axisWords = false;
-  let nonModalAxisCommand = false;
-  let speed: number | undefined;
-  let feed: number | undefined;
-  let spindle: SpindleMode | undefined;
-  let programEnd = false;
-  for (const word of line.match(/[A-Z][-+]?[0-9.]+/g) ?? []) {
-    const letter = word[0] ?? '';
-    const value = Number(word.slice(1));
-    if (letter === 'G') {
-      if (value === 0 || value === 1 || value === 2 || value === 3) {
-        motion = `G${value}` as GrblMotionMode;
-        explicitMotion = true;
-      } else if (Math.floor(value) === 38) {
-        motion = 'G38';
-        explicitMotion = true;
-      } else if (value === 80) {
-        motion = 'G80';
-      } else if ([10, 28, 30, 92].includes(Math.floor(value))) {
-        nonModalAxisCommand = true;
-      }
-    } else if (letter === 'M') {
-      if (value === 3) spindle = 'cw';
-      else if (value === 4) spindle = 'ccw';
-      else if (value === 5) spindle = 'off';
-      else if (value === 2 || value === 30) programEnd = true;
-    } else if (letter === 'S') {
-      speed = value;
-    } else if (letter === 'F') {
-      feed = value;
-    } else if ('XYZABC'.includes(letter)) {
-      axisWords = true;
-    }
-  }
-  return { motion, explicitMotion, axisWords, nonModalAxisCommand, speed, feed, spindle, programEnd };
+function applyMWord(block: MutableBlock, value: number): void {
+  if (value === 3) block.spindle = 'cw';
+  else if (value === 4) block.spindle = 'ccw';
+  else if (value === 5) block.spindle = 'off';
+  else if (value === 2 || value === 30) block.programEnd = true;
 }
 
 function laserFlags(

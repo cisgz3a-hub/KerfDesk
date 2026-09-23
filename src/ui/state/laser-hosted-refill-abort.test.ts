@@ -153,7 +153,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  const closing = useLaserStore.getState().disconnect().catch(() => undefined);
+  const closing = useLaserStore
+    .getState()
+    .disconnect()
+    .catch(() => undefined);
   await vi.advanceTimersByTimeAsync(5_000);
   await closing;
   vi.useRealTimers();

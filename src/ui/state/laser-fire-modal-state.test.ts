@@ -62,7 +62,10 @@ function useProfile(device: DeviceProfile): void {
   });
 }
 
-async function fireBytes(active: boolean, from: LaserState): Promise<{
+async function fireBytes(
+  active: boolean,
+  from: LaserState,
+): Promise<{
   readonly bytes: string;
   readonly state: LaserState;
 }> {
@@ -143,7 +146,10 @@ describe('momentary Fire and the GRBL laser-mode modal state', () => {
 
   it('lights the beam right after a completed Falcon job, whose park leaves G0 modal', async () => {
     useProfile(FALCON_A1_PRO_GRBLHAL_PROFILE);
-    const model = runGrblLines(powerUpGrbl(true), grblStrategy.emit(JOB, FALCON_A1_PRO_GRBLHAL_PROFILE));
+    const model = runGrblLines(
+      powerUpGrbl(true),
+      grblStrategy.emit(JOB, FALCON_A1_PRO_GRBLHAL_PROFILE),
+    );
     expect(model.motion).toBe('G0');
 
     await pressFire(model);
@@ -171,7 +177,10 @@ describe('momentary Fire and the GRBL laser-mode modal state', () => {
     const model = powerUpGrbl(true);
     runGrblLines(model, driver.commands.buildJog({ dx: 5, feed: 1000 }));
     runGrblLines(model, driver.commands.frameToolOffLines);
-    runGrblLines(model, driver.commands.buildFrameLines({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000));
+    runGrblLines(
+      model,
+      driver.commands.buildFrameLines({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000),
+    );
 
     await pressFire(model);
 

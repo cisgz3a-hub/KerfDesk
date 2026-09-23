@@ -105,7 +105,8 @@ export function trackControllerDoorHold(
         at: now(),
       };
     },
-    isHeld: () => latest !== null && latest.held && now() - latest.at <= DOOR_HOLD_REPORT_MAX_AGE_MS,
+    isHeld: () =>
+      latest !== null && latest.held && now() - latest.at <= DOOR_HOLD_REPORT_MAX_AGE_MS,
   };
 }
 

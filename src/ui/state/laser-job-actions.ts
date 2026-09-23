@@ -251,6 +251,25 @@ async function prepareStartBoundary(
   return effectiveOptions;
 }
 
+// Web Serial can deliver the commanded boot banner before write() settles.
+// That observed reset boundary is stronger evidence than the stale transport
+// promise; only rethrow when no reboot was observed. A port that closed under
+// the write proves nothing was delivered.
+async function settleResetWrite(
+  context: JobActionContext,
+  resetWrite: Promise<void>,
+  resetWriteEpoch: number,
+): Promise<void> {
+  try {
+    await resetWrite;
+  } catch (error) {
+    const portClosed = context.refs.connection == null;
+    if (!portClosed && (context.refs.writeEpoch ?? 0) > resetWriteEpoch) return;
+    if (portClosed) context.set({ safetyNotice: writeFailedNotice('stop') });
+    throw error;
+  }
+}
+
 async function runStopJob(context: JobActionContext, reason?: JobStopReason): Promise<void> {
   const { set, get, refs, safeWrite, driver } = context;
   const softReset = driver().realtime.softReset;
@@ -287,19 +306,7 @@ async function runStopJob(context: JobActionContext, reason?: JobStopReason): Pr
     const resetWrite = safeWrite(softReset, 'stop');
     void resetWrite.catch(() => undefined);
     await releaseHostedRefill(refs);
-    try {
-      await resetWrite;
-    } catch (error) {
-      // Web Serial can deliver the commanded boot banner before write()
-      // settles. That observed reset boundary is stronger evidence than the
-      // stale transport promise; only rethrow when no reboot was observed. A
-      // port that closed under the write proves nothing was delivered.
-      const portClosed = refs.connection == null;
-      if (portClosed || (refs.writeEpoch ?? 0) <= resetWriteEpoch) {
-        if (portClosed) set({ safetyNotice: writeFailedNotice('stop') });
-        throw error;
-      }
-    }
+    await settleResetWrite(context, resetWrite, resetWriteEpoch);
   }
   if (softReset === null) {
     // Marlin-style controllers have no realtime planner reset. M5/M107 are
