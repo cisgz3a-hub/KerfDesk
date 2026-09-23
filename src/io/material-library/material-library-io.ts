@@ -15,9 +15,14 @@ import {
   parsePresetMatchMetadata,
   type MaterialPresetMatchMetadata,
 } from './material-preset-metadata';
+import {
+  canonicalProcessRecipe,
+  type ProcessRecipe,
+} from '../../core/material-library/process-recipe';
+import { parseProcessRecipes } from './process-recipe-io';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
-export const MATERIAL_LIBRARY_SCHEMA_VERSION = 1;
+export const MATERIAL_LIBRARY_SCHEMA_VERSION = 2;
 
 export { createMaterialLibraryDeviceHint };
 export type { MaterialLibraryDeviceHint };
@@ -50,6 +55,7 @@ export type MaterialLibraryDocument = {
   readonly name: string;
   readonly deviceHint?: MaterialLibraryDeviceHint;
   readonly entries: ReadonlyArray<MaterialPreset>;
+  readonly processRecipes?: ReadonlyArray<ProcessRecipe>;
 };
 
 export type DeserializeMaterialLibraryResult =
@@ -96,9 +102,11 @@ export function deserializeMaterialLibraryValue(raw: unknown): DeserializeMateri
   if (version > MATERIAL_LIBRARY_SCHEMA_VERSION) {
     return { kind: 'schema-too-new', sawVersion: version };
   }
-  if (version < MATERIAL_LIBRARY_SCHEMA_VERSION) {
+  if (version < 1) {
     return { kind: 'schema-too-old', sawVersion: version };
   }
+  if (!Number.isInteger(version))
+    return { kind: 'invalid', reason: 'librarySchemaVersion must be an integer' };
 
   return parseCurrentLibrary(raw);
 }
@@ -120,8 +128,21 @@ export function mergeMaterialLibraries(
     appended.push(entry);
   }
 
+  const recipes = [...(base.processRecipes ?? [])];
+  const recipeIds = new Set(recipes.map((recipe) => recipe.id));
+  for (const recipe of incoming.processRecipes ?? []) {
+    if (recipeIds.has(recipe.id)) skippedDuplicateIds.push(recipe.id);
+    else {
+      recipeIds.add(recipe.id);
+      recipes.push(recipe);
+    }
+  }
   return {
-    library: canonicalLibrary({ ...base, entries: [...base.entries, ...appended] }),
+    library: canonicalLibrary({
+      ...base,
+      entries: [...base.entries, ...appended],
+      processRecipes: recipes,
+    }),
     skippedDuplicateIds,
   };
 }
@@ -150,6 +171,8 @@ function parseCurrentLibrary(raw: Record<string, unknown>): DeserializeMaterialL
   if (entryResult.kind === 'invalid') {
     return entryResult;
   }
+  const recipes = parseProcessRecipes(raw['processRecipes']);
+  if (recipes.kind === 'invalid') return recipes;
 
   return {
     kind: 'ok',
@@ -162,6 +185,7 @@ function parseCurrentLibrary(raw: Record<string, unknown>): DeserializeMaterialL
         ? { deviceHint: deviceHintResult.deviceHint }
         : {}),
       entries: entryResult.entries,
+      ...(recipes.value.length === 0 ? {} : { processRecipes: recipes.value }),
     }),
   };
 }
@@ -292,6 +316,7 @@ function parseThickness(
 }
 
 function canonicalLibrary(document: MaterialLibraryDocument): MaterialLibraryDocument {
+  const processRecipes = document.processRecipes ?? [];
   return {
     format: MATERIAL_LIBRARY_FORMAT,
     librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
@@ -301,6 +326,9 @@ function canonicalLibrary(document: MaterialLibraryDocument): MaterialLibraryDoc
       ? { deviceHint: canonicalDeviceHint(document.deviceHint) }
       : {}),
     entries: document.entries.map(canonicalPreset),
+    ...(processRecipes.length === 0
+      ? {}
+      : { processRecipes: processRecipes.map(canonicalProcessRecipe) }),
   };
 }
 

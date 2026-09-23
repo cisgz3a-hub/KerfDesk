@@ -22,9 +22,7 @@ export function CutsLayersPanel(): JSX.Element {
   const setView = useUiStore((s) => s.setCutsLayersView);
   const layers = useStore((s) => s.project.scene.layers);
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
-  const showMaterialLibrary = machineKind === 'laser';
-  const activeView =
-    !showMaterialLibrary && requestedView === 'materials' ? 'layers' : requestedView;
+  const activeView = requestedView;
   if (!panelVisible) {
     return (
       <CollapsedRail
@@ -51,7 +49,8 @@ export function CutsLayersPanel(): JSX.Element {
       </header>
       <ArtworkPanelTabs
         active={activeView}
-        showMaterials={showMaterialLibrary}
+        showMaterials={true}
+        materialsLabel={machineKind === 'cnc' ? 'Recipes' : 'Materials'}
         onSelect={setView}
       />
       <div

@@ -14,9 +14,13 @@ const VIEWS: ReadonlyArray<{
 export function ArtworkPanelTabs(props: {
   readonly active: CutsLayersView;
   readonly showMaterials: boolean;
+  readonly materialsLabel?: string;
   readonly onSelect: (view: CutsLayersView) => void;
 }): JSX.Element {
-  const views = VIEWS.filter((view) => props.showMaterials || view.id !== 'materials');
+  const views = VIEWS.filter((view) => props.showMaterials || view.id !== 'materials').map(
+    (view) =>
+      view.id === 'materials' ? { ...view, label: props.materialsLabel ?? view.label } : view,
+  );
   return (
     <div role="tablist" aria-label="Artwork panel view" className="lf-artwork-view-tabs">
       {views.map((view, index) => (

@@ -81,7 +81,7 @@ import {
   savedLibrariesActions,
   type SavedLibrariesActions,
 } from './saved-libraries-actions';
-import { materialPresetActions, type MaterialPresetActions } from './material-preset-actions';
+import { libraryActions, type LibraryActions } from './material-library-store-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { operationActions, type OperationActions } from './operation-actions';
 import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
@@ -179,7 +179,7 @@ export type AppState = ObjectPropertiesActions &
   MaterialLibraryActions &
   ReturnType<typeof currentSavedLibrariesState> &
   SavedLibrariesActions &
-  MaterialPresetActions &
+  LibraryActions &
   CncLibrarySlice &
   CncLiveCapsState &
   CncLiveCapsActions &
@@ -454,7 +454,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),
   ...savedLibrariesActions(set, get),
-  ...materialPresetActions(set),
+  ...libraryActions(set),
   ...objectPropertiesActions(set),
   ...operationActions(set),
   ...artworkOrderActions(set),
