@@ -48,8 +48,8 @@ import {
   pushLog,
   setupCommandBlockMessage,
   toolChangeContinueBlockMessage,
-  toolChangeHoldEntryPatch,
 } from './laser-store-helpers';
+import { steppedStreamerPatch } from './tool-change-hold-entry';
 import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
 import { effectiveStartStreamOptions } from './laser-job-effective-stream-options';
@@ -150,8 +150,17 @@ async function runStartJob(
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
+    // Seed this run's tool queue first: a short first section can reach its M0
+    // synchronously, and the shared hold entry then consumes the queue head.
+    const toolQueue = {
+      toolChangeLabels: labels,
+      toolChangeToolIds: toolIds,
+      pendingToolLabel: null,
+      pendingToolId: null,
+    };
     set((state) => ({
-      streamer: stepped.state,
+      ...toolQueue,
+      ...steppedStreamerPatch({ ...state, ...toolQueue }, null, stepped.state),
       streamerEpoch: writeOwner.streamerEpoch,
       activeRunId: options.runId ?? null,
       ...liveCanvasStartPatch(
@@ -164,11 +173,6 @@ async function runStartJob(
       ),
       accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
       activeJobMachineKind: options.machineKind ?? 'laser',
-      toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
-      toolChangeToolIds: entersHoldNow ? toolIds.slice(1) : toolIds,
-      pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
-      pendingToolId: entersHoldNow ? (toolIds[0] ?? null) : null,
-      ...toolChangeEntryPatch(state, entersHoldNow),
     }));
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
@@ -357,18 +361,6 @@ export function countToolChangeBoundaries(gcode: string): number {
   return gcode.split('\n').filter(isToolChangeLine).length;
 }
 
-function toolChangeEntryPatch(state: LaserState, entersHoldNow: boolean): Partial<LaserState> {
-  // A short first tool section can reach M0 synchronously, before the ack path
-  // sees a transition. Invalidate the old tool's Z evidence here too.
-  return entersHoldNow
-    ? {
-        workZZeroEvidence: null,
-        workZReferenceEpoch: state.workZReferenceEpoch + 1,
-        toolChangeIdleSeen: false,
-      }
-    : {};
-}
-
 function assertStartAllowed(set: SetFn, get: GetFn, allowStartArming = false): void {
   const state = get();
   assertAutofocusIdle(state);
@@ -435,22 +427,14 @@ async function runContinueToolChange(
   let toSend = '';
   set((s) => {
     if (s.streamer === null) return s;
-    const stepped = step(continueToolChangeStreamer(s.streamer));
+    const continued = continueToolChangeStreamer(s.streamer);
+    const stepped = step(continued);
     toSend = stepped.toSend;
     // Continuing always consumes the current M0, so a resulting 'tool-change'
-    // status is a NEW hold reached within this single fill. The ack-path
-    // transition patch never sees it (status was already 'tool-change'), so the
-    // prior tool's Z evidence, the stale toolChangeIdleSeen, and the tool label
-    // would carry into the next hold — apply the shared entry patch here (F22).
-    const enteredNextHold = stepped.state.status === 'tool-change';
-    return {
-      streamer: stepped.state,
-      ...(enteredNextHold
-        ? {
-            ...toolChangeHoldEntryPatch(s),
-          }
-        : {}),
-    };
+    // status is a NEW hold reached within this single fill. The ack path never
+    // sees it (status was already 'tool-change'), so the shared entry patch
+    // applies here (F22).
+    return steppedStreamerPatch(s, continued, stepped.state);
   });
   if (toSend.length > 0) {
     const writeOwner = streamWriteOwner(get());

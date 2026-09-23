@@ -10,11 +10,8 @@ import {
 } from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import type { LaserState } from './laser-store';
-import {
-  hasUnsettledStreamAcks,
-  streamerCanPauseForMpg,
-  toolChangeHoldEntryPatch,
-} from './laser-store-helpers';
+import { hasUnsettledStreamAcks, streamerCanPauseForMpg } from './laser-store-helpers';
+import { steppedStreamerPatch } from './tool-change-hold-entry';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import {
@@ -106,22 +103,16 @@ export function advanceStreamBy(
   if (s === null) return count;
   const writeOwner = streamWriteOwner(get());
   const stepped = stepAcks(s, ack, count, get().mpgActive === true);
-  const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
   const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
+  // An ack refill that reaches an M0 enters the tool-change hold: the shared
+  // patch voids the previous bit's Z0, re-arms the fresh-Idle latch and names
+  // the incoming bit in the same update (ADR-171, Codex audit P1, R5).
+  // stepAcks stops at the first status change, so comparing with the streamer
+  // the batch started from detects exactly the step that entered the hold.
   set((state) => ({
-    streamer: stepped.state,
+    ...steppedStreamerPatch(state, s, stepped.state),
     ...(stepped.state.status === 'errored' ? liveCanvasLifecyclePatch(state, 'errored') : {}),
   }));
-  // Entering a tool-change hold means a new bit is going in: the previous bit's
-  // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
-  // (the setup gate allows it during the hold). Invalidate so the no-work-zero
-  // advisory is honest again until they do (Codex audit P1).
-  if (enteredToolChange) {
-    // New bit going in: void the prior Z0, require a FRESH Idle before the setup
-    // gate / Continue unlock, and consume the next tool label so the pause UI can
-    // name the bit (R5). Shared with the Continue entry site (F22).
-    set((state) => toolChangeHoldEntryPatch(state));
-  }
   if (finishedStreaming) {
     beginPostJobSettle(set, get, refs, safeWrite);
   }
