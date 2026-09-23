@@ -58,13 +58,13 @@ Simulator verification is not a weak substitute — `src/__fixtures__/controller
 firmware simulators driving the **real** laser-store (`PROJECT.md:225-226`). What it cannot prove is
 timing, electrical behavior, or firmware quirks.
 
-**ADR-157** (`:7793`) reconciles detected firmware, streaming mode, receive window, output dialect,
-active driver, and Start readiness through one fail-closed policy, and **refuses cross-family profile
-selection after detection**.
+**ADR-157** (`:7793`) reconciles detected firmware, streaming mode, receive window, output dialect and
+active driver, and **refuses cross-family profile selection after detection**. Its Start refusal was
+deleted by ADR-228 (`:10550`); a completed Frame is the sole ordinary Start gate (`PROJECT.md:248-249`).
 
 ## Character-counted streaming
 
-`src/core/controllers/grbl/streamer.ts` (395 lines) is a **pure state machine** — it never touches the
+`src/core/controllers/grbl/streamer.ts` (394 lines) is a **pure state machine** — it never touches the
 port. It answers "what should I send next?"; the platform adapter does byte I/O and feeds responses
 back via `onAck` (`streamer.ts:14-17`).
 

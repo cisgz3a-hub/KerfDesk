@@ -35,9 +35,9 @@ seeds, path counts, invariant predicates. It does not prove **fidelity**: that a
 or a V-carve actually *looks* like the source. Output can be geometrically wrong and still pass
 everything. No machine is qualified, and passing software tests does not qualify one (see ADR-322
 in [`DECISIONS.md`](DECISIONS.md) and the
-[correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)). There is
-currently no machine available to this project for verification, so treat every unproven row above
-as unproven rather than pending.
+[correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md)). Informal use is
+not verification, and there is currently no machine available to this project for verification, so
+treat every hardware row above as unproven rather than pending.
 
 **Check your output in an independent G-code viewer before running it, keep the work area clear,
 and stay at the machine.** The in-app Abort is a software stop, not a safety-rated E-stop —

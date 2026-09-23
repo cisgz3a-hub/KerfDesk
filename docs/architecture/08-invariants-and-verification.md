@@ -8,18 +8,18 @@ From `PROJECT.md:418-428`, with the actual enforcement mechanism for each:
 
 | # | Invariant | Enforced by | Kind |
 |---|---|---|---|
-| 1 | **Bounds check** — paths fit the configured bed | `findOutOfBoundsCoords` (`predicates.ts:88`) + arc bulge check (line 141) | Property test, 100 seeds |
+| 1 | **Bounds check** — paths fit the configured bed | `findOutOfBoundsCoords` (`predicates.ts:91`) + arc bulge check (line 159) | Property test, 100 seeds |
 | 2 | **Origin honesty** — output matches profile origin | `toMachineCoords` (`origin-transform.ts:21`) | Unit + review |
 | 3 | **Laser-off on travel** | `findLaserOnTravelIssues` (`predicates.ts:54`) | Property test, 100 seeds |
 | 4 | **No partial output** | `core/preflight/pre-emit.ts` — failure writes nothing, sends nothing | Unit |
 | 5 | **Deterministic G-code** — byte-identical | Vitest snapshots + fuzz over 100 seeds | Snapshot + property |
 | 6 | **Units honest** — mm internally | Inches converted only at the import boundary | Review |
-| 7 | **Power scale honest** — `S` matches `$30` | `expectedS` (`predicates.ts:187`), tested at `$30 ∈ {100,255,1000}` | Property test |
+| 7 | **Power scale honest** — `S` matches `$30` | `expectedS` (`predicates.ts:206`), tested at `$30 ∈ {100,255,1000}` | Property test |
 | 8 | **No telemetry** | Two narrow desktop-only release checks permitted (ADR-024/135, ADR-249) | Review + CSP |
 | 9 | **Abort reachable always** | No modal may block it | Review |
 
 CNC adds its own, outside the numbered list: **Z up on travel**, via `findPlungedTravelIssues` and
-`findSpindleStartClearanceIssues` (`core/invariants/cnc-motion.ts:20`, `:48`).
+`findSpindleStartClearanceIssues` (`core/invariants/cnc-motion.ts:23`, `:55`).
 
 **Non-negotiable #9 carries an explicit honesty caveat** (`PROJECT.md:428`): the software Abort /
 Controller Reset *is not a safety-rated E-stop*. Dangerous conditions require the machine's physical
@@ -34,7 +34,7 @@ consequences, both deliberate (`predicates.ts:1-11`):
    sent.
 2. The predicates are liberal about formatting — comments stripped, blanks skipped, trailing whitespace
    tolerated — so they can validate G-code from **external tools** too, not just our own emitters. That
-   is what makes the imported-`.nc` and standalone-generator checks possible (`cnc-motion.ts:44-47`).
+   is what makes the imported-`.nc` and standalone-generator checks possible (`cnc-motion.ts:51-54`).
 
 ## What the suite actually asserts
 
@@ -56,9 +56,10 @@ strength of a green suite.
 **ADR-025** (`DECISIONS.md:1081`) added `src/__fixtures__/perceptual/`, which renders trace output and
 diffs it against analytic ground-truth masks via **IoU** (intersection over union).
 
-It has a known, documented blind spot. `PROJECT.md:150` records it: imagetracerjs is outline-only, so a
-single pen stroke becomes two parallel contours — and **closing that outline-vs-centerline gap is not
-caught by the IoU harness.** Project memory puts it more bluntly: *IoU is blind to waviness → trust
+It has a known, documented blind spot. `PROJECT.md:150` records it (2026-05-29, when imagetracerjs was
+the tracer): an outline-only trace turns a single pen stroke into two parallel contours, and **that
+outline-vs-centerline gap is not caught by the IoU harness.** The in-house centerline engine has since
+shipped (`PROJECT.md:141`, ADR-123); the IoU blind spot still stands. Project memory puts it more bluntly: *IoU is blind to waviness → trust
 rendered PNGs.* A wobbly curve and a clean curve can score nearly identically on IoU while looking
 obviously different.
 
@@ -117,9 +118,9 @@ check on the program text, **not a photograph** — so it does not discharge the
 | ADR-094 driver refactor byte-identity | **NOT QUALIFIED** on hardware — the earlier claim rested on the withdrawn Falcon verification claim |
 | FluidNC / Marlin / Smoothieware | Simulator only |
 | Ruida `.rd` | Encode→decode round-trip proven; **never accepted by real hardware** |
-| Laser F.2 raster burn | **PENDING** — never burned on the Falcon |
-| Laser F.3 set-work-origin | **PENDING** |
-| All CNC Phase H | **CLAIMED** — code + tests landed, no hardware pass |
+| Laser F.2 raster burn | **NOT QUALIFIED** — WORKFLOW F-F2 checklist not completed; an informal image/fill job on the Falcon (ADR-341) and a photo engraving on the 4040 (ADR-235) are not qualification |
+| Laser F.3 set-work-origin | **NOT QUALIFIED** — code shipped; WORKFLOW F-F3 checklist not completed |
+| All CNC Phase H | **NOT QUALIFIED** — code + tests, plus informal cuts on a Neotronics 4040 (ADR-111) |
 | Phase K box fit | **CLAIMED** — no box has been cut and assembled |
 | Desktop Preview launch/install | **CLAIMED** until real-OS verification |
 
