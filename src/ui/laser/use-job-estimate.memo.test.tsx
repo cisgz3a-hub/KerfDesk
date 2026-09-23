@@ -2,7 +2,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import type * as LiveJobEstimateModule from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
 
@@ -68,6 +70,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   act(() => useStore.getState().newProject());
+  act(() => useLaserStore.setState({ statusReport: null }));
   vi.useRealTimers();
 });
 
@@ -94,4 +97,40 @@ describe('useJobEstimate memoization', () => {
     });
     expect(spies.estimateLiveJob.mock.calls.length - mountCalls).toBe(1);
   });
+
+  it('reuses a recent head position but does not keep one estimate per position', () => {
+    act(() => {
+      useStore.getState().setProject(lineProject());
+    });
+    act(() => {
+      root.render(<Probe />);
+    });
+    const settleHeadAt = (x: number): void => {
+      act(() => {
+        useLaserStore.setState({ statusReport: idleAt(x) });
+      });
+      act(() => {
+        vi.advanceTimersByTime(JOB_ESTIMATE_DEBOUNCE_MS + 1);
+      });
+    };
+    for (const x of [0, 10, 20, 30, 40]) settleHeadAt(x);
+    const calls = spies.estimateLiveJob.mock.calls.length;
+
+    settleHeadAt(30);
+    expect(spies.estimateLiveJob.mock.calls.length).toBe(calls);
+    settleHeadAt(0);
+    expect(spies.estimateLiveJob.mock.calls.length).toBe(calls + 1);
+  });
 });
+
+function idleAt(x: number): StatusReport {
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x, y: 0, z: 0 },
+    wPos: null,
+    feed: 0,
+    spindle: 0,
+    wco: null,
+  };
+}

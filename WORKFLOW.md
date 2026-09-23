@@ -1243,14 +1243,16 @@ link; it does not claim that bytes can cross a cable that is already physically 
 The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state,
 and the Machine rail may retain its detailed progress bar. Both update whenever the streamer
 advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
-reconciliation; it is not presented as elapsed-time or remaining-time progress.
+reconciliation (and, less a 4,096-block planner window, its floor; ADR-352); it is not presented as
+elapsed-time or remaining-time progress.
 
 Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
 and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
 head position contributes approach time in every placement mode. That position is sampled only
 while the head is settled — an Idle report with no Frame, jog, probe, autofocus, streamed job or
 MPG motion — and the last settled sample holds while it moves, so Frame and jog motion never
-re-prepare the estimate. Job Review reuses the prepared
+re-prepare the estimate. While a job runs (outside Preview) or a Frame is still preparing, the
+estimate keeps its last value and settles once afterwards (ADR-352). Job Review reuses the prepared
 program's timing baseline when available, and Start retains the same cut/travel calibration.
 The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
 and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and

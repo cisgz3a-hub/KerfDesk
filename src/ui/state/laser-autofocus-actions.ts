@@ -8,6 +8,7 @@ import {
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -103,7 +104,7 @@ function autofocusBlockMessage(state: LaserState, refs: LiveRefs): string | null
   if (state.autofocusBusy) return 'Auto-focus is already running.';
   if (
     state.pendingUntrackedAcks > 0 ||
-    (state.pendingTransportWrites ?? 0) > 0 ||
+    pendingTransportWriteCount(state) > 0 ||
     refs.controllerCommand !== null ||
     refs.controllerIdleWait !== null ||
     refs.controllerStatusWait != null

@@ -12,6 +12,7 @@ import {
   publishCancelFailure,
   type CancelContext,
 } from './laser-motion-cancel-context';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
@@ -100,7 +101,7 @@ async function waitForCancelledMotionQueue(
 function motionQueueSettled(state: LaserState): boolean {
   return (
     state.pendingUntrackedAcks === 0 &&
-    (state.pendingTransportWrites ?? 0) === 0 &&
+    pendingTransportWriteCount(state) === 0 &&
     (state.motionOperation?.pendingMotionTransportWrites ?? 0) === 0
   );
 }
