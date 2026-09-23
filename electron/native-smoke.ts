@@ -2,6 +2,7 @@ import type { App, BrowserWindow } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { createNativeSmokeTerminalClaim } from './native-smoke-terminal-claim.js';
+import { RENDERER_SMOKE_SOURCE } from './native-smoke-renderer.js';
 
 const USER_DATA_ARG = '--kerfdesk-native-smoke-user-data=';
 const RESULT_ARG = '--kerfdesk-native-smoke-result=';
@@ -107,60 +108,3 @@ function argumentValue(argv: ReadonlyArray<string>, prefix: string): string | nu
   const value = argv.find((arg) => arg.startsWith(prefix));
   return value === undefined ? null : value.slice(prefix.length);
 }
-
-const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const button = (label) => {
-    const match = [...document.querySelectorAll('button')].find(
-      (candidate) => candidate.getAttribute('aria-label') === label,
-    );
-    if (!(match instanceof HTMLButtonElement)) throw new Error(label + ' button missing');
-    return match;
-  };
-  let saved = '';
-  Object.defineProperty(window, 'showOpenFilePicker', {
-    configurable: true,
-    value: async () => [{
-      kind: 'file',
-      name: 'native-smoke.svg',
-      getFile: async () => new File([
-        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><path d="M1 1 L9 9" stroke="#000"/></svg>',
-      ], 'native-smoke.svg', { type: 'image/svg+xml' }),
-    }],
-  });
-  Object.defineProperty(window, 'showSaveFilePicker', {
-    configurable: true,
-    value: async () => ({
-      kind: 'file',
-      name: 'native-smoke.lf2',
-      createWritable: async () => ({
-        write: async (data) => { saved = data instanceof Blob ? await data.text() : String(data); },
-        close: async () => undefined,
-        abort: async () => undefined,
-      }),
-    }),
-  });
-  button('Import...').click();
-  for (let attempt = 0; attempt < 40 && !saved.includes('native-smoke.svg'); attempt += 1) {
-    await delay(50);
-    button('Save As...').click();
-    await delay(50);
-  }
-  if (!saved.includes('native-smoke.svg')) throw new Error('imported SVG was absent from saved project');
-  let savedSchemaVersion = null;
-  try {
-    const savedProject = JSON.parse(saved);
-    savedSchemaVersion = savedProject?.schemaVersion ?? null;
-  } catch {
-    // The result below reports an invalid save without hiding the other smoke evidence.
-  }
-  return {
-    readyToShow: true,
-    imported: true,
-    saved: Number.isSafeInteger(savedSchemaVersion) && savedSchemaVersion > 0,
-    savedSchemaVersion,
-    savedBytes: saved.length,
-    title: document.title,
-    url: location.href,
-  };
-})()`;
