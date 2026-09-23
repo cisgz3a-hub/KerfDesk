@@ -104,7 +104,7 @@ export function replaceSvgGroups(
   inserted: readonly string[],
 ): readonly SceneGroup[] {
   const retained = new Set(inserted);
-  const groups = (original.groups ?? [])
+  const groups: SceneGroup[] = (original.groups ?? [])
     .map((group) => {
       const ownsSource = [...removed].every((id) => group.objectIds.includes(id));
       const objectIds = ownsSource

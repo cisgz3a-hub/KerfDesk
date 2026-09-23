@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ownedClipImage } from '../../__fixtures__/owned-image-clip';
 import type { RasterImage } from '../../core/scene';
+import { PngThumbnailBuilder } from '../import/png-thumbnail';
 import { matchSvgSourceComponents } from './svg-fragment-reimport';
 
 function pagedImage(sourceAssetId: string, lumaAssetId: string): RasterImage {
   const { dataUrl, lumaBase64: _luma, ...source } = ownedClipImage();
   if (dataUrl === undefined) throw new Error('Missing fixture pixels');
+  const builder = new PngThumbnailBuilder(4, 4);
+  for (let row = 0; row < 4; row += 1) builder.accept(new Uint8Array(4));
+  const thumbnail = builder.finish();
   return {
     ...source,
     transform: source.svgImport?.transform ?? source.transform,
@@ -21,7 +25,12 @@ function pagedImage(sourceAssetId: string, lumaAssetId: string): RasterImage {
       naturalHeight: 4,
       sampledWidth: 4,
       sampledHeight: 4,
-      thumbnail: { mimeType: 'image/png', dataUrl, width: 4, height: 4 },
+      thumbnail: {
+        mimeType: thumbnail.mimeType,
+        dataUrl: 'data:image/bmp;base64,' + Buffer.from(thumbnail.bytes).toString('base64'),
+        width: 4,
+        height: 4,
+      },
     },
   };
 }

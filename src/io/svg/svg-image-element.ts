@@ -160,9 +160,13 @@ function clipShape(
   if (children.length !== 1 || children[0]?.tagName.toLowerCase() !== 'path')
     throw new Error('SVG image clips must contain one compound path.');
   const path = children[0];
+  validateClipRule(clip, path);
+  return { clip, path };
+}
+
+function validateClipRule(clip: Element, path: Element): void {
   const rule = path.getAttribute('clip-rule') ?? clip.getAttribute('clip-rule') ?? 'nonzero';
   if (rule !== 'evenodd') throw new Error('Only even-odd SVG image clips are supported.');
   if (path.hasAttribute('clip-path') || clip.hasAttribute('clip-path'))
     throw new Error('A clip inside an SVG clip definition is not supported.');
-  return { clip, path };
 }
