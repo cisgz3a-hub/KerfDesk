@@ -1,7 +1,10 @@
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 
 export type PauseResumeTransitionAction = 'pause' | 'resume';
-export type PauseResumeLivenessPolicy = 'none' | 'cnc-door';
+// 'cnc-door': settled writes and every fresh Door progress report refresh the
+// silence deadline. 'door-restore': only fresh Resume restore reports do (the
+// laser path, where the beam stays dark until the cycle restarts).
+export type PauseResumeLivenessPolicy = 'none' | 'cnc-door' | 'door-restore';
 
 export type PauseResumeTransitionToken = {
   readonly id: symbol;
@@ -53,11 +56,14 @@ export const PAUSE_RESUME_TRANSITION_MAX_TIMEOUT_MS = 30_000;
 
 export class PauseResumeTransitionError extends Error {
   public readonly failDarkAlreadyRequested: boolean;
+  /** The silence or absolute deadline expired, as opposed to losing ownership. */
+  public readonly deadlineExpired: boolean;
 
-  public constructor(message: string, failDarkAlreadyRequested: boolean) {
+  public constructor(message: string, failDarkAlreadyRequested: boolean, deadlineExpired = false) {
     super(message);
     this.name = 'PauseResumeTransitionError';
     this.failDarkAlreadyRequested = failDarkAlreadyRequested;
+    this.deadlineExpired = deadlineExpired;
   }
 }
 
@@ -220,6 +226,10 @@ export function cancelPauseResumeTransition(
   rejectPauseResumeTransition(refs, request, new PauseResumeTransitionError(message, true));
 }
 
+export function isPauseResumeDeadlineError(error: unknown): boolean {
+  return error instanceof PauseResumeTransitionError && error.deadlineExpired;
+}
+
 export function failDarkWasAlreadyRequested(
   error: unknown,
   token: PauseResumeTransitionToken,
@@ -255,7 +265,7 @@ function rejectForTimeout(
   rejectPauseResumeTransition(
     refs,
     request,
-    new PauseResumeTransitionError(request.timeoutMessage, false),
+    new PauseResumeTransitionError(request.timeoutMessage, false, true),
   );
 }
 

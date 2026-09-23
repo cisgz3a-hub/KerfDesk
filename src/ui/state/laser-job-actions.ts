@@ -36,7 +36,11 @@ import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
 import type { JobStopReason } from './job-stop-request';
-import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
+import {
+  disconnectStopUnconfirmedNotice,
+  writeFailedNotice,
+  type LaserSafetyAction,
+} from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
   startPendingControllerMessage,
@@ -248,14 +252,14 @@ async function prepareStartBoundary(
 }
 
 async function runStopJob(context: JobActionContext, reason?: JobStopReason): Promise<void> {
-  // Abort changes the stream's status, so this side owns the writes again
-  // before anything else happens (ADR-334).
-  await releaseHostedRefill(context.refs);
   const { set, get, refs, safeWrite, driver } = context;
+  const softReset = driver().realtime.softReset;
+  // Queued stop lines need a single writer, so a controller without a realtime
+  // reset takes the hosted refill back first (ADR-334).
+  if (softReset === null) await releaseHostedRefill(refs);
   const transitionCancellationMessage =
     'Pause or Resume was cancelled because the operator requested Abort.';
   cancelPauseResumeTransition(refs, transitionCancellationMessage);
-  const softReset = driver().realtime.softReset;
   if (softReset !== null) {
     clearCncLiveCaps();
     const resetWriteEpoch = refs.writeEpoch ?? 0;
@@ -274,13 +278,27 @@ async function runStopJob(context: JobActionContext, reason?: JobStopReason): Pr
         : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
     }));
     armResetCleanup(refs, safeWrite, cleanupLines);
+    // The reset goes to the transport before the hosted refill is taken back.
+    // A worker that receives it retires its own refill queue (ADR-334 §4), so
+    // awaiting the release first only put the Abort byte behind every line
+    // the renderer had yet to process, and behind a handshake timer that
+    // closes the port. The release still runs, after the reset is posted, so
+    // a silent worker is bounded exactly as before.
+    const resetWrite = safeWrite(softReset, 'stop');
+    void resetWrite.catch(() => undefined);
+    await releaseHostedRefill(refs);
     try {
-      await safeWrite(softReset, 'stop');
+      await resetWrite;
     } catch (error) {
       // Web Serial can deliver the commanded boot banner before write()
       // settles. That observed reset boundary is stronger evidence than the
-      // stale transport promise; only rethrow when no reboot was observed.
-      if ((refs.writeEpoch ?? 0) <= resetWriteEpoch) throw error;
+      // stale transport promise; only rethrow when no reboot was observed. A
+      // port that closed under the write proves nothing was delivered.
+      const portClosed = refs.connection == null;
+      if (portClosed || (refs.writeEpoch ?? 0) <= resetWriteEpoch) {
+        if (portClosed) set({ safetyNotice: writeFailedNotice('stop') });
+        throw error;
+      }
     }
   }
   if (softReset === null) {
