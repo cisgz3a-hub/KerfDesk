@@ -21,6 +21,7 @@ import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import type { ResolvedJobPlacement } from '../job-placement';
 import {
   isPreparationSuperseded,
@@ -107,7 +108,10 @@ export function useJobEstimate(): LiveJobEstimate {
   // made during a run still re-estimates; the held placement keeps the moving
   // head out of the key either way.
   const previewMode = useStore((s) => s.previewMode);
-  const frozen = useLaserStore(selectJobRunning) && !previewMode;
+  // A Frame's own compile of the same job runs meanwhile; a background
+  // estimate beside it only slows the Frame the operator is waiting for.
+  const framePreparing = useFramePreparationStore((s) => s.pending);
+  const frozen = (useLaserStore(selectJobRunning) || framePreparing) && !previewMode;
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,

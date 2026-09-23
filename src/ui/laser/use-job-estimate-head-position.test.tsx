@@ -15,6 +15,7 @@ import {
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { startMotionOperation } from '../state/laser-motion-operation';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import type * as PreparationWorkerClient from '../workspace/preparation-worker-client';
 import type { LiveJobEstimate } from './live-job-estimate';
 import { JOB_ESTIMATE_DEBOUNCE_MS, useJobEstimate } from './use-job-estimate';
@@ -113,6 +114,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  useFramePreparationStore.setState({ pending: false, progress: null });
   useStore.getState().newProject();
   useStore.setState({ previewMode: false });
   useLaserStore.setState({
@@ -241,6 +243,28 @@ describe('useJobEstimate head position', () => {
         jobOrigin: expect.objectContaining({ currentPosition: { x: 0, y: 0 } }),
       }),
     );
+
+    await unmount();
+  });
+
+  it('holds the estimate while a Frame prepares the same job, then settles once', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: reportAtX(0) });
+    useStore.setState({ project: overBudgetRasterProject() });
+    const unmount = await renderProbe();
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    // Frame compiles this job itself; a background compile beside it only
+    // slows the Frame, even when an input changes meanwhile.
+    act(() => useFramePreparationStore.setState({ pending: true }));
+    act(() => useStore.setState({ project: { ...useStore.getState().project } }));
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    act(() => useFramePreparationStore.setState({ pending: false }));
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(2);
 
     await unmount();
   });

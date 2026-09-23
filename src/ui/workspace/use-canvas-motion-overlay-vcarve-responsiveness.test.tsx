@@ -18,6 +18,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import type * as IdlePlanModule from './idle-canvas-motion-plan';
 import type * as IdleWorkerClient from './idle-canvas-motion-worker-client';
@@ -62,6 +63,7 @@ beforeEach(() => {
   workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReturnValue(null);
   workerMocks.cancelIdleCanvasMotionPlanOffThread.mockReset();
   useCanvasViewStore.setState({ showGcode: false });
+  useFramePreparationStore.setState({ pending: false, progress: null });
   observedOverlay = null;
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -167,6 +169,25 @@ describe('idle canvas plan during a Frame trace', () => {
     expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(1);
 
     await act(async () => useLaserStore.setState({ motionOperation: null }));
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits while a Frame is still preparing the job, cancelling a plan in flight', async () => {
+    const pending = new Promise<CanvasMotionOverlay['plan']>(() => undefined);
+    workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReturnValue(pending);
+    useLaserStore.setState({ statusReport: idleAt(0, 0) });
+    await render(complexScriptProject());
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(1);
+
+    await act(async () => useFramePreparationStore.setState({ pending: true }));
+    expect(workerMocks.cancelIdleCanvasMotionPlanOffThread).toHaveBeenCalledOnce();
+    await act(async () => useLaserStore.setState({ statusReport: idleAt(20, 20) }));
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(1);
+
+    await act(async () => useFramePreparationStore.setState({ pending: false }));
     await settleIdleDelay();
     expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(2);
   });

@@ -17,6 +17,7 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import { canvasMachineRevision } from './canvas-machine-revision';
@@ -40,6 +41,7 @@ export function useCanvasMotionOverlay(
   const outputScope = useOutputScope();
   const liveRun = useLaserStore((state) => state.liveCanvasRun ?? null);
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
+  const framePreparing = useFramePreparationStore((state) => state.pending);
   const machineRevision = useLaserStore(canvasMachineRevision);
   const laser = useMemo(
     () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
@@ -68,7 +70,7 @@ export function useCanvasMotionOverlay(
     registrationKey,
     machineRevision,
     interactionActive,
-    motionActive,
+    motionActive: motionActive || framePreparing,
     laser,
     canvasCovered,
   });
@@ -246,7 +248,7 @@ function shouldClearIdlePlan(input: IdlePlanInput): boolean {
 // A Frame trace or a jog reports Idle between its moves, and each of those
 // positions started a whole-job compile in a fresh worker only to cancel it
 // half a second later, competing with Frame's own preparation. Plan once the
-// operation that owns the motion has finished.
+// operation that owns the motion, or a Frame still preparing, has finished.
 function shouldDeferIdlePlan(input: IdlePlanInput): boolean {
   return (
     input.interactionActive ||
