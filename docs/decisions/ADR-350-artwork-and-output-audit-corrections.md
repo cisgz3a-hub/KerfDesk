@@ -65,7 +65,7 @@ merge is part of this decision's local implementation.
 
 No additional runtime dependency is introduced in this priority slice. Reusable operation recipes,
 personal artwork libraries/templates, broader file formats and circular variable copies are now
-covered by the separately authorized ADR-352 follow-up. Live data sources remain separate feature
+covered by the separately authorized ADR-357 follow-up. Live data sources remain separate feature
 work. The companion workspace usability fixes are recorded in ADR-351.
 
 ### Verification

@@ -170,7 +170,7 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 
 ### Phase G — v0.7 "Drawing tools" [Built (B1–B7); P2 follow-ups pending]
 
-**Reusable work and interchange (ADR-352).** Personal artwork entries preserve editable content,
+**Reusable work and interchange (ADR-357).** Personal artwork entries preserve editable content,
 fonts/pixels, dependencies and operation copies. Protected templates open complete saved projects
 as new unsaved work. Native material libraries also carry complete ordered laser/CNC process
 recipes, including disabled steps and referenced cutters. Grid, Circular and Point Rotation can
@@ -679,7 +679,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
 - DXF, PDF/PDF-compatible AI, HPGL/PLT and BMP/GIF/TIFF import are in scope
-  under ADR-098 and ADR-352. PDF uses explicit page selection and complete-path
+  under ADR-098 and ADR-357. PDF uses explicit page selection and complete-path
   conversion or a whole-page rendered image. Legacy non-PDF AI, unsupported
   HPGL drawing commands and unsupported TIFF encodings remain explicit errors.
 - In-app AI depth inference and bundled model weights remain out of scope until P2R.5 receives its

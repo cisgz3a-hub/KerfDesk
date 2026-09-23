@@ -1529,7 +1529,7 @@ above are no longer current output behavior.
 - Compatibility: [Vitest 4 migration](https://v4.vitest.dev/guide/migration) supports existing Vite 6 and Node 22. Test helpers use concrete callable signatures. A real V8 coverage fixture checks brace inclusion and uncovered source; production coverage policy is unchanged. Frozen install retains release-age policy. Full and production-only audit results are recorded independently.
 - Details and qualification evidence: `docs/audits/2026-09-19-development-tool-advisories.md`.
 
-## 2026-09-23 - Local PDF and TIFF artwork import (ADR-352)
+## 2026-09-23 - Local PDF and TIFF artwork import (ADR-357)
 
 - Evaluator: Codex. Current use case: the user requested the remaining audited format gaps,
   including PDF/PDF-compatible AI page import and TIFF alongside BMP/GIF and clean-room HPGL.
@@ -1567,4 +1567,4 @@ above are no longer current output behavior.
   licence gate passes 56 production packages across nine licences. PDF.js's unused optional Node
   canvas edge is removed with an exact parent/version pnpm override, keeping native canvas out
   of the runtime closure. PDF resource gzip contribution is 2,201,129 bytes before decoder chunks;
-  ADR-352 records the alternatives and retained offline precache tradeoff.
+  ADR-357 records the alternatives and retained offline precache tradeoff.

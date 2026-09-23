@@ -205,7 +205,7 @@ Identical to the format-specific import flows except:
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
 
-**Document pages and additional formats (ADR-352):**
+**Document pages and additional formats (ADR-357):**
 
 - PDF/compatible AI opens a page picker with a preview and physical size. Choose **Editable paths**
   for complete simple vector pages, or **Image for engraving or tracing** with a chosen DPI.
@@ -226,7 +226,7 @@ Identical to the format-specific import flows except:
 
 ### F-A5. Selection
 
-Reusable designs (ADR-352): open **Design Library → My artwork**, select artwork on the canvas and
+Reusable designs (ADR-357): open **Design Library → My artwork**, select artwork on the canvas and
 save it with a name/category. Search or filter saved entries, insert independent editable copies,
 or exchange .lfart library files using Import/Export. Copies retain saved positions, groups,
 fonts, full pixels, dependencies and their own operation settings. Inserting is one undo step.
@@ -2177,7 +2177,7 @@ settings and Job Review keep their existing read-only setup references.
   approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
-### F-D6. Distinct variable values in arrays (ADR-350/351, amending ADR-279)
+### F-D6. Distinct variable values in arrays (ADR-350/357, amending ADR-279)
 
 **Success:**
 
@@ -3022,7 +3022,7 @@ fidelity proof.
 
 ### F-ML1. Material library — save, load, and session persistence
 
-**Process recipes (ADR-352).** Open **Materials** in laser mode or **Recipes** in CNC mode.
+**Process recipes (ADR-357).** Open **Materials** in laser mode or **Recipes** in CNC mode.
 Select one artwork, name its process and choose **Save selected process**. The recipe includes
 ordered operations, disabled/visible states, effective laser settings and referenced CNC cutters.
 Select one or more destination artworks and choose **Apply recipe to selection** to replace only

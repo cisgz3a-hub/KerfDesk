@@ -1,4 +1,4 @@
-## ADR-352 - Reusable artwork, processes and document import (2026-09-23)
+## ADR-357 - Reusable artwork, processes and document import (2026-09-23)
 
 **Status:** Accepted for the user-authorized follow-up to ADR-350. Local implementation and
 software validation are distinct from publication, packaged-app and machine qualification.
