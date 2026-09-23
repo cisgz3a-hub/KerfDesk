@@ -67,8 +67,9 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
   `.gcode` / `.tap` — or the exact program you're about to run — in a 3D viewer with playback,
   per-segment source links and an informational program-health report.
 - **Drawing tools** — rectangle, ellipse, polygon, star and pen/polyline, plus Bézier node
-  editing and boolean operations (weld, subtract, intersect, exclude, offset) via `clipper2`.
-- **Text** — 4 bundled outline fonts and 4 single-line/stroke faces for engraving, plus imported
+  editing and boolean operations (weld, subtract, intersect, exclude) via `clipper2`. A separate
+  **Offset outlines** panel keeps the original and adds a larger or smaller outline of closed shapes.
+- **Text** — 21 bundled outline fonts and 4 single-line/stroke faces for engraving, plus imported
   `.ttf`/`.otf` embedded into the project. Variable text from CSV, serial numbers and dates.
 - **Parametric box generator** — finger-jointed closed, open-top and slide-lid boxes with
   dividers, panel cutouts, baked joint clearance and CNC corner-overcut relief. (Kerf itself is
@@ -106,9 +107,9 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
 - **3D relief from STL** — clean-room parser → max-Z heightmap → waterline roughing → ball-nose
   scallop finishing.
 - Tiling for jobs larger than the bed, with registration holes and per-tile export.
-- Touch-plate **probing** (Z and XYZ corner, two-stage `G38.2`), a tool library with 18 built-in
+- Touch-plate **probing** (Z and XYZ corner, two-stage `G38.2`), a tool library with 22 built-in
   bits plus your own, a chipload-based feeds & speeds calculator, multi-tool jobs with `M0`
-  manual tool change, a spoilboard surfacing wizard, and a live 3D material-removal simulation.
+  manual tool change, a spoilboard surfacing wizard, and a 3D view of the simulated cut in Preview.
 
 Cut ordering is a safety design, not a convenience: pockets and engraves run first, profiles
 last, inner contours before outer — a part is machined completely before the cut that could free it.

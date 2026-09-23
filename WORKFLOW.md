@@ -101,7 +101,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
-- **CNC Canvas Focus**: at 1439 px wide or below, CNC starts with the 3D result collapsed to a named 44 px restore strip unless the operator has already chosen otherwise. Expanding or collapsing 3D is one click, persists across reloads, and overrides later responsive defaults.
+- **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
 - **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
 - **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains available when its existing receipt checks allow it. Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
@@ -4268,6 +4268,12 @@ and lifts the command's CNC-only gate.)*
    evidence, WCO/origin, position, tool, or Work Z refuses before recovery G-code.
 
 ### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
+
+**Not mounted (2026-08-03, #633).** The pane described below is not shown
+in the app. It stays out of the workspace until it passes perceptual, GPU
+and real-hardware browser qualification (ADR-288). To see the cut in 3D,
+use the **3D** button in a CNC Preview (F-CNC23). This section is retained
+as the pane's design record.
 
 #### Success
 1. In CNC mode a docked "3D result" pane sits between the canvas and the
