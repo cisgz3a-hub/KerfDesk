@@ -1,19 +1,41 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
+import type { LaserSecondPassWriterVersion } from '../../../core/laser-second-pass/types';
+import type { LaserResumeTransformVersion } from '../../../core/controllers/grbl/resume-program';
 import { fingerprintsEqual, type GcodeFingerprint } from '../../../core/recovery';
+
+/** One recorded laser resume. `version` names the resume transform that built
+ * its bytes; a step saved before transforms were versioned omits it and was
+ * built by transform 1 (ADR-341 Amendment 3). */
+export type LaserResumeStep = {
+  readonly fromLine: number;
+  readonly version?: LaserResumeTransformVersion;
+};
 
 /** Each stage consumes the previous stage's exact output after its recorded
  * recovery transforms. Later recovery transforms remain outside this chain. */
 export type LaserSecondPassStage = {
   readonly sourceRunId: string;
   readonly sourceFingerprint: GcodeFingerprint;
-  readonly resumeChainBefore: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly resumeChainBefore: ReadonlyArray<LaserResumeStep>;
   readonly selection: LaserSecondPassSelection;
+  /** Painted-pass writer that built this stage; absent means writer 1. */
+  readonly writerVersion?: LaserSecondPassWriterVersion;
 };
 
 export type LaserSecondPassChain = ReadonlyArray<LaserSecondPassStage>;
 
 export function isLaserSecondPassChain(value: unknown): value is LaserSecondPassChain {
   return Array.isArray(value) && value.length > 0 && value.every(isStage);
+}
+
+export function isLaserResumeStep(value: unknown): value is LaserResumeStep {
+  if (!isRecord(value)) return false;
+  const version = value['version'];
+  return (
+    Number.isSafeInteger(value['fromLine']) &&
+    Number(value['fromLine']) > 0 &&
+    (version === undefined || version === 1 || version === 2)
+  );
 }
 
 export function laserSecondPassChainsEqual(
@@ -29,12 +51,17 @@ export function laserSecondPassChainsEqual(
         other !== undefined &&
         stage.sourceRunId === other.sourceRunId &&
         fingerprintsEqual(stage.sourceFingerprint, other.sourceFingerprint) &&
-        JSON.stringify(stage.resumeChainBefore.map((step) => step.fromLine)) ===
-          JSON.stringify(other.resumeChainBefore.map((step) => step.fromLine)) &&
+        resumeChainKey(stage.resumeChainBefore) === resumeChainKey(other.resumeChainBefore) &&
+        (stage.writerVersion ?? 1) === (other.writerVersion ?? 1) &&
         selectionKey(stage.selection) === selectionKey(other.selection)
       );
     })
   );
+}
+
+/** Compares resume chains by what they build: an unversioned step is transform 1. */
+export function resumeChainKey(chain: ReadonlyArray<LaserResumeStep>): string {
+  return JSON.stringify(chain.map((step) => [step.fromLine, step.version ?? 1]));
 }
 
 /** Retention key and Frame execution signature of a painted pass: the exact
@@ -67,13 +94,15 @@ function isStage(value: unknown): value is LaserSecondPassStage {
   if (!isRecord(value)) return false;
   const source = value['sourceRunId'];
   const resume = value['resumeChainBefore'];
+  const writer = value['writerVersion'];
   return (
     typeof source === 'string' &&
     source.length > 0 &&
     source.length <= 200 &&
     isFingerprint(value['sourceFingerprint']) &&
     Array.isArray(resume) &&
-    resume.every(isResumeStep) &&
+    resume.every(isLaserResumeStep) &&
+    (writer === undefined || writer === 1 || writer === 2) &&
     isSelection(value['selection'])
   );
 }
@@ -86,12 +115,6 @@ function isFingerprint(value: unknown): value is GcodeFingerprint {
     ) &&
     Number(value['fnv1a']) <= 0xffffffff &&
     Number(value['lines']) > 0
-  );
-}
-
-function isResumeStep(value: unknown): boolean {
-  return (
-    isRecord(value) && Number.isSafeInteger(value['fromLine']) && Number(value['fromLine']) > 0
   );
 }
 

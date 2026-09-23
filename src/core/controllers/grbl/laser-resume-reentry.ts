@@ -4,6 +4,18 @@ export type LaserResumeMotion = 'G0' | 'G1' | 'G2' | 'G3' | null;
 /** Active work coordinate system at the recovery boundary. */
 export type LaserResumeWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
 
+/**
+ * The laser resume transform, recorded with every archived resume step so a
+ * saved recovery replays with the transform that produced its bytes
+ * (ADR-341 Amendment 3).
+ *
+ * 1: the original transform. Its re-entry `G0` left the modal motion at rapid,
+ *    so a raster row resumed mid-row ran dark, and air assist stayed off.
+ * 2: re-issues the active air assist before the re-entry and makes the first
+ *    resumed movement state its motion mode explicitly.
+ */
+export type LaserResumeTransformVersion = 1 | 2;
+
 /** Modal values needed to rebuild a beam-off laser recovery boundary. */
 export type LaserResumeModalState = {
   units: 'G20' | 'G21';
@@ -17,6 +29,9 @@ export type LaserResumeModalState = {
   feed: number | null;
   x: number | null;
   y: number | null;
+  // Air assist rides the coolant outputs: M7 (mist) and M8 (flood), M9 off.
+  mist: boolean;
+  flood: boolean;
 };
 
 type GcodeWord = { readonly letter: string; readonly value: number };
@@ -24,33 +39,88 @@ type RewrittenLine = { readonly line: string; readonly physicalPower: number };
 
 const WORD_RE = /([A-Za-z])(-?\d+(?:\.\d+)?)/g;
 const POWER_OR_COMMENT_RE = /(\([^)]*\))|[Ss]-?\d+(?:\.\d+)?/g;
+const AXIS_LETTERS: ReadonlySet<string> = new Set(['X', 'Y', 'Z', 'A', 'B', 'C']);
+// Group-0 commands that consume a line's axis words themselves, so the modal
+// motion mode does not run (GRBL gcode.c AXIS_COMMAND_NON_MODAL; G43.1 is the
+// tool-length axis command).
+const AXIS_CONSUMING_G: ReadonlySet<number> = new Set([10, 28, 30, 92, 43.1]);
+const EXPLICIT_MOTION_G: ReadonlySet<number> = new Set([0, 1, 2, 3, 38.2, 38.3, 38.4, 38.5, 80]);
 
 /** Keeps replay power at zero until the source program reaches real burn motion. */
 export function rewriteLaserResumeTail(
   state: LaserResumeModalState,
   originalTail: ReadonlyArray<string>,
+  version: LaserResumeTransformVersion = 1,
 ): ReadonlyArray<string> {
   const intended = { ...state };
   const rewritten: string[] = [];
   let physicalPower = 0;
+  // The re-entry move is a G0, so the controller's modal motion is rapid
+  // until the program next names a motion word. Transform 2 names the
+  // program's own motion mode on the first line that relies on it.
+  let motionPending = version >= 2;
   for (const rawLine of originalTail) {
-    const result = rewriteReplayLine(intended, rawLine, physicalPower);
+    let line = rawLine;
+    if (motionPending) {
+      const restored = restoreModalMotion(intended, rawLine);
+      line = restored.line;
+      motionPending = !restored.settled;
+    }
+    const result = rewriteReplayLine(intended, line, physicalPower, version);
     rewritten.push(result.line);
     physicalPower = result.physicalPower;
   }
   return rewritten;
 }
 
+/** Names the intended motion mode on the first line that would otherwise run
+ * the controller's modal motion (still G0 from the re-entry). A line with its
+ * own motion word settles the controller's motion mode by itself. */
+function restoreModalMotion(
+  intended: LaserResumeModalState,
+  rawLine: string,
+): { readonly line: string; readonly settled: boolean } {
+  const words = wordsForLine(rawLine);
+  if (words.some(isExplicitMotionWord)) return { line: rawLine, settled: true };
+  if (!invokesModalMotion(words)) return { line: rawLine, settled: false };
+  if (intended.motion === null) return { line: rawLine, settled: true };
+  return { line: withMotionWord(rawLine, intended.motion), settled: true };
+}
+
+function isExplicitMotionWord({ letter, value }: GcodeWord): boolean {
+  return letter === 'G' && EXPLICIT_MOTION_G.has(value);
+}
+
+/** GRBL runs the modal motion mode for any line with axis words and no
+ * explicit axis command, whatever other modal G words (G90, G21...) it has. */
+function invokesModalMotion(words: ReadonlyArray<GcodeWord>): boolean {
+  const hasAxisWord = words.some(({ letter }) => AXIS_LETTERS.has(letter));
+  if (!hasAxisWord) return false;
+  return !words.some(
+    (word) =>
+      isExplicitMotionWord(word) || (word.letter === 'G' && AXIS_CONSUMING_G.has(word.value)),
+  );
+}
+
+/** Inserts the motion word at the start of the line's words, after any leading
+ * whitespace and `N` line number, in the line's own spacing style. */
+function withMotionWord(rawLine: string, motion: Exclude<LaserResumeMotion, null>): string {
+  const lead = /^\s*(?:[Nn]\d+\s*)?/.exec(rawLine)?.[0] ?? '';
+  const separator = /\s/.test(stripComments(rawLine).trim()) ? ' ' : '';
+  return `${lead}${motion}${separator}${rawLine.slice(lead.length)}`;
+}
+
 function rewriteReplayLine(
   intended: LaserResumeModalState,
   rawLine: string,
   physicalPower: number,
+  version: LaserResumeTransformVersion,
 ): RewrittenLine {
   const words = wordsForLine(rawLine);
   applyReplayWords(intended, words);
   const explicitPower = lastWordValue(words, 'S');
   const hasArm = words.some(({ letter, value }) => letter === 'M' && (value === 3 || value === 4));
-  if (isBurnMotion(intended, words)) {
+  if (isBurnMotion(intended, words, version)) {
     const burnPower = intended.sValue ?? 0;
     const line =
       explicitPower === null && physicalPower !== burnPower
@@ -81,8 +151,12 @@ function applyReplayWords(state: LaserResumeModalState, words: ReadonlyArray<Gco
   }
 }
 
-function isBurnMotion(state: LaserResumeModalState, words: ReadonlyArray<GcodeWord>): boolean {
-  const motion = motionForLine(state, words);
+function isBurnMotion(
+  state: LaserResumeModalState,
+  words: ReadonlyArray<GcodeWord>,
+  version: LaserResumeTransformVersion,
+): boolean {
+  const motion = motionForLine(state, words, version);
   const hasXyDestination = words.some(({ letter }) => letter === 'X' || letter === 'Y');
   const hasArcCenter = words.some(({ letter }) => letter === 'I' || letter === 'J');
   const hasDestination = hasXyDestination || ((motion === 'G2' || motion === 'G3') && hasArcCenter);
@@ -99,6 +173,7 @@ function isBurnMotion(state: LaserResumeModalState, words: ReadonlyArray<GcodeWo
 function motionForLine(
   state: LaserResumeModalState,
   words: ReadonlyArray<GcodeWord>,
+  version: LaserResumeTransformVersion,
 ): LaserResumeMotion {
   for (let i = words.length - 1; i >= 0; i -= 1) {
     const word = words[i];
@@ -106,6 +181,10 @@ function motionForLine(
     const explicitMotion = motionFor(word.value);
     if (explicitMotion !== null) return explicitMotion;
   }
+  // Transform 2 follows the controller: a modal G word such as G90 or G21 on
+  // the line does not stop its axis words running the modal motion. Transform
+  // 1 treated any G word as a non-burn line and is kept for archived replays.
+  if (version >= 2) return invokesModalMotion(words) ? state.motion : null;
   const hasOtherGCode = words.some(({ letter }) => letter === 'G');
   return hasOtherGCode ? null : state.motion;
 }

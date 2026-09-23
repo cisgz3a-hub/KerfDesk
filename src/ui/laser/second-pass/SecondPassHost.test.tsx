@@ -116,7 +116,7 @@ describe('completed-job second pass offer', () => {
     await offer('saved');
     expect(host.textContent).toContain('Would you like to darken selected areas?');
     expect(useUiStore.getState().modalDepth).toBe(1);
-    await act(async () => button('Done').click());
+    await act(async () => button('Not now').click());
     await offer('saved');
     await render();
     expect(host.querySelector('[role="dialog"]')).toBeNull();
@@ -151,7 +151,7 @@ describe('completed-job second pass offer', () => {
     await complete('first');
     await render();
     await offer('first');
-    await act(async () => button('Done').click());
+    await act(async () => button('Not now').click());
     await act(async () => {
       await complete('second');
     });
@@ -243,9 +243,11 @@ describe('completed-job second pass offer', () => {
     const launcher = button('Paint a second pass…');
     launcher.focus();
     await offer('saved');
-    expect(document.activeElement).toBe(button('Done'));
+    // The unprompted offer focuses itself, not a button a stray keystroke could press.
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]');
+    expect(document.activeElement).toBe(dialog);
     await act(async () =>
-      button('Done').dispatchEvent(
+      dialog?.dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,

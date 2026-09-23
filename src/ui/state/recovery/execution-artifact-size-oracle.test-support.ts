@@ -1,5 +1,9 @@
-// Verbatim copy of the estimator before ADR-352 reordered its plain-container
-// path. The parity fuzz pins the new walk to it, byte for byte.
+// Copy of the estimator before ADR-352 reordered its plain-container path. The
+// parity fuzz pins the new walk to it, byte for byte. String values, RegExp
+// text and Blob/File names are charged with the shared `stringBytes` rule of
+// ADR-341 Amendment 3, which has its own tests; the traversal is verbatim.
+
+import { stringBytes } from './execution-artifact-size';
 
 const OBJECT_OVERHEAD_BYTES = 16;
 const ENTRY_OVERHEAD_BYTES = 8;
@@ -52,7 +56,7 @@ function executionArtifactPrimitiveBytes(
   value: unknown,
   allowTransientFunctions: boolean,
 ): number | null {
-  if (typeof value === 'string') return value.length * 3;
+  if (typeof value === 'string') return stringBytes(value);
   if (
     value === null ||
     value === undefined ||
@@ -113,7 +117,7 @@ function supportedCloneContainerBytes(value: object, pending: unknown[]): number
   if (value instanceof RegExp) {
     return boundedAdd(
       OBJECT_OVERHEAD_BYTES,
-      (value.source.length + value.flags.length) * 3 + PRIMITIVE_BYTES,
+      stringBytes(value.source) + stringBytes(value.flags) + PRIMITIVE_BYTES,
     );
   }
   return null;
@@ -135,9 +139,9 @@ function setBytes(value: Set<unknown>, pending: unknown[]): number {
 
 function blobBytes(value: Blob): number {
   let bytes = boundedAdd(OBJECT_OVERHEAD_BYTES, value.size);
-  bytes = boundedAdd(bytes, value.type.length * 3 + ENTRY_OVERHEAD_BYTES);
+  bytes = boundedAdd(bytes, stringBytes(value.type) + ENTRY_OVERHEAD_BYTES);
   if (typeof File !== 'undefined' && value instanceof File) {
-    bytes = boundedAdd(bytes, value.name.length * 3 + PRIMITIVE_BYTES);
+    bytes = boundedAdd(bytes, stringBytes(value.name) + PRIMITIVE_BYTES);
   }
   return bytes;
 }

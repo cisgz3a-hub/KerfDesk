@@ -41,6 +41,8 @@ describe('main-to-renderer fixed close protocol with actual unload hooks', () =>
     install();
     const pending = request('prepare');
     expect(stop).toHaveBeenCalledTimes(1);
+    // Recovery must record this as the app closing, not an operator Abort.
+    expect(stop).toHaveBeenCalledWith('app-closing');
     const early = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(early);
     window.dispatchEvent(new Event('pagehide'));

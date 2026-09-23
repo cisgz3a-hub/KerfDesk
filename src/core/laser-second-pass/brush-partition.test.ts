@@ -92,6 +92,8 @@ describe('analytic paintbrush intersection', () => {
     ]);
   });
 
+  // One assertion per run, not two per sample: 77,000 separate expect() calls
+  // made this test take 2 s alone and over 25 s beside other suites.
   it('agrees with an independent distance-to-polyline oracle for arbitrary directions and brush overlap', () => {
     const point = fc.record({
       x: fc.integer({ min: -100, max: 100 }),
@@ -114,20 +116,25 @@ describe('analytic paintbrush intersection', () => {
           const segment = { ...line(0, 0, 1, 1), from, to };
           const brush = selection(strokes);
           const intervals = partitionBrushPower(segment, buildBrushIndex(brush), strokes);
-          expect(intervals[0]?.start).toBe(0);
-          expect(intervals.at(-1)?.end).toBe(1);
+          const mismatches: string[] = [];
+          if (intervals[0]?.start !== 0 || intervals.at(-1)?.end !== 1) {
+            mismatches.push(`intervals do not cover [0, 1]: ${JSON.stringify(intervals)}`);
+          }
           for (let sample = 0; sample < 257; sample += 1) {
             const t = (sample + 0.371) / 257;
             const point = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
             const matches = intervals.filter((interval) => t >= interval.start && t < interval.end);
-            expect(matches).toHaveLength(1);
-            expect(matches[0]?.scale).toBe(maskScaleAt(point, strokes));
+            const expected = maskScaleAt(point, strokes);
+            if (matches.length !== 1 || matches[0]?.scale !== expected) {
+              mismatches.push(`t=${t}: ${JSON.stringify(matches)} expected scale ${expected}`);
+            }
           }
+          expect(mismatches).toEqual([]);
         },
       ),
       { seed: 928461, numRuns: 150 },
     );
-  });
+  }, 30_000);
 
   it('queries local capsule bounds without visiting thousands of distant brush edges', () => {
     const brush = selection(Array.from({ length: 10000 }, (_, i) => dot(i * 20, i * 20, 1)));

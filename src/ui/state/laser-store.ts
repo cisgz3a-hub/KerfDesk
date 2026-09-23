@@ -47,6 +47,7 @@ import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
 import type { RxCapacityEvidence } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
+import type { JobStopRequest } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
 import { overrideActions } from './override-actions';
@@ -129,6 +130,9 @@ export type LaserState = LaserStoreActions &
     readonly streamer: StreamerState | null;
     /** Monotonic owner for async stream writes within a controller session. */
     readonly streamerEpoch: number;
+    /** Why KerfDesk stopped the stream of `streamerEpoch`, when it was asked
+     * to (Abort, or the app closing); read through currentJobStopRequest. */
+    readonly jobStopRequest?: JobStopRequest | null;
     readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;
