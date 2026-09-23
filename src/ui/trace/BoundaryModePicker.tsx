@@ -11,6 +11,7 @@ const BOUNDARY_MODE_HINT =
   'Crop keeps only the boxed region (like LightBurn). Enhance re-traces the box at 2× and patches it into the full trace to recover small features.';
 
 export function BoundaryModePicker(props: {
+  readonly allowEnhance?: boolean;
   readonly value: BoundaryMode;
   readonly onChange: (next: BoundaryMode) => void;
 }): JSX.Element {
@@ -24,12 +25,20 @@ export function BoundaryModePicker(props: {
           className="lf-select"
           style={selectStyle}
           aria-label="Trace boundary mode"
-          title="Choose whether the boundary box crops the trace or enhances that region."
+          title={
+            props.allowEnhance === false
+              ? 'Trace only the selected photo region.'
+              : BOUNDARY_MODE_HINT
+          }
         >
           <option value="crop">Crop region</option>
-          <option value="enhance">Enhance region</option>
+          {props.allowEnhance !== false ? <option value="enhance">Enhance region</option> : null}
         </select>
-        <span style={hintStyle}>{BOUNDARY_MODE_HINT}</span>
+        <span style={hintStyle}>
+          {props.allowEnhance === false
+            ? 'Photo shading traces only the boxed region. Use Detail to refine its shading.'
+            : BOUNDARY_MODE_HINT}
+        </span>
       </span>
     </label>
   );

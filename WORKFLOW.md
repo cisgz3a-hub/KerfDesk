@@ -2162,7 +2162,15 @@ ADR-279.*
    the original image's aspect ratio even when their working grids round to different sizes.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
-2. Choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
+2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
+   tones as fine filled lines. Adjust **Detail**, **Brightness** and **Contrast** while comparing
+   Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
+   need a Fill operation with scan lines crossing the traced lines for shaded laser output.
+   Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
+   thin line coverage before applying the Image operation. CNC keeps the editable shapes;
+   choose an appropriate machining operation and tool size for their widths. This is a line
+   halftone treatment; Image mode also offers grayscale and dithered photo engraving.
+   For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both

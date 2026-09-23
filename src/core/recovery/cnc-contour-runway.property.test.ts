@@ -100,6 +100,38 @@ function assertRepresentedRunway(first: number, second: number, ratio: number): 
 }
 
 describe('planCncContourRunway properties', () => {
+  // fast-check seed 2049810117 found this on the main deploy of 90c791c5f.
+  // The requested runway start lands 0.00004 mm before the represented vertex
+  // at x=1.987, so emitting it forces a finer precision. At that precision
+  // GRBL's parser reads the unchanged anchor one float32 step lower, and a
+  // second emission picks yet another precision: the plan Review showed was
+  // not the path the recovery job would cut.
+  it('keeps the runway on the source representation when its start lands beside a vertex', () => {
+    assertRepresentedRunway(1.9865000000000002, 1, 0.3347975153538776);
+  });
+
+  // The broad property below reaches that corner only by chance. This one
+  // always asks for a runway that starts less than half a 3-decimal step
+  // beyond the represented vertex, where the new segment collapses at the
+  // source precision and forces the emitter to escalate.
+  it('keeps every requested runway sound when its start lands just beyond a vertex', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 1, max: 50, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ min: 1, max: 50, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ min: 0, max: 0.0005, minExcluded: true, noNaN: true, noDefaultInfinity: true }),
+        (first, second, offsetMm) => {
+          const represented = cncContourEmissionPoints(
+            contourPass(straightContourJob(first, second)),
+          );
+          const available = pointAt(represented, 2).x - pointAt(represented, 0).x;
+          const toVertex = pointAt(represented, 2).x - pointAt(represented, 1).x;
+          assertRepresentedRunway(first, second, (toVertex + offsetMm) / available);
+        },
+      ),
+    );
+  });
+
   it('makes a represented straight runway at least the requested length and ends at the anchor', () => {
     fc.assert(
       fc.property(
