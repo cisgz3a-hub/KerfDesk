@@ -28,6 +28,7 @@ export function UnionSilhouetteDialog(props: {
         <span>Result operation</span>
         <select
           className="lf-input"
+          title="Choose the operation whose settings the combined silhouette will use."
           value={chosenId}
           onChange={(event) => setChosenId(event.currentTarget.value)}
         >

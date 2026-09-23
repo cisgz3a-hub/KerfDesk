@@ -44,6 +44,7 @@ export function JoinPathsDialog(props: {
           type="number"
           min="0"
           step="any"
+          title="Set the largest endpoint gap that Join paths may bridge."
           value={toleranceText}
           onChange={(event) => setToleranceText(event.currentTarget.value)}
         />
