@@ -180,10 +180,7 @@ describe('Workspace job dock', () => {
     expect(host.querySelector('[aria-label="Start from"]')).not.toBeNull();
     expect(host.querySelector('[aria-label="Selected artwork only"]')).not.toBeNull();
     expect(host.querySelector('[aria-label="Execution archive"]')).not.toBeNull();
-    // The docked console itself mounts only while its section is open.
-    expect(
-      [...host.querySelectorAll('summary')].some((summary) => summary.textContent === 'Console'),
-    ).toBe(true);
+    expect(host.querySelector('[aria-label="Console command"]')).not.toBeNull();
     const dock = host.querySelector('[aria-label="Job actions"]');
     expect(dock?.textContent).toContain('Wait for the controller to reconnect.');
     expect(host.querySelector('aside')?.textContent).not.toContain('Last Start attempt blocked');

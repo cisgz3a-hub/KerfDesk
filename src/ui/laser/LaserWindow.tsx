@@ -188,10 +188,9 @@ function MachineRailHeading(props: {
 }
 
 // The docked console follows the transcript, which publishes several times a
-// second during a job; mounted behind a closed summary it re-rendered at that
-// rate for nobody. It mounts only while the section is open, so its filters
-// and unsent draft start fresh on each opening. The launcher subscribes to
-// nothing and owns the Super Console dialog, so it stays mounted.
+// second during a job; behind a closed summary it re-rendered at that rate for
+// nobody. While the section is closed it holds its last transcript instead,
+// and it stays mounted so its filters and unsent draft survive a close.
 function MachineConsoleSection(): JSX.Element {
   const [open, setOpen] = useState(false);
   return (
@@ -200,7 +199,7 @@ function MachineConsoleSection(): JSX.Element {
       title="Show advanced controller commands and communication history."
       onOpenChange={setOpen}
     >
-      {open ? <ConsolePanel /> : null}
+      <ConsolePanel active={open} />
       <SuperConsoleLauncher />
     </CollapsibleRailSection>
   );
