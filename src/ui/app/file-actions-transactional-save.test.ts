@@ -26,9 +26,27 @@ describe.each(['web', 'electron'] as const)('%s transactional Save G-code', (pla
     expect(pickFileForSave).not.toHaveBeenCalled();
     await handleSaveGcode(ctx, { prebuilt: artifact });
 
+    expect(ctx.platform.reserveFileForSave).not.toHaveBeenCalled();
     expect(pickFileForSave).toHaveBeenCalledOnce();
+    expect(pickFileForSave).toHaveBeenCalledWith({
+      suggestedName: 'untitled.gcode',
+      extensions: ['.gcode', '.nc'],
+    });
     expect(target.write).toHaveBeenCalledOnce();
     expect(target.written[0]).toContain('G21');
+  });
+
+  it('leaves the export unwritten when Save As is cancelled', async () => {
+    const pickFileForSave = vi.fn(async () => null);
+    const ctx = context(platformId, projectWithLine(), pickFileForSave);
+    const artifact = await prebuildGcodeSave(ctx);
+    if (artifact === null) throw new Error('expected prebuilt G-code');
+
+    await handleSaveGcode(ctx, { prebuilt: artifact });
+
+    expect(pickFileForSave).toHaveBeenCalledOnce();
+    expect(ctx.platform.reserveFileForSave).not.toHaveBeenCalled();
+    expect(ctx.pushToast).not.toHaveBeenCalledWith(expect.any(String), 'success');
   });
 });
 
@@ -42,6 +60,9 @@ function context(
       id,
       pickFilesForOpen: async () => [],
       pickFileForSave,
+      // Production adapters expose both methods. Ordinary prepared exports
+      // must use Save As, not a directory picker followed by a filename panel.
+      reserveFileForSave: vi.fn(async () => null),
       serial: { isSupported: () => false, requestPort: async () => null },
     },
     project,

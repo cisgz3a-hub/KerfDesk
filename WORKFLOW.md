@@ -588,13 +588,15 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 #### Success — web and packaged desktop
 1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
-2. The Chromium directory picker reserves a destination directory while the click still carries
-   user activation. It does not create or truncate the named file.
-3. A non-modal **Save G-code as** panel starts with `<project-name>.gcode` when the project has a
-   saved name, otherwise `untitled.gcode`. The filename remains editable and the live Stop controls
-   remain clickable while the panel is open.
-4. Pre-flight and background preparation run (F-A10). A failure creates no file.
-5. After preparation succeeds, the selected directory creates the named file and writes the bytes.
+2. Pre-flight and background preparation run (F-A10) before choosing a file. A failure creates no file.
+3. When the complete export is ready, click **Save as…**. The standard Chromium Save As dialog
+   opens with `<project-name>.gcode` when the project has a saved name, otherwise `untitled.gcode`.
+4. Choose any permitted folder, such as **Downloads** or **Desktop**, and enter a new filename
+   or choose an existing file to replace. An existing file is not required. The native dialog handles
+   overwrite confirmation; cancelling it writes nothing.
+5. Saving writes the prepared G-code to the selected file. Ordinary single-file exports do not ask
+   for directory-wide access or open a second filename panel. Tiled CNC exports still choose one
+   folder for their generated set of files.
 6. Toast: `Saved G-code to <filename>`.
 7. The File System Access API is required (Chromium-only, per PROJECT.md "Delivery targets"); there
    is **no browser-download fallback**. If unavailable, the save reports a clear error toast.

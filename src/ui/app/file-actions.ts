@@ -21,7 +21,6 @@ import {
 } from '../../core/scene';
 import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
-import { requestSaveFilename } from '../state/save-filename-store';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -231,7 +230,7 @@ async function saveOrdinaryGcode(
   )) {
     ctx.pushToast(advisory, 'warning');
   }
-  // Production calls this from the Choose destination button with a prebuilt
+  // Production calls this from the Save as button with a prebuilt
   // artifact, so the picker is invoked synchronously inside that fresh user
   // gesture. Direct/test callers without an artifact prepare first: factual
   // failure must never create, open, truncate, or modify a final target.
@@ -239,10 +238,11 @@ async function saveOrdinaryGcode(
   if (prepared.kind === 'failed') return;
   let target: SaveTarget | null;
   try {
-    target = await pickGcodeDestination(ctx.platform, {
+    // Preparation is complete, so use the normal Save As dialog. A directory
+    // reservation adds a second filename prompt and restricts folder choices.
+    target = await ctx.platform.pickFileForSave({
       suggestedName: suggestedGcodeName(ctx.savedName),
       extensions: ['.gcode', '.nc'],
-      chooseName: requestSaveFilename,
     });
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
@@ -262,13 +262,6 @@ async function saveOrdinaryGcode(
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
   }
-}
-
-function pickGcodeDestination(
-  platform: PlatformAdapter,
-  request: Parameters<PlatformAdapter['pickFileForSave']>[0],
-): Promise<SaveTarget | null> {
-  return (platform.reserveFileForSave ?? platform.pickFileForSave)(request);
 }
 
 function advanceExportVariables(ctx: SaveGcodeCtx): void {

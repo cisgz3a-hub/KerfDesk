@@ -18,6 +18,29 @@ test.beforeEach(async ({ page }) => {
   await dismissNotifications(page);
 });
 
+test('saves prepared G-code with Save As without asking for a directory', async ({
+  page,
+  kerfdesk,
+}) => {
+  const eventCount = (await kerfdesk.events()).length;
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  const dialog = page.getByRole('dialog', { name: 'Save G-code', exact: true });
+  await expect(dialog).toContainText('Downloads or Desktop');
+  await choosePreparedGcodeDestination(page);
+
+  expect(await savedText(kerfdesk, '.gcode')).toContain('G21');
+  const saveEvents = (await kerfdesk.events()).slice(eventCount);
+  expect(saveEvents.filter((event) => event.kind === 'picker-save')).toEqual([
+    expect.objectContaining({ name: 'project-basic.gcode' }),
+  ]);
+  expect(
+    saveEvents.filter((event) =>
+      ['picker-open', 'picker-directory', 'picker-directory-file'].includes(event.kind),
+    ),
+  ).toEqual([]);
+  await expect(page.getByRole('dialog', { name: 'Choose G-code filename' })).toHaveCount(0);
+});
+
 test('creates arrays, nests them, previews them, and saves one undoable project', async ({
   page,
   kerfdesk,
@@ -1170,8 +1193,7 @@ async function reviewStartBoundary(page: Page): Promise<{
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
-  await acceptGcodeFilename(page);
+  await dialog.getByRole('button', { name: 'Save as…' }).click();
 }
 
 async function dismissNotifications(page: Page): Promise<void> {
@@ -1186,12 +1208,6 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
   await input.fill(value);
   await input.press('Tab');
   await expect(input).toHaveValue(value);
-}
-
-async function acceptGcodeFilename(page: Page): Promise<void> {
-  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
-  await expect(panel).toBeVisible();
-  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
