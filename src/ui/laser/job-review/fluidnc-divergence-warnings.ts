@@ -60,7 +60,7 @@ function lineBoundaryWarnings(input: FluidncDivergenceInput): ReadonlyArray<stri
       `longest: line ${longest.lineNumber} at ${longest.length} characters). ` +
       `FluidNC returns error:14 for parser payloads above that limit. Its direct Lineedit ` +
       `collector can retain up to ${FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS} printable characters, ` +
-      `but that does not raise executable G-code capacity. CurveDesk's shared streamer trims leading ` +
+      `but that does not raise executable G-code capacity. KerfDesk's shared streamer trims leading ` +
       'and trailing whitespace before transmission. It does not apply additional shortening, ' +
       'splitting, or dropping because of this FluidNC boundary.',
   ];
@@ -77,16 +77,16 @@ function activeFluidncSettingWarning(): string {
     `${FLUIDNC_READ_ONLY_SETTING_WARNING_PREFIX} FluidNC exposes ${settingList()} as read-only ` +
     'mirrors of its YAML configuration. A write such as $32=1 answers ' +
     `error:${FLUIDNC_READ_ONLY_SETTING_ERROR_CODE} (ReadOnlySetting) and changes nothing, so the ` +
-    '$30/$32 remedy named in the laser-mode acknowledgement cannot be applied from CurveDesk. ' +
+    '$30/$32 remedy named in the laser-mode acknowledgement cannot be applied from KerfDesk. ' +
     'Set laser mode and max spindle speed in the FluidNC YAML config, then re-read the controller. ' +
-    'With FluidNC active, CurveDesk does not send numeric $ setting writes.'
+    'With FluidNC active, KerfDesk does not send numeric $ setting writes.'
   );
 }
 
 function detectedFluidncMismatchWarning(active: ControllerKind): string {
   return (
     `${FLUIDNC_IDENTITY_MISMATCH_WARNING_PREFIX} The connected banner looks like FluidNC, but the ` +
-    `active ${active} driver remains authoritative and CurveDesk does not switch it automatically. ` +
+    `active ${active} driver remains authoritative and KerfDesk does not switch it automatically. ` +
     'Numeric $ setting-write behavior therefore follows the active driver; verify the selected ' +
     'controller profile before sending a setting command.'
   );
