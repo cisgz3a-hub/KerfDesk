@@ -2,6 +2,7 @@ import { createProject, type Project, type SceneObject } from '../../core/scene'
 import { findFontEntry } from '../../core/text';
 import { deserializeProject, prepareProjectForPersistence } from '../../io/project';
 import { MAX_EMBEDDED_FONTS } from '../../io/project/project-embedded-font-validator';
+import { validateSceneBudgets } from '../../io/project/project-scene-integrity-validator';
 import { portableProjectAssets } from '../app/portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { clipboardFromSelection, prepareClipboardPaste } from '../state/scene-clipboard-actions';
@@ -128,6 +129,17 @@ export function insertPersonalArtwork(state: AppState, entry: PersonalArtwork): 
       'This artwork uses different variable text data. Insert it into a new project or use matching project data.',
     );
   }
+  const scene = {
+    ...prepared.scene,
+    objects: [...prepared.scene.objects, ...prepared.objects],
+    groups: [...(prepared.scene.groups ?? []), ...prepared.groups],
+    artworkOrder: insertedArtworkOrder(state.project, source, prepared.objects),
+  };
+  if (validateSceneBudgets(scene) !== null) {
+    throw new Error(
+      'This artwork would exceed the project limits for artwork, operations or groups. Remove unused items, or insert it into a new project.',
+    );
+  }
   const [primary, ...rest] = prepared.selectedObjectIds;
   return {
     project: {
@@ -135,12 +147,7 @@ export function insertPersonalArtwork(state: AppState, entry: PersonalArtwork): 
       embeddedFonts: fonts.fonts,
       ...(cnc.machine === undefined ? {} : { machine: cnc.machine }),
       ...(variables === undefined ? {} : { variables }),
-      scene: {
-        ...prepared.scene,
-        objects: [...prepared.scene.objects, ...prepared.objects],
-        groups: [...(prepared.scene.groups ?? []), ...prepared.groups],
-        artworkOrder: insertedArtworkOrder(state.project, source, prepared.objects),
-      },
+      scene,
     },
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),

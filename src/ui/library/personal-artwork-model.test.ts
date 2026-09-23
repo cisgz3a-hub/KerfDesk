@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
+  createLayer,
   createProject,
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -7,6 +8,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { prepareProjectForPersistence } from '../../io/project';
+import { PROJECT_SCENE_LIMITS } from '../../io/project/project-scene-integrity-validator';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import {
@@ -99,6 +101,67 @@ it('inserts new object/group/operation/font identities into a colliding project 
   expect(useStore.getState().project).toBe(destination);
   useStore.getState().redo();
   expect(useStore.getState().project).toBe(inserted);
+});
+
+it.each(['operations', 'artwork'] as const)(
+  'refuses insertion atomically when its %s would exceed the saved-project budget',
+  async (budget) => {
+    select();
+    const entry = await capturePersonalArtwork(useStore.getState(), 'Logo', 'Jigs');
+    const source = artworkProject();
+    const project = {
+      ...createProject(),
+      scene: {
+        objects:
+          budget === 'artwork'
+            ? Array.from({ length: PROJECT_SCENE_LIMITS.objects }, (_, index) => ({
+                ...source.scene.objects[0]!,
+                id: `existing-${index}`,
+              }))
+            : [],
+        layers:
+          budget === 'operations'
+            ? Array.from({ length: PROJECT_SCENE_LIMITS.layers - 2 }, (_, index) =>
+                createLayer({
+                  id: `existing-operation-${index}`,
+                  color: `#${index.toString(16).padStart(6, '0')}`,
+                }),
+              )
+            : [source.scene.layers[0]!],
+        groups: [],
+      },
+    };
+    expect(prepareProjectForPersistence(project).kind).toBe('ok');
+    useStore.setState({ project, undoStack: [source], redoStack: [source], dirty: false });
+    const before = useStore.getState();
+    expect(() => useStore.setState((state) => insertPersonalArtwork(state, entry))).toThrow(
+      'exceed the project limits',
+    );
+    expect(useStore.getState()).toBe(before);
+  },
+);
+
+it('allows insertion that exactly fills the saved-project operation budget', async () => {
+  select();
+  const entry = await capturePersonalArtwork(useStore.getState(), 'Logo', '');
+  const project = {
+    ...createProject(),
+    scene: {
+      objects: [],
+      layers: Array.from({ length: PROJECT_SCENE_LIMITS.layers - 3 }, (_, index) =>
+        createLayer({
+          id: `existing-operation-${index}`,
+          color: `#${index.toString(16).padStart(6, '0')}`,
+        }),
+      ),
+      groups: [],
+    },
+  };
+  useStore.setState({ project });
+  useStore.setState((state) => insertPersonalArtwork(state, entry));
+  const inserted = useStore.getState().project;
+  expect(inserted.scene.layers).toHaveLength(PROJECT_SCENE_LIMITS.layers);
+  expect(prepareProjectForPersistence(inserted).kind).toBe('ok');
 });
 
 it('captures original paged PNG bytes and full luma so export/import needs no source database', async () => {
