@@ -11,6 +11,9 @@
 // Disconnect handling: the `disconnect` event fires when the OS drops the
 // port (USB cable yank). We surface that via the SerialConnection.onClose
 // handlers so the controller state machine can transition to "Disconnected".
+// A UART line error (framing, parity, break, overrun) is not a disconnect: the
+// port stays open and the read loop continues on a fresh stream
+// (serial-read-loop.ts, audit connect-1).
 //
 // Quirk: Chromium and Electron sometimes return a SerialPort instance from
 // requestPort() that's still flagged "open" from a previous session
@@ -27,8 +30,8 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
-import { createReadSlice, type ReadSlice } from './serial-read-slice';
-import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
+import { runSerialReadLoop, type SerialReadTarget } from './serial-read-loop';
+import { encodeWireBytes, extractSerialLines } from './serial-wire';
 import { createWorkerSerialConnection } from './worker-serial-connection';
 import type { SerialWorkerResponse } from './serial-worker-protocol';
 
@@ -188,15 +191,28 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
 
 type Subscribers<T> = Set<(value: T) => void>;
 
-function makeConnection(port: SerialPort): SerialConnection {
-  const lineSubs: Subscribers<string> = new Set();
-  const closeSubs: Subscribers<void> = new Set();
-  const ctx = {
+type ConnectionContext = SerialReadTarget & {
+  closed: boolean;
+  streamsClosed: boolean;
+  readonly writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
+};
+
+function openConnectionContext(port: SerialPort): ConnectionContext {
+  const ctx: ConnectionContext = {
+    port,
     closed: false,
     streamsClosed: false,
     reader: port.readable?.getReader(),
     writer: port.writable?.getWriter(),
+    isOpen: () => !ctx.closed && !ctx.streamsClosed,
   };
+  return ctx;
+}
+
+function makeConnection(port: SerialPort): SerialConnection {
+  const lineSubs: Subscribers<string> = new Set();
+  const closeSubs: Subscribers<void> = new Set();
+  const ctx = openConnectionContext(port);
 
   const closeStreamsOnce = async (): Promise<void> => {
     if (ctx.streamsClosed) return;
@@ -217,7 +233,7 @@ function makeConnection(port: SerialPort): SerialConnection {
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
-  void runReadLoop(ctx.reader, lineSubs, handleDroppedConnection, () => !ctx.closed);
+  void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection);
 
   const closeConnection = async (): Promise<void> => {
     if (ctx.closed) return;
@@ -285,79 +301,6 @@ function makeConnection(port: SerialPort): SerialConnection {
       await forgetConnection();
     },
   };
-}
-
-async function runReadLoop(
-  reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
-  lineSubs: Subscribers<string>,
-  onEnd: () => void,
-  isOpen: () => boolean,
-): Promise<void> {
-  if (reader === undefined) return;
-  const decoder = new TextDecoder('utf-8');
-  const slice = createReadSlice();
-  let framing = EMPTY_SERIAL_LINE_STATE;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      slice.resumed();
-      const extracted = extractSerialLines(framing, decoder.decode(value, { stream: true }));
-      framing = extracted.state;
-      const dispatched = dispatchLines(lineSubs, extracted.lines, slice, isOpen, 0);
-      if (dispatched !== true && !(await dispatched)) break;
-    }
-  } catch (err) {
-    console.error('Serial read loop terminated:', err);
-  } finally {
-    slice.close();
-    onEnd();
-  }
-}
-
-// Dispatches in wire order, synchronously while the task's slice lasts (so an
-// ordinary chunk behaves exactly as before), then continues on a later task
-// (ADR-356). A connection closed during that yield gets no further lines: they
-// are dropped exactly as bytes still in flight at close are.
-function dispatchLines(
-  lineSubs: Subscribers<string>,
-  lines: ReadonlyArray<string>,
-  slice: ReadSlice,
-  isOpen: () => boolean,
-  from: number,
-): true | Promise<boolean> {
-  for (let index = from; index < lines.length; index += 1) {
-    if (slice.spent()) return dispatchAfterYield(lineSubs, lines, slice, isOpen, index);
-    dispatchLine(lineSubs, lines[index] ?? '');
-  }
-  return true;
-}
-
-async function dispatchAfterYield(
-  lineSubs: Subscribers<string>,
-  lines: ReadonlyArray<string>,
-  slice: ReadSlice,
-  isOpen: () => boolean,
-  from: number,
-): Promise<boolean> {
-  await slice.yieldTask();
-  if (!isOpen()) return false;
-  return await dispatchLines(lineSubs, lines, slice, isOpen, from);
-}
-
-// Subscriber exceptions must not masquerade as a dropped cable: before this
-// isolation, one throwing handler exited the read loop through catch/finally,
-// closed the streams, and fired onClose — a full mid-job "port closed" — and
-// silently dropped the rest of the chunk's lines. Loop-fatal behavior is
-// reserved for genuine stream errors from reader.read().
-function dispatchLine(lineSubs: Subscribers<string>, line: string): void {
-  for (const h of lineSubs) {
-    try {
-      h(line);
-    } catch (err) {
-      console.error('Serial line handler threw; continuing with remaining lines:', err);
-    }
-  }
 }
 
 // The reader / writer must be cancelled-and-awaited before port.close() —
