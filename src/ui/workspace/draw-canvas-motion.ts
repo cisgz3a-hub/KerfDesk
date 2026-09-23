@@ -10,9 +10,10 @@ import {
 import { cncPassPosition } from '../state/canvas-pass-progress';
 import { canvasTheme } from '../theme/canvas-theme';
 import { burnIsActive, drawBurnGlow, drawBurnTail } from './draw-burn-trail';
-import { drawCanvasMotionRoute, type RoutePalette } from './draw-canvas-motion-route';
+import { drawCanvasMotionRoute } from './draw-canvas-motion-route';
 import { drawCanvasStartMarkers } from './draw-canvas-motion-markers';
 import type { MarkerBox } from './canvas-motion-marker-layout';
+import type { RoutePalette } from './motion-route-style';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewTransform } from './view-transform';
 
@@ -35,16 +36,21 @@ function routePalette(): RoutePalette {
   };
 }
 
+/**
+ * `requestRedraw` repaints the whole layer later: the route raster calls it when
+ * a view change has settled or a sliced rebuild has caught up (ADR-346 rule).
+ */
 export function drawCanvasMotionOverlay(
   ctx: CanvasRenderingContext2D,
   overlay: CanvasMotionOverlay,
   view: ViewTransform,
   viewport?: CanvasBitmapSize,
   artwork: ReadonlyArray<MarkerBox> = [],
+  requestRedraw?: () => void,
 ): void {
   const { plan, run } = overlay;
   if (run !== null) {
-    drawCanvasMotionRoute(ctx, plan, run, view, routePalette());
+    drawCanvasMotionRoute(ctx, plan, run, view, routePalette(), requestRedraw);
     drawBurnTail(ctx, plan, run, view);
   }
   drawApproach(ctx, plan, run, view);

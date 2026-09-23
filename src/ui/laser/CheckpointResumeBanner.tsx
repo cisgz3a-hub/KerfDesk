@@ -1,17 +1,19 @@
 // Optional, newest-only recovery capsule. Archived jobs are observational
 // until the operator explicitly reaches a final supervised Start action.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import {
+  RECOVERY_CLAIM_LEASE_MS,
   recoveryClaimIsExpired,
   recoveryRepository,
   type RecoveryCapsule,
   type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
 } from '../state/recovery';
-import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
@@ -21,22 +23,17 @@ export function CheckpointResumeBanner(props: {
   readonly repository?: RecoveryRepository;
 }): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const snapshot = useRecoveryRepositorySnapshot(repository);
-  const capsule = snapshot.recoveryCapsule;
+  const { recoveryCapsule: capsule, pendingStart } = useRecoveryRepositorySelection(
+    selectBannerSlots,
+    repository,
+  );
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
   const [reviewOpen, setReviewOpen] = useState(false);
+  const claimActive = useRecoveryClaimActive(capsule?.claim);
   // A pending Start may already have reached the controller. Never offer the
   // older capsule during the short owner lease; it returns only if arming is
   // cancelled, otherwise the candidate commits or reconciles as newest.
-  if (jobActive || snapshot.pendingStart !== null || capsule === null) return null;
-
-  // A claim only blocks Review while its lease is live. A crash between claiming
-  // and arming leaves an abandoned claim; once it outlives the lease Review
-  // re-opens rather than stranding the record forever (audit B4). Evaluated at
-  // render: the banner appears on the post-crash reload, when the stale claim is
-  // already old.
-  const claimActive =
-    capsule.claim !== undefined && !recoveryClaimIsExpired(capsule.claim, Date.now());
+  if (jobActive || pendingStart !== null || capsule === null) return null;
 
   return (
     <>
@@ -76,6 +73,36 @@ export function CheckpointResumeBanner(props: {
       ) : null}
     </>
   );
+}
+
+function selectBannerSlots({ recoveryCapsule, pendingStart }: RecoveryRepositorySnapshot) {
+  return { recoveryCapsule, pendingStart };
+}
+
+// setTimeout overflows past 2^31-1 ms and fires at once; a longer wait re-arms.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+// A claim only blocks Review while its lease is live. A crash between claiming
+// and arming leaves an abandoned claim; once it outlives the lease Review
+// re-opens rather than stranding the record forever (audit B4). The lease ends
+// on the clock, not on a store write, and an idle rail no longer re-renders on
+// each status poll, so the banner arms its own timer for the expiry instant;
+// otherwise Review stayed locked until something unrelated re-rendered it.
+function useRecoveryClaimActive(claim: RecoveryCapsule['claim']): boolean {
+  const [expiryCheck, setExpiryCheck] = useState(0);
+  const active = claim !== undefined && !recoveryClaimIsExpired(claim, Date.now());
+  const expiresAtMs =
+    claim === undefined ? Number.NaN : Date.parse(claim.claimedAtIso) + RECOVERY_CLAIM_LEASE_MS;
+  useEffect(() => {
+    // An unparseable claim time never expires (it fails closed), so no timer.
+    if (!active || Number.isNaN(expiresAtMs)) return undefined;
+    const delayMs = Math.min(Math.max(0, expiresAtMs - Date.now()), MAX_TIMER_DELAY_MS);
+    // Re-rendering re-reads the clock; a wake that finds the lease still live
+    // (clamped wait, wall clock stepped back) re-arms through expiryCheck.
+    const timer = window.setTimeout(() => setExpiryCheck((count) => count + 1), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [active, expiresAtMs, expiryCheck]);
+  return active;
 }
 
 function RecoveryDescription({

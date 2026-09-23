@@ -1,5 +1,6 @@
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 export type ControllerQualificationPhase =
   | 'controller-response'
@@ -156,7 +157,7 @@ function controllerQualificationIsBusy(state: LaserState): boolean {
     state.controllerOperation !== null ||
     state.motionOperation !== null ||
     state.pendingUntrackedAcks > 0 ||
-    (state.pendingTransportWrites ?? 0) > 0 ||
+    pendingTransportWriteCount(state) > 0 ||
     isActiveJob(state.streamer)
   );
 }

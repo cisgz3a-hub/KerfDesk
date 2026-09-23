@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
-import { recoveryRepository, type RecoveryRepository } from '../../state/recovery';
+import {
+  recoveryRepository,
+  type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
+} from '../../state/recovery';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
-import { useRecoveryRepositorySnapshot } from '../../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
 
 export function SecondPassControl(props: {
   busy: boolean;
@@ -10,7 +14,7 @@ export function SecondPassControl(props: {
   repository?: RecoveryRepository;
 }): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const snapshot = useRecoveryRepositorySnapshot(repository);
+  const snapshot = useRecoveryRepositorySelection(selectCompletedSlots, repository);
   const [selected, setSelected] = useState('');
   const openEditor = useLaserSecondPassUiStore((s) => s.openEditor);
   const records = snapshot.executionHistory
@@ -66,6 +70,13 @@ export function SecondPassControl(props: {
       )}
     </div>
   );
+}
+
+function selectCompletedSlots({
+  executionHistory,
+  lastCompletedReceipt,
+}: RecoveryRepositorySnapshot) {
+  return { executionHistory, lastCompletedReceipt };
 }
 
 function selectedCompletedRun(

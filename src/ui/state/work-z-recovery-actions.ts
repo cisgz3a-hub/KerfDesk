@@ -7,6 +7,7 @@ import { mpgCommandBlockMessage, pushLog, setupCommandBlockMessage } from './las
 import type { LaserState } from './laser-store';
 import { useStore } from './store';
 import { captureControllerWorkZEvidence } from './work-z-zero-evidence';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 export type WorkZRecoveryConfirmation = {
   readonly activeToolId: string;
@@ -150,7 +151,7 @@ function recoveryMachineStateIssue(state: LaserState): string | null {
   const mpgBlock = mpgCommandBlockMessage(state);
   if (mpgBlock !== null) return mpgBlock;
   if (state.statusReport?.state !== 'Idle') return 'CNC must report Idle before Work-Z recovery.';
-  if (state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0) {
+  if (state.pendingUntrackedAcks > 0 || pendingTransportWriteCount(state) > 0) {
     return 'Wait for earlier controller writes and acknowledgements before Work-Z recovery.';
   }
   return null;

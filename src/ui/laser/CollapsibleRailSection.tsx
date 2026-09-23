@@ -4,11 +4,25 @@ interface Props {
   readonly label: string;
   readonly title?: string;
   readonly children: ReactNode;
+  // Mirrors the native disclosure state for a parent that mounts costly
+  // content only while the section is open. The <details> stays uncontrolled.
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
-export function CollapsibleRailSection({ label, title, children }: Props): JSX.Element {
+export function CollapsibleRailSection({
+  label,
+  title,
+  children,
+  onOpenChange,
+}: Props): JSX.Element {
   return (
-    <details className="lf-machine-disclosure" style={sectionStyle}>
+    <details
+      className="lf-machine-disclosure"
+      style={sectionStyle}
+      onToggle={
+        onOpenChange === undefined ? undefined : (event) => onOpenChange(event.currentTarget.open)
+      }
+    >
       <summary style={summaryStyle} title={title}>
         {label}
       </summary>

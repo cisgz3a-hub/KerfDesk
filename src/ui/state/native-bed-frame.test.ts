@@ -5,7 +5,12 @@ import {
   nativeBedFrame,
   nativePointToBed,
 } from '../../core/devices/native-bed-frame';
-import { resolveNativeBedFrame, type NativeBedEvidence } from './native-bed-frame';
+import {
+  nativeBedEvidenceSnapshot,
+  resolveNativeBedFrame,
+  selectNativeBedEvidence,
+  type NativeBedEvidence,
+} from './native-bed-frame';
 import { stockNativeEvidence } from './native-bed-frame.test-support';
 
 const ORIGINS: Origin[] = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'];
@@ -92,5 +97,27 @@ describe('verified native controller to profile-bed frame', () => {
     expect(
       nativeBedFrame({ ...DEVICE, bedWidth: NaN }, { minX: -358, minY: -268, maxX: 0, maxY: 0 }),
     ).toBeNull();
+  });
+});
+
+describe('selectNativeBedEvidence', () => {
+  it('reuses one snapshot until a field the snapshot copies changes', () => {
+    const evidence = stockNativeEvidence(DEVICE);
+    const first = selectNativeBedEvidence(evidence);
+    expect(first).toEqual(nativeBedEvidenceSnapshot(evidence));
+    // A store set that leaves every evidence field alone (an acknowledged line).
+    expect(selectNativeBedEvidence({ ...evidence })).toBe(first);
+
+    // Driven by the snapshot's own keys, so a field added to the snapshot but
+    // not to the memo's inputs fails here instead of serving stale evidence.
+    let previous = first;
+    for (const key of Object.keys(first)) {
+      const changed = { ...evidence, [key]: { changedField: key } } as typeof evidence;
+      const selected = selectNativeBedEvidence(changed);
+      expect(selected).not.toBe(previous);
+      expect(selected).toEqual(nativeBedEvidenceSnapshot(changed));
+      previous = selectNativeBedEvidence(evidence);
+      expect(previous).toEqual(first);
+    }
   });
 });

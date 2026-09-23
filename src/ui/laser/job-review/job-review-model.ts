@@ -3,12 +3,7 @@
 // still read stores directly; compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
-import {
-  analyzeFillHeatRisk,
-  formatDuration,
-  type Job,
-  type ScanOffsetPoint,
-} from '../../../core/job';
+import { formatDuration, type Job, type ScanOffsetPoint } from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
   machineKindOf,
@@ -34,6 +29,7 @@ import {
   originTileValue,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
+import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
@@ -286,7 +282,7 @@ function fillRunwayTiles(
   job: Job,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): ReadonlyArray<JobReviewStatTile> {
-  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
+  const coverage = memoizedFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount === 0) return [];
   const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
   return [

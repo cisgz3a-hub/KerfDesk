@@ -17,7 +17,10 @@ import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
+import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
+import { canvasMachineRevision } from './canvas-machine-revision';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import {
   buildIdleCanvasMotionPlanFromRequest,
@@ -37,11 +40,10 @@ export function useCanvasMotionOverlay(
   const interactionActive = useStore((state) => state.pendingUndo !== null);
   const outputScope = useOutputScope();
   const liveRun = useLaserStore((state) => state.liveCanvasRun ?? null);
+  const motionActive = useLaserStore((state) => state.motionOperation !== null);
+  const framePreparing = useFramePreparationStore((state) => state.pending);
   const machineRevision = useLaserStore(canvasMachineRevision);
-  const laser = useMemo(
-    () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
-    [machineRevision],
-  );
+  const laser = useCanvasMachineSnapshot(machineRevision);
   const printAndCut = useExperimentalLaserFeatures((state) => state.features.printAndCut);
   const firstRegistration = usePrintCutSessionStore((state) => state.first);
   const secondRegistration = usePrintCutSessionStore((state) => state.second);
@@ -65,30 +67,55 @@ export function useCanvasMotionOverlay(
     registrationKey,
     machineRevision,
     interactionActive,
+    motionActive: motionActive || framePreparing,
     laser,
     canvasCovered,
   });
 
-  const currentIdlePlan = idlePlan?.current === true ? idlePlan.plan : null;
   const staleTerminalRun = shouldClearTerminalRun(
     liveRun,
-    currentIdlePlan,
+    idlePlan?.current === true ? idlePlan.plan : null,
     project.scene.objects.length === 0,
   );
   useClearStaleTerminalRun(liveRun, staleTerminalRun);
 
-  if (previewMode || canvasCovered) return null;
-  if (liveRun !== null && !staleTerminalRun) {
-    return {
-      plan: liveRun.plan,
-      run: liveRun,
-      showStartMarkers,
-      planIsCurrent: isActiveCanvasLifecycle(liveRun) || idlePlan?.current === true,
-    };
-  }
-  return idlePlan === null
-    ? null
-    : { plan: idlePlan.plan, run: null, showStartMarkers, planIsCurrent: idlePlan.current };
+  // The motion layer redraws whenever this object's identity changes, so a fresh
+  // literal per render repainted it on every Workspace render (drags, drafts,
+  // parent re-renders) although nothing it draws had changed.
+  const visiblePlan = idlePlan?.plan ?? null;
+  const visiblePlanIsCurrent = idlePlan?.current === true;
+  const colorScheme = useCanvasColorScheme();
+  return useMemo(() => {
+    // The draw reads its palette from canvasTheme's scheme-dependent getters, so
+    // a theme switch must hand the layer a new object or it keeps the old colors.
+    void colorScheme;
+    if (previewMode || canvasCovered) return null;
+    if (liveRun !== null && !staleTerminalRun) {
+      return {
+        plan: liveRun.plan,
+        run: liveRun,
+        showStartMarkers,
+        planIsCurrent: isActiveCanvasLifecycle(liveRun) || visiblePlanIsCurrent,
+      };
+    }
+    return visiblePlan === null
+      ? null
+      : {
+          plan: visiblePlan,
+          run: null,
+          showStartMarkers,
+          planIsCurrent: visiblePlanIsCurrent,
+        };
+  }, [
+    previewMode,
+    canvasCovered,
+    liveRun,
+    staleTerminalRun,
+    visiblePlan,
+    visiblePlanIsCurrent,
+    showStartMarkers,
+    colorScheme,
+  ]);
 }
 
 type IdlePlanInput = {
@@ -101,6 +128,7 @@ type IdlePlanInput = {
   readonly registrationKey: string;
   readonly machineRevision: string;
   readonly interactionActive: boolean;
+  readonly motionActive: boolean;
   readonly laser: ReturnType<typeof canvasMachineSnapshot>;
   readonly canvasCovered: boolean;
 };
@@ -183,6 +211,7 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
     input.registrationKey,
     input.machineRevision,
     input.interactionActive,
+    input.motionActive,
     input.laser,
     input.canvasCovered,
   ]);
@@ -225,9 +254,15 @@ function shouldClearIdlePlan(input: IdlePlanInput): boolean {
   return input.previewMode || input.canvasCovered || input.project.scene.objects.length === 0;
 }
 
+// The plan draws the rapid from the head, so it is keyed on the Idle position.
+// A Frame trace or a jog reports Idle between its moves, and each of those
+// positions started a whole-job compile in a fresh worker only to cancel it
+// half a second later, competing with Frame's own preparation. Plan once the
+// operation that owns the motion, or a Frame still preparing, has finished.
 function shouldDeferIdlePlan(input: IdlePlanInput): boolean {
   return (
     input.interactionActive ||
+    input.motionActive ||
     isActiveCanvasLifecycleOrNull(input.liveRun) ||
     (input.laser.statusReport !== null && input.laser.statusReport.state !== 'Idle')
   );
@@ -297,6 +332,15 @@ function useClearStaleTerminalRun(liveRun: LiveCanvasRun | null, stale: boolean)
   }, [liveRun, stale]);
 }
 
+function useCanvasMachineSnapshot(
+  machineRevision: string,
+): ReturnType<typeof canvasMachineSnapshot> {
+  return useMemo(
+    () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
+    [machineRevision],
+  );
+}
+
 function canvasMachineSnapshot(
   state: ReturnType<typeof useLaserStore.getState>,
   canvasRevision = '',
@@ -319,36 +363,6 @@ function canvasMachineSnapshot(
     statusQuery: state.capabilities.statusQuery,
     ...(canvasRevision === '' ? {} : { canvasRevision }),
   };
-}
-
-function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>): string {
-  const report = state.statusReport;
-  const position =
-    report === null
-      ? 'unknown'
-      : report.state === 'Idle'
-        ? `idle:${axisKey(report.mPos)}:${axisKey(report.wPos)}:${axisKey(report.wco)}`
-        : `busy:${report.state}`;
-  return [
-    state.connection.kind,
-    state.capabilities.statusQuery,
-    state.controllerSettings?.reportInches === true ? 'in' : 'mm',
-    state.workOriginActive ? 'origin' : 'machine',
-    String(state.trustedPositionEpoch ?? 0),
-    axisKey(state.wcoCache),
-    // The snapshot forwards homingState (ADR-327); confirmHome flips it without
-    // touching any other keyed field, so it must key the revision too.
-    state.homingState,
-    JSON.stringify(nativeBedEvidenceSnapshot(state)),
-    position,
-  ].join('|');
-}
-
-function axisKey(
-  axis: { readonly x: number; readonly y: number; readonly z: number } | null,
-): string {
-  if (axis === null) return '-';
-  return `${axis.x.toFixed(3)},${axis.y.toFixed(3)},${axis.z.toFixed(3)}`;
 }
 
 function statusQueryFor(

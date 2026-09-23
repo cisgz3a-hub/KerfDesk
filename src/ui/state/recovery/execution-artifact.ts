@@ -177,7 +177,11 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
   assertArchiveMayFit(args);
   const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
-  assertExecutionArtifactSizeWithinBudget({ ...args, canvasPlan }, 0, true);
+  // No budget walk here: the measurement below walks the finished artifact,
+  // which holds the same job, and enforces the same budget. Walking the inputs
+  // first doubled a node-per-motion-point traversal that runs while the first
+  // window of the job is on the wire (ADR-352); assertArchiveMayFit has already
+  // refused the hopeless case before any allocation.
   const prepared = prepareOutputForStructuredClone(args.prepared);
   const machineKind = machineKindOf(prepared.project.machine);
   const device = prepared.project.device;
@@ -290,11 +294,18 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
  * decode. Legacy exact artifacts are retained only as untrusted historical
  * data and are never authorized for runtime execution. */
 export function isCurrentExecutionArtifact(value: unknown): value is CurrentExecutionArtifactV2 {
+  return isExecutionArtifact(value) && executionArtifactIsCurrent(value);
+}
+
+/** The schema half of `isCurrentExecutionArtifact`, for a caller that already
+ * holds an artifact which passed `isExecutionArtifact`. */
+export function executionArtifactIsCurrent(
+  artifact: ExecutionArtifactV1,
+): artifact is CurrentExecutionArtifactV2 {
   return (
-    isExecutionArtifact(value) &&
-    value.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
-    value.provenance?.schemaVersion === 2 &&
-    value.provenance.archivedControllerObservationSha256 !== undefined
+    artifact.schemaVersion === EXECUTION_ARTIFACT_SCHEMA_VERSION &&
+    artifact.provenance?.schemaVersion === 2 &&
+    artifact.provenance.archivedControllerObservationSha256 !== undefined
   );
 }
 

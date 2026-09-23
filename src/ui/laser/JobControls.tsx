@@ -64,11 +64,11 @@ export function JobControls(props: Props): JSX.Element {
   const { disabled, onStartJob } = props;
   const configure = configureCallbacks(props);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
-  // By value and throttled: the streamer object is replaced on every
-  // acknowledgement, and this rail only shows a status and a line count
-  // (ADR-333).
-  const streamProgress = useLiveStreamProgress();
-  const status = streamProgress.status ?? undefined;
+  // Status by value: the streamer object is replaced on every acknowledgement
+  // (ADR-333), and this section only branches on the status. The line count
+  // lives in the LiveProgressBar leaf, so a burn re-renders that bar rather
+  // than the whole Job section and every control inside it.
+  const status = useLaserStore((s) => s.streamer?.status) ?? undefined;
   const isStreaming = status === 'streaming';
   const isPaused = status === 'paused';
   const isToolChange = status === 'tool-change';
@@ -144,7 +144,7 @@ export function JobControls(props: Props): JSX.Element {
         <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       </CollapsibleRailSection>
       <NoHomingPositionGuide disabled={disabled} streaming={controlsBusy} />
-      {streamProgress.total > 0 && <ProgressBar progress={streamProgress} />}
+      <LiveProgressBar />
     </div>
   );
 }
@@ -223,6 +223,12 @@ function PlacementSection(props: {
       {controls}
     </CollapsibleRailSection>
   );
+}
+
+// Throttled by useLiveStreamProgress; absent until the stream has a line total.
+function LiveProgressBar(): JSX.Element | null {
+  const progress = useLiveStreamProgress();
+  return progress.total > 0 ? <ProgressBar progress={progress} /> : null;
 }
 
 function ProgressBar({ progress }: { readonly progress: LiveStreamProgress }): JSX.Element {

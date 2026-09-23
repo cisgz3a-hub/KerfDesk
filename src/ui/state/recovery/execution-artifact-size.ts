@@ -50,6 +50,13 @@ function executionArtifactValueBytes(
   const primitiveBytes = executionArtifactPrimitiveBytes(value, allowTransientFunctions);
   if (primitiveBytes !== null) return primitiveBytes;
   const objectValue = value as object;
+  // Plain objects and arrays are nearly every node of a job (one per motion
+  // point), and none of them can be a buffer, a view or another clone type, so
+  // they skip those checks. The walk runs while the first window of a job is
+  // already on the wire (ADR-352).
+  if (isPlainCloneContainer(objectValue)) {
+    return plainContainerBytes(objectValue, pending, seenContainers);
+  }
   const binaryBytes = executionArtifactBinaryBytes(objectValue, seenContainers, seenBackingBuffers);
   return binaryBytes ?? cloneContainerBytes(objectValue, pending, seenContainers);
 }
@@ -100,13 +107,25 @@ function cloneContainerBytes(
   seenContainers.add(value);
   const structuredCloneBytes = supportedCloneContainerBytes(value, pending);
   if (structuredCloneBytes !== null) return structuredCloneBytes;
-  if (!isPlainCloneContainer(value)) return Number.MAX_SAFE_INTEGER;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+// Object.keys, not Object.entries: the same own enumerable keys in the same
+// order, without allocating a [key, value] pair per property.
+function plainContainerBytes(
+  value: object,
+  pending: unknown[],
+  seenContainers: WeakSet<object>,
+): number {
+  if (seenContainers.has(value)) return 0;
+  seenContainers.add(value);
   let bytes = Array.isArray(value)
     ? boundedAdd(OBJECT_OVERHEAD_BYTES, value.length * ENTRY_OVERHEAD_BYTES)
     : OBJECT_OVERHEAD_BYTES;
-  for (const [key, child] of Object.entries(value)) {
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
     bytes = boundedAdd(bytes, key.length * 3 + ENTRY_OVERHEAD_BYTES);
-    pending.push(child);
+    pending.push(record[key]);
   }
   return bytes;
 }
@@ -155,8 +174,11 @@ function backingBufferBytes(buffer: ArrayBufferLike, seenBackingBuffers: WeakSet
   return boundedAdd(buffer.byteLength, OBJECT_OVERHEAD_BYTES);
 }
 
+const SHARED_ARRAY_BUFFER: typeof SharedArrayBuffer | null =
+  typeof SharedArrayBuffer === 'undefined' ? null : SharedArrayBuffer;
+
 function isSharedArrayBuffer(value: object): value is SharedArrayBuffer {
-  return typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer;
+  return SHARED_ARRAY_BUFFER !== null && value instanceof SHARED_ARRAY_BUFFER;
 }
 
 function isPlainCloneContainer(value: object): boolean {

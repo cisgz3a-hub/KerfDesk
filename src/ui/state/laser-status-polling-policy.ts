@@ -1,3 +1,4 @@
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { hasUnsettledStreamAcks, isActiveJob } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 
@@ -23,7 +24,7 @@ export function canSendQueuedStatusQuery(
   idlePollDivisor: number,
 ): boolean {
   if (hasUnsettledStreamAcks(state.streamer)) return false;
-  if (state.pendingUntrackedAcks > 0 || (state.pendingTransportWrites ?? 0) > 0) return false;
+  if (state.pendingUntrackedAcks > 0 || pendingTransportWriteCount(state) > 0) return false;
   if (refs.controllerCommand !== null) return false;
   return shouldFastPoll(state) || pollTick % idlePollDivisor === 0;
 }
