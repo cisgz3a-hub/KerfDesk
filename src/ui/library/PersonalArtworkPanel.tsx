@@ -36,7 +36,12 @@ export function PersonalArtworkPanel(props: {
       {library.error !== '' ? (
         <p role="alert">
           {library.error}{' '}
-          <button type="button" disabled={library.busy} onClick={library.retry}>
+          <button
+            type="button"
+            title="Try loading My artwork again."
+            disabled={library.busy}
+            onClick={library.retry}
+          >
             Retry
           </button>
         </p>
@@ -63,6 +68,7 @@ function PersonalArtworkResults(props: {
             type="button"
             key={entry.id}
             aria-pressed={entry.id === selected?.id}
+            title="Choose this saved artwork to view its available actions."
             onClick={() => setSelectedId(entry.id)}
           >
             <strong>{entry.name}</strong>
@@ -79,6 +85,7 @@ function PersonalArtworkResults(props: {
           <button
             type="button"
             disabled={props.library.busy}
+            title="Add an editable copy of this artwork and its operations to the current project."
             onClick={() => props.library.insert(selected)}
           >
             Insert artwork
@@ -86,6 +93,7 @@ function PersonalArtworkResults(props: {
           <button
             type="button"
             disabled={props.library.busy}
+            title="Remove this saved entry from My artwork."
             onClick={() => props.library.remove(selected.id)}
           >
             Delete from My artwork

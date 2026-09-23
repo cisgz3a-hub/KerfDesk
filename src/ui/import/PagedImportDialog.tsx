@@ -94,6 +94,7 @@ function ImportPage({ request }: { readonly request: PagedImportRequest }): JSX.
         <Field label="Page">
           <NumberInput
             aria-label="Page to import"
+            title="Choose which document page to add to the current project."
             min={1}
             max={request.source.pageCount}
             step={1}
@@ -123,9 +124,12 @@ function ImportPage({ request }: { readonly request: PagedImportRequest }): JSX.
         ) : null}
       </div>
       <DialogActions>
-        <Button onClick={cancel}>Cancel</Button>
+        <Button title="Close this page import without adding artwork." onClick={cancel}>
+          Cancel
+        </Button>
         <Button
           variant="primary"
+          title="Add the selected page using the chosen import mode."
           disabled={page === null || busy}
           onClick={() => {
             void importPage();
@@ -212,6 +216,7 @@ function PagePreview({
         <select
           className="lf-input"
           aria-label="Page import mode"
+          title="Choose editable paths or an image of the complete page."
           value={mode}
           disabled={busy}
           onChange={(event) => setMode(event.target.value === 'paths' ? 'paths' : 'image')}
@@ -228,6 +233,7 @@ function PagePreview({
         <Field label="Resolution" unit="DPI">
           <NumberInput
             aria-label="Page image resolution"
+            title="Set image detail in dots per inch; the page keeps its physical size."
             min={1}
             value={dpi}
             disabled={busy}

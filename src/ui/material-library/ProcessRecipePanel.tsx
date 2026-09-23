@@ -23,11 +23,16 @@ export function ProcessRecipePanel(): JSX.Element {
         <span style={labelStyle}>Name</span>
         <input
           aria-label="Process recipe name"
+          title="Name the complete operation sequence saved from one selected artwork."
           value={model.name}
           onChange={(event) => model.setName(event.currentTarget.value)}
         />
       </label>
-      <Button disabled={model.count !== 1 || model.name.trim() === ''} onClick={model.save}>
+      <Button
+        disabled={model.count !== 1 || model.name.trim() === ''}
+        title="Save the selected artwork's complete operation sequence for reuse."
+        onClick={model.save}
+      >
         Save selected process
       </Button>
       <RecipePicker recipes={model.recipes} recipe={model.recipe} onChange={model.select} />
@@ -40,7 +45,11 @@ export function ProcessRecipePanel(): JSX.Element {
         >
           Apply recipe to selection
         </Button>
-        <Button disabled={model.recipe === undefined} onClick={model.remove}>
+        <Button
+          disabled={model.recipe === undefined}
+          title="Remove the selected recipe from this material library."
+          onClick={model.remove}
+        >
           Delete recipe
         </Button>
       </div>
@@ -75,6 +84,7 @@ function RecipePicker(props: {
       <span style={labelStyle}>Recipe</span>
       <select
         aria-label="Saved process recipe"
+        title="Choose a saved process recipe for this machine type."
         value={props.recipe?.id ?? ''}
         disabled={props.recipes.length === 0}
         onChange={(event) => props.onChange(event.currentTarget.value)}

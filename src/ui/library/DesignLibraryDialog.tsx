@@ -65,6 +65,7 @@ function OpenDesignLibraryDialog(): JSX.Element {
           type="button"
           className="lf-library-text-button"
           aria-pressed={collection === 'bundled'}
+          title="Browse the design catalogue."
           onClick={() => {
             owner.current.revision += 1;
             setCollection('bundled');
@@ -76,6 +77,7 @@ function OpenDesignLibraryDialog(): JSX.Element {
           type="button"
           className="lf-library-text-button"
           aria-pressed={collection === 'personal'}
+          title="Browse and reuse artwork saved on this device."
           onClick={() => {
             owner.current.revision += 1;
             setCollection('personal');
