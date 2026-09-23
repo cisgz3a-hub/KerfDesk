@@ -107,7 +107,8 @@ function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {
           title="Use the image pixels as-is and skip KerfDesk image processing."
         />
         <p className="lf-laser-help">
-          Pass-through skips image adjustments and uses the original pixels.
+          Pass-through keeps original pixels and density, skipping brightness, contrast, gamma,
+          negative and dither adjustments. Power range, placement, masks and Dot Width still apply.
         </p>
       </div>
     </details>

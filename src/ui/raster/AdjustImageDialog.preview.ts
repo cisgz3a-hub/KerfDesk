@@ -18,6 +18,7 @@ export function drawAdjustImagePreview(
   image: RasterImage,
   draft: PreviewDraft,
   mode: 'source' | 'processed',
+  maximumPowerPercent: number,
 ): void {
   if (canvas === null) return;
   const size = previewSize(image.pixelWidth, image.pixelHeight);
@@ -27,7 +28,9 @@ export function drawAdjustImagePreview(
   if (ctx === null) return;
   const luma = previewLuma(image, draft, mode, size);
   const rgba =
-    mode === 'source' ? grayscaleRgba(luma) : processedRgba(luma, size.width, size.height, draft);
+    mode === 'source'
+      ? grayscaleRgba(luma)
+      : processedRgba(luma, size.width, size.height, draft, maximumPowerPercent);
   const imageData = new Uint8ClampedArray(rgba.length);
   imageData.set(draft.invertDisplay ? invertRgba(rgba) : rgba);
   ctx.putImageData(new ImageData(imageData, size.width, size.height), 0, 0);
@@ -53,9 +56,13 @@ function processedRgba(
   width: number,
   height: number,
   draft: PreviewDraft,
+  maximumPowerPercent: number,
 ): Uint8ClampedArray {
-  const sMax = 1000;
-  const sMin = Math.round((Math.min(draft.minPower, 100) / 100) * sMax);
+  // Min Power is an absolute machine percentage, just like the operation's
+  // maximum. A fixed 100% maximum would show a different tonal range to export.
+  const maximum = Math.min(100, Math.max(0, maximumPowerPercent));
+  const sMax = Math.round((maximum / 100) * 1000);
+  const sMin = Math.round((Math.min(maximum, Math.max(0, draft.minPower)) / 100) * 1000);
   const sValues = dither(
     { luma, width, height },
     { algorithm: imageDitherAlgorithm(draft), sMax, sMin },
