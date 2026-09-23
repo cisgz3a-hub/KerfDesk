@@ -8,6 +8,7 @@ import { startControllerCommand } from './laser-interactive-command';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWriteFn } from './laser-line-shared';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 const OWNED_QUEUE_TIMEOUT_MS = 8_000;
 const OWNED_QUEUE_POLL_MS = 10;
@@ -185,7 +186,7 @@ async function waitForOwnedQueue(
     const state = get();
     if (
       state.pendingUntrackedAcks === 0 &&
-      (state.pendingTransportWrites ?? 0) === 0 &&
+      pendingTransportWriteCount(state) === 0 &&
       (state.motionOperation?.pendingMotionTransportWrites ?? 0) === 0
     ) {
       return;
