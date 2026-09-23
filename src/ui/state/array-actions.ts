@@ -2,6 +2,7 @@ import {
   arrayPlacements,
   combinedBBox,
   sceneObjectHasVisibleLayer,
+  type ArrayPlacement,
   type ArraySpec,
   type Bounds,
   type Project,
@@ -19,6 +20,7 @@ export { placedObject } from './array-selection-copies';
 export type ArrayMaterialization = {
   readonly bounds: Bounds;
   readonly sources: ReadonlyArray<ReadonlyArray<SceneObject>>;
+  readonly placements?: ReadonlyArray<ArrayPlacement>;
 };
 export type ArrayActions = {
   readonly arraySelection: (
@@ -50,7 +52,7 @@ export function applyArraySelection(
   const selection = arraySourceSelection(state, materialized);
   if (selection === null) return state;
   const { selectedIds, sourceObjects, selected, bounds } = selection;
-  const placements = arrayPlacements(bounds, spec);
+  const placements = materialized?.placements ?? arrayPlacements(bounds, spec);
   const first = placements[0];
   if (first === undefined) return state;
 

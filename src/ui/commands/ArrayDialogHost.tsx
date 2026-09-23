@@ -28,7 +28,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   };
   const apply = async (spec: ArraySpec, advanceVariables = false): Promise<void> => {
     const owner = ++request.current;
-    if (!advanceVariables || spec.kind !== 'grid') {
+    if (!advanceVariables) {
       arraySelection(spec);
       close();
       return;

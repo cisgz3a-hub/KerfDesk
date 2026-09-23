@@ -1,4 +1,5 @@
 import { bendTextRender, placeTextOnPath } from '../../core/text';
+import { IDENTITY_TRANSFORM } from '../../core/scene';
 import type { VariableTextRenderer } from '../../io/gcode';
 import { renderTextGeometry } from './render-text-geometry';
 import { applyTextWeld } from './apply-text-weld';
@@ -24,7 +25,8 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     if (placed.kind !== 'ok') throw new Error(placed.message);
     return {
       ...applyTextWeld(placed.rendered, text.fontKey, text.weldOverlaps),
-      transform: { ...text.transform, x: placed.origin.x, y: placed.origin.y },
+      // The guide's transform is already baked into placed world-space paths.
+      transform: { ...IDENTITY_TRANSFORM, x: placed.origin.x, y: placed.origin.y },
     };
   }
   return applyTextWeld(
