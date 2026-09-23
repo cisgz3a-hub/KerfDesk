@@ -10,6 +10,11 @@ export type LaserControllerOperation =
       readonly phase: 'command' | 'settling' | 'awaiting-idle';
       readonly idleReports: number;
       readonly operationId: number;
+      /** Home was written to a controller in Alarm and no non-Alarm report has
+       * arrived since. An Alarm report in this window can answer a status
+       * query the controller serviced before it executed the Home line, so it
+       * is not evidence of a new Alarm (see laser-home-alarm-reply). */
+      readonly awaitingFirstNonAlarmReport?: true;
     }
   | {
       readonly kind: 'autofocus';
