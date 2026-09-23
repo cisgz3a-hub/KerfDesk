@@ -143,7 +143,7 @@ describe('Smoothieware lifecycle against the simulator', () => {
     const sim = await connectSmoothieIdle({ motionMs: 300, initialManualFire: true });
     await useLaserStore.getState().jog({ dx: 7, feed: 900 });
     expect(sim.outbound().at(-1)).toBe(
-      'fire off\nM400\nM221 S0\nM5\nM9\nG21\nG91\nG0 X7.000 F900\nG90\n',
+      'fire off\nM400\nM221 S0\nM5\nM9\nM120\nG21\nG91\nG0 X7.000 F900\nG90\nM121\n',
     );
     await pump(900);
     expect(useLaserStore.getState().motionOperation).toBeNull();
@@ -170,14 +170,15 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(sim.outbound()).not.toContain('FIRE OFF\n');
   });
 
-  it('homes with G28.2 and confirms after fresh Idle', async () => {
+  it('homes with $H and confirms after fresh Idle', async () => {
     const sim = await connectSmoothieIdle({ initialManualFire: true });
     const home = useLaserStore.getState().home();
     await pump(1000);
     await home;
     expect(useLaserStore.getState().homingState).toBe('confirmed');
-    expect(sim.outbound()).toContain('G28.2\n');
+    expect(sim.outbound()).toContain('$H\n');
     expect(sim.state().isHomed).toBe(true);
+    expect(sim.state().parkMoves).toBe(0);
     expect(sim.state().manualFire).toBe(false);
     expect(sim.state().laserScale).toBe(0);
   });
@@ -185,7 +186,9 @@ describe('Smoothieware lifecycle against the simulator', () => {
   it('acknowledges native beam-off cleanup before Frame motion', async () => {
     const sim = await connectSmoothieIdle({ initialManualFire: true });
     const frame = useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 1000);
-    await pump(4000);
+    // Each Frame line after the tool-off prefix waits for a fresh Idle poll;
+    // the M120/M121 seek-rate push/pop adds two of them.
+    await pump(6000);
     await frame;
     expect(useLaserStore.getState().motionOperation).toBeNull();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
@@ -324,6 +327,8 @@ describe('Smoothieware lifecycle against the simulator', () => {
     await send;
     expect(sim.outbound()).toContain('version\n');
     expect(useLaserStore.getState().log.some((l) => l.includes('Build version'))).toBe(true);
+    // Upstream prints no ok after `version`; its build line is the completion.
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     await expect(
       useLaserStore.getState().sendConsoleCommand('config-set sd foo bar'),
     ).rejects.toThrow(/persistent Smoothie configuration/i);

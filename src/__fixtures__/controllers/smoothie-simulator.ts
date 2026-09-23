@@ -1,10 +1,18 @@
-// smoothie-simulator — scripted Smoothieware firmware over the fake serial
-// port. GRBL-flavored realtime bytes (? ! ~ Ctrl-X), `ok` per line, Smoothie
-// status format `<Idle|MPos:x,y,z|WPos:x,y,z>`, `!!` markers while halted,
-// M999 halt recovery, G28.2 homing that acks on completion.
+// smoothie-simulator — scripted Smoothieware V1 firmware over the fake serial
+// port. GRBL-flavored realtime bytes (? ! ~ Ctrl-X), `ok` per G-code line,
+// Smoothie status format `<Idle|MPos:x,y,z|WPos:x,y,z>`, `!!` markers while
+// halted (`error:Alarm lock` in grbl mode), M999 halt recovery. Shell lines
+// (`$...` and lowercase) answer exactly as upstream SimpleShell does, which
+// means most of them print no `ok` (smoothie-sim-shell.ts). The G28 family
+// follows the firmware dialect: `grblMode` defaults to false, the non-CNC
+// firmware.bin default, where G28 homes and G28.2 only parks.
+// Robot.cpp's seek/feed split is modelled too: F on a G0 line sets the seek
+// rate every later bare G0 inherits, and M120/M121 push/pop that state.
+// https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/robot/Robot.cpp
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
-import { parseMotionWords, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import { hasGWord, parseMotionWords, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import { smoothieReferenceEffect, smoothieShellReply } from './smoothie-sim-shell';
 import type { PlatformAdapter } from '../../platform/types';
 
 export type SmoothieSimRejectRule = {
@@ -19,6 +27,10 @@ export type CreateSmoothieSimulatorOptions = {
   readonly rejectLines?: ReadonlyArray<SmoothieSimRejectRule>;
   readonly emitBannerOnOpen?: boolean;
   readonly initialManualFire?: boolean;
+  /** Kernel grbl_mode. False (the default) models the stock non-CNC build. */
+  readonly grblMode?: boolean;
+  /** Robot default_seek_rate in mm/min (the config-sample value by default). */
+  readonly defaultSeekRate?: number;
 };
 
 export type SmoothieSimState = {
@@ -31,6 +43,14 @@ export type SmoothieSimState = {
   readonly laserScale: number;
   readonly proportionalPower: boolean;
   readonly burnPowers: ReadonlyArray<number>;
+  /** Endstop homing cycles actually run. */
+  readonly homingCycles: number;
+  /** Endstops::handle_park rapids to the saved park point. */
+  readonly parkMoves: number;
+  /** Current Robot seek_rate (mm/min): what a bare G0 would run at. */
+  readonly seekRate: number;
+  /** The seek rate each G0 move ran at, in order. */
+  readonly seekMoveRates: ReadonlyArray<number>;
 };
 
 export type SmoothieSimulator = {
@@ -41,6 +61,15 @@ export type SmoothieSimulator = {
   readonly triggerHalt: () => void;
 };
 
+type RobotModalState = {
+  readonly seekRate: number;
+  readonly feedRate: number;
+  readonly isAbsolute: boolean;
+};
+
+const DEFAULT_SEEK_RATE_MM_PER_MIN = 4000;
+const DEFAULT_FEED_RATE_MM_PER_MIN = 4000;
+
 export function createSmoothieSimulator(
   options: CreateSmoothieSimulatorOptions = {},
 ): SmoothieSimulator {
@@ -48,6 +77,7 @@ export function createSmoothieSimulator(
   const motionMs = options.motionMs ?? 10;
   const homingMs = options.homingMs ?? 5;
   const rejects = options.rejectLines ?? [];
+  const grblMode = options.grblMode ?? false;
   const port = createFakeSerialPort();
   let pos: SimVec3 = SIM_ZERO_VEC3;
   let machine: SmoothieSimState['machine'] = 'Idle';
@@ -61,6 +91,14 @@ export function createSmoothieSimulator(
   let proportionalPower = true;
   let motionPower = 0;
   const burnPowers: number[] = [];
+  let homingCycles = 0;
+  let parkMoves = 0;
+  let parkPosition = { x: 0, y: 0 }; // Endstops saved_position{0}
+  let seekRate = options.defaultSeekRate ?? DEFAULT_SEEK_RATE_MM_PER_MIN;
+  let feedRate = DEFAULT_FEED_RATE_MM_PER_MIN;
+  let motionMode: 0 | 1 = 0;
+  const seekMoveRates: number[] = [];
+  const stateStack: RobotModalState[] = [];
   let rxBuffer = '';
 
   const emit = (line: string): void => {
@@ -114,16 +152,50 @@ export function createSmoothieSimulator(
       return true;
     }
     if (/^M115\b/i.test(line)) {
-      emit('FIRMWARE_NAME:Smoothieware, FIRMWARE_URL:http%3A//smoothieware.org');
-      emit('ok');
-      return true;
-    }
-    if (/^version\b/i.test(line)) {
-      emit('Build version: edge-abc123, Build date: 2024, MCU: LPC1769');
+      emit(
+        `FIRMWARE_NAME:Smoothieware, FIRMWARE_URL:http%3A//smoothieware.org, X-GRBL_MODE:${grblMode ? 1 : 0}`,
+      );
       emit('ok');
       return true;
     }
     return false;
+  };
+
+  // Homing and parking block inside on_gcode_received, so the line's `ok`
+  // (GcodeDispatch, or SimpleShell for `$H`) prints only once motion ends.
+  const runHomingCycle = (): void => {
+    machine = 'Home';
+    pendingMotions = 0;
+    setTimeout(() => {
+      pos = SIM_ZERO_VEC3;
+      isHomed = true;
+      homingCycles += 1;
+      machine = 'Idle';
+      port.emitLine('ok');
+    }, homingMs);
+  };
+  const runParkMove = (): void => {
+    // handle_park: push_state, `G53 G0 X<saved> Y<saved>` at the current
+    // seek rate, wait_for_idle, pop_state. No endstop is touched.
+    machine = 'Run';
+    seekMoveRates.push(seekRate);
+    setTimeout(() => {
+      pos = { ...pos, x: parkPosition.x, y: parkPosition.y };
+      parkMoves += 1;
+      machine = 'Idle';
+      port.emitLine('ok');
+    }, motionMs);
+  };
+  const handleReference = (line: string): boolean => {
+    const effect = smoothieReferenceEffect(line, grblMode);
+    if (effect === null) return false;
+    if (effect === 'home') runHomingCycle();
+    else if (effect === 'park') runParkMove();
+    else {
+      parkPosition = { x: pos.x, y: pos.y };
+      emit('ok');
+    }
+    return true;
   };
 
   const handleLaserPower = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
@@ -136,10 +208,35 @@ export function createSmoothieSimulator(
     if (/^G1\b/.test(line) && motionPower > 0) burnPowers.push(motionPower * laserScale);
   };
 
+  // Robot::process_move: `if (motion_mode == SEEK) seek_rate = F else feed_rate = F`.
+  const applyRates = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
+    if (hasGWord(line, 0)) motionMode = 0;
+    else if (hasGWord(line, 1)) motionMode = 1;
+    if (words.feed !== null) {
+      if (motionMode === 0) seekRate = words.feed;
+      else feedRate = words.feed;
+    }
+    if (words.hasMotion && motionMode === 0) seekMoveRates.push(seekRate);
+  };
+
+  const handleRobotState = (line: string): boolean => {
+    if (/^M120\b/i.test(line)) {
+      stateStack.push({ seekRate, feedRate, isAbsolute });
+    } else if (/^M121\b/i.test(line)) {
+      const saved = stateStack.pop();
+      if (saved !== undefined) ({ seekRate, feedRate, isAbsolute } = saved);
+    } else {
+      return false;
+    }
+    emit('ok');
+    return true;
+  };
+
   const handleMotion = (line: string): void => {
     const words = parseMotionWords(line);
     handleLaserPower(line, words);
     if (words.setsAbsolute !== null) isAbsolute = words.setsAbsolute;
+    applyRates(line, words);
     if (words.hasMotion) {
       pos = {
         x: words.x === null ? pos.x : isAbsolute ? words.x : pos.x + words.x,
@@ -153,45 +250,65 @@ export function createSmoothieSimulator(
     emit('ok');
   };
 
+  // SimpleShell owns `$` and lowercase lines whether or not the machine is
+  // halted; `$H` clears a halt and homes. Returns false for G-code lines.
+  const handleShellLine = (line: string): boolean => {
+    if (line === '$H') {
+      isHalted = false;
+      runHomingCycle();
+      return true;
+    }
+    const shell = smoothieShellReply(line, { halted: isHalted });
+    if (shell === null) return false;
+    if (shell.clearsHalt) {
+      isHalted = false;
+      machine = 'Idle';
+    }
+    for (const reply of shell.lines) emit(reply);
+    return true;
+  };
+
+  // A halted kernel refuses every G-code except M999 (`!!`, or `error:Alarm
+  // lock` in grbl mode), and Laser::on_console_line_received returns before
+  // printing anything, so `fire off` is silently ignored in that state.
+  const refuseWhileHalted = (line: string): boolean => {
+    if (!isHalted || /^M999\b/i.test(line)) return false;
+    if (!/^fire\b/.test(line)) emit(grblMode ? 'error:Alarm lock' : '!!');
+    return true;
+  };
+
+  const handleNonMotionLine = (line: string): boolean => {
+    if (/^M999\b/i.test(line)) {
+      isHalted = false;
+      machine = 'Idle';
+      emit('ok');
+      return true;
+    }
+    if (line === 'fire off' || line === 'fire 0') {
+      manualFire = false;
+      emit('turning laser off and returning to auto mode'); // native completion, no ok
+      return true;
+    }
+    if (/^M400\b/i.test(line)) {
+      if (pendingMotions === 0) emit('ok');
+      else pendingSettles += 1;
+      return true;
+    }
+    return handleReference(line) || handleQuery(line) || handleRobotState(line);
+  };
+
   const handleLine = (line: string): void => {
-    if (isHalted && !/^M999\b/i.test(line)) {
-      emit('!!');
+    if (line === '') {
+      emit('ok'); // GcodeDispatch acknowledges an empty line.
       return;
     }
+    if (handleShellLine(line) || refuseWhileHalted(line)) return;
     const reject = rejects.find((rule) => rule.pattern.test(line));
     if (reject !== undefined) {
       emit(`error:${reject.error}`);
       return;
     }
-    if (/^M999\b/i.test(line)) {
-      isHalted = false;
-      machine = 'Idle';
-      emit('ok');
-      return;
-    }
-    if (line === 'fire off') {
-      manualFire = false;
-      emit('turning laser off and returning to auto mode'); // native completion, no ok
-      return;
-    }
-    if (/^G28\.2\b/i.test(line)) {
-      machine = 'Home';
-      pendingMotions = 0;
-      setTimeout(() => {
-        pos = SIM_ZERO_VEC3;
-        isHomed = true;
-        machine = 'Idle';
-        port.emitLine('ok');
-      }, homingMs);
-      return;
-    }
-    if (handleQuery(line)) return;
-    if (/^M400\b/i.test(line)) {
-      if (pendingMotions === 0) emit('ok');
-      else pendingSettles += 1;
-      return;
-    }
-    handleMotion(line);
+    if (!handleNonMotionLine(line)) handleMotion(line);
   };
 
   port.onOpen(() => {
@@ -229,6 +346,10 @@ export function createSmoothieSimulator(
       laserScale,
       proportionalPower,
       burnPowers: [...burnPowers],
+      homingCycles,
+      parkMoves,
+      seekRate,
+      seekMoveRates: [...seekMoveRates],
     }),
     outbound: () => port.outbound(),
     triggerHalt: () => {
