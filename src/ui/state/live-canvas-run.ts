@@ -116,6 +116,10 @@ function updatedRun(
     manifest: run.plan.manifest,
     previous: run.route,
     reportedPosition: reportedHead,
+    // The execution window counts back from this ceiling, so the streamer and
+    // the manifest must number the same sendable lines. Both are built from the
+    // one G-code string with isSendableGcodeLine; a streamer-only preamble would
+    // slide the window past the head and confirm route it has not reached.
     acceptedSendableLines: streamer?.completed ?? 0,
     ...(executingLineNumber === undefined ? {} : { executingLineNumber }),
   });

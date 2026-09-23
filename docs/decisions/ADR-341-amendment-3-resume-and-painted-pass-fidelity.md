@@ -68,10 +68,13 @@ resume builder's output with itself, so they could not see these defects:
    chosen line through the ordinary Frame preparation, without a run candidate, so it
    issues no permit. Both are information; Frame remains the only ordinary Start guard
    (rule 7, ADR-228) and recovery Start keeps its own qualification.
-6. **Archive estimate.** An all-ASCII string counts one byte per character, as the
-   structured clone of every browser engine and UTF-8 store it; any other string keeps
-   the maximum UTF-8 bytes per UTF-16 code unit. Job Review warns before Start when the
-   program and its packed motion data alone exceed the 64 MiB archive budget.
+6. **Archive estimate.** A string of printable ASCII, tabs and line breaks (G-code,
+   base64) counts one byte per character, as the structured clone of every browser
+   engine and UTF-8 store it; any other string, and every object key, keeps the maximum
+   UTF-8 bytes per UTF-16 code unit. Keys stay at the maximum because there is one per
+   node of a large job and scanning each would cost Start more than it saves (ADR-352).
+   Job Review warns before Start when the program and its packed motion data alone
+   exceed the 64 MiB archive budget.
 7. **Reconciling an archive-backed Start appends its history record**, an interruption
    at zero acknowledged lines, exactly as a stale active run is promoted.
    **Recording an interruption the history already holds succeeds.** The tracker

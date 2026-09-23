@@ -65,6 +65,7 @@ import type {
 } from './laser-controller-observation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
+import { bindLiveJobTransportLedger } from './laser-job-transport-ledger';
 import { setupActions } from './laser-setup-actions';
 import { fireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
@@ -341,6 +342,7 @@ const refs: LiveRefs = {
   pendingResetCleanup: null,
   untrackedAckReservations: [],
 };
+bindLiveJobTransportLedger(refs);
 
 async function safeWrite(
   set: SetFn,

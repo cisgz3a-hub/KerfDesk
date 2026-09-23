@@ -12,13 +12,19 @@ import type { LaserMotionOperationId } from './laser-motion-operation';
 import { JOG_MPG_INTERRUPTION_MESSAGE } from './frame-status-failure';
 import { reserveUntrackedAcks, type UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 import {
+  beginJobTransportWrite,
+  settleJobTransportWrite,
+  type JobTransportLedgerRefs,
+} from './laser-job-transport-ledger';
+import {
   activeJobCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
 } from './laser-store-helpers';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
-  TranscriptBufferRefs & {
+  TranscriptBufferRefs &
+  JobTransportLedgerRefs & {
     connection: SerialConnection | null;
     readonly driver: ControllerDriver;
     nextTranscriptId: number;
@@ -81,6 +87,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     }
     const writeSource =
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
+    if (source === 'job' && action === undefined) return writeJobRefill(set, refs, conn, line);
     const owedAcks = owedTerminalAcks(line, writeSource);
     const writeEpoch = refs.writeEpoch ?? 0;
     const motionOperationId = currentMotionOperationId(get, action);
@@ -104,6 +111,35 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+// A refill (one per acknowledged line) owes no untracked ack and belongs to no
+// motion operation, so its only store-visible bookkeeping was the transport
+// counter, which now lives on the job transport ledger (ADR-352). Its
+// transcript entry is held back with the acknowledgement it answers
+// (ADR-333), so an ordinary refill performs no store write at all. A failure
+// is recorded exactly as before, minus the store counter it never took.
+async function writeJobRefill(
+  set: SetFn,
+  refs: SafeWriteRefs,
+  conn: SerialConnection,
+  line: string,
+): Promise<void> {
+  const writeEpoch = refs.writeEpoch ?? 0;
+  const ledgerEpoch = beginJobTransportWrite(refs);
+  try {
+    await conn.write(line);
+    assertCurrentWriteEpoch(refs, writeEpoch);
+  } catch (err) {
+    settleJobTransportWrite(refs, ledgerEpoch);
+    recordWriteFailure(set, refs, writeEpoch, err, undefined, undefined, false);
+    throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
+  }
+  settleJobTransportWrite(refs, ledgerEpoch);
+  const entry = outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, 'job');
+  if (bufferTranscriptEntry(refs, entry)) {
+    set((state) => publishTranscriptPatch(refs, state));
+  }
 }
 
 function currentMotionOperationId(
@@ -130,10 +166,10 @@ function commitSuccessfulWrite(
   motionOperationId: LaserMotionOperationId | undefined,
 ): void {
   const entry = outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, source);
-  // A refill chunk is the other half of the acknowledgement flood, so it is
-  // held back the same way and published with the next line that matters
-  // (ADR-333). The transport counter is NOT deferred: Start's queue fence and
-  // the motion settlement read it.
+  // A job-stream chunk (the Start window, a Resume refill) is the other half
+  // of the acknowledgement flood, so it is held back the same way and
+  // published with the next line that matters (ADR-333). Ordinary refills
+  // never reach here; they take writeJobRefill.
   const publishJobBatch = source === 'job' && bufferTranscriptEntry(refs, entry);
   set((state) => ({
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
@@ -153,11 +189,14 @@ function recordWriteFailure(
   err: unknown,
   action: LaserSafetyAction | undefined,
   motionOperationId: LaserMotionOperationId | undefined,
+  storeCounted = true,
 ): void {
   if ((refs.writeEpoch ?? 0) !== expectedEpoch) return;
   const message = serialWriteErrorMessage(err);
   set((state) => ({
-    pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+    ...(storeCounted
+      ? { pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1) }
+      : {}),
     // A queued-write rejection is ambiguous: the controller may have accepted
     // the line before the adapter failed. Retain its FIFO acknowledgement
     // reservation as a quarantine until the real terminal response arrives or

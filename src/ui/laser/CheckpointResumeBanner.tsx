@@ -1,18 +1,20 @@
 // Optional, newest-only recovery capsule. Archived jobs are observational
 // until the operator explicitly reaches a final supervised Start action.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import {
+  RECOVERY_CLAIM_LEASE_MS,
   recoveryClaimIsExpired,
   recoveryRepository,
   type RecoveryCapsule,
   type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
 } from '../state/recovery';
-import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { frameRemainingRecoveryArea } from './laser-recovery-frame';
@@ -23,23 +25,17 @@ export function CheckpointResumeBanner(props: {
   readonly repository?: RecoveryRepository;
 }): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const snapshot = useRecoveryRepositorySnapshot(repository);
-  const capsule = snapshot.recoveryCapsule;
+  const { recoveryCapsule: capsule, pendingStart } = useRecoveryRepositorySelection(
+    selectBannerSlots,
+    repository,
+  );
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
-  const liveWorkOffsetMm = useLiveWorkOffsetMm();
   const [reviewOpen, setReviewOpen] = useState(false);
+  const claimActive = useRecoveryClaimActive(capsule?.claim);
   // A pending Start may already have reached the controller. Never offer the
   // older capsule during the short owner lease; it returns only if arming is
   // cancelled, otherwise the candidate commits or reconciles as newest.
-  if (jobActive || snapshot.pendingStart !== null || capsule === null) return null;
-
-  // A claim only blocks Review while its lease is live. A crash between claiming
-  // and arming leaves an abandoned claim; once it outlives the lease Review
-  // re-opens rather than stranding the record forever (audit B4). Evaluated at
-  // render: the banner appears on the post-crash reload, when the stale claim is
-  // already old.
-  const claimActive =
-    capsule.claim !== undefined && !recoveryClaimIsExpired(capsule.claim, Date.now());
+  if (jobActive || pendingStart !== null || capsule === null) return null;
 
   return (
     <>
@@ -65,34 +61,85 @@ export function CheckpointResumeBanner(props: {
         <CncPassRecoveryWizard capsule={capsule} onClose={() => setReviewOpen(false)} />
       ) : null}
       {reviewOpen && capsule.artifact.machineKind === 'laser' ? (
-        <LaserRecoveryReviewDialog
+        <LaserRecoveryReview
           capsule={capsule}
+          repository={repository}
           onClose={() => setReviewOpen(false)}
-          onStart={(saved, fromLine) =>
-            runLaserRecoveryCapsuleFlow(
-              saved,
-              repository,
-              fromLine === undefined ? {} : { fromLine },
-            )
-          }
-          liveWorkOffsetMm={liveWorkOffsetMm}
-          onFrameRemaining={(bounds) => frameRemainingRecoveryArea(capsule, bounds)}
         />
       ) : null}
     </>
   );
 }
 
+/** The laser review with the live controller facts it compares against.
+ * Mounted only while open, so a closed banner never re-renders on status
+ * reports (ADR-352). */
+function LaserRecoveryReview(props: {
+  readonly capsule: RecoveryCapsule;
+  readonly repository: RecoveryRepository;
+  readonly onClose: () => void;
+}): JSX.Element {
+  const liveWorkOffsetMm = useLiveWorkOffsetMm();
+  return (
+    <LaserRecoveryReviewDialog
+      capsule={props.capsule}
+      onClose={props.onClose}
+      onStart={(saved, fromLine) =>
+        runLaserRecoveryCapsuleFlow(
+          saved,
+          props.repository,
+          fromLine === undefined ? {} : { fromLine },
+        )
+      }
+      liveWorkOffsetMm={liveWorkOffsetMm}
+      onFrameRemaining={(bounds) => frameRemainingRecoveryArea(props.capsule, bounds)}
+    />
+  );
+}
+
 /** The controller's reported work offset in mm; null until it reports one
- * (the cache is cleared on every connect, disconnect and reset). */
+ * (the cache is cleared on every connect, disconnect and reset). Selecting the
+ * numbers, not the object, ignores repeated identical reports. */
 function useLiveWorkOffsetMm(): WorkCoordinateOffset | null {
-  const wco = useLaserStore((state) => state.wcoCache);
+  const x = useLaserStore((state) => state.wcoCache?.x ?? null);
+  const y = useLaserStore((state) => state.wcoCache?.y ?? null);
+  const z = useLaserStore((state) => state.wcoCache?.z ?? null);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   return useMemo(() => {
-    if (wco === null) return null;
+    if (x === null || y === null || z === null) return null;
     const scale = reportInches ? 25.4 : 1;
-    return { x: wco.x * scale, y: wco.y * scale, z: wco.z * scale };
-  }, [wco, reportInches]);
+    return { x: x * scale, y: y * scale, z: z * scale };
+  }, [x, y, z, reportInches]);
+}
+
+function selectBannerSlots({ recoveryCapsule, pendingStart }: RecoveryRepositorySnapshot) {
+  return { recoveryCapsule, pendingStart };
+}
+
+// setTimeout overflows past 2^31-1 ms and fires at once; a longer wait re-arms.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+// A claim only blocks Review while its lease is live. A crash between claiming
+// and arming leaves an abandoned claim; once it outlives the lease Review
+// re-opens rather than stranding the record forever (audit B4). The lease ends
+// on the clock, not on a store write, and an idle rail no longer re-renders on
+// each status poll, so the banner arms its own timer for the expiry instant;
+// otherwise Review stayed locked until something unrelated re-rendered it.
+function useRecoveryClaimActive(claim: RecoveryCapsule['claim']): boolean {
+  const [expiryCheck, setExpiryCheck] = useState(0);
+  const active = claim !== undefined && !recoveryClaimIsExpired(claim, Date.now());
+  const expiresAtMs =
+    claim === undefined ? Number.NaN : Date.parse(claim.claimedAtIso) + RECOVERY_CLAIM_LEASE_MS;
+  useEffect(() => {
+    // An unparseable claim time never expires (it fails closed), so no timer.
+    if (!active || Number.isNaN(expiresAtMs)) return undefined;
+    const delayMs = Math.min(Math.max(0, expiresAtMs - Date.now()), MAX_TIMER_DELAY_MS);
+    // Re-rendering re-reads the clock; a wake that finds the lease still live
+    // (clamped wait, wall clock stepped back) re-arms through expiryCheck.
+    const timer = window.setTimeout(() => setExpiryCheck((count) => count + 1), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [active, expiresAtMs, expiryCheck]);
+  return active;
 }
 
 function RecoveryDescription({

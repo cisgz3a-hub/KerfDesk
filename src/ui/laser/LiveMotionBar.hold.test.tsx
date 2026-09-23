@@ -1,7 +1,7 @@
 // The controller keeps answering `?` but has stopped acknowledging the sent
 // lines. The bar used to read JOB RUNNING over an idle machine (or, after ten
 // seconds, a safety banner claiming a soft reset that never happened).
-import { act } from 'react';
+import { act, Profiler } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createStreamer, pause, step } from '../../core/controllers/grbl';
@@ -98,6 +98,31 @@ describe('LiveMotionBar controller holding the program', () => {
     const { host, root } = await render(<LiveMotionBar />);
     try {
       expect(host.textContent).toContain('$152=100');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // One shared value per hold state: a fresh object compared unequal on every
+  // store write, so a held job re-rendered the bar on each status poll.
+  it('does not re-render a held bar for polls that leave the hold unchanged', async () => {
+    const heldReport = () => ({ ...idleReport(), state: 'Hold' as const });
+    useLaserStore.setState({ streamer: streamingStreamer(), statusReport: heldReport() });
+    let commits = 0;
+    const { host, root } = await render(
+      <Profiler id="live-motion" onRender={() => (commits += 1)}>
+        <LiveMotionBar />
+      </Profiler>,
+    );
+    try {
+      commits = 0;
+      for (let sequence = 1; sequence <= 5; sequence += 1) {
+        await act(async () =>
+          useLaserStore.setState({ statusSequence: sequence, statusReport: heldReport() }),
+        );
+      }
+      expect(commits).toBe(0);
+      expect(host.textContent).toContain('CONTROLLER HOLD');
     } finally {
       await act(async () => root.unmount());
     }

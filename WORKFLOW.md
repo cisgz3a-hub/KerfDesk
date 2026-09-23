@@ -1243,14 +1243,16 @@ link; it does not claim that bytes can cross a cable that is already physically 
 The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state,
 and the Machine rail may retain its detailed progress bar. Both update whenever the streamer
 advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
-reconciliation; it is not presented as elapsed-time or remaining-time progress.
+reconciliation (and, less a 4,096-block planner window, its floor; ADR-352); it is not presented as
+elapsed-time or remaining-time progress.
 
 Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
 and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
 head position contributes approach time in every placement mode. That position is sampled only
 while the head is settled — an Idle report with no Frame, jog, probe, autofocus, streamed job or
 MPG motion — and the last settled sample holds while it moves, so Frame and jog motion never
-re-prepare the estimate. Job Review reuses the prepared
+re-prepare the estimate. While a job runs (outside Preview) or a Frame is still preparing, the
+estimate keeps its last value and settles once afterwards (ADR-352). Job Review reuses the prepared
 program's timing baseline when available, and Start retains the same cut/travel calibration.
 The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
 and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and
@@ -2423,8 +2425,8 @@ Hardware burn on the Falcon (must be confirmed by user):
    bidirectional burn shows ghosted or staggered vertical edges, lower speed and repeat scan-offset
    calibration before trusting that mode.
 
-When this checklist passes, mark F.2.f complete in the hardware
-verification inventory and tag the build as the first Phase F.2 release.
+When this checklist passes, mark F.2.f complete in `PROJECT.md` Phase
+F.2 and tag the build as the first Phase F.2 release.
 
 ### F-F3. Set work origin to the current head position (Phase F.3)
 
@@ -2571,9 +2573,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 
-When this checklist passes on the Falcon, promote Phase F.3's
-"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
-Shipped" and update the hardware verification inventory.
+When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
+("Code shipped; hardware verification pending") with the recorded result and update the F.3
+row of the hardware status table in `docs/architecture/08-invariants-and-verification.md`.
 
 #### No-homing positioning guide (ADR-193)
 
@@ -6375,7 +6377,7 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       and desktop packaging introduces no target-specific laser/CNC divergence.
 
 Until every applicable box is checked on the named real OS and hardware, that
-desktop artifact stays **CLAIMED** in the hardware verification inventory.
+desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance item 7.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

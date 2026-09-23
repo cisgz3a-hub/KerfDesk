@@ -22,7 +22,7 @@ describe('effectiveStartStreamOptions', () => {
     controllerBuildInfo: null,
     controllerBuildInfoObservation: null,
   };
-  // The live-verified Falcon A1 Pro idle report: 512 planner blocks, 64 KiB ring.
+  // Bf values a maintainer's Falcon A1 Pro reported on 2026-07-19 (ADR-331).
   const falconEvidence = {
     rxBytesFree: 65535,
     plannerBlocksFree: 512,

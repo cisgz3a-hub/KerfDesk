@@ -43,23 +43,6 @@ import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 
 export function App(): JSX.Element {
-  // Recovery stays in a nonblocking banner. Background autosave protects
-  // edits throughout the session; global handlers catch asynchronous errors.
-  usePolylineFairingUpgrade();
-  useSingleArtworkSelection();
-  useAutosave();
-  useMaterialLibraryPersistence();
-  useCncLibraryPersistence();
-  useLayerDefaultsPersistence();
-  useGlobalErrorHandlers();
-  useJobShortcuts();
-  useShortcuts();
-  useSpacePan();
-  useActiveJobWakeLock();
-  useJobCheckpoint();
-  useUnloadStop();
-  useUnsavedChangesGuard();
-  useWindowTitle();
   return (
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
@@ -101,8 +84,35 @@ export function App(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <AppLifecycle />
     </div>
   );
+}
+
+// App-wide hooks live in a leaf that renders nothing. Nothing below App is
+// memoised, so a hook that re-rendered App re-rendered every rail, dialog host
+// and the workspace with it — which the status poll and each cursor hover did
+// while the shortcut hooks subscribed from here. Mounted last so its effects
+// still run after every sibling's, as they did from App itself.
+function AppLifecycle(): null {
+  // Recovery stays in a nonblocking banner. Background autosave protects
+  // edits throughout the session; global handlers catch asynchronous errors.
+  usePolylineFairingUpgrade();
+  useSingleArtworkSelection();
+  useAutosave();
+  useMaterialLibraryPersistence();
+  useCncLibraryPersistence();
+  useLayerDefaultsPersistence();
+  useGlobalErrorHandlers();
+  useJobShortcuts();
+  useShortcuts();
+  useSpacePan();
+  useActiveJobWakeLock();
+  useJobCheckpoint();
+  useUnloadStop();
+  useUnsavedChangesGuard();
+  useWindowTitle();
+  return null;
 }
 
 // The main canvas has two modes (ADR-255): the design view, and a G-code 3D

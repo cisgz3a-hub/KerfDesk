@@ -9,10 +9,16 @@ import {
 } from './execution-artifact-size';
 
 describe('string storage estimate', () => {
-  it('counts an all-ASCII string at one byte per character', () => {
+  it('counts printable ASCII, tabs and line breaks at one byte per character', () => {
     expect(stringBytes('')).toBe(0);
     expect(stringBytes('G1X12.5S300\n')).toBe(12);
-    expect(stringBytes('\u0000\u007f')).toBe(2);
+    expect(stringBytes('G1\tX1\r\n')).toBe(7);
+    expect(stringBytes('data:image/png;base64,iVBORw0KGgo=')).toBe(34);
+  });
+
+  it('charges other control characters conservatively, like wide text', () => {
+    expect(stringBytes('G1\u0000')).toBe(9);
+    expect(stringBytes('\u007f')).toBe(3);
   });
 
   it('keeps the UTF-8 maximum for any string with a wider code unit', () => {

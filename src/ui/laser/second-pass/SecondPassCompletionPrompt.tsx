@@ -3,9 +3,13 @@ import { laserSecondPassSupportsController } from '../../../core/laser-second-pa
 import { Dialog, DialogActions } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
-import type { ExecutionArtifactV1, RecoveryRepository } from '../../state/recovery';
+import type {
+  ExecutionArtifactV1,
+  RecoveryRepository,
+  RecoveryRepositorySnapshot,
+} from '../../state/recovery';
 import { isModalOpen, useUiStore } from '../../state/ui-store';
-import { useRecoveryRepositorySnapshot } from '../../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
 import { jobControlsBusy } from '../job-controls-busy';
 
 /** Only a flat laser run whose program the transformer can read is offered;
@@ -17,10 +21,14 @@ function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
   );
 }
 
+function selectLastCompletedReceipt(snapshot: RecoveryRepositorySnapshot) {
+  return snapshot.lastCompletedReceipt;
+}
+
 export function SecondPassCompletionPrompt(props: {
   repository: RecoveryRepository;
 }): JSX.Element | null {
-  const snapshot = useRecoveryRepositorySnapshot(props.repository);
+  const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, props.repository);
   const runId = useLaserSecondPassUiStore((s) => s.completionRunId);
   const request = useLaserSecondPassUiStore((s) => s.editorRequest);
   const dismiss = useLaserSecondPassUiStore((s) => s.dismissCompletion);
@@ -35,7 +43,6 @@ export function SecondPassCompletionPrompt(props: {
   const modalOpen = useUiStore(isModalOpen);
   const [presentedRunId, setPresentedRunId] = useState<string | null>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
-  const receipt = snapshot.lastCompletedReceipt;
   const matching = receipt?.runId === runId;
   const offerable = receipt != null && matching && secondPassOfferable(receipt.artifact);
 
