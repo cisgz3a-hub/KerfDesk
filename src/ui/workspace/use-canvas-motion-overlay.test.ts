@@ -96,6 +96,37 @@ describe('idle canvas motion plan', () => {
     expect(observedOverlay?.showStartMarkers).toBe(false);
   });
 
+  it('hands the motion layer one overlay object until something it draws changes', async () => {
+    const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
+    if (decoded.kind !== 'ok') throw new Error(`Fixture failed to load: ${decoded.kind}`);
+    useStore.setState({
+      project: decoded.project,
+      jobPlacement: { startFrom: 'absolute', anchor: 'front-left' },
+    });
+    useLaserStore.setState(initialLaserState());
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    await act(async () => {
+      root = createRoot(host as HTMLDivElement);
+      root.render(createElement(Harness, { project: decoded.project }));
+    });
+    await waitForPublishedOverlay();
+    const published = observedOverlay;
+    const rendersBefore = harnessRenders;
+
+    // The motion layer repaints whenever the overlay identity changes, so a
+    // parent re-render that changes nothing it draws must hand back the same one.
+    await act(async () => {
+      root?.render(createElement(Harness, { project: decoded.project }));
+    });
+    expect(harnessRenders).toBeGreaterThan(rendersBefore);
+    expect(observedOverlay).toBe(published);
+
+    await act(async () => useUiStore.getState().setShowCanvasStartMarkers(false));
+    expect(observedOverlay).not.toBe(published);
+    expect(observedOverlay?.showStartMarkers).toBe(false);
+  });
+
   it('does not rerender the workspace hook for every moving status sample', async () => {
     const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
     if (decoded.kind !== 'ok') throw new Error(`Fixture failed to load: ${decoded.kind}`);

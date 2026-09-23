@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
+import { createStreamer } from '../../core/controllers/grbl/streamer';
 import {
   addLayer,
   addObject,
@@ -113,7 +114,12 @@ beforeEach(() => {
 
 afterEach(() => {
   useStore.getState().newProject();
-  useLaserStore.setState({ statusReport: null, motionOperation: null, trustedPositionEpoch: 0 });
+  useLaserStore.setState({
+    statusReport: null,
+    motionOperation: null,
+    streamer: null,
+    trustedPositionEpoch: 0,
+  });
   vi.useRealTimers();
 });
 
@@ -196,6 +202,44 @@ describe('useJobEstimate head position', () => {
     }
     // The head never actually settled anywhere new, so the first request stands.
     expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    await unmount();
+  });
+
+  it('does not re-estimate a Current Position job while it streams, then settles once', async () => {
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: reportAtX(0) });
+    useStore.setState({ project: overBudgetRasterProject() });
+    const unmount = await renderProbe();
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    // The placement origin is the head, which the job moves on every poll; the
+    // badge shows the run's own timing meanwhile, so nothing may recompile.
+    const streamer = { ...createStreamer('G1 X1'), status: 'streaming' as const };
+    act(() => useLaserStore.setState({ streamer }));
+    for (let poll = 1; poll <= 40; poll += 1) {
+      await act(async () => {
+        useLaserStore.setState({ statusReport: reportAtX(poll * 5, 'Run') });
+        await vi.advanceTimersByTimeAsync(STATUS_POLL_INTERVAL_MS);
+      });
+    }
+    // An edit made during the run waits for the run as well.
+    act(() => useStore.setState({ project: { ...useStore.getState().project } }));
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      useLaserStore.setState({ streamer: null, statusReport: reportAtX(0) });
+    });
+    await settleDebounce();
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenCalledTimes(2);
+    expect(workerMocks.prepareJobEstimateOffThread).toHaveBeenLastCalledWith(
+      useStore.getState().project,
+      expect.objectContaining({
+        jobOrigin: expect.objectContaining({ currentPosition: { x: 0, y: 0 } }),
+      }),
+    );
 
     await unmount();
   });

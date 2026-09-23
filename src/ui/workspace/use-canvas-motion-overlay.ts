@@ -18,6 +18,7 @@ import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
+import { canvasMachineRevision } from './canvas-machine-revision';
 import { costlyCanvasPreparation } from './canvas-preparation-policy';
 import {
   buildIdleCanvasMotionPlanFromRequest,
@@ -77,11 +78,17 @@ export function useCanvasMotionOverlay(
   );
   useClearStaleTerminalRun(liveRun, staleTerminalRun);
 
-  if (previewMode || canvasCovered) return null;
-  if (liveRun !== null && !staleTerminalRun) {
-    return { plan: liveRun.plan, run: liveRun, showStartMarkers };
-  }
-  return idlePlan === null ? null : { plan: idlePlan.plan, run: null, showStartMarkers };
+  // The motion layer redraws whenever this object's identity changes, so a fresh
+  // literal per render repainted it on every Workspace render (drags, drafts,
+  // parent re-renders) although nothing it draws had changed.
+  const visiblePlan = idlePlan?.plan ?? null;
+  return useMemo(() => {
+    if (previewMode || canvasCovered) return null;
+    if (liveRun !== null && !staleTerminalRun) {
+      return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+    }
+    return visiblePlan === null ? null : { plan: visiblePlan, run: null, showStartMarkers };
+  }, [previewMode, canvasCovered, liveRun, staleTerminalRun, visiblePlan, showStartMarkers]);
 }
 
 type IdlePlanInput = {
@@ -312,36 +319,6 @@ function canvasMachineSnapshot(
     statusQuery: state.capabilities.statusQuery,
     ...(canvasRevision === '' ? {} : { canvasRevision }),
   };
-}
-
-function canvasMachineRevision(state: ReturnType<typeof useLaserStore.getState>): string {
-  const report = state.statusReport;
-  const position =
-    report === null
-      ? 'unknown'
-      : report.state === 'Idle'
-        ? `idle:${axisKey(report.mPos)}:${axisKey(report.wPos)}:${axisKey(report.wco)}`
-        : `busy:${report.state}`;
-  return [
-    state.connection.kind,
-    state.capabilities.statusQuery,
-    state.controllerSettings?.reportInches === true ? 'in' : 'mm',
-    state.workOriginActive ? 'origin' : 'machine',
-    String(state.trustedPositionEpoch ?? 0),
-    axisKey(state.wcoCache),
-    // The snapshot forwards homingState (ADR-327); confirmHome flips it without
-    // touching any other keyed field, so it must key the revision too.
-    state.homingState,
-    JSON.stringify(nativeBedEvidenceSnapshot(state)),
-    position,
-  ].join('|');
-}
-
-function axisKey(
-  axis: { readonly x: number; readonly y: number; readonly z: number } | null,
-): string {
-  if (axis === null) return '-';
-  return `${axis.x.toFixed(3)},${axis.y.toFixed(3)},${axis.z.toFixed(3)}`;
 }
 
 function statusQueryFor(
