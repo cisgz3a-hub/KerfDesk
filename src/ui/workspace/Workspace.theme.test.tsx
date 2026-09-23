@@ -83,6 +83,21 @@ it('repaints the idle motion markers when the theme changes', async () => {
   });
   useLaserStore.setState(initialLaserState());
   useUiStore.setState({ draftShape: null, penDraft: null });
+  // jsdom lays nothing out, and the motion layer does not paint into the
+  // unmeasured placeholder bitmap, so give the canvases a real size.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () =>
+      ({
+        width: 800,
+        height: 600,
+        top: 0,
+        left: 0,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+      }) as DOMRect,
+  );
   const drawMotion = vi.spyOn(motion, 'drawCanvasMotionOverlay');
   const host = document.createElement('div');
   document.body.appendChild(host);
