@@ -71,7 +71,7 @@ Use the supported Creality Falcon profile selected through the complete setup wi
 
 ## GRB series: second GRBL-family machine
 
-Use a machine whose controller or firmware family differs from the Falcon's. The Falcon's exact firmware build is unconfirmed (its vendor labels the connection GRBL-LPC), so read and record both machines' firmware in `environment.md` before counting the second machine as different.
+Use a machine whose controller or firmware family differs from the Falcon's. The Falcon's exact firmware build is unconfirmed (its vendor labels the connection GRBL-LPC), so read each machine's firmware, record it in that run's `environment.md`, and compare the two before counting the second machine as different.
 
 | Case | Procedure | Pass condition |
 | --- | --- | --- |

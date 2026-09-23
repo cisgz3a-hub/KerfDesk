@@ -2543,8 +2543,8 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 
-When this checklist passes on the Falcon, promote Phase F.3's
-"Future feature notes" entry in `PROJECT.md` to "Phase F.3 — Shipped" and update the F.3
+When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
+("Code shipped; hardware verification pending") with the recorded result and update the F.3
 row of the hardware status table in `docs/architecture/08-invariants-and-verification.md`.
 
 #### No-homing positioning guide (ADR-193)

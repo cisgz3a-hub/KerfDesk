@@ -4,7 +4,7 @@
 
 ## Preamble and postamble
 
-Hard-coded, not user-editable (`PROJECT.md:493`). From `preamble()` (`grbl-strategy.ts:79-98`):
+Hard-coded, not user-editable (`PROJECT.md:626`). From `preamble()` (`grbl-strategy.ts:79-98`):
 
 ```gcode
 G21          ; mm
@@ -32,7 +32,7 @@ happens, the beam stays off. `M3 S0` primes safely at zero power.
 
 `scaleS` (`grbl-strategy.ts:43-45`): `S = round((powerPercent / 100) × device.maxPowerS)`, where
 `maxPowerS` is the machine's `$30`. That is non-negotiable #7, property-tested across
-`$30 ∈ {100, 255, 1000}` (`PROJECT.md:589`).
+`$30 ∈ {100, 255, 1000}` (`PROJECT.md:728`).
 
 Mode selection is modal and spans groups (`emitJob`, `grbl-strategy.ts:444-475`):
 
@@ -42,7 +42,7 @@ Mode selection is modal and spans groups (`emitJob`, `grbl-strategy.ts:444-475`)
 | `fill` | **M4** dynamic | GRBL scales `S` by actual/programmed feed. |
 | `raster` | self-managed M4, ends `M5` | Handled inside `emit-raster.ts`. |
 
-The M4-for-fill decision is **ADR-036** (`DECISIONS.md:1919`), superseding ADR-020 #4. Recorded
+The M4-for-fill decision is **ADR-036** (`DECISIONS.md:1976`), superseding ADR-020 #4. Recorded
 reason: a short engrave stroke that never reaches programmed feed — the head accelerating from
 rest inside a few-mm glyph — deposits constant energy per mm instead of over-burning the slow
 zones. That was the small-text "uneven density" defect. Secondary safety benefit noted at
@@ -82,7 +82,7 @@ move**. If a whole segment collapses, its laser-off seek is omitted too (line 15
 
 ## Fill (mode `fill`)
 
-Hatch geometry is a compile-time decision, not a new G-code shape (ADR-019, `DECISIONS.md:689`) —
+Hatch geometry is a compile-time decision, not a new G-code shape (ADR-019, `DECISIONS.md:700`) —
 closed polylines are replaced with parallel hatch lines that flow through the same emit path.
 
 Four fill styles resolve in `vectorGroupsForLayer` (`compile-job.ts:161-187`):
@@ -116,7 +116,7 @@ ADR-038 made unidirectional fill a **per-layer option** — snake was previously
 
 A `RasterImage` SceneObject variant carries a PNG data URL plus base64 luma; `dither.ts` runs
 threshold / Floyd–Steinberg / grayscale; `emit-raster.ts` emits M4-mode per-pixel `S`-modulated
-`G1` sweeps with overscan (ADR-020, `PROJECT.md:120`).
+`G1` sweeps with overscan (ADR-020, `PROJECT.md:157`).
 
 Key decisions:
 
@@ -129,7 +129,7 @@ Key decisions:
   row is materialized lazily instead of held in memory.
 - **ADR-202** separates burn raster fidelity from bounded preview/stream work.
 
-Image overscan is a **fixed 5 mm default, not per-layer** (`PROJECT.md:403`) — an asymmetry with
+Image overscan is a **fixed 5 mm default, not per-layer** (`PROJECT.md:524`) — an asymmetry with
 fill overscan worth flagging in cross-reference.
 
 ## Air assist
@@ -143,10 +143,11 @@ transitions, but this was **not re-verified end-to-end in this session — UNVER
 
 - **Perceptual fidelity of fill and raster.** The suite asserts path counts, byte-identity, and
   invariants. It has never asserted a fill *looks* like the source (CLAUDE.md rule 2).
-- **F.2.f hardware burn** — never burned on the Falcon (`PROJECT.md:157`).
+- **F.2.f hardware burn** — WORKFLOW F-F2 checklist not completed on the Falcon; an informal
+  image/fill job there (ADR-341) does not qualify it (`PROJECT.md:157`).
 - **F.3 set-work-origin** — code shipped, hardware verification pending (`PROJECT.md:158`).
 - **F.4 Convert to Bitmap A5** placement/brightness polish pending; no LightBurn side-by-side
-  (`PROJECT.md:122`).
+  (`PROJECT.md:159`).
 
 ## Cross-reference slot — Phase 2
 
@@ -156,7 +157,7 @@ transitions, but this was **not re-verified end-to-end in this session — UNVER
    Scan Line uses per-layer bounded every-sweep runways; explicit legacy policies retain ADR-033.
 3. **Scanning offset.** Does LightBurn's per-speed interpolation match ours (`offsetForSpeed`)? A
    different interpolation shows as a visible zipper at intermediate speeds.
-4. **Dither count.** `DECISIONS.md:1283` records **3 dither algorithms vs LightBurn's ten**. Which
+4. **Dither count.** `DECISIONS.md:1294` records **3 dither algorithms vs LightBurn's ten**. Which
    of the seven missing actually change output quality on wood/acrylic, and which are cosmetic?
 5. **Image overscan.** Is LightBurn's image overscan per-layer? Ours is fixed 5 mm — if theirs is
    tunable, that is a parity gap.
