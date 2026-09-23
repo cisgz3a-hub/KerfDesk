@@ -238,6 +238,8 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       ids: [
         'tools.convert-to-path',
         'tools.weld',
+        'tools.union-silhouette',
+        'tools.join-paths',
         'tools.subtract',
         'tools.intersect',
         'tools.exclude',
