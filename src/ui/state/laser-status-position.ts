@@ -72,14 +72,16 @@ export function statusPositionPatch(
 // The caches keep their identity while the controller repeats the same values.
 // Every consumer selects them by reference, so a fresh-but-equal object from
 // each Ov:/A:/WCO frame re-rendered those consumers on polls that changed
-// nothing. The values are flat scalars, so a shallow comparison is exact.
-function unchangedOr<T extends object>(previous: T | null | undefined, next: T): T {
+// nothing. The shallow comparison is exact only for flat scalar values, which
+// FlatCache enforces: a nested field added later fails to compile here rather
+// than silently comparing by reference.
+type FlatCache = Readonly<Record<string, number | boolean | string | null | undefined>>;
+
+function unchangedOr<T extends FlatCache>(previous: T | null | undefined, next: T): T {
   if (previous === null || previous === undefined) return next;
-  const before = previous as Readonly<Record<string, unknown>>;
-  const after = next as Readonly<Record<string, unknown>>;
-  const keys = Object.keys(after);
-  if (keys.length !== Object.keys(before).length) return next;
-  return keys.every((key) => Object.is(before[key], after[key])) ? previous : next;
+  const keys = Object.keys(next);
+  if (keys.length !== Object.keys(previous).length) return next;
+  return keys.every((key) => Object.is(previous[key], next[key])) ? previous : next;
 }
 
 // Manual Air mirrors the controller's own coolant state whenever a frame
