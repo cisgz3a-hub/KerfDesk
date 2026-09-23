@@ -226,4 +226,31 @@ describe('burn route raster across view changes', () => {
     // The same work used to be one synchronous task in the zoom's layout effect.
     expect(work).toBeGreaterThan(40);
   });
+
+  it("abandons a finished plan's pending rebuild once another plan paints", () => {
+    const finished = hatchPlan({ rows: 100, segmentsPerRow: 220 });
+    const total = finished.manifest.totalRouteMm;
+    const visible = inkCanvas(280, 150);
+    let jobShown = true;
+    const redraw = vi.fn(() => {
+      if (jobShown) paintFrame(visible, finished, total * 0.8, V2, redraw);
+    });
+    paintFrame(visible, finished, total * 0.8, V1, redraw);
+    paintFrame(visible, finished, total * 0.8, V2, redraw);
+    // Every stroke costs clock time, so the rebuild needs several slices.
+    InkContext.onStroke = (segments) => {
+      clock.now += segments * 0.003;
+    };
+    elapse(ROUTE_RASTER_SETTLE_MS);
+    expect(redraw).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    jobShown = false;
+    paintFrame(visible, hatchPlan({ rows: 4, segmentsPerRow: 4 }), 0, V2);
+    const strokes = recordStrokes();
+    vi.runAllTimers();
+
+    expect(strokes).toEqual([]);
+    expect(redraw).toHaveBeenCalledTimes(1);
+  });
 });

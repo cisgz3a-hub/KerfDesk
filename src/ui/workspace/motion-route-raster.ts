@@ -91,6 +91,10 @@ export type RouteRasterRequest = {
 
 const states = new WeakMap<CanvasMotionPlan, RouteRasterState>();
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
+// The plan painted last. Its pending rebuild is abandoned as soon as another
+// plan paints, so a finished job's catch-up slices neither keep running nor
+// keep its plan alive through the slice timer.
+let lastState: RouteRasterState | null = null;
 
 /**
  * Composites the route raster onto `ctx`. Returns false when rasters are not
@@ -102,6 +106,8 @@ export function drawRouteRaster(request: RouteRasterRequest): boolean {
   const key = rasterKey(ctx.canvas, view);
   const state = routeRasterState(request, key);
   if (state === null) return false;
+  if (lastState !== null && lastState !== state) dropRebuild(lastState);
+  lastState = state;
   state.goalRouteMm = request.confirmedRouteMm;
   state.requestRedraw = request.requestRedraw;
   if (request.confirmedRouteMm < state.shown.confirmedRouteMm) rewind(state);
@@ -119,6 +125,8 @@ export function drawRouteRaster(request: RouteRasterRequest): boolean {
 export function resetRouteRastersForTests(): void {
   if (settleTimer !== null) clearTimeout(settleTimer);
   settleTimer = null;
+  if (lastState !== null) dropRebuild(lastState);
+  lastState = null;
 }
 
 function rasterSupported(ctx: CanvasRenderingContext2D): boolean {
