@@ -20,6 +20,8 @@ const GRID = Number(process.env['BIG_JOB_GRID'] ?? 18);
 // controller's own acknowledgement counter.
 const PROJECT_FILE = process.env['BIG_JOB_PROJECT_FILE'];
 const DUMP_PROJECT = process.env['BIG_JOB_DUMP_PROJECT'];
+const PROFILE_FRAME = process.env['BIG_JOB_PROFILE_FRAME'] === '1';
+const PROFILE_START = process.env['BIG_JOB_PROFILE_START'] === '1';
 
 interface RunProbe {
   readonly elapsedMs: number;
@@ -48,6 +50,7 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   });
   await page.addInitScript({ content: pacedSerialSource });
   if (PROJECT_FILE !== undefined) await installProjectPicker(page, PROJECT_FILE);
+  if (process.env['BIG_JOB_TRACE_WORKERS'] === '1') await installWorkerTrace(page);
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible({ timeout: 60_000 });
   if (PROJECT_FILE !== undefined) {
@@ -67,12 +70,32 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
 
+  const frameCdp = PROFILE_FRAME ? await page.context().newCDPSession(page) : null;
+  if (frameCdp !== null) {
+    await frameCdp.send('Profiler.enable');
+    await frameCdp.send('Profiler.setSamplingInterval', { interval: 500 });
+    await frameCdp.send('Profiler.start');
+  }
   const frameStarted = Date.now();
+  await page.evaluate(() => {
+    (window as unknown as { __WORKER_TRACE_MARK__?: number }).__WORKER_TRACE_MARK__ =
+      performance.now();
+  });
   await page.getByRole('button', { name: 'Frame job', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled({
     timeout: 240_000,
   });
   const frameMs = Date.now() - frameStarted;
+  const frameWorkers = await page.evaluate(() => {
+    const w = window as unknown as { __WORKER_TRACE__?: unknown[]; __WORKER_TRACE_MARK__?: number };
+    const mark = w.__WORKER_TRACE_MARK__ ?? 0;
+    return (w.__WORKER_TRACE__ ?? []).filter((event) => (event as { t: number }).t >= mark);
+  });
+  let frameProfile: unknown = null;
+  if (frameCdp !== null) {
+    const { profile } = (await frameCdp.send('Profiler.stop')) as { profile: CpuProfile };
+    frameProfile = { busy: busyTime(profile), top: summariseProfile(profile).slice(0, 80) };
+  }
 
   const startClicked = Date.now();
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
@@ -81,6 +104,12 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   const reviewMs = Date.now() - startClicked;
   const ackedBeforeStart = await simAcked(page);
   await armInteractionProbe(page);
+  const startCdp = PROFILE_START ? await page.context().newCDPSession(page) : null;
+  if (startCdp !== null) {
+    await startCdp.send('Profiler.enable');
+    await startCdp.send('Profiler.setSamplingInterval', { interval: 250 });
+    await startCdp.send('Profiler.start');
+  }
   const confirmClicked = Date.now();
   await review.getByRole('button', { name: 'Start job' }).click();
   await expect
@@ -91,6 +120,11 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   // Keep observing the first seconds of the run, where Start-time work lands.
   await page.waitForTimeout(3_000);
   const startPhase = await readInteractionProbe(page);
+  let startProfile: unknown = null;
+  if (startCdp !== null) {
+    const { profile } = (await startCdp.send('Profiler.stop')) as { profile: CpuProfile };
+    startProfile = { busy: busyTime(profile), top: summariseProfile(profile).slice(0, 90) };
+  }
   const total = (await streamProbe(page)).total;
 
   const idleWindow = await measure(page, 3_000, null);
@@ -114,6 +148,9 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
     retainedHeap: { startMb: retainedStartMb, endMb: retainedEndMb },
     interaction,
     topSelf: runWindow.topSelf,
+    frameProfile,
+    frameWorkers,
+    startProfile,
   };
   const outFile = process.env['BIG_JOB_OUT'] ?? testInfo.outputPath('big-job-run.json');
   writeFileSync(outFile, JSON.stringify(summary, null, 2));
@@ -518,6 +555,47 @@ async function retainedHeapMb(_page: Page, cdp: CDPSession): Promise<number> {
   await cdp.send('HeapProfiler.collectGarbage');
   const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
   return Math.round(usedSize / 1e6);
+}
+
+// Diagnostic: records every worker created and every message across the
+// boundary, so a slow phase can be attributed to work queued on a worker.
+async function installWorkerTrace(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const trace: Record<string, unknown>[] = [];
+    (window as unknown as { __WORKER_TRACE__: unknown[] }).__WORKER_TRACE__ = trace;
+    const Native = window.Worker;
+    let nextId = 0;
+    class TracedWorker extends Native {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        const id = (nextId += 1);
+        const name = String(url).replace(/^.*\//, '').replace(/\?.*$/, '');
+        trace.push({ t: performance.now(), id, name, kind: 'new' });
+        const post = this.postMessage.bind(this);
+        this.postMessage = ((message: unknown, transfer?: Transferable[]) => {
+          const kind =
+            (message as { kind?: string; type?: string } | null)?.kind ??
+            (message as { type?: string } | null)?.type;
+          trace.push({ t: performance.now(), id, name, kind: 'post', message: kind });
+          return transfer === undefined ? post(message) : post(message, transfer);
+        }) as Worker['postMessage'];
+        this.addEventListener('message', (event) => {
+          const data = event.data as { kind?: string; type?: string } | null;
+          trace.push({
+            t: performance.now(),
+            id,
+            name,
+            kind: 'reply',
+            message: data?.kind ?? data?.type,
+          });
+        });
+        this.addEventListener('error', () =>
+          trace.push({ t: performance.now(), id, name, kind: 'error' }),
+        );
+      }
+    }
+    window.Worker = TracedWorker as typeof Worker;
+  });
 }
 
 async function simAcked(page: Page): Promise<number> {
