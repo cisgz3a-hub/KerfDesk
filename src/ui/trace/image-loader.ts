@@ -137,6 +137,7 @@ function rasterizeImage(source: CanvasImageSource, width: number, height: number
 }
 
 export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawImageData {
+  if (image.rgbCompositedOnWhite === true) return image;
   const data = new Uint8ClampedArray(image.data.length);
   for (let i = 0; i < image.data.length; i += 4) {
     const alpha = image.data[i + 3] ?? 255;
@@ -146,7 +147,7 @@ export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawIm
     data[i + 2] = compositeChannel(image.data[i + 2], opacity);
     data[i + 3] = alpha;
   }
-  return { width: image.width, height: image.height, data };
+  return { width: image.width, height: image.height, data, rgbCompositedOnWhite: true };
 }
 
 function compositeChannel(value: number | undefined, opacity: number): number {

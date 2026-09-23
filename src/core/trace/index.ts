@@ -1,7 +1,8 @@
 // core/trace — raster vectorization. The single entry point the app uses
 // (dialog preview, import commit, batch trace) is traceImageToColoredPaths,
 // which dispatches by options:
-//   - 2-colour fixed-palette options (ALL surfaced filled presets: Line Art,
+//   - photoDetail options → continuous-tone filled ribbons (photo-trace.ts).
+//   - 2-colour fixed-palette options (Line Art,
 //     Smooth, Sharp) → the in-house contour backend (contour-trace.ts),
 //     built on the clean-room centerline machinery.
 //   - traceMode 'centerline' / 'edge' → the medial-axis and edge tracers
@@ -13,8 +14,8 @@
 //
 // The whole pipeline is original / permissively-licensed code — the
 // potrace-derived backend was removed (ADR-123). All paths share the same
-// preprocessing chain (raster-prep image adjustments → median → threshold →
-// despeckle).
+// contour preprocessing chain (raster-prep image adjustments → median →
+// threshold → despeckle), except photo shading which retains continuous tone.
 
 export type { RawImageData, TraceOptions } from './trace-image';
 export {

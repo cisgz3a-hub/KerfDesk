@@ -54,6 +54,19 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // facet from small curve radius even at ~6px strokes. Smooth preset: opts in.
     upscaleSmallSmoothSources: true,
   },
+  'Photo shading': {
+    traceMode: 'filled-contours',
+    photoDetail: 60,
+    brightness: 0,
+    contrast: 0,
+    numberOfColors: 2,
+    pathOmit: 0,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: false,
+  },
   Centerline: {
     // For black strokes that should engrave as one path down the
     // middle instead of filled outline contours. Uses the same

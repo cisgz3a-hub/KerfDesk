@@ -68,17 +68,32 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('offers all five trace presets including the rebuilt Edge Detection', async () => {
+  it('offers photo shading alongside the existing trace styles', async () => {
     await withTraceDialog(async (host) => {
       const select = presetSelect(host);
       const values = Array.from(select.options).map((option) => option.value);
       expect(values).toContain('Line Art');
+      expect(values).toContain('Photo shading');
       expect(values).toContain('Smooth');
       expect(values).toContain('Sharp');
       expect(values).toContain('Centerline');
       // Re-exposed with the chained single-line backend (it was hidden while
       // the outline backend doubled every edge).
       expect(values).toContain('Edge Detection');
+    });
+  });
+
+  it('shows photo tone controls and explains both shaded output choices', async () => {
+    await withTraceDialog(async (host) => {
+      await changeSelect(presetSelect(host), 'Photo shading');
+      expect(host.querySelector('[aria-label="Trace Brightness"]')).not.toBeNull();
+      expect(host.querySelector('[aria-label="Trace Contrast"]')).not.toBeNull();
+      expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
+      expect(fillStyleSelect(host)).not.toBeNull();
+      expect(host.textContent).toContain('Editable filled lines reproduce the photo’s shades.');
+      await changeSelect(outputSelect(host), 'raster');
+      expect(host.textContent).toContain('Engraves the shaded line pattern');
+      expect(host.textContent).not.toContain('Original grayscale shading is not retained.');
     });
   });
 
@@ -106,11 +121,11 @@ describe('Trace Image workflow controls', () => {
       );
 
       for (const preset of ['Smooth', 'Sharp']) {
-        await changePreset(select, preset);
+        await changeSelect(select, preset);
         expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
       }
       for (const preset of ['Centerline']) {
-        await changePreset(select, preset);
+        await changeSelect(select, preset);
         expect(fillStyleSelect(host)).toBeNull();
       }
     });
@@ -131,6 +146,7 @@ describe('Trace Image workflow controls', () => {
         );
         expect(disabledByName).toEqual({
           'Line Art': false,
+          'Photo shading': false,
           Smooth: false,
           Sharp: false,
           Centerline: false,
@@ -271,7 +287,7 @@ describe('Trace Image workflow controls', () => {
   it('shows the edge-specific controls when Edge Detection is selected', async () => {
     await withTraceDialog(async (host) => {
       const select = presetSelect(host);
-      await changePreset(select, 'Edge Detection');
+      await changeSelect(select, 'Edge Detection');
       const text = host.textContent ?? '';
       expect(text).toContain('Sensitivity');
     });
@@ -279,7 +295,7 @@ describe('Trace Image workflow controls', () => {
 
   it('does not show contour-only Smoothness and Optimize controls for Centerline', async () => {
     await withTraceDialog(async (host) => {
-      await changePreset(presetSelect(host), 'Centerline');
+      await changeSelect(presetSelect(host), 'Centerline');
       const text = host.textContent ?? '';
       expect(text).toContain('Automatic threshold (Otsu)');
       expect(text).toContain('Remove ink specks');
@@ -385,10 +401,6 @@ function fillStyleSelect(host: HTMLElement): HTMLSelectElement | null {
 
 function outputSelect(host: HTMLElement): HTMLSelectElement | null {
   return host.querySelector('select[aria-label="Trace output"]');
-}
-
-async function changePreset(select: HTMLSelectElement, value: string): Promise<void> {
-  await changeSelect(select, value);
 }
 
 async function changeSelect(select: HTMLSelectElement | null, value: string): Promise<void> {

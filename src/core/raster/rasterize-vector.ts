@@ -24,7 +24,11 @@
 // scanline primitive across all three is a candidate refactor, not done here.
 
 import { type Bounds, type Polyline, type Vec2 } from '../scene';
-import { fillVectorGroups, type VectorFillGroup } from './rasterize-vector-fill';
+import {
+  fillVectorGroups,
+  fillVectorGroupsWithCoverage,
+  type VectorFillGroup,
+} from './rasterize-vector-fill';
 
 // LightBurn sets every converted pixel to 50% gray by default; white is
 // unburned material. 127, not 128: ditherThreshold burns strictly BELOW its
@@ -49,6 +53,10 @@ const MIN_PIXEL_DIM = 1;
 export type VectorRasterRenderType = 'fill-all' | 'outlines';
 
 export type VectorRasterInput = {
+  // Preserve sub-pixel filled area as gray edge pixels for photo shading.
+  // Ordinary vector bitmap conversion retains its existing binary sampling.
+  readonly preserveCoverage?: boolean;
+  readonly coverageAxis?: 'x' | 'y';
   // Closed contours in millimetre (scene) space. Even-odd across all
   // contours, so an inner contour cuts a hole (the centre of a letter "O").
   readonly polylines: ReadonlyArray<Polyline>;
@@ -96,7 +104,8 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
   const fillPolylines = input.fillPolylines ?? (input.renderType === 'outlines' ? [] : polylines);
   const outlinePolylines =
     input.outlinePolylines ?? (input.renderType === 'outlines' ? polylines : []);
-  fillVectorGroups(
+  const fill = input.preserveCoverage === true ? fillVectorGroupsWithCoverage : fillVectorGroups;
+  fill(
     grid,
     input.fillGroups ?? [
       { objects: [{ paths: [{ polylines: fillPolylines, fillRule: 'evenodd' }] }] },
@@ -104,6 +113,7 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
     bounds,
     scaleForExtent(width, widthMm),
     scaleForExtent(height, heightMm),
+    input.coverageAxis ?? 'x',
   );
   strokePolylines(
     grid,
