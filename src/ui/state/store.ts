@@ -1,3 +1,4 @@
+import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
 // Slice factories keep the create call within ADR-015's size rule.
 
@@ -117,7 +118,7 @@ import {
   pathNodeCurveCommandActions,
   type PathNodeCurveCommandActions,
 } from './path-node-curve-command-actions';
-import type { ImportOutcome, TraceExistingImageOptions } from './scene-mutations';
+import type { TraceExistingImageOptions } from './scene-mutations';
 import type { TextInsertOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
@@ -174,6 +175,7 @@ export type AppState = ObjectPropertiesActions &
   ObjectDeleteActions &
   SceneClipboardActions &
   SceneGroupActions &
+  SvgFragmentActions &
   SceneLockActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions &
@@ -255,11 +257,6 @@ export type AppState = ObjectPropertiesActions &
     // Fresh imports always append, even when another object has the same
     // display filename. Explicit re-import is a separate selected-target
     // action so filename collisions cannot silently replace artwork.
-    readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-    readonly reimportSvgObject: (
-      targetObjectId: string,
-      object: SceneObject,
-    ) => ImportOutcome | null;
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
     readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).

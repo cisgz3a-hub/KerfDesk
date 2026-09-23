@@ -17,6 +17,10 @@ export async function librarySvgObjectFor(
     id,
     source: `Library: ${entry.title}`,
   });
+  if (result.fragment?.entries.some((item) => item.kind === 'svg-image'))
+    throw new Error(
+      'This bundled library entry contains bitmap content. Import its SVG file as artwork instead.',
+    );
   if (result.object === null) return null;
   const strokeWidthMm = libraryRoundStrokeWidthMm(entry, svgText);
   return {

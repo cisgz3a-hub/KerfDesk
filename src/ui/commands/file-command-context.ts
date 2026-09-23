@@ -70,6 +70,7 @@ export function fileCommandContext(
       void handleUnifiedArtworkImport(platform, {
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject: app.importSvgObject,
+        importSvgFragment: app.importSvgFragment,
         importRasterImage: app.importRasterImage,
         pushToast,
       }),
@@ -79,6 +80,7 @@ export function fileCommandContext(
         app.importSvgObject,
         pushToast,
         () => useStore.getState().projectDocumentEpoch,
+        app.importSvgFragment,
       ),
     importDxf: () =>
       void handleImportDxf(

@@ -17,6 +17,7 @@ import {
   type PartialCellGrid,
 } from '../../core/grid';
 import type { AABB, RasterImage, Transform as ObjTransform } from '../../core/scene';
+import { closedImageClipContours } from '../../core/raster/image-mask';
 import type { ViewTransform } from './view-transform';
 
 type RasterImageCacheEntry = {
@@ -104,6 +105,7 @@ export function drawRasterImage(
     readonly bounds: AABB;
     readonly transform: ObjTransform;
     readonly role?: 'trace-source';
+    readonly imageClip?: RasterImage['imageClip'];
   },
   view: ViewTransform,
   options: DrawRasterImageOptions = {},
@@ -121,7 +123,7 @@ export function drawRasterImage(
   // Trace-source backings draw tinted so the operator can tell the
   // deletable original apart from the trace stacked on top (ADR-026).
   const paint = obj.role === 'trace-source' ? (tintedTraceSource(displayDataUrl, img) ?? img) : img;
-  drawBitmapAtTransform(ctx, paint, obj.bounds, obj.transform, view);
+  drawBitmapAtTransform(ctx, paint, obj.bounds, obj.transform, view, obj.imageClip);
 }
 
 export function rasterDisplayDataUrl(obj: Pick<RasterImage, 'dataUrl' | 'imageAsset'>): string {
@@ -150,6 +152,7 @@ export function drawBitmapAtTransform(
   bounds: AABB,
   transform: ObjTransform,
   view: ViewTransform,
+  imageClip?: RasterImage['imageClip'],
 ): void {
   const t = transform;
   const w = bounds.maxX - bounds.minX;
@@ -160,8 +163,24 @@ export function drawBitmapAtTransform(
   const sx = (t.mirrorX ? -1 : 1) * t.scaleX * view.scale;
   const sy = (t.mirrorY ? -1 : 1) * t.scaleY * view.scale;
   ctx.scale(sx, sy);
+  if (imageClip !== undefined) clipRasterImage(ctx, imageClip);
   ctx.drawImage(bitmap, bounds.minX, bounds.minY, w, h);
   ctx.restore();
+}
+
+function clipRasterImage(
+  ctx: CanvasRenderingContext2D,
+  paths: NonNullable<RasterImage['imageClip']>,
+): void {
+  ctx.beginPath();
+  for (const contour of closedImageClipContours(paths)) {
+    const start = contour[0];
+    if (start === undefined) continue;
+    ctx.moveTo(start.x, start.y);
+    for (const point of contour.slice(1)) ctx.lineTo(point.x, point.y);
+    ctx.closePath();
+  }
+  ctx.clip('evenodd');
 }
 
 type BitmapAxisSpan = {

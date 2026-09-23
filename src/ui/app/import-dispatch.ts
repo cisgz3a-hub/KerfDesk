@@ -1,3 +1,4 @@
+import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import type { SceneObject } from '../../core/scene';
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 import type { GcodeInspectionSource } from '../gcode-inspector';
@@ -30,6 +31,7 @@ export const ARTWORK_IMPORT_EXTENSIONS = [
 
 export type ImportDispatchActions = {
   readonly getProjectDocumentEpoch: () => number;
+  readonly importSvgFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
   readonly importRasterImage: (object: SceneObject, batchIndex?: number) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
@@ -59,14 +61,19 @@ async function dispatchOwnedImportFiles(
   owner: ImportDocumentOwner,
   options: { readonly sourceLabel?: 'Drop' | 'Import' },
 ): Promise<void> {
-  const ownedActions = bindImportActionsToDocument(actions, owner);
+  let successfulArtworkCount = 0;
+  const ownedActions = countSuccessfulInsertions(
+    bindImportActionsToDocument(actions, owner),
+    () => {
+      successfulArtworkCount += 1;
+    },
+  );
   const recognized = recognizedImportFiles(files, ownedActions, options.sourceLabel ?? 'Import');
   if (recognized === null) return;
 
-  let successfulArtworkCount = 0;
   let openedGcode = false;
   const additionalGcodeNames: string[] = [];
-  const nextSuccessIndex = (): number => successfulArtworkCount++;
+  const nextSuccessIndex = (): number => successfulArtworkCount;
   for (const { file, kind } of recognized) {
     if (!owner.isCurrent()) return;
     if (kind === 'gcode' && openedGcode) {
@@ -89,6 +96,34 @@ async function dispatchOwnedImportFiles(
       'warning',
     );
   }
+}
+
+function countSuccessfulInsertions(
+  actions: ImportDispatchActions,
+  inserted: () => void,
+): ImportDispatchActions {
+  const fragmentSink = actions.importSvgFragment;
+  return {
+    ...actions,
+    importSvgObject: (object, batchIndex) => {
+      const outcome = actions.importSvgObject(object, batchIndex);
+      inserted();
+      return outcome;
+    },
+    importRasterImage: (object, batchIndex) => {
+      actions.importRasterImage(object, batchIndex);
+      inserted();
+    },
+    ...(fragmentSink === undefined
+      ? {}
+      : {
+          importSvgFragment: (fragment: SvgArtworkFragment, batchIndex?: number) => {
+            const outcome = fragmentSink(fragment, batchIndex);
+            inserted();
+            return outcome;
+          },
+        }),
+  };
 }
 
 function recognizedImportFiles(
@@ -166,11 +201,20 @@ export function bindImportActionsToDocument(
   actions: ImportDispatchActions,
   owner: ImportDocumentOwner,
 ): ImportDispatchActions {
+  const importSvgFragment = actions.importSvgFragment;
   const assertCurrent = (): void => {
     if (!owner.isCurrent()) throw new StaleImportCompletion();
   };
   return {
     ...actions,
+    ...(importSvgFragment === undefined
+      ? {}
+      : {
+          importSvgFragment: (fragment: SvgArtworkFragment, batchIndex?: number) => {
+            assertCurrent();
+            return importSvgFragment(fragment, batchIndex);
+          },
+        }),
     importSvgObject: (object, batchIndex) => {
       assertCurrent();
       return actions.importSvgObject(object, batchIndex);
@@ -216,7 +260,12 @@ async function dispatchOneFile(
     return;
   }
   if (kind === 'svg') {
-    await importSvgFiles([file], actions.importSvgObject, actions.pushToast, { nextSuccessIndex });
+    await importSvgFiles([file], actions.importSvgObject, actions.pushToast, {
+      nextSuccessIndex,
+      ...(actions.importSvgFragment === undefined
+        ? {}
+        : { importFragment: actions.importSvgFragment }),
+    });
     return;
   }
   if (kind === 'dxf') {

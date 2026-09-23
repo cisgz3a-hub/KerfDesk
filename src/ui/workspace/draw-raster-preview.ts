@@ -300,6 +300,9 @@ function transformCacheKey(obj: RasterImage, device: DeviceProfile): string {
     mirrorX: obj.transform.mirrorX,
     mirrorY: obj.transform.mirrorY,
     rotationDeg: obj.transform.rotationDeg,
+    // An external mask stays in scene space when the image moves. Owned clips
+    // move with the pixels and still allow the translation-only cache reuse.
+    ...(obj.imageMaskId === undefined ? {} : { x: obj.transform.x, y: obj.transform.y }),
     origin: device.origin,
     bedWidth: device.bedWidth,
     bedHeight: device.bedHeight,

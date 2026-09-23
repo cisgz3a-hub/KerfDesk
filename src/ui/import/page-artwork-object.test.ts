@@ -4,6 +4,7 @@ import { importImageFile } from '../commands/import-image-action';
 import { parseSvgOffThread } from './document-import-worker-client';
 import { pageArtworkObject } from './page-artwork-object';
 import type { PreparedArtworkPage } from './paged-artwork-source';
+import { ownedClipImage } from '../../__fixtures__/owned-image-clip';
 
 vi.mock('../commands/import-image-action', () => ({ importImageFile: vi.fn() }));
 vi.mock('./document-import-worker-client', () => ({ parseSvgOffThread: vi.fn() }));
@@ -43,6 +44,24 @@ describe('document page artwork preparation', () => {
       commit(image);
       return image;
     });
+  });
+
+  it('does not silently drop a bitmap when the editable-path destination receives mixed SVG', async () => {
+    const page = {
+      ...prepared(document.createElement('canvas')),
+      vectorSvg:
+        '<svg viewBox="0 0 10 10"><path d="M0 0L10 10"/><image width="10" height="10" preserveAspectRatio="none" href="' +
+        ownedClipImage().dataUrl +
+        '"/></svg>',
+    };
+    const commit = vi.fn();
+    await expect(
+      pageArtworkObject(page, 'mixed.pdf', 'paths', 300, {
+        signal: new AbortController().signal,
+        commit,
+      }),
+    ).rejects.toThrow(/contains embedded images/);
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it('asynchronously encodes PNG and keeps page millimetres with the existing sampled raster', async () => {

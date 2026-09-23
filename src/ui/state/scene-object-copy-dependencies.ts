@@ -24,7 +24,11 @@ export function sceneObjectCopyClosure(
 export function remapSceneObjectCopyDependencies(
   object: SceneObject,
   copiedIds: ReadonlyMap<string, string>,
+  options: { readonly preserveSvgImport?: boolean } = {},
 ): SceneObject {
+  // A duplicate is a fresh owner, never a member of the source file's replacement set.
+  // Array placement also remaps dependencies on originals that keep their identity.
+  if (options.preserveSvgImport !== true) object = withoutSvgImport(object);
   if ('traceSourceId' in object && object.traceSourceId !== undefined) {
     const traceSourceId = copiedIds.get(object.traceSourceId);
     if (traceSourceId !== undefined) object = { ...object, traceSourceId };
@@ -40,6 +44,12 @@ export function remapSceneObjectCopyDependencies(
       : { ...object, pathText: { ...object.pathText, guideObjectId } };
   }
   return object;
+}
+
+function withoutSvgImport(object: SceneObject): SceneObject {
+  if (object.svgImport === undefined) return object;
+  const { svgImport: _source, ...detached } = object;
+  return detached;
 }
 
 export function sceneObjectCopyDependencyIds(object: SceneObject): readonly string[] {

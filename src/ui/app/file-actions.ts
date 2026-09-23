@@ -1,3 +1,4 @@
+import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // Shared file-action handlers used by both the Toolbar buttons and the
 // window-level keyboard shortcut listener (F-A15). Each function takes the
 // PlatformAdapter + the store-bound callbacks it needs as arguments —
@@ -97,8 +98,12 @@ export async function handleImportSvg(
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
   getProjectDocumentEpoch: () => number,
+  importSvgFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome,
 ): Promise<void> {
-  const actions = vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch);
+  const actions = {
+    ...vectorImportActions(importSvgObject, pushToast, getProjectDocumentEpoch),
+    ...(importSvgFragment === undefined ? {} : { importSvgFragment }),
+  };
   const owner = captureImportDocumentOwner(getProjectDocumentEpoch);
   const ownedActions = bindImportActionsToDocument(actions, owner);
   let files: ReadonlyArray<{
@@ -114,7 +119,14 @@ export async function handleImportSvg(
     return;
   }
   if (!owner.isCurrent()) return;
-  await importSvgFiles(files, ownedActions.importSvgObject, ownedActions.pushToast);
+  await importSvgFiles(
+    files,
+    ownedActions.importSvgObject,
+    ownedActions.pushToast,
+    ownedActions.importSvgFragment === undefined
+      ? {}
+      : { importFragment: ownedActions.importSvgFragment },
+  );
 }
 
 function vectorImportActions(

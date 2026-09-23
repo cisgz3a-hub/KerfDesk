@@ -31,6 +31,10 @@ export async function pageArtworkObject(
     const parsed =
       pending === null ? parseSvg({ svgText: page.vectorSvg, id, source }) : await pending;
     options.signal.throwIfAborted();
+    if (parsed.fragment?.entries.some((entry) => entry.kind === 'svg-image'))
+      throw new Error(
+        'This page contains embedded images. Choose Image to retain the complete page.',
+      );
     if (parsed.object === null) throw new Error('No editable paths were found on this page.');
     options.commit(parsed.object);
     return;

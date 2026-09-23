@@ -139,10 +139,12 @@ opportunity, without an extra branding delay. It introduces no startup interacti
       strips `<script>`, `<foreignObject>`, event handlers, external references, and non-image data
       URIs. If the Worker cannot start, the warning-disclosed main-thread fallback uses DOMPurify
       (`USE_PROFILES: { svg: true, svgFilters: true }`) plus its reference-removal hook.
-   3. Geometry walked out of the sanitized DOM into internal Scene objects.
-   4. Object is placed centered on the bed by default, at its natural mm size from the SVG `viewBox`.
-   5. Object is auto-selected (selection handles visible).
-   6. Artwork Operations auto-populates with one named operation for the imported artwork. Its
+   3. Geometry and embedded bitmaps become ordered editable Scene objects. All image decoding
+      completes before the file is inserted together in one Undo step (ADR-358).
+   4. The complete composition is centered with one translation at its natural physical size.
+      Objects retain their relative positions, transforms and authored millimetre dimensions.
+   5. The file's objects are selected together and grouped when there is more than one.
+   6. Artwork Operations auto-populates with named Line, Fill and Image operations. Their
       presentation color is assigned from the automatic high-contrast palette; source SVG colors
       are preserved inside the artwork.
    7. Toast: `Imported design.svg — 1 artwork`.
@@ -155,8 +157,12 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 5. Toast: `Imported 3 designs · 3 artwork operations`.
 
 #### Success — SVG with embedded raster image
-1. Phase A ignores embedded raster (`<image>` elements).
-2. Sanitized count appears in toast: `Imported design.svg · 1 embedded image ignored (Phase E will support these)`.
+1. Embedded PNG, JPEG, BMP and WebP pixels are decoded into raster artwork, preserving the SVG
+   image bounds, rotation, unequal scale and mirroring. Bitmap DPI does not change SVG placement.
+2. KerfDesk-exported image clips and holes remain owned by the image, with no extra mask artwork
+   or cutting operation. Image clips intersect an independently assigned image mask.
+3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
+   and document replacement leave the complete file uninserted and release staged image assets.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
@@ -182,10 +188,10 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 2. Toast (warning): `<filename> has no drawable content`. No state change.
 
 #### Edge — SVG is larger than the machine bed
-1. After import, the object's bounding box is checked against bed dimensions.
-2. If any part is outside bed: warning toast `Design extends beyond bed. Resize or reposition before generating G-code.`
-3. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
-4. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
+1. Import preserves the complete source size; it never shrinks individual components to fit.
+2. Out-of-bounds geometry shows the workspace warning overlay and remains a Job Review warning.
+3. Operators can resize or reposition the artwork. A completed Frame for the exact reviewed job
+   remains the sole ordinary Start policy gate (ADRs 228, 230, 232 and 237).
 
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
@@ -666,9 +672,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
-4. The SVG works as artwork interchange. KerfDesk's current SVG importer still ignores embedded
-   raster images, so re-importing a mixed image/vector SVG is not a complete project round trip.
-   Use the project format to preserve editable text and machining data.
+4. Re-import preserves the supported vector/image composition, physical size and image clips
+   (ADR-358). Use the project format to preserve editable text and machining data. Software tests
+   do not replace rendered verification in KerfDesk and an independent vector editor.
+5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
+   Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
+   receive new operations. Copies are independent of the original source's replacement set.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 

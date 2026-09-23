@@ -1,11 +1,5 @@
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
-import {
-  burnDecodeMaxEdge,
-  extractLumaBase64,
-  loadImageAsRawData,
-  readFileAsDataUrl,
-  readImageNaturalSize,
-} from '../trace/image-loader';
+import { readFileAsDataUrl } from '../trace/image-loader';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
 import {
@@ -18,11 +12,10 @@ import { largeImportAdvisory } from '../app/import-size-advisory';
 import {
   shouldDecodeDimensionQualifiedPng,
   shouldPageBackPng,
-  tryDecodeDimensionQualifiedPng,
-  tryDecodeQualifiedPng,
 } from '../import/qualified-png-raster';
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
 import { freezeGif, isGif } from '../import/freeze-gif';
+import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
 
 /** Imports the file into the scene; resolves with the created object (null
  * when skipped or failed) so callers like Image Studio can chain onto it. */
@@ -79,27 +72,6 @@ function staticImage(file: File): Promise<File> {
 function assertImportActive(signal: AbortSignal | undefined): void {
   signal?.throwIfAborted();
 }
-
-type ImageDimensions = { readonly width: number; readonly height: number };
-type LoadedImageSamples =
-  | {
-      readonly kind: 'embedded';
-      readonly natural: ImageDimensions;
-      readonly sampled: ImageDimensions;
-      readonly lumaBase64: string;
-      readonly density?: ImageDensity | null;
-      readonly cleanupWarning?: string;
-    }
-  | {
-      readonly kind: 'paged';
-      readonly natural: ImageDimensions;
-      readonly sampled: ImageDimensions;
-      readonly imageAsset: NonNullable<
-        Extract<SceneObject, { readonly kind: 'raster-image' }>['imageAsset']
-      >;
-      readonly density: ImageDensity | null;
-      readonly rollback: () => Promise<string | null>;
-    };
 
 function warnImageCleanup(
   loaded: LoadedImageSamples,
@@ -169,38 +141,6 @@ async function handleFailedImport(
   const message = error instanceof Error ? error.message : String(error);
   pushToast(`Could not load image: ${message}`, 'error');
   return null;
-}
-
-async function loadImageSamples(
-  file: File,
-  pageBacked: boolean,
-  dimensionQualified: boolean,
-  options: PngImportControls['options'] | undefined,
-): Promise<LoadedImageSamples> {
-  if (pageBacked) {
-    const qualified = await tryDecodeQualifiedPng(file, options);
-    if (qualified !== null) return { kind: 'paged', ...qualified };
-  } else if (dimensionQualified) {
-    const qualified = await tryDecodeDimensionQualifiedPng(file, options);
-    if (qualified !== null) {
-      return {
-        kind: 'embedded',
-        natural: qualified.natural,
-        sampled: qualified.sampled,
-        lumaBase64: qualified.lumaBase64,
-        density: qualified.density,
-        ...(qualified.cleanupWarning === null ? {} : { cleanupWarning: qualified.cleanupWarning }),
-      };
-    }
-  }
-  const natural = await readImageNaturalSize(file);
-  const sampled = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
-  return {
-    kind: 'embedded',
-    natural,
-    sampled,
-    lumaBase64: extractLumaBase64(sampled),
-  };
 }
 
 type PngImportControls = {

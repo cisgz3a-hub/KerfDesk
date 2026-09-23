@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ParseSvgResult } from '../../io/svg';
-import { describeImportError, describeImportResult } from './import-toasts';
+import {
+  describeImportError,
+  describeImportResult,
+  describeReimportOutcome,
+} from './import-toasts';
 
 function baseResult(over: Partial<ParseSvgResult> = {}): ParseSvgResult {
   return {
@@ -56,7 +60,18 @@ describe('describeImportResult', () => {
       baseResult({ ignoredTextElements: 4, ignoredImageElements: 1 }),
     );
     expect(toasts.some((t) => t.message.includes('4 text elements'))).toBe(true);
-    expect(toasts.some((t) => t.message.includes('1 embedded image'))).toBe(true);
+    expect(
+      toasts.some((t) => t.message.includes('1 image ignored — no embedded bitmap data')),
+    ).toBe(true);
+  });
+
+  it('surfaces unsupported presentation diagnostics as warnings', () => {
+    const note =
+      'SVG presentation: Imported 1 SVG element(s) as strokes only; their fills were omitted.';
+    expect(describeImportResult('mixed.svg', baseResult({ notes: [note] }))).toContainEqual({
+      message: 'mixed.svg: ' + note,
+      variant: 'warning',
+    });
   });
 });
 
@@ -65,5 +80,16 @@ describe('describeImportError', () => {
     const t = describeImportError('bad.svg', new Error('parse failed'));
     expect(t.variant).toBe('error');
     expect(t.message).toContain('parse failed');
+  });
+  it('does not claim to preserve settings when no source component matched', () => {
+    expect(
+      describeReimportOutcome({
+        kind: 'replaced',
+        source: 'changed.svg',
+        kept: 0,
+        added: 1,
+        removed: 1,
+      }).message,
+    ).toBe('Re-imported changed.svg — new layer settings (1 new, 1 removed)');
   });
 });
