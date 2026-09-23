@@ -115,7 +115,10 @@ Cut Planner also offers opt-in **Remove overlapping lines**, off by default. It 
 laser Line spans within one compiled settings group while retaining separate operations, pass
 counts and gaps (ADR-350). **File → Export artwork as SVG...** exports the selection or scene with
 physical sizing, outlined text, embedded source images and image masks, without consuming
-production variables. Existing SVG import still ignores embedded raster images.
+production variables. SVG import retains the complete exported vector/image composition,
+physical placement and supported image clips in one undoable insertion (ADR-358). Unsupported
+external clipping/effects report errors; independent-editor and rendered round-trip acceptance
+remain separate verification requirements.
 
 Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
 with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
