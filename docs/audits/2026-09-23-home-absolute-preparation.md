@@ -57,10 +57,23 @@ physical-safety fixtures were corrected to provide the required post-Home WCO.
 The final Frame/Start representation cohort passed 58 tests across three files.
 Two independent code reviews found no remaining actionable issue.
 
+The original `C:\Users\Asus\Desktop\Owl.png` passed the combined Chrome test on
+the branch integrated with main `57a5a55a7`: Sharp, commit, Preview, scrub/play/pause,
+Home with X200.398/Y170.323 WCO, three Frame clicks, and an equivalent WPos report.
+The run finished in 2.8 minutes with 14,389 contours / 494,902 vertices preserved,
+no renderer crash or page error, neither preparation toast, and no G92/G10 writes.
+The rendered final page showed “Ready to start — framed job unchanged”.
+The image SHA-256 was
+`7e9c682821fbb079dabb29535dc85f71e47fc6008bfb38fb35257f808664a6c5`.
+Stage JSON and screenshots are under `artifacts/absolute-home-owl-complete/`.
+
 An initial parallel validation batch exhausted host memory: TypeScript, Prettier
 and esbuild reported allocation failures, and the owl browser run timed out while
 still tracing. Those attempts are not passing evidence. Validation was reduced
 to sequential runs. Local browser evidence is kept under ignored `artifacts/`.
+Two intermediate browser attempts exposed test harness issues: a summary element
+was addressed as a button, and a short action timeout also constrained cold page
+navigation. The final run uses the real summary and a separate navigation timeout.
 
 These are software and simulated-controller checks. No physical Home, Frame,
 engraving, material run or hardware qualification was performed by the agent.

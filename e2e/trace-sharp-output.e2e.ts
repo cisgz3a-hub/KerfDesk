@@ -26,6 +26,7 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
 }, testInfo) => {
   test.setTimeout(420_000);
   page.setDefaultTimeout(15_000);
+  page.setDefaultNavigationTimeout(120_000);
   const bytes = readFileSync(imagePath);
   const stages: unknown[] = [];
   const record = (stage: string, details: unknown = {}) => {
