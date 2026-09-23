@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mixedCanvasCompilationProject } from '../../__fixtures__/mixed-canvas-compilation-project';
 import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
 import type { JobBounds } from '../../core/job';
+import type { Project } from '../../core/scene';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { useStore } from '../state/store';
 import { useLaserStore } from '../state/laser-store';
@@ -51,6 +52,17 @@ class ControlledWorker {
       data: { requestId: this.posted.at(-1)?.requestId, progress },
     } as MessageEvent<OutputPreparationResult>);
   }
+}
+
+// The controlled worker holds every compilation open until a test answers it,
+// so the job's size never stands in for a slow compile. finishCompilation still
+// compiles for real on the test thread: one engraved CNC mark takes
+// milliseconds, where the mixed fixture's V-carve load took about a second per
+// Frame and pushed repeated Frames past the 5 s test timeout.
+function engravedMarkProject(): Project {
+  const project = mixedCanvasCompilationProject();
+  const objects = project.scene.objects.filter((object) => object.id === 'engraved-mark');
+  return { ...project, scene: { ...project.scene, objects } };
 }
 
 const originalFrame = useLaserStore.getState().frame;
@@ -105,7 +117,7 @@ beforeEach(() => {
   ControlledWorker.instances = [];
   vi.stubGlobal('Worker', ControlledWorker);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  useStore.setState({ project: mixedCanvasCompilationProject() });
+  useStore.setState({ project: engravedMarkProject() });
   useLaserStore.setState({
     ...initialLaserState(),
     statusReport: idleControllerStatusForFrameTest(),
