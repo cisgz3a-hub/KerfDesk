@@ -147,7 +147,10 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
   useEffect(() => {
     const requestInput = inputRef.current;
     const request = ++requestRef.current;
-    if (shouldClearIdlePlan(requestInput)) {
+    // A running job draws its own plan. The idle plan is a second whole-job
+    // route model (about 100 MB for a 373k-line fill) that nothing shows until
+    // the run ends, when it is re-planned from the settled head anyway (ADR-352).
+    if (shouldClearIdlePlan(requestInput) || isActiveCanvasLifecycleOrNull(requestInput.liveRun)) {
       setIdleState(null);
       return;
     }

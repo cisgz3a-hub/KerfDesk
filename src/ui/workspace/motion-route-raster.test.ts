@@ -227,6 +227,44 @@ describe('burn route raster across view changes', () => {
     expect(work).toBeGreaterThan(40);
   });
 
+  it('catches up a long confirmed backlog in bounded slices, not one task', () => {
+    // After a hidden window or a busy thread the route confirmed since the last
+    // paint can be most of the job; appending it must not be one long task.
+    const plan = hatchPlan({ rows: 100, segmentsPerRow: 220 });
+    const total = plan.manifest.totalRouteMm;
+    const view = { scale: 12, offsetX: 8, offsetY: 8 };
+    const visible = inkCanvas(280, 150);
+    let latest: Float32Array = new Float32Array(0);
+    const redraw = vi.fn(() => {
+      latest = paintFrame(visible, plan, total * 0.9, view, redraw);
+    });
+    paintFrame(visible, plan, total * 0.05, view, redraw);
+    let work = 0;
+    InkContext.onStroke = (segments, widthPx) => {
+      const cost = segments * (widthPx > 1 ? 0.003 : 0.00005);
+      clock.now += cost;
+      work += cost;
+    };
+
+    latest = paintFrame(visible, plan, total * 0.9, view, redraw);
+    const firstTask = work;
+    for (let guard = 0; redraw.mock.calls.length === 0 && guard < 1_000; guard += 1) {
+      vi.advanceTimersToNextTimer();
+    }
+
+    // One append batch (4,096 wide segments) is the most a slice can overrun by.
+    expect(firstTask).toBeLessThanOrEqual(ROUTE_REBUILD_SLICE_MS + 4_096 * 0.003);
+    expect(work).toBeGreaterThan(40);
+    expect(redraw).toHaveBeenCalledTimes(1);
+    InkContext.onStroke = () => undefined;
+    // Separate 1,024-segment batches meet at antialiased seams, the same as a
+    // sliced rebuild; the trail itself is the same.
+    const fresh = paintFrame(inkCanvas(280, 150), twin(plan), total * 0.9, view);
+    for (const channel of [0, 2, 3]) {
+      expect(compareInk(latest, fresh, channel).iou).toBeGreaterThan(0.99);
+    }
+  });
+
   it("abandons a finished plan's pending rebuild once another plan paints", () => {
     const finished = hatchPlan({ rows: 100, segmentsPerRow: 220 });
     const total = finished.manifest.totalRouteMm;

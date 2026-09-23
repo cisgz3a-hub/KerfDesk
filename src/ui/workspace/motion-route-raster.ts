@@ -48,6 +48,13 @@ export const ROUTE_REBUILD_SLICE_MS = 8;
  * slice overruns its budget by at most that.
  */
 const REBUILD_BATCH_SEGMENTS = 1_024;
+/**
+ * Segments per batch when a paint appends newly confirmed route. A status poll
+ * appends a few hundred, so an ordinary append stays one stroke (identical to
+ * an unsliced one); only a backlog after a long gap is split, overrunning its
+ * slice by at most ~12 ms at the full stroker.
+ */
+const APPEND_BATCH_SEGMENTS = 4_096;
 /** Cull margin around the canvas: half the widest stroke plus antialiasing. */
 const CULL_MARGIN_PX = 4;
 
@@ -73,6 +80,7 @@ type RouteRasterState = {
   pendingAt: number;
   goalRouteMm: number;
   sliceTimer: ReturnType<typeof setTimeout> | null;
+  appendTimer: ReturnType<typeof setTimeout> | null;
   requestRedraw: (() => void) | undefined;
 };
 
@@ -106,12 +114,21 @@ export function drawRouteRaster(request: RouteRasterRequest): boolean {
   const key = rasterKey(ctx.canvas, view);
   const state = routeRasterState(request, key);
   if (state === null) return false;
-  if (lastState !== null && lastState !== state) dropRebuild(lastState);
+  if (lastState !== null && lastState !== state) {
+    dropRebuild(lastState);
+    dropAppend(lastState);
+  }
   lastState = state;
   state.goalRouteMm = request.confirmedRouteMm;
   state.requestRedraw = request.requestRedraw;
   if (request.confirmedRouteMm < state.shown.confirmedRouteMm) rewind(state);
-  appendConfirmed(state, state.shown);
+  // A paint normally appends the ~0.25 s of route confirmed since the last one.
+  // After a long gap (a hidden window, a busy thread) that can be most of the
+  // job, so an existing raster catches up in slices like a rebuild. A raster
+  // with no trail yet is painted exact at once, as a new plan always was.
+  const deadline =
+    state.shown.confirmedRouteMm === 0 ? null : performance.now() + ROUTE_REBUILD_SLICE_MS;
+  if (!appendConfirmed(state, state.shown, deadline, APPEND_BATCH_SEGMENTS)) scheduleAppend(state);
   if (state.shown.key === key) {
     state.pendingKey = null;
     dropRebuild(state);
@@ -125,7 +142,10 @@ export function drawRouteRaster(request: RouteRasterRequest): boolean {
 export function resetRouteRastersForTests(): void {
   if (settleTimer !== null) clearTimeout(settleTimer);
   settleTimer = null;
-  if (lastState !== null) dropRebuild(lastState);
+  if (lastState !== null) {
+    dropRebuild(lastState);
+    dropAppend(lastState);
+  }
   lastState = null;
 }
 
@@ -165,6 +185,7 @@ function routeRasterState(request: RouteRasterRequest, key: string): RouteRaster
     pendingAt: 0,
     goalRouteMm: 0,
     sliceTimer: null,
+    appendTimer: null,
     requestRedraw: undefined,
   };
   states.set(request.plan, state);
@@ -246,6 +267,7 @@ function appendConfirmed(
   state: RouteRasterState,
   raster: RouteRaster,
   deadline: number | null = null,
+  batchSegments = REBUILD_BATCH_SEGMENTS,
 ): boolean {
   while (raster.confirmedRouteMm < state.goalRouteMm) {
     const batch = confirmedRouteBatch(
@@ -254,7 +276,7 @@ function appendConfirmed(
       raster.confirmedRouteMm,
       state.goalRouteMm,
       raster.cull,
-      deadline === null ? Number.POSITIVE_INFINITY : REBUILD_BATCH_SEGMENTS,
+      deadline === null ? Number.POSITIVE_INFINITY : batchSegments,
     );
     // Opaque into the raster: the cap is the composite in blit(), so repeated
     // overlap can never darken past one burn.
@@ -333,6 +355,22 @@ function scheduleSlice(state: RouteRasterState): void {
     if (runRebuildSlice(state)) state.requestRedraw?.();
     else if (state.next !== null) scheduleSlice(state);
   }, 0);
+}
+
+function scheduleAppend(state: RouteRasterState): void {
+  if (state.appendTimer !== null) return;
+  state.appendTimer = setTimeout(() => {
+    state.appendTimer = null;
+    const deadline = performance.now() + ROUTE_REBUILD_SLICE_MS;
+    if (appendConfirmed(state, state.shown, deadline, APPEND_BATCH_SEGMENTS)) {
+      state.requestRedraw?.();
+    } else scheduleAppend(state);
+  }, 0);
+}
+
+function dropAppend(state: RouteRasterState): void {
+  if (state.appendTimer !== null) clearTimeout(state.appendTimer);
+  state.appendTimer = null;
 }
 
 function dropRebuild(state: RouteRasterState): void {
