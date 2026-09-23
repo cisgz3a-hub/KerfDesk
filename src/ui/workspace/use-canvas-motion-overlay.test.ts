@@ -138,6 +138,7 @@ describe('idle canvas motion plan', () => {
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
     const initialPlan = observedOverlay?.plan;
     expect(initialPlan).toBeDefined();
+    expect(observedOverlay?.planIsCurrent).toBe(true);
     await act(async () => {
       useStore.getState().beginInteraction();
       useStore.getState().setObjectTransform('e2e-square', {
@@ -151,6 +152,7 @@ describe('idle canvas motion plan', () => {
       });
     });
     expect(observedOverlay?.plan).toBe(initialPlan);
+    expect(observedOverlay?.planIsCurrent).toBe(false);
     const rendersWhileDragging = harnessRenders;
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, IDLE_CANVAS_PLAN_DELAY_MS + 50));
@@ -166,6 +168,7 @@ describe('idle canvas motion plan', () => {
     });
     expect(observedOverlay?.plan.jobStart).not.toBeNull();
     expect(observedOverlay?.plan).not.toBe(initialPlan);
+    expect(observedOverlay?.planIsCurrent).toBe(true);
   });
 
   it('clears a canceled job overlay when its final artwork is deleted', async () => {

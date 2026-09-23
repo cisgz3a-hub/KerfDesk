@@ -105,18 +105,26 @@ function SelectedOperationEditor(props: {
       aria-label={props.selectionActive ? 'Selected artwork operation' : 'Artwork operation'}
       className="lf-operation-inspector"
     >
-      <OperationIdentity
-        operation={props.active}
-        candidates={props.candidates}
-        onRename={renameOperation}
+      <OperationChoice
+        operations={props.candidates}
+        activeId={props.active.id}
         onSelect={props.onSelect}
       />
       {affected > 1 && !(overrideEditing && props.machineKind === 'laser') ? (
-        <p className="lf-artwork-hint">
+        <p className="lf-artwork-hint lf-operation-scope">
           Shared by {affected} artworks. Edits apply to all of them.
         </p>
       ) : null}
-      <OperationToggles operation={props.active} affected={affected} />
+      {props.machineKind === 'laser' && overrideEditing && !hasMixedFields(mixedFields) ? (
+        <p className="lf-artwork-hint lf-operation-scope">
+          This artwork has its own settings. The values shown here are used for its output.
+        </p>
+      ) : null}
+      {!props.active.output ? (
+        <p className="lf-artwork-hint lf-operation-scope" role="status">
+          Excluded from output. Turn on Include in output below to use this operation in the job.
+        </p>
+      ) : null}
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
@@ -131,6 +139,8 @@ function SelectedOperationEditor(props: {
           reconcileKey={reconcileKey}
         />
       )}
+      <OperationIdentity operation={props.active} onRename={renameOperation} />
+      <OperationToggles operation={props.active} affected={affected} />
       <OperationContextActions
         affected={affected}
         selectedUsingActive={activeObjects.length}
@@ -140,11 +150,6 @@ function SelectedOperationEditor(props: {
         }
         onAdd={() => inspectCreatedOperation(() => addOperation(objectIds), props.onSelect)}
       />
-      {props.machineKind === 'laser' && overrideEditing && !hasMixedFields(mixedFields) ? (
-        <p className="lf-artwork-hint">
-          This artwork has its own settings. The values shown here are used for its output.
-        </p>
-      ) : null}
       <CompatibilityNote
         objects={props.objects}
         operation={effectiveOperation}
@@ -154,33 +159,37 @@ function SelectedOperationEditor(props: {
   );
 }
 
+function OperationChoice(props: {
+  readonly operations: ReadonlyArray<Layer>;
+  readonly activeId: string;
+  readonly onSelect: (id: string) => void;
+}): JSX.Element | null {
+  if (props.operations.length <= 1) return null;
+  return (
+    <OperationSelect
+      operations={props.operations}
+      value={props.activeId}
+      onChange={props.onSelect}
+    />
+  );
+}
+
 function OperationIdentity(props: {
   readonly operation: Layer;
-  readonly candidates: ReadonlyArray<Layer>;
   readonly onRename: (id: string, name: string) => void;
-  readonly onSelect: (id: string) => void;
 }): JSX.Element {
   return (
-    <>
-      <div className="lf-operation-identity">
-        <span className="lf-operation-swatch" style={{ background: props.operation.color }} />
-        <label>
-          <span className="lf-artwork-eyebrow">Operation name</span>
-          <OperationNameInput
-            operationId={props.operation.id}
-            name={props.operation.name}
-            onRename={props.onRename}
-          />
-        </label>
-      </div>
-      {props.candidates.length > 1 ? (
-        <OperationSelect
-          operations={props.candidates}
-          value={props.operation.id}
-          onChange={props.onSelect}
+    <div className="lf-operation-identity">
+      <span className="lf-operation-swatch" style={{ background: props.operation.color }} />
+      <label>
+        <span className="lf-artwork-eyebrow">Operation name</span>
+        <OperationNameInput
+          operationId={props.operation.id}
+          name={props.operation.name}
+          onRename={props.onRename}
         />
-      ) : null}
-    </>
+      </label>
+    </div>
   );
 }
 

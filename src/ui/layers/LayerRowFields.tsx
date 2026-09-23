@@ -23,29 +23,18 @@ export type LayerOperationControlTarget = {
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 };
 
-export function LayerRowSettingsFields(props: {
+type LayerRowSettingsFieldsProps = {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
-}): JSX.Element {
+  readonly compact?: boolean;
+};
+
+export function LayerRowSettingsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
   const { layer, operationTarget } = props;
   const { settings } = operationTarget;
   return (
     <>
-      <section className="lf-laser-essentials" aria-label="Power, speed, passes and scan direction">
-        <h4 className="lf-laser-section-title">Essential settings</h4>
-        <div className="lf-laser-essentials__grid">
-          <FieldRow label="Power" unit="%">
-            <PowerInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-          <FieldRow label="Speed" unit="mm/min">
-            <SpeedInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-          <FieldRow label="Passes" unit="times">
-            <PassesInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-        </div>
-        <ScanDirectionField layer={layer} operationTarget={operationTarget} />
-      </section>
+      <LaserEssentialsFields {...props} />
       {!operationTarget.mixedFields?.mode ? (
         <details className="lf-laser-options">
           <summary title="Show extra settings for the selected laser process">
@@ -96,6 +85,30 @@ export function LayerRowSettingsFields(props: {
         </details>
       ) : null}
     </>
+  );
+}
+
+function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
+  const { layer, operationTarget } = props;
+  return (
+    <section
+      className={`lf-laser-essentials${props.compact ? ' lf-laser-essentials--compact' : ''}`}
+      aria-label="Power, speed, passes and scan direction"
+    >
+      {props.compact ? null : <h4 className="lf-laser-section-title">Essential settings</h4>}
+      <div className="lf-laser-essentials__grid">
+        <FieldRow label="Power" unit="%">
+          <PowerInput layer={layer} operationTarget={operationTarget} />
+        </FieldRow>
+        <FieldRow label="Speed" unit="mm/min">
+          <SpeedInput layer={layer} operationTarget={operationTarget} />
+        </FieldRow>
+        <FieldRow label="Passes" unit="times">
+          <PassesInput layer={layer} operationTarget={operationTarget} />
+        </FieldRow>
+      </div>
+      <ScanDirectionField layer={layer} operationTarget={operationTarget} />
+    </section>
   );
 }
 

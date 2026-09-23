@@ -11,10 +11,35 @@ import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { computeView } from './view-transform';
 
-export function EmptyHint(): JSX.Element {
+export function EmptyHint(): JSX.Element | null {
+  const toolMode = useUiStore((state) => state.toolMode);
+  const setToolMode = useUiStore((state) => state.setToolMode);
+  const setLibraryOpen = useUiStore((state) => state.setLibraryDialogOpen);
+  if (toolMode.kind !== 'select') return null;
   return (
-    <div style={emptyHintStyle} aria-hidden="true">
-      Drag an SVG or image here, or use File → Import
+    <div style={emptyHintStyle}>
+      <div className="lf-empty-entry">
+        <strong>Start your design</strong>
+        <p>Drop an SVG or image here, or choose Import in the toolbar.</p>
+        <div className="lf-empty-entry-actions">
+          <button
+            type="button"
+            className="lf-btn"
+            title="Select the rectangle tool, then drag on the canvas to draw."
+            onClick={() => setToolMode({ kind: 'draw', shape: 'rect' })}
+          >
+            Draw a rectangle
+          </button>
+          <button
+            type="button"
+            className="lf-btn"
+            title="Open the design library to add artwork to the canvas."
+            onClick={() => setLibraryOpen(true)}
+          >
+            Browse designs
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -289,10 +314,6 @@ const measureReadoutStyle: React.CSSProperties = {
   border: '1px solid var(--lf-accent)',
 };
 const scrubberContainerStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 24,
-  right: 24,
-  bottom: 12,
   display: 'flex',
   alignItems: 'center',
   gap: 10,
@@ -302,7 +323,7 @@ const scrubberContainerStyle: React.CSSProperties = {
 const scrubberInputStyle: React.CSSProperties = { flex: 1 };
 const scrubberLabelStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
-  fontSize: 11,
+  fontSize: 12,
   minWidth: 40,
   textAlign: 'right',
 };

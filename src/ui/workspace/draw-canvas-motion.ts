@@ -1,10 +1,6 @@
 /* eslint-disable no-restricted-syntax -- controller motion is scene data drawn
- * onto the canvas, not chrome. The safety chrome (frame/job markers, approach,
- * head ring) stays a fixed red at both canvas themes so it can never be read as
- * anything but the machine. Only the label follows the bed — a hard-white plate
- * on the dark bed read as a sticker pasted over the work, and #dc2626 text on
- * that plate fails contrast — and it stays red either way. Burn colours proper
- * live in canvasTheme.burn* (ADR-047). */
+ * onto the canvas. The reported head and approach stay red; the separately
+ * named planned starts use the theme's distinct marker accents. */
 import type { Vec2 } from '../../core/scene';
 import {
   mapControllerPointToScene,
@@ -15,18 +11,21 @@ import { cncPassPosition } from '../state/canvas-pass-progress';
 import { canvasTheme } from '../theme/canvas-theme';
 import { burnIsActive, drawBurnGlow, drawBurnTail } from './draw-burn-trail';
 import { drawCanvasMotionRoute, type RoutePalette } from './draw-canvas-motion-route';
+import { drawCanvasStartMarkers } from './draw-canvas-motion-markers';
+import type { MarkerBox } from './canvas-motion-marker-layout';
+import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewTransform } from './view-transform';
 
 export type CanvasMotionOverlay = {
   readonly plan: CanvasMotionPlan;
   readonly run: LiveCanvasRun | null;
   readonly showStartMarkers?: boolean;
+  /** False while retained starts belong to the previous idle preparation. */
+  readonly planIsCurrent?: boolean;
 };
 
 const RED = '#dc2626';
 const HEAD_CORE = '#ffffff';
-const START_LABEL_TEXT_OPACITY = 0.5;
-const START_LABEL_BACKGROUND_OPACITY = 0.2;
 
 function routePalette(): RoutePalette {
   return {
@@ -40,6 +39,8 @@ export function drawCanvasMotionOverlay(
   ctx: CanvasRenderingContext2D,
   overlay: CanvasMotionOverlay,
   view: ViewTransform,
+  viewport?: CanvasBitmapSize,
+  artwork: ReadonlyArray<MarkerBox> = [],
 ): void {
   const { plan, run } = overlay;
   if (run !== null) {
@@ -47,7 +48,9 @@ export function drawCanvasMotionOverlay(
     drawBurnTail(ctx, plan, run, view);
   }
   drawApproach(ctx, plan, run, view);
-  if (overlay.showStartMarkers !== false) drawStartMarkers(ctx, plan, view);
+  if (overlay.showStartMarkers !== false) {
+    drawCanvasStartMarkers(ctx, plan, view, overlay.planIsCurrent === false, viewport, artwork);
+  }
   if (
     plan.capability === 'realtime' &&
     run?.reportedHead !== null &&
@@ -55,29 +58,6 @@ export function drawCanvasMotionOverlay(
   ) {
     drawHead(ctx, mapControllerPointToScene(run.reportedHead, plan), run, view);
   }
-}
-
-// Distance below which two markers are treated as the same point on screen.
-const MARKER_COLLISION_PX = 26;
-
-function drawStartMarkers(
-  ctx: CanvasRenderingContext2D,
-  plan: CanvasMotionPlan,
-  view: ViewTransform,
-): void {
-  drawFrameStart(ctx, plan, view);
-  if (plan.jobStart === null) return;
-  // A job origin placed on the frame corner is the common case, and stacking
-  // both plates at one point rendered the two labels as overlapping nonsense.
-  drawMarker(ctx, plan.jobStart, 'JOB START', view, collidesWithFrameStart(plan, view) ? 1 : -1);
-}
-
-function collidesWithFrameStart(plan: CanvasMotionPlan, view: ViewTransform): boolean {
-  const frameStart = plan.framePerimeter[0];
-  if (frameStart === undefined || plan.jobStart === null) return false;
-  const a = sceneToCanvas(frameStart, view);
-  const b = sceneToCanvas(plan.jobStart, view);
-  return Math.hypot(a.x - b.x, a.y - b.y) < MARKER_COLLISION_PX;
 }
 
 function drawApproach(
@@ -97,57 +77,6 @@ function drawApproach(
   ctx.moveTo(from.x, from.y);
   ctx.lineTo(to.x, to.y);
   ctx.stroke();
-  ctx.restore();
-}
-
-function drawFrameStart(
-  ctx: CanvasRenderingContext2D,
-  plan: CanvasMotionPlan,
-  view: ViewTransform,
-): void {
-  const start = plan.framePerimeter[0];
-  const next = plan.framePerimeter[1];
-  if (start === undefined || next === undefined) return;
-  drawMarker(ctx, start, 'FRAME START', view);
-  const from = sceneToCanvas(start, view);
-  const toward = sceneToCanvas(next, view);
-  const angle = Math.atan2(toward.y - from.y, toward.x - from.x);
-  const length = 20;
-  const end = { x: from.x + Math.cos(angle) * length, y: from.y + Math.sin(angle) * length };
-  ctx.save();
-  ctx.strokeStyle = RED;
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(end.x, end.y);
-  ctx.lineTo(end.x - Math.cos(angle - Math.PI / 6) * 6, end.y - Math.sin(angle - Math.PI / 6) * 6);
-  ctx.moveTo(end.x, end.y);
-  ctx.lineTo(end.x - Math.cos(angle + Math.PI / 6) * 6, end.y - Math.sin(angle + Math.PI / 6) * 6);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawMarker(
-  ctx: CanvasRenderingContext2D,
-  point: Vec2,
-  label: string,
-  view: ViewTransform,
-  labelSide: 1 | -1 = -1,
-): void {
-  const at = sceneToCanvas(point, view);
-  ctx.save();
-  ctx.fillStyle = RED;
-  ctx.beginPath();
-  ctx.arc(at.x, at.y, 4, 0, Math.PI * 2);
-  ctx.fill();
-  drawLabel(
-    ctx,
-    at.x + 8,
-    at.y + labelSide * 8,
-    label,
-    START_LABEL_BACKGROUND_OPACITY,
-    START_LABEL_TEXT_OPACITY,
-  );
   ctx.restore();
 }
 

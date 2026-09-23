@@ -19,6 +19,7 @@ import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
 import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
@@ -113,12 +114,8 @@ export function App(): JSX.Element {
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
-  return (
-    <div style={canvasAreaStyle} data-toast-workspace>
-      {/* G-code owns the canvas, so Workspace is unmounted rather than merely
-          covered. Its cleanup cancels idle motion/preview workers and makes a
-          late heavy result incapable of committing or drawing underneath. */}
-      {showGcode ? <CanvasGcodeView active /> : <Workspace />}
+  const accessories = (
+    <>
       <WorkspaceCameraOverlay />
       <RegistrationJigPanel />
       <CameraPanel />
@@ -127,7 +124,25 @@ function CanvasArea(): JSX.Element {
       <div style={canvasSwitchStyle}>
         <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
       </div>
-    </div>
+    </>
+  );
+  return (
+    <WorkspaceViewport
+      content={
+        showGcode ? (
+          <div className="lf-workspace-stage">
+            <CanvasGcodeView active />
+          </div>
+        ) : (
+          <Workspace />
+        )
+      }
+    >
+      {/* G-code owns the canvas, so Workspace is unmounted rather than merely
+          covered. Its cleanup cancels idle motion/preview workers and makes a
+          late heavy result incapable of committing or drawing underneath. */}
+      {accessories}
+    </WorkspaceViewport>
   );
 }
 
@@ -156,14 +171,5 @@ const mainStyle: React.CSSProperties = {
   flex: 1,
   minHeight: 0,
   minWidth: 0,
-  overflow: 'hidden',
-};
-const canvasAreaStyle: React.CSSProperties = {
-  // flex:1 + minWidth:0 lets the workspace shrink to whatever the side rails
-  // leave. overflow:hidden prevents the inner canvas (with width: 100%) from
-  // forcing the flexbox open when sized between paint frames.
-  flex: 1,
-  minWidth: 0,
-  position: 'relative',
   overflow: 'hidden',
 };

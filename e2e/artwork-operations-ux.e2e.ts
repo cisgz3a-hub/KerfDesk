@@ -139,7 +139,7 @@ test('direct CNC material and bit choices persist without changing machine defau
   await material.selectOption('hardwood-birch');
   await bit.selectOption('em-1588');
   await rougher.selectOption('em-6350');
-  await expect(page.getByRole('dialog', { name: 'CNC Startup Setup' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'CNC Machine Setup' })).toHaveCount(0);
 
   const assigned = await saveProject(page, kerfdesk);
   expect(assigned.project.scene.layers[0]?.cnc).toMatchObject({

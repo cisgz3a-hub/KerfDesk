@@ -103,7 +103,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     enabled(
       'tools.optimization-settings',
       'tools',
-      'Optimization Settings...',
+      'Cut Planner...',
       'Adjust output path optimization',
       ctx.optimizationSettings,
     ),

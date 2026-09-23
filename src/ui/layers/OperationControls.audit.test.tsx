@@ -161,12 +161,12 @@ describe('artwork control audit: operations', () => {
         setupField="spindle-max"
       />,
     );
-    await click(button(host, 'Machine maximum: 10000. Managed in Startup Setup.'));
+    await click(button(host, 'Machine maximum: 10000. Managed in Machine Setup.'));
     expect(host.querySelector('[role="note"]')).not.toBeNull();
     await click(button(host, 'Close'));
     expect(host.querySelector('[role="note"]')).toBeNull();
     expect(
-      button(host, 'Machine maximum: 10000. Managed in Startup Setup.').getAttribute(
+      button(host, 'Machine maximum: 10000. Managed in Machine Setup.').getAttribute(
         'aria-expanded',
       ),
     ).toBe('false');

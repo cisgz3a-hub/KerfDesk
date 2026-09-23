@@ -127,7 +127,7 @@ test('keeps rail focus visible without leaking rail chrome into nested dialogs',
   }
 });
 
-test('keeps CNC job setup out of Artwork and opens it through Startup Setup', async ({ page }) => {
+test('keeps CNC job setup out of Artwork and opens it through Machine Setup', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
@@ -137,14 +137,14 @@ test('keeps CNC job setup out of Artwork and opens it through Startup Setup', as
   await expect(artworkPanel.getByLabel('Stock origin X', { exact: true })).toHaveCount(0);
   await expect(artworkPanel.getByLabel('Stock origin Y', { exact: true })).toHaveCount(0);
 
-  const stockReference = page.getByLabel('Stock from Startup Setup');
+  const stockReference = page.getByLabel('Stock from Machine Setup');
   await expect(stockReference).toBeVisible();
   await stockReference
-    .getByRole('button', { name: 'Expand stock reference from Startup Setup' })
+    .getByRole('button', { name: 'Expand stock reference from Machine Setup' })
     .click();
   await expect(stockReference.locator('input')).toHaveCount(0);
-  await stockReference.getByRole('button', { name: 'Edit in Startup Setup' }).click();
-  const startup = page.getByRole('dialog', { name: 'CNC Startup Setup' });
+  await stockReference.getByRole('button', { name: 'Edit in Machine Setup' }).click();
+  const startup = page.getByRole('dialog', { name: 'CNC Machine Setup' });
   await expect(startup).toBeVisible();
   await expect(startup.getByLabel('Stock origin X', { exact: true })).toBeVisible();
   await expect(startup.getByLabel('Stock origin Y', { exact: true })).toBeVisible();
@@ -183,6 +183,8 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         ),
     );
+    await machineMaximum.scrollIntoViewIfNeeded();
+    await artworkSpindle.scrollIntoViewIfNeeded();
 
     const panelMetrics = await panel.evaluate((element) => {
       const box = element.getBoundingClientRect();
@@ -205,16 +207,42 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
       const box = element.getBoundingClientRect();
       return { bottom: box.bottom, left: box.left, right: box.right, top: box.top };
     });
+    const viewport = await artworkSpindle.evaluate((element) => {
+      const scrollport = element.closest('.lf-artwork-view-content');
+      if (scrollport === null) throw new Error('Artwork scrollport missing');
+      const box = scrollport.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom };
+    });
     for (const box of [maximumBox, spindleBox]) {
       expect(box.left).toBeGreaterThanOrEqual(panelMetrics.left - 1);
       expect(box.right).toBeLessThanOrEqual(panelMetrics.right + 1);
+      expect(box.top).toBeGreaterThanOrEqual(viewport.top - 1);
+      expect(box.bottom).toBeLessThanOrEqual(viewport.bottom + 1);
     }
-    expect(maximumBox.bottom).toBeLessThanOrEqual(spindleBox.top + 1);
+    expect(
+      maximumBox.right <= spindleBox.left + 1 || maximumBox.bottom <= spindleBox.top + 1,
+      'Machine maximum should be beside or above requested RPM without overlapping it',
+    ).toBe(true);
+    for (const control of [machineMaximum, artworkSpindle]) {
+      expect(
+        await control.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            (box.left + box.right) / 2,
+            (box.top + box.bottom) / 2,
+          );
+          return hit === element || (hit !== null && element.contains(hit));
+        }),
+        'Both RPM controls should remain unobscured',
+      ).toBe(true);
+    }
   }
 
   await machineMaximum.click();
   await expect(
-    panel.getByText('This is the machine maximum spindle speed saved in Startup Setup.'),
+    panel.getByText(
+      'This is the machine maximum spindle speed saved in Machine Setup. Artwork spindle speed is the requested running speed for this operation.',
+    ),
   ).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Edit in Startup Setup' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Edit in Machine Setup' })).toBeVisible();
 });

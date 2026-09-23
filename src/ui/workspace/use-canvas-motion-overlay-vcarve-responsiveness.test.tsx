@@ -19,6 +19,9 @@ import { useCanvasViewStore } from '../state/canvas-view-store';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 import type * as IdlePlanModule from './idle-canvas-motion-plan';
 import type * as IdleWorkerClient from './idle-canvas-motion-worker-client';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
+import { fingerprintGcode } from '../../core/recovery';
+import { startLiveCanvasRun } from '../state/canvas-motion-plan';
 
 const planMocks = vi.hoisted(() => ({
   buildIdleCanvasMotionPlanFromRequest: vi.fn(),
@@ -139,7 +142,129 @@ describe('idle canvas V-carve responsiveness', () => {
 
     expect(observedOverlay).toBeNull();
   });
+
+  it('marks retained terminal markers as updating and never republishes an older async result', async () => {
+    const project = complexScriptProject();
+    const initial = markerPlan(project, 'initial');
+    const older = markerPlan(project, 'older');
+    const newest = markerPlan(project, 'newest');
+    let finishOlder: ((plan: CanvasMotionOverlay['plan']) => void) | undefined;
+    let finishNewest: ((plan: CanvasMotionOverlay['plan']) => void) | undefined;
+    workerMocks.prepareIdleCanvasMotionPlanOffThread
+      .mockResolvedValueOnce(initial)
+      .mockReturnValueOnce(
+        new Promise<CanvasMotionOverlay['plan']>((resolve) => {
+          finishOlder = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<CanvasMotionOverlay['plan']>((resolve) => {
+          finishNewest = resolve;
+        }),
+      );
+    await render(project);
+    await settleIdleDelay();
+    expect(observedOverlay?.plan).toBe(initial);
+    expect(observedOverlay?.planIsCurrent).toBe(true);
+    await act(async () =>
+      useLaserStore.setState({
+        liveCanvasRun: { ...startLiveCanvasRun(initial), lifecycle: 'stopped' },
+      }),
+    );
+    await render({ ...project, scene: { ...project.scene } });
+    expect(observedOverlay?.plan).toBe(initial);
+    expect(observedOverlay?.planIsCurrent).toBe(false);
+    await settleIdleDelay();
+    await render({ ...project, scene: { ...project.scene } });
+    await settleIdleDelay();
+    await act(async () => finishNewest?.(newest));
+    expect(observedOverlay?.plan).toBe(newest);
+    expect(observedOverlay?.planIsCurrent).toBe(true);
+    expect(observedOverlay?.run).toBeNull();
+    await act(async () => finishOlder?.(older));
+    expect(observedOverlay?.plan).toBe(newest);
+    expect(observedOverlay?.planIsCurrent).toBe(true);
+  });
+
+  it.each(['placement', 'output scope', 'machine context'] as const)(
+    'does not describe terminal markers as current after %s changes without a replacement plan',
+    async (changedContext) => {
+      const project = complexScriptProject();
+      const initial = markerPlan(project, 'initial');
+      workerMocks.prepareIdleCanvasMotionPlanOffThread.mockResolvedValueOnce(initial);
+      await render(project);
+      await settleIdleDelay();
+      await act(async () =>
+        useLaserStore.setState({
+          liveCanvasRun: { ...startLiveCanvasRun(initial), lifecycle: 'stopped' },
+        }),
+      );
+      expect(observedOverlay?.planIsCurrent).toBe(true);
+
+      await act(async () => {
+        if (changedContext === 'placement') {
+          useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'center' } });
+        } else if (changedContext === 'output scope') {
+          useStore.setState({
+            outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+            selectedObjectId: 'dancing-script-like',
+          });
+        } else {
+          useLaserStore.setState({ trustedPositionEpoch: 1 });
+        }
+      });
+
+      expect(observedOverlay?.plan).toBe(initial);
+      expect(observedOverlay?.run?.lifecycle).toBe('stopped');
+      expect(observedOverlay?.planIsCurrent).toBe(false);
+      await settleIdleDelay();
+      expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(2);
+      expect(observedOverlay?.plan).toBe(initial);
+      expect(observedOverlay?.planIsCurrent).toBe(false);
+    },
+  );
+
+  it.each(['running', 'paused', 'tool-change'] as const)(
+    'keeps the active %s plan current without requiring an idle replacement',
+    async (lifecycle) => {
+      const project = complexScriptProject();
+      const active = markerPlan(project, 'active');
+      useLaserStore.setState({ liveCanvasRun: { ...startLiveCanvasRun(active), lifecycle } });
+      await render(project);
+      await act(async () =>
+        useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'center' } }),
+      );
+      await settleIdleDelay();
+
+      expect(observedOverlay?.plan).toBe(active);
+      expect(observedOverlay?.run?.lifecycle).toBe(lifecycle);
+      expect(observedOverlay?.planIsCurrent).toBe(true);
+      expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).not.toHaveBeenCalled();
+    },
+  );
 });
+
+function markerPlan(project: Project, key: string): CanvasMotionOverlay['plan'] {
+  const gcode = 'G21\nG90\nM5\nG0 X0 Y0\nG1 X10 F1000';
+  return {
+    manifest: buildMotionManifest(gcode, { machineKind: 'cnc' }),
+    fingerprint: fingerprintGcode(gcode),
+    retentionKey: key,
+    machineKind: 'cnc',
+    device: project.device,
+    coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    framePerimeter: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ],
+    jobStart: { x: 0, y: 0 },
+    approachFrom: null,
+    capability: 'realtime',
+    unavailableReason: null,
+    resumed: false,
+    positionEpoch: 0,
+  };
+}
 
 async function render(project: Project): Promise<void> {
   useStore.setState({ project });

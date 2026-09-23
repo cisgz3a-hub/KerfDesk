@@ -12,8 +12,6 @@ export function PreviewRenderStatus({
 }
 
 const statusStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 56,
-  left: 12,
+  display: 'inline-block',
   pointerEvents: 'none',
 };

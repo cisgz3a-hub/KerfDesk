@@ -79,9 +79,16 @@ export function useCanvasMotionOverlay(
 
   if (previewMode || canvasCovered) return null;
   if (liveRun !== null && !staleTerminalRun) {
-    return { plan: liveRun.plan, run: liveRun, showStartMarkers };
+    return {
+      plan: liveRun.plan,
+      run: liveRun,
+      showStartMarkers,
+      planIsCurrent: isActiveCanvasLifecycle(liveRun) || idlePlan?.current === true,
+    };
   }
-  return idlePlan === null ? null : { plan: idlePlan.plan, run: null, showStartMarkers };
+  return idlePlan === null
+    ? null
+    : { plan: idlePlan.plan, run: null, showStartMarkers, planIsCurrent: idlePlan.current };
 }
 
 type IdlePlanInput = {

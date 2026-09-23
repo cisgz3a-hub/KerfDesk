@@ -3,7 +3,7 @@
   --lf-setup-reference-white-space: normal;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   width: 100%;
 }
@@ -19,10 +19,67 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--lf-border);
-  border-radius: 10px;
-  background: var(--lf-bg-1);
+  padding: 0;
+}
+
+.lf-cnc-primary-assignment,
+.lf-cnc-cut-grid,
+.lf-cnc-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-cnc-depth-field,
+.lf-cnc-spindle-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lf-cnc-feed-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
+}
+
+.lf-cnc-spindle-field {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  align-items: end;
+}
+
+.lf-cnc-tool-details {
+  min-width: 0;
+}
+
+.lf-cnc-tool-details > summary {
+  padding: 3px 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lf-cnc-tool-details > summary:hover {
+  color: var(--lf-text);
+}
+
+.lf-cnc-tool-details > summary:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 2px;
+}
+
+.lf-cnc-tool-details > summary small {
+  display: block;
+  color: var(--lf-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lf-cnc-tool-details__body {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
 }
 
 .lf-cnc-settings-card > h4,
@@ -67,8 +124,8 @@
 }
 
 .lf-cnc-tool-field > label > span {
-  color: var(--lf-text-muted);
-  font-size: 12px;
+  color: var(--lf-text);
+  font-size: 13px;
 }
 
 .lf-cnc-tool-field > label > select {

@@ -28,7 +28,7 @@ import { CncOpenPathNote } from './CncOpenPathNote';
 import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { CncSetupReferenceFields } from './CncSetupReferenceFields';
-import { CncOperationToolFields } from './CncOperationToolFields';
+import { CncOperationToolDetails, CncOperationToolFields } from './CncOperationToolFields';
 import './cnc-operation-settings.css';
 
 export function CncLayerFields(props: {
@@ -54,6 +54,10 @@ export function CncLayerFields(props: {
   };
   const commit = (patch: Partial<CncLayerSettings>): void =>
     commitSettings(withManualCncFeedPatch(settings, patch));
+  const commitAssignment = (next: CncLayerSettings, replaceFeedDrafts: boolean): void => {
+    if (replaceFeedDrafts) setAssignmentRevision((revision) => revision + 1);
+    commitSettings(next);
+  };
 
   return (
     <div className="lf-cnc-settings">
@@ -61,15 +65,11 @@ export function CncLayerFields(props: {
         layer={layer}
         settings={settings}
         hasReliefObjects={hasReliefObjects}
-        onCommitSettings={(next, replaceFeedDrafts) => {
-          if (replaceFeedDrafts) setAssignmentRevision((revision) => revision + 1);
-          commitSettings(next);
-        }}
+        onCommitSettings={commitAssignment}
       />
       <CncCutDepthSection
         layer={layer}
         settings={settings}
-        stockThicknessMm={stockThicknessMm}
         hasReliefObjects={hasReliefObjects}
         onCommit={commit}
       />
@@ -84,6 +84,18 @@ export function CncLayerFields(props: {
         maxFeed={maxFeed}
         spindleMaxRpm={spindleMaxRpm}
         onCommit={commit}
+      />
+      <CncCutOptions
+        layer={layer}
+        settings={settings}
+        stockThicknessMm={stockThicknessMm}
+        onCommit={commit}
+      />
+      <CncOperationToolDetails
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommitSettings={commitAssignment}
       />
       {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
       <CncLayerAdvancedGroup
@@ -101,33 +113,32 @@ export function CncLayerFields(props: {
 function CncCutDepthSection(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
-  readonly stockThicknessMm: number;
   readonly hasReliefObjects: boolean;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, stockThicknessMm, hasReliefObjects, onCommit: commit } = props;
+  const { layer, settings, hasReliefObjects, onCommit: commit } = props;
   return (
     <section className="lf-cnc-settings-card" aria-label="Cut & depth">
-      <div className="lf-cnc-settings-heading">
-        <h4>Cut &amp; depth</h4>
+      <div className="lf-cnc-cut-grid">
+        <Row label="Cut type" stacked>
+          <select
+            value={settings.cutType}
+            onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
+            aria-label={`Cut type for ${layer.color}`}
+            title="How this layer's shapes are machined: outline (with bit-radius offset), pocket, or engrave."
+            style={selectStyle}
+          >
+            {CNC_CUT_TYPES.map((cutType) => (
+              <option key={cutType} value={cutType}>
+                {cutTypeLabel(cutType)}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <div className="lf-cnc-depth-field">
+          <CutDepthField layer={layer} settings={settings} onCommit={commit} />
+        </div>
       </div>
-      <Row label="Cut type">
-        <select
-          value={settings.cutType}
-          onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
-          aria-label={`Cut type for ${layer.color}`}
-          title="How this layer's shapes are machined: outline (with bit-radius offset), pocket, or engrave."
-          style={selectStyle}
-        >
-          {CNC_CUT_TYPES.map((cutType) => (
-            <option key={cutType} value={cutType}>
-              {cutTypeLabel(cutType)}
-            </option>
-          ))}
-        </select>
-      </Row>
-      <p className="lf-cnc-settings-hint">{cutTypeHint(settings.cutType)}</p>
-      <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
       <CncOpenPathNote layer={layer} settings={settings} />
       {/*
         CncThinDetailNote is deliberately not rendered here. It ran the whole
@@ -146,13 +157,34 @@ function CncCutDepthSection(props: {
           shapes only.
         </p>
       ) : null}
-      <CutDepthField
-        layer={layer}
-        settings={settings}
-        stockThicknessMm={stockThicknessMm}
-        onCommit={commit}
-      />
     </section>
+  );
+}
+
+function CncCutOptions(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly stockThicknessMm: number;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  return (
+    <details className="lf-section">
+      <summary title="Show cut-type guidance and stock-depth options.">Cut options</summary>
+      <div className="lf-section-body">
+        <p className="lf-cnc-settings-hint">{cutTypeHint(props.settings.cutType)}</p>
+        <CncLineArtContoursField {...props} />
+        {props.settings.cutType !== 'v-carve' && props.stockThicknessMm > 0 ? (
+          <button
+            type="button"
+            onClick={() => props.onCommit({ depthMm: props.stockThicknessMm })}
+            title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
+            style={throughButtonStyle}
+          >
+            Set to stock thickness ({props.stockThicknessMm} mm)
+          </button>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -188,13 +220,10 @@ function cutTypeHint(cutType: CncCutType): string {
   }
 }
 
-// Cut depth + a one-click stock-depth action. Calling exact stock thickness a
-// "through cut" over-promises: real stock varies, while any spoilboard overcut
-// must be a measured operator choice rather than a hidden extra depth.
+// The numeric depth stays visible; the measured stock-depth shortcut is in Cut options.
 function CutDepthField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
-  readonly stockThicknessMm: number;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const isVCarve = props.settings.cutType === 'v-carve';
@@ -202,7 +231,7 @@ function CutDepthField(props: {
   if (isVCarve) {
     return (
       <>
-        <Row label="Flat depth">
+        <Row label="Flat depth" stacked>
           <input
             type="checkbox"
             checked={flatDepthEnabled}
@@ -213,6 +242,7 @@ function CutDepthField(props: {
         </Row>
         {flatDepthEnabled ? (
           <NumberField
+            stacked
             layer={props.layer}
             label="Floor depth"
             unit="mm"
@@ -235,6 +265,7 @@ function CutDepthField(props: {
   return (
     <>
       <NumberField
+        stacked
         layer={props.layer}
         label={props.settings.cutType === 'inlay-pair' ? 'Insert depth' : 'Cut depth'}
         unit="mm"
@@ -249,18 +280,6 @@ function CutDepthField(props: {
         }
         onCommit={(depthMm) => props.onCommit({ depthMm })}
       />
-      {props.stockThicknessMm > 0 ? (
-        <Row label="">
-          <button
-            type="button"
-            onClick={() => props.onCommit({ depthMm: props.stockThicknessMm })}
-            title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
-            style={throughButtonStyle}
-          >
-            Set to stock thickness ({props.stockThicknessMm} mm)
-          </button>
-        </Row>
-      ) : null}
     </>
   );
 }

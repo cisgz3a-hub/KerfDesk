@@ -51,12 +51,15 @@ export function AppMenuBar(props: {
               open={menu.openFamily === family}
               tabIndex={menu.focusedFamily === family ? 0 : -1}
               onFocus={() => menu.setFocusedFamily(family)}
-              onOpenChange={(open) =>
+              onOpenChange={(open) => {
+                menu.setFocusedFamily(family);
+                menu.pendingMenuFocus.current = open ? 'first' : null;
+                menu.pendingFamilyReturn.current = open ? null : family;
                 menu.setOpenFamily((current) => {
                   if (open) return family;
                   return current === family ? null : current;
-                })
-              }
+                });
+              }}
               onCommandRun={() => menu.setOpenFamily(null)}
             />
           ))}
@@ -93,11 +96,6 @@ function MenuFamily(props: {
         title={controlHelp(familyHelpId)}
         data-help-id={familyHelpId}
         onClick={(event) => {
-          event.preventDefault();
-          toggle();
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
           toggle();
         }}
@@ -139,6 +137,7 @@ function MenuItem(props: {
     <button
       type="button"
       role={command.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      tabIndex={-1}
       {...(command.active === undefined ? {} : { 'aria-checked': command.active })}
       className="lf-menu-item"
       disabled={!command.enabled}
@@ -146,10 +145,8 @@ function MenuItem(props: {
       data-help-id={commandHelp}
       style={menuItemStyle}
       onClick={(event) => {
-        if (command.id === 'help.tutorials') {
-          // The menu row disappears before the tutorial captures its return target.
-          event.currentTarget.closest('details')?.querySelector('summary')?.focus();
-        }
+        // Commands may open a dialog. Its return target must survive menu removal.
+        event.currentTarget.closest('details')?.querySelector('summary')?.focus();
         if (runCommand(command)) props.onCommandRun();
       }}
     >
