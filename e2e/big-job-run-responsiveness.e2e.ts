@@ -95,7 +95,9 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
 
   const idleWindow = await measure(page, 3_000, null);
   const cdp = await page.context().newCDPSession(page);
+  const retainedStartMb = await retainedHeapMb(page, cdp);
   const runWindow = await measure(page, RUN_WINDOW_MS, cdp);
+  const retainedEndMb = await retainedHeapMb(page, cdp);
   const interaction = await interactDuringRun(page);
   const progress = await streamProbe(page);
 
@@ -109,6 +111,7 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
     progress,
     firstWindow: idleWindow.probe,
     runWindow: runWindow.probe,
+    retainedHeap: { startMb: retainedStartMb, endMb: retainedEndMb },
     interaction,
     topSelf: runWindow.topSelf,
   };
@@ -506,6 +509,15 @@ async function installBigFillProject(page: Page, grid: number): Promise<void> {
       },
     });
   }, grid);
+}
+
+// Live heap after a forced full collection: what the run actually retains,
+// as opposed to garbage awaiting the next GC.
+async function retainedHeapMb(_page: Page, cdp: CDPSession): Promise<number> {
+  await cdp.send('HeapProfiler.enable');
+  await cdp.send('HeapProfiler.collectGarbage');
+  const { usedSize } = (await cdp.send('Runtime.getHeapUsage')) as { usedSize: number };
+  return Math.round(usedSize / 1e6);
 }
 
 async function simAcked(page: Page): Promise<number> {
