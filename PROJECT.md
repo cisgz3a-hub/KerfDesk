@@ -215,7 +215,7 @@ artistic brightness, externally estimated relative order, hand edits, or an STL 
 | P2R.6 | Exact machine/tool/material air-cut and representative wood coupon qualification | Planned hardware evidence; no universal parameter claim |
 
 
-### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]
+### Phase I — v0.9 "Multi-controller" [Merged to main; hardware passes CLAIMED]
 
 (Integrated as Phase I: the CNC router track holds Phase H — ADR-104 records the numbering resolution.)
 
@@ -251,7 +251,7 @@ Verified end-to-end against scripted firmware simulators
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,
 simulator and unverified evidence. No controller or machine gains physical qualification
-from software tests. See ADR-322 and the [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md).
+from software tests. See ADR-322 and the [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md). Older entries in the frozen `DECISIONS.md` that describe Falcon hardware verification (ADR-008, ADR-018 and the ADR-094 consequences) fall under this finding and are not qualification evidence. ADR-331's statement that the Falcon runs grblHAL rests on one 2026-07-19 status report; it does not identify the firmware build.
 
 ### Phase K — v0.10 "Box generator" [Built (S0–S6); hardware fit CLAIMED]
 
@@ -372,8 +372,8 @@ byte-identical for unchanged input. Design + research:
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
 - ~~Additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
-  see Phase I above (ADR-094..097).** Remaining follow-ups: hardware passes (Falcon
-  grblHAL burn; community Marlin/Smoothie/FluidNC verification), Ruida
+  see Phase I above (ADR-094..097).** Remaining follow-ups: hardware qualification (Falcon
+  A1 Pro, firmware build unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation then the Electron UDP transport, wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
 - Phase J: Linux desktop build. Linux remains web/PWA-only until that phase; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)

@@ -71,7 +71,7 @@ Use the supported Creality Falcon profile selected through the complete setup wi
 
 ## GRB series: second GRBL-family machine
 
-Use a machine with a different controller or firmware family from the Falcon, such as GRBL 1.1 versus grblHAL.
+Use a machine whose controller or firmware family differs from the Falcon's. The Falcon's exact firmware build is unconfirmed (its vendor labels the connection GRBL-LPC), so read and record both machines' firmware in `environment.md` before counting the second machine as different.
 
 | Case | Procedure | Pass condition |
 | --- | --- | --- |

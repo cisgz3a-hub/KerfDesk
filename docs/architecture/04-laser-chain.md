@@ -143,8 +143,8 @@ transitions, but this was **not re-verified end-to-end in this session — UNVER
 
 - **Perceptual fidelity of fill and raster.** The suite asserts path counts, byte-identity, and
   invariants. It has never asserted a fill *looks* like the source (CLAUDE.md rule 2).
-- **F.2.f hardware burn** — never burned on the Falcon (`PROJECT.md:120`).
-- **F.3 set-work-origin** — code shipped, hardware verification pending (`PROJECT.md:121`).
+- **F.2.f hardware burn** — never burned on the Falcon (`PROJECT.md:157`).
+- **F.3 set-work-origin** — code shipped, hardware verification pending (`PROJECT.md:158`).
 - **F.4 Convert to Bitmap A5** placement/brightness polish pending; no LightBurn side-by-side
   (`PROJECT.md:122`).
 
