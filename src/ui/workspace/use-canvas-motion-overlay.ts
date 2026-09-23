@@ -39,6 +39,7 @@ export function useCanvasMotionOverlay(
   const interactionActive = useStore((state) => state.pendingUndo !== null);
   const outputScope = useOutputScope();
   const liveRun = useLaserStore((state) => state.liveCanvasRun ?? null);
+  const motionActive = useLaserStore((state) => state.motionOperation !== null);
   const machineRevision = useLaserStore(canvasMachineRevision);
   const laser = useMemo(
     () => canvasMachineSnapshot(useLaserStore.getState(), machineRevision),
@@ -67,6 +68,7 @@ export function useCanvasMotionOverlay(
     registrationKey,
     machineRevision,
     interactionActive,
+    motionActive,
     laser,
     canvasCovered,
   });
@@ -114,6 +116,7 @@ type IdlePlanInput = {
   readonly registrationKey: string;
   readonly machineRevision: string;
   readonly interactionActive: boolean;
+  readonly motionActive: boolean;
   readonly laser: ReturnType<typeof canvasMachineSnapshot>;
   readonly canvasCovered: boolean;
 };
@@ -196,6 +199,7 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
     input.registrationKey,
     input.machineRevision,
     input.interactionActive,
+    input.motionActive,
     input.laser,
     input.canvasCovered,
   ]);
@@ -238,9 +242,15 @@ function shouldClearIdlePlan(input: IdlePlanInput): boolean {
   return input.previewMode || input.canvasCovered || input.project.scene.objects.length === 0;
 }
 
+// The plan draws the rapid from the head, so it is keyed on the Idle position.
+// A Frame trace or a jog reports Idle between its moves, and each of those
+// positions started a whole-job compile in a fresh worker only to cancel it
+// half a second later, competing with Frame's own preparation. Plan once the
+// operation that owns the motion has finished.
 function shouldDeferIdlePlan(input: IdlePlanInput): boolean {
   return (
     input.interactionActive ||
+    input.motionActive ||
     isActiveCanvasLifecycleOrNull(input.liveRun) ||
     (input.laser.statusReport !== null && input.laser.statusReport.state !== 'Idle')
   );

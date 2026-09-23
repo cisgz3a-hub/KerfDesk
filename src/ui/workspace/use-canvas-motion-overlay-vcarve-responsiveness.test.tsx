@@ -11,7 +11,9 @@ import {
   type Project,
   type TextObject,
 } from '../../core/scene';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { startMotionOperation } from '../state/laser-motion-operation';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -140,6 +142,47 @@ describe('idle canvas V-carve responsiveness', () => {
     expect(observedOverlay).toBeNull();
   });
 });
+
+describe('idle canvas plan during a Frame trace', () => {
+  it('plans once after the Frame, not at every Idle corner it reports on the way', async () => {
+    const pending = new Promise<CanvasMotionOverlay['plan']>(() => undefined);
+    workerMocks.prepareIdleCanvasMotionPlanOffThread.mockReturnValue(pending);
+    useLaserStore.setState({ statusReport: idleAt(0, 0) });
+    await render(complexScriptProject());
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(1);
+
+    await act(async () =>
+      useLaserStore.setState({ motionOperation: startMotionOperation('frame') }),
+    );
+    for (const [x, y] of [
+      [10, 10],
+      [60, 10],
+      [60, 40],
+      [10, 40],
+    ] as const) {
+      await act(async () => useLaserStore.setState({ statusReport: idleAt(x, y) }));
+      await settleIdleDelay();
+    }
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(1);
+
+    await act(async () => useLaserStore.setState({ motionOperation: null }));
+    await settleIdleDelay();
+    expect(workerMocks.prepareIdleCanvasMotionPlanOffThread).toHaveBeenCalledTimes(2);
+  });
+});
+
+function idleAt(x: number, y: number): StatusReport {
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x, y, z: 0 },
+    wPos: null,
+    feed: null,
+    spindle: null,
+    wco: null,
+  };
+}
 
 async function render(project: Project): Promise<void> {
   useStore.setState({ project });
