@@ -19,13 +19,7 @@ import { useUiStore } from '../state/ui-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
-import {
-  DragOverlay,
-  DragReadout,
-  EmptyHint,
-  MeasureReadoutOverlay,
-  ZoomControls,
-} from './overlays';
+import { DragOverlay, DragReadout, MeasureReadoutOverlay, ZoomControls } from './overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
@@ -87,8 +81,6 @@ export function Workspace(): JSX.Element {
   useWorkspaceWheelZoom(ref);
   useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
-  const showEmptyHint =
-    project.scene.objects.length === 0 && !previewMode && !dragOverlay && !textEditing;
   return (
     <div className="lf-workspace-view">
       <div className="lf-workspace-stage">
@@ -101,7 +93,6 @@ export function Workspace(): JSX.Element {
           viewState={viewState}
           canvasMotionOverlay={canvasMotionOverlay}
         />
-        {showEmptyHint && <EmptyHint />}
         {dragOverlay && <DragOverlay />}
         <WorkspaceInteractionOverlays
           canvasRef={ref}

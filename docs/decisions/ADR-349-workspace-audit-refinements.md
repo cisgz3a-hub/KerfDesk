@@ -31,8 +31,9 @@ that changed the source pixel pattern in preview and emitted output.
    selection survive the layout transition.
 5. File status is explicit text derived from the existing save tracking:
    Not saved to file, Unsaved changes, or File up to date. It does not claim an
-   autosave or recovery write succeeded. An empty workspace offers drawing and
-   library entry points and explains import without opening a forced tutorial.
+   autosave or recovery write succeeded. The empty drawing area stays clear,
+   without an introductory card. Drawing tools, Import and the design library
+   remain available through their existing controls.
    Copper remains the action accent; keyboard focus uses a separate blue token.
 6. Pass-through keeps source density and luminance, skipping stored brightness,
    contrast, gamma, negative and dither settings in the compiler, processed

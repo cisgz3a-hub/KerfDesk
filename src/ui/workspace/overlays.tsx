@@ -1,5 +1,5 @@
-// Workspace overlays — UI chrome that sits above the canvas: empty-state
-// hint (F-A2), drag-to-import zone (F-A3), drag-readout chip (F-A6),
+// Workspace overlays — UI chrome that sits above the canvas:
+// drag-to-import zone (F-A3), drag-readout chip (F-A6),
 // preview scrubber (F-A8). Extracted from Workspace.tsx to keep that file
 // under the 250-line soft cap per CLAUDE.md.
 
@@ -10,39 +10,6 @@ import { useUiStore } from '../state/ui-store';
 import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { computeView } from './view-transform';
-
-export function EmptyHint(): JSX.Element | null {
-  const toolMode = useUiStore((state) => state.toolMode);
-  const setToolMode = useUiStore((state) => state.setToolMode);
-  const setLibraryOpen = useUiStore((state) => state.setLibraryDialogOpen);
-  if (toolMode.kind !== 'select') return null;
-  return (
-    <div style={emptyHintStyle}>
-      <div className="lf-empty-entry">
-        <strong>Start your design</strong>
-        <p>Drop an SVG or image here, or choose Import in the toolbar.</p>
-        <div className="lf-empty-entry-actions">
-          <button
-            type="button"
-            className="lf-btn"
-            title="Select the rectangle tool, then drag on the canvas to draw."
-            onClick={() => setToolMode({ kind: 'draw', shape: 'rect' })}
-          >
-            Draw a rectangle
-          </button>
-          <button
-            type="button"
-            className="lf-btn"
-            title="Open the design library to add artwork to the canvas."
-            onClick={() => setLibraryOpen(true)}
-          >
-            Browse designs
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function DragOverlay(): JSX.Element {
   return (
@@ -262,18 +229,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-const emptyHintStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-  color: 'var(--lf-text-muted)',
-  fontStyle: 'italic',
-  fontSize: 14,
-  fontFamily: 'system-ui, sans-serif',
-};
 const dragOverlayStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 12,
