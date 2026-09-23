@@ -6,6 +6,7 @@ import { TutorialButton } from '../tutorials/TutorialButton';
 
 export const VISIBLE_TRACE_PRESET_NAMES = [
   'Line Art',
+  'Photo shading',
   'Smooth',
   'Sharp',
   'Centerline',
@@ -18,6 +19,8 @@ export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 export type TraceOutput = 'raster' | 'vector';
 
 const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'Photo shading':
+    'For portraits and real photographs. Fine filled lines vary in width to keep highlights, midtones and shadows.',
   'Line Art':
     'A balanced start for logos, lettering and drawings. Automatic detection keeps pale details.',
   Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
@@ -89,7 +92,7 @@ export function PresetPicker(props: {
         </select>
       </label>
       <div className="lf-trace-preset-description">
-        <span>{props.value === 'Centerline' ? 'Single paths' : 'Closed outlines'}</span>
+        <span>{presetGeometryLabel(props.value)}</span>
         <p>{PRESET_DESCRIPTIONS[props.value]}</p>
       </div>
       {props.machineKind === 'cnc' ? (
@@ -107,7 +110,13 @@ export function PresetPicker(props: {
   );
 }
 
+function presetGeometryLabel(preset: string): string {
+  if (preset === 'Photo shading') return 'Shaded vectors';
+  return preset === 'Centerline' ? 'Single paths' : 'Closed outlines';
+}
+
 export function TraceOutputFields(props: {
+  readonly photoShading?: boolean;
   readonly machineKind: 'laser' | 'cnc';
   readonly traceOutput: TraceOutput;
   readonly onTraceOutputChange: (output: TraceOutput) => void;
@@ -122,7 +131,11 @@ export function TraceOutputFields(props: {
       {props.machineKind === 'cnc' ? (
         <CncTraceHint />
       ) : (
-        <TraceOutputPicker value={props.traceOutput} onChange={props.onTraceOutputChange} />
+        <TraceOutputPicker
+          value={props.traceOutput}
+          onChange={props.onTraceOutputChange}
+          photoShading={props.photoShading === true}
+        />
       )}
       {showFillStyle ? (
         <TraceFillStylePicker
@@ -130,11 +143,18 @@ export function TraceOutputFields(props: {
           onChange={props.onTraceFillStyleChange}
         />
       ) : null}
+      {props.photoShading ? (
+        <p className="lf-trace-hint">
+          For vectors, aim Fill scan lines across the traced lines and use fine spacing. Raster scan
+          needs enough resolution; CNC tools must fit the narrow shapes.
+        </p>
+      ) : null}
     </>
   );
 }
 
 export function TraceOutputPicker(props: {
+  readonly photoShading?: boolean;
   readonly value: TraceOutput;
   readonly onChange: (next: TraceOutput) => void;
 }): JSX.Element {
@@ -145,7 +165,7 @@ export function TraceOutputPicker(props: {
         <select
           className="lf-select"
           aria-label="Trace output"
-          title="Create editable vectors or a black-and-white raster scan."
+          title="Create editable vectors or engrave the traced pattern as a raster scan."
           value={props.value}
           onChange={(e) => props.onChange(e.target.value === 'raster' ? 'raster' : 'vector')}
         >
@@ -154,9 +174,13 @@ export function TraceOutputPicker(props: {
         </select>
       </label>
       <p className="lf-trace-hint">
-        {props.value === 'vector'
-          ? 'Editable paths for line or fill operations.'
-          : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
+        {props.photoShading
+          ? props.value === 'vector'
+            ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
+            : 'Engraves the shaded line pattern with image scan motion.'
+          : props.value === 'vector'
+            ? 'Editable paths for line or fill operations.'
+            : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
       </p>
     </div>
   );

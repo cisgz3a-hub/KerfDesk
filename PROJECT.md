@@ -147,6 +147,13 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
 
 Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
 
+**Photo shading (ADR-349).** A dedicated preset preserves portrait and photographic
+tones as fine filled vector lines with varying widths. Detail, Brightness and
+Contrast control the result; binary thresholding does not run. Editable vectors
+use Fill for shaded laser output. The dialog's Raster scan output preserves
+partial pixel coverage before Image processing. CNC retains editable geometry;
+tool size and the chosen machining operation determine achievable shading.
+
 **Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
 
 ### Phase F — v0.6 "Raster engrave" [In progress]

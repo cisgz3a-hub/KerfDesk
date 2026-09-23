@@ -35,6 +35,7 @@ import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { runTraceSteps, type TraceStepRunner } from './trace-steps';
 import { resolveTraceSourceOptions } from './trace-alpha';
+import { traceImageToPhotoPathsSteps } from './photo-trace';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -142,6 +143,13 @@ export async function traceImageToColoredPaths(
   requestedOptions: TraceOptions,
   run: TraceStepRunner = runTraceSteps,
 ): Promise<ColoredPath[]> {
+  // Photo tone is encoded in ribbon coverage, before any binary detection or
+  // contour supersampling can discard it. The backend owns its bounded grid.
+  if (requestedOptions.photoDetail !== undefined) {
+    return withCanonicalTraceCurves(
+      await run(traceImageToPhotoPathsSteps(image, requestedOptions)),
+    );
+  }
   const options = resolveTraceSourceOptions(image, requestedOptions);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or

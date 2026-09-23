@@ -79,6 +79,7 @@ export async function buildRasterTraceOutput(
   source: RasterImage,
   traced: TracedImage,
   operations: ReadonlyArray<Layer>,
+  preserveCoverage = false,
 ): Promise<RasterImage> {
   const positioned = positionTraceOverRasterSource(source, traced);
   const linesPerMm = rasterTraceLinesPerMm(source, traced, operations);
@@ -89,8 +90,21 @@ export async function buildRasterTraceOutput(
     dpi: linesPerMmToDpi(linesPerMm),
     renderType,
     brightnessPercent: 0,
+    ...(preserveCoverage
+      ? {
+          preserveCoverage: true,
+          coverageAxis: photoCoverageAxis(positioned.transform.rotationDeg),
+        }
+      : {}),
   });
   return { ...raster, id: traced.id };
+}
+
+// Integrate across ribbon widths, including rotated and mirrored placements.
+// Fixed samples along the widths can otherwise miss a narrow highlight.
+function photoCoverageAxis(rotationDeg: number): 'x' | 'y' {
+  const radians = (rotationDeg * Math.PI) / 180;
+  return Math.abs(Math.sin(radians)) > Math.abs(Math.cos(radians)) ? 'y' : 'x';
 }
 
 /** Use enough pixels for every scan that will consume the committed bitmap.

@@ -10,6 +10,9 @@
 import type { TraceOptions } from '../../core/trace';
 
 export type LightBurnTraceSettingOverrides = {
+  readonly photoDetail?: number;
+  readonly photoBrightness?: number;
+  readonly photoContrast?: number;
   readonly detectionMode?: TraceDetectionMode;
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
@@ -34,6 +37,7 @@ export function mergeLightBurnTraceSettings(
   preset: TraceOptions,
   settings: LightBurnTraceSettingOverrides,
 ): TraceOptions {
+  if (preset.photoDetail !== undefined) return mergePhotoSettings(preset, settings);
   const out: Record<string, unknown> = { ...preset };
   applyDetectionSettings(out, preset, settings);
   if (settings.ignoreLessThanPixels !== undefined) {
@@ -51,6 +55,24 @@ export function mergeLightBurnTraceSettings(
     applyEdgeTraceSettings(out, preset, settings);
   }
   return out as TraceOptions;
+}
+
+function mergePhotoSettings(
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): TraceOptions {
+  // Keep the operator's other style settings in UI state without allowing a
+  // stale threshold, alpha mask or speckle filter to destroy photo midtones.
+  return {
+    ...preset,
+    photoDetail: photoValue(settings.photoDetail, preset.photoDetail ?? 60, 0, 100),
+    brightness: photoValue(settings.photoBrightness, preset.brightness ?? 0, -100, 100),
+    contrast: photoValue(settings.photoContrast, preset.contrast ?? 0, -100, 100),
+  };
+}
+
+function photoValue(value: number | undefined, fallback: number, min: number, max: number): number {
+  return value === undefined || !Number.isFinite(value) ? fallback : clamp(value, min, max);
 }
 
 export function traceDetectionMode(
@@ -190,6 +212,7 @@ function copyIfDefined<T extends keyof TraceOptions>(
 // can collapse a near-uniform image to zero paths: Otsu histogram
 // binarization, fixedPalette, or despeckle.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
+  if (options.photoDetail !== undefined) return false;
   // Edge mode never runs the shared preprocessing (local contrast reads the raw
   // image), so relaxing these flags cannot change its output — a zero-paths
   // retry would just repeat the identical multi-second pipeline.
