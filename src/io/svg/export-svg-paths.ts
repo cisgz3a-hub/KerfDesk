@@ -1,5 +1,4 @@
 import {
-  applyTransform,
   polylineToCurveSubpath,
   type ColoredPath,
   type CurveSubpath,
@@ -10,7 +9,9 @@ import { transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform'
 
 export function svgNumber(value: number): string {
   if (!Number.isFinite(value)) throw new Error('Artwork contains a non-finite coordinate.');
-  return String(Number(value.toFixed(6)));
+  // Local units and transform coefficients can be very small or very large.
+  // Rounding either before multiplication changes the physical artwork size.
+  return String(value);
 }
 
 export function xmlText(value: string): string {
@@ -40,16 +41,20 @@ export function xmlText(value: string): string {
 }
 
 export function svgObjectMatrix(transform: Transform): SvgMatrix {
-  const zero = applyTransform({ x: 0, y: 0 }, transform);
-  const x = applyTransform({ x: 1, y: 0 }, transform);
-  const y = applyTransform({ x: 0, y: 1 }, transform);
+  // Match applyTransform's scale, mirror, rotation, then translation order.
+  // Subtracting translated basis points would erase small scales near large offsets.
+  const radians = (transform.rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const x = transform.scaleX * (transform.mirrorX ? -1 : 1);
+  const y = transform.scaleY * (transform.mirrorY ? -1 : 1);
   return {
-    a: x.x - zero.x,
-    b: x.y - zero.y,
-    c: y.x - zero.x,
-    d: y.y - zero.y,
-    e: zero.x,
-    f: zero.y,
+    a: x * cos,
+    b: x * sin,
+    c: -y * sin,
+    d: y * cos,
+    e: transform.x,
+    f: transform.y,
   };
 }
 

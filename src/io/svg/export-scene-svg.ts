@@ -1,14 +1,17 @@
 import {
   applyTransform,
+  isClosedEnough,
   pathUsesOperation,
   polylineToCurveSubpath,
   type Bounds,
   type ColoredPath,
+  type CurveSubpath,
   type Project,
   type RasterImage,
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
+import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { err, ok, type Result } from '../../core/result';
 import {
@@ -169,28 +172,35 @@ function imageClip(image: RasterImage, index: number, project: Project): string 
   const mask = project.scene.objects.find((object) => object.id === image.imageMaskId);
   if (mask === undefined || !('paths' in mask))
     throw new Error('The image mask is missing or is not vector artwork.');
-  const paths = mask.paths
-    .map((path) => {
-      const curves = (path.curves ?? path.polylines.map(polylineToCurveSubpath)).filter(
-        (curve) => curve.closed,
-      );
-      return (
-        '<path d="' +
-        svgPathData(curves) +
-        '" transform="' +
-        svgMatrixAttribute(mask.transform) +
-        '" clip-rule="' +
-        (path.fillRule ?? (mask.kind === 'text' ? 'nonzero' : 'evenodd')) +
-        '"/>'
-      );
-    })
-    .join('');
+  // Raster masks combine every contour with even-odd parity, irrespective of
+  // artwork color or fill-rule. Separate clip children would union their holes.
+  const curves = mask.paths.flatMap((path) =>
+    path.curves === undefined
+      ? path.polylines
+          .filter(isClosedEnough)
+          .map((polyline) => polylineToCurveSubpath({ ...polyline, closed: true }))
+      : path.curves.filter(isClosedMaskCurve).map((curve) => ({ ...curve, closed: true })),
+  );
+  // The raster pipeline ignores a mask whose last closed contour was removed.
+  if (curves.length === 0) return '';
   return (
     '<defs><clipPath id="mask-' +
     index +
-    '" clipPathUnits="userSpaceOnUse">' +
-    paths +
-    '</clipPath></defs>'
+    '" clipPathUnits="userSpaceOnUse"><path d="' +
+    svgPathData(curves) +
+    '" transform="' +
+    svgMatrixAttribute(mask.transform) +
+    '" clip-rule="evenodd"/></clipPath></defs>'
+  );
+}
+
+function isClosedMaskCurve(curve: CurveSubpath): boolean {
+  const end = curve.segments.at(-1)?.to;
+  return (
+    end !== undefined &&
+    (curve.closed ||
+      (Math.abs(end.x - curve.start.x) < CLOSURE_EPS_MM &&
+        Math.abs(end.y - curve.start.y) < CLOSURE_EPS_MM))
   );
 }
 
