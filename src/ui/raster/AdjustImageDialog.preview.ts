@@ -1,11 +1,5 @@
-import {
-  applyLumaAdjustments,
-  dither,
-  maybeInvertLuma,
-  rasterPreviewRgba,
-  resampleLumaNearest,
-  whiteLuma,
-} from '../../core/raster';
+import { dither, rasterPreviewRgba, resampleLumaNearest, whiteLuma } from '../../core/raster';
+import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
 import type { Layer, RasterImage } from '../../core/scene';
 
 type PreviewDraft = {
@@ -15,6 +9,7 @@ type PreviewDraft = {
   readonly ditherAlgorithm: Layer['ditherAlgorithm'];
   readonly minPower: number;
   readonly negativeImage: boolean;
+  readonly passThrough: boolean;
   readonly invertDisplay: boolean;
 };
 
@@ -45,10 +40,7 @@ function previewLuma(
   size: { readonly width: number; readonly height: number },
 ): Uint8Array {
   const sourceLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
-  const base =
-    mode === 'source'
-      ? sourceLuma
-      : maybeInvertLuma(applyLumaAdjustments(sourceLuma, draft), draft.negativeImage);
+  const base = mode === 'source' ? sourceLuma : prepareImageLuma(sourceLuma, draft, draft);
   return resampleLumaNearest(
     { luma: base, width: image.pixelWidth, height: image.pixelHeight },
     size.width,
@@ -64,7 +56,10 @@ function processedRgba(
 ): Uint8ClampedArray {
   const sMax = 1000;
   const sMin = Math.round((Math.min(draft.minPower, 100) / 100) * sMax);
-  const sValues = dither({ luma, width, height }, { algorithm: draft.ditherAlgorithm, sMax, sMin });
+  const sValues = dither(
+    { luma, width, height },
+    { algorithm: imageDitherAlgorithm(draft), sMax, sMin },
+  );
   return rasterPreviewRgba(sValues, sMax, width, height);
 }
 
