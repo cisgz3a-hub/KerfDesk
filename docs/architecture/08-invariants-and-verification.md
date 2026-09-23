@@ -4,7 +4,7 @@ The honest version. CLAUDE.md rule 2 requires it: *green tests are NOT proof a f
 
 ## The nine safety and correctness non-negotiables
 
-From `PROJECT.md:301-311`, with the actual enforcement mechanism for each:
+From `PROJECT.md:418-428`, with the actual enforcement mechanism for each:
 
 | # | Invariant | Enforced by | Kind |
 |---|---|---|---|
@@ -21,9 +21,9 @@ From `PROJECT.md:301-311`, with the actual enforcement mechanism for each:
 CNC adds its own, outside the numbered list: **Z up on travel**, via `findPlungedTravelIssues` and
 `findSpindleStartClearanceIssues` (`core/invariants/cnc-motion.ts:20`, `:48`).
 
-**Non-negotiable #9 carries an explicit honesty caveat** (`PROJECT.md:311`): the software Abort /
+**Non-negotiable #9 carries an explicit honesty caveat** (`PROJECT.md:428`): the software Abort /
 Controller Reset *is not a safety-rated E-stop*. Dangerous conditions require the machine's physical
-E-stop or power isolation. ADR-200 (`:8599`) restates it.
+E-stop or power isolation. ADR-200 (`:8948`) restates it.
 
 ## The critical design choice: predicates read the final text
 
@@ -53,10 +53,10 @@ strength of a green suite.
 
 ## The perceptual harness — and its blind spot
 
-**ADR-025** (`DECISIONS.md:1070`) added `src/__fixtures__/perceptual/`, which renders trace output and
+**ADR-025** (`DECISIONS.md:1081`) added `src/__fixtures__/perceptual/`, which renders trace output and
 diffs it against analytic ground-truth masks via **IoU** (intersection over union).
 
-It has a known, documented blind spot. `PROJECT.md:113` records it: imagetracerjs is outline-only, so a
+It has a known, documented blind spot. `PROJECT.md:150` records it: imagetracerjs is outline-only, so a
 single pen stroke becomes two parallel contours — and **closing that outline-vs-centerline gap is not
 caught by the IoU harness.** Project memory puts it more bluntly: *IoU is blind to waviness → trust
 rendered PNGs.* A wobbly curve and a clean curve can score nearly identically on IoU while looking
@@ -125,9 +125,9 @@ check on the program text, **not a photograph** — so it does not discharge the
 
 No machine is qualified. ADR-322 (`DECISIONS.md:20209`) withdrew the former Falcon
 hardware-verification claim after the 2026-09-19 audit found no reproducible physical evidence for
-it. Software tests do not qualify a controller or machine (`PROJECT.md:244-247`).
+it. Software tests do not qualify a controller or machine (`PROJECT.md:251-254`).
 
-`PROJECT.md:55` states the packaging equivalent explicitly: *passing builds and automated tests prove
+`PROJECT.md:68` states the packaging equivalent explicitly: *passing builds and automated tests prove
 only packaging integrity.*
 
 ## Enforcement that is mechanical vs review-only
@@ -157,11 +157,11 @@ drifted somewhere.
 
 - **`prettier --check .` is repo-wide and is NOT part of `pnpm lint`.** A Prettier-dirty file passes lint
   locally and fails the release gate.
-- **ADR-254** (`:11873`, merged as `b3c52341`) moved the dependency audit **out** of the merge gate.
+- **ADR-254** (`:12704`, merged as `b3c52341`) moved the dependency audit **out** of the merge gate.
   `audit:deps` now runs nightly and files a tracking issue; it does not block PRs. Triage the open audit
   issue before cutting a `v*` desktop release.
 
-Playwright browser smoke is a **separate** workflow, not part of the release gate (ADR-158, `:7441`).
+Playwright browser smoke is a **separate** workflow, not part of the release gate (ADR-158, `:7825`).
 
 ## Cross-reference slot — Phase 2
 

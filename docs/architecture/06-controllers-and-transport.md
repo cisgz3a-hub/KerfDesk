@@ -4,7 +4,7 @@ How bytes actually reach the machine, and what happens when they don't.
 
 ## The driver seam
 
-**ADR-094** (`DECISIONS.md:3827`) introduced `ControllerDriver` as the single seam every firmware
+**ADR-094** (`DECISIONS.md:4057`) introduced `ControllerDriver` as the single seam every firmware
 family drives the whole app through: connect → identify → jog/frame → run/pause/resume/software-abort
 → recover, with output, streaming, console, settings, and UI **capability-gated per firmware**.
 
@@ -40,25 +40,25 @@ cutting accessory.
 | GRBL v1.1+ | ADR-006 | **Not qualified** — used informally on a Neotronics 4040 (GRBL-family firmware, exact build unconfirmed) |
 | grblHAL | ADR-094 I.2 | **Not qualified** — used informally on a Creality Falcon A1 Pro (GRBL-family firmware, exact build unconfirmed; its profile picks grblHAL as a compatibility choice) |
 | FluidNC | ADR-094 I.2 | Simulator only; settings read-only |
-| Marlin | ADR-095 (`:3871`) | Simulator only — queued `M114`, stream-side pause, `G28 X Y`, `M400` settle |
-| Smoothieware | ADR-096 (`:3899`) | Simulator only — fractional `S` (e.g. `S0.500` at 0–1.0 scale) |
-| Ruida | ADR-097 (`:3923`) | **Experimental** `.rd` export, `transport: 'file-only'`, never accepted by real hardware |
+| Marlin | ADR-095 (`:4101`) | Simulator only — queued `M114`, stream-side pause, `G28 X Y`, `M400` settle |
+| Smoothieware | ADR-096 (`:4129`) | Simulator only — fractional `S` (e.g. `S0.500` at 0–1.0 scale) |
+| Ruida | ADR-097 (`:4153`) | **Experimental** `.rd` export, `transport: 'file-only'`, never accepted by real hardware |
 
 No machine is qualified. This table used to mark both GRBL rows hardware-verified on the
 maintainer's Falcon A1 Pro (2026-07-02), and inferred from that pass that the ADR-094 driver
 refactor was byte-identical on real hardware. ADR-322 (`DECISIONS.md:20209`) withdrew that claim:
 the 2026-09-19 audit found no reproducible physical evidence for it. Software tests do not qualify a
-controller or machine (`PROJECT.md:244-247`). The Falcon A1 Pro profile's evidence note says the
+controller or machine (`PROJECT.md:251-254`). The Falcon A1 Pro profile's evidence note says the
 vendor labels the connection GRBL-LPC, the exact firmware build is not independently established,
 and the grblHAL family selection is not hardware qualification
 (`src/core/devices/falcon-profiles.ts:45-50`). The Neotronics 4040 profile likewise asks the
 operator to confirm the GRBL build (`src/core/devices/device-profile.ts:410`).
 
 Simulator verification is not a weak substitute — `src/__fixtures__/controllers/` holds scripted
-firmware simulators driving the **real** laser-store (`PROJECT.md:170-171`). What it cannot prove is
+firmware simulators driving the **real** laser-store (`PROJECT.md:225-226`). What it cannot prove is
 timing, electrical behavior, or firmware quirks.
 
-**ADR-157** (`:7412`) reconciles detected firmware, streaming mode, receive window, output dialect,
+**ADR-157** (`:7793`) reconciles detected firmware, streaming mode, receive window, output dialect,
 active driver, and Start readiness through one fail-closed policy, and **refuses cross-family profile
 selection after detection**.
 
@@ -84,7 +84,7 @@ Eight statuses (`streamer.ts:47-55`), and the distinctions are all load-bearing:
 
 `idle` · `streaming` · `paused` · `tool-change` · `done` · `cancelled` · `disconnected` · `errored`
 
-- **`errored` vs `cancelled`.** An `error:N` ack is **terminal** — ADR-041 (`DECISIONS.md:2249`). The
+- **`errored` vs `cancelled`.** An `error:N` ack is **terminal** — ADR-041 (`DECISIONS.md:2318`). The
   stated reason (`streamer.ts:35-38`): terminality protects against a laser-on line firing at a
   mispositioned head after a rejected move. Noted as matching both CNCjs and LightBurn.
 - **`disconnected` vs `cancelled`.** Same data effect, different wording so the UI can say "job
@@ -127,22 +127,22 @@ file line number, and **the two must not drift**.
 ## Transport
 
 - **Web/PWA:** WebSerial via `src/platform/web/web-serial.ts`. First-class delivery target on Chromium
-  browsers (`PROJECT.md:37`). *Brave caveat:* WebSerial ships but may be gated behind a Shields/flags
+  browsers (`PROJECT.md:50`). *Brave caveat:* WebSerial ships but may be gated behind a Shields/flags
   toggle; upstream `brave-browser#24404` was still open at last re-verification 2026-05-28.
 - **Desktop:** Electron with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, **no
-  preload and no `ipcMain` surface** (`PROJECT.md:491`). `setPermissionRequestHandler` returns `false`
+  preload and no `ipcMain` surface** (`PROJECT.md:624`). `setPermissionRequestHandler` returns `false`
   except for `serial`, `fileSystem*`, `media` (video-only), and `screen-wake-lock`.
 - **Ruida:** `transport: 'file-only'` — no live link. The pure UDP session state machine exists as
-  groundwork only (`PROJECT.md:186-188`).
+  groundwork only (`PROJECT.md:242-244`).
 
 ## Console and diagnostics
 
-**ADR-229** (`:10010`) added the super console with a guarded command dialog. Per project memory (Super
+**ADR-229** (`:10626`) added the super console with a guarded command dialog. Per project memory (Super
 Console audit 2026-07-19) a **P2 remains open**: a console `$$` can wedge `controllerOp` because there
 is no timeout. **Not re-verified in this session.**
 
-**ADR-183** (`:7910`) makes unexpected GRBL terminal responses invalidate controller ownership.
-**ADR-182** (`:7870`) makes grblHAL MPG ownership a latched CNC Start blocker — a permitted
+**ADR-183** (`:8359`) makes unexpected GRBL terminal responses invalidate controller ownership.
+**ADR-182** (`:8319`) makes grblHAL MPG ownership a latched CNC Start blocker — a permitted
 transport-precondition refusal (another controller physically owns the machine).
 
 ## Cross-reference slot — Phase 2
