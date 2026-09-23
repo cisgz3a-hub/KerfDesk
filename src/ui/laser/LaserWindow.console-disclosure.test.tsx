@@ -45,19 +45,76 @@ describe('LaserWindow Console disclosure', () => {
       expect(summary).toBeInstanceOf(HTMLElement);
       expect(disclosure).toBeInstanceOf(HTMLDetailsElement);
       expect((disclosure as HTMLDetailsElement).open).toBe(false);
+      expect(disclosure?.contains(button(host, 'Set up & Frame'))).toBe(false);
+
+      await toggle(summary);
+      expect((disclosure as HTMLDetailsElement).open).toBe(true);
       expect(disclosure?.querySelector('input[aria-label="Console command"]')).toBeInstanceOf(
         HTMLInputElement,
       );
-      expect(disclosure?.contains(button(host, 'Set up & Frame'))).toBe(false);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 
-      await act(async () => summary?.click());
-      expect((disclosure as HTMLDetailsElement).open).toBe(true);
+  // The docked console follows the transcript, which publishes several times a
+  // second during a job. Behind a closed summary it must not be mounted at all.
+  it('mounts the docked console only while the section is open', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+      const { summary, details } = consoleDisclosure(host);
+      expect(details.querySelector('[aria-label="GRBL console"]')).toBeNull();
+      expect(details.contains(button(host, 'Super console'))).toBe(true);
+
+      await toggle(summary);
+      expect(details.querySelector('[aria-label="GRBL console"]')).toBeInstanceOf(HTMLElement);
+      expect(details.querySelector('[aria-label="Docked console commands"]')).toBeInstanceOf(
+        HTMLElement,
+      );
+
+      await toggle(summary);
+      expect(details.open).toBe(false);
+      expect(details.querySelector('[aria-label="GRBL console"]')).toBeNull();
+      expect(details.contains(button(host, 'Super console'))).toBe(true);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
     }
   });
 });
+
+// The <details> toggle event is queued as a task after the summary click.
+async function toggle(summary: HTMLElement | undefined): Promise<void> {
+  await act(async () => {
+    summary?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+function consoleDisclosure(host: HTMLElement): {
+  readonly summary: HTMLElement;
+  readonly details: HTMLDetailsElement;
+} {
+  const summary = [...host.querySelectorAll('summary')].find(
+    (candidate) => candidate.textContent === 'Console',
+  );
+  const details = summary?.parentElement;
+  if (summary === undefined || !(details instanceof HTMLDetailsElement)) {
+    throw new Error('Console disclosure not rendered');
+  }
+  return { summary, details };
+}
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {
   const match = [...host.querySelectorAll('button')].find((candidate) =>

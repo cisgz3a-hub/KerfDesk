@@ -19,20 +19,23 @@ export function statusPositionPatch(
   > {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
   // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
-  const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
+  const ovPatch =
+    report.ov === null || report.ov === undefined
+      ? {}
+      : { ovCache: unchangedOr(state.ovCache, report.ov) };
   // A: is intermittent with Ov:. Preserve the last state on frames carrying
   // neither field; the parser turns Ov-without-A into a known all-off value.
   const accessoryPatch =
     report.accessories === null || report.accessories === undefined
       ? {}
       : {
-          accessoryCache: {
+          accessoryCache: unchangedOr(state.accessoryCache, {
             ...report.accessories,
             ...(state.accessoryCache?.secondarySpindlePresent === true
               ? { secondarySpindlePresent: true }
               : {}),
             ...exceptionalAccessoryLatch(state.accessoryCache, report.accessoryReportPresent),
-          },
+          }),
         };
   const airPatch = manualAirPatch(report);
   if (state.positionEvidenceSuppressed === true || state.reportUnitsUnconfirmed === true) {
@@ -60,10 +63,23 @@ export function statusPositionPatch(
     ...ovPatch,
     ...accessoryPatch,
     ...airPatch,
-    wcoCache: report.wco,
+    wcoCache: unchangedOr(state.wcoCache, report.wco),
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
   };
+}
+
+// The caches keep their identity while the controller repeats the same values.
+// Every consumer selects them by reference, so a fresh-but-equal object from
+// each Ov:/A:/WCO frame re-rendered those consumers on polls that changed
+// nothing. The values are flat scalars, so a shallow comparison is exact.
+function unchangedOr<T extends object>(previous: T | null | undefined, next: T): T {
+  if (previous === null || previous === undefined) return next;
+  const before = previous as Readonly<Record<string, unknown>>;
+  const after = next as Readonly<Record<string, unknown>>;
+  const keys = Object.keys(after);
+  if (keys.length !== Object.keys(before).length) return next;
+  return keys.every((key) => Object.is(before[key], after[key])) ? previous : next;
 }
 
 // Manual Air mirrors the controller's own coolant state whenever a frame

@@ -6,6 +6,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
@@ -41,6 +42,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   act(() => root?.unmount());
   host?.remove();
   root = null;
@@ -59,15 +61,33 @@ describe('JobControls setup-row store subscriptions', () => {
     expect(counter.checks).toBe(before);
   });
 
-  // The progress bar legitimately subscribes to `streamer`, so a burn still
-  // re-renders this rail per ack. What must NOT reach the setup row is the
-  // poll's own bookkeeping, which no control here reads.
+  // The poll's own bookkeeping reaches no control here.
   it('does not re-check framed-run readiness on status-poll bookkeeping', () => {
     render();
     const before = counter.checks;
 
     act(() => useLaserStore.setState({ statusSequence: 42 }));
 
+    expect(counter.checks).toBe(before);
+  });
+
+  // Only the progress-bar leaf follows the line count. The section itself
+  // branches on the stream status, which acknowledgements do not change.
+  it('moves the progress bar without re-rendering the Job section per acknowledgement', () => {
+    vi.useFakeTimers();
+    const streaming = step(createStreamer('G1 X1 S100\nG1 X2 S100')).state;
+    act(() => useLaserStore.setState({ streamer: { ...streaming, completed: 0, total: 100 } }));
+    render();
+    const before = counter.checks;
+
+    for (let completed = 1; completed <= 20; completed += 1) {
+      act(() => useLaserStore.setState({ streamer: { ...streaming, completed, total: 100 } }));
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+    }
+
+    expect(host?.textContent).toContain('20 / 100 lines');
     expect(counter.checks).toBe(before);
   });
 
