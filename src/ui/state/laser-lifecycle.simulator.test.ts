@@ -93,7 +93,8 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(s.connection.kind).toBe('connected');
     expect(sim.outbound().some((w) => w.includes('$$'))).toBe(true);
     expect(s.controllerSettings?.laserModeEnabled).toBe(true);
-    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200 }]);
+    // ADR-354: a GRBL-family profile asks for worker-hosted streaming by default.
+    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200, hostedStreaming: true }]);
   });
 
   it('polls ? on the idle cadence and stores the parsed status report', async () => {

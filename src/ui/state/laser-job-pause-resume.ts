@@ -66,7 +66,7 @@ const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
   // Pause is about to change the stream's status, so this side takes the
-  // refill back first; a confirmed Resume can hand it over again (ADR-350).
+  // refill back first; a confirmed Resume can hand it over again (ADR-354).
   await releaseHostedRefill(context.refs);
   const activeDriver = context.driver();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';

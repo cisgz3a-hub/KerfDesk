@@ -71,7 +71,7 @@ has or lacks a USB/firmware interruption.
   completed; early `native-closing` only starts the deadline. Reentrant requests join one close.
   A late refill-stop marker cannot revive a handover that closing already retired.
 
-ADR-350 records the architecture and operator-facing behaviour. Focused checks cover native
+ADR-354 records the architecture and operator-facing behaviour. Focused checks cover native
 selection/open/close, framing, handover, invalidation, preference persistence, Resume and
 Continue. The permanent browser test is included in normal Playwright discovery.
 The integrated focused run passes 331 tests across 40 files.

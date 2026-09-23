@@ -1,4 +1,4 @@
-## ADR-350 - Open the serial port in the worker and restore background refill after Resume (2026-09-23)
+## ADR-354 - Open the serial port in the worker and restore background refill after Resume (2026-09-23)
 
 **Status:** Accepted. Supersedes ADR-334's window-owned transferred streams, opt-in default,
 silent fallback and one-time arm. Hardware qualification remains separate.

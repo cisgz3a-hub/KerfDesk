@@ -888,7 +888,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. App opens at 115200 baud, registers line + close handlers, starts the 250 ms status poll.
 5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
 
-#### Background streaming (ADR-350)
+#### Background streaming (ADR-354)
 1. Compatible GRBL-family connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
    Chrome window is minimised or busy.

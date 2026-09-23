@@ -44,7 +44,7 @@ afterEach(() => {
 // The three-stage shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
-  it('offers worker streaming only for GRBL-family controllers and keeps its saved preference', async () => {
+  it('defaults worker streaming on for GRBL-family controllers and keeps an explicit opt-out', async () => {
     const view = await renderWizard();
     const workerOption = () =>
       view.host.querySelector<HTMLInputElement>(
@@ -55,8 +55,10 @@ describe('DeviceSetupWizard', () => {
       await openSetupDisclosure(view.host, 'Advanced connection and streaming');
       const option = workerOption();
       if (option === null) throw new Error('GRBL worker option missing');
+      // ADR-354: on by default for a GRBL-family profile with no saved choice.
+      expect(option.checked).toBe(true);
       await act(async () => option.click());
-      expect(workerOption()?.checked).toBe(true);
+      expect(workerOption()?.checked).toBe(false);
 
       for (const controllerKind of ['marlin', 'smoothieware']) {
         await changeSelect(view.host, 'Controller firmware', controllerKind);
@@ -64,7 +66,8 @@ describe('DeviceSetupWizard', () => {
       }
       for (const controllerKind of ['grblhal', 'fluidnc', 'grbl-v1.1']) {
         await changeSelect(view.host, 'Controller firmware', controllerKind);
-        expect(workerOption()?.checked).toBe(true);
+        // The explicit opt-out survives a controller change.
+        expect(workerOption()?.checked).toBe(false);
       }
     } finally {
       await view.unmount();
