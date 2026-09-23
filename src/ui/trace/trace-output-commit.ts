@@ -11,6 +11,7 @@ import {
 } from './trace-raster-output';
 
 export type TraceOutputCommitArgs = {
+  readonly photoShading?: boolean;
   readonly seed: Pick<RasterImage, 'id' | 'source'>;
   readonly traceOutput?: TraceOutput;
   readonly deleteSourceAfterTrace?: boolean;
@@ -85,6 +86,7 @@ async function commitRasterTraceOutput(
     inputs.source,
     traced,
     inputs.operations.map(({ operation }) => operation),
+    args.photoShading === true,
   );
   const currentOwner = ctx.claimOwner();
   if (currentOwner === null) return false;

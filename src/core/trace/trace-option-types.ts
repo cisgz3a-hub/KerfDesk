@@ -5,6 +5,10 @@
 // unchanged.
 
 export type TraceOptions = {
+  // Photo shading traces continuous tones as black filled ribbons. Presence
+  // selects the photo backend; 0..100 controls the bounded detail grid. Shades
+  // live in covered area, so ordinary fill and bitmap output retain them.
+  readonly photoDetail?: number;
   // Filled contours preserve source silhouettes for fill engraving.
   // Centerline traces skeletonize dark strokes into open line paths
   // for single-pass vector engraving. Edge detection uses local contrast
