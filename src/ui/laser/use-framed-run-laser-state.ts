@@ -29,9 +29,24 @@ const FRAMED_RUN_FIELDS = [
   'controllerSessionEpoch',
 ] as const;
 
-const framedRunFieldsEqual = watchedFieldsEqual<LaserState, (typeof FRAMED_RUN_FIELDS)[number]>(
+const allFieldsEqual = watchedFieldsEqual<LaserState, (typeof FRAMED_RUN_FIELDS)[number]>(
   FRAMED_RUN_FIELDS,
 );
+const fieldsBesideReportEqual = watchedFieldsEqual<LaserState, (typeof FRAMED_RUN_FIELDS)[number]>(
+  FRAMED_RUN_FIELDS.filter((field) => field !== 'statusReport'),
+);
+
+// Without a permit the readiness answer is fixed (Frame first) and the row
+// reads only the controller state from the report, so a poll that merely moves
+// the head, four a second for a whole job, need not re-render it (ADR-349).
+export function framedRunFieldsEqual(a: LaserState, b: LaserState): boolean {
+  if (a === b) return true;
+  if (a.framedRun !== null || b.framedRun !== null) return allFieldsEqual(a, b);
+  return (
+    (a.statusReport?.state ?? null) === (b.statusReport?.state ?? null) &&
+    fieldsBesideReportEqual(a, b)
+  );
+}
 
 export function useFramedRunLaserState(): LaserState {
   return useStoreWithEqualityFn(useLaserStore, selectWholeState, framedRunFieldsEqual);
