@@ -15,6 +15,7 @@ import { filterDesignLibrary, type LibraryFilters } from './design-library-filte
 import type { LibraryEntry } from './design-library-types';
 import { EMPTY_LIBRARY_FILTERS } from './design-library-view-model';
 import { insertLibraryEntryForDocument } from './library-entry-insert';
+import { PersonalArtworkPanel } from './PersonalArtworkPanel';
 import './design-library.css';
 import './design-library-card.css';
 import './design-library-detail.css';
@@ -28,6 +29,7 @@ export function DesignLibraryDialog(): JSX.Element | null {
 }
 
 function OpenDesignLibraryDialog(): JSX.Element {
+  const [collection, setCollection] = useState<'bundled' | 'personal'>('bundled');
   const setOpen = useUiStore((state) => state.setLibraryDialogOpen);
   const owner = useRef({ mounted: true, revision: 0 });
   useEffect(() => {
@@ -49,12 +51,55 @@ function OpenDesignLibraryDialog(): JSX.Element {
       owner.current.revision === revision &&
       useUiStore.getState().libraryDialogOpen;
   }, []);
-  const browser = useDesignLibraryBrowser(close, captureInsertOwner);
   return (
     <Dialog title="Design Library" size="xl" panelClassName="lf-library-dialog" onClose={close}>
       <div className="lf-library-dialog__close">
         <IconButton icon="close" label="Close Design Library" onClick={close} size="sm" />
       </div>
+      <div
+        className="lf-library-toolbar__actions lf-library-source-tabs"
+        role="group"
+        aria-label="Library source"
+      >
+        <button
+          type="button"
+          className="lf-library-text-button"
+          aria-pressed={collection === 'bundled'}
+          onClick={() => {
+            owner.current.revision += 1;
+            setCollection('bundled');
+          }}
+        >
+          Bundled designs
+        </button>
+        <button
+          type="button"
+          className="lf-library-text-button"
+          aria-pressed={collection === 'personal'}
+          onClick={() => {
+            owner.current.revision += 1;
+            setCollection('personal');
+          }}
+        >
+          My artwork
+        </button>
+      </div>
+      {collection === 'personal' ? (
+        <PersonalArtworkPanel onClose={close} />
+      ) : (
+        <BundledDesignLibrary close={close} captureInsertOwner={captureInsertOwner} />
+      )}
+    </Dialog>
+  );
+}
+
+function BundledDesignLibrary(props: {
+  readonly close: () => void;
+  readonly captureInsertOwner: () => () => boolean;
+}): JSX.Element {
+  const browser = useDesignLibraryBrowser(props.close, props.captureInsertOwner);
+  return (
+    <>
       <p className="lf-library-dialog__intro">
         Explore editable vectors, inspect exact licensing, then add one design to your canvas.
       </p>
@@ -69,7 +114,7 @@ function OpenDesignLibraryDialog(): JSX.Element {
         />
         <LibraryWorkspace browser={browser} />
       </div>
-    </Dialog>
+    </>
   );
 }
 

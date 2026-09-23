@@ -20,6 +20,15 @@ export const FILE_COMMAND_HELP: Readonly<
     family: 'file',
     tooltip: 'Save the current project as a new file.',
   },
+  'file.open-template': {
+    family: 'file',
+    tooltip: 'Start a new unsaved project from a template. The first Save asks for a destination.',
+  },
+  'file.save-template': {
+    family: 'file',
+    tooltip:
+      'Save artwork, notes, unused operations and settings as a reusable protected template.',
+  },
   'file.import': {
     family: 'file',
     tooltip: 'Import SVG, DXF, PNG, JPG, or STL artwork through one ordered picker.',

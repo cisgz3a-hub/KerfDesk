@@ -10,6 +10,7 @@ import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
 import { gcodeInspectorCommands } from './gcode-command-family';
+import { templateCommands } from './template-command-family';
 
 export { connectionHelpCommand, helpCommand, safetyHelpCommand } from './help-command-family';
 
@@ -37,6 +38,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveProjectAs,
       'Ctrl+Shift+S',
     ),
+    ...templateCommands(ctx),
     enabled(
       'file.import',
       'file',

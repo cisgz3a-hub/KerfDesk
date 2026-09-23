@@ -16,6 +16,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     ...baseCtxArrangeActions(),
     unionSilhouette: vi.fn(),
     joinPaths: vi.fn(),
+    openTemplate: vi.fn(),
+    saveTemplate: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;

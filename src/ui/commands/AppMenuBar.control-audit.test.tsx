@@ -22,6 +22,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.open': { callback: 'openProject' },
   'file.save': { callback: 'saveProject' },
   'file.save-as': { callback: 'saveProjectAs' },
+  'file.open-template': { callback: 'openTemplate' },
+  'file.save-template': { callback: 'saveTemplate' },
   'file.import': { callback: 'importArtwork' },
   'file.import-svg': { callback: 'importSvg' },
   'file.import-dxf': { callback: 'importDxf' },

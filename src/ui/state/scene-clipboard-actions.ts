@@ -13,7 +13,7 @@ import {
 import { removeSceneObjectsFromState } from './object-delete-actions';
 import {
   remapSceneObjectCopyDependencies,
-  sceneObjectCopyDependencyId,
+  sceneObjectCopyDependencyIds,
   sceneObjectCopyClosure,
 } from './scene-object-copy-dependencies';
 import { pushUndo } from './scene-mutations';
@@ -82,7 +82,7 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
   };
 }
 
-function clipboardFromSelection(
+export function clipboardFromSelection(
   state: Pick<
     AppState,
     'project' | 'projectDocumentEpoch' | 'selectedObjectId' | 'additionalSelectedIds'
@@ -127,6 +127,7 @@ function cloneClipboardObjects(
   objects: ReadonlyArray<SceneObject>,
   sourceOperations: ReadonlyArray<Layer>,
   operationIdMap: ReadonlyMap<string, string>,
+  offsetMm: number,
 ): {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly idMap: ReadonlyMap<string, string>;
@@ -134,9 +135,10 @@ function cloneClipboardObjects(
   const idMap = new Map(objects.map((object) => [object.id, crypto.randomUUID()] as const));
   const targetIds = new Set(scene.objects.map((object) => object.id));
   for (const object of objects) {
-    const dependencyId = sceneObjectCopyDependencyId(object);
-    if (dependencyId !== undefined && !idMap.has(dependencyId) && targetIds.has(dependencyId)) {
-      idMap.set(dependencyId, crypto.randomUUID());
+    for (const dependencyId of sceneObjectCopyDependencyIds(object)) {
+      if (!idMap.has(dependencyId) && targetIds.has(dependencyId)) {
+        idMap.set(dependencyId, crypto.randomUUID());
+      }
     }
   }
   return {
@@ -147,8 +149,8 @@ function cloneClipboardObjects(
         id: idMap.get(object.id) ?? crypto.randomUUID(),
         transform: {
           ...object.transform,
-          x: object.transform.x + PASTE_OFFSET_MM,
-          y: object.transform.y + PASTE_OFFSET_MM,
+          x: object.transform.x + offsetMm,
+          y: object.transform.y + offsetMm,
         },
       } as SceneObject;
       return remapSceneObjectOperationBindings(
@@ -160,13 +162,14 @@ function cloneClipboardObjects(
   };
 }
 
-function prepareClipboardPaste(
+export function prepareClipboardPaste(
   scene: Scene,
   copiedLayers: ReadonlyArray<Layer>,
   objects: ReadonlyArray<SceneObject>,
   selectedObjectIds: ReadonlyArray<string>,
   groups: ReadonlyArray<SceneGroup> = [],
   reuseExistingOperations = false,
+  offsetMm = PASTE_OFFSET_MM,
 ): {
   readonly scene: Scene;
   readonly objects: ReadonlyArray<SceneObject>;
@@ -209,7 +212,7 @@ function prepareClipboardPaste(
   }
   const reservedOperationIds = operationIdentityIds(out.layers);
   protectCollidingMissingOperationIds(out, objects, operationIdMap, reservedOperationIds);
-  const cloned = cloneClipboardObjects(scene, objects, copiedLayers, operationIdMap);
+  const cloned = cloneClipboardObjects(scene, objects, copiedLayers, operationIdMap, offsetMm);
   const materialized = materializeClipboardObjects(
     out,
     cloned.objects,

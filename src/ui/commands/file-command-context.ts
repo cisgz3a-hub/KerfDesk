@@ -8,6 +8,7 @@ import {
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { handleUnifiedArtworkImport } from '../app/import-dispatch';
 import { openProjectCommand } from './open-project-command';
+import { openTemplateCommand, saveTemplateCommand } from './template-command-actions';
 import { handleImportHeightMaps } from '../app/height-map-import-action';
 import { handleExportArtworkSvg } from '../app/export-artwork-svg';
 import type { PlatformAdapter } from '../../platform/types';
@@ -19,18 +20,15 @@ import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import type { useToastStore } from '../state/toast-store';
 
-export function fileCommandContext(
-  callbacks: CommandShellCallbacks,
-  platform: PlatformAdapter,
-  app: ReturnType<typeof useStore.getState>,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): Pick<
+type FileCommandContext = Pick<
   AppCommandContext,
   | 'confirmDiscard'
   | 'newProject'
   | 'openProject'
   | 'saveProject'
   | 'saveProjectAs'
+  | 'openTemplate'
+  | 'saveTemplate'
   | 'importArtwork'
   | 'importSvg'
   | 'importDxf'
@@ -40,7 +38,14 @@ export function fileCommandContext(
   | 'exportSvg'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
-> {
+>;
+
+export function fileCommandContext(
+  callbacks: CommandShellCallbacks,
+  platform: PlatformAdapter,
+  app: ReturnType<typeof useStore.getState>,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): FileCommandContext {
   // Save and the Inspector compile from the stores as they stand at CLICK
   // time, not from the render that built this context. Reading them here is
   // what lets the command surface skip the status-poll and mousemove
@@ -59,6 +64,8 @@ export function fileCommandContext(
     openProject: () => void openProjectCommand(platform, pushToast),
     saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
     saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
+    openTemplate: () => void openTemplateCommand(platform, pushToast),
+    saveTemplate: () => void saveTemplateCommand(platform, pushToast),
     importArtwork: () =>
       void handleUnifiedArtworkImport(platform, {
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,

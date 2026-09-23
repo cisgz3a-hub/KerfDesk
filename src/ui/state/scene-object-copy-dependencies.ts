@@ -11,10 +11,11 @@ export function sceneObjectCopyClosure(
   for (const id of pending) {
     const object = objectsById.get(id);
     if (object === undefined) continue;
-    const dependencyId = sceneObjectCopyDependencyId(object);
-    if (dependencyId === undefined || closureIds.has(dependencyId)) continue;
-    closureIds.add(dependencyId);
-    pending.push(dependencyId);
+    for (const dependencyId of sceneObjectCopyDependencyIds(object)) {
+      if (closureIds.has(dependencyId)) continue;
+      closureIds.add(dependencyId);
+      pending.push(dependencyId);
+    }
   }
   return objects.filter((object) => closureIds.has(object.id));
 }
@@ -24,6 +25,10 @@ export function remapSceneObjectCopyDependencies(
   object: SceneObject,
   copiedIds: ReadonlyMap<string, string>,
 ): SceneObject {
+  if ('traceSourceId' in object && object.traceSourceId !== undefined) {
+    const traceSourceId = copiedIds.get(object.traceSourceId);
+    if (traceSourceId !== undefined) object = { ...object, traceSourceId };
+  }
   if (object.kind === 'raster-image' && object.imageMaskId !== undefined) {
     const imageMaskId = copiedIds.get(object.imageMaskId);
     return imageMaskId === undefined ? object : { ...object, imageMaskId };
@@ -35,6 +40,12 @@ export function remapSceneObjectCopyDependencies(
       : { ...object, pathText: { ...object.pathText, guideObjectId } };
   }
   return object;
+}
+
+export function sceneObjectCopyDependencyIds(object: SceneObject): readonly string[] {
+  const primary = sceneObjectCopyDependencyId(object);
+  const trace = 'traceSourceId' in object ? object.traceSourceId : undefined;
+  return [...(primary === undefined ? [] : [primary]), ...(trace === undefined ? [] : [trace])];
 }
 
 export function sceneObjectCopyDependencyId(object: SceneObject): string | undefined {
