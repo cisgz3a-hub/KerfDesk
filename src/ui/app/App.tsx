@@ -107,7 +107,7 @@ export function App(): JSX.Element {
 }
 
 // The main canvas has two modes (ADR-255): the design view, and a G-code 3D
-// PREVIEW of what this project compiles to. The switch is on the canvas
+// PREVIEW of what this project compiles to. The switch is above the canvas
 // because it is a glance, not a workbench — the toolbar's "Inspect G-code
 // (3D)" opens the in-depth screen. Both stay usable during a job, where
 // watching the running program is the point.
@@ -121,13 +121,11 @@ function CanvasArea(): JSX.Element {
       <CameraPanel />
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
-      <div style={canvasSwitchStyle}>
-        <CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />
-      </div>
     </>
   );
   return (
     <WorkspaceViewport
+      controls={<CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />}
       content={
         showGcode ? (
           <div className="lf-workspace-stage">
@@ -145,20 +143,6 @@ function CanvasArea(): JSX.Element {
     </WorkspaceViewport>
   );
 }
-
-// Top-CENTRE, deliberately: the rulers own the left edge and the motion
-// badge owns top-right (canvas-motion-badge.tsx, top/right 12) — anchoring
-// either side buries one of them. Its own elevation so it reads as a
-// control rather than part of the drawing.
-const canvasSwitchStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 30,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  zIndex: 4,
-  boxShadow: 'var(--lf-shadow)',
-  borderRadius: 'var(--lf-radius-lg)',
-};
 
 const shellStyle: React.CSSProperties = {
   display: 'flex',

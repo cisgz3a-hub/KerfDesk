@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { act, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { findRegistrationBoxBounds } from '../../core/scene';
 import { WorkspaceCameraOverlay } from '../camera/WorkspaceCameraOverlay';
+import { CanvasViewSwitch } from '../gcode-inspector/CanvasViewSwitch';
 import { BoardAnchorOverlay } from '../laser/board-capture/BoardAnchorOverlay';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -15,8 +17,12 @@ import { canvasMouseToScene } from './view-transform';
 import { Workspace } from './Workspace';
 import { WorkspaceViewport } from './WorkspaceViewport';
 
+const previewCss = readFileSync('src/ui/workspace/workspace-preview.css', 'utf8');
+
 const WIDTH = 800;
 const FULL_HEIGHT = 600;
+const CONTROLS_HEIGHT = 32;
+const DESIGN_HEIGHT = FULL_HEIGHT - CONTROLS_HEIGHT;
 const VIEW = { zoomFactor: 1.25, panX: 12, panY: -8 };
 const observers = new Set<ResizeObserverStub>();
 let reservedStageHeight = 420;
@@ -76,9 +82,10 @@ beforeEach(() => {
     this: HTMLElement,
   ) {
     const insideStageCell = this.closest('.lf-workspace-stage, .lf-workspace-accessories') !== null;
-    const height =
-      insideStageCell && useStore.getState().previewMode ? reservedStageHeight : FULL_HEIGHT;
-    return rect(height);
+    if (this.closest('.lf-workspace-view-controls') !== null) return rect(CONTROLS_HEIGHT);
+    if (!insideStageCell) return rect(FULL_HEIGHT);
+    const height = useStore.getState().previewMode ? reservedStageHeight : DESIGN_HEIGHT;
+    return rect(height, CONTROLS_HEIGHT);
   });
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -101,7 +108,10 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
   const project = useStore.getState().project;
   await act(async () =>
     root.render(
-      <WorkspaceViewport content={<Workspace />}>
+      <WorkspaceViewport
+        controls={<CanvasViewSwitch showGcode={false} onChange={() => undefined} />}
+        content={<Workspace />}
+      >
         <WorkspaceCameraOverlay />
         <BoardAnchorOverlay
           geometry={{ kind: 'rect', origin: { x: 0, y: 0 }, widthMm: 120, heightMm: 80 }}
@@ -113,24 +123,30 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
     ),
   );
   const base = baseCanvas();
-  const stage = host.querySelector('.lf-workspace-stage');
-  const accessories = host.querySelector('.lf-workspace-accessories');
-  const viewport = host.querySelector('.lf-workspace-canvas-area');
-  expect(stage).not.toBeNull();
-  expect(accessories?.parentElement).toBe(viewport);
-  expect(stage?.closest('.lf-workspace-canvas-area')).toBe(viewport);
+  const stage = element('.lf-workspace-stage');
+  const accessories = element('.lf-workspace-accessories');
+  const viewport = element('.lf-workspace-canvas-area');
+  const controls = element('.lf-workspace-view-controls');
+  const selector = element('[aria-label="Canvas view"]');
+  expect(accessories.parentElement).toBe(viewport);
+  expect(stage.closest('.lf-workspace-canvas-area')).toBe(viewport);
   expect(base.parentElement).toBe(stage);
   expect(cameraCanvas().parentElement?.parentElement).toBe(accessories);
   expect(boardOverlay().parentElement).toBe(accessories);
-  assertSharedCoordinates(FULL_HEIGHT);
+  expect(selector.parentElement).toBe(controls);
+  expect(controls.parentElement).toBe(viewport);
+  expect(stage.contains(selector)).toBe(false);
+  expect(accessories.contains(selector)).toBe(false);
+  expect(controls.getBoundingClientRect().bottom).toBe(base.getBoundingClientRect().top);
+  assertSharedCoordinates(DESIGN_HEIGHT);
   expect(host.querySelector('.lf-preview-dock')).toBeNull();
 
   await act(async () => useStore.setState({ previewMode: true }));
   await resizeStage(420);
   const dock = host.querySelector('.lf-preview-dock');
-  expect(dock?.parentElement).toBe(stage?.parentElement);
-  expect(stage?.contains(dock)).toBe(false);
-  expect(accessories?.contains(dock)).toBe(false);
+  expect(dock?.parentElement).toBe(stage.parentElement);
+  expect(stage.contains(dock)).toBe(false);
+  expect(accessories.contains(dock)).toBe(false);
   assertSharedCoordinates(420);
   expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, 420]);
 
@@ -139,14 +155,60 @@ it('keeps artwork, camera and board coordinates on the resized stage while Previ
   assertSharedCoordinates(320);
   expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, 320]);
 
+  // The expanded dock on a short screen leaves a small stage; the view selector
+  // stays above it instead of covering the fitted artwork, rulers or markers.
+  await resizeStage(160);
+  expect(controls.getBoundingClientRect().bottom).toBe(base.getBoundingClientRect().top);
+  assertSharedCoordinates(160, false);
+  expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, 160]);
+
   await act(async () => useStore.setState({ previewMode: false }));
-  await resizeStage(FULL_HEIGHT);
+  await resizeStage(DESIGN_HEIGHT);
   expect(host.querySelector('.lf-preview-dock')).toBeNull();
   expect(baseCanvas()).toBe(base);
-  assertSharedCoordinates(FULL_HEIGHT);
-  expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, FULL_HEIGHT]);
+  assertSharedCoordinates(DESIGN_HEIGHT);
+  expect(draw.mock.calls.at(-1)?.slice(1, 3)).toEqual([WIDTH, DESIGN_HEIGHT]);
   expect(useUiStore.getState()).toMatchObject(VIEW);
   expect(useStore.getState().project).toBe(project);
+});
+
+it('reserves distinct grid rows for the view selector, coordinate stage and preview dock', async () => {
+  const style = document.createElement('style');
+  style.textContent = previewCss;
+  document.head.appendChild(style);
+  try {
+    await act(async () =>
+      root.render(
+        <WorkspaceViewport
+          controls={<CanvasViewSwitch showGcode={false} onChange={() => undefined} />}
+          content={
+            <>
+              <div className="lf-workspace-stage" />
+              <div className="lf-preview-dock" />
+            </>
+          }
+        >
+          <span>Camera and board reference frame</span>
+        </WorkspaceViewport>,
+      ),
+    );
+    const area = (selector: string): string => {
+      const element = host.querySelector(selector);
+      if (element === null) throw new Error(`Missing ${selector}`);
+      return getComputedStyle(element).gridArea;
+    };
+    expect(area('.lf-workspace-view-controls')).toBe('controls');
+    expect(area('.lf-workspace-stage')).toBe('stage');
+    expect(area('.lf-workspace-accessories')).toBe('stage');
+    expect(area('.lf-preview-dock')).toBe('preview');
+    const viewport = host.querySelector('.lf-workspace-canvas-area');
+    if (viewport === null) throw new Error('Missing viewport');
+    expect(getComputedStyle(viewport).gridTemplate).toMatch(
+      /controls.*auto.*stage.*minmax\(0, 1fr\).*preview.*auto/s,
+    );
+  } finally {
+    style.remove();
+  }
 });
 
 it('preserves accessory state and source lifetime when design and G-code content replace each other', async () => {
@@ -156,6 +218,7 @@ it('preserves accessory state and source lifetime when design and G-code content
     await act(async () =>
       root.render(
         <WorkspaceViewport
+          controls={<CanvasViewSwitch showGcode={showGcode} onChange={() => undefined} />}
           content={
             showGcode ? <div className="lf-workspace-stage">G-code fixture</div> : <Workspace />
           }
@@ -209,7 +272,7 @@ async function resizeStage(height: number): Promise<void> {
   });
 }
 
-function assertSharedCoordinates(height: number): void {
+function assertSharedCoordinates(height: number, boardHandlesVisible = true): void {
   const base = baseCanvas();
   expect([base.width, base.height]).toEqual([WIDTH, height]);
   // Independent fit calculation for a 400 mm square bed and its 30 px rulers/margin.
@@ -223,13 +286,19 @@ function assertSharedCoordinates(height: number): void {
   expect(matrix[13]).toBeCloseTo(offsetY, 8);
   const corner = boardOverlay().querySelector<HTMLButtonElement>('[data-board-anchor="top-right"]');
   const bounds = findRegistrationBoxBounds(useStore.getState().project.scene);
-  if (corner === null || bounds === null) throw new Error('Missing board reference corner');
-  expect(Number.parseFloat(corner.style.left)).toBeCloseTo(offsetX + bounds.maxX * scale, 8);
-  expect(Number.parseFloat(corner.style.top)).toBeCloseTo(offsetY + bounds.minY * scale, 8);
+  if (bounds === null) throw new Error('Missing board reference');
+  if (boardHandlesVisible) {
+    if (corner === null) throw new Error('Missing board reference corner');
+    expect(Number.parseFloat(corner.style.left)).toBeCloseTo(offsetX + bounds.maxX * scale, 8);
+    expect(Number.parseFloat(corner.style.top)).toBeCloseTo(offsetY + bounds.minY * scale, 8);
+  } else {
+    // Preserve the existing hiding policy when the board's 44px handles collide.
+    expect(corner).toBeNull();
+  }
   const scenePoint = canvasMouseToScene(
     {
       clientX: 10 + offsetX + 80 * scale,
-      clientY: 20 + offsetY + 60 * scale,
+      clientY: 20 + CONTROLS_HEIGHT + offsetY + 60 * scale,
     } as React.MouseEvent<HTMLCanvasElement>,
     base,
     useStore.getState().project,
@@ -259,14 +328,20 @@ function boardOverlay(): HTMLElement {
   return overlay;
 }
 
-function rect(height: number): DOMRect {
+function element(selector: string): HTMLElement {
+  const match = host.querySelector(selector);
+  if (!(match instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+  return match;
+}
+
+function rect(height: number, topOffset = 0): DOMRect {
   return {
     x: 10,
-    y: 20,
+    y: 20 + topOffset,
     left: 10,
-    top: 20,
+    top: 20 + topOffset,
     right: 810,
-    bottom: 20 + height,
+    bottom: 20 + topOffset + height,
     width: WIDTH,
     height,
     toJSON: () => ({}),

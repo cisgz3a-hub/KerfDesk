@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react';
 import './workspace-preview.css';
 
-// Stage and accessories occupy the same grid cell. The preview dock alone
-// contributes the second row, so coordinate overlays retain both their box and
-// their React lifetime when the user changes view or opens preview details.
+// View controls and the preview dock have their own rows. Stage and accessories
+// share the remaining cell, retaining their coordinate box and React lifetime
+// when the user changes view or opens preview details.
 export function WorkspaceViewport(props: {
+  readonly controls: ReactNode;
   readonly content: ReactNode;
   readonly children: ReactNode;
 }): JSX.Element {
   return (
     <div className="lf-workspace-canvas-area" data-toast-workspace>
+      <div className="lf-workspace-view-controls">{props.controls}</div>
       {props.content}
       <div className="lf-workspace-accessories">{props.children}</div>
     </div>

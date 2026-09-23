@@ -4,7 +4,20 @@
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template: minmax(0, 1fr) auto / minmax(0, 1fr);
+  grid-template:
+    'controls' auto
+    'stage' minmax(0, 1fr)
+    'preview' auto / minmax(0, 1fr);
+}
+
+.lf-workspace-view-controls {
+  grid-area: controls;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--lf-border);
+  background: var(--lf-bg-0);
 }
 
 .lf-workspace-view {
@@ -13,7 +26,7 @@
 
 .lf-workspace-stage {
   position: relative;
-  grid-area: 1 / 1;
+  grid-area: stage;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -21,7 +34,7 @@
 
 .lf-workspace-accessories {
   position: relative;
-  grid-area: 1 / 1;
+  grid-area: stage;
   min-width: 0;
   min-height: 0;
   pointer-events: none;
@@ -32,7 +45,7 @@
 }
 
 .lf-preview-dock {
-  grid-area: 2 / 1;
+  grid-area: preview;
   box-sizing: border-box;
   max-height: min(260px, 40vh);
   overflow: auto;
