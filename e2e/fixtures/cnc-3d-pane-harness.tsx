@@ -12,7 +12,7 @@ let preferenceCaptured = false;
 export function mountCnc3DPaneHarness(): void {
   unmountCnc3DPaneHarness();
   const main = document.querySelector('main');
-  if (main === null) throw new Error('CurveDesk main layout is unavailable');
+  if (main === null) throw new Error('KerfDesk main layout is unavailable');
   previousPreference = localStorage.getItem(PANE_PREFERENCE_KEY);
   preferenceCaptured = true;
   localStorage.setItem(PANE_PREFERENCE_KEY, 'expanded');

@@ -3,7 +3,7 @@
 // The request carries the Blob ITSELF rather than already-read text or bytes.
 // Blob is structured-cloneable, so the worker performs BOTH the read and the
 // parse. Whether a browser shares or copies the Blob's backing storage is an
-// implementation detail; the design guarantee is that CurveDesk does not first
+// implementation detail; the design guarantee is that KerfDesk does not first
 // materialize the file as a main-thread string or byte array.
 //
 // SVG is deliberately absent. Its pipeline runs DOMPurify and `new DOMParser()`
