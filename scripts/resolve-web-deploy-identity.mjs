@@ -82,7 +82,7 @@ function candidateVerdict(eventName, checkout, currentMain, lane) {
   }
   if (!lane.candidateOnMain) {
     return skip(
-      `${subject} is no longer on main (current main is ${currentMain}), so it does not build.`,
+      `${subject} is not on main (current main is ${currentMain}), so it does not build.`,
     );
   }
   if (lane.newerValidatedSha !== null) {

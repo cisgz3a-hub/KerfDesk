@@ -149,10 +149,10 @@ test('keeps the tip-only rule when production or the lane evidence is unknown', 
   assert.match(unavailable.reason, /unavailable \(GitHub API answered 403 for actions\/runs\)/u);
 });
 
-test('does not build a candidate that has left main', () => {
+test('does not build a candidate that is not on main', () => {
   const left = candidate({ laneEvidence: laneEvidence({ candidateOnMain: false }) });
   assert.equal(left.eligible, false);
-  assert.match(left.reason, /is no longer on main/u);
+  assert.match(left.reason, /^Validated commit 1{40} is not on main \(current main is 2{40}\)/u);
 });
 
 test('a candidate behind the tip needs lane evidence, never a guess', () => {
