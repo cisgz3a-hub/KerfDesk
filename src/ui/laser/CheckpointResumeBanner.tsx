@@ -1,10 +1,11 @@
 // Optional, newest-only recovery capsule. Archived jobs are observational
 // until the operator explicitly reaches a final supervised Start action.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import type { WorkCoordinateOffset } from '../state/origin-actions';
 import {
   recoveryClaimIsExpired,
   recoveryRepository,
@@ -14,6 +15,7 @@ import {
 import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
+import { frameRemainingRecoveryArea } from './laser-recovery-frame';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 
 export function CheckpointResumeBanner(props: {
@@ -24,6 +26,7 @@ export function CheckpointResumeBanner(props: {
   const snapshot = useRecoveryRepositorySnapshot(repository);
   const capsule = snapshot.recoveryCapsule;
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
+  const liveWorkOffsetMm = useLiveWorkOffsetMm();
   const [reviewOpen, setReviewOpen] = useState(false);
   // A pending Start may already have reached the controller. Never offer the
   // older capsule during the short owner lease; it returns only if arming is
@@ -72,10 +75,24 @@ export function CheckpointResumeBanner(props: {
               fromLine === undefined ? {} : { fromLine },
             )
           }
+          liveWorkOffsetMm={liveWorkOffsetMm}
+          onFrameRemaining={(bounds) => frameRemainingRecoveryArea(capsule, bounds)}
         />
       ) : null}
     </>
   );
+}
+
+/** The controller's reported work offset in mm; null until it reports one
+ * (the cache is cleared on every connect, disconnect and reset). */
+function useLiveWorkOffsetMm(): WorkCoordinateOffset | null {
+  const wco = useLaserStore((state) => state.wcoCache);
+  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
+  return useMemo(() => {
+    if (wco === null) return null;
+    const scale = reportInches ? 25.4 : 1;
+    return { x: wco.x * scale, y: wco.y * scale, z: wco.z * scale };
+  }, [wco, reportInches]);
 }
 
 function RecoveryDescription({

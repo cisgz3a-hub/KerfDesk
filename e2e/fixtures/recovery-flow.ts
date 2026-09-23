@@ -69,7 +69,7 @@ export interface CapsuleProbe {
 export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
   return page.evaluate(async () => {
     const recoveryUrl = '/src/ui/state/recovery/index.ts';
-    const coreUrl = '/src/core/recovery/index.ts';
+    const restartUrl = '/src/core/recovery/automatic-restart-line.ts';
     const resumeUrl = '/src/ui/laser/laser-resume-program.ts';
     const { recoveryRepository } = (await import(recoveryUrl)) as {
       recoveryRepository: {
@@ -84,8 +84,13 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
         };
       };
     };
-    const { rawResumeLine } = (await import(coreUrl)) as {
-      rawResumeLine: (gcode: string, acked: number) => number;
+    // The same automatic restart line the recovery flow uses.
+    const { automaticRestart } = (await import(restartUrl)) as {
+      automaticRestart: (
+        gcode: string,
+        acked: number,
+        interruption: { kind: string; message: string },
+      ) => { line: number };
     };
     const { buildLaserResumeProgram } = (await import(resumeUrl)) as {
       buildLaserResumeProgram: (
@@ -96,7 +101,7 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
     const capsule = recoveryRepository.getSnapshot().recoveryCapsule;
     if (capsule === null || capsule.artifact.kind !== 'exact-execution') return null;
     const gcode = capsule.artifact.gcode ?? '';
-    const resumeLine = rawResumeLine(gcode, capsule.ackedLines);
+    const resumeLine = automaticRestart(gcode, capsule.ackedLines, capsule.interruption).line;
     const program = buildLaserResumeProgram(gcode, resumeLine);
     const sendable = (line: string): boolean => line.trim() !== '' && !line.trim().startsWith(';');
     return {

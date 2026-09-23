@@ -79,7 +79,7 @@ function withLatency(repository: RecoveryRepository, random: () => number): void
 }
 
 /** The production Start protocol (ADR-337): arm the durable intent, retrying
- * as an operator would after "Another job Start is already being prepared";
+ * as an operator would after a Start the previous run's record still blocked;
  * the controller accepts; the archive is staged and activated afterwards.
  * Returns how many Start presses were refused first, and the post-accept
  * archive, which completes in the background while the job streams. */
@@ -290,7 +290,8 @@ describe('checkpoint tracker under randomized lifecycles and storage latency', (
       await pause(30);
       expectOneTruthfulTerminalPerRun(snapshot, script);
       expectOffersOnlyForSettledRuns(offered, script);
-      expect(reportFailure).not.toHaveBeenCalled();
+      // Compare the calls themselves so a failure names what went wrong.
+      expect(reportFailure.mock.calls).toEqual([]);
     },
     120_000,
   );

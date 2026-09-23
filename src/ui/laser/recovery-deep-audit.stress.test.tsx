@@ -13,6 +13,7 @@ import {
 } from '../../core/controllers/grbl/laser-burn-oracle.test-helper';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { rawResumeLine } from '../../core/recovery';
+import { automaticRestart } from '../../core/recovery/automatic-restart-line';
 import {
   createLayer,
   createProject,
@@ -156,8 +157,9 @@ async function recoverOnWire(interrupted: Interrupted): Promise<string[]> {
 
 /** What the original program burns from the automatic restart line onward. */
 function originalRemainder(interrupted: Interrupted): OracleBurn[] {
-  const fromLine = rawResumeLine(interrupted.gcode, interrupted.capsule.ackedLines);
-  return oracleBurns(interrupted.gcode).filter((burn) => burn.line >= fromLine);
+  const { gcode, capsule } = interrupted;
+  const fromLine = automaticRestart(gcode, capsule.ackedLines, capsule.interruption).line;
+  return oracleBurns(gcode).filter((burn) => burn.line >= fromLine);
 }
 
 describe('what a recovered job actually burns (wire bytes, independent interpreter)', () => {
@@ -237,14 +239,33 @@ describe('a line the controller rejects mid-job', () => {
   it(
     'the default recovery replays the burn the controller rejected',
     async () => {
-      const { capsule, gcode, target } = await rejectedRun();
+      const { h, capsule, gcode, target } = await rejectedRun();
       const rejectedLine = gcode.split('\n').findIndex((line) => line.trim() === target) + 1;
       const rejectedBurn = oracleBurns(gcode).find((burn) => burn.line === rejectedLine);
       if (rejectedBurn === undefined) throw new Error('Expected the rejected line to burn.');
-      // Automatic recovery restarts after the acknowledged count. GRBL answers a
-      // rejected line with error:N, which the stream counts as acknowledged.
-      const automatic = rawResumeLine(gcode, capsule.ackedLines);
-      expect(automatic).toBeLessThanOrEqual(rejectedLine);
+      // GRBL answers a rejected line with error:N, which the stream counts as
+      // acknowledged; the automatic restart must still start at that line.
+      expect(rawResumeLine(gcode, capsule.ackedLines)).toBeGreaterThan(rejectedLine);
+      expect(automaticRestart(gcode, capsule.ackedLines, capsule.interruption)).toEqual({
+        line: rejectedLine,
+        replaysRejectedLine: true,
+      });
+      // The operator unplugs and reconnects the controller, then recovers.
+      h.simulator.yankCable();
+      await tick(20);
+      h.simulator = await connectSimulator();
+      const before = h.simulator.outbound().length;
+      vi.mocked(jobAwareAlert).mockClear();
+      expect(await drive(runLaserRecoveryCapsuleFlow(capsule, h.repository))).toBe(true);
+      expect(jobAwareAlert).not.toHaveBeenCalled();
+      for (let waited = 0; waited < 60_000 && useLaserStore.getState().streamer !== null; ) {
+        await tick(100);
+        waited += 100;
+      }
+      expect(useLaserStore.getState().streamer).toBeNull();
+      const sent = programLines(h.simulator, before);
+      const burned = oracleBurns(sent.join('\n'), RECONNECTED_HEAD).map(burnGeometryKey);
+      expect(burned).toContain(burnGeometryKey(rejectedBurn));
     },
     STRESS_TIMEOUT_MS,
   );

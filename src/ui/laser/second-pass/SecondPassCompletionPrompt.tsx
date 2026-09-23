@@ -53,8 +53,11 @@ export function SecondPassCompletionPrompt(props: {
   // modalOpen gates the initial presentation only: this Dialog itself then
   // registers as a modal. Hydrated receipts alone never set completionRunId.
   if (!runId || runId !== presentedRunId || !offerable || busy || request) return null;
+  // The offer appears on its own when a job settles, often while the operator
+  // is typing in a field: focus the dialog, not a button, so that keystroke
+  // cannot answer it (ADR-341 Amendment 3).
   return (
-    <Dialog title="Job complete" size="sm" onClose={() => dismiss(runId)}>
+    <Dialog title="Job complete" size="sm" initialFocus="surface" onClose={() => dismiss(runId)}>
       <p>Would you like to darken selected areas?</p>
       <p>
         Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
@@ -65,9 +68,9 @@ export function SecondPassCompletionPrompt(props: {
         <button
           className="lf-btn"
           onClick={() => dismiss(runId)}
-          title="Finish for now. The saved job remains available for a second pass later."
+          title="Close this offer. The saved job remains available for a second pass later."
         >
-          Done
+          Not now
         </button>
         <button
           className="lf-btn lf-btn--primary"

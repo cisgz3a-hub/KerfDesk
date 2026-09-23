@@ -311,7 +311,13 @@ test('a page reload mid-job saves a recoverable capsule no older than one checkp
   await expect(page.getByRole('button', { name: 'Open...' })).toBeVisible();
   await selectWorkspacePanel(page, 'Machine');
   const saved = await savedCapsule(page);
-  expect(saved.interruption).toBe('unknown');
+  // A truthful cause: the app closing, when its stop request was saved before
+  // the page went away, or the restart that found the job still active.
+  const cause = `${saved.interruption}: ${saved.interruptionMessage}`;
+  expect(cause).not.toContain('ended unexpectedly');
+  expect(cause).toMatch(
+    /^(?:cancelled: KerfDesk was closed or reloaded|unknown: The application restarted while this job was active)/,
+  );
   expect(saved.ackedLines).toBeLessThanOrEqual(60);
   expect(saved.ackedLines).toBeGreaterThan(60 - 25);
   // The capsule outlives the project session: reopen the design's machine.
@@ -431,19 +437,43 @@ test('two windows cannot both resume one interrupted job', async ({ page, kerfde
   expect(sent.length).toBeGreaterThan(0);
   expect(refusalsA()).toEqual([]);
 
-  // Window B still shows the consumed capsule (windows do not share updates) and
-  // tries it: the revision check must refuse it before anything streams.
+  // Window B refreshes when window A changes the shared recovery record, so the
+  // consumed card disappears there too instead of lingering until reload
+  // (ADR-341 Amendment 3), and nothing streams from window B.
   await other.page.bringToFront();
-  const writesBefore = programLinesSince(await other.events(), 0).length;
-  if (await cardB.getByText('Interrupted job saved', { exact: true }).isVisible()) {
-    if (!(await cardB.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
-      await cardB.getByText('Interrupted job saved', { exact: true }).click();
-    await cardB.getByRole('button', { name: 'Review recovery', exact: true }).click();
-    const reviewB = other.page.getByRole('dialog', { name: 'Review interrupted laser job' });
-    await reviewB.getByRole('button', { name: 'Start supervised recovery', exact: true }).click();
-    await other.page.waitForTimeout(2_000);
-  }
-  const programB = programLinesSince(await other.events(), 0).slice(writesBefore);
+  await expect(cardB.getByText('Interrupted job saved', { exact: true })).toHaveCount(0);
+  const programB = programLinesSince(await other.events(), 0);
+  expect(programB.filter((line) => /^G[01]\b/.test(line))).toEqual([]);
+  await other.page.close();
+});
+
+test('a recovery review open in another window closes when this window resumes the job', async ({
+  page,
+  kerfdesk,
+}) => {
+  test.setTimeout(180_000);
+  await connectAndHome(page, kerfdesk);
+  const baselineLines = await startHeld(page, kerfdesk);
+  await acknowledgeExactly(page, kerfdesk, baselineLines, 2);
+  await kerfdesk.disconnectSerial();
+  await savedCapsule(page);
+  const other = await secondWindow(page);
+  other.page.on('dialog', (dialog) => void dialog.accept());
+  await selectWorkspacePanel(other.page, 'Machine');
+  await connectAndHome(other.page, other.fixture);
+  // Window B opens its review first; window A then resumes the same capsule.
+  const cardB = other.page.locator('details[aria-label="Interrupted job recovery"]');
+  if (!(await cardB.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
+    await cardB.getByText('Interrupted job saved', { exact: true }).click();
+  await cardB.getByRole('button', { name: 'Review recovery', exact: true }).click();
+  const reviewB = other.page.getByRole('dialog', { name: 'Review interrupted laser job' });
+  await expect(reviewB).toBeVisible();
+  await page.bringToFront();
+  expect((await recoverAndDrain(page, kerfdesk)).length).toBeGreaterThan(0);
+  // The stale review cannot be started: it closes with the record it showed.
+  await other.page.bringToFront();
+  await expect(reviewB).toHaveCount(0);
+  const programB = programLinesSince(await other.events(), 0);
   expect(programB.filter((line) => /^G[01]\b/.test(line))).toEqual([]);
   await other.page.close();
 });

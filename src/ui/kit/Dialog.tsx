@@ -23,11 +23,19 @@ export function Dialog(props: {
   // CutSettings/Convert pattern); onSubmit must preventDefault itself.
   readonly as?: 'div' | 'form';
   readonly onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
+  /** 'surface' focuses the dialog itself on open, for dialogs that appear
+   * unprompted: a keystroke meant for the field the operator was typing in
+   * must not press a button. Tab still reaches every control. */
+  readonly initialFocus?: 'first-control' | 'surface';
   readonly children: React.ReactNode;
 }): JSX.Element {
   const backdropRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useDialogA11y(backdropRef, props.onClose);
+  useDialogA11y(
+    backdropRef,
+    props.onClose,
+    props.initialFocus === undefined ? {} : { initialFocus: props.initialFocus },
+  );
   useRegisterModal();
   const panelClass = ['lf-dialog', `lf-dialog--${props.size ?? 'md'}`, props.panelClassName]
     .filter((value) => value !== undefined && value !== '')

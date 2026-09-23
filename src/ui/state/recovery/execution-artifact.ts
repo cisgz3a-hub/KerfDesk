@@ -36,7 +36,12 @@ import {
   assertExecutionArtifactSizeWithinBudget,
   measureExecutionArtifactBytesWithinBudget,
 } from './execution-artifact-size';
-import { isLaserSecondPassChain, type LaserSecondPassChain } from './laser-second-pass-lineage';
+import {
+  isLaserResumeStep,
+  isLaserSecondPassChain,
+  type LaserResumeStep,
+  type LaserSecondPassChain,
+} from './laser-second-pass-lineage';
 
 export { estimateExecutionArtifactBytes } from './execution-artifact-size';
 
@@ -106,7 +111,7 @@ export type ExecutionArtifactV1 = {
   readonly prepared: PreparedExecutionOutput;
   /** Ordered, deterministic resume transforms applied after emitting `prepared`.
    * Absent for ordinary starts and CNC recovery jobs. */
-  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserResumeChain?: ReadonlyArray<LaserResumeStep>;
   readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly canvasPlan: ArchivedCanvasMotionPlan;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
@@ -146,7 +151,7 @@ type CreateExecutionArtifactBase = {
   readonly runId: RunId;
   readonly gcode: string;
   readonly prepared: PreparedExecutionOutput;
-  readonly laserResumeChain?: ReadonlyArray<{ readonly fromLine: number }>;
+  readonly laserResumeChain?: ReadonlyArray<LaserResumeStep>;
   readonly laserSecondPassChain?: LaserSecondPassChain;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
@@ -302,13 +307,7 @@ function hasValidLaserResumeChain(value: Record<string, unknown>): boolean {
   const chain = value['laserResumeChain'];
   if (chain === undefined) return true;
   if (value['machineKind'] !== 'laser' || !Array.isArray(chain)) return false;
-  return chain.every(
-    (step) =>
-      isRecord(step) &&
-      typeof step['fromLine'] === 'number' &&
-      Number.isInteger(step['fromLine']) &&
-      step['fromLine'] >= 1,
-  );
+  return chain.every(isLaserResumeStep);
 }
 
 export function isLegacyFingerprintArtifact(

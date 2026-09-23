@@ -96,7 +96,9 @@ describe('RecoveryRepository', () => {
     expect(active?.artifact.gcode.length).toBe(largeGcode.length);
     expect(active?.artifact.gcode.endsWith('M5\n')).toBe(true);
     expect(active?.ackedLines).toBe(25);
-  });
+    // Hashing 5.4 MB of G-code three times takes about 2 s alone and nearly
+    // 5 s beside other suites; the default timeout made it flaky.
+  }, 30_000);
 
   it('keeps staging sealed until accepted, then replaces the older capsule', async () => {
     const { repository } = harness();

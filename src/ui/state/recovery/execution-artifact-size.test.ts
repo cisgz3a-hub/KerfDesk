@@ -5,7 +5,30 @@ import {
   measureExecutionArtifactBytesWithinBudget,
   memoizedExecutionArtifactBytes,
   MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES,
+  stringBytes,
 } from './execution-artifact-size';
+
+describe('string storage estimate', () => {
+  it('counts an all-ASCII string at one byte per character', () => {
+    expect(stringBytes('')).toBe(0);
+    expect(stringBytes('G1X12.5S300\n')).toBe(12);
+    expect(stringBytes('\u0000\u007f')).toBe(2);
+  });
+
+  it('keeps the UTF-8 maximum for any string with a wider code unit', () => {
+    expect(stringBytes('°')).toBe(3);
+    expect(stringBytes('G1 ; 10 mm²')).toBe(33);
+    expect(stringBytes('😀')).toBe(6);
+  });
+
+  it('archives a 25 million character program that the old three-byte rule refused', () => {
+    const gcode = 'X12.345S678\n'.repeat(Math.ceil(25_000_000 / 12));
+    expect(gcode.length * 3).toBeGreaterThan(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES);
+    const measured = measureExecutionArtifactBytesWithinBudget({ gcode });
+    expect(measured).toBeGreaterThanOrEqual(gcode.length);
+    expect(measured).toBeLessThan(gcode.length + 256);
+  });
+});
 
 /** A graph shaped like the part of an artifact that dominates the traversal:
  * one node per motion-manifest point. */

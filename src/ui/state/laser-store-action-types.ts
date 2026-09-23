@@ -5,6 +5,7 @@ import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
 import type { FramedRunCandidate } from './framed-run';
 import type { StartJobOptions } from './laser-job-options';
+import type { JobStopReason } from './job-stop-request';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
 import type { WorkZRecoveryConfirmation } from './work-z-recovery-actions';
@@ -63,7 +64,8 @@ export type LaserStoreActions = {
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly continueToolChange: () => Promise<void>;
-  readonly stopJob: () => Promise<void>;
+  /** Abort the running job. `reason` records why for recovery (default: the operator). */
+  readonly stopJob: (reason?: JobStopReason) => Promise<void>;
   readonly clearSafetyNotice: () => void;
   readonly pushSystemNotice: (line: string) => void;
   readonly applyDetectedSettings: () => void;

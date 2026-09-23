@@ -1615,6 +1615,24 @@ authorization, Frame proof, controller command, or safety boundary.
   movement or scan line if necessary; overlapping engraving may become darker. Coincident
   passes require checking the selected line number. The picker selects the beginning of a
   movement, not an arbitrary point inside it, and does not isolate an area for a second pass.
+  The line field shows the automatic line number. After a controller rejection (`error:N`),
+  which the stream counts as acknowledged although the controller discarded the line, the
+  automatic line is the rejected line itself, so that burn is not skipped; the picker says
+  that lines the controller ran after it before stopping may burn again (ADR-341 Amendment 3).
+- The resumed program re-issues the air assist (M7/M8) the job had switched on before its
+  beam-off re-entry, and names the program's motion mode on the first resumed line that relies
+  on it: the re-entry is a rapid, and a raster row resumed mid-row used to continue as dark
+  rapids. Saved recoveries record which resume transform built them and replay with it.
+- **Placement and work origin** in the review shows the saved placement, the work origin the
+  job ran with and the controller's current one (in mm from machine zero). When they differ by
+  more than 0.05 mm it warns that the rest of the job would land that far from the finished part
+  (a controller reset clears a temporary origin; home first where the machine homes). **Frame
+  remaining area** traces everything still to engrave from the chosen line, from the current
+  origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
+- A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
+  closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
+  only a stop nobody requested reads as unexplained. A recovery card another window has
+  claimed, started or discarded refreshes in every open window.
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -1631,7 +1649,10 @@ authorization, Frame proof, controller command, or safety boundary.
   and source-line mapping. The saved G-code, project and prepared raster output remain exact;
   opening the selected recovery preview restores its complete route. This avoids large
   object-per-point overhead without raising the existing artifact or history limits. Jobs that
-  still exceed those limits retain the explicit warning that recovery capture is unavailable.
+  still exceed those limits retain the explicit warning that recovery capture is unavailable,
+  and Job Review now says so before Start. All-ASCII text such as G-code counts one byte per
+  character toward the limit, as browsers store it; it used to count three, which refused
+  recovery copies for photo engravings above about 22 million characters.
 - An active-stream watchdog that resumes after a long scheduler gap issues one fresh status
   query opportunity before declaring the link silent. Repeated delays cannot indefinitely
   extend an unanswered query; normal two-second silence still requests fail-dark containment.
@@ -1642,9 +1663,11 @@ authorization, Frame proof, controller command, or safety boundary.
 
 - After a settled laser completion and successful archive capture, **Job complete** asks
   **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
-  that exact saved job in the paintbrush/eraser editor, or **Done** to finish. No motion is
-  started by this choice. The prompt also works with the Machine panel collapsed, waits
-  behind another open dialog, and appears once for that completion. Reloading saved history,
+  that exact saved job in the paintbrush/eraser editor, or **Not now** to close the offer. No
+  motion is started by this choice. The prompt also works with the Machine panel collapsed, waits
+  behind another open dialog, and appears once for that completion. It opens with focus on
+  itself, not on a button, so a keystroke meant for the field being edited cannot answer it;
+  Tab reaches both buttons. Reloading saved history,
   an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
 - **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
   The completed-run selector also offers older retained completions. When a completed run
@@ -1670,8 +1693,13 @@ authorization, Frame proof, controller command, or safety boundary.
   sweeps are omitted. A sweep ends at a rapid, a beam or air word, a feed change, or a
   laser-off feed move that leaves the current line (a controlled-dark row change, even when it
   runs at the engraving feed); a laser-off move that continues the line is a runway and stays
-  with its burn. Intersecting sweeps can traverse unpainted areas with S0 to retain their
-  run-in/run-out motion. Every repositioning command carries S0 while the beam mode stays
+  with its burn. A selected sweep is replayed only from its first painted point less the
+  sweep's own lead-in to its last painted point plus its own lead-out, crossing unpainted parts
+  in between at S0, so the head passes each painted point at the speed the original reached
+  there; a side with no lead-in (or lead-out) keeps the sweep's full approach on that side. A
+  small painted spot on a wide image row no longer replays the whole row. Repeated `G1` and
+  unchanged S words are left out (ADR-341 Amendment 3); saved passes record which writer built
+  them and replay with it. Every repositioning command carries S0 while the beam mode stays
   armed; the mode word is written only when the mode changes and the program ends with one M5,
   so the controller does not stop and drain around every selected sweep. Painted passes
   archived before 2026-09-22 were emitted with per-sweep beam words; they stay in history but

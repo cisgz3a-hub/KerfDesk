@@ -12,6 +12,7 @@ import {
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import { currentJobStopRequest } from './job-stop-request';
 import type { ConnectControllerOptions } from './laser-store';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -225,6 +226,24 @@ describe('laser lifecycle against the GRBL simulator', () => {
     await pump(50);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().locked).toBe(false);
+  });
+
+  it('records that the operator stopped the stream, for the recovery cause', async () => {
+    await connectIdle();
+    await startTestLaserJob(jobLines(40, 2));
+    await pump(5);
+    const epoch = useLaserStore.getState().streamerEpoch;
+    // The request must accompany the errored mark itself: that is the state
+    // the checkpoint tracker records the interruption from.
+    const seenWithError: unknown[] = [];
+    const unsubscribe = useLaserStore.subscribe((state) => {
+      if (state.streamer?.status === 'errored') seenWithError.push(currentJobStopRequest(state));
+    });
+    await useLaserStore.getState().stopJob();
+    unsubscribe();
+    expect(seenWithError[0]).toEqual({ reason: 'operator', streamerEpoch: epoch });
+    await pump(50);
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
 
   it('treats a mid-stream error:N as terminal; recovery is Stop, then unlock', async () => {
