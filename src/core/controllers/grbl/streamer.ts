@@ -3,6 +3,7 @@ import {
   normalizeGrblRxBufferBytes,
   type GrblStreamingMode,
 } from '../../grbl-streaming';
+import { findFirstSendableLineOver } from './sendable-line-scan';
 
 // GRBL character-counted streaming buffer (pure state machine).
 //
@@ -164,12 +165,8 @@ export function findOversizedLine(
   rxBufferBytes: number = DEFAULT_RX_BUFFER_BYTES,
 ): OversizedLine | null {
   const limit = normalizeGrblRxBufferBytes(rxBufferBytes);
-  const lines = splitLines(gcode);
-  for (let i = 0; i < lines.length; i += 1) {
-    const bytes = lines[i]?.length ?? 0;
-    if (bytes > limit) return { lineNumber: i + 1, bytes, limit };
-  }
-  return null;
+  const oversized = findFirstSendableLineOver(gcode, limit);
+  return oversized === null ? null : { ...oversized, limit };
 }
 
 // Terminal statuses are absorbing: once the stream is done, cancelled,

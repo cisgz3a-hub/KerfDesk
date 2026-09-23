@@ -30,6 +30,7 @@ import {
 } from '../job-placement';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
+import { advanceExportVariables } from './advance-export-variables';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
@@ -146,7 +147,11 @@ export type SaveGcodeCtx = {
   // G54 emission will mismatch a placement measured from the active offset.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
-  readonly advanceVariablesAfter?: (expectedProject: Project, trigger: 'successful-export') => void;
+  readonly advanceVariablesAfter?: (
+    expectedProject: Project,
+    trigger: 'successful-export',
+    outputScope?: OutputScope,
+  ) => void;
 };
 
 function optionalSettingsCapability(
@@ -181,6 +186,9 @@ export async function handleSaveGcode(
       ...optionalSettingsCapability(ctx.settingsCapability),
       ...optionalActiveWcs(ctx.activeWcs),
       pushToast: ctx.pushToast,
+      ...(ctx.advanceVariablesAfter === undefined
+        ? {}
+        : { advanceVariablesAfter: ctx.advanceVariablesAfter }),
     })
   ) {
     return;
@@ -262,11 +270,6 @@ async function saveOrdinaryGcode(
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
   }
-}
-
-function advanceExportVariables(ctx: SaveGcodeCtx): void {
-  if (ctx.advanceVariablesAfter === undefined) return;
-  ctx.advanceVariablesAfter(ctx.project, 'successful-export');
 }
 
 // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should

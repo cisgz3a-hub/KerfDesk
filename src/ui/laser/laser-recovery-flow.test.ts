@@ -239,7 +239,7 @@ describe('exact laser recovery activation', () => {
     expect(startJob).toHaveBeenCalledWith(expected.lines.join('\n'), expect.anything());
     const firstRun = repository.getSnapshot().activeRun;
     if (firstRun === null) throw new Error('Expected tracked recovery.');
-    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine }]);
+    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine, version: 2 }]);
     expect(firstRun.artifact.provenance).toMatchObject({
       workflow: { requestedFromLine: fromLine, effectiveFromLine: fromLine },
     });

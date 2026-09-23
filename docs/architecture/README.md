@@ -57,13 +57,13 @@ slots, then classify each answer into [09-weakness-register.md](09-weakness-regi
 | **DIVERGENCE (unintentional)** | We differ with no ADR authority. | **This is a bug** (ADR-027). File it. |
 | **OUR ADVANTAGE** | We do something the reference cannot. | Record; protect it in tests. |
 
-ADR-027 (`DECISIONS.md:1272`) is the governing rule: a divergence is a defect by default,
+ADR-027 (`DECISIONS.md:1283`) is the governing rule: a divergence is a defect by default,
 to be redesigned toward LightBurn rather than defended as a design choice.
 
 ### Blocking problem for Phase 2 — read before pulling competitor docs
 
 ADR-027 names **`LIGHTBURN-STUDY.md`** as the authoritative LightBurn behavior reference
-(`DECISIONS.md:1293`) and as the running divergence ledger (`DECISIONS.md:1295`).
+(`DECISIONS.md:1304`) and as the running divergence ledger (`DECISIONS.md:1306`).
 `src/core/output/grbl-strategy.ts:13` also cites "LIGHTBURN-STUDY §8" to justify our G-code
 preamble divergence.
 

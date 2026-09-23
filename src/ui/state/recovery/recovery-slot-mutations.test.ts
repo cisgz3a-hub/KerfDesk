@@ -6,7 +6,12 @@ import {
   RECOVERY_CLAIM_LEASE_MS,
   type PersistedRecoverySlots,
 } from './recovery-model';
-import { activateClaimedRecoveryMutation, claimRecoveryMutation } from './recovery-slot-mutations';
+import {
+  activateClaimedRecoveryMutation,
+  activateFreshRunMutation,
+  claimRecoveryMutation,
+  interruptRunMutation,
+} from './recovery-slot-mutations';
 
 const RUN_ID = 'run-recovery';
 const NOW = '2026-07-15T10:00:00.000Z';
@@ -102,6 +107,33 @@ describe('claimRecoveryMutation lease (B4)', () => {
     expect(result.value).toBe(true);
     expect(result.slots.recoveryCapsule?.claim?.attemptId).toBe('fresh-attempt');
     expect(result.slots.recoveryCapsule?.claim?.claimedAtIso).toBe(pastLease);
+  });
+});
+
+describe('repeated interruption of a superseded run', () => {
+  const RUN_B = 'run-next';
+  const interruption = { kind: 'controller-error', message: 'error:1' } as const;
+
+  it('succeeds without change once a later run replaced the capsule', () => {
+    // Run A errored and was recorded; run B then started, clearing A's capsule.
+    const recorded = interruptRunMutation(ACTIVE_SLOTS, RUN_ID, 2, interruption, NOW);
+    expect(recorded.value).toBe(true);
+    const next = activateFreshRunMutation(
+      { ...recorded.slots, pendingStart: null },
+      { runId: RUN_B, sendableLines: 9 } as ExecutionArtifactV1,
+      recorded.slots.generation,
+      NOW,
+    );
+    expect(next.slots.recoveryCapsule).toBeNull();
+
+    // The tracker's second terminal for A, from the stream disappearing.
+    const repeated = interruptRunMutation(next.slots, RUN_ID, 2, interruption, NOW);
+    expect(repeated).toEqual({ slots: next.slots, value: true });
+  });
+
+  it('still refuses to interrupt a run it never recorded', () => {
+    const other = interruptRunMutation(emptyRecoverySlots(0), 'run-unknown', 1, interruption, NOW);
+    expect(other.value).toBe(false);
   });
 });
 

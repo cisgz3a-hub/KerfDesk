@@ -385,4 +385,12 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
 
     expect(committedTrace(ctx).paths).toEqual(rawPaths);
   });
+
+  it('preserves photo shade coverage when committing to CNC', async () => {
+    const rawPaths = mockTraceResult();
+    const ctx = ctxWith(DEFAULT_CNC_MACHINE_CONFIG);
+    await commit({ ...commitArgs(seedRaster()), options: TRACE_PRESETS['Photo shading']! }, ctx);
+    expect(committedTrace(ctx).paths).toEqual(rawPaths);
+    expect(committedTrace(ctx).traceMode).toBe('filled-contours');
+  });
 });

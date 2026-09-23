@@ -110,7 +110,7 @@ function CncToolManagerRow(props: {
             props.onChangeFluteCount?.(props.tool.id, fluteCount);
           }}
           aria-label={`Flute count for ${props.tool.name}`}
-          title="Set this cutter's actual number of cutting flutes. This Startup Setup change is saved with the job."
+          title="Set this cutter's actual number of cutting flutes. This Machine Setup change is saved with the job."
           style={fluteInputStyle}
         />
       )}

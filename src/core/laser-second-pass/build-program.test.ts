@@ -20,14 +20,16 @@ function selection(strokes: ReadonlyArray<LaserSecondPassStroke>): LaserSecondPa
   return { version: 1, maxPowerS: 1000, strokes };
 }
 
+/** Writer 1 exactly as shipped: saved stages without a writer version replay
+ * through it, so its bytes are pinned here. Writer 2 has its own suite. */
 function ready(source: string, brush: LaserSecondPassSelection) {
-  const result = buildLaserSecondPassProgram(source, brush);
+  const result = buildLaserSecondPassProgram(source, brush, { writerVersion: 1 });
   expect(result.kind, result.kind === 'error' ? result.message : undefined).toBe('ready');
   if (result.kind !== 'ready') throw new Error(result.message);
   return result;
 }
 
-describe('selective pass construction', () => {
+describe('selective pass construction (writer 1, replayed for saved stages)', () => {
   it('clips at the exact painted chord and preserves dark entry/exit runways', () => {
     const result = ready(SOURCE, selection([stroke(5, 1, 0.5)]));
     const motions = simulateProgram(result.gcode);

@@ -12,26 +12,17 @@
 // HTML overlays (drop hint, preview scrubber, etc.) in `overlays.tsx`.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type Toolpath } from '../../core/job';
+import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
-import {
-  DragOverlay,
-  DragReadout,
-  EmptyHint,
-  MeasureReadoutOverlay,
-  ZoomControls,
-} from './overlays';
-import { PreviewControlsPanel, PreviewStatusOverlays } from './preview-overlays';
-import { Cut3DPreviewDialog } from '../relief-viewer';
+import { DragOverlay, DragReadout, MeasureReadoutOverlay, ZoomControls } from './overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
-import { useCncCut3DSurface } from './use-cnc-cut3d-surface';
 import { useCncRemovalGrid } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
 import { useDragMove } from './use-workspace-drag';
@@ -41,7 +32,9 @@ import { useCanvasMotionOverlay } from './use-canvas-motion-overlay';
 import { CanvasMotionBadge } from './canvas-motion-badge';
 import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
-import { WorkspacePreviewChrome } from './WorkspacePreviewChrome';
+import { WorkspacePreviewDock } from './WorkspacePreviewDock';
+import { NodeEditHint } from './NodeEditHint';
+import './workspace-preview.css';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
 import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
@@ -49,10 +42,8 @@ import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-te
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const project = useStore((s) => s.project);
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const selectedPathNode = useStore((s) => s.selectedPathNode);
-  const selectedPathNodes = useStore((s) => s.selectedPathNodes);
-  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  const { selectedObjectId, selectedPathNode, selectedPathNodes, additionalSelectedIds } =
+    useWorkspaceSelection();
   const previewMode = useStore((s) => s.previewMode);
   const routePreviewLabel = useStore(selectRoutePreviewLabel);
   const { scrubberT, showPreviewTravel } = useWorkspacePreviewState();
@@ -91,38 +82,60 @@ export function Workspace(): JSX.Element {
   useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (
-    <>
-      <WorkspaceCanvasLayers
-        baseRef={ref}
-        canvasSize={canvasSize}
-        handlers={handlers}
-        project={project}
-        previewMode={previewMode}
-        viewState={viewState}
-        canvasMotionOverlay={canvasMotionOverlay}
-      />
-      {project.scene.objects.length === 0 && !dragOverlay && !textEditing && <EmptyHint />}
-      {dragOverlay && <DragOverlay />}
-      <WorkspaceInteractionOverlays
-        canvasRef={ref}
-        project={project}
-        selectedObjectId={selectedObjectId}
-        dragKind={dragKind}
-        viewState={viewState}
-      />
-      <WorkspacePreviewOverlays
+    <div className="lf-workspace-view">
+      <div className="lf-workspace-stage">
+        <WorkspaceCanvasLayers
+          baseRef={ref}
+          canvasSize={canvasSize}
+          handlers={handlers}
+          project={project}
+          previewMode={previewMode}
+          viewState={viewState}
+          canvasMotionOverlay={canvasMotionOverlay}
+        />
+        {dragOverlay && <DragOverlay />}
+        <WorkspaceInteractionOverlays
+          canvasRef={ref}
+          project={project}
+          selectedObjectId={selectedObjectId}
+          dragKind={dragKind}
+          viewState={viewState}
+        />
+        <WorkspacePointerOverlays canvasSize={canvasSize} dragging={dragKind !== null} />
+        <WorkspaceDesignChrome previewMode={previewMode} overlay={canvasMotionOverlay} />
+      </div>
+      <WorkspacePreviewDock
         previewMode={previewMode}
         project={project}
         toolpath={previewToolpath}
         estimate={jobEstimate}
         routeLabel={routePreviewLabel}
         cncRemovalGrid={cncRemovalGrid}
+        rasterPending={previewBitmap.pending}
       />
-      <WorkspacePointerOverlays canvasSize={canvasSize} dragging={dragKind !== null} />
-      <WorkspacePreviewChrome previewMode={previewMode} rasterPending={previewBitmap.pending} />
-      {!previewMode && <CanvasMotionBadge overlay={canvasMotionOverlay} />}
-      {!previewMode && <ArtworkNumberingPrompt />}
-      {!previewMode && <ZoomControls />}
+    </div>
+  );
+}
+
+function useWorkspaceSelection() {
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const selectedPathNode = useStore((s) => s.selectedPathNode);
+  const selectedPathNodes = useStore((s) => s.selectedPathNodes);
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  return { selectedObjectId, selectedPathNode, selectedPathNodes, additionalSelectedIds };
+}
+
+function WorkspaceDesignChrome(props: {
+  readonly previewMode: boolean;
+  readonly overlay: ReturnType<typeof useCanvasMotionOverlay>;
+}): JSX.Element | null {
+  if (props.previewMode) return null;
+  return (
+    <>
+      <CanvasMotionBadge overlay={props.overlay} />
+      <ArtworkNumberingPrompt />
+      <NodeEditHint />
+      <ZoomControls />
     </>
   );
 }
@@ -160,50 +173,6 @@ function useDropPenDraftOnProjectReplace(project: Project): void {
   }, [project]);
 }
 
-function WorkspacePreviewOverlays(props: {
-  readonly previewMode: boolean;
-  readonly project: Project;
-  readonly toolpath: Toolpath | null;
-  readonly estimate: ReturnType<typeof useJobEstimate>;
-  readonly routeLabel: string;
-  readonly cncRemovalGrid: RemovalGrid | null;
-}): JSX.Element | null {
-  const [cut3DOpen, setCut3DOpen] = useState(false);
-  const cut3DSurface = useCncCut3DSurface(props.cncRemovalGrid, cut3DOpen);
-  if (!props.previewMode || props.toolpath === null) return null;
-  const grid = props.cncRemovalGrid;
-  const machine = props.project.machine;
-  const stockThicknessMm = machine?.kind === 'cnc' ? machine.stock.thicknessMm : 0;
-  return (
-    <>
-      <PreviewStatusOverlays
-        project={props.project}
-        toolpath={props.toolpath}
-        {...(grid === null ? {} : { resolution: grid.resolution })}
-      />
-      <PreviewControlsPanel
-        toolpath={props.toolpath}
-        estimate={props.estimate}
-        routeLabel={props.routeLabel}
-        disabled={props.toolpath.totalLength <= 0}
-        {...(grid !== null ? { onOpen3D: () => setCut3DOpen(true) } : {})}
-      />
-      {cut3DOpen && grid !== null ? (
-        <Cut3DPreviewDialog
-          grid={grid}
-          mesh={cut3DSurface.kind === 'ready' ? cut3DSurface.mesh : null}
-          {...(cut3DSurface.kind === 'ready' ? { surfaceRevision: cut3DSurface.revision } : {})}
-          {...(cut3DSurface.kind === 'unavailable'
-            ? { unavailableReason: cut3DSurface.reason }
-            : {})}
-          stockThicknessMm={stockThicknessMm}
-          onClose={() => setCut3DOpen(false)}
-        />
-      ) : null}
-    </>
-  );
-}
-
 function WorkspaceInteractionOverlays(props: {
   readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
@@ -231,7 +200,7 @@ function WorkspaceInteractionOverlays(props: {
   );
 }
 
-function useWorkspaceDraw(args: {
+type WorkspaceDrawArgs = {
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
   readonly selectedObjectId: string | null;
@@ -251,7 +220,9 @@ function useWorkspaceDraw(args: {
   readonly canvasSize: CanvasBitmapSize;
   readonly previewBitmap: ReturnType<typeof usePreviewBitmapRenderer>;
   readonly artworkRunFocus: ReturnType<typeof useUiStore.getState>['artworkRunFocus'];
-}): void {
+};
+
+function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
   const draftShape = useUiStore((s) => s.draftShape);

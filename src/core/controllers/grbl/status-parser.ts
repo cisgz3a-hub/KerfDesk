@@ -95,8 +95,8 @@ export type StatusReport = {
   /**
    * Planner blocks free and RX ring bytes free from `Bf:`. Free counts, not
    * capacity: while the host has nothing in flight the RX value IS the usable
-   * receive capacity (stock GRBL idles at `Bf:15,128`, a grblHAL Falcon A1 Pro
-   * at `Bf:512,65535`). Optional so hand-built test mocks need not set it;
+   * receive capacity (stock GRBL idles at `Bf:15,128`; a Falcon A1 Pro profiled as
+   * grblHAL reported `Bf:512,65535`). Optional so hand-built test mocks need not set it;
    * null when the frame omits the field or it is malformed.
    */
   readonly buffer?: BufferState | null;
@@ -299,7 +299,7 @@ function pickAxisField(
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
     const parts = f.slice(label.length + 1).split(',');
-    // grblHAL/Falcon reports include additional axes after XYZ. Keep the
+    // grblHAL and Falcon reports can include axes after XYZ. Keep the
     // coordinates KerfDesk uses, while still rejecting malformed vectors.
     if (parts.length < 3 || parts.some((token) => parseCanonicalStatusNumber(token) === null)) {
       return null;

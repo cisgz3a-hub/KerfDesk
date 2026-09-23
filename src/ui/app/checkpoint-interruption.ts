@@ -1,12 +1,20 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
+import { jobStopRequestMessage, type JobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
 
+/** The recorded cause of a terminal stream: a safety notice names its fault;
+ * without one, a stop KerfDesk was asked for (Abort, the app closing) is a
+ * cancellation, and only a stop nobody asked for is unexplained. */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
+  stopRequest: JobStopRequest | null = null,
 ): JobInterruption | null {
   if (!['cancelled', 'disconnected', 'errored'].includes(status)) return null;
+  if (notice === null && stopRequest !== null) {
+    return { kind: 'cancelled', message: jobStopRequestMessage(stopRequest.reason) };
+  }
   if (notice === null) return fallbackInterruption(status);
   return {
     kind: noticeKind(status, notice),

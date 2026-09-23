@@ -8,6 +8,30 @@ import {
 } from './processed-bitmap';
 
 describe('processed raster bitmap', () => {
+  it('keeps original pixels in preview and export despite stored adjustments and dithering', () => {
+    const image = rasterImage({
+      pixelWidth: 3,
+      pixelHeight: 1,
+      luma: [0, 128, 255],
+      brightness: 100,
+      contrast: -100,
+      gamma: 5,
+    });
+    const layer = imageLayer({
+      passThrough: true,
+      negativeImage: true,
+      ditherAlgorithm: 'ordered',
+      power: 100,
+    });
+    for (const options of [{}, { maxEdge: 2048 }]) {
+      const result = buildProcessedRasterBitmap(image, layer, DEFAULT_DEVICE_PROFILE, options);
+      expect(result).toMatchObject({ kind: 'ok', width: 3, height: 1 });
+      expect(result.kind === 'ok' ? Array.from(result.rgba) : []).toEqual([
+        0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 255,
+      ]);
+    }
+  });
+
   it('matches image-layer grayscale preview power and min-power scaling', () => {
     const layer = imageLayer({
       ditherAlgorithm: 'grayscale',
@@ -31,7 +55,8 @@ describe('processed raster bitmap', () => {
     const layer = imageLayer({
       ditherAlgorithm: 'threshold',
       negativeImage: true,
-      passThrough: true,
+      passThrough: false,
+      linesPerMm: 1,
     });
     const result = buildProcessedRasterBitmap(
       rasterImage({ pixelWidth: 2, pixelHeight: 1, luma: [0, 255] }),

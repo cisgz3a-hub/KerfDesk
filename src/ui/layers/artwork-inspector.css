@@ -1,7 +1,7 @@
 .lf-artwork-inspector {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -17,9 +17,9 @@
   display: flex;
   flex-shrink: 0;
   gap: 2px;
-  padding: 3px;
-  border-radius: 7px;
-  background: var(--lf-bg-0);
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--lf-border);
 }
 
 .lf-artwork-editor-tabs .lf-btn {
@@ -29,12 +29,12 @@
   min-height: 30px;
   padding: 5px;
   border: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .lf-artwork-editor-tabs [aria-selected='true'] {
   color: var(--lf-accent-fg);
-  background: var(--lf-bg-1);
+  background: var(--lf-accent-wash);
   font-weight: 600;
 }
 
@@ -97,7 +97,7 @@
 .lf-artwork-context strong {
   display: block;
   overflow-wrap: anywhere;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.4;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -106,7 +106,7 @@
 
 .lf-artwork-eyebrow {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--lf-text-muted);
   line-height: 1.5;
@@ -207,8 +207,15 @@
 .lf-operation-inspector {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+}
+
+.lf-operation-scope {
+  padding: 5px 8px;
+  border-left: 2px solid var(--lf-border-strong);
+  background: var(--lf-bg-0);
+  color: var(--lf-text);
 }
 
 .lf-operation-inspector__heading {
@@ -224,14 +231,16 @@
 
 .lf-operation-swatch {
   width: 5px;
-  height: 39px;
+  height: 32px;
   flex-shrink: 0;
   border-radius: 3px;
 }
 
 .lf-operation-identity > label {
   display: grid;
-  gap: 4px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
@@ -270,9 +279,8 @@
 .lf-operation-output {
   display: grid;
   gap: 8px;
-  padding: 8px;
-  border-radius: 7px;
-  background: var(--lf-bg-0);
+  padding: 10px 0 0;
+  border-top: 1px solid var(--lf-border);
 }
 
 .lf-operation-output__toggles {
@@ -286,7 +294,7 @@
   align-items: center;
   gap: 7px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
 }
 

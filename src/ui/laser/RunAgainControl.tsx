@@ -6,8 +6,9 @@ import {
   recoveryRepository,
   type LastCompletedReceipt,
   type RecoveryRepository,
+  type RecoveryRepositorySnapshot,
 } from '../state/recovery';
-import { useRecoveryRepositorySnapshot } from '../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
@@ -27,9 +28,8 @@ type Props = {
  * receipt; clicking performs a fresh compile and final fingerprint check. */
 export function RunAgainControl(props: Props): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
-  const snapshot = useRecoveryRepositorySnapshot(repository);
+  const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, repository);
   const app = useExecutionSignatureAppState();
-  const receipt = snapshot.lastCompletedReceipt;
   const [starting, setStarting] = useState(false);
 
   // These stores participate in print-and-cut execution identity but are read
@@ -70,4 +70,8 @@ export function RunAgainControl(props: Props): JSX.Element | null {
       {starting ? 'Checking completed job…' : 'Run same job again from start'}
     </button>
   );
+}
+
+function selectLastCompletedReceipt(snapshot: RecoveryRepositorySnapshot) {
+  return snapshot.lastCompletedReceipt;
 }

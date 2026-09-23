@@ -17,18 +17,14 @@ export function recoveryArtifactPreparedOutput(
   try {
     const prepared = hydratePreparedExecutionOutput(artifact.prepared);
     if (prepared === null) return null;
-    let gcode = emitPreparedGcode(prepared, {
+    let gcode: string | null = emitPreparedGcode(prepared, {
       outputScope: artifact.outputScope,
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
       sourceGeometryChecks: 'compiled-evidence-only',
     }).gcode;
     for (const stage of artifact.laserSecondPassChain ?? []) {
-      if (stage.selection.maxPowerS !== prepared.project.device.maxPowerS) return null;
-      gcode = applyResumeChain(gcode, stage.resumeChainBefore);
-      if (!fingerprintsEqual(fingerprintGcode(gcode), stage.sourceFingerprint)) return null;
-      const secondPass = buildLaserSecondPassProgram(gcode, stage.selection);
-      if (secondPass.kind === 'error') return null;
-      gcode = secondPass.gcode;
+      gcode = applySecondPassStage(gcode, stage, prepared.project.device.maxPowerS);
+      if (gcode === null) return null;
     }
     gcode = applyResumeChain(gcode, artifact.laserResumeChain ?? []);
     return gcode === artifact.gcode &&
@@ -40,12 +36,30 @@ export function recoveryArtifactPreparedOutput(
   }
 }
 
+/** One painted stage: its recorded resumes, then its recorded writer. Null
+ * when the stage no longer reproduces its sealed source. */
+function applySecondPassStage(
+  gcode: string,
+  stage: NonNullable<ExecutionArtifactV1['laserSecondPassChain']>[number],
+  maxPowerS: number,
+): string | null {
+  if (stage.selection.maxPowerS !== maxPowerS) return null;
+  const source = applyResumeChain(gcode, stage.resumeChainBefore);
+  if (!fingerprintsEqual(fingerprintGcode(source), stage.sourceFingerprint)) return null;
+  // A stage saved before writers were versioned was written by writer 1.
+  const secondPass = buildLaserSecondPassProgram(source, stage.selection, {
+    writerVersion: stage.writerVersion ?? 1,
+  });
+  return secondPass.kind === 'error' ? null : secondPass.gcode;
+}
+
 function applyResumeChain(
   gcode: string,
   chain: NonNullable<ExecutionArtifactV1['laserResumeChain']>,
 ): string {
   for (const step of chain) {
-    const resumed = buildLaserResumeProgram(gcode, step.fromLine);
+    // A step saved before transforms were versioned was built by transform 1.
+    const resumed = buildLaserResumeProgram(gcode, step.fromLine, step.version ?? 1);
     if (resumed.kind === 'error') throw new Error(resumed.reason);
     gcode = resumed.lines.join('\n');
   }

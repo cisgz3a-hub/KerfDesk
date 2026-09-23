@@ -10,19 +10,21 @@ import { useLaserStore } from '../state/laser-store';
 import { zeroZOverwriteWarning } from './zero-z-guard';
 
 export function useZeroZAction(): () => void {
-  const zeroZHere = useLaserStore((s) => s.zeroZHere);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
-  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
-  const evidence = useLaserStore((s) => s.workZZeroEvidence);
-  const referenceEpoch = useLaserStore((s) => s.workZReferenceEpoch);
+  // The live state is read at the click. Subscribing to it re-rendered the
+  // whole jog panel on every status poll of a running job, only to hold values
+  // this handler reads once (ADR-352).
   return useCallback((): void => {
+    const state = useLaserStore.getState();
     const warning = zeroZOverwriteWarning({
-      evidence,
-      referenceEpoch,
-      workZMm: currentWorkZMm(statusReport, wcoCache, reportInches),
+      evidence: state.workZZeroEvidence,
+      referenceEpoch: state.workZReferenceEpoch,
+      workZMm: currentWorkZMm(
+        state.statusReport,
+        state.wcoCache,
+        state.controllerSettings?.reportInches === true,
+      ),
     });
     if (warning !== null && !jobAwareConfirm(warning)) return;
-    void zeroZHere();
-  }, [evidence, referenceEpoch, reportInches, statusReport, wcoCache, zeroZHere]);
+    void state.zeroZHere();
+  }, []);
 }

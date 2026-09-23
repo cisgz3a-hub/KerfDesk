@@ -60,14 +60,14 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
 - **Decision affected:** ADR-285; used only by `src/core/cnc/vcarve-medial-axis.ts` to build
   vector medial-axis topology candidates for flowing V-carve toolpaths.
 - **Evaluated:** 2026-08-02 (Codex session)
-- **Confidence:** high for the pinned dependency and bounded topology role; CurveDesk's exact
+- **Confidence:** high for the pinned dependency and bounded topology role; KerfDesk's exact
   containment, chord, depth, and emitted-profile checks remain authoritative.
 - **Re-verify by:** 2027-02-02
 - **Justification:** ADR-285 needs deterministic vector Delaunay adjacency for source-boundary
   samples. The package supplies that narrow topology primitive without adding I/O, platform code,
   global state, or a competing application abstraction.
 - **Alternatives considered:**
-  - CurveDesk's raster centerline pipeline under `src/core/trace/centerline/` was rejected for this
+  - KerfDesk's raster centerline pipeline under `src/core/trace/centerline/` was rejected for this
     CNC slice: it deliberately quantizes geometry to a pixel field and does not supply the vector
     boundary-clearance candidates required by the conical depth law.
   - A hand-written Delaunay triangulator was rejected because it would duplicate robust geometric
@@ -78,14 +78,14 @@ Each entry here corresponds to a `package.json` dependency. New rows are added w
   - npm records 5.1.0 as released 2026-03-23. The repository was not archived and had pushes in
     June 2026. Issue #94 received a collaborator response the next day; issue #91 received a
     repository-member response. This meets ADR-017's current-maintenance and visible-response bar.
-  - The installed ESM source is a pure in-memory module. CurveDesk imports it from `core/`; focused
+  - The installed ESM source is a pure in-memory module. KerfDesk imports it from `core/`; focused
     browser-compatible builds, typecheck, and tests require no platform patch.
   - A standalone browser bundle measured with the workspace's esbuild 0.28.1 was 8,572 bytes
     minified / 3,357 bytes gzip including `robust-predicates`, below the 1 MB compressed budget.
   - `pnpm audit --prod --json` reported zero known vulnerabilities at evaluation time (0 low,
     moderate, high, or critical).
   - Upstream issues #91 and #94 reproduce on 5.1.0. They are retained as application regressions;
-    Delaunator output is never accepted without CurveDesk's exact region/chord checks.
+    Delaunator output is never accepted without KerfDesk's exact region/chord checks.
   - `public/third-party-notices.txt` carries the verbatim ISC and Unlicense notices.
 
 ### React + React DOM
@@ -903,7 +903,7 @@ V-carve inward-offset ladder is no longer the ordinary V-carve planner.
   code never runs. The web PWA may fetch those emitted chunks during its
   whole-app offline precache, but it does not parse or execute them in the
   renderer before insertion. Every file retains an immutable upstream URL and
-  SHA-256 in the canonical catalog manifest, then passes through CurveDesk's
+  SHA-256 in the canonical catalog manifest, then passes through KerfDesk's
   normal sanitized SVG importer.
 - **Maintenance/fit:** the exact upstream release was tagged 2026-05-06; the
   package has no dependencies. The final M5 gate records emitted asset sizes,
@@ -1424,14 +1424,14 @@ above are no longer current output behavior.
   `docs/audits/2026-08-01-offline-production-expansion-roadmap.md`.
 - **Evaluated:** 2026-08-01, Codex review session.
 - **Confidence:** high for the documented comparison workflows; these sources do not prove
-  CurveDesk implementation, camera accuracy, physical placement, or stock fidelity.
+  KerfDesk implementation, camera accuracy, physical placement, or stock fidelity.
 - **Re-verify by:** 2027-02-01.
 - **Alternatives considered:** no dependency or external format was adopted. These primary vendor
   pages were preferred to secondary feature summaries; each remains comparison evidence rather than
   implementation authority.
 - **Notes:** LightBurn documents variable controls/arrays and selective user-bundle contents; xTool
   documents sample-based batch-fill limitations; Autodesk distinguishes motion animation from stock
-  verification and documents STL among mesh-export formats. CurveDesk keeps its offline,
+  verification and documents STL among mesh-export formats. KerfDesk keeps its offline,
   deterministic, frame-first, and hardware-qualification boundaries.
 
 ---
@@ -1439,7 +1439,7 @@ above are no longer current output behavior.
 ## CNC cutter geometry, V-carve topology, and whole-region ordering - 2026-08-02
 
 - **Question:** Why did the supplied script lettering lift, plunge, revisit letters, and change Z;
-  what G-code geometry is correct for every cutter family CurveDesk currently exposes?
+  what G-code geometry is correct for every cutter family KerfDesk currently exposes?
 - **Artifact examined:** `C:\Users\Asus\Downloads\untitled  gemors.gcode`, SHA-256
   `020F538234439DA7437160A4106814CA78B4C1642047566EC6CC3E69A1EFE524`.
   It contains 2,374 lines, 68 declared cutting passes, 68 tool-down episodes, 69 rapid XY moves
@@ -1464,13 +1464,13 @@ above are no longer current output behavior.
   - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/uiPocketMachineForm/index.html
   - https://help.autodesk.com/view/fusion360/ENU/?contextId=MFG-REF-2D-POCKET-CMD
 - **Single-line engraving:** Vectric Quick Engraving and Autodesk Trace follow selected vectors;
-  depth and actual groove width depend on the engraving cutter's tip geometry. CurveDesk's current
+  depth and actual groove width depend on the engraving cutter's tip geometry. KerfDesk's current
   `engrave` operation is this constant-depth line-following class. It is not Autodesk's closed-profile
   tapered Engrave and should be described as Trace/single-line engraving in future UI work. Source:
   - https://docs.vectric.com/docs/V12.5/Aspire/ENU/Help/form/Quick%20Engrave/index.html
 - **Drilling:** Vectric documents peck drilling as repeated plunges with retracts to clear chips.
   Stock GRBL does not implement canned drilling cycles, so explicit `G0`/`G1` pecks are the correct
-  dialect. CurveDesk has a drill operation but no drill cutter kind; selectable non-drill tools are
+  dialect. KerfDesk has a drill operation but no drill cutter kind; selectable non-drill tools are
   therefore not evidence of physically correct drilling geometry. Sources:
   - https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/Drilling%20Toolpath/
   - https://github.com/gnea/grbl#readme
@@ -1485,7 +1485,7 @@ above are no longer current output behavior.
   - https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/3D-ADAPTIVE-STEPS.htm
   - https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/3D-SCALLOP-STEPS.htm
 - **Surfacing and inlay:** Facing/surfacing is a constant-Z clearing pattern for a flat-bottom cutter.
-  CurveDesk's straight inlay is correctly an end-mill pocket plus offset male profile; it is not a
+  KerfDesk's straight inlay is correctly an end-mill pocket plus offset male profile; it is not a
   tapered V-inlay and must not be described as one. Autodesk describes Face as clearing flat areas
   and its tutorial selects a flat end mill; Vectric's straight inlay uses radius-compensated pocket
   and outside-profile toolpaths with the same cutter for both halves. Sources:
@@ -1504,11 +1504,11 @@ above are no longer current output behavior.
   major. Multi-tool jobs remain tool-major to avoid repeated tool changes.
 - **Medial dependency:** `delaunator@5.1.0` (ISC) and locked `robust-predicates@3.0.3`
   (Unlicense) were evaluated under ADR-017. Delaunator provides topology candidates only; exact
-  CurveDesk region/chord and emitted-depth checks are authoritative. Upstream reports #91 and #94
+  KerfDesk region/chord and emitted-depth checks are authoritative. Upstream reports #91 and #94
   reproduce on 5.1.0 and are retained as application regressions:
   - https://github.com/mapbox/delaunator/issues/91
   - https://github.com/mapbox/delaunator/issues/94
-- **Ball-nose V-carve boundary:** Vectric allows Ball Nose tools in its V-Carve operation. CurveDesk
+- **Ball-nose V-carve boundary:** Vectric allows Ball Nose tools in its V-Carve operation. KerfDesk
   currently has no spherical V-carve depth/contact law; selecting a ball nose reaches the historical
   non-V-bit 60-degree cone compatibility fallback. That output is not ball-nose V-carve geometry and
   remains explicitly unsupported pending a separate spherical planner. Source:

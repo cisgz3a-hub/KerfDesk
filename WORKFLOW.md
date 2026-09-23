@@ -344,11 +344,28 @@ Identical to the format-specific import flows except:
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Preview, save, compilation, Frame, and Start consume the
-   resulting ordinary scene objects through the existing exact-artifact path. This mode creates no
+7. Array settings remain transient. Grid can optionally **Advance variables per copy** (F-D6);
+   its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
+   compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
 
 ---
+
+### F-A6b. Repair vector artwork (ADR-350)
+
+1. Select closed vector artwork and choose **Tools → Union silhouette...** to combine its filled
+   regions. Choose the result operation from the selection. The dialog explains that the chosen
+   operation's base settings replace source artwork overrides. Apply replaces the sources as one
+   selected object in one undo step. Existing **Weld** continues to preserve operation partitions.
+2. Select one or more vector artworks and choose **Tools → Join paths...** to repair compatible
+   open contours. **Maximum gap (mm)** defaults to 0.05. The dialog reports joins, closures and
+   remaining open paths before applying. Original endpoints stay in place; a nonzero gap receives
+   a straight connector. Canonical cubic and elliptical geometry remains editable.
+3. Operation identities, colour, override intent, fill rule and transformed stroke metadata must
+   match. Ambiguous endpoint branches and manually tabbed contours stay unchanged. Unaffected
+   tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
+4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
+   unchanged on invalid or empty results. They do not operate a machine.
 
 ### F-A7. Artwork Operations panel
 
@@ -611,6 +628,32 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 - Save G-code button is disabled (see F-A7 edge).
 
 ---
+
+### F-A9a. Export artwork as SVG (ADR-350)
+
+1. Select the artwork to exchange, then choose **File → Export selected artwork as SVG...**.
+   With nothing selected, **Export artwork as SVG...** includes the whole scene, including
+   output-disabled artwork.
+2. The export captures the source selection and one clock before choosing a destination.
+   It resolves current variable text, outlines text, preserves physical millimetre size and
+   canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
+   Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
+   report an error without claiming a successful partial export. A write error reports its reason.
+4. The SVG works as artwork interchange. KerfDesk's current SVG importer still ignores embedded
+   raster images, so re-importing a mixed image/vector SVG is not a complete project round trip.
+   Use the project format to preserve editable text and machining data.
+
+### F-A9b. Remove overlapping laser lines (ADR-350)
+
+1. Open **Tools → Cut Planner** and enable **Remove overlapping lines**. It defaults off and is
+   saved with the project.
+2. Within each compiled laser Line settings group, the earliest ordered contour retains coincident
+   spans, including partial and reversed overlap. Comparison uses final emitted coordinate
+   precision after placement. Removed intervals remain laser-off gaps.
+3. Separate operations and pass counts, deliberate retracing within one contour, materialized
+   kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
+   the existing reviewed artifact and Frame just like other output changes.
 
 ### F-A10. Pre-flight check (before G-code save)
 
@@ -1245,14 +1288,16 @@ link; it does not claim that bytes can cross a cable that is already physically 
 The Live Motion bar shows `completed / total` lines and a percentage beside the active-job state,
 and the Machine rail may retain its detailed progress bar. Both update whenever the streamer
 advances. This acknowledged-line value remains a transport diagnostic and a ceiling for route
-reconciliation; it is not presented as elapsed-time or remaining-time progress.
+reconciliation (and, less a 4,096-block planner window, its floor; ADR-352); it is not presented as
+elapsed-time or remaining-time progress.
 
 Before Start, the project estimate uses native emitted G-code, including its rounded coordinates
 and feeds, XYZ moves, true arc lengths, CNC pecks, entry moves and finish parking. Known physical
 head position contributes approach time in every placement mode. That position is sampled only
 while the head is settled — an Idle report with no Frame, jog, probe, autofocus, streamed job or
 MPG motion — and the last settled sample holds while it moves, so Frame and jog motion never
-re-prepare the estimate. Job Review reuses the prepared
+re-prepare the estimate. While a job runs (outside Preview) or a Frame is still preparing, the
+estimate keeps its last value and settles once afterwards (ADR-352). Job Review reuses the prepared
 program's timing baseline when available, and Start retains the same cut/travel calibration.
 The timeline includes deterministic timing commands, including CNC `G4` spindle spin-up dwells,
 and serial delivery at the configured baud rate (8N1). Transmission overlaps earlier motion and
@@ -1617,6 +1662,24 @@ authorization, Frame proof, controller command, or safety boundary.
   movement or scan line if necessary; overlapping engraving may become darker. Coincident
   passes require checking the selected line number. The picker selects the beginning of a
   movement, not an arbitrary point inside it, and does not isolate an area for a second pass.
+  The line field shows the automatic line number. After a controller rejection (`error:N`),
+  which the stream counts as acknowledged although the controller discarded the line, the
+  automatic line is the rejected line itself, so that burn is not skipped; the picker says
+  that lines the controller ran after it before stopping may burn again (ADR-341 Amendment 3).
+- The resumed program re-issues the air assist (M7/M8) the job had switched on before its
+  beam-off re-entry, and names the program's motion mode on the first resumed line that relies
+  on it: the re-entry is a rapid, and a raster row resumed mid-row used to continue as dark
+  rapids. Saved recoveries record which resume transform built them and replay with it.
+- **Placement and work origin** in the review shows the saved placement, the work origin the
+  job ran with and the controller's current one (in mm from machine zero). When they differ by
+  more than 0.05 mm it warns that the rest of the job would land that far from the finished part
+  (a controller reset clears a temporary origin; home first where the machine homes). **Frame
+  remaining area** traces everything still to engrave from the chosen line, from the current
+  origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
+- A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
+  closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
+  only a stop nobody requested reads as unexplained. A recovery card another window has
+  claimed, started or discarded refreshes in every open window.
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -1633,20 +1696,40 @@ authorization, Frame proof, controller command, or safety boundary.
   and source-line mapping. The saved G-code, project and prepared raster output remain exact;
   opening the selected recovery preview restores its complete route. This avoids large
   object-per-point overhead without raising the existing artifact or history limits. Jobs that
-  still exceed those limits retain the explicit warning that recovery capture is unavailable.
+  still exceed those limits retain the explicit warning that recovery capture is unavailable,
+  and Job Review now says so before Start. All-ASCII text such as G-code counts one byte per
+  character toward the limit, as browsers store it; it used to count three, which refused
+  recovery copies for photo engravings above about 22 million characters.
 - An active-stream watchdog that resumes after a long scheduler gap issues one fresh status
   query opportunity before declaring the link silent. Repeated delays cannot indefinitely
   extend an unanswered query; normal two-second silence still requests fail-dark containment.
   This prevents a demonstrated false disconnect and does not establish that a particular
   browser, USB adapter or controller keeps streaming while minimised.
+- ADR-356 amends that watchdog. A processed acknowledgement counts as fresh controller output
+  as well as a status report, because after a page stall the reply to the resumed query can
+  wait behind a backlog of acknowledgements. Each further gap may re-open the query window at
+  most three times for one unchanged observation, so repeated delays still cannot extend an
+  unanswered query indefinitely, and two seconds of on-schedule silence still requests
+  fail-dark containment.
+- The live bar's "controller holding program" state, its log line and the 90-second
+  unacknowledged-lines notice count only time the page was running. After a poll gap of two
+  seconds or more the wait restarts from the resumed tick, so a page stall is not reported
+  as the controller holding the program (ADR-356).
+- After any page stall, the controller output that queued up meanwhile is handed to the app
+  in slices of about 8 ms, with input, drawing and the status poll running in between,
+  instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
+  keeps the page answering during catch-up; it does not make a stalled page keep feeding
+  the controller, which still depends on the page unless the transport runs in a worker.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
 - After a settled laser completion and successful archive capture, **Job complete** asks
   **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
-  that exact saved job in the paintbrush/eraser editor, or **Done** to finish. No motion is
-  started by this choice. The prompt also works with the Machine panel collapsed, waits
-  behind another open dialog, and appears once for that completion. Reloading saved history,
+  that exact saved job in the paintbrush/eraser editor, or **Not now** to close the offer. No
+  motion is started by this choice. The prompt also works with the Machine panel collapsed, waits
+  behind another open dialog, and appears once for that completion. It opens with focus on
+  itself, not on a button, so a keystroke meant for the field being edited cannot answer it;
+  Tab reaches both buttons. Reloading saved history,
   an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
 - **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
   The completed-run selector also offers older retained completions. When a completed run
@@ -1672,8 +1755,13 @@ authorization, Frame proof, controller command, or safety boundary.
   sweeps are omitted. A sweep ends at a rapid, a beam or air word, a feed change, or a
   laser-off feed move that leaves the current line (a controlled-dark row change, even when it
   runs at the engraving feed); a laser-off move that continues the line is a runway and stays
-  with its burn. Intersecting sweeps can traverse unpainted areas with S0 to retain their
-  run-in/run-out motion. Every repositioning command carries S0 while the beam mode stays
+  with its burn. A selected sweep is replayed only from its first painted point less the
+  sweep's own lead-in to its last painted point plus its own lead-out, crossing unpainted parts
+  in between at S0, so the head passes each painted point at the speed the original reached
+  there; a side with no lead-in (or lead-out) keeps the sweep's full approach on that side. A
+  small painted spot on a wide image row no longer replays the whole row. Repeated `G1` and
+  unchanged S words are left out (ADR-341 Amendment 3); saved passes record which writer built
+  them and replay with it. Every repositioning command carries S0 while the beam mode stays
   armed; the mode word is written only when the mode changes and the program ends with one M5,
   so the controller does not stop and drain around every selected sweep. Painted passes
   archived before 2026-09-22 were emitted with per-sweep beam words; they stay in history but
@@ -2063,58 +2151,39 @@ settings and Job Review keep their existing read-only setup references.
   approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
-### F-D6. Impose offline variable data across one sheet [Planned — ADR-279]
-
-*Not implemented yet. This section records the accepted target workflow for staged delivery under
-ADR-279.*
+### F-D6. Distinct variable values in a Grid array (ADR-350, amending ADR-279)
 
 **Success:**
 
-1. Select one design unit whose text may contain the shipped bounded offline fields.
-2. Open **Variable-data imposition** and choose a grid layout. Slot 1 uses the current CSV record and
-   serial value; each later slot advances by the existing `Advance by` value. Grid order is
-   row-major. Circular imposition remains deferred until its variable-width collision behavior is
-   specified.
-3. CurveDesk materializes every slot against one captured clock before showing the result. Layout
-   uses the maximum rendered envelope across the batch, so a longer later value cannot silently
-   overlap its neighbour.
-4. Preview, Save Project, and Frame do not consume records; Save Project also does not persist the
-   transient imposition. Successful Save G-code export, including tiled G-code and experimental
-   file-only `.rd`, applies the exact post-batch state once only for `after-successful-export`; a
-   completed stream applies it once only for `after-successful-stream`; `manual` changes on neither
-   trigger. Failed, cancelled, stale, mismatched-policy, or retried preparation consumes nothing.
-5. For machine output, complete Frame for the exact current job as usual. Frame remains the only
-   guard. This flow adds no block, refusal, gate, cap, clamp, delay, hide, disable, rewrite, or
-   confirmation to preview, project save, import/export, Apply, output, Frame, or Start beyond the
-   existing factual compile-integrity, transport, and handoff preconditions. Imposition concerns
-   appear in the editor or Job Review.
+1. Select a design containing variable text, open **Arrange → Array...**, choose **Grid**, and
+   enable **Advance variables per copy**. The option defaults off. Circular and Point Rotation
+   arrays retain ordinary copying.
+2. Slots advance in row-major order using the existing record/serial stride and wrap settings.
+   Existing relative slot spans and token-level serial offsets are preserved. All text renders
+   against one captured clock before spacing uses the largest rendered envelope in the batch.
+3. **Create array** commits one undo step and consumes no production records. Each text copy stores
+   its sequence offset; project schema 8 preserves it through save/reopen and text edits. Generator
+   parameters remain transient. Objects remain editable and can be moved individually.
+4. Later variable changes regenerate values while retaining manual positions. Preview the layout
+   again when new values are wider. There is no automatic layout reflow.
+5. Successful G-code or experimental file-only Ruida export, or completion of all tile writes,
+   advances once only under **after-successful-export**. The existing owned, settled stream event
+   advances once only under **after-successful-stream**. **Manual** advances under neither event.
+6. Advancement follows the captured emitted scope and enabled operation bindings, through the
+   greatest emitted sequence offset plus one. Noncontiguous selected copies do not reuse emitted
+   serials, and later unselected copies are not consumed. Visually hidden but output-enabled artwork
+   still counts because visibility does not disable output.
+7. Preview, project save, SVG artwork export and Frame do not advance records. A completed Frame
+   for the exact reviewed job remains the sole ordinary Start policy gate.
 
-**Error:**
+**Errors and cancellation:**
 
-- A missing field, malformed embedded CSV value, or materialization failure identifies the affected
-  slot and leaves the project and variable cursor unchanged.
-- A prepared artifact whose source project or variable state changed is stale and cannot apply its
-  saved post-batch cursor. Re-prepare from the current state.
-
-**Empty:**
-
-- With no selected design unit, explain that one design must be selected; do not create an empty
-  batch.
-- A design with no CSV tokens can still batch serial and date/time fields without an embedded CSV.
-  A CSV field with no embedded dataset or addressed row reports the affected slot and leaves the
-  variable cursor unchanged.
-
-**Edge:**
-
-- The batch sequences ordered slot indices independently of final geometry. The original grid rows,
-  columns, and spacing remain available until every slot has been measured; only then are final
-  placements calculated. Grid layout materializes every valid requested placement without a policy
-  count cap; imposition adds no second size rule.
-- Date/time values use one captured clock for the whole batch.
-- Phase one is transient and offline. It does not add live databases, barcode/QR generation,
-  camera-detected placement, persisted imposition schema, or a new machine policy gate.
-- Record wrap, serial wrap, and `Advance by` semantics reuse the existing variable-sequence rules;
-  the batch plan records the exact next state rather than recalculating it after output.
+- Missing data or failed text materialization identifies the affected copy and leaves the project
+  and cursor unchanged. Creation cancelled or made stale by an intervening edit consumes nothing.
+- Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
+  advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
+- Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
+  embedded record. This feature adds no live data source or barcode/QR generator.
 
 ## Phase E flows
 
@@ -2136,7 +2205,15 @@ ADR-279.*
    the original image's aspect ratio even when their working grids round to different sizes.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
-2. Choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
+2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
+   tones as fine filled lines. Adjust **Detail**, **Brightness** and **Contrast** while comparing
+   Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
+   need a Fill operation with scan lines crossing the traced lines for shaded laser output.
+   Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
+   thin line coverage before applying the Image operation. CNC keeps the editable shapes;
+   choose an appropriate machining operation and tool size for their widths. This is a line
+   halftone treatment; Image mode also offers grayscale and dithered photo engraving.
+   For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
@@ -2389,8 +2466,8 @@ Hardware burn on the Falcon (must be confirmed by user):
    bidirectional burn shows ghosted or staggered vertical edges, lower speed and repeat scan-offset
    calibration before trusting that mode.
 
-When this checklist passes, mark F.2.f complete in the hardware
-verification inventory and tag the build as the first Phase F.2 release.
+When this checklist passes, mark F.2.f complete in `PROJECT.md` Phase
+F.2 and tag the build as the first Phase F.2 release.
 
 ### F-F3. Set work origin to the current head position (Phase F.3)
 
@@ -2537,9 +2614,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 
-When this checklist passes on the Falcon, promote Phase F.3's
-"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
-Shipped" and update the hardware verification inventory.
+When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
+("Code shipped; hardware verification pending") with the recorded result and update the F.3
+row of the hardware status table in `docs/architecture/08-invariants-and-verification.md`.
 
 #### No-homing positioning guide (ADR-193)
 
@@ -3263,7 +3340,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    shallowest levels produce regions (possibly none) — correct: there is
    nothing to rough without cutting into finishing stock.
 2. Roughing requests physical heightmap cells at exactly bit diameter / 8 in
-   the final scaled metric; CurveDesk attempts that exact derived allocation
+   the final scaled metric; KerfDesk attempts that exact derived allocation
    with no 0.2 mm floor or four-million-cell coarsening, and reports an
    unrepresentable or failed allocation as a factual materialization error.
 3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
@@ -3412,7 +3489,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    that the requested angle was not applied. Output remains available.
 6. A project saved before `vCarveFlatDepthEnabled` existed keeps its historical
    requested depth cap and opens with **Flat depth** enabled. Turning the switch
-   off is the explicit migration to ordinary flowing depth; CurveDesk does not
+   off is the explicit migration to ordinary flowing depth; KerfDesk does not
    silently reinterpret the old project.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
@@ -4662,7 +4739,7 @@ and lifts the command's CNC-only gate.)*
    opens Job Review. It names physical workholding/clearance and every common
    competing command path: pendant/MPG, WebUI/network, another sender app, PLC
    motion or spindle commands, controller macros, and SD/file jobs.
-2. The operator confirms CurveDesk is the sole command owner while emergency-
+2. The operator confirms KerfDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
 3. The resulting evidence is bound to the permit's exact program fingerprint plus
    the current trusted-position and work-Z-reference epochs before claim/stream.
@@ -4808,7 +4885,7 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
    command is deliberately separate from **Import Image...**: it declares that
-   tone is physical relief data rather than asking CurveDesk to infer 3D shape
+   tone is physical relief data rather than asking KerfDesk to infer 3D shape
    from a photograph.
 2. A qualified input is a lossless, non-interlaced PNG containing either 8- or
    16-bit grayscale samples, or 8-bit grayscale-plus-alpha samples. The
@@ -4825,12 +4902,12 @@ and lifts the command's CNC-only gate.)*
    and, in CNC mode when that relief is selected, the Relief properties panel shows the pixel
    dimensions, precision, and persisted declared source meaning **Depth map**. A loaded canonical
    project instead shows whichever of the five validated source meanings it actually stores;
-   CurveDesk does not infer or edit that value in this flow. **Recorded source details** separately
+   KerfDesk does not infer or edit that value in this flow. **Recorded source details** separately
    lists the persisted source name, optional source bit depth and source polarity, and optional
    producer name/model/version. A blank or absent value reads **Not recorded**, and the panel says
    the metadata is recorded, not authenticated. **Recorded source polarity** describes the source
    declaration; the editable mapping below controls the current materialization and may differ. A
-   legacy-mesh relief has no canonical provenance object, so CurveDesk does not fabricate this group.
+   legacy-mesh relief has no canonical provenance object, so KerfDesk does not fabricate this group.
    The success toast always explains that the relief is stored in either machine mode and that
    output geometry is generated only in CNC mode, including when the mode changes during import.
 4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
@@ -4864,20 +4941,20 @@ and lifts the command's CNC-only gate.)*
    result once. Under **Stretch**, Width and Height are independent, so Width retains the current
    canonical Height. After the existing machine-space conversion yields an accepted positive finite
    canonical Width patch, a derived Height that correctly rounds to `0` or `Infinity` does not
-   rewrite that patch: CurveDesk retains the prior Height and records **Stretch**. It neither rejects
+   rewrite that patch: KerfDesk retains the prior Height and records **Stretch**. It neither rejects
    nor clamps the accepted patch and adds no confirmation. This repair does not change the editor's
    machine-space-to-stored-Width conversion. Every real heightfield Width edit synchronizes the
    canonical and duplicate Width values and rebuilds natural bounds from the updated canonical
    dimensions. A legacy mesh keeps its existing target-Width and stored-natural-bounds-aspect rule
    before the separate exact bounded re-expression below.
    If resolved heightfield dimensions exceed project v4's existing `1,000,000 mm` coordinate domain,
-   CurveDesk uses the smallest common power-of-two factor that can divide both canonical dimensions
+   KerfDesk uses the smallest common power-of-two factor that can divide both canonical dimensions
    and multiply both nonzero scale axes exactly. It adopts that internal re-factor only when the
    dimensions and scales reverse exactly, remain inside the unchanged project domains, preserve both
    native machine-space dimensions, and keep every finite transformed corner bit-identical.
    The same persistence boundary applies to a legacy mesh after a positive finite stored Width patch
    has been accepted. If target Width or either natural-bound span exceeds the coordinate domain,
-   CurveDesk chooses the smallest common power-of-two factor that brings all three local values into
+   KerfDesk chooses the smallest common power-of-two factor that brings all three local values into
    range, divides target Width and both natural-bound dimensions by that factor, and multiplies both
    signed scale axes by it. The candidate is adopted only when every multiply/divide reverses exactly,
    scales remain inside their existing domain, all four transformed natural-bound corners stay finite
@@ -4894,7 +4971,7 @@ and lifts the command's CNC-only gate.)*
    The synchronous O(n) scan has no browser or packaged-Electron latency qualification in this slice.
    Independent-axis-only encodings, exact-zero compatibility, scale exhaustion, non-reversible
    subnormal factors, non-finite or drifting transformed geometry, and native division that rounds a
-   positive finite displayed Width to `0` or `Infinity` remain outside this bounded repair. CurveDesk
+   positive finite displayed Width to `0` or `Infinity` remain outside this bounded repair. KerfDesk
    does not reject, restore, clamp, cap, approximate, delay, or confirm those edits; an exceptional
    project can still remain outside the saveable v4 domain. Full durability requires a future
    intent-versus-materialized-geometry representation. Corrected canonical dimensions can change
@@ -5070,7 +5147,7 @@ and lifts the command's CNC-only gate.)*
    mask length, invalid inclusion threshold, non-finite physical mapping, or digest
    mismatch reports the exact factual integrity problem and creates no object.
 2. A source whose declared format cannot preserve the selected mode reports what
-   is unsupported. CurveDesk does not silently flatten alpha, reduce 16-bit data
+   is unsupported. KerfDesk does not silently flatten alpha, reduce 16-bit data
    through a display canvas, color-manage raw depth codes, invent missing depth,
    or relabel RGB brightness as measured geometry.
 3. Failure or cancellation leaves the project unchanged and offers **Retry** or
@@ -5099,7 +5176,7 @@ and lifts the command's CNC-only gate.)*
    applied. The planned creation surface adds histogram and clipped-sample percentages. Unusually
    coarse effective cell size remains disclosed rather than silently corrected.
 3. Large sources use worker decode with byte/row progress and cooperative Escape
-   cancellation. Size and estimated memory are advisories. CurveDesk neither
+   cancellation. Size and estimated memory are advisories. KerfDesk neither
    invents a policy ceiling nor silently downsamples; any operator-selected
    reduction displays the resulting dimensions and millimetres per cell.
 4. A canonical source name or any present producer string may be blank. Source
@@ -5216,7 +5293,7 @@ and lifts the command's CNC-only gate.)*
    or converted to a floor behind the operator's back.
 
 #### Edge - resolution, spacing, reach, and simulation limits
-1. If source/CAM resolution changes for a requested preview, CurveDesk displays the
+1. If source/CAM resolution changes for a requested preview, KerfDesk displays the
    requested and effective cell spacing before treating the result as current. It
    does not silently coarsen the canonical heightfield cell count. This slice preserves
    the established Stepover and scallop editor/planner ranges from current main.
@@ -5278,7 +5355,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Error - persistence, preparation, or transport factually fails
 1. Autosave quota/write/digest failure does not replace a previously committed
-   manifest; when one exists it remains eligible for recovery, and CurveDesk
+   manifest; when one exists it remains eligible for recovery, and KerfDesk
    discloses that the newest state is not autosaved. Manual Save validates and
    writes the self-contained in-memory project; no relief authority exists only as
    a local ID.
@@ -5309,7 +5386,7 @@ and lifts the command's CNC-only gate.)*
 4. Wood dust extraction, guarding, workholding, tool reach, spindle/tool condition,
    fire risk, and material response remain operator/machine-system responsibilities.
    They are disclosed in review and qualification records, not represented as facts
-   proved by CurveDesk's preview or G-code tests.
+   proved by KerfDesk's preview or G-code tests.
 5. Current large-field recovery evidence covers committed Chrome IndexedDB state
    across reload and real two-window Web Locks. Abrupt process/power loss, packaged
    Electron restart, target-device quota, peak memory, and renderer responsiveness
@@ -6341,7 +6418,7 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       and desktop packaging introduces no target-specific laser/CNC divergence.
 
 Until every applicable box is checked on the named real OS and hardware, that
-desktop artifact stays **CLAIMED** in the hardware verification inventory.
+desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance item 7.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

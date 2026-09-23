@@ -175,7 +175,7 @@ export function assertBuildMetadata(title, args) {
 
 export function validateProject(bytes) {
   const project = JSON.parse(bytes.toString('utf8'));
-  assert.equal(project.schemaVersion, 7, 'Expected current project schema');
+  assert.equal(project.schemaVersion, 8, 'Expected current project schema');
   assert.equal(
     project.scene?.objects?.length,
     1,

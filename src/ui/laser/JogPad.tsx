@@ -36,14 +36,10 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
-  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
   const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
-  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const focusReady = focusJogReady(device, machineKind);
 
   const sendVector = useCallback(
@@ -79,12 +75,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         onFeed={setSelectedFeed}
       />
       <div className="lf-jog-controls" style={jogRowStyle}>
-        <JogArrowGrid
+        <JogArrows
           disabled={disabled}
           stepMm={step}
           feed={feed}
           signs={signs}
-          position={position}
           bounds={bounds}
           continuousJogSupported={continuousJogSupported}
           onJog={sendVector}
@@ -104,6 +99,18 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       />
     </div>
   );
+}
+
+// The head position only aims a continuous jog. A disabled pad (a job, Frame or
+// another motion owns the machine) cannot start one, so it does not follow the
+// status report either; before, the whole jog panel re-rendered on every poll
+// of a running job (ADR-352).
+function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
+  const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
+  const wcoCache = useLaserStore((s) => s.wcoCache);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
+  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
+  return <JogArrowGrid {...props} position={position} />;
 }
 
 function useJogPadShortcuts(

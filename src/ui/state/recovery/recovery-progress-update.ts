@@ -7,6 +7,7 @@ import {
   type RecoveryRepositorySnapshot,
 } from './recovery-model';
 import { updateProgressMutation } from './recovery-slot-mutations';
+import { storedSlotsUnchanged } from './recovery-mutation-commit';
 import { recoveryOk as ok } from './recovery-result';
 import type { RecoveryRepositoryState } from './recovery-repository-state';
 import type { RecoveryAuthoritativeResetBase } from './recovery-repository-state';
@@ -92,6 +93,7 @@ export async function commitRecoveryProgress(args: {
     const mutation = updateProgressMutation(base, args.runId, args.ackedLines, args.updatedAtIso);
     return {
       slots: mutation.slots,
+      unchanged: storedSlotsUnchanged(raw, parsed, mutation.slots),
       value: progressCommitValue(base, mutation.slots, mutation.value, parsed.accepted),
     };
   });

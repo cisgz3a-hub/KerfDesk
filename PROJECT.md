@@ -111,6 +111,12 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner remains bounded nearest-neighbor rather than full 2-opt (ADR-163).
 
+Cut Planner also offers opt-in **Remove overlapping lines**, off by default. It removes coincident
+laser Line spans within one compiled settings group while retaining separate operations, pass
+counts and gaps (ADR-350). **File → Export artwork as SVG...** exports the selection or scene with
+physical sizing, outlined text, embedded source images and image masks, without consuming
+production variables. Existing SVG import still ignores embedded raster images.
+
 Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
 with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
 invalid, or oversized inputs.
@@ -132,13 +138,21 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, and editable glyph welding (ADR-321).
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
 - Twenty-one bundled outline fonts cover sans, serif, monospace, script, display, and stencil text. The calligraphy collection adds Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script, Italianno, and Corinthia, with Cinzel Decorative for companion lettering. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
-- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields;
-  bounded offline sheet imposition is adopted for staged implementation (ADR-279). Live databases
-  and barcode/QR generation remain deferred (ADR-164).
+- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields.
+  Grid arrays can advance variables per copy, persist each copy's sequence offset, and advance the
+  cursor only after successful output under its configured policy (ADR-350, amending ADR-279).
+  Live databases, circular variable imposition and barcode/QR generation remain deferred.
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
 Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
+
+**Photo shading (ADR-349).** A dedicated preset preserves portrait and photographic
+tones as fine filled vector lines with varying widths. Detail, Brightness and
+Contrast control the result; binary thresholding does not run. Editable vectors
+use Fill for shaded laser output. The dialog's Raster scan output preserves
+partial pixel coverage before Image processing. CNC retains editable geometry;
+tool size and the chosen machining operation determine achievable shading.
 
 **Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
 
@@ -147,7 +161,7 @@ Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline
 Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019 (Fill) + ADR-020 (Image).
 
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Requested or calibrated bidirectional Fill alternates row direction; a fresh generic traced Scan Line starts one-way when it has neither an explicit direction nor verified or legacy-verified scan-offset calibration. Generic Scan Line sweeps use bounded feed-matched laser-off entry and exit motion inside the exact Frame motion envelope.
-- **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs 11 conversion modes (threshold, eight error-diffusion kernels, ordered Bayer, and grayscale), with negative-image and pass-through settings; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
+- **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs 11 conversion modes (threshold, eight error-diffusion kernels, ordered Bayer, and grayscale), with negative-image and pass-through settings; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet completed on the Falcon (an informal image/fill job there, ADR-341, is not qualification).
 - **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
 - **F.4 — Convert to Bitmap** [A1–A4 shipped (Fill All / Outlines / Use Cut Settings + DPI control); A5 placement/brightness polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
@@ -161,7 +175,10 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
 - A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the current drawing layer color with a live mm readout.
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Parametric property editing and bounded node/Bezier editing have since shipped (ADR-159, ADR-164).
-- The broader geometry kernel — weld, general boolean operations, and arbitrary offset editing — remains out of scope and still requires an explicit phase and dependency evaluation.
+- Operation-aware Weld, Subtract/Intersect/Exclude and offsets use the established geometry
+  kernel. **Union silhouette** explicitly assigns the combined region to one chosen operation;
+  **Join paths** repairs compatible open contours across artwork with a visible gap tolerance
+  (ADR-103, ADR-350). Ambiguous junctions and manually tabbed contours remain available for manual editing.
 
 ### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
@@ -208,7 +225,7 @@ artistic brightness, externally estimated relative order, hand edits, or an STL 
 | P2R.6 | Exact machine/tool/material air-cut and representative wood coupon qualification | Planned hardware evidence; no universal parameter claim |
 
 
-### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]
+### Phase I — v0.9 "Multi-controller" [Merged to main; no controller hardware-qualified]
 
 (Integrated as Phase I: the CNC router track holds Phase H — ADR-104 records the numbering resolution.)
 
@@ -244,7 +261,7 @@ Verified end-to-end against scripted firmware simulators
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,
 simulator and unverified evidence. No controller or machine gains physical qualification
-from software tests. See ADR-322 and the [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md).
+from software tests. See ADR-322 and the [correction record](docs/audits/2026-09-19-machine-compatibility-fixes/README.md). Older entries in the frozen `DECISIONS.md` that describe Falcon hardware verification (ADR-008, ADR-018) or treat the Falcon as a grblHAL verification target (the ADR-094 consequences) fall under this finding and are not qualification evidence. ADR-331's statement that the Falcon runs grblHAL rests on one 2026-07-19 status report; it does not identify the firmware build.
 
 ### Phase K — v0.10 "Box generator" [Built (S0–S6); hardware fit CLAIMED]
 
@@ -365,8 +382,8 @@ byte-identical for unchanged input. Design + research:
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
 - ~~Additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
-  see Phase I above (ADR-094..097).** Remaining follow-ups: hardware passes (Falcon
-  grblHAL burn; community Marlin/Smoothie/FluidNC verification), Ruida
+  see Phase I above (ADR-094..097).** Remaining follow-ups: hardware qualification (Falcon
+  A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation then the Electron UDP transport, wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
 - Phase J: Linux desktop build. Linux remains web/PWA-only until that phase; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)

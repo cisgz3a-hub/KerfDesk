@@ -10,6 +10,7 @@ import {
   type LightBurnTraceSettingOverrides,
 } from './trace-options';
 import { TraceDetectionControls } from './TraceDetectionControls';
+import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
@@ -19,6 +20,7 @@ type TraceSettingsControlsProps = {
 };
 
 export function TraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
+  if (props.preset.photoDetail !== undefined) return <PhotoTraceSettingsControls {...props} />;
   return props.preset.traceMode === 'edge' ? (
     <EdgeTraceSettingsControls {...props} />
   ) : (

@@ -11,7 +11,7 @@ The one transform every machine move passes through, and the sign trap it create
 
 The bridge is a single pure function, `toMachineCoords(p, device)` at
 `src/core/devices/origin-transform.ts:21`, with an exact inverse `toSceneCoords` at line 28.
-Non-negotiable #2 — *origin honesty* — is this function (`PROJECT.md:304`).
+Non-negotiable #2 — *origin honesty* — is this function (`PROJECT.md:421`).
 
 ## The five origins
 
@@ -86,7 +86,7 @@ simple containment-depth interpretation does not.
 ## Z — asymmetric by design
 
 There is no shared Z model. Laser mode has **no Z control beyond initial homing**
-(`PROJECT.md:524`); CNC is inherently Z-aware. CNC semantics: **Z0 = stock top**, set by the
+(`PROJECT.md:657`); CNC is inherently Z-aware. CNC semantics: **Z0 = stock top**, set by the
 operator zeroing the bit on the stock before running (`cnc-grbl-strategy.ts:11-12`). Cutting
 depths are therefore negative. See [05](05-cnc-chain.md).
 
@@ -94,7 +94,7 @@ depths are therefore negative. See [05](05-cnc-chain.md).
 
 The pipeline emits absolute `G90` machine coordinates and lets the controller apply the work
 offset at run time — so setting a work origin costs **zero pipeline change** (ADR-021,
-`DECISIONS.md:980`; `PROJECT.md:121`). Implementation is `G92 X0 Y0` / `G92.1`; persistent
+`DECISIONS.md:991`; `PROJECT.md:158`). Implementation is `G92 X0 Y0` / `G92.1`; persistent
 `G10 L20 P1` was deferred. Both emitters pin `G54` in the preamble so a stale `G55`–`G59`
 selection cannot displace the job.
 

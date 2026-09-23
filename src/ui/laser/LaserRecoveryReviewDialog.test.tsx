@@ -144,7 +144,7 @@ describe('LaserRecoveryReviewDialog', () => {
     expect(host?.textContent).toContain('Recovery replays line 4 and every later line');
     await act(async () => button('Start supervised recovery').click());
     expect(onStart).toHaveBeenLastCalledWith(capsule, 4);
-    act(() => button('Use transport estimate').click());
+    act(() => button('Use automatic line').click());
     await act(async () => button('Start supervised recovery').click());
     expect(onStart).toHaveBeenLastCalledWith(capsule);
   });

@@ -96,7 +96,7 @@
   /* Faint accent wash (drag-import overlay fill) */
   --lf-accent-wash: rgba(168, 90, 42, 0.08);
 
-  --lf-focus: #a85a2a;
+  --lf-focus: #2463b4;
   --lf-backdrop: rgba(38, 34, 30, 0.35);
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
   --lf-shadow: 0 2px 8px rgba(28, 25, 21, 0.18);
@@ -160,7 +160,7 @@
   --lf-tint-success-hover: #2c4b3c;
   --lf-tint-success-active: #345b48;
   --lf-accent-wash: rgba(227, 154, 99, 0.12);
-  --lf-focus: #e39a63;
+  --lf-focus: #90bfff;
   --lf-backdrop: rgba(12, 11, 9, 0.6);
   --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }

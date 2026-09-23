@@ -142,7 +142,7 @@ function ToolSelect(props: {
             setPictureRequested(true);
           }}
           aria-label={props.ariaLabel}
-          title={`Choose ${props.label.toLowerCase()} for this operation in Startup Setup.`}
+          title={`Choose ${props.label.toLowerCase()} for this operation in Machine Setup.`}
         >
           <option value="">{props.emptyLabel}</option>
           {isMissing ? <option value={props.value ?? ''}>Current unavailable bit</option> : null}

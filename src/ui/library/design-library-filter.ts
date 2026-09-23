@@ -49,23 +49,40 @@ export function filterDesignLibrary(
         filters.sourceKind === 'all' ||
         entry.provenance.sourceKind === filters.sourceKind,
     )
-    .filter((entry) => query === '' || haystack(entry).includes(query))
+    .filter(
+      (entry) => query === '' || haystack(entry).includes(query) || ownCreditMatches(entry, query),
+    )
     .slice()
     .sort((a, b) => `${a.category}\u0000${a.title}`.localeCompare(`${b.category}\u0000${b.title}`));
 }
 
 function haystack(entry: LibraryEntry): string {
   const provenance = entry.provenance;
-  return [
+  const credit =
+    provenance.sourceKind === 'owned' ? [] : [provenance.creator, provenance.sourceName];
+  return searchText([
     entry.title,
     entry.category,
     entry.subcategory,
     ...entry.tags,
-    provenance.creator,
-    provenance.sourceName,
+    ...credit,
     provenance.license,
     provenance.licenseId,
-  ]
+  ]);
+}
+
+// Originals credit KerfDesk itself, and "kerf" is a laser term: a substring
+// match would answer a kerf search with every original. That credit matches
+// whole words only, so "kerfdesk" finds the originals and "kerf" does not.
+function ownCreditMatches(entry: LibraryEntry, query: string): boolean {
+  const provenance = entry.provenance;
+  if (provenance.sourceKind !== 'owned') return false;
+  const credit = searchText([provenance.sourceName, provenance.creator]);
+  return ` ${credit} `.includes(` ${query.split(/\s+/u).join(' ')} `);
+}
+
+function searchText(values: ReadonlyArray<string | undefined>): string {
+  return values
     .filter((value): value is string => value !== undefined)
     .join(' ')
     .toLowerCase();

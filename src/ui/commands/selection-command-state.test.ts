@@ -11,6 +11,7 @@ import {
   selectionCanBreakApart,
   selectionCanCombine,
   selectionCanWeld,
+  unionSilhouetteOperations,
 } from './selection-command-state';
 
 describe('selection command state', () => {
@@ -62,6 +63,44 @@ describe('selection command state', () => {
     expect(selectionCanCombine(project, ['canonical-open', 'ordinary-closed'])).toBe(false);
     expect(selectionCanWeld(project, ['canonical-closed'])).toBe(true);
     expect(selectionCanCombine(project, ['canonical-closed', 'ordinary-closed'])).toBe(true);
+  });
+
+  it('offers union operations for the whole closed-vector selection and canonical geometry', () => {
+    const first = importedSvg('first', canonicalPath(false, true));
+    const second = {
+      ...importedSvg('second', squarePath('#0000ff', 5, 0, 10)),
+      operationIds: ['second-cut'],
+    };
+    const scene = {
+      objects: [first, second],
+      layers: [
+        createLayer({ id: 'first-cut', color: '#000000' }),
+        createLayer({ id: 'second-cut', color: '#0000ff' }),
+      ],
+    };
+    expect(
+      unionSilhouetteOperations(scene, ['first', 'second']).map((operation) => operation.id),
+    ).toEqual(['first-cut', 'second-cut']);
+    expect(unionSilhouetteOperations(scene, ['first'])).toEqual([scene.layers[0]]);
+    expect(unionSilhouetteOperations({ ...scene, layers: [] }, ['first', 'second'])).toEqual([]);
+  });
+
+  it('rejects union when any selected vector is locked, open, empty, or missing', () => {
+    const vector = importedSvg('vector', squarePath('#000000', 0, 0, 10));
+    const scene = {
+      objects: [
+        vector,
+        { ...vector, id: 'locked', locked: true },
+        importedSvg('open', canonicalPath(true, false)),
+        { ...vector, id: 'empty', paths: [] },
+      ],
+      layers: [createLayer({ id: 'cut', color: '#000000' })],
+    };
+    for (const other of ['locked', 'open', 'empty', 'missing']) {
+      expect(unionSilhouetteOperations(scene, ['vector', other]), other).toEqual([]);
+    }
+    expect(unionSilhouetteOperations(scene, [])).toEqual([]);
+    expect(selectionCanWeld({ ...createProject(), scene }, ['vector', 'locked'])).toBe(true);
   });
 
   // ADR-029 amendment ii: Convert to Bitmap merges the whole selection into

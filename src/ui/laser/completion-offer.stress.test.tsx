@@ -98,7 +98,7 @@ describe('completion offer under repeated runs', () => {
       await tick(20);
       expect(h.promptShown()).toBe(true);
       expect(h.dialogCount()).toBe(1);
-      await h.clickButton('Done');
+      await h.clickButton('Not now');
       expect(h.promptShown()).toBe(false);
       await tick(3_000);
       expect(h.promptShown()).toBe(false);

@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from './canvas-text-store';
+import { fixtureState } from '../state/variable-array-test-fixture';
 
 const mocks = vi.hoisted(() => ({ render: vi.fn() }));
 vi.mock('./render-text-geometry', () => ({ renderTextGeometry: mocks.render }));
@@ -69,6 +70,31 @@ afterEach(async () => {
 });
 
 describe('canvas text and variable commit ownership', () => {
+  it('keeps a copy slot when its text is edited, committed and undone', async () => {
+    const fixture = fixtureState();
+    const original = fixture.project.scene.objects[0];
+    if (original?.kind !== 'text' || original.variableTemplate === undefined)
+      throw new Error('Missing variable fixture');
+    const copy = {
+      ...original,
+      variableTemplate: { ...original.variableTemplate, sequenceOffset: 4 },
+    };
+    await act(async () => {
+      useCanvasTextStore.getState().close();
+      useStore.setState({
+        project: { ...fixture.project, scene: { ...fixture.project.scene, objects: [copy] } },
+      });
+      useCanvasTextStore.getState().beginEdit(copy);
+    });
+    await typeText('Changed {{serial:3}}');
+    await done();
+    expect(useStore.getState().project.scene.objects[0]).toMatchObject({
+      content: 'Changed {{serial:3}}',
+      variableTemplate: { sequenceOffset: 4 },
+    });
+    await act(async () => useStore.getState().undo());
+    expect(useStore.getState().project.scene.objects[0]).toBe(copy);
+  });
   it.each(['escape', 'empty-done'] as const)(
     'discards staged serial data on %s',
     async (finish) => {

@@ -31,6 +31,9 @@ import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './ra
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
 import { shouldTraceAlphaMask } from './trace-alpha';
+import { traceImageToPhotoPathsSteps } from './photo-trace';
+import { coloredPathsToSvg } from './paths-to-svg';
+import { runTraceSteps } from './trace-steps';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -61,6 +64,9 @@ export type RawImageData = {
   readonly width: number;
   readonly height: number;
   readonly data: Uint8ClampedArray;
+  // The UI decoder stores RGB already composited onto white while retaining
+  // source alpha for mask tracing. Omitted/false means ordinary straight RGBA.
+  readonly rgbCompositedOnWhite?: boolean;
 };
 
 // RGBA channel count per pixel — the multiplier relating dimensions to buffer
@@ -98,6 +104,13 @@ export async function traceImageToSvgString(
   image: RawImageData,
   options: TraceOptions = DEFAULT_TRACE_OPTIONS,
 ): Promise<string> {
+  if (options.photoDetail !== undefined) {
+    return coloredPathsToSvg(
+      runTraceSteps(traceImageToPhotoPathsSteps(image, options)),
+      image.width,
+      image.height,
+    );
+  }
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);
   return tracer.imagedataToSVG(prepared, buildImageTracerOptions(options));

@@ -83,60 +83,72 @@ export function CncCoreCutFields(props: {
   const { layer, settings, maxFeed, spindleMaxRpm, onCommit } = props;
   return (
     <section className="lf-cnc-settings-card" aria-label="Feeds & passes">
-      <h4>Feeds &amp; passes</h4>
-      <p className="lf-cnc-settings-hint">
-        Feed moves across the material. Plunge moves down into it.
-      </p>
-      <NumberField
-        layer={layer}
-        label="Depth per pass"
-        unit="mm"
-        value={settings.depthPerPassMm}
-        min={0.05}
-        max={50}
-        step={0.25}
-        title="Material removed per Z pass. Rule of thumb: up to half the bit diameter in wood."
-        onCommit={(depthPerPassMm) => onCommit({ depthPerPassMm })}
-      />
-      <NumberField
-        layer={layer}
-        label="Feed"
-        unit="mm/min"
-        value={settings.feedMmPerMin}
-        min={1}
-        max={maxFeed}
-        step={50}
-        title="XY cutting feed rate."
-        onCommit={(feedMmPerMin) => onCommit({ feedMmPerMin })}
-      />
-      <NumberField
-        layer={layer}
-        label="Plunge"
-        unit="mm/min"
-        value={settings.plungeMmPerMin}
-        min={1}
-        max={maxFeed}
-        step={25}
-        title="Z plunge feed rate — slower than XY feed, bits cut poorly straight down."
-        onCommit={(plungeMmPerMin) => onCommit({ plungeMmPerMin })}
-      />
-      <SetupOwnedValueRow
-        label="Machine maximum"
-        value={`${spindleMaxRpm.toLocaleString('en-US')} RPM`}
-        description="This is the machine maximum spindle speed saved in Startup Setup. Artwork spindle speed below is the requested running speed for this operation."
-        setupField="spindle-max"
-      />
-      <NumberField
-        layer={layer}
-        label="Artwork spindle speed"
-        unit="RPM"
-        value={settings.spindleRpm}
-        min={1000}
-        max={spindleMaxRpm}
-        step={500}
-        title="Requested spindle running speed for this artwork operation. Machine maximum is shown above and is edited in Startup Setup."
-        onCommit={(spindleRpm) => onCommit({ spindleRpm })}
-      />
+      <div className="lf-cnc-feed-grid">
+        <NumberField
+          stacked
+          layer={layer}
+          label="Depth per pass"
+          unit="mm"
+          value={settings.depthPerPassMm}
+          min={0.05}
+          max={50}
+          step={0.25}
+          title="Material removed per Z pass. Rule of thumb: up to half the bit diameter in wood."
+          onCommit={(depthPerPassMm) => onCommit({ depthPerPassMm })}
+        />
+        <NumberField
+          stacked
+          layer={layer}
+          label="Feed"
+          unit="mm/min"
+          value={settings.feedMmPerMin}
+          min={1}
+          max={maxFeed}
+          step={50}
+          title="XY cutting feed rate."
+          onCommit={(feedMmPerMin) => onCommit({ feedMmPerMin })}
+        />
+        <NumberField
+          stacked
+          layer={layer}
+          label="Plunge"
+          unit="mm/min"
+          value={settings.plungeMmPerMin}
+          min={1}
+          max={maxFeed}
+          step={25}
+          title="Z plunge feed rate — slower than XY feed, bits cut poorly straight down."
+          onCommit={(plungeMmPerMin) => onCommit({ plungeMmPerMin })}
+        />
+        <div className="lf-cnc-spindle-field">
+          <SetupOwnedValueRow
+            compact
+            label="Machine maximum"
+            value={`${spindleMaxRpm.toLocaleString('en-US')} RPM`}
+            description="This is the machine maximum spindle speed saved in Machine Setup. Artwork spindle speed is the requested running speed for this operation."
+            setupField="spindle-max"
+          />
+          <NumberField
+            stacked
+            layer={layer}
+            label="Artwork spindle speed"
+            unit="RPM"
+            value={settings.spindleRpm}
+            min={1000}
+            max={spindleMaxRpm}
+            step={500}
+            title="Requested spindle running speed for this artwork operation. Machine maximum is shown alongside and is edited in Machine Setup."
+            onCommit={(spindleRpm) => onCommit({ spindleRpm })}
+          />
+        </div>
+      </div>
+      <details className="lf-inspector-help">
+        <summary title="Explain cutting feed, plunge rate and spindle speed.">About feeds</summary>
+        <p className="lf-cnc-settings-hint">
+          Feed moves across the material. Plunge moves down into it. Spindle speed is the requested
+          running RPM; the machine maximum comes from Machine Setup.
+        </p>
+      </details>
     </section>
   );
 }
