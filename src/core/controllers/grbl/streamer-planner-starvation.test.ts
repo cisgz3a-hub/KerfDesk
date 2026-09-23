@@ -1,9 +1,9 @@
 // Planner starvation: the failure mode on the other side of back-pressure.
 //
 // `streamer-planner-backpressure.test.ts` proves the sender never OVERRUNS a
-// controller that has gone quiet. This file proves the opposite hazard that
-// made a Falcon A1 Pro (grblHAL, 512-block planner) stop and restart mid-burn
-// (ADR-331): with only the stock 120 bytes in flight — about eight raster
+// controller that has gone quiet. This file proves the opposite hazard, which
+// ADR-331 diagnosed (not hardware-confirmed) in a Falcon A1 Pro's mid-burn
+// stop and restart: with only the stock 120 bytes in flight — about eight raster
 // lines — any acknowledgement round trip longer than those lines' worth of
 // motion leaves the planner EMPTY, so the machine decelerates to a stop, and
 // then restarts when the next refill lands. A window sized from the
