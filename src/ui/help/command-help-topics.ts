@@ -219,7 +219,15 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.weld': {
     family: 'tools',
-    tooltip: 'Union selected closed vector contours into one baked path object by layer color.',
+    tooltip: 'Weld contours within each operation, preserving separate operations and settings.',
+  },
+  'tools.union-silhouette': {
+    family: 'tools',
+    tooltip: 'Combine closed shapes into one silhouette using a chosen result operation.',
+  },
+  'tools.join-paths': {
+    family: 'tools',
+    tooltip: 'Join nearby open endpoints with matching operations, colour and artwork settings.',
   },
   'tools.subtract': {
     family: 'tools',

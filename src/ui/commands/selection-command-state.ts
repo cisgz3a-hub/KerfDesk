@@ -79,6 +79,24 @@ export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<st
   return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
 }
 
+export function selectionCanJoinPaths(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): boolean {
+  const objects = selectedConvertibleVectors(project, selectedIds);
+  return (
+    objects.length > 0 &&
+    objects.every((object) => object.locked !== true) &&
+    objects.some((object) =>
+      object.paths.some((path) =>
+        path.curves === undefined
+          ? path.polylines.some((polyline) => !polyline.closed && polyline.points.length > 1)
+          : path.curves.some((curve) => !curve.closed && curve.segments.length > 0),
+      ),
+    )
+  );
+}
+
 // ADR-103 G1: booleans need a subject AND at least one clip.
 export function selectionCanCombine(project: Project, selectedIds: ReadonlyArray<string>): boolean {
   const selected = new Set(selectedIds);

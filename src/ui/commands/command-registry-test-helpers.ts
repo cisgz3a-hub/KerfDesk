@@ -14,6 +14,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     ...baseCtxFlags(),
     ...baseCtxActions(),
     ...baseCtxArrangeActions(),
+    unionSilhouette: vi.fn(),
+    joinPaths: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;
@@ -37,6 +39,7 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     hasConvertibleSelection: false,
     canConvertSelectionToPath: false,
     canWeldSelection: false,
+    canJoinPaths: false,
     canCombineSelection: false,
     hasFillableSelection: false,
     canCloseOpenFillContours: false,

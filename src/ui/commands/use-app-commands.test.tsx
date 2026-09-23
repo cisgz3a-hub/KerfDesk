@@ -160,6 +160,8 @@ function callbacks(): CommandShellCallbacks {
     requestOptimizationSettings: doNothing,
     requestArray: doNothing,
     requestQuickNest: doNothing,
+    requestUnionSilhouette: doNothing,
+    requestJoinPaths: doNothing,
     requestPrintAndCut: doNothing,
     requestRotarySetup: doNothing,
     requestLabsSettings: doNothing,

@@ -193,7 +193,7 @@ function weldCommand(ctx: AppCommandContext): AppCommand {
         'tools.weld',
         'tools',
         'Weld',
-        'Union selected closed vector contours into one path object',
+        'Weld contours within each operation, preserving separate operations and settings',
         ctx.weldSelection,
       )
     : disabled(

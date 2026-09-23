@@ -70,6 +70,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.multi-file-trace': { callback: 'multiFileTrace' },
   'tools.convert-to-path': { callback: 'convertSelectionToPath' },
   'tools.weld': { callback: 'weldSelection' },
+  'tools.union-silhouette': { callback: 'unionSilhouette' },
+  'tools.join-paths': { callback: 'joinPaths' },
   'tools.subtract': { callback: 'subtractSelection' },
   'tools.intersect': { callback: 'intersectSelection' },
   'tools.exclude': { callback: 'excludeSelection' },
