@@ -15,7 +15,7 @@ const entry = (patch: Partial<LibraryEntry>): LibraryEntry => ({
   tags: ['base'],
   provenance: {
     sourceKind: 'owned',
-    sourceName: 'CurveDesk',
+    sourceName: 'KerfDesk',
     license: 'MIT',
     licenseId: 'MIT',
   },
@@ -60,6 +60,32 @@ describe('filterDesignLibrary', () => {
     ]);
   });
 
+  it("matches originals by the app's own credit only as whole words", () => {
+    const credited = entry({
+      id: 'credited-original',
+      title: 'Credited Original',
+      provenance: {
+        sourceKind: 'owned',
+        sourceName: 'KerfDesk',
+        creator: 'KerfDesk contributors',
+        license: 'MIT',
+        licenseId: 'MIT',
+      },
+    });
+    const ids = (search: string) =>
+      filterDesignLibrary([...entries, credited], { search }).map((item) => item.id);
+
+    expect(ids('KerfDesk')).toEqual([
+      'cnc-pocket-test',
+      'flower-art',
+      'credited-original',
+      'laser-kerf-comb',
+    ]);
+    expect(ids('kerfdesk   contributors')).toEqual(['credited-original']);
+    expect(ids('desk')).toEqual([]);
+    expect(ids('kerf')).toEqual(['laser-kerf-comb']);
+  });
+
   it.each([
     ['title', 'title needle', entry({ id: 'title', title: 'Title Needle' })],
     ['category', 'signs & plaques', entry({ id: 'category', category: 'Signs & Plaques' })],
@@ -99,7 +125,7 @@ describe('filterDesignLibrary', () => {
         id: 'license',
         provenance: {
           sourceKind: 'owned',
-          sourceName: 'CurveDesk',
+          sourceName: 'KerfDesk',
           license: 'Friendly Permit',
           licenseId: 'FRIENDLY-1.0',
         },

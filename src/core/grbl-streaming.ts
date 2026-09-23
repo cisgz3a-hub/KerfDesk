@@ -4,8 +4,8 @@ export const MAX_GRBL_RX_BUFFER_BYTES = 4096;
 // stream.h: `#ifndef RX_BUFFER_SIZE / #define RX_BUFFER_SIZE 1024`), eight times
 // stock GRBL's 128. Streaming a grblHAL controller through the stock 120-byte
 // window leaves only ~8 raster lines in flight, so any host or USB round trip
-// longer than those few milliseconds of motion drains the planner and the
-// machine stops and restarts mid-burn (ADR-331). A grblHAL profile therefore
+// longer than those few milliseconds of motion can drain the planner and stop
+// the machine mid-burn (simulator-shown, ADR-331). A grblHAL profile therefore
 // requests this window; the Start boundary still bounds it by the capacity the
 // controller itself reports, so a build with a smaller ring narrows the window
 // instead of overflowing it.

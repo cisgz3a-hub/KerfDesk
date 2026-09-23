@@ -1,5 +1,5 @@
 export const BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE =
-  'Background compilation is unavailable. Reopen CurveDesk or enable worker support, then try again.';
+  'Background compilation is unavailable. Reopen KerfDesk or enable worker support, then try again.';
 
 export const BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE =
   'Background output preparation queue is full. Wait for the current compilation to finish, then try again.';

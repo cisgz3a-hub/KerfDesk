@@ -64,7 +64,7 @@ export function useDesignSimulate(source: DesignCarveSource | null): DesignSimul
           kind: 'failed',
           reason: isDesignSceneSuperseded(error)
             ? 'Bit simulation was superseded by newer canvas work. Try Simulate again.'
-            : 'Background bit simulation failed. Reopen CurveDesk and try again.',
+            : 'Background bit simulation failed. Reopen KerfDesk and try again.',
         });
       });
   }, [source]);

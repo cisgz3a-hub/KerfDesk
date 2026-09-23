@@ -2,7 +2,7 @@ import type { FluidncV403RealtimeDispatch } from './fluidnc-v403-realtime-dispat
 
 /**
  * Literal firmware-side expectations derived from pinned FluidNC v4.0.3 source.
- * These do not model CurveDesk preparation, text encoding, acknowledgement
+ * These do not model KerfDesk preparation, text encoding, acknowledgement
  * ownership, configured asynchronous effects, or physical behavior.
  *
  * Pinned source: bdring/FluidNC commit

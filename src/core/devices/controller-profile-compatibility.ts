@@ -106,7 +106,7 @@ function controllerProfileCorrections(args: {
 // The stock-GRBL 120-byte window is the catalog default every profile inherits.
 // On grblHAL it holds only ~8 raster lines against a >= 1 KiB ring and a
 // 512-block planner, so any host or USB round trip longer than a few
-// milliseconds of motion starves the planner (stop-and-go burns, ADR-331).
+// milliseconds of motion can starve the planner (stop-and-go, simulator-shown, ADR-331).
 // A grblHAL family therefore lifts a window still sitting at the inherited
 // stock default; a value the operator typed is theirs and stays, EXCEPT the
 // stock default itself, which is indistinguishable from never having chosen.
