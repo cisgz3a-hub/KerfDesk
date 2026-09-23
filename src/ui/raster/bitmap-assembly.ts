@@ -44,6 +44,8 @@ const CURVE_TOLERANCE_PIXELS = 0.25;
 export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
 export type BitmapConversionOptions = {
+  readonly preserveCoverage?: boolean;
+  readonly coverageAxis?: 'x' | 'y';
   readonly dpi?: number;
   readonly renderType?: ConvertToBitmapRenderType;
   readonly layers?: ReadonlyArray<BitmapLayerSetting>;
@@ -126,6 +128,9 @@ function rasterizeConvertibles(
   const baked = objects.map((object) => bakeConvertibleTransform(object, toleranceMm, budget));
   const { fillGroups, outlinePolylines } = bitmapFillGroups(baked, options);
   const raster = rasterizeVectorToLuma({
+    ...(options.preserveCoverage === true
+      ? { preserveCoverage: true, coverageAxis: options.coverageAxis ?? 'x' }
+      : {}),
     polylines: [],
     fillGroups,
     outlinePolylines,

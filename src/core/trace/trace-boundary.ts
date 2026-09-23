@@ -47,7 +47,7 @@ export function cropRawImageData(image: RawImageData, boundary: TraceBoundary): 
     const targetStart = row * normalized.width * 4;
     data.set(image.data.slice(sourceStart, sourceEnd), targetStart);
   }
-  return { width: normalized.width, height: normalized.height, data };
+  return { ...image, width: normalized.width, height: normalized.height, data };
 }
 
 export function offsetColoredPaths(
