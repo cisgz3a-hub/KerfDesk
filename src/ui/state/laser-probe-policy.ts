@@ -53,6 +53,7 @@ export function invalidProbeEvidence(affectsXy: boolean): Partial<LaserState> {
         wcoCache: null,
         frameVerification: null,
         framedRun: null,
+        frameTrace: null,
         workOriginActive: true,
         workOriginSource: 'unknown',
       }

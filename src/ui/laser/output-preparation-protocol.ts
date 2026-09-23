@@ -11,6 +11,7 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { EmitRdOptions, EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
+import type { FrameBoundsPreview } from './frame-bounds-preview';
 
 export type OutputSnapshotRequest = {
   readonly registration?: SimilarityTransform | null;
@@ -116,7 +117,10 @@ export type OutputPreparationEnvelope = {
   readonly request: OutputPreparationRequest;
 };
 
-/** Worker reply, correlated to its originating request by `requestId`. */
+/** Worker reply, correlated to its originating request by `requestId`. A
+ * Start request may first report the Frame rectangles of the job it is
+ * compiling (ADR-353); the response that follows carries the exact program
+ * built from that same compile. */
 export type OutputPreparationResult =
   | {
       readonly requestId: number;
@@ -125,4 +129,8 @@ export type OutputPreparationResult =
   | {
       readonly requestId: number;
       readonly progress: OutputCompilationProgress;
+    }
+  | {
+      readonly requestId: number;
+      readonly frameBounds: FrameBoundsPreview;
     };

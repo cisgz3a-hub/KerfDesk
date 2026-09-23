@@ -53,6 +53,18 @@ Start begins from that same point (`framed-run.ts:61-63`).
 described as *"Completion-issued authorization for one exact prepared program."* It carries the
 candidate, the `completedStatusSequence`, and the controller snapshot at completion.
 
+**2a. A dense job's Frame may trace before its program exists (ADR-353).** When preparation runs
+off-thread, the worker reports the compiled job's frame rectangles seconds before it finishes
+emitting, preflighting and packing the program. `runFrameNow` then dispatches a `FrameTraceCandidate`
+— every candidate field except the program, marked `exactProgram: 'deferred'` — and completion records
+a `FrameTrace` in `frameTrace` instead of a permit. The permit is minted only when the exact program
+arrives, `frameBoundsPreviewMatches` proves its own metrics reproduce the traced rectangles, and the
+trace is still the store's trace with nothing drifted since its clean Idle (`frame-trace-flow.ts`).
+A trace expires under exactly the permit's rules (`framed-run-invalidation.ts`), is voided wherever
+a machine or setup change voids frame proofs, and can authorize nothing by itself. A permit and a
+trace never coexist: any Frame dispatch clears both, and minting consumes the trace. What changed
+is when the operator waits, not what is authorized.
+
 **3. Completion is validated against two changes.** `framedRunCompletionIssue` (`framed-run.ts:148`)
 returns a message — and therefore issues **no permit** — when either check fails:
 
