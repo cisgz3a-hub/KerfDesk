@@ -1632,14 +1632,17 @@ authorization, Frame proof, controller command, or safety boundary.
   opening the selected recovery preview restores its complete route. This avoids large
   object-per-point overhead without raising the existing artifact or history limits. Jobs that
   still exceed those limits retain the explicit warning that recovery capture is unavailable.
-- An active-stream watchdog that resumes after a long scheduler gap issues a fresh status
-  query opportunity before declaring the link silent. A processed acknowledgement counts as
-  fresh controller output as well as a status report, because after a page stall the reply
-  to that query can wait behind a backlog of acknowledgements. Each further gap may re-open
-  the window at most three times for one unchanged observation (ADR-356), so repeated delays
-  cannot indefinitely extend an unanswered query; normal two-second silence still requests
-  fail-dark containment. This prevents a demonstrated false disconnect and does not establish
-  that a particular browser, USB adapter or controller keeps streaming while minimised.
+- An active-stream watchdog that resumes after a long scheduler gap issues one fresh status
+  query opportunity before declaring the link silent. Repeated delays cannot indefinitely
+  extend an unanswered query; normal two-second silence still requests fail-dark containment.
+  This prevents a demonstrated false disconnect and does not establish that a particular
+  browser, USB adapter or controller keeps streaming while minimised.
+- ADR-356 amends that watchdog. A processed acknowledgement counts as fresh controller output
+  as well as a status report, because after a page stall the reply to the resumed query can
+  wait behind a backlog of acknowledgements. Each further gap may re-open the query window at
+  most three times for one unchanged observation, so repeated delays still cannot extend an
+  unanswered query indefinitely, and two seconds of on-schedule silence still requests
+  fail-dark containment.
 - The live bar's "controller holding program" state, its log line and the 90-second
   unacknowledged-lines notice count only time the page was running. After a poll gap of two
   seconds or more the wait restarts from the resumed tick, so a page stall is not reported
