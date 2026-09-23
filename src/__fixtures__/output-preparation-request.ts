@@ -8,12 +8,14 @@ import type {
   OutputPreparationResponse,
 } from '../ui/laser/output-preparation-protocol';
 import { prepareOutputRequest } from '../ui/laser/output-preparation';
+import type { FrameBoundsPreview } from '../ui/laser/frame-bounds-preview';
 
 export function prepareOutputRequestForTest(
   request: OutputPreparationRequest,
   execution: {
     readonly signal?: AbortSignal;
     readonly onProgress?: (progress: OutputCompilationProgress) => void;
+    readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   } = {},
 ): Promise<OutputPreparationResponse> {
   return prepareOutputRequest(request, {

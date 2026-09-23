@@ -1,10 +1,5 @@
-import {
-  findOversizedLine,
-  type OverrideValues,
-  type StatusReport,
-} from '../../core/controllers/grbl';
+import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
-import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
@@ -59,6 +54,7 @@ import {
   largeJobPreparationWarning,
   largeRasterPreparationWarning,
   partitionEmitPreflight,
+  preparedProgramIntegrityIssue,
 } from './start-job-readiness-policy';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
@@ -68,6 +64,7 @@ import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
+import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 
 export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
@@ -219,6 +216,8 @@ export async function prepareStartJobSnapshot(
     readonly prepare?: PrepareOutputSnapshotOptions['prepare'];
     /** Frame preparation compiles the exact candidate before a permit exists. */
     readonly requireFrame?: boolean;
+    /** Receives the Frame rectangles as soon as the job is compiled (ADR-353). */
+    readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   },
 ): Promise<StartJobPreparation> {
   const effectivePlacement = placementForResolvedOrigin(jobPlacement, options.resolvedJobOrigin);
@@ -252,6 +251,13 @@ export async function prepareStartJobSnapshot(
     machine,
   );
   if (!inspected.ok) return inspected;
+  const canvasPlanKey = canvasPlanRetentionKey(
+    project,
+    outputScope,
+    effectivePlacement,
+    options.registration,
+  );
+  options.onFrameBounds?.(frameBoundsPreviewOf(inspected.prepared, canvasPlanKey));
   return finalizeStartPreparation({
     project: preparationProject,
     controllerSettings,
@@ -262,12 +268,7 @@ export async function prepareStartJobSnapshot(
     placement,
     motionOffset,
     inspected,
-    canvasPlanKey: canvasPlanRetentionKey(
-      project,
-      outputScope,
-      effectivePlacement,
-      options.registration,
-    ),
+    canvasPlanKey,
     printCutRegistrationActive: options.registration !== undefined,
     sourceGeometryChecks: 'full',
   });
@@ -387,31 +388,6 @@ function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
     },
     warnings: [],
   };
-}
-
-function nonExecutableProgramMessages(preflight: {
-  readonly issues: ReadonlyArray<{ readonly message: string }>;
-}): ReadonlyArray<string> {
-  const messages = preflight.issues.map((issue) => issue.message);
-  return messages.length > 0
-    ? messages
-    : ['The prepared job contains no executable controller commands. Nothing was framed or sent.'];
-}
-
-function preparedProgramIntegrityIssue(
-  gcode: string,
-  rxBufferBytes: number,
-  preflight: { readonly issues: ReadonlyArray<{ readonly message: string }> },
-): ReadonlyArray<string> | null {
-  if (!hasSendableGcodeLine(gcode)) {
-    return nonExecutableProgramMessages(preflight);
-  }
-  const oversized = findOversizedLine(gcode, rxBufferBytes);
-  if (oversized === null) return null;
-  return [
-    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
-  ];
 }
 
 function registrationOption(registration: SimilarityTransform | null | undefined): {

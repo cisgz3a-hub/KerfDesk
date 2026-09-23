@@ -34,7 +34,7 @@ import {
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
 import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
-import { finishedJobStateReset } from './laser-session-reset';
+import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
 import type { JobStopReason } from './job-stop-request';
 import { disconnectStopUnconfirmedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -136,7 +136,7 @@ async function runStartJob(
   const completion = createStartArmingCompletion(context);
   set({
     controllerOperation: { kind: 'start-arming', phase: 'queue-fence' },
-    ...(options.framedRunPermit === undefined ? { frameVerification: null, framedRun: null } : {}),
+    ...(options.framedRunPermit === undefined ? frameProofReset() : {}),
   });
   try {
     const effectiveOptions = await prepareStartBoundary(context, gcode, options, setupEpoch);
@@ -303,8 +303,7 @@ async function runStopJob(context: JobActionContext, reason?: JobStopReason): Pr
     airAssistOn: false,
     // ADR-228 amendment: Abort during a frame must kill the proof directly —
     // an aborted trace was not completed, whatever the side effects imply.
-    frameVerification: null,
-    framedRun: null,
+    ...frameProofReset(),
     ...originUnknownAfterControllerReset(state),
     streamer:
       state.streamer === null

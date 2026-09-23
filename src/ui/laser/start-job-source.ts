@@ -1,11 +1,8 @@
-import type { StatusQueryCapability } from '../../core/controllers';
-import type { ControllerKind } from '../../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings } from '../../core/job';
 import type { PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { currentOutputScope, useStore } from '../state';
-import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import { useCameraStore } from '../state/camera-store';
 import {
   rebuildCanvasPlanForGcode,
@@ -14,7 +11,6 @@ import {
 } from '../state/canvas-motion-plan';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
 import {
   captureLaserModeStartSnapshot,
   type LaserModeStartSnapshot,
@@ -41,6 +37,16 @@ import {
   STALE_START_PREPARATION_MESSAGE,
 } from './start-preparation-owner';
 import { publishFramePreparationProgress } from '../state/frame-preparation-store';
+import type { FrameBoundsPreview } from './frame-bounds-preview';
+import { machineSnapshot } from './start-machine-snapshot';
+
+/** Optional observers of one Start preparation. */
+export type StartPreparationHooks = {
+  /** Off-thread preparations only: the Frame rectangles as soon as the job is
+   * compiled, before the exact program exists (ADR-353). A main-thread
+   * preparation finishes in one turn, so it never reports them early. */
+  readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
+};
 
 export type PreparedRecoverySource = {
   readonly project: Project;
@@ -65,6 +71,7 @@ export async function prepareCurrentStartJob(
   resolvedJobOrigin?: JobOriginPlacement,
   requireFrame = true,
   signal?: AbortSignal,
+  hooks: StartPreparationHooks = {},
 ): Promise<StartJobPreparation> {
   if (signal?.aborted === true)
     throw new DOMException('Output preparation cancelled.', 'AbortError');
@@ -85,6 +92,7 @@ export async function prepareCurrentStartJob(
       requireFrame,
       registration,
       useSnapshot,
+      hooks,
       ...(signal === undefined ? {} : { signal }),
     });
   }
@@ -116,6 +124,7 @@ async function prepareCurrentStartInBackground(args: {
   readonly registration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly useSnapshot: boolean;
   readonly signal?: AbortSignal;
+  readonly hooks: StartPreparationHooks;
 }): Promise<StartJobPreparation> {
   const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal, {
     jobPlacement: args.jobPlacement,
@@ -145,6 +154,7 @@ async function prepareCurrentStartInBackground(args: {
       },
       publishFramePreparationProgress,
       owner.signal,
+      args.hooks.onFrameBounds,
     );
     if (background === null) {
       return { ok: false, messages: [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE] };
@@ -321,6 +331,7 @@ async function prepareRecoveryProjectSource(
           registration: undefined,
           // Re-evaluating variables/registration would alter checkpoint bytes.
           useSnapshot: false,
+          hooks: {},
         })
       : prepareStartJob(
           project,
@@ -365,66 +376,9 @@ async function prepareRecoveryProjectSource(
   };
 }
 
-function machineSnapshot(
-  project: Project,
-  laser: ReturnType<typeof useLaserStore.getState>,
-  camera: ReturnType<typeof useCameraStore.getState>,
-) {
-  return {
-    connected: laser.connection.kind === 'connected',
-    statusReport: laser.statusReport,
-    alarmCode: laser.alarmCode,
-    hasActiveStreamer: isActiveJob(laser.streamer),
-    cncJobsSupported: laser.capabilities.cncJobs,
-    motionOperationActive: laser.motionOperation !== null,
-    controllerOperationActive: laser.controllerOperation !== null,
-    autofocusBusy: laser.autofocusBusy,
-    workOriginActive: laser.workOriginActive,
-    workZZeroEvidence: laser.workZZeroEvidence,
-    workZReferenceEpoch: laser.workZReferenceEpoch,
-    controllerSessionEpoch: laser.controllerSessionEpoch,
-    controllerBuildInfo: laser.controllerBuildInfo,
-    controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
-    controllerSettings: laser.controllerSettings,
-    controllerSettingsObservation: laser.controllerSettingsObservation,
-    wcoCache: laser.wcoCache,
-    activeWcs: laser.activeWcs,
-    ovCache: laser.ovCache,
-    accessoryCache: laser.accessoryCache ?? null,
-    frameVerification: laser.frameVerification,
-    settingsCapability: laser.capabilities.settings,
-    activeControllerKind: laser.activeControllerKind,
-    detectedControllerKind: laser.detectedControllerKind,
-    activeControllerCommandSet: laser.activeControllerCommandSet,
-    cameraPlacementActive: camera.placementActive,
-    cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
-    cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
-      project.device.cameraAlignment,
-      project.device.cameraCalibration,
-      camera.surfaceHeightMm,
-    ),
-    homingState: laser.homingState,
-    trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
-    reportInches: laser.controllerSettings?.reportInches === true,
-    statusQuery: liveStatusQueryCapability(
-      laser.activeControllerKind,
-      laser.capabilities.statusQuery,
-    ),
-  };
-}
-
 function jobPlacementForArchivedArtifact(artifact: ExecutionArtifactV1): JobPlacementSettings {
   return {
     startFrom: artifact.jobOrigin?.startFrom ?? 'absolute',
     anchor: artifact.jobOrigin?.anchor ?? 'front-left',
   };
-}
-
-function liveStatusQueryCapability(
-  controllerKind: ControllerKind,
-  configured: StatusQueryCapability,
-): StatusQueryCapability {
-  if (controllerKind === 'marlin') return 'queued-poll';
-  if (controllerKind === 'ruida') return 'none';
-  return configured;
 }

@@ -247,7 +247,11 @@ describe('Frame preparation ownership', () => {
     await finishCompilation(worker);
     completeFrame();
     await expect(first).resolves.toBe(true);
-    expect(useFramePreparationStore.getState()).toEqual({ pending: false, progress: null });
+    expect(useFramePreparationStore.getState()).toEqual({
+      pending: false,
+      progress: null,
+      stage: 'preparing',
+    });
     // Nothing owns a Frame now, so a late report has no control to describe.
     worker.report(progress);
     expect(useFramePreparationStore.getState().progress).toBeNull();

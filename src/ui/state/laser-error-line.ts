@@ -39,6 +39,7 @@ export function handleErrorLine(
     lastError: code,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     ...errorNoticePatch(state, code, raw, rejectedLine),
     ...motionErrorPatch,
   });
@@ -61,6 +62,7 @@ export function handleResendLine(
   set({
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     // Retransmission is deliberately unsupported: once firmware reports a
     // protocol desynchronization, an in-flight Frame/Jog can no longer prove
     // that every intended motion line executed exactly once. Keep its FIFO

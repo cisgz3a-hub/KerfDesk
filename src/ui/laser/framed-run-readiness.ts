@@ -1,4 +1,4 @@
-import type { FramedRunPermit } from '../state/framed-run';
+import type { FramedRunEvidence } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
@@ -7,8 +7,10 @@ import { currentReplayExecutionSignature } from './start-job-execution-tracking'
 export const FRAME_JOB_FIRST_MESSAGE =
   'Frame this job first. A completed Frame authorizes the exact prepared job that Start will send.';
 
+/** Null when the completed Frame evidence — a permit, or a trace awaiting its
+ * exact program — still describes the current job and controller. */
 export function framedRunReadinessIssue(
-  permit: FramedRunPermit | null,
+  permit: FramedRunEvidence | null,
   app: ReturnType<typeof useStore.getState> = useStore.getState(),
   laser: ReturnType<typeof useLaserStore.getState> = useLaserStore.getState(),
   options: { readonly ignoreControllerStatusState?: boolean } = {},

@@ -61,6 +61,7 @@ function makeLaserStateFields() {
     workOriginSource: 'none',
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     framedRunStartClaim: null,
   };
 }
@@ -81,6 +82,7 @@ function makeLaserStateActions() {
     setFireActive: async () => undefined,
     cancelJog: async () => undefined,
     frame: async () => undefined,
+    traceFrame: async () => undefined,
     startJob: async () => undefined,
     pauseJob: async () => undefined,
     resumeJob: async () => undefined,

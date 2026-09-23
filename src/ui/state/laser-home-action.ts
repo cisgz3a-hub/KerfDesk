@@ -111,6 +111,7 @@ export async function runHomeAction(
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     log: pushLog(state, '[lf2] Homing started. Invalidated origin and frame evidence.'),
   }));
   const epochs = {

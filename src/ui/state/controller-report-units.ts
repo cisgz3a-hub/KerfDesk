@@ -42,5 +42,6 @@ function clearReportedCoordinateEvidence(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }

@@ -146,6 +146,7 @@ export function unknownOriginPatch(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 
