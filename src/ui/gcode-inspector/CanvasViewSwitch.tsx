@@ -58,14 +58,14 @@ function Option(props: {
 const wrapStyle: React.CSSProperties = {
   display: 'flex',
   gap: 2,
-  padding: 2,
+  padding: 1,
   borderRadius: 'var(--lf-radius-lg)',
   border: '1px solid var(--lf-border)',
   background: 'var(--lf-bg-2)',
 };
 
 const optionStyle: React.CSSProperties = {
-  padding: '4px 14px',
+  padding: '2px 14px',
   fontSize: 'var(--lf-text-md)',
   lineHeight: 1.4,
   borderRadius: 'var(--lf-radius-md)',

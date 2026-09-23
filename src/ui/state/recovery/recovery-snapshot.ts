@@ -1,7 +1,8 @@
 import {
-  isCurrentExecutionArtifact,
+  executionArtifactIsCurrent,
   isExecutionArtifact,
-  isRecoveryArtifact,
+  isLegacyFingerprintArtifact,
+  type ExecutionArtifactV1,
   type RecoveryArtifactV1,
 } from './execution-artifact';
 import { memoizedExecutionArtifactBytes } from './execution-artifact-size';
@@ -44,13 +45,13 @@ export async function hydrateRecoveryState(
       generation: slots.generation,
       activeRun:
         slots.activeRun !== null &&
-        isExecutionArtifact(activeArtifact) &&
+        isValidatedExecutionArtifact(activeArtifact) &&
         progressMatchesArtifact(slots.activeRun, activeArtifact)
           ? { ...slots.activeRun, artifact: activeArtifact }
           : null,
       recoveryCapsule: hydratedRecoveryCapsule(slots, recoveryArtifact),
       lastCompletedReceipt:
-        slots.lastCompletedReceipt !== null && isExecutionArtifact(completedArtifact)
+        slots.lastCompletedReceipt !== null && isValidatedExecutionArtifact(completedArtifact)
           ? { ...slots.lastCompletedReceipt, artifact: completedArtifact }
           : null,
       pendingStart: slots.pendingStart,
@@ -87,7 +88,7 @@ async function artifactMap(
         if (
           stored !== null &&
           stored.generation === slots.generation &&
-          isRecoveryArtifact(stored.artifact) &&
+          isValidatedRecoveryArtifact(stored.artifact) &&
           (stored.artifact.kind === 'legacy-fingerprint-only' ||
             (await storedExecutionArtifactIntegrityIsValid(stored)))
         ) {
@@ -104,9 +105,28 @@ function knownArtifactCanHydrate(
 ): artifact is RecoveryArtifactV1 {
   return (
     artifact?.runId === runId &&
-    isRecoveryArtifact(artifact) &&
-    (artifact.kind === 'legacy-fingerprint-only' || isCurrentExecutionArtifact(artifact))
+    isValidatedRecoveryArtifact(artifact) &&
+    (artifact.kind === 'legacy-fingerprint-only' || executionArtifactIsCurrent(artifact))
   );
+}
+
+// Hydrated artifacts are immutable, and the coordinator hands the same
+// references back on every refresh. Full validation fingerprints the whole
+// program text, so it runs once per artifact identity instead of two or three
+// times per retained run on every refresh.
+const validatedExecutionArtifacts = new WeakSet<object>();
+
+function isValidatedExecutionArtifact(value: unknown): value is ExecutionArtifactV1 {
+  if (typeof value === 'object' && value !== null && validatedExecutionArtifacts.has(value)) {
+    return true;
+  }
+  if (!isExecutionArtifact(value)) return false;
+  validatedExecutionArtifacts.add(value);
+  return true;
+}
+
+function isValidatedRecoveryArtifact(value: unknown): value is RecoveryArtifactV1 {
+  return isValidatedExecutionArtifact(value) || isLegacyFingerprintArtifact(value);
 }
 
 function hydratedExecutionHistory(
@@ -120,7 +140,9 @@ function hydratedExecutionHistory(
     if (record === undefined || seen.has(record.runId)) continue;
     seen.add(record.runId);
     const artifact = artifactFor(records, record.runId);
-    if (!isExecutionArtifact(artifact) || !progressMatchesArtifact(record, artifact)) continue;
+    if (!isValidatedExecutionArtifact(artifact) || !progressMatchesArtifact(record, artifact)) {
+      continue;
+    }
     newestUnique.push({
       ...record,
       // Same measurement as before, cached on the artifact's identity: the
@@ -151,7 +173,7 @@ function hydratedRecoveryCapsule(
   artifact: RecoveryArtifactV1 | null,
 ): RecoveryRepositorySnapshot['recoveryCapsule'] {
   const capsule = slots.recoveryCapsule;
-  if (capsule === null || !isRecoveryArtifact(artifact)) return null;
+  if (capsule === null || !isValidatedRecoveryArtifact(artifact)) return null;
   return artifact.kind === capsule.artifactKind && progressMatchesArtifact(capsule, artifact)
     ? { ...capsule, artifact }
     : null;

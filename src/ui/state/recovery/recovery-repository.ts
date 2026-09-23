@@ -403,6 +403,7 @@ export class RecoveryRepository {
         committed.baseAccepted ? undefined : { snapshot: before, slotRevision: beforeRevision },
       );
       await this.artifactCleanup.afterMutation(before, this.state.snapshot);
+      if (this.state.slotRevision !== beforeRevision) this.options.onSlotsChanged?.();
       return ok(committed.value);
     } catch (error) {
       return this.storageFailure(operation, error);

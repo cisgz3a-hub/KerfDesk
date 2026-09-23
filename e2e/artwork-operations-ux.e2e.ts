@@ -138,8 +138,9 @@ test('direct CNC material and bit choices persist without changing machine defau
   const rougher = panel.getByRole('combobox', { name: /^Pocket roughing bit for/ });
   await material.selectOption('hardwood-birch');
   await bit.selectOption('em-1588');
+  await openSection(panel, /^Bit details & additional tools/);
   await rougher.selectOption('em-6350');
-  await expect(page.getByRole('dialog', { name: 'CNC Startup Setup' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'CNC Machine Setup' })).toHaveCount(0);
 
   const assigned = await saveProject(page, kerfdesk);
   expect(assigned.project.scene.layers[0]?.cnc).toMatchObject({
@@ -158,6 +159,7 @@ test('direct CNC material and bit choices persist without changing machine defau
   await expect(page).toHaveTitle(/direct-cnc-roundtrip\.lf2/, { timeout: 30_000 });
   await expect(material).toHaveValue('hardwood-birch');
   await expect(bit).toHaveValue('em-1588');
+  await openSection(panel, /^Bit details & additional tools/);
   await expect(rougher).toHaveValue('em-6350');
 
   await material.selectOption('');
@@ -183,6 +185,7 @@ test('direct CNC material and bit choices persist without changing machine defau
   await expect(page).toHaveTitle(/manual-cnc-roundtrip\.lf2/, { timeout: 30_000 });
   await expect(material).toHaveValue('');
   await expect(bit).toHaveValue('');
+  await openSection(panel, /^Bit details & additional tools/);
   await expect(rougher).toHaveValue('em-6350');
   await expectNoSerial(kerfdesk);
 });

@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, Profiler } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { grblDriver } from '../../core/controllers';
@@ -64,6 +64,9 @@ afterEach(async () => {
     connection: { kind: 'disconnected' },
     statusReport: null,
     fireActive: false,
+    alarmCode: null,
+    statusSequence: 0,
+    pendingTransportWrites: 0,
   });
   vi.restoreAllMocks();
 });
@@ -157,6 +160,31 @@ describe('MomentaryFireControl', () => {
 
     expect(setFireActive.mock.calls.filter(([active]) => active === false)).toHaveLength(1);
     expect(useLaserStore.getState().fireActive).toBe(true);
+  });
+
+  // Always mounted in the jog pad: store writes it does not read — the per-ack
+  // transport bookkeeping and the status poll's sequence — must not render it.
+  it('renders only for the laser state it reads', async () => {
+    let commits = 0;
+    await act(async () =>
+      root.render(
+        <Profiler id="fire" onRender={() => (commits += 1)}>
+          <MomentaryFireControl />
+        </Profiler>,
+      ),
+    );
+    commits = 0;
+
+    for (let sequence = 1; sequence <= 5; sequence += 1) {
+      await act(async () =>
+        useLaserStore.setState({ statusSequence: sequence, pendingTransportWrites: sequence }),
+      );
+    }
+    expect(commits).toBe(0);
+
+    await act(async () => useLaserStore.setState({ alarmCode: 9 }));
+    expect(commits).toBe(1);
+    expect(host.querySelector('button')?.disabled).toBe(true);
   });
 
   it('does not mount without the Labs opt-in', async () => {

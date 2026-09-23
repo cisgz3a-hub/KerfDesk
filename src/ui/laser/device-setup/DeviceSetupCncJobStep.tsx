@@ -38,9 +38,9 @@ export function DeviceSetupCncJobStep(props: {
     props.onApplyMaterial(materialKey);
   };
   return (
-    <section style={sectionStyle} aria-label="CNC Startup Setup">
+    <section style={sectionStyle} aria-label="CNC Machine Setup">
       <div style={introStyle}>
-        <strong>CNC Startup Setup — current job</strong>
+        <strong>CNC Machine Setup — current job</strong>
         <span>
           Set the stock, default bit, and operation tool plan once here. Artwork settings keep
           operation-specific depth, feed, plunge, and running spindle speed.
@@ -57,12 +57,12 @@ export function DeviceSetupCncJobStep(props: {
         onChangeCustomTools={props.onChangeCustomTools}
         onRemoveTool={props.onRemoveTool}
       />
-      <MachineSetupFieldAnchor field="stock" label="Stock dimensions in Startup Setup">
+      <MachineSetupFieldAnchor field="stock" label="Stock dimensions in Machine Setup">
         <SetupCard title="Stock">
           <DeviceSetupCncStockFields machine={machine} onChange={editStock} />
         </SetupCard>
       </MachineSetupFieldAnchor>
-      <MachineSetupFieldAnchor field="tool-plan" label="Tool Plan in Startup Setup">
+      <MachineSetupFieldAnchor field="tool-plan" label="Tool Plan in Machine Setup">
         <SetupCard title="Tool Plan">
           <DeviceSetupCncToolPlan
             machine={machine}
@@ -72,7 +72,7 @@ export function DeviceSetupCncJobStep(props: {
           />
         </SetupCard>
       </MachineSetupFieldAnchor>
-      <MachineSetupFieldAnchor field="tiling" label="Tiling in Startup Setup">
+      <MachineSetupFieldAnchor field="tiling" label="Tiling in Machine Setup">
         <SetupCard title="Tiling">
           <DeviceSetupCncTilingFields
             tiling={machine.tiling}
@@ -97,10 +97,10 @@ function MaterialAndBitCards(props: {
   return (
     <>
       <SetupCard title="Material and default bit">
-        <MachineSetupFieldAnchor field="material" label="Project material in Startup Setup">
+        <MachineSetupFieldAnchor field="material" label="Project material in Machine Setup">
           <DraftMaterialPicker machine={props.machine} onApply={props.onApplyMaterial} />
         </MachineSetupFieldAnchor>
-        <MachineSetupFieldAnchor field="default-bit" label="Default bit in Startup Setup">
+        <MachineSetupFieldAnchor field="default-bit" label="Default bit in Machine Setup">
           <DraftDefaultBitSelect machine={props.machine} onChange={props.onChangeMachine} />
         </MachineSetupFieldAnchor>
       </SetupCard>

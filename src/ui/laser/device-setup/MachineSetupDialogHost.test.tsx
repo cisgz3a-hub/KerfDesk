@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe('MachineSetupDialogHost', () => {
-  it('does not open Startup Setup when CNC artwork is placed', async () => {
+  it('does not open Machine Setup when CNC artwork is placed', async () => {
     useStore.getState().setMachineKind('cnc');
     const view = await renderHost();
     try {
@@ -45,7 +45,7 @@ describe('MachineSetupDialogHost', () => {
         useStore.getState().importSvgObject(svgObj('placed-artwork', ['#000000'])),
       );
       expect(useMachineSetupDialogStore.getState().state.kind).toBe('idle');
-      expect(view.host.textContent).not.toContain('CNC Startup Setup');
+      expect(view.host.textContent).not.toContain('CNC Machine Setup');
     } finally {
       await view.unmount();
     }
@@ -57,10 +57,10 @@ describe('MachineSetupDialogHost', () => {
     const view = await renderHost();
     try {
       await act(async () => openMachineSetup({ kind: 'cnc', field: 'spindle-max' }));
-      expect(view.host.textContent).toContain('CNC Startup Setup');
+      expect(view.host.textContent).toContain('CNC Machine Setup');
       expect(view.host.textContent).toContain('Step 2 of 3');
       expect(document.activeElement?.getAttribute('aria-label')).toBe(
-        'Spindle maximum in Startup Setup',
+        'Spindle maximum in Machine Setup',
       );
       await changeInput(view.host, 'Spindle maximum', '18000');
       expect(cncMachine().params.spindleMaxRpm).toBe(before);
@@ -129,7 +129,7 @@ describe('MachineSetupDialogHost', () => {
       await changeSelect(view.host, `Startup bit for ${layer.name}`, nextTool.id);
       expect(cncMachine().stock.materialKey).toBeUndefined();
       await act(async () => stepButton(view.host, 3, 'Review & save').click());
-      await act(async () => button(view.host, 'Save CNC startup setup').click());
+      await act(async () => button(view.host, 'Save CNC machine setup').click());
       const after = cncMachine();
       expect(after.stock.materialKey).toBe(material.value);
       expect(after.toolId).toBe(nextTool.id);
@@ -141,7 +141,7 @@ describe('MachineSetupDialogHost', () => {
     }
   });
 
-  it('owns bit-library editing without mutating the live project when Startup Setup is cancelled', async () => {
+  it('owns bit-library editing without mutating the live project when Machine Setup is cancelled', async () => {
     useStore.getState().setMachineKind('cnc');
     const beforeProject = JSON.stringify(useStore.getState().project);
     const beforeCustomTools = useStore.getState().cncLibrary.customTools;
@@ -201,7 +201,7 @@ describe('MachineSetupDialogHost', () => {
       expect(cncMachine().tools.some((tool) => tool.id === custom.id)).toBe(true);
       expect(useStore.getState().project.scene.layers[0]?.cnc?.toolId).toBe(custom.id);
       await act(async () => stepButton(view.host, 3, 'Review & save').click());
-      await act(async () => button(view.host, 'Save CNC startup setup').click());
+      await act(async () => button(view.host, 'Save CNC machine setup').click());
       expect(cncMachine().tools.some((tool) => tool.id === custom.id)).toBe(false);
       expect(useStore.getState().cncLibrary.customTools).not.toContainEqual(custom);
       expect(useStore.getState().project.scene.layers[0]?.cnc?.toolId).toBeUndefined();
@@ -246,7 +246,7 @@ describe('MachineSetupDialogHost', () => {
       );
       await changeInput(view.host, `Flute count for ${catalog.tool.name}`, '18');
       await act(async () => stepButton(view.host, 3, 'Review & save').click());
-      await act(async () => button(view.host, 'Save CNC startup setup').click());
+      await act(async () => button(view.host, 'Save CNC machine setup').click());
 
       expect(cncMachine().tools.find((tool) => tool.id === existing.id)?.fluteCount).toBe(17);
       expect(useStore.getState().cncLibrary.customTools).toContainEqual(

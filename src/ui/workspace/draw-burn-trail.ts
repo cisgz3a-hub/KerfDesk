@@ -10,7 +10,8 @@ const TAIL_WINDOW_MM = 18;
 /** Nominal mark width when the profile carries no measured optics. */
 const NOMINAL_LASER_KERF_MM = 0.2;
 const NOMINAL_CNC_KERF_MM = 1;
-const MIN_BURN_PX = 1.1;
+/** Display floor of a burned mark; at the floor the width no longer shows the kerf. */
+export const MIN_BURN_PX = 1.1;
 const MAX_BURN_PX = 3;
 const HOT_WIDTH_FACTOR = 1.7;
 const GLOW_RADIUS_PX = 13;

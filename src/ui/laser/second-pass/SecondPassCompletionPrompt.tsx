@@ -3,9 +3,13 @@ import { laserSecondPassSupportsController } from '../../../core/laser-second-pa
 import { Dialog, DialogActions } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
-import type { ExecutionArtifactV1, RecoveryRepository } from '../../state/recovery';
+import type {
+  ExecutionArtifactV1,
+  RecoveryRepository,
+  RecoveryRepositorySnapshot,
+} from '../../state/recovery';
 import { isModalOpen, useUiStore } from '../../state/ui-store';
-import { useRecoveryRepositorySnapshot } from '../../state/use-recovery-repository';
+import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
 import { jobControlsBusy } from '../job-controls-busy';
 
 /** Only a flat laser run whose program the transformer can read is offered;
@@ -17,10 +21,14 @@ function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
   );
 }
 
+function selectLastCompletedReceipt(snapshot: RecoveryRepositorySnapshot) {
+  return snapshot.lastCompletedReceipt;
+}
+
 export function SecondPassCompletionPrompt(props: {
   repository: RecoveryRepository;
 }): JSX.Element | null {
-  const snapshot = useRecoveryRepositorySnapshot(props.repository);
+  const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, props.repository);
   const runId = useLaserSecondPassUiStore((s) => s.completionRunId);
   const request = useLaserSecondPassUiStore((s) => s.editorRequest);
   const dismiss = useLaserSecondPassUiStore((s) => s.dismissCompletion);
@@ -35,7 +43,6 @@ export function SecondPassCompletionPrompt(props: {
   const modalOpen = useUiStore(isModalOpen);
   const [presentedRunId, setPresentedRunId] = useState<string | null>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
-  const receipt = snapshot.lastCompletedReceipt;
   const matching = receipt?.runId === runId;
   const offerable = receipt != null && matching && secondPassOfferable(receipt.artifact);
 
@@ -53,8 +60,11 @@ export function SecondPassCompletionPrompt(props: {
   // modalOpen gates the initial presentation only: this Dialog itself then
   // registers as a modal. Hydrated receipts alone never set completionRunId.
   if (!runId || runId !== presentedRunId || !offerable || busy || request) return null;
+  // The offer appears on its own when a job settles, often while the operator
+  // is typing in a field: focus the dialog, not a button, so that keystroke
+  // cannot answer it (ADR-341 Amendment 3).
   return (
-    <Dialog title="Job complete" size="sm" onClose={() => dismiss(runId)}>
+    <Dialog title="Job complete" size="sm" initialFocus="surface" onClose={() => dismiss(runId)}>
       <p>Would you like to darken selected areas?</p>
       <p>
         Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
@@ -65,9 +75,9 @@ export function SecondPassCompletionPrompt(props: {
         <button
           className="lf-btn"
           onClick={() => dismiss(runId)}
-          title="Finish for now. The saved job remains available for a second pass later."
+          title="Close this offer. The saved job remains available for a second pass later."
         >
-          Done
+          Not now
         </button>
         <button
           className="lf-btn lf-btn--primary"

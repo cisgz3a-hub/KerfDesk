@@ -25,6 +25,7 @@ export function CanvasMotionBadge(props: {
             <span
               role="status"
               data-testid="canvas-motion-status"
+              aria-busy={overlay.planIsCurrent === false}
               style={overlay.run === null ? cautionMessageStyle : messageStyle}
             >
               {message}
@@ -77,6 +78,7 @@ function CanvasMotionProbe(props: {
     <span
       data-testid="canvas-motion-probe"
       data-lifecycle={attrs.lifecycle}
+      data-plan-current={props.overlay.planIsCurrent !== false}
       data-confirmed-route-mm={attrs.confirmedRouteMm}
       data-reported-head-x={attrs.headX}
       data-reported-head-y={attrs.headY}
@@ -194,9 +196,12 @@ function elapsedBadgeText(run: NonNullable<CanvasMotionOverlay['run']>, nowMs: n
 function markerDescription(overlay: CanvasMotionOverlay): string {
   const frame = overlay.plan.framePerimeter[0];
   const job = overlay.plan.jobStart;
-  const frameText = frame === undefined ? 'Frame start unavailable' : 'Frame start ready';
-  const jobText = job === null ? 'Job start unavailable' : 'Job start ready';
-  return `${frameText}; ${jobText}`;
+  const updating = overlay.planIsCurrent === false;
+  const state = updating ? 'updating' : 'planned';
+  const frameText = frame === undefined ? 'Frame start unavailable' : `Frame start ${state}`;
+  const jobText = job === null ? 'Job start unavailable' : `Job start ${state}`;
+  const previous = updating ? '; showing previous planned positions' : '';
+  return `${frameText}; ${jobText}${previous}`;
 }
 
 function badgeMessage(
@@ -207,8 +212,11 @@ function badgeMessage(
   const run = overlay.run;
   const relative = overlay.plan.coordinateFrame.kind === 'relative';
   if (run === null) {
-    if (relative) return 'Relative view — physical bed position unverified';
-    return overlay.plan.unavailableReason;
+    const reason = relative
+      ? 'Relative view — physical bed position unverified'
+      : overlay.plan.unavailableReason;
+    if (overlay.planIsCurrent !== false) return reason;
+    return `Updating start markers${reason === null ? '' : ` • ${reason}`}`;
   }
   const truth = overlay.plan.capability === 'realtime' ? 'Controller-reported' : 'Planned route';
   const state = run.controllerState ?? lifecycleLabel(run.lifecycle);
@@ -223,7 +231,8 @@ function badgeMessage(
   // the idle bed-position warning here incorrectly makes a valid run look
   // unverified. Any real live-position limitation is already carried by the
   // plan capability and accuracy reason.
-  return `${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}`;
+  const updating = overlay.planIsCurrent === false ? 'Updating start markers • ' : '';
+  return `${updating}${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}`;
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

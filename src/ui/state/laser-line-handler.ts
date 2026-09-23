@@ -51,6 +51,7 @@ import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './la
 import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { advanceStream, settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
+import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { hasUnsettledStreamAcks } from './laser-store-helpers';
@@ -74,6 +75,7 @@ export function handleLine(
   line: string,
 ): void {
   const cls = refs.driver.classifyLine(line);
+  flushStreamAcksBefore(set, get, refs, safeWrite, cls.kind);
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   captureActiveWcsFromModalReport(set, line);
@@ -178,9 +180,7 @@ function routeAcknowledgement(
       }));
     }
   }
-  if (ackSettlement.owner === 'stream') {
-    advanceStream(set, get, refs, safeWrite, 'ok');
-  }
+  if (ackSettlement.owner === 'stream') routeStreamAck(set, get, refs, safeWrite);
 }
 
 // GRBL answers $G with `[GC:...]` (the connect-time modal read, an operator
@@ -365,6 +365,7 @@ function handleWelcomeLine(
     fireActive: false,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
@@ -464,6 +465,7 @@ function handleAlarmLine(
     fireActive: false,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     statusObservation: null,
     homingState: 'unknown',
     homingProof: null,

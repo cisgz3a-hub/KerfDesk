@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { currentJobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
 import { checkpointInterruption } from './checkpoint-interruption';
 
@@ -52,5 +53,44 @@ describe('checkpointInterruption', () => {
 
   it('returns null when the streamer stopped cleanly', () => {
     expect(checkpointInterruption('idle', null)).toBeNull();
+  });
+
+  it('records an operator Abort as a cancellation, not an unexplained end', () => {
+    // Abort marks the stream errored before the reset byte, with no notice.
+    expect(checkpointInterruption('errored', null)?.message).toBe(
+      'The job stream ended unexpectedly.',
+    );
+    expect(
+      checkpointInterruption('errored', null, { reason: 'operator', streamerEpoch: 3 }),
+    ).toEqual({ kind: 'cancelled', message: 'Stopped by the operator (Abort).' });
+  });
+
+  it('records the app closing mid-job as a cancellation that may not have arrived', () => {
+    const interruption = checkpointInterruption('errored', null, {
+      reason: 'app-closing',
+      streamerEpoch: 3,
+    });
+    expect(interruption?.kind).toBe('cancelled');
+    expect(interruption?.message).toContain('closed or reloaded');
+    expect(interruption?.message).toContain('may not have arrived');
+  });
+
+  it('lets a safety notice name the cause even when a stop was requested', () => {
+    const notice: LaserSafetyNotice = {
+      kind: 'disconnect-during-job',
+      message: 'The USB link dropped mid-job.',
+    };
+    expect(
+      checkpointInterruption('disconnected', notice, { reason: 'operator', streamerEpoch: 1 }),
+    ).toEqual({ kind: 'disconnect', message: notice.message });
+  });
+});
+
+describe('currentJobStopRequest', () => {
+  it('describes only the stream it was recorded for', () => {
+    const request = { reason: 'operator' as const, streamerEpoch: 4 };
+    expect(currentJobStopRequest({ jobStopRequest: request, streamerEpoch: 4 })).toBe(request);
+    expect(currentJobStopRequest({ jobStopRequest: request, streamerEpoch: 5 })).toBeNull();
+    expect(currentJobStopRequest({ streamerEpoch: 4 })).toBeNull();
   });
 });

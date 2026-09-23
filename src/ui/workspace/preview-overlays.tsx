@@ -117,23 +117,31 @@ export function PreviewStatsPanel(props: {
         />
         Traversal moves
       </label>
-      <div style={statsGridStyle} aria-label="Preview distance statistics">
-        <span>Cut</span>
-        <strong>{formatMm(stats.cutMm)}</strong>
-        <span>Travel</span>
-        <strong>{formatMm(stats.travelMm)}</strong>
-        {stats.plungeMm > 0 ? (
-          <>
-            <span>Plunge</span>
-            <strong>{formatMm(stats.plungeMm)}</strong>
-          </>
-        ) : null}
-        <span>Total</span>
-        <strong>{formatMm(stats.totalMm)}</strong>
-        <span>Time</span>
-        <strong>{formatEstimate(props.estimate)}</strong>
-        <PreviewEstimateBreakdown estimate={props.estimate} includesPlunge={stats.plungeMm > 0} />
-      </div>
+      <span>
+        Estimated time <strong>{formatEstimate(props.estimate)}</strong>
+      </span>
+      <details className="lf-preview-details">
+        <summary title="Show path distances and the estimated time breakdown.">
+          Distances and time details
+        </summary>
+        <div style={statsGridStyle} aria-label="Preview distance statistics">
+          <span>Cut</span>
+          <strong>{formatMm(stats.cutMm)}</strong>
+          <span>Travel</span>
+          <strong>{formatMm(stats.travelMm)}</strong>
+          {stats.plungeMm > 0 ? (
+            <>
+              <span>Plunge</span>
+              <strong>{formatMm(stats.plungeMm)}</strong>
+            </>
+          ) : null}
+          <span>Total</span>
+          <strong>{formatMm(stats.totalMm)}</strong>
+          <span>Time</span>
+          <strong>{formatEstimate(props.estimate)}</strong>
+          <PreviewEstimateBreakdown estimate={props.estimate} includesPlunge={stats.plungeMm > 0} />
+        </div>
+      </details>
     </div>
   );
 }
@@ -149,7 +157,6 @@ export function PreviewControlsPanel(props: {
   const passBoundaries = useMemo(() => passBoundaryFractions(props.toolpath), [props.toolpath]);
   return (
     <div
-      className="lf-chip"
       style={previewControlsPanelStyle}
       role="group"
       aria-label="Preview route controls and statistics"
@@ -315,16 +322,9 @@ function PassStepButtons(props: {
 }
 
 const stackStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 36,
-  left: '50%',
-  transform: 'translateX(-50%)',
   display: 'flex',
   flexDirection: 'column',
-  alignItems: 'center',
   gap: 6,
-  pointerEvents: 'none',
-  maxWidth: 'calc(100% - 48px)',
 };
 
 const hintStyle: React.CSSProperties = {
@@ -368,30 +368,26 @@ const statsGridStyle: React.CSSProperties = {
   rowGap: 2,
   alignItems: 'baseline',
   fontFamily: 'ui-monospace, Menlo, monospace',
-  fontSize: 11,
+  fontSize: 12,
 };
 
 const routeControlsStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  flexWrap: 'wrap',
   gap: 8,
   fontFamily: 'system-ui, sans-serif',
   fontSize: 12,
 };
 
 const previewControlsPanelStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 24,
-  bottom: 64,
   display: 'flex',
   alignItems: 'center',
-  gap: 16,
+  gap: 10,
   flexWrap: 'wrap',
-  borderRadius: 4,
-  padding: '7px 10px',
+  padding: '0 0 6px',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 12,
-  maxWidth: 'calc(100% - 48px)',
 };
 
 const compactButtonStyle: React.CSSProperties = {

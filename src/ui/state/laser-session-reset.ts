@@ -43,6 +43,21 @@ export function finishedJobStateReset(): FinishedJobState {
 }
 
 /**
+ * The three Frame proofs a physical or setup mutation voids together: the
+ * compatibility bounds proof, the exact permit, and a trace still waiting for
+ * its exact program (ADR-353). Spread it wherever a machine or setup change
+ * invalidates Frame evidence. A clear scoped to one specific permit does not
+ * need it: a permit and a trace never coexist, because every Frame dispatch
+ * clears both and minting a permit consumes the trace.
+ */
+export function frameProofReset(): Pick<
+  LaserState,
+  'frameVerification' | 'framedRun' | 'frameTrace'
+> {
+  return { frameVerification: null, framedRun: null, frameTrace: null };
+}
+
+/**
  * State owned by ONE controller session. Adds the firmware-reported values that
  * only mean something while the port is open: the latched fault codes, and the
  * modal/override readouts GRBL reports on an intermittent cadence, and the

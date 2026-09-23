@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:curvedesk:executable-plan:v1",
-  "title": "CurveDesk ExecutablePlan v1",
+  "title": "KerfDesk ExecutablePlan v1",
   "description": "Deterministic semantic sidecar for one exact legacy G-code program (ADR-271).",
   "type": "object",
   "additionalProperties": false,

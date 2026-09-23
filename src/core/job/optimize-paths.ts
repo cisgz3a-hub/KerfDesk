@@ -51,11 +51,13 @@ import type { CutGroup, FillGroup, Group, Job } from './job';
 import { offsetForEmittedFeed } from './scan-offset';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 import { configuredSegmentOrder, startCursorForSegments } from './segment-order';
+import { removeCutOverlaps } from './remove-cut-overlaps';
 
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
->;
+> &
+  Partial<Pick<ProjectOptimizationSettings, 'removeOverlappingLines'>>;
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
@@ -70,12 +72,18 @@ export function optimizePaths(
   scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
+  const ordered =
+    settings.travelPolicy === 'source-order'
+      ? prioritized
+      : optimizeGroups(prioritized, settings, scanningOffsets);
   return {
     ...job,
+    // Keep containment/ordering decisions on the original contours. Splitting
+    // shared edges afterwards cannot turn an inner contour into a new outer cut.
     groups:
-      settings.travelPolicy === 'source-order'
-        ? prioritized
-        : optimizeGroups(prioritized, settings, scanningOffsets),
+      settings.removeOverlappingLines === true
+        ? ordered.map((group) => (group.kind === 'cut' ? removeCutOverlaps(group) : group))
+        : ordered,
   };
 }
 

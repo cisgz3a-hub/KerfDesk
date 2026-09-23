@@ -13,4 +13,7 @@ export type RecoveryRepositoryOptions = {
   readonly legacyStorage: LegacyCheckpointStorage;
   readonly nowIso?: () => string;
   readonly onWarning?: (warning: RecoveryRepositoryWarning) => void;
+  /** Called after this window committed a change to the recovery slots (not
+   * after progress writes), so other windows can refresh their snapshot. */
+  readonly onSlotsChanged?: () => void;
 };

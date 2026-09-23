@@ -5,6 +5,7 @@ import type { PreparedOutput, PrepareOutputOptions } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
 import { runtimeCoordinatePreparationOptions } from '../job-placement';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
+import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 import { prepareStartInput } from './start-job-input';
 import {
   finalizeStartPreparation,
@@ -22,6 +23,9 @@ export async function prepareStartJobAsync(
   resolvedJobOrigin: JobOriginPlacement | undefined,
   requireFrame: boolean,
   prepare: (project: Project, options: PrepareOutputOptions) => Promise<PreparedOutput>,
+  /** Receives the Frame rectangles as soon as the job is compiled, before the
+   * costly remainder of preparation (ADR-353). */
+  onFrameBounds?: (preview: FrameBoundsPreview) => void,
 ): Promise<StartJobPreparation> {
   const input = prepareStartInput(
     project,
@@ -42,6 +46,8 @@ export async function prepareStartJobAsync(
   });
   const inspected = inspectPreparedStart(prepared, machine);
   if (!inspected.ok) return inspected;
+  const canvasPlanKey = canvasPlanRetentionKey(project, outputScope, input.effectivePlacement);
+  onFrameBounds?.(frameBoundsPreviewOf(inspected.prepared, canvasPlanKey));
   return finalizeStartPreparation({
     project,
     controllerSettings,
@@ -52,7 +58,7 @@ export async function prepareStartJobAsync(
     placement: input.placement,
     motionOffset: input.motionOffset,
     inspected,
-    canvasPlanKey: canvasPlanRetentionKey(project, outputScope, input.effectivePlacement),
+    canvasPlanKey,
     printCutRegistrationActive: false,
     sourceGeometryChecks: 'full',
   });

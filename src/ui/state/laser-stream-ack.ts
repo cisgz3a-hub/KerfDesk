@@ -84,15 +84,28 @@ export function advanceStream(
   safeWrite: SafeWriteFn,
   ack: 'ok' | 'error' | 'alarm',
 ): void {
+  advanceStreamBy(set, get, refs, safeWrite, ack, 1);
+}
+
+/**
+ * Applies up to `count` consecutive acknowledgements of one kind exactly as that
+ * many advanceStream calls would, with one store write and one refill write.
+ * The pure onAck/step sequence is the same; it stops after the first ack that
+ * changes the stream's status, so every transition keeps its side effects in
+ * order. Returns how many it applied (ADR-352).
+ */
+export function advanceStreamBy(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  ack: 'ok' | 'error' | 'alarm',
+  count: number,
+): number {
   const s: StreamerState | null = get().streamer;
-  if (s === null) return;
+  if (s === null) return count;
   const writeOwner = streamWriteOwner(get());
-  const acked = onAck(s, ack);
-  const stepped = step(
-    get().mpgActive === true && streamerCanPauseForMpg(acked.state)
-      ? pauseStreamer(acked.state)
-      : acked.state,
-  );
+  const stepped = stepAcks(s, ack, count, get().mpgActive === true);
   const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
   const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
   set((state) => ({
@@ -129,4 +142,31 @@ export function advanceStream(
       containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', writeOwner);
     });
   }
+  return stepped.applied;
+}
+
+// The same pure onAck -> step pair advanceStream ran per acknowledgement,
+// repeated until one of them changes the stream's status. The refill bytes of
+// every step are concatenated in order, so the controller receives exactly the
+// bytes the per-ack path would have written, in one write.
+function stepAcks(
+  initial: StreamerState,
+  ack: 'ok' | 'error' | 'alarm',
+  count: number,
+  mpgActive: boolean,
+): { readonly state: StreamerState; readonly toSend: string; readonly applied: number } {
+  let state = initial;
+  let toSend = '';
+  let applied = 0;
+  while (applied < count) {
+    const acked = onAck(state, ack);
+    const stepped = step(
+      mpgActive && streamerCanPauseForMpg(acked.state) ? pauseStreamer(acked.state) : acked.state,
+    );
+    state = stepped.state;
+    toSend += stepped.toSend;
+    applied += 1;
+    if (state.status !== initial.status) break;
+  }
+  return { state, toSend, applied };
 }

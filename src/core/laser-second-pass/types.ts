@@ -24,6 +24,17 @@ export type LaserSecondPassSelection = {
   readonly initialPosition?: LaserSecondPassPoint;
 };
 
+/**
+ * The painted-pass writer that produced a program, recorded with each saved
+ * stage so it replays byte-identically (ADR-341 Amendment 3).
+ *
+ * 1: replays every selected sweep end to end and writes G1 and S on every line.
+ * 2: replays each selected sweep only from its painted span less the sweep's
+ *    own lead-in to the painted span plus its own lead-out, and leaves out
+ *    motion and power words that repeat the modal value.
+ */
+export type LaserSecondPassWriterVersion = 1 | 2;
+
 export type LaserSecondPassSegment = {
   readonly from: LaserSecondPassPoint;
   readonly to: LaserSecondPassPoint;

@@ -1,11 +1,16 @@
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
   type Project,
+  type OutputScope,
   type VariableAdvancementPolicy,
   type VariableCsvDataset,
   type VariableSequenceSettings,
 } from '../../core/scene';
-import { advanceVariableSequence, resolveVariableSequence } from '../../core/variables';
+import {
+  advanceVariableSequence,
+  nextProjectVariableSequence,
+  resolveVariableSequence,
+} from '../../core/variables';
 import { pushUndo } from './scene-mutations';
 
 export type VariableAdvanceTrigger = 'successful-export' | 'successful-stream';
@@ -37,6 +42,7 @@ export type VariableDataActions = {
   readonly advanceVariablesAfter: (
     expectedProject: Project,
     trigger: VariableAdvanceTrigger,
+    outputScope?: OutputScope,
   ) => void;
 };
 
@@ -79,12 +85,13 @@ export function variableDataActions(
         const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
         return variableMutation(state, advanceVariableSequence(variables, 'reset'));
       }),
-    advanceVariablesAfter: (expectedProject, trigger) =>
+    advanceVariablesAfter: (expectedProject, trigger, outputScope) =>
       set((state) => {
         if (state.project !== expectedProject) return {};
         const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
         if (!policyMatches(variables.advancement, trigger)) return {};
-        const advanced = advanceVariableSequence(variables, 'next');
+        const advanced = nextProjectVariableSequence(expectedProject, outputScope);
+        if (advanced === variables) return {};
         return {
           project: {
             ...state.project,

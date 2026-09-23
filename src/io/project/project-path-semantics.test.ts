@@ -51,7 +51,7 @@ describe('version 7 converted path semantics', () => {
     const parsed = deserializeProjectValue(raw);
     if (parsed.kind !== 'ok') throw new Error(JSON.stringify(parsed));
     const written = serializeProject(parsed.project);
-    expect(JSON.parse(written).schemaVersion).toBe(7);
+    expect(JSON.parse(written).schemaVersion).toBe(8);
     const loaded = deserializeProject(written);
     if (loaded.kind !== 'ok') throw new Error(JSON.stringify(loaded));
     expect((loaded.project.scene.objects[0] as ImportedSvg).paths[0]).toMatchObject(

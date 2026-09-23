@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe('SetupOwnedValueRow', () => {
-  it('explains a read-only value and requests its exact Startup Setup field', async () => {
+  it('explains a read-only value and requests its exact Machine Setup field', async () => {
     root = createRoot(host);
     await act(async () => {
       root?.render(
@@ -50,9 +50,9 @@ describe('SetupOwnedValueRow', () => {
     );
 
     const edit = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Edit in Startup Setup',
+      (button) => button.textContent === 'Edit in Machine Setup',
     );
-    if (!(edit instanceof HTMLButtonElement)) throw new Error('Startup Setup action missing');
+    if (!(edit instanceof HTMLButtonElement)) throw new Error('Machine Setup action missing');
     await act(async () => edit.click());
 
     expect(useMachineSetupDialogStore.getState().state).toEqual({

@@ -1,4 +1,4 @@
-import type { Project } from '../../core/scene';
+import { pathUsesOperation, type Layer, type Project, type Scene } from '../../core/scene';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
@@ -77,6 +77,47 @@ export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<st
       selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
   );
   return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
+}
+
+/** Available result operations only when the entire selection qualifies for silhouette union. */
+export function unionSilhouetteOperations(
+  scene: Scene,
+  selectedIds: ReadonlyArray<string>,
+): ReadonlyArray<Layer> {
+  const selected = new Set(selectedIds);
+  const objects = scene.objects.filter(
+    (object): object is VectorSceneObject =>
+      selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
+  );
+  if (
+    objects.length === 0 ||
+    objects.length !== selectedIds.length ||
+    !objects.every(objectHasOnlyClosedContours)
+  )
+    return [];
+  return scene.layers.filter((operation) =>
+    objects.some((object) =>
+      object.paths.some((path) => pathUsesOperation(object, path, operation)),
+    ),
+  );
+}
+
+export function selectionCanJoinPaths(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): boolean {
+  const objects = selectedConvertibleVectors(project, selectedIds);
+  return (
+    objects.length > 0 &&
+    objects.every((object) => object.locked !== true) &&
+    objects.some((object) =>
+      object.paths.some((path) =>
+        path.curves === undefined
+          ? path.polylines.some((polyline) => !polyline.closed && polyline.points.length > 1)
+          : path.curves.some((curve) => !curve.closed && curve.segments.length > 0),
+      ),
+    )
+  );
 }
 
 // ADR-103 G1: booleans need a subject AND at least one clip.

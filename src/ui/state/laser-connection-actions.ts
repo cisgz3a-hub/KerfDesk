@@ -235,6 +235,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     workOriginSource: 'none',
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     capabilities: refs.driver.capabilities,
     activeControllerKind: refs.driver.kind,
     activeControllerCommandSet: refs.driver.commandSet ?? null,

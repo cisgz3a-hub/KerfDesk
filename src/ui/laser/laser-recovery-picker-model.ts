@@ -156,6 +156,47 @@ export function firstRecoveryMovement(
   return null;
 }
 
+export type RecoveryWorkBounds = {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+};
+
+/** Work-coordinate extent of every burn at or after `fromLine`: what a
+ * recovery from that line would still engrave. Null when nothing burns. */
+export function remainingRecoveryWorkBounds(
+  route: RecoveryPreviewRoute,
+  fromLine: number,
+): RecoveryWorkBounds | null {
+  const manifest = route.manifest;
+  const data = manifest.pointData;
+  const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const count = packedBlockCount(manifest);
+  for (let block = 0; block < count; block += 1) {
+    if (packedBlockKind(manifest, block) !== 'process') continue;
+    if (packedBlockRawLineIndex(manifest, block) + 1 < fromLine) continue;
+    const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
+    const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
+    for (let at = start; at < end; at += PACKED_POINT_WIDTH) {
+      includeWorkPoint(bounds, data[at] ?? Number.NaN, data[at + 1] ?? Number.NaN);
+    }
+  }
+  return Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) ? bounds : null;
+}
+
+function includeWorkPoint(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  x: number,
+  y: number,
+): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  bounds.minX = Math.min(bounds.minX, x);
+  bounds.minY = Math.min(bounds.minY, y);
+  bounds.maxX = Math.max(bounds.maxX, x);
+  bounds.maxY = Math.max(bounds.maxY, y);
+}
+
 export function acknowledgedRecoveryMovement(
   route: RecoveryPreviewRoute,
   ackedLines: number,

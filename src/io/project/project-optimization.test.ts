@@ -79,6 +79,7 @@ describe('project cut-planner settings', () => {
         reduceTravelMoves: false,
         travelPolicy: 'source-order',
         insideFirst: false,
+        removeOverlappingLines: true,
         layerPriority: 'reverse-project-order',
         pathDirection: 'preserve',
         startPoint: 'job-center',
@@ -89,5 +90,16 @@ describe('project cut-planner settings', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') expect(result.project.optimization).toEqual(project.optimization);
+  });
+
+  it('defaults a missing overlap option off and rejects non-boolean values', () => {
+    const project = createProject();
+    const { removeOverlappingLines: _overlap, ...legacy } = project.optimization;
+    const old = deserializeProject(JSON.stringify({ ...project, optimization: legacy }));
+    expect(old.kind === 'ok' ? old.project.optimization.removeOverlappingLines : null).toBe(false);
+    const invalid = deserializeProject(
+      JSON.stringify({ ...project, optimization: { ...legacy, removeOverlappingLines: 'yes' } }),
+    );
+    expect(invalid.kind).toBe('invalid');
   });
 });

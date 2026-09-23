@@ -15,17 +15,23 @@ import type {
   OutputPreparationRequest,
   OutputPreparationResponse,
   StartOutputPreparationRequest,
+  OutputSnapshotRequest,
 } from './output-preparation-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { runCanvasCompilationTasks } from '../workspace/canvas-compilation-worker-pool';
 import { renderVariableText } from '../text/render-variable-text';
 import { detectMachineJobWarnings } from './machine-job-warnings';
 import { finalizeTiledOutput } from '../app/tiled-output-preparation';
+import type { FrameBoundsPreview } from './frame-bounds-preview';
 
 export type OutputPreparationContext = {
   readonly jobId: string;
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: OutputCompilationProgress) => void;
+  /** Start only: the Frame rectangles, reported as soon as the job is
+   * compiled so a split Frame can trace them while the exact program is still
+   * being finished (ADR-353). */
+  readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   readonly runCncTasks?: CncCompilationTaskRunner;
 };
 
@@ -74,7 +80,7 @@ async function prepareTilesOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await asyncPreparer(context)(project, request.options);
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   return {
     kind: 'tiles',
     result: finalizeTiledOutput(
@@ -91,7 +97,7 @@ async function prepareRdOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await asyncPreparer(context)(project, request.options);
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   return { kind: 'rd', result: emitPreparedRdFile(prepared) };
 }
 
@@ -100,17 +106,7 @@ async function prepareSaveOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepare = asyncPreparer(context);
-  const prepared =
-    request.snapshot === undefined
-      ? await prepare(project, request.options)
-      : await prepareOutputSnapshot(project, {
-          ...request.options,
-          clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
-          renderVariableText,
-          ...request.snapshot,
-          prepare,
-        });
+  const prepared = await prepareWithOptionalSnapshot(project, request, context);
   const machineWarnings = prepared.ok
     ? detectMachineJobWarnings(
         prepared.project,
@@ -141,6 +137,7 @@ async function prepareStartOutput(
           request.resolvedJobOrigin,
           request.requireFrame,
           prepare,
+          context.onFrameBounds,
         )
       : await prepareStartJobSnapshot(
           request.project,
@@ -157,6 +154,9 @@ async function prepareStartOutput(
               : { resolvedJobOrigin: request.resolvedJobOrigin }),
             requireFrame: request.requireFrame,
             prepare,
+            ...(context.onFrameBounds === undefined
+              ? {}
+              : { onFrameBounds: context.onFrameBounds }),
           },
         );
   return result.ok
@@ -178,6 +178,23 @@ function fixedSnapshotClock(evaluatedAtIso: string): () => Date {
     throw new Error('Output snapshot evaluation time is invalid.');
   }
   return () => new Date(timestamp.getTime());
+}
+
+function prepareWithOptionalSnapshot(
+  project: Project,
+  request: { readonly options: PrepareOutputOptions; readonly snapshot?: OutputSnapshotRequest },
+  context: OutputPreparationContext,
+) {
+  const prepare = asyncPreparer(context);
+  return request.snapshot === undefined
+    ? prepare(project, request.options)
+    : prepareOutputSnapshot(project, {
+        ...request.options,
+        ...request.snapshot,
+        clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
+        renderVariableText,
+        prepare,
+      });
 }
 
 function asyncPreparer(context: OutputPreparationContext) {

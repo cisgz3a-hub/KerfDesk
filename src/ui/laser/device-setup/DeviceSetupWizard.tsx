@@ -72,7 +72,7 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   });
   return (
     <Dialog
-      title={state.machineKind === 'cnc' ? 'CNC Startup Setup' : 'Machine Setup'}
+      title={state.machineKind === 'cnc' ? 'CNC Machine Setup' : 'Machine Setup'}
       size="xl"
       panelClassName="lf-setup-dialog"
       onClose={save.saving ? () => undefined : props.onClose}

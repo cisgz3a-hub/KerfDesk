@@ -79,7 +79,11 @@ function fieldsVariableTemplate(
   | { readonly ok: true; readonly template?: NonNullable<TextObject['variableTemplate']> }
   | { readonly ok: false; readonly message: string } {
   if (values.variableTemplate === undefined) return { ok: true };
-  return parseVariableTemplateSource(values.content);
+  const parsed = parseVariableTemplateSource(values.content);
+  const sequenceOffset = values.variableTemplate.sequenceOffset;
+  return parsed.ok && sequenceOffset !== undefined
+    ? { ...parsed, template: { ...parsed.template, sequenceOffset } }
+    : parsed;
 }
 
 function placeRenderedText(

@@ -591,7 +591,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   kerfdesk,
 }) => {
   const probe = page.getByTestId('canvas-motion-probe');
-  await expect(probe).toHaveAttribute('aria-label', /Frame start ready; Job start ready/);
+  await expect(probe).toHaveAttribute('aria-label', /Frame start planned; Job start planned/);
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
@@ -943,7 +943,7 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   );
   const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
   await expect(complete).toContainText('Would you like to darken selected areas?');
-  await complete.getByRole('button', { name: 'Done', exact: true }).click();
+  await complete.getByRole('button', { name: 'Not now', exact: true }).click();
   await dismissNotifications(page);
   const paintButton = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
   await expect(paintButton).toBeEnabled();

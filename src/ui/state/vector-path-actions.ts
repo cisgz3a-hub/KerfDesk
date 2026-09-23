@@ -30,8 +30,9 @@ import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-acti
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { planWeldSelection } from './vector-path-weld-plan';
+import { vectorRepairActions, type VectorRepairActions } from './vector-repair-actions';
 
-export type VectorPathActions = {
+export type VectorPathActions = VectorRepairActions & {
   readonly convertSelectionToPath: () => void;
   readonly weldSelection: () => void;
   // ADR-103 G1 — subject = bottom-most selected object, clips = the rest.
@@ -64,6 +65,7 @@ type VectorPathSet = (fn: (state: VectorPathState) => VectorPathMutation | Vecto
 
 export function vectorPathActions(set: VectorPathSet): VectorPathActions {
   return {
+    ...vectorRepairActions(set),
     convertSelectionToPath: () => set((state) => convertSelectionToPathMutation(state)),
     weldSelection: () => set((state) => weldSelectionMutation(state)),
     booleanSelection: (op) => set((state) => booleanSelectionMutation(state, op)),

@@ -4,23 +4,23 @@ Every runtime dependency, its exact version in this tree, and the decision that 
 
 ## The governing dependency policy
 
-**ADR-017** (`DECISIONS.md:498`) is the gate: a library must pass license, maintenance, fit,
+**ADR-017** (`DECISIONS.md:501`) is the gate: a library must pass license, maintenance, fit,
 size, and CVE review before adoption, and **library availability is explicitly not a
-scope-expansion trigger** (restated in ADR-006, `DECISIONS.md:296`). GPL-family packages are
-rejected outright so distribution options stay open (`PROJECT.md:19`), enforced by
+scope-expansion trigger** (restated in ADR-006, `DECISIONS.md:299`). GPL-family packages are
+rejected outright so distribution options stay open (`PROJECT.md:32`), enforced by
 `scripts/check-licenses.mjs` in CI.
 
 The result is a deliberately tiny runtime tree — **10 packages**, read from `package.json`:
 
 | Package | Version in tree | Role | Authority |
 |---|---|---|---|
-| `react` / `react-dom` | `^18.3.0` | UI | ADR-009 (`DECISIONS.md:352`) |
+| `react` / `react-dom` | `^18.3.0` | UI | ADR-009 (`DECISIONS.md:355`) |
 | `zustand` | `^4.5.0` | State, strict slices | ADR-009 |
-| `clipper2-ts` | `2.0.1-17` | The **only** geometry kernel dependency | ADR-098 §2 (`DECISIONS.md:4306`) |
-| `three` | `^0.180.0` | 3D relief / cut preview — UI only | ADR-102 (`DECISIONS.md:4555`), an explicit override of ADR-098 §2 |
-| `opentype.js` | `^2.0.0` | Text → outlines | ADR-012 (`DECISIONS.md:412`) |
-| `dompurify` | `^3.4.12` | SVG sanitization (untrusted input) | ADR-017; `PROJECT.md:355` requires ≥ 3.3.2 |
-| `imagetracerjs` | `^1.2.6` | Multi-colour trace fallback, **UI-unreachable** | ADR-123 (`DECISIONS.md:6166`) |
+| `clipper2-ts` | `2.0.1-17` | The **only** geometry kernel dependency | ADR-098 §2 (`DECISIONS.md:4561`) |
+| `three` | `^0.180.0` | 3D relief / cut preview — UI only | ADR-102 (`DECISIONS.md:4872`), an explicit override of ADR-098 §2 |
+| `opentype.js` | `^2.0.0` | Text → outlines | ADR-012 (`DECISIONS.md:415`) |
+| `dompurify` | `^3.4.12` | SVG sanitization (untrusted input) | ADR-017; `PROJECT.md:475` requires ≥ 3.3.2 |
+| `imagetracerjs` | `^1.2.6` | Multi-colour trace fallback, **UI-unreachable** | ADR-123 (`DECISIONS.md:6492`) |
 | `electron-updater` | `^6.8.9` | Desktop update feed, **inert** until signing exists | ADR-024/135 |
 | `lucide-static` | `^1.23.0` | Icon assets | **UNDECIDED — no ADR** found for this package |
 
@@ -28,7 +28,7 @@ Notable *absences*, each deliberate:
 
 - **No Immer.** The store uses spreads throughout; `produce` must not be imported (CLAUDE.md
   "Mutable state"). Immer is only an optional peer of Zustand and is absent from the tree.
-- **No Tailwind, no UI framework.** CSS Modules only (`PROJECT.md:349`).
+- **No Tailwind, no UI framework.** CSS Modules only (`PROJECT.md:466`).
 - **No potrace.** `potrace-wasm` was rejected on GPL grounds; ADR-123 removed the
   potrace-derived backend entirely to clear the MIT-release blocker.
 - **No CNCjs dependency.** Read as a protocol *reference* only (ADR-006 verification;
@@ -36,7 +36,7 @@ Notable *absences*, each deliberate:
 
 ## Why the architecture looks like this
 
-The shape is a direct response to a named failure. **ADR-002** (`DECISIONS.md:239`) records
+The shape is a direct response to a named failure. **ADR-002** (`DECISIONS.md:242`) records
 that LaserForge 1.0 scored well on pipeline correctness but the lived experience was shotgun
 surgery — fixes in one module broke others. The recorded verdict: a 9/10 module that breaks
 under maintenance is not 9/10. No code carried over.
@@ -70,9 +70,9 @@ through `index.ts`". Because elements are declared in folder mode, a deep path l
 
 ## Why GRBL is the centre of gravity
 
-**ADR-006** (`DECISIONS.md:296`) fixed the MVP on GRBL v1.1+ only, with `OutputStrategy` as
+**ADR-006** (`DECISIONS.md:299`) fixed the MVP on GRBL v1.1+ only, with `OutputStrategy` as
 the seam for later families. The wire authority is the `gnea/grbl` wiki — **archived since
-August 2019** (`PROJECT.md:570`). Actively maintained protocol-compatible forks are grblHAL,
+August 2019** (`PROJECT.md:709`). Actively maintained protocol-compatible forks are grblHAL,
 FluidNC, and µCNC.
 
 This matters for cross-referencing: our protocol reference is frozen, so where LightBurn or
@@ -83,7 +83,7 @@ reading that fork's own documentation.
 ## Language and type strictness
 
 TypeScript strict with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`
-(`PROJECT.md:348`). `any` is banned. Non-null assertions (`!`) are banned outside tests. State
+(`PROJECT.md:465`). `any` is banned. Non-null assertions (`!`) are banned outside tests. State
 that can be in N states is a discriminated union with `assertNever` in the default arm, so a
 new variant becomes a compile error at every switch — this is how new `SceneObject` kinds and
 new controller families land without silent gaps (ADR-014, ADR-094).
@@ -103,4 +103,4 @@ Answer each from LightBurn / Easel / Carbide Create documentation:
 3. **Archived-protocol risk.** Does LightBurn target grblHAL/FluidNC extensions we ignore
    because the 1.1h archive predates them?
 4. **Startup/shutdown block policy.** Does LightBurn let the user edit the preamble/postamble?
-   We hard-code it (`PROJECT.md:493`) — is that a parity gap or a safety advantage?
+   We hard-code it (`PROJECT.md:626`) — is that a parity gap or a safety advantage?

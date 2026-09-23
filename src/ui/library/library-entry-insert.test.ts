@@ -25,7 +25,7 @@ function entry(loadSvgText: () => Promise<string>): LibraryEntry {
     tags: ['test'],
     provenance: {
       sourceKind: 'owned',
-      sourceName: 'CurveDesk',
+      sourceName: 'KerfDesk',
       license: 'MIT',
       licenseId: 'MIT',
     },

@@ -7,9 +7,9 @@ import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
 
-// v7 preserves converted text winding and transformed stroke pens. Older
-// readers must not silently reinterpret these paths as different cutting regions.
-export const PROJECT_SCHEMA_VERSION = 7 as const;
+// v8 preserves per-copy variable sequence offsets. Older readers would repeat
+// one record on every badge if allowed to silently ignore this metadata.
+export const PROJECT_SCHEMA_VERSION = 8 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
@@ -28,6 +28,8 @@ export type ProjectOptimizationSettings = {
   readonly reduceTravelMoves: boolean;
   readonly travelPolicy: 'nearest-neighbor' | 'source-order';
   readonly insideFirst: boolean;
+  /** Opt-in removal of coincident laser Line spans within each operation. */
+  readonly removeOverlappingLines: boolean;
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
@@ -58,6 +60,7 @@ export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
+  removeOverlappingLines: false,
   layerPriority: 'project-order',
   pathDirection: 'allow-reverse',
   startPoint: 'machine-origin',

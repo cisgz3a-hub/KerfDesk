@@ -171,7 +171,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location: 'CNC Startup Setup → Tiling; File → Save G-code',
+    location: 'CNC Machine Setup → Tiling; File → Save G-code',
     prerequisites:
       'A CNC project and a physical plan for holding, indexing and referencing the stock.',
     visual: 'cnc-tiling',
@@ -197,7 +197,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
         title: 'Save the setup and export the files',
         examplePhase: 2,
         instruction:
-          'Save CNC startup setup, then use File → Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
+          'Save CNC machine setup, then use File → Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
         focus: 'Save setup → indexed files',
         result:
           'Each file contains the output for its own tile rather than one continuous machine run.',

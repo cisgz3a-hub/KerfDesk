@@ -8,6 +8,7 @@ import {
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -44,6 +45,7 @@ export function autofocusActions(
           workZReferenceEpoch: state.workZReferenceEpoch + 1,
           frameVerification: null,
           framedRun: null,
+          frameTrace: null,
           trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
           log: pushLog(
             state,
@@ -69,6 +71,7 @@ async function runOwnedAutofocus(
     autofocusBusy: true,
     controllerOperation: { kind: 'autofocus', phase: 'preflight', idleReports: 0 },
     framedRun: null,
+    frameTrace: null,
     frameVerification: null,
   });
   try {
@@ -103,7 +106,7 @@ function autofocusBlockMessage(state: LaserState, refs: LiveRefs): string | null
   if (state.autofocusBusy) return 'Auto-focus is already running.';
   if (
     state.pendingUntrackedAcks > 0 ||
-    (state.pendingTransportWrites ?? 0) > 0 ||
+    pendingTransportWriteCount(state) > 0 ||
     refs.controllerCommand !== null ||
     refs.controllerIdleWait !== null ||
     refs.controllerStatusWait != null

@@ -1,6 +1,8 @@
 // The renderer half of the packaged native smoke: evaluated in the Electron
 // window by native-smoke.ts, and in the browser suite against the real UI by
 // e2e/native-smoke-renderer.e2e.ts. It has no imports so both can load it.
+// src/ui/common/Toolbar.native-smoke-reach.test.tsx pins the toolbar side of
+// the contract (accessible names, More items as menuitems) in the fast suite.
 
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

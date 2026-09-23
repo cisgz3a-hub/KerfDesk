@@ -58,6 +58,17 @@ describe('AdjustImageDialog', () => {
       click(host, 'input[name="negativeImage"]');
       click(host, 'input[name="passThrough"]');
 
+      for (const name of ['minPower', 'dotWidthCorrectionMm']) {
+        expect(host.querySelector<HTMLInputElement>(`[name="${name}"]`)?.disabled).toBe(false);
+      }
+      expect(host.textContent).toContain('masks and dot-width correction still apply');
+      click(host, 'input[name="passThrough"]');
+      expect(host.querySelector<HTMLInputElement>('input[name="brightness"]')?.value).toBe('25');
+      expect(host.querySelector<HTMLInputElement>('input[name="brightness"]')?.disabled).toBe(
+        false,
+      );
+      click(host, 'input[name="passThrough"]');
+
       expect(onApply).not.toHaveBeenCalled();
 
       await act(async () => {

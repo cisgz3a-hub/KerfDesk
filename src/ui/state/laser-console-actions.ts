@@ -219,6 +219,7 @@ function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCo
   // mutated controller or accessory state against the prior Frame permit.
   set((state) => ({
     framedRun: null,
+    frameTrace: null,
     ...(hasAccessoryCommand(command.normalized)
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),
@@ -314,6 +315,7 @@ function consoleStateEffectPatch(
     homingProof: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
   };
   switch (effect) {
@@ -378,6 +380,7 @@ function consoleObservationPatch(
     statusReport: null,
     statusObservation: null,
     framedRun: null,
+    frameTrace: null,
     ...(hasAccessoryCommand(command)
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),

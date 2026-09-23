@@ -9,6 +9,7 @@ import {
   type NativeXyBounds,
 } from '../../core/devices/native-bed-frame';
 import type { SessionObservationStamp } from './laser-controller-observation';
+import { memoizeOnInputs } from './memoize-on-inputs';
 
 export type NativeBedEvidence = {
   readonly controllerSessionEpoch?: number;
@@ -36,6 +37,25 @@ export function nativeBedEvidenceSnapshot(source: Required<NativeBedEvidence>): 
     homingState: source.homingState,
   };
 }
+
+// The evidence changes only on connect, settings/build reads and homing, yet
+// laser-store selectors run on every set (~3 per acknowledged line while a job
+// streams). Hand back the same snapshot until one of its fields changes, so
+// selectors key on its identity instead of stringifying it per set.
+export const selectNativeBedEvidence = memoizeOnInputs(
+  (source: Required<NativeBedEvidence>) => [
+    source.controllerSessionEpoch,
+    source.controllerSettings,
+    source.controllerSettingsObservation,
+    source.controllerBuildInfo,
+    source.controllerBuildInfoObservation,
+    source.activeControllerKind,
+    source.activeControllerCommandSet,
+    source.detectedControllerKind,
+    source.homingState,
+  ],
+  nativeBedEvidenceSnapshot,
+);
 
 export const UNKNOWN_NATIVE_BED_MESSAGE =
   'The controller-to-bed coordinate mapping is unverified. The canvas is artwork-relative; physical bed position and no-go-zone clearance must be checked at the machine.';

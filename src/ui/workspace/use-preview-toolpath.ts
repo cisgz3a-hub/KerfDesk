@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
-import { resolvePreviewJobPlacement, type JobPlacementSettings } from '../job-placement';
+import type { ResolvedJobPlacement } from '../job-placement';
 import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath } from './draw-preview';
@@ -22,6 +22,7 @@ import {
   useRuntimeCoordinatePreparation,
   type RuntimeCoordinatePreparation,
 } from '../use-runtime-coordinate-preparation';
+import { usePreviewJobPlacement } from '../use-preview-job-placement';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -40,13 +41,12 @@ export function usePreviewToolpath(
   const [toolpath, setToolpath] = useState<PreviewToolpath | null>(null);
   const outputScope = useOutputScope();
 
-  // Resolve the placement during render (cheap) and key the rebuild on the
-  // RESOLVED placement, not the raw statusReport — a connected controller stores
-  // a fresh report object every 250 ms poll, but in absolute/user/verified modes
-  // the resolved placement is byte-identical across polls, so the preview should
-  // not rebuild. In current-position mode the origin tracks mPos, so the key
-  // changes as the head moves (a legitimate rebuild).
-  const placement = usePreviewPlacement(jobPlacement);
+  // Key the rebuild on the RESOLVED placement, not the raw statusReport — a
+  // connected controller stores a fresh report object every 250 ms poll, but in
+  // absolute/user/verified modes the resolved placement is byte-identical across
+  // polls, so the preview should not rebuild. In current-position mode the
+  // origin tracks the settled head, so a settled move is a legitimate rebuild.
+  const placement = usePreviewJobPlacement(jobPlacement);
   const coordinateOptions = useRuntimeCoordinatePreparation(project.device, placement);
   const placementKey = useMemo(() => JSON.stringify(placement), [placement]);
   // The scheduled build reads the latest resolved placement via a ref so the
@@ -104,7 +104,7 @@ export function usePreviewToolpath(
 function runScheduledPreviewBuild(args: {
   readonly project: Project;
   readonly externalGcodePreview: ReturnType<typeof useStore.getState>['externalGcodePreview'];
-  readonly placement: ReturnType<typeof usePreviewPlacement>;
+  readonly placement: ResolvedJobPlacement;
   readonly coordinateOptions: RuntimeCoordinatePreparation;
   readonly outputScope: NonNullable<LargeJobPreparationOptions['outputScope']>;
   readonly initialPosition: LargeJobPreparationOptions['initialPosition'];
@@ -169,24 +169,6 @@ function previewPreparationOptions(
     ...(initialPosition === undefined ? {} : { initialPosition }),
     outputScope,
   };
-}
-
-function usePreviewPlacement(jobPlacement: JobPlacementSettings) {
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const workOriginActive = useLaserStore((state) => state.workOriginActive);
-  const wcoCache = useLaserStore((state) => state.wcoCache);
-  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  return useMemo(() => {
-    // Preview does not move the machine: work-zero-relative modes take the
-    // export fallback so they can be inspected before the controller origin is
-    // set; Start still uses resolveJobPlacement and remains blocked.
-    return resolvePreviewJobPlacement(jobPlacement, {
-      statusReport,
-      workOriginActive,
-      wcoCache,
-      reportInches,
-    });
-  }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
 }
 
 function hasVariableText(project: Project): boolean {

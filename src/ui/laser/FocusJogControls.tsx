@@ -15,7 +15,13 @@ export function FocusJogControls(props: {
   const supportsZAxis = profileSupportsCapability(props.device, 'z-axis');
   const isCncMachine = props.machineKind === 'cnc';
   if (!supportsZAxis && !isCncMachine) {
-    return <p style={hintStyle}>Manual focus: adjust the laser head by hand.</p>;
+    return (
+      <p style={hintStyle}>
+        {props.device.autofocusCommand.trim() === ''
+          ? 'Manual focus: adjust the laser head by hand.'
+          : 'Use Auto-focus in the machine controls to focus this head.'}
+      </p>
+    );
   }
   const ready = focusJogReady(props.device, props.machineKind);
   const disabled = props.disabled || !ready;

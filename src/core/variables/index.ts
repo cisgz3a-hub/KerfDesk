@@ -1,5 +1,10 @@
 export { parseVariableCsv, type CsvParseResult } from './parse-csv';
 export {
+  advanceVariableSequenceBy,
+  variableCopyOffset,
+  nextProjectVariableSequence,
+} from './sequence-offset';
+export {
   evaluateVariableTemplate,
   type VariableEvaluationContext,
   type VariableEvaluationResult,

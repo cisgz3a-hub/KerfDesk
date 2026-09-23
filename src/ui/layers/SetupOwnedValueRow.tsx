@@ -7,6 +7,7 @@ export function SetupOwnedValueRow(props: {
   readonly value: string;
   readonly description: string;
   readonly setupField: CncStartupSetupField;
+  readonly compact?: boolean;
 }): JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false);
   const explanationId = useId();
@@ -21,18 +22,20 @@ export function SetupOwnedValueRow(props: {
         className="lf-setup-reference-button"
         aria-expanded={isExpanded}
         aria-controls={explanationId}
-        aria-label={`${props.label}: ${props.value}. Managed in Startup Setup.`}
-        title="Read-only here. Select to learn more or edit it in Startup Setup."
-        style={referenceButtonStyle}
+        aria-label={`${props.label}: ${props.value}. Managed in Machine Setup.`}
+        title="Read-only here. Select to learn more or edit it in Machine Setup."
+        style={props.compact ? compactReferenceButtonStyle : referenceButtonStyle}
         onClick={() => setIsExpanded((current) => !current)}
       >
         <span style={labelStyle}>{props.label}</span>
         <span className="lf-setup-reference-value" style={valueStyle}>
           {props.value}
         </span>
-        <span aria-hidden="true" style={infoStyle}>
-          Info
-        </span>
+        {props.compact ? null : (
+          <span aria-hidden="true" style={infoStyle}>
+            Info
+          </span>
+        )}
       </button>
       {isExpanded ? (
         <div id={explanationId} role="note" style={explanationStyle}>
@@ -48,9 +51,9 @@ export function SetupOwnedValueRow(props: {
             <button
               type="button"
               onClick={handleEdit}
-              title={`Open Startup Setup at ${props.label}.`}
+              title={`Open Machine Setup at ${props.label}.`}
             >
-              Edit in Startup Setup
+              Edit in Machine Setup
             </button>
           </div>
         </div>
@@ -75,6 +78,15 @@ const referenceButtonStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 4,
   cursor: 'pointer',
+};
+
+const compactReferenceButtonStyle: React.CSSProperties = {
+  ...referenceButtonStyle,
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  gap: '2px 6px',
+  padding: '3px 5px',
 };
 
 const labelStyle: React.CSSProperties = { fontSize: 12 };
