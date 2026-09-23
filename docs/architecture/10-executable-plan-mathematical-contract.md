@@ -54,7 +54,7 @@ samples. The host does not compare them with the plan and emit corrective motion
 `A:E` value is a boolean spindle-encoder fault boundary, not continuous axis position or cutting-
 load feedback. A particular machine/controller may implement internal closed-loop hardware, but
 that is hardware/firmware capability outside what the current host source can prove. Therefore a
-wood-only position shift cannot be attributed to one cause from CurveDesk source alone.
+wood-only position shift cannot be attributed to one cause from KerfDesk source alone.
 
 ## 2. v1 construction
 

@@ -2101,7 +2101,7 @@ ADR-279.*
    serial value; each later slot advances by the existing `Advance by` value. Grid order is
    row-major. Circular imposition remains deferred until its variable-width collision behavior is
    specified.
-3. CurveDesk materializes every slot against one captured clock before showing the result. Layout
+3. KerfDesk materializes every slot against one captured clock before showing the result. Layout
    uses the maximum rendered envelope across the batch, so a longer later value cannot silently
    overlap its neighbour.
 4. Preview, Save Project, and Frame do not consume records; Save Project also does not persist the
@@ -3297,7 +3297,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    shallowest levels produce regions (possibly none) — correct: there is
    nothing to rough without cutting into finishing stock.
 2. Roughing requests physical heightmap cells at exactly bit diameter / 8 in
-   the final scaled metric; CurveDesk attempts that exact derived allocation
+   the final scaled metric; KerfDesk attempts that exact derived allocation
    with no 0.2 mm floor or four-million-cell coarsening, and reports an
    unrepresentable or failed allocation as a factual materialization error.
 3. Each depth level emits at most 4,096 inward rings. A non-emitting next-inset
@@ -3446,7 +3446,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    that the requested angle was not applied. Output remains available.
 6. A project saved before `vCarveFlatDepthEnabled` existed keeps its historical
    requested depth cap and opens with **Flat depth** enabled. Turning the switch
-   off is the explicit migration to ordinary flowing depth; CurveDesk does not
+   off is the explicit migration to ordinary flowing depth; KerfDesk does not
    silently reinterpret the old project.
 
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
@@ -4696,7 +4696,7 @@ and lifts the command's CNC-only gate.)*
    opens Job Review. It names physical workholding/clearance and every common
    competing command path: pendant/MPG, WebUI/network, another sender app, PLC
    motion or spindle commands, controller macros, and SD/file jobs.
-2. The operator confirms CurveDesk is the sole command owner while emergency-
+2. The operator confirms KerfDesk is the sole command owner while emergency-
    stop, safety-door, and feed-hold circuits remain enabled.
 3. The resulting evidence is bound to the permit's exact program fingerprint plus
    the current trusted-position and work-Z-reference epochs before claim/stream.
@@ -4842,7 +4842,7 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. Choose **File -> Import Height Map...** and select one or more PNG files. This
    command is deliberately separate from **Import Image...**: it declares that
-   tone is physical relief data rather than asking CurveDesk to infer 3D shape
+   tone is physical relief data rather than asking KerfDesk to infer 3D shape
    from a photograph.
 2. A qualified input is a lossless, non-interlaced PNG containing either 8- or
    16-bit grayscale samples, or 8-bit grayscale-plus-alpha samples. The
@@ -4859,12 +4859,12 @@ and lifts the command's CNC-only gate.)*
    and, in CNC mode when that relief is selected, the Relief properties panel shows the pixel
    dimensions, precision, and persisted declared source meaning **Depth map**. A loaded canonical
    project instead shows whichever of the five validated source meanings it actually stores;
-   CurveDesk does not infer or edit that value in this flow. **Recorded source details** separately
+   KerfDesk does not infer or edit that value in this flow. **Recorded source details** separately
    lists the persisted source name, optional source bit depth and source polarity, and optional
    producer name/model/version. A blank or absent value reads **Not recorded**, and the panel says
    the metadata is recorded, not authenticated. **Recorded source polarity** describes the source
    declaration; the editable mapping below controls the current materialization and may differ. A
-   legacy-mesh relief has no canonical provenance object, so CurveDesk does not fabricate this group.
+   legacy-mesh relief has no canonical provenance object, so KerfDesk does not fabricate this group.
    The success toast always explains that the relief is stored in either machine mode and that
    output geometry is generated only in CNC mode, including when the mode changes during import.
 4. For a selected canonical heightfield only, the CNC Relief properties panel shows a read-only
@@ -4898,20 +4898,20 @@ and lifts the command's CNC-only gate.)*
    result once. Under **Stretch**, Width and Height are independent, so Width retains the current
    canonical Height. After the existing machine-space conversion yields an accepted positive finite
    canonical Width patch, a derived Height that correctly rounds to `0` or `Infinity` does not
-   rewrite that patch: CurveDesk retains the prior Height and records **Stretch**. It neither rejects
+   rewrite that patch: KerfDesk retains the prior Height and records **Stretch**. It neither rejects
    nor clamps the accepted patch and adds no confirmation. This repair does not change the editor's
    machine-space-to-stored-Width conversion. Every real heightfield Width edit synchronizes the
    canonical and duplicate Width values and rebuilds natural bounds from the updated canonical
    dimensions. A legacy mesh keeps its existing target-Width and stored-natural-bounds-aspect rule
    before the separate exact bounded re-expression below.
    If resolved heightfield dimensions exceed project v4's existing `1,000,000 mm` coordinate domain,
-   CurveDesk uses the smallest common power-of-two factor that can divide both canonical dimensions
+   KerfDesk uses the smallest common power-of-two factor that can divide both canonical dimensions
    and multiply both nonzero scale axes exactly. It adopts that internal re-factor only when the
    dimensions and scales reverse exactly, remain inside the unchanged project domains, preserve both
    native machine-space dimensions, and keep every finite transformed corner bit-identical.
    The same persistence boundary applies to a legacy mesh after a positive finite stored Width patch
    has been accepted. If target Width or either natural-bound span exceeds the coordinate domain,
-   CurveDesk chooses the smallest common power-of-two factor that brings all three local values into
+   KerfDesk chooses the smallest common power-of-two factor that brings all three local values into
    range, divides target Width and both natural-bound dimensions by that factor, and multiplies both
    signed scale axes by it. The candidate is adopted only when every multiply/divide reverses exactly,
    scales remain inside their existing domain, all four transformed natural-bound corners stay finite
@@ -4928,7 +4928,7 @@ and lifts the command's CNC-only gate.)*
    The synchronous O(n) scan has no browser or packaged-Electron latency qualification in this slice.
    Independent-axis-only encodings, exact-zero compatibility, scale exhaustion, non-reversible
    subnormal factors, non-finite or drifting transformed geometry, and native division that rounds a
-   positive finite displayed Width to `0` or `Infinity` remain outside this bounded repair. CurveDesk
+   positive finite displayed Width to `0` or `Infinity` remain outside this bounded repair. KerfDesk
    does not reject, restore, clamp, cap, approximate, delay, or confirm those edits; an exceptional
    project can still remain outside the saveable v4 domain. Full durability requires a future
    intent-versus-materialized-geometry representation. Corrected canonical dimensions can change
@@ -5104,7 +5104,7 @@ and lifts the command's CNC-only gate.)*
    mask length, invalid inclusion threshold, non-finite physical mapping, or digest
    mismatch reports the exact factual integrity problem and creates no object.
 2. A source whose declared format cannot preserve the selected mode reports what
-   is unsupported. CurveDesk does not silently flatten alpha, reduce 16-bit data
+   is unsupported. KerfDesk does not silently flatten alpha, reduce 16-bit data
    through a display canvas, color-manage raw depth codes, invent missing depth,
    or relabel RGB brightness as measured geometry.
 3. Failure or cancellation leaves the project unchanged and offers **Retry** or
@@ -5133,7 +5133,7 @@ and lifts the command's CNC-only gate.)*
    applied. The planned creation surface adds histogram and clipped-sample percentages. Unusually
    coarse effective cell size remains disclosed rather than silently corrected.
 3. Large sources use worker decode with byte/row progress and cooperative Escape
-   cancellation. Size and estimated memory are advisories. CurveDesk neither
+   cancellation. Size and estimated memory are advisories. KerfDesk neither
    invents a policy ceiling nor silently downsamples; any operator-selected
    reduction displays the resulting dimensions and millimetres per cell.
 4. A canonical source name or any present producer string may be blank. Source
@@ -5250,7 +5250,7 @@ and lifts the command's CNC-only gate.)*
    or converted to a floor behind the operator's back.
 
 #### Edge - resolution, spacing, reach, and simulation limits
-1. If source/CAM resolution changes for a requested preview, CurveDesk displays the
+1. If source/CAM resolution changes for a requested preview, KerfDesk displays the
    requested and effective cell spacing before treating the result as current. It
    does not silently coarsen the canonical heightfield cell count. This slice preserves
    the established Stepover and scallop editor/planner ranges from current main.
@@ -5312,7 +5312,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Error - persistence, preparation, or transport factually fails
 1. Autosave quota/write/digest failure does not replace a previously committed
-   manifest; when one exists it remains eligible for recovery, and CurveDesk
+   manifest; when one exists it remains eligible for recovery, and KerfDesk
    discloses that the newest state is not autosaved. Manual Save validates and
    writes the self-contained in-memory project; no relief authority exists only as
    a local ID.
@@ -5343,7 +5343,7 @@ and lifts the command's CNC-only gate.)*
 4. Wood dust extraction, guarding, workholding, tool reach, spindle/tool condition,
    fire risk, and material response remain operator/machine-system responsibilities.
    They are disclosed in review and qualification records, not represented as facts
-   proved by CurveDesk's preview or G-code tests.
+   proved by KerfDesk's preview or G-code tests.
 5. Current large-field recovery evidence covers committed Chrome IndexedDB state
    across reload and real two-window Web Locks. Abrupt process/power loss, packaged
    Electron restart, target-device quota, peak memory, and renderer responsiveness

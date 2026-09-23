@@ -1,5 +1,5 @@
 // Bundled Design Library manifest (ADR-105 G11). Customer artwork uses one
-// pinned, provenance-complete visual family; CurveDesk templates remain
+// pinned, provenance-complete visual family; KerfDesk templates remain
 // geometry-only and flow through the normal SVG insertion path.
 
 import { OWNED_TEMPLATE_ENTRIES } from './design-library-owned-svg';
