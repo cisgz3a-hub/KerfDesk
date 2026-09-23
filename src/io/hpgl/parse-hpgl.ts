@@ -5,6 +5,7 @@ import { hpglCommands } from './hpgl-tokenizer';
 import { createHpglState, executeHpgl } from './hpgl-interpreter';
 import { flushStroke } from './hpgl-paths';
 import { hpglResult } from './hpgl-result';
+import { noteHpglImportSize } from './hpgl-size-advisory';
 import { HpglError, type ParseHpglResult } from './hpgl-types';
 
 export function parseHpgl(args: {
@@ -13,8 +14,13 @@ export function parseHpgl(args: {
   readonly source: string;
 }): ParseHpglResult {
   const state = createHpglState();
+  const sourceSize = { textLength: args.text.length, commands: 0, numbers: 0 };
   try {
-    for (const command of hpglCommands(args.text)) executeHpgl(state, command);
+    for (const command of hpglCommands(args.text)) {
+      sourceSize.commands += 1;
+      sourceSize.numbers += command.values.length;
+      executeHpgl(state, command);
+    }
     if (state.polygonMode)
       throw new HpglError(
         'unterminated-polygon',
@@ -22,6 +28,7 @@ export function parseHpgl(args: {
         state.command,
       );
     flushStroke(state);
+    noteHpglImportSize(state, sourceSize);
     return hpglResult(state, args);
   } catch (error) {
     const failure =

@@ -1,12 +1,7 @@
 import type { ColoredPath, ImportedSvg, Polyline, Vec2 } from '../../core/scene';
 
-export const HPGL_IMPORT_LIMITS = {
-  textLength: 8_000_000,
-  commands: 100_000,
-  numbers: 1_000_000,
-  points: 250_000,
-  paths: 50_000,
-} as const;
+// An individual generated point array uses JavaScript's actual array representation.
+const MAX_ARRAY_LENGTH = 2 ** 32 - 1;
 
 export const HPGL_SUPPORTED_COMMANDS = [
   'IN',
@@ -147,14 +142,21 @@ export function finitePoint(point: Vec2, command: HpglCommand): Vec2 {
 }
 
 export function reservePoints(state: HpglState, count: number): void {
-  state.workPoints += count;
-  if (!Number.isSafeInteger(count) || count < 0 || state.workPoints > HPGL_IMPORT_LIMITS.points) {
+  if (!Number.isSafeInteger(count) || count < 0) {
     throw new HpglError(
-      'limit-exceeded',
-      `Import exceeds ${HPGL_IMPORT_LIMITS.points} generated points.`,
+      'invalid-geometry',
+      'Generated point counts must be nonnegative safe integers.',
       state.command,
     );
   }
+  if (count > MAX_ARRAY_LENGTH) {
+    throw new HpglError(
+      'unrepresentable-geometry',
+      'A generated point array exceeds the JavaScript array representation.',
+      state.command,
+    );
+  }
+  state.workPoints += count;
 }
 
 export function note(state: HpglState, code: string, message: string): void {

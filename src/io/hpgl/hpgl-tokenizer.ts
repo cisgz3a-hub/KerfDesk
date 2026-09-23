@@ -1,9 +1,4 @@
-import {
-  HPGL_IMPORT_LIMITS,
-  HPGL_SUPPORTED_COMMANDS,
-  HpglError,
-  type HpglCommand,
-} from './hpgl-types';
+import { HPGL_SUPPORTED_COMMANDS, HpglError, type HpglCommand } from './hpgl-types';
 
 const NUMBER = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)/y;
 const LETTER = /[a-z]/i;
@@ -12,15 +7,7 @@ const SUPPORTED: ReadonlySet<string> = new Set(HPGL_SUPPORTED_COMMANDS);
 
 /** Full-token ASCII grammar; never recovers by skipping unrecognised source bytes. */
 export function* hpglCommands(text: string): Generator<HpglCommand> {
-  if (text.length > HPGL_IMPORT_LIMITS.textLength) {
-    throw new HpglError(
-      'limit-exceeded',
-      `Input exceeds ${HPGL_IMPORT_LIMITS.textLength} characters.`,
-    );
-  }
   let index = 0;
-  let commands = 0;
-  let numbers = 0;
   while (index < text.length) {
     if (SPACE.test(text.charAt(index)) || text[index] === ';') {
       index += 1;
@@ -36,8 +23,6 @@ export function* hpglCommands(text: string): Generator<HpglCommand> {
         `Unsupported command ${name}. No partial artwork was imported; convert unsupported content to outlines or export SVG/DXF.`,
         location,
       );
-    if (++commands > HPGL_IMPORT_LIMITS.commands)
-      throw new HpglError('limit-exceeded', 'Too many commands.', location);
     index += 2;
     if (name === 'CO') {
       index = skipComment(text, index, location);
@@ -46,9 +31,6 @@ export function* hpglCommands(text: string): Generator<HpglCommand> {
     }
     const parsed = readValues(text, index, location);
     index = parsed.index;
-    numbers += parsed.values.length;
-    if (numbers > HPGL_IMPORT_LIMITS.numbers)
-      throw new HpglError('limit-exceeded', 'Too many numeric parameters.', location);
     yield { ...location, values: parsed.values };
   }
 }
@@ -72,8 +54,6 @@ function readValues(text: string, start: number, command: Pick<HpglCommand, 'nam
     checkSeparator(values.length, spaced || afterComma, char, command);
     const numeric = readNumber(text, index, command);
     values.push(numeric.value);
-    if (values.length > HPGL_IMPORT_LIMITS.numbers)
-      throw new HpglError('limit-exceeded', 'Too many numeric parameters.', command);
     afterComma = false;
     index = numeric.end;
   }

@@ -1,12 +1,5 @@
 import type { Polyline, Vec2 } from '../../core/scene';
-import {
-  finitePoint,
-  HPGL_IMPORT_LIMITS,
-  HpglError,
-  note,
-  reservePoints,
-  type HpglState,
-} from './hpgl-types';
+import { finitePoint, note, reservePoints, type HpglState } from './hpgl-types';
 
 export function equalPoint(a: Vec2, b: Vec2): boolean {
   return a.x === b.x && a.y === b.y;
@@ -61,16 +54,6 @@ export function emitPolylines(
   const usable = polylines.filter((line) => line.points.length >= 2);
   if (usable.length === 0) return;
   for (const line of usable) state.outputPoints += line.points.length;
-  if (
-    state.outputPoints > HPGL_IMPORT_LIMITS.points ||
-    state.paths.length >= HPGL_IMPORT_LIMITS.paths
-  ) {
-    throw new HpglError(
-      'limit-exceeded',
-      'Expanded geometry exceeds the HPGL import point/path budget.',
-      state.command,
-    );
-  }
   state.paths.push({
     pen: state.pen,
     polylines: usable,

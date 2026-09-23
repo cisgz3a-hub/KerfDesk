@@ -91,7 +91,7 @@ function createPenColors(): (pen: number) => string {
     if (known !== undefined) return known;
     let color: string;
     do {
-      // Odd multiplication is a permutation modulo 2^24; the path budget is far smaller.
+      // Odd multiplication permutes the 24-bit colour space; skip the base palette.
       ordinal += 1;
       color = `#${((ordinal * 0x9e3779) % 0x1000000).toString(16).padStart(6, '0')}`;
     } while (reserved.has(color));

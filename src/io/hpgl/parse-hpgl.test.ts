@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HPGL_IMPORT_LIMITS, parseHpgl } from './index';
+import { parseHpgl } from './index';
 
 function parse(text: string) {
   return parseHpgl({ text, id: 'plot', source: 'design.plt' });
@@ -188,6 +188,7 @@ describe('strict HPGL geometry import', () => {
     'PD0x10,20',
     'SP1.5',
     'SP-1',
+    'SP9007199254740992',
     'CI0',
     'AA0,0,90,0',
     'AA0,0,99999',
@@ -204,21 +205,6 @@ describe('strict HPGL geometry import', () => {
     expect(parse(`${style};SP1;PD40,0;`)).toMatchObject({
       kind: 'error',
       diagnostics: [{ severity: 'error' }],
-    });
-  });
-
-  it('bounds source size, generated arc work and repeated polygon output expansion', () => {
-    expect(parse(' '.repeat(HPGL_IMPORT_LIMITS.textLength + 1))).toMatchObject({
-      kind: 'error',
-      diagnostics: [{ code: 'limit-exceeded' }],
-    });
-    expect(parse(`SP1;PU40,0;PD;${'AA0,0,32767,.5;'.repeat(5)}`)).toMatchObject({
-      kind: 'error',
-      diagnostics: [{ code: 'limit-exceeded' }],
-    });
-    expect(parse(`SP1;PM0;CI40,.5;PM2;${'EP;'.repeat(350)}`)).toMatchObject({
-      kind: 'error',
-      diagnostics: [{ code: 'limit-exceeded' }],
     });
   });
 });
