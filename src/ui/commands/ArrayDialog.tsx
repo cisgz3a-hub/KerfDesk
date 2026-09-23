@@ -10,9 +10,13 @@ import {
 export function ArrayDialog(props: {
   readonly selectionBounds: Bounds;
   readonly onCancel: () => void;
-  readonly onApply: (spec: ArraySpec) => void;
+  readonly onApply: (spec: ArraySpec, advanceVariables?: boolean) => void;
+  readonly hasVariableText?: boolean;
+  readonly errorMessage?: string;
+  readonly preparing?: boolean;
 }): JSX.Element {
   const [mode, setMode] = useState<ArraySpec['kind']>('grid');
+  const [advanceVariables, setAdvanceVariables] = useState(false);
   const [rows, setRows] = useState('2');
   const [columns, setColumns] = useState('2');
   const [spacingX, setSpacingX] = useState('2');
@@ -45,22 +49,12 @@ export function ArrayDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        props.onApply(arraySpecFromDraft(mode, draft));
+        const spec = arraySpecFromDraft(mode, draft);
+        if (mode === 'grid' && advanceVariables) props.onApply(spec, true);
+        else props.onApply(spec);
       }}
     >
-      <div role="tablist" aria-label="Array type" style={tabsStyle}>
-        <ModeButton active={mode === 'grid'} label="Grid" onClick={() => setMode('grid')} />
-        <ModeButton
-          active={mode === 'point-rotation'}
-          label="Point Rotation"
-          onClick={() => setMode('point-rotation')}
-        />
-        <ModeButton
-          active={mode === 'circular'}
-          label="Circular"
-          onClick={() => setMode('circular')}
-        />
-      </div>
+      <ArrayModes mode={mode} onChange={setMode} />
       {mode === 'grid' ? (
         <GridArrayFields
           values={{ rows, columns, spacingX, spacingY }}
@@ -77,6 +71,13 @@ export function ArrayDialog(props: {
           setters={{ setCount, setCenterX, setCenterY, setRadius, setStartAngle, setRotateCopies }}
         />
       )}
+      <VariableArrayOption
+        visible={mode === 'grid' && props.hasVariableText === true}
+        checked={advanceVariables}
+        onChange={setAdvanceVariables}
+      />
+      {props.preparing === true ? <p role="status">Preparing variable copies…</p> : null}
+      {props.errorMessage === undefined ? null : <p role="alert">{props.errorMessage}</p>}
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
@@ -84,6 +85,58 @@ export function ArrayDialog(props: {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function ArrayModes(props: {
+  readonly mode: ArraySpec['kind'];
+  readonly onChange: (mode: ArraySpec['kind']) => void;
+}): JSX.Element {
+  return (
+    <div role="tablist" aria-label="Array type" style={tabsStyle}>
+      <ModeButton
+        active={props.mode === 'grid'}
+        label="Grid"
+        onClick={() => props.onChange('grid')}
+      />
+      <ModeButton
+        active={props.mode === 'point-rotation'}
+        label="Point Rotation"
+        onClick={() => props.onChange('point-rotation')}
+      />
+      <ModeButton
+        active={props.mode === 'circular'}
+        label="Circular"
+        onClick={() => props.onChange('circular')}
+      />
+    </div>
+  );
+}
+
+function VariableArrayOption(props: {
+  readonly visible: boolean;
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}): JSX.Element | null {
+  if (!props.visible) return null;
+  return (
+    <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+      <label>
+        <input
+          type="checkbox"
+          checked={props.checked}
+          onChange={(event) => props.onChange(event.currentTarget.checked)}
+        />{' '}
+        Advance variables per copy
+      </label>
+      {props.checked ? (
+        <p style={{ margin: 0, fontSize: 13 }}>
+          Records run left to right in each row, using Advance by and wrapping at range ends.
+          Spacing fits all current values. Later data changes keep your placements; preview again.
+          Creating copies does not advance the current record.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

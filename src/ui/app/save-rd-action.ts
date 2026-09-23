@@ -17,6 +17,9 @@ import {
 } from '../laser/output-preparation-errors';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { SaveGcodeCtx } from './file-actions';
+import { advanceExportVariables } from './advance-export-variables';
+import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
+import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const RD_EXPERIMENTAL_WARNING =
   'EXPERIMENTAL .rd export: the encoding follows public Ruida research and has NOT been verified on a real controller. Preview the file on the machine panel and test on scrap first.';
@@ -25,11 +28,15 @@ export async function handleSaveRd(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): Promise<void> {
+  const snapshot = captureProjectOutputSnapshot(ctx.project);
   const options: EmitRdOptions = {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
   };
-  if (!outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)) {
+  if (
+    snapshot === undefined &&
+    !outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
+  ) {
     const result = emitRdFile(ctx.project, options);
     if (!result.ok) return showRdFailure(result.messages);
     const target = await pickRdTarget(ctx);
@@ -41,7 +48,7 @@ export async function handleSaveRd(
   // compile on the browser thread.
   const target = await pickRdTarget(ctx);
   if (target === null) return;
-  const result = await prepareBackgroundRd(ctx, options);
+  const result = await prepareBackgroundRd(ctx, options, snapshot);
   if (result === null) return;
   if (!result.ok) return showRdFailure(result.messages);
   await writeRdResult(ctx, target, result);
@@ -62,8 +69,14 @@ async function pickRdTarget(ctx: SaveGcodeCtx): Promise<SaveTarget | null> {
 async function prepareBackgroundRd(
   ctx: SaveGcodeCtx,
   options: EmitRdOptions,
+  snapshot: OutputSnapshotRequest | undefined,
 ): Promise<EmitRdResult | null> {
-  const pending = prepareRdOutputOffThread({ kind: 'rd', project: ctx.project, options });
+  const pending = prepareRdOutputOffThread({
+    kind: 'rd',
+    project: ctx.project,
+    options,
+    ...(snapshot === undefined ? {} : { snapshot }),
+  });
   if (pending === null) {
     showBackgroundUnavailable();
     return null;
@@ -86,6 +99,7 @@ async function writeRdResult(
     // Copy the Uint8Array view into an exact-size plain ArrayBuffer-backed view
     // so Blob cannot accidentally include bytes outside a future subarray.
     await target.write(new Blob([new Uint8Array(result.bytes)]));
+    advanceExportVariables(ctx);
     ctx.pushToast(`Saved .rd job to ${target.displayName}`, 'success');
     for (const advisory of result.advisories) {
       ctx.pushToast(advisory.message, 'warning');
