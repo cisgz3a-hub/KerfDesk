@@ -3,6 +3,8 @@ import {
   combinedBBox,
   sceneObjectHasVisibleLayer,
   type ArraySpec,
+  type Bounds,
+  type Project,
   type SceneGroup,
   type SceneObject,
 } from '../../core/scene';
@@ -14,41 +16,50 @@ import type { AppState } from './store';
 
 export { placedObject } from './array-selection-copies';
 
-export type ArrayActions = { readonly arraySelection: (spec: ArraySpec) => void };
+export type ArrayMaterialization = {
+  readonly bounds: Bounds;
+  readonly sources: ReadonlyArray<ReadonlyArray<SceneObject>>;
+};
+export type ArrayActions = {
+  readonly arraySelection: (
+    spec: ArraySpec,
+    materialized?: ArrayMaterialization,
+    expectedProject?: Project,
+  ) => void;
+};
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function arrayActions(set: Setter): ArrayActions {
-  return { arraySelection: (spec) => set((state) => applyArraySelection(state, spec)) };
+  return {
+    arraySelection: (spec, materialized, expectedProject) =>
+      set((state) =>
+        expectedProject !== undefined && state.project !== expectedProject
+          ? {}
+          : applyArraySelection(state, spec, undefined, materialized),
+      ),
+  };
 }
 
 export function applyArraySelection(
   state: AppState,
   spec: ArraySpec,
   idFactory: () => string = () => crypto.randomUUID(),
+  materialized?: ArrayMaterialization,
 ): AppState | Partial<AppState> {
-  const selectedIds = selectionIds(state);
-  const selected = state.project.scene.objects.filter((object) => selectedIds.has(object.id));
-  if (
-    selected.length === 0 ||
-    selected.some(
-      (object) =>
-        object.locked === true || !sceneObjectHasVisibleLayer(state.project.scene, object),
-    )
-  ) {
-    return state;
-  }
-  const bounds = combinedBBox(selected);
-  if (bounds === null) return state;
+  const selection = arraySourceSelection(state, materialized);
+  if (selection === null) return state;
+  const { selectedIds, sourceObjects, selected, bounds } = selection;
   const placements = arrayPlacements(bounds, spec);
   const first = placements[0];
   if (first === undefined) return state;
 
-  const copySources = sceneObjectCopyClosure(state.project.scene.objects, selectedIds);
+  const copySources = sceneObjectCopyClosure(sourceObjects, selectedIds);
   const copySourceIds = new Set(copySources.map((object) => object.id));
+  const groups = state.project.scene.groups ?? [];
   const firstPlan = planArrayFirstPlacement(
-    state.project.scene.objects,
-    state.project.scene.groups ?? [],
+    sourceObjects,
+    groups,
     selected,
     copySources,
     first,
@@ -57,13 +68,19 @@ export function applyArraySelection(
   const copies: SceneObject[] = [...firstPlan.copiedObjects];
   const copiedSelectedIds: string[] = [];
   const copiedGroups: SceneGroup[] = cloneSelectedGroups(
-    state.project.scene.groups ?? [],
+    groups,
     firstPlan.protectedSourceIds,
     firstPlan.copiedIds,
     idFactory,
   );
-  for (const placement of placements.slice(1)) {
-    const copied = copyObjectsAtArrayPlacement(copySources, placement, idFactory);
+  for (let index = 1; index < placements.length; index += 1) {
+    const placement = placements[index];
+    if (placement === undefined) continue;
+    const copied = copyObjectsAtArrayPlacement(
+      materialized?.sources[index] ?? copySources,
+      placement,
+      idFactory,
+    );
     const ids = copied.ids;
     copies.push(...copied.objects);
     copiedSelectedIds.push(
@@ -72,9 +89,7 @@ export function applyArraySelection(
         return id === undefined ? [] : [id];
       }),
     );
-    copiedGroups.push(
-      ...cloneSelectedGroups(state.project.scene.groups ?? [], copySourceIds, ids, idFactory),
-    );
+    copiedGroups.push(...cloneSelectedGroups(groups, copySourceIds, ids, idFactory));
   }
   const objects = state.project.scene.objects
     .map((object) => firstPlan.movedById.get(object.id) ?? object)
@@ -86,7 +101,7 @@ export function applyArraySelection(
       scene: {
         ...state.project.scene,
         objects,
-        groups: [...(state.project.scene.groups ?? []), ...copiedGroups],
+        groups: [...groups, ...copiedGroups],
       },
     },
     selectedObjectId: selectedResultIds[0] ?? null,
@@ -95,6 +110,25 @@ export function applyArraySelection(
     redoStack: [],
     dirty: true,
   };
+}
+
+function arraySourceSelection(state: AppState, materialized: ArrayMaterialization | undefined) {
+  const selectedIds = selectionIds(state);
+  const firstSources = new Map(materialized?.sources[0]?.map((object) => [object.id, object]));
+  const sourceObjects = state.project.scene.objects.map(
+    (object) => firstSources.get(object.id) ?? object,
+  );
+  const selected = sourceObjects.filter((object) => selectedIds.has(object.id));
+  if (
+    selected.length === 0 ||
+    selected.some(
+      (object) =>
+        object.locked === true || !sceneObjectHasVisibleLayer(state.project.scene, object),
+    )
+  )
+    return null;
+  const bounds = materialized?.bounds ?? combinedBBox(selected);
+  return bounds === null ? null : { selectedIds, sourceObjects, selected, bounds };
 }
 
 function selectionIds(state: AppState): ReadonlySet<string> {

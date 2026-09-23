@@ -1,5 +1,8 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { Project } from '../../core/scene';
+import { useStore } from '../state/store';
+import { canvasStartLabelObstacles } from './canvas-motion-label-obstacles';
+import type { MarkerBox } from './canvas-motion-marker-layout';
 import { drawCanvasMotionOverlay, type CanvasMotionOverlay } from './draw-canvas-motion';
 import { isMeasuredCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState } from './view-transform';
@@ -12,28 +15,49 @@ type MotionLayerArgs = {
   readonly overlay: CanvasMotionOverlay | null;
 };
 
+type MotionLayerPaintArgs = MotionLayerArgs & {
+  readonly view: ReturnType<typeof computeView>;
+  readonly artwork: ReadonlyArray<MarkerBox>;
+};
+
 export function useCanvasMotionLayer(args: MotionLayerArgs): void {
+  const selectedId = useStore((state) => state.selectedObjectId);
+  const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
+  const view = useMemo(
+    () =>
+      computeView(
+        args.canvasSize.width,
+        args.canvasSize.height,
+        args.project.device.bedWidth,
+        args.project.device.bedHeight,
+        args.viewState,
+      ),
+    [args.canvasSize, args.project.device.bedWidth, args.project.device.bedHeight, args.viewState],
+  );
+  const markersVisible = args.overlay !== null && args.overlay.showStartMarkers !== false;
+  const artwork = useMemo(
+    () =>
+      markersVisible && isMeasuredCanvasBitmapSize(args.canvasSize)
+        ? canvasStartLabelObstacles(args.project.scene, view, selectedId, additionalSelectedIds)
+        : [],
+    [markersVisible, args.canvasSize, args.project.scene, view, selectedId, additionalSelectedIds],
+  );
+  const paintArgs: MotionLayerPaintArgs = { ...args, view, artwork };
+
   // The route raster asks for a repaint after a zoom has settled or a sliced
   // rebuild lands; it must paint the latest committed props, not the ones in
   // force when the request was made, and it must not re-render React.
-  const latest = useRef(args);
+  const latest = useRef(paintArgs);
   useLayoutEffect(() => {
-    latest.current = args;
+    latest.current = paintArgs;
   });
   useLayoutEffect(() => {
     const paint = (): void => paintMotionLayer(latest.current, paint);
     paint();
-  }, [
-    args.ref,
-    args.project.device.bedWidth,
-    args.project.device.bedHeight,
-    args.viewState,
-    args.canvasSize,
-    args.overlay,
-  ]);
+  }, [args.ref, view, artwork, args.canvasSize, args.overlay]);
 }
 
-function paintMotionLayer(args: MotionLayerArgs, requestRedraw: () => void): void {
+function paintMotionLayer(args: MotionLayerPaintArgs, requestRedraw: () => void): void {
   const canvas = args.ref.current;
   if (canvas === null) return;
   const ctx = canvas.getContext('2d');
@@ -42,12 +66,12 @@ function paintMotionLayer(args: MotionLayerArgs, requestRedraw: () => void): voi
   // The placeholder bitmap is replaced within the same commit; painting the
   // route into it would build a raster only to throw it away.
   if (args.overlay === null || !isMeasuredCanvasBitmapSize(args.canvasSize)) return;
-  const view = computeView(
-    canvas.width,
-    canvas.height,
-    args.project.device.bedWidth,
-    args.project.device.bedHeight,
-    args.viewState,
+  drawCanvasMotionOverlay(
+    ctx,
+    args.overlay,
+    args.view,
+    args.canvasSize,
+    args.artwork,
+    requestRedraw,
   );
-  drawCanvasMotionOverlay(ctx, args.overlay, view, requestRedraw);
 }

@@ -20,7 +20,7 @@ export function MachineModeToggle(): JSX.Element {
     }
   };
   return (
-    <div role="group" aria-label="Machine type" style={groupStyle}>
+    <div role="group" aria-label="Machine type" className="lf-machine-mode">
       <SegButton
         machineKind="laser"
         label="Laser"
@@ -59,37 +59,9 @@ function SegButton(props: {
       data-capability-warning={!props.available ? 'true' : undefined}
       onClick={props.onSelect}
       title={title}
-      style={!props.available ? unavailableSegStyle : props.active ? activeSegStyle : segStyle}
+      className="lf-machine-mode__choice"
     >
       {props.label}
     </button>
   );
 }
-
-const groupStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 0,
-  marginBottom: 10,
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  overflow: 'hidden',
-};
-const segStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '5px 0',
-  border: 'none',
-  background: 'var(--lf-bg-2)',
-  color: 'var(--lf-text-muted)',
-  cursor: 'pointer',
-  fontWeight: 600,
-};
-const activeSegStyle: React.CSSProperties = {
-  ...segStyle,
-  background: 'var(--lf-accent)',
-  color: 'var(--lf-on-fill)',
-};
-const unavailableSegStyle: React.CSSProperties = {
-  ...segStyle,
-  color: 'var(--lf-warning-text)',
-  boxShadow: 'inset 0 -2px 0 var(--lf-warning-border)',
-};

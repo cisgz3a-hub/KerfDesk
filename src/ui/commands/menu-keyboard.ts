@@ -20,14 +20,52 @@ export function handleMenuKeyDown(
     | CommandFamily
     | undefined;
   if (family === undefined) return;
+  if (!menuOwnsKey(event, context.openFamily)) return;
+  event.stopPropagation();
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    event.preventDefault();
+    return;
+  }
+  if (handleDismissKey(event, context, family)) return;
   if (target.closest('[data-menu-family-summary]') !== null) {
     handleSummaryKey(event, context, family);
-  } else if (
-    target.getAttribute('role') === 'menuitem' ||
-    target.getAttribute('role') === 'menuitemcheckbox'
-  ) {
-    handleItemKey(event, context, family, target as HTMLButtonElement);
+  } else {
+    const item = target.closest<HTMLButtonElement>(
+      'button[role="menuitem"], button[role="menuitemcheckbox"]',
+    );
+    if (item !== null) handleItemKey(event, context, family, item);
   }
+}
+
+function menuOwnsKey(event: KeyboardEvent<HTMLElement>, openFamily: CommandFamily | null): boolean {
+  // Software Abort remains reachable from every window state. A closed summary
+  // owns only menu navigation; ordinary shortcuts resume after dismissal.
+  if (isMenuAbortShortcut(event)) return false;
+  if (openFamily !== null) return true;
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  return ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(
+    event.key,
+  );
+}
+
+function handleDismissKey(
+  event: KeyboardEvent<HTMLElement>,
+  context: MenuKeyboardContext,
+  family: CommandFamily,
+): boolean {
+  if (event.key !== 'Escape' && event.key !== 'Tab') return false;
+  if (event.key === 'Escape') event.preventDefault();
+  context.pendingMenuFocus.current = null;
+  context.pendingFamilyReturn.current = null;
+  if (context.root !== null) familySummary(context.root, family)?.focus();
+  context.setOpenFamily(null);
+  return true;
+}
+
+export function isMenuAbortShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>,
+): boolean {
+  return event.key === '.' && (event.ctrlKey || event.metaKey) && !event.altKey;
 }
 
 function handleSummaryKey(
@@ -35,10 +73,9 @@ function handleSummaryKey(
   context: MenuKeyboardContext,
   family: CommandFamily,
 ): void {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+  if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
     event.preventDefault();
-    context.pendingMenuFocus.current = event.key === 'ArrowUp' ? 'last' : 'first';
-    context.setOpenFamily(family);
+    openMenuEdge(context, family, event.key === 'ArrowUp' ? 'last' : 'first');
     return;
   }
   if (event.key === 'Home' || event.key === 'End') {
@@ -49,6 +86,20 @@ function handleSummaryKey(
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
   event.preventDefault();
   focusAdjacentFamily(context, family, event.key === 'ArrowRight' ? 1 : -1, false);
+}
+
+function openMenuEdge(
+  context: MenuKeyboardContext,
+  family: CommandFamily,
+  edge: 'first' | 'last',
+): void {
+  if (context.openFamily === family) {
+    const items = menuItems(context.root?.querySelector(`[data-family-menu="${family}"]`));
+    (edge === 'last' ? items[items.length - 1] : items[0])?.focus();
+  } else {
+    context.pendingMenuFocus.current = edge;
+    context.setOpenFamily(family);
+  }
 }
 
 function handleItemKey(
@@ -65,10 +116,6 @@ function handleItemKey(
     focusAdjacentFamily(context, family, event.key === 'ArrowRight' ? 1 : -1, true);
     return;
   }
-  if (event.key !== 'Escape') return;
-  event.preventDefault();
-  context.pendingFamilyReturn.current = family;
-  context.setOpenFamily(null);
 }
 
 function handleItemListKey(
@@ -136,4 +183,8 @@ function focusFamilyBoundary(context: MenuKeyboardContext, edge: 'first' | 'last
   if (target === undefined || family === undefined) return;
   context.setFocusedFamily(family);
   target.focus();
+  if (context.openFamily !== null) {
+    context.pendingMenuFocus.current = null;
+    context.setOpenFamily(family);
+  }
 }

@@ -430,8 +430,9 @@ describe('job stream transcript source', () => {
     const entries = jobStreamEntries();
     const outbound = entries.filter((e) => e.direction === 'out');
     const inbound = entries.filter((e) => e.direction === 'in');
-    // Initial window plus at least two refills, and the acks that drove them.
-    expect(outbound.length).toBeGreaterThanOrEqual(3);
+    // The initial window plus the refill for both acks, and the acks that drove
+    // it. Acks that arrive together are refilled in one write (ADR-352).
+    expect(outbound.flatMap((e) => e.raw.split('\n').filter(Boolean)).length).toBeGreaterThan(5);
     expect(inbound.length).toBeGreaterThanOrEqual(2);
     expect([...new Set(entries.map((e) => e.source))]).toEqual(['job']);
     // Wire order survives the batch: the status reply is published last.

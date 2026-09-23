@@ -2,8 +2,8 @@
 // secondary management surface; it must never push the active settings away.
 import { useState } from 'react';
 import { machineKindOf, type Layer } from '../../core/scene';
-import { CollapsedRail, RailPanelHeading } from '../common';
-import { Icon } from '../kit';
+import { CollapsedRail } from '../common';
+import { Icon, IconButton } from '../kit';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -39,8 +39,16 @@ export function CutsLayersPanel(): JSX.Element {
       aria-label="Artwork / Operations panel"
       className="lf-rail lf-pane-form lf-artwork-panel"
     >
-      <RailPanelHeading title="Artwork / Operations" onCollapse={() => togglePanel('layers')} />
-      <MachineModeToggle />
+      <header className="lf-artwork-panel-heading">
+        <h2>Artwork</h2>
+        <MachineModeToggle />
+        <IconButton
+          icon="chevron-right"
+          size="sm"
+          label="Collapse Artwork / Operations panel"
+          onClick={() => togglePanel('layers')}
+        />
+      </header>
       <ArtworkPanelTabs
         active={activeView}
         showMaterials={showMaterialLibrary}

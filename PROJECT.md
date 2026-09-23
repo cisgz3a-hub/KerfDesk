@@ -111,6 +111,12 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner remains bounded nearest-neighbor rather than full 2-opt (ADR-163).
 
+Cut Planner also offers opt-in **Remove overlapping lines**, off by default. It removes coincident
+laser Line spans within one compiled settings group while retaining separate operations, pass
+counts and gaps (ADR-350). **File → Export artwork as SVG...** exports the selection or scene with
+physical sizing, outlined text, embedded source images and image masks, without consuming
+production variables. Existing SVG import still ignores embedded raster images.
+
 Layout extension (ADR-151): Quick Nest can compact small/medium jobs against real closed outlines,
 with deterministic item/point/candidate budgets and immediate rectangular fallback for dense,
 invalid, or oversized inputs.
@@ -132,9 +138,10 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, and editable glyph welding (ADR-321).
 - Imported `.ttf` / `.otf` user fonts are embedded in the project under fixed count and byte budgets; KerfDesk does not enumerate or depend on host system fonts (ADR-164).
 - Twenty-one bundled outline fonts cover sans, serif, monospace, script, display, and stencil text. The calligraphy collection adds Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script, Italianno, and Corinthia, with Cinzel Decorative for companion lettering. Four reviewed OFL native-stroke fonts add technical, display, calligraphic, and casual-hand centerline writing for CNC engraving. Text can be assigned independently to CNC machining layers; outline text supports variable-depth V-carving, while open stroke text defaults to Engrave/on-path.
-- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields;
-  bounded offline sheet imposition is adopted for staged implementation (ADR-279). Live databases
-  and barcode/QR generation remain deferred (ADR-164).
+- Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields.
+  Grid arrays can advance variables per copy, persist each copy's sequence offset, and advance the
+  cursor only after successful output under its configured policy (ADR-350, amending ADR-279).
+  Live databases, circular variable imposition and barcode/QR generation remain deferred.
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -168,7 +175,10 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
 - A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the current drawing layer color with a live mm readout.
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Parametric property editing and bounded node/Bezier editing have since shipped (ADR-159, ADR-164).
-- The broader geometry kernel — weld, general boolean operations, and arbitrary offset editing — remains out of scope and still requires an explicit phase and dependency evaluation.
+- Operation-aware Weld, Subtract/Intersect/Exclude and offsets use the established geometry
+  kernel. **Union silhouette** explicitly assigns the combined region to one chosen operation;
+  **Join paths** repairs compatible open contours across artwork with a visible gap tolerance
+  (ADR-103, ADR-350). Ambiguous junctions and manually tabbed contours remain available for manual editing.
 
 ### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 

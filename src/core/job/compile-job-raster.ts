@@ -1,13 +1,7 @@
 import { type DeviceProfile } from '../devices';
 import { clamp } from '../math';
-import {
-  applyImageMaskToLuma,
-  applyLumaAdjustments,
-  dither,
-  maybeInvertLuma,
-  pixelExtentForMm,
-  resampleLumaNearest,
-} from '../raster';
+import { applyImageMaskToLuma, dither, pixelExtentForMm, resampleLumaNearest } from '../raster';
+import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processing';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
@@ -101,8 +95,7 @@ function compileRasterGroup(
   const scanDirection = resolveImageScanDirection(device, layer);
   const sourceLuma = sourceLumaForRaster(obj, options.sourceLumaOverride);
   if (sourceLuma === null) return null;
-  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
-  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
+  const preparedLuma = prepareImageLuma(sourceLuma, obj, layer);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
   const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
   const compilationMaxS = rasterCompilationPowerScale(device);
@@ -191,7 +184,7 @@ function rasterValuesFor(
     maskObject: input.maskObject,
     device: input.device,
     bounds: input.bounds,
-    algorithm: input.layer.ditherAlgorithm,
+    algorithm: imageDitherAlgorithm(input.layer),
     sMax: input.sMax,
     sMin: input.sMin,
   });
@@ -239,7 +232,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
     );
     return dither(
       { luma: rotatedLuma, width: input.pixelWidth, height: input.pixelHeight },
-      { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+      { algorithm: imageDitherAlgorithm(input.layer), sMax: input.sMax, sMin: input.sMin },
     );
   }
   const luma = input.layer.passThrough
@@ -269,7 +262,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
   );
   return dither(
     { luma: orientedLuma, width: input.pixelWidth, height: input.pixelHeight },
-    { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+    { algorithm: imageDitherAlgorithm(input.layer), sMax: input.sMax, sMin: input.sMin },
   );
 }
 

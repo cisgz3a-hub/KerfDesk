@@ -26,16 +26,27 @@ export function LaserProcessField(props: {
   readonly autoFocus?: boolean;
   readonly onChange: (mode: LayerMode) => void;
   readonly help?: React.ReactNode;
+  readonly compact?: boolean;
+  readonly children?: React.ReactNode;
 }): JSX.Element {
   const descriptionId = useId();
+  const description = props.mixed
+    ? 'Choose one process to use for all selected artwork.'
+    : PROCESS_COPY[props.mode].description;
   return (
-    <div className="lf-laser-process">
-      <div className="lf-laser-process__heading">
-        <span className="lf-laser-section-title">Laser process</span>
-        {props.help}
-      </div>
+    <div className={`lf-laser-process${props.compact ? ' lf-laser-process--compact' : ''}`}>
+      {props.compact ? null : (
+        <div className="lf-laser-process__heading">
+          <span className="lf-laser-section-title">Laser process</span>
+          {props.help}
+        </div>
+      )}
       <div className="lf-laser-process__choice">
-        <ProcessIllustration mode={props.mode} mixed={props.mixed === true} />
+        {props.compact ? (
+          <span className="lf-laser-section-title">Process</span>
+        ) : (
+          <ProcessIllustration mode={props.mode} mixed={props.mixed === true} />
+        )}
         <select
           className="lf-select"
           name={props.name}
@@ -58,11 +69,22 @@ export function LaserProcessField(props: {
           ))}
         </select>
       </div>
-      <p id={descriptionId} className="lf-laser-help">
-        {props.mixed
-          ? 'Choose one process to use for all selected artwork.'
-          : PROCESS_COPY[props.mode].description}
-      </p>
+      {props.children}
+      {props.compact ? (
+        <details className="lf-inspector-help">
+          <summary title="Show guidance for the selected laser process.">
+            About this process
+          </summary>
+          <p id={descriptionId} className="lf-laser-help">
+            {description}
+          </p>
+          {props.help}
+        </details>
+      ) : (
+        <p id={descriptionId} className="lf-laser-help">
+          {description}
+        </p>
+      )}
     </div>
   );
 }

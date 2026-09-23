@@ -231,7 +231,7 @@ test('build badge assertions fail for stale version, wrong commit and missing id
 
 function projectFixture() {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     workspace: { width: 300, height: 300, units: 'mm' },
     jobSetup: { placement: 'fixture' },
     scene: {
@@ -271,7 +271,7 @@ test('disk evidence rejects missing source, missing geometry and changed millime
   changed.scene.objects[0].paths[0].polylines[0].points[1].x = 200;
   assert.throws(() => validateProject(Buffer.from(JSON.stringify(changed))), /millimetre geometry/);
   assert.throws(
-    () => validateProject(Buffer.from('{"schemaVersion":7,"scene":{"objects":[]}}')),
+    () => validateProject(Buffer.from('{"schemaVersion":8,"scene":{"objects":[]}}')),
     /exactly one/,
   );
 });

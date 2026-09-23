@@ -8,6 +8,7 @@ import {
   type VariableTemplateToken,
 } from '../scene';
 import { effectiveObjectPowerPercent, effectiveOperationForObject } from '../effective-output';
+import { advanceVariableSequenceBy } from './sequence-offset';
 
 export type VariableEvaluationContext = {
   readonly now: Date;
@@ -31,13 +32,48 @@ export function evaluateVariableTemplate(
   if (typeof template !== 'object' || template === null || !Array.isArray(template.tokens)) {
     return { ok: false, message: 'Variable text template must contain a token list.' };
   }
+  const copy = copyEvaluationContext(template, project, context);
+  if (!copy.ok) return copy;
   const values: string[] = [];
   for (const token of template.tokens) {
-    const evaluated = evaluateToken(token, text, project, context);
+    const evaluated = evaluateToken(token, text, project, copy.context);
     if (!evaluated.ok) return evaluated;
     values.push(evaluated.value);
   }
   return { ok: true, value: values.join('').normalize('NFC') };
+}
+
+function copyEvaluationContext(
+  template: VariableTemplate,
+  project: Project,
+  context: VariableEvaluationContext,
+):
+  | { readonly ok: true; readonly context: VariableEvaluationContext }
+  | { readonly ok: false; readonly message: string } {
+  const offset = template.sequenceOffset ?? 0;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Number.MAX_SAFE_INTEGER)
+    return { ok: false, message: 'Variable copy offset must be a non-negative safe integer.' };
+  const variables = project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+  const serialValue = context.serialValue ?? variables.serialValue;
+  if (offset > 0 && (!Number.isSafeInteger(serialValue) || serialValue < 0)) {
+    return { ok: false, message: 'Variable serial must be a non-negative safe integer.' };
+  }
+  const assigned = advanceVariableSequenceBy(
+    {
+      ...variables,
+      recordIndex: context.recordIndex ?? variables.recordIndex,
+      serialValue,
+    },
+    offset,
+  );
+  return {
+    ok: true,
+    context: {
+      ...context,
+      recordIndex: assigned.recordIndex,
+      serialValue: assigned.serialValue,
+    },
+  };
 }
 
 function evaluateToken(

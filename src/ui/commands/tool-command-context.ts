@@ -45,6 +45,8 @@ export function toolCommandContext(
   | 'multiFileTrace'
   | 'convertSelectionToPath'
   | 'weldSelection'
+  | 'unionSilhouette'
+  | 'joinPaths'
   | 'subtractSelection'
   | 'intersectSelection'
   | 'excludeSelection'
@@ -78,6 +80,8 @@ export function toolCommandContext(
     multiFileTrace: callbacks.requestMultiFileTrace,
     convertSelectionToPath: app.convertSelectionToPath,
     weldSelection: app.weldSelection,
+    unionSilhouette: callbacks.requestUnionSilhouette,
+    joinPaths: callbacks.requestJoinPaths,
     subtractSelection: () => app.booleanSelection('subtract'),
     intersectSelection: () => app.booleanSelection('intersect'),
     excludeSelection: () => app.booleanSelection('exclude'),

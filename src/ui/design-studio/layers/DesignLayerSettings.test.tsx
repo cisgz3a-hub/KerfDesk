@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 describe('DesignLayerSettings', () => {
-  it('shows the Startup default bit read-only and deep-links to Tool Plan after explaining Apply', () => {
+  it('shows the Job default bit read-only and deep-links to Tool Plan after explaining Apply', () => {
     const onPatch = vi.fn();
     renderSettings(DEFAULT_DESIGN_LAYER, onPatch);
 
@@ -48,9 +48,9 @@ describe('DesignLayerSettings', () => {
     const bitReference = referenceButton('Bit');
     expect(bitReference.disabled).toBe(false);
     expect(bitReference.textContent).toContain('90 degree V-bit');
-    expect(bitReference.textContent).toContain('Startup default');
+    expect(bitReference.textContent).toContain('Job default');
     expect(host?.textContent).toContain(
-      'Apply the design, then edit its operation in Startup Setup › Tool Plan.',
+      'Apply the design, then edit its operation in Machine Setup › Tool Plan.',
     );
 
     act(() => bitReference.click());
@@ -58,9 +58,9 @@ describe('DesignLayerSettings', () => {
       /inherits the current job default bit.*Apply the design first/i,
     );
     const edit = [...(host?.querySelectorAll('button') ?? [])].find(
-      (button) => button.textContent === 'Edit in Startup Setup',
+      (button) => button.textContent === 'Edit in Machine Setup',
     );
-    if (!(edit instanceof HTMLButtonElement)) throw new Error('Startup Setup action missing');
+    if (!(edit instanceof HTMLButtonElement)) throw new Error('Machine Setup action missing');
     act(() => edit.click());
 
     expect(useMachineSetupDialogStore.getState().state).toEqual({
@@ -128,7 +128,7 @@ describe('DesignLayerSettings', () => {
     expect(clearing.textContent).toContain('Single stage');
     act(() => clearing.click());
     expect(host?.querySelector('[role="note"]')?.textContent).toMatch(
-      /Apply the design first.*Startup Setup › Tool Plan/i,
+      /Apply the design first.*Machine Setup › Tool Plan/i,
     );
   });
 

@@ -28,9 +28,9 @@ export function DesignLayerSettings(props: {
         stockThicknessMm={props.stockThicknessMm}
         onPatch={props.onPatch}
       />
-      <section aria-label="Cutter assignments from Startup Setup" style={referenceSectionStyle}>
+      <section aria-label="Cutter assignments from Machine Setup" style={referenceSectionStyle}>
         <p style={referenceHintStyle}>
-          Read-only here. Apply the design, then edit its operation in Startup Setup › Tool Plan.
+          Read-only here. Apply the design, then edit its operation in Machine Setup › Tool Plan.
         </p>
         <SetupOwnedValueRow
           label="Bit"
@@ -56,7 +56,7 @@ function primaryBitValue(
   tools: ReadonlyArray<CncTool>,
   activeTool: CncTool,
 ): string {
-  if (layer.toolId === undefined) return `${toolLabel(activeTool)} (Startup default)`;
+  if (layer.toolId === undefined) return `${toolLabel(activeTool)} (Job default)`;
   return `${savedToolLabel(layer.toolId, tools)} (saved design override)`;
 }
 
@@ -77,19 +77,19 @@ function toolLabel(tool: CncTool): string {
 
 function primaryBitDescription(layer: DesignLayer): string {
   return layer.toolId === undefined
-    ? 'This layer inherits the current job default bit. Apply the design first, then change the resulting operation in Startup Setup › Tool Plan.'
-    : 'This saved design carries a legacy primary-bit override. It remains read-only here and is preserved when you Apply. Then edit or reset the resulting operation in Startup Setup › Tool Plan.';
+    ? 'This layer inherits the current job default bit. Apply the design first, then change the resulting operation in Machine Setup › Tool Plan.'
+    : 'This saved design carries a legacy primary-bit override. It remains read-only here and is preserved when you Apply. Then edit or reset the resulting operation in Machine Setup › Tool Plan.';
 }
 
 function clearingBitDescription(layer: DesignLayer): string {
   if (layer.vClearToolId === undefined) {
-    return 'This design currently uses a single-stage V-carve. Apply the design first, then assign any flat-floor clearing bit in Startup Setup › Tool Plan.';
+    return 'This design currently uses a single-stage V-carve. Apply the design first, then assign any flat-floor clearing bit in Machine Setup › Tool Plan.';
   }
   const relevance =
     layer.cutType === 'v-carve' && (layer.vCarveFlatDepthEnabled ?? true)
       ? ''
       : ' The current cut settings do not use this clearing assignment.';
-  return `This saved design carries a legacy clearing-bit override. It remains read-only here and is preserved when you Apply.${relevance} Then edit or reset the resulting operation in Startup Setup › Tool Plan.`;
+  return `This saved design carries a legacy clearing-bit override. It remains read-only here and is preserved when you Apply.${relevance} Then edit or reset the resulting operation in Machine Setup › Tool Plan.`;
 }
 
 const referenceSectionStyle: React.CSSProperties = {

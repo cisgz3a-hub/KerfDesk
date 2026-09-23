@@ -22,7 +22,7 @@ import { openMachineSetup, useMachineSetupDialogStore } from './machine-setup-di
 vi.mock('../../cnc-viewer3d/bit-preview-three-scene', () => ({
   createBitPreviewThreeScene: vi.fn(async () => ({
     kind: 'no-webgl',
-    reason: 'WebGL intentionally unavailable in Startup Setup feedback tests.',
+    reason: 'WebGL intentionally unavailable in Machine Setup feedback tests.',
   })),
 }));
 
@@ -45,7 +45,7 @@ afterEach(() => {
   useMachineSetupDialogStore.setState({ state: { kind: 'idle' }, configuredRevision: 0 });
 });
 
-describe('CNC Startup Setup cutter feedback', () => {
+describe('CNC Machine Setup cutter feedback', () => {
   it('previews a staged default bit and warns only when final Save commits retained values', async () => {
     const fixture = installManualOperation();
     const view = await renderHost();
@@ -183,7 +183,7 @@ function cncMachine(): CncMachineConfig {
 
 async function saveStartup(host: HTMLElement): Promise<void> {
   await act(async () => stepButton(host, 3, 'Review & save').click());
-  await act(async () => button(host, 'Save CNC startup setup').click());
+  await act(async () => button(host, 'Save CNC machine setup').click());
 }
 
 function expectWarning(message: string | RegExp): void {

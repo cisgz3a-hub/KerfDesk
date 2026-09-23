@@ -44,12 +44,14 @@ export function LaserOperationFields(props: {
         </p>
       ) : null}
       <LaserProcessField
+        compact
         mode={props.operation.mode}
         mixed={props.mixedFields.mode === true}
         ariaLabel={`Mode for ${props.ariaContext}`}
         onChange={(mode) => commit({ mode })}
-      />
-      <LayerRowSettingsFields layer={props.operation} operationTarget={target} />
+      >
+        <LayerRowSettingsFields layer={props.operation} operationTarget={target} compact />
+      </LaserProcessField>
       <AirAssistField
         checked={props.operation.airAssist}
         mixed={props.mixedFields.airAssist === true}

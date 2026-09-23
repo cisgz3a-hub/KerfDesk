@@ -299,8 +299,10 @@ describe('computeKerfOutputParity', () => {
       luma: [0, 100],
       layer: { imageBidirectional: true },
     });
-    expect(outputParity(adjusted.session, adjusted.project)?.removedPixels).toBe(0);
-    expect(outputParity(inverted.session, inverted.project)?.removedPixels).toBe(1);
+    // Pass-through keeps original luma: black/grey still loses two short runs,
+    // while an original white pixel stays white despite the stored negative flag.
+    expect(outputParity(adjusted.session, adjusted.project)?.removedPixels).toBe(2);
+    expect(outputParity(inverted.session, inverted.project)?.removedPixels).toBe(0);
     expect(outputParity(powerOff.session, powerOff.project)?.removedPixels).toBe(0);
     expect(outputParity(forward.session, forward.project)?.removedPixels).toBe(
       outputParity(bidirectional.session, bidirectional.project)?.removedPixels,

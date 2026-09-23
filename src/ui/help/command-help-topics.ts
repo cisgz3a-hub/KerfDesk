@@ -1,4 +1,5 @@
 import type { CommandFamily, CommandId } from '../commands/command-types';
+import { FILE_COMMAND_HELP } from './file-command-help';
 
 export type CommandHelpTopic = {
   readonly family: CommandFamily;
@@ -6,55 +7,7 @@ export type CommandHelpTopic = {
 };
 
 export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
-  'file.new': {
-    family: 'file',
-    tooltip: 'Create a new blank project.',
-  },
-  'file.open': {
-    family: 'file',
-    tooltip: 'Open a saved KerfDesk project file.',
-  },
-  'file.save': {
-    family: 'file',
-    tooltip: 'Save the current project to its existing file.',
-  },
-  'file.save-as': {
-    family: 'file',
-    tooltip: 'Save the current project as a new file.',
-  },
-  'file.import': {
-    family: 'file',
-    tooltip: 'Import SVG, DXF, PNG, JPG, or STL artwork through one ordered picker.',
-  },
-  'file.import-svg': {
-    family: 'file',
-    tooltip: 'Import vector artwork from an SVG file.',
-  },
-  'file.import-dxf': {
-    family: 'file',
-    tooltip: 'Import vector artwork from an ASCII DXF drawing (works in laser and CNC mode).',
-  },
-  'file.import-image': {
-    family: 'file',
-    tooltip: 'Import a PNG or JPG image for engraving or tracing.',
-  },
-  'file.import-height-map': {
-    family: 'file',
-    tooltip:
-      'Import a qualified non-interlaced grayscale PNG (8-bit, 16-bit, or 8-bit with alpha) as an explicit top-down CNC relief height map.',
-  },
-  'file.open-gcode': {
-    family: 'file',
-    tooltip: 'Open a .nc/.gcode/.tap program in the 3D Inspector (both machine modes).',
-  },
-  'file.inspect-gcode': {
-    family: 'file',
-    tooltip: "Compile this project's G-code and inspect it in 3D — read-only, nothing is saved.",
-  },
-  'file.save-gcode': {
-    family: 'file',
-    tooltip: 'Export the current job as GRBL G-code.',
-  },
+  ...FILE_COMMAND_HELP,
   'edit.undo': {
     family: 'edit',
     tooltip: 'Undo the most recent scene edit.',
@@ -214,7 +167,15 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.weld': {
     family: 'tools',
-    tooltip: 'Union selected closed vector contours into one baked path object by layer color.',
+    tooltip: 'Weld contours within each operation, preserving separate operations and settings.',
+  },
+  'tools.union-silhouette': {
+    family: 'tools',
+    tooltip: 'Combine closed shapes into one silhouette using a chosen result operation.',
+  },
+  'tools.join-paths': {
+    family: 'tools',
+    tooltip: 'Join nearby open endpoints with matching operations, colour and artwork settings.',
   },
   'tools.subtract': {
     family: 'tools',

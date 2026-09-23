@@ -107,7 +107,7 @@ describe('handleLine streamer writes', () => {
   // Mid-job refills are the job stream continuing — transcribed as anything
   // else, the console's "hide job stream" filter stops hiding them and the
   // panel floods with raw G-code during every job.
-  it('tags ack-driven refill writes with the job transcript source', () => {
+  it('tags ack-driven refill writes with the job transcript source', async () => {
     const { refs, set, get } = makeHarness();
     const safeWrite = vi.fn(
       async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
@@ -119,6 +119,8 @@ describe('handleLine streamer writes', () => {
     set({ streamer: step(createStreamer(gcode)).state });
 
     handleLine(set, get, refs, safeWrite, 'ok');
+    // The ack is applied with the rest of its serial chunk (ADR-352).
+    await Promise.resolve();
 
     expect(safeWrite).toHaveBeenCalledWith(`${longLine}\n`, undefined, 'job');
   });
@@ -237,6 +239,8 @@ describe('handleLine streamer writes', () => {
     });
 
     handleLine(set, get, refs, safeWrite, 'ok');
+    // One hop for the chunk's ack flush (ADR-352), one for the rejected write.
+    await Promise.resolve();
     await Promise.resolve();
 
     expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n', undefined, 'job');

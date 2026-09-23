@@ -106,4 +106,5 @@ function samePoint(a: Vec2, b: Vec2): boolean {
 export const curveEndpointJoin = {
   close: closeCurveEndpoints,
   join: joinCurveEndpoints,
+  reverse: reverseCurve,
 } as const;

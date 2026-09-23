@@ -50,6 +50,36 @@ function variableProject(): Project {
 }
 
 describe('evaluateVariableTemplate', () => {
+  it('applies a copy slot to an injected cursor before a field-relative serial offset', () => {
+    const template: VariableTemplate = {
+      sequenceOffset: 3,
+      tokens: [
+        { kind: 'csv', column: 'name' },
+        { kind: 'serial', prefix: '-', width: 3, offset: 100 },
+      ],
+    };
+    expect(
+      evaluateVariableTemplate(template, text, variableProject(), {
+        now: new globalThis.Date(0),
+        recordIndex: 1,
+        serialValue: 20,
+      }),
+    ).toEqual({ ok: true, value: 'Ada-123' });
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 0.5])(
+    'reports an invalid copied serial context without throwing (%s)',
+    (serialValue) => {
+      expect(
+        evaluateVariableTemplate(
+          { sequenceOffset: 2, tokens: [{ kind: 'serial', prefix: '', width: 1 }] },
+          text,
+          variableProject(),
+          { now: new globalThis.Date(0), serialValue },
+        ),
+      ).toMatchObject({ ok: false, message: expect.stringContaining('serial') });
+    },
+  );
   it.each([
     null,
     undefined,
