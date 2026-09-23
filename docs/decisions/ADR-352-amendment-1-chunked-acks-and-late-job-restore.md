@@ -66,11 +66,16 @@ left in this lane:
 
 ### Verification
 
-- The incident harness from the ADR-356 investigation (`freeze-late-image-job.e2e.ts`, kept on
-  that branch): a synthetic 1,175 × 1,190 px Floyd-Steinberg photo engrave, 316,425 lines, on
-  the Falcon A1 Pro profile against a paced grblHAL stand-in (128-block planner), fast-forwarded
-  to 73.5% and then run at the incident pace of 45 lines/s. Development build, same machine and
-  configuration as its run 5 on the build before ADR-352:
+- An uncommitted scratch harness written for the ADR-356 investigation
+  (`freeze-late-image-job.e2e.ts` with an extended copy of `e2e/fixtures/paced-grbl-serial.js`,
+  in a local worktree at 90c791c5f; it is not in the repository). It streams a synthetic
+  1,175 × 1,190 px Floyd-Steinberg photo engrave (316,425 lines) on the Falcon A1 Pro profile
+  against a paced grblHAL stand-in (128-block planner) in a Vite development build under headless
+  Chrome, fast-forwarded to 73.5% and then run at the incident pace of 45 lines/s. To get past a
+  Start refusal of the synthetic image it overwrites the recorded Frame bounds signature (Frame
+  recorded 15,15,260,253 including overscan; Start recomputed 20,15,255,253); that possible
+  Frame/Start mismatch is a separate open question, not something this measurement exercises.
+  Same machine and configuration as the investigation's run 5 on the build before ADR-352:
 
   | At 74% of the job                                   | Before ADR-352 | ADR-352 + this amendment |
   | --------------------------------------------------- | -------------- | ------------------------ |
