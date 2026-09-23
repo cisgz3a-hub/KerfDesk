@@ -65,7 +65,7 @@ merge is part of this decision's local implementation.
 
 No additional runtime dependency is introduced. Reusable operation recipes, personal artwork
 libraries, broader file formats, circular variable imposition and live data sources remain separate
-feature work. The companion workspace usability fixes are recorded in ADR-349.
+feature work. The companion workspace usability fixes are recorded in ADR-351.
 
 ### Verification
 

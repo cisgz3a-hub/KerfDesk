@@ -1,4 +1,4 @@
-## ADR-349 - Keep workspace essentials visible and image processing truthful (2026-09-23)
+## ADR-351 - Keep workspace essentials visible and image processing truthful (2026-09-23)
 
 **Status:** Accepted. | **Date:** 2026-09-23
 
