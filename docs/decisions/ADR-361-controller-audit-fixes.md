@@ -1,4 +1,4 @@
-## ADR-357 - Controller audit fixes: no wedged owners, no silent refusals, visible speed ceilings (2026-09-24)
+## ADR-361 - Controller audit fixes: no wedged owners, no silent refusals, visible speed ceilings (2026-09-24)
 
 **Status:** Accepted. | **Date:** 2026-09-24
 
