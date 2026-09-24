@@ -2678,7 +2678,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
     bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
-11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
+    Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
+    saved before the preset gained `M8` (2026-09-19) still reads
+    Disabled and sends no air command at all; the Air output row then
+    offers **Use preset air settings** (ADR-370), which sets both. With
+    an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
     operator left on stays on. With the first operation's Air off, Job
@@ -2689,7 +2694,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     "Air restart" ticked the program must contain exactly one `M8` and
     one `M9`, the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=0`. Untick "Air restart" and the same job must
+    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
+    page defines `$152` as the standby wait, so `100` keeps the pump
+    powered and `0` idles it immediately; the A1 Pro page does not list
+    it). Send `$152=100` from the Console while Idle: on the Falcon
+    command set it accepts `$150`, `$151` and `$152` (whole numbers
+    0-100) and still refuses every other numeric setting write
+    (ADR-370). The write clears the Frame proof, so Frame again before
+    Start. Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.

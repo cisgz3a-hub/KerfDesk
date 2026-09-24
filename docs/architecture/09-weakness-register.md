@@ -103,8 +103,10 @@ explicit maintainer ruling rather than leaving it implicit.
 Carried from project memory; each needs confirmation against the current tree:
 
 - Console `$$` can wedge `controllerOp` — **no timeout** (Super Console audit 2026-07-19).
-- Air assist previously emitted nothing in some paths (burn-quality audit 2026-07-17). Current code does
-  emit `M7`/`M8`/`M9` transitions (`grbl-strategy.ts:421-431`) but was not traced end-to-end.
+- Air assist previously emitted nothing in some paths (burn-quality audit 2026-07-17). Traced
+  end to end on 2026-09-24: `prepare-output-air-assist.test.ts` pins project Air settings through
+  compile, emission (`grbl-strategy.ts:427-455`, ADR-335 hold) and the resume preamble. Physical pump
+  behaviour on the Falcon A1 Pro remains hardware-unverified (WORKFLOW F-F3 checklist, steps 11-12).
 - `.lbrn` export drops cut settings.
 - `linesPerMm < 1` floor not fixed (CNC lead/ramp audit 2026-07-24).
 - Trace `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (`PROJECT.md:150`).
