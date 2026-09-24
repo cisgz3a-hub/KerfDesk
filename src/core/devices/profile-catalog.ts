@@ -191,7 +191,7 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
     ]),
   ),
   entry(GENERIC_GRBLHAL_PROFILE, [
-    'grblHAL is wire-compatible with the GRBL driver; extended alarm codes 11-13 are decoded.',
+    'grblHAL is wire-compatible with the GRBL driver; its alarm codes 10-22 are decoded, including 10 = E-stop.',
   ]),
   entry(GENERIC_FLUIDNC_PROFILE, [
     'FluidNC numeric $ setting writes are blocked in-app (configuration lives in its YAML config).',
