@@ -221,6 +221,28 @@ describe('serial worker core (ADR-334)', () => {
     // A cancelled reader ends the loop rather than hanging it.
     await h.core.readLoop();
   });
+
+  // The writer is drained with a bounded close, not aborted (audit
+  // transport-4), so a drain that has not settled is what 'closed' must await.
+  it('does not announce EOF closure before an asynchronous writable drain releases its lock', async () => {
+    let releaseDrain = (): void => undefined;
+    const draining = new Promise<void>((resolve) => {
+      releaseDrain = resolve;
+    });
+    const readable = new ReadableStream<Uint8Array>({ start: (controller) => controller.close() });
+    const writable = new WritableStream<Uint8Array>({ close: () => draining });
+    const posted: SerialWorkerResponse[] = [];
+    const core = createSerialWorkerCore({ post: (message) => posted.push(message) });
+    core.handle({ kind: 'attach', readable, writable });
+    await flush();
+    expect(posted).not.toContainEqual({ kind: 'closed' });
+    expect(writable.locked).toBe(true);
+    releaseDrain();
+    await core.readLoop();
+    await core.close();
+    expect(readable.locked || writable.locked).toBe(false);
+    expect(posted.filter((message) => message.kind === 'closed')).toHaveLength(1);
+  });
 });
 
 // A stream the test can fail, standing in for the transferred port readable.

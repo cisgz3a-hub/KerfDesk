@@ -74,6 +74,7 @@ import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 import { laserStartOverrideReset } from './laser-start-override-reset';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
+import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 
@@ -109,10 +110,7 @@ export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
 export function jobActions(
   set: SetFn,
   get: GetFn,
-  refs: ResetCleanupRefs &
-    ControllerLifecycleRefs & {
-      readonly driver: ControllerDriver;
-    },
+  refs: JobActionContext['refs'],
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
@@ -121,7 +119,7 @@ export function jobActions(
   // already names the cause for recovery.
   const failDarkStop = (): Promise<void> => runStopJob(context);
   return {
-    continueToolChange: () => runContinueToolChange(set, get, refs, safeWrite),
+    continueToolChange: () => runContinueToolChange(context),
     startJob: (gcode, options = {}) => runStartJob(context, gcode, options),
     pauseJob: () => runConfirmedPauseJob({ ...context, failDarkStop }),
     resumeJob: () => runConfirmedResumeJob({ ...context, failDarkStop }),
@@ -432,13 +430,17 @@ async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
 // controller was never held (the M0 was never sent); it is idling at the park
 // position and simply needs the next lines fed. Functional set for the same
 // at-write-time snapshot reason as runResumeJob.
-async function runContinueToolChange(
-  set: SetFn,
-  get: GetFn,
-  refs: ResetCleanupRefs & ControllerLifecycleRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  if (get().streamer?.status !== 'tool-change') return;
+async function runContinueToolChange(context: JobActionContext): Promise<void> {
+  const { set, get, refs, safeWrite } = context;
+  const heldStream = get().streamer;
+  if (heldStream?.status !== 'tool-change') return;
+  const writeOwner = streamWriteOwner(get());
+  const readOwnedStreamer = captureHostedRefillStream(context);
+  // The hold's ACK path may still be releasing the old hosted refill. Finish
+  // that handback before consuming M0, and do not consume a replacement hold
+  // or the same hold twice if another Continue won this await.
+  await releaseHostedRefill(refs);
+  if (readOwnedStreamer() !== heldStream) return;
   // Fresh Idle proves the pre-M0 retract/park completed; fresh work-Z evidence
   // proves the replacement bit was touched off. Both are required before the
   // stream may issue its spindle-off safe-Z lift and later M3/G4.
@@ -460,15 +462,16 @@ async function runContinueToolChange(
     return steppedStreamerPatch(s, continued, stepped.state);
   });
   if (toSend.length > 0) {
-    const writeOwner = streamWriteOwner(get());
     try {
       await safeWrite(toSend, 'resume');
+      if (readOwnedStreamer() === null) return;
       const mpgBlock = mpgCommandBlockMessage(get());
       if (mpgBlock !== null) {
         set({ lastWriteError: mpgBlock });
         return;
       }
       set((state) => liveCanvasExecutionAcceptedPatch(state));
+      await armHostedRefill(refs, readOwnedStreamer);
     } catch (err) {
       containActiveStreamWriteFailure(set, refs, safeWrite, 'resume', writeOwner);
       throw err;

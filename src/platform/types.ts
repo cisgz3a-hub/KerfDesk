@@ -58,10 +58,9 @@ export type FileSaveRequest = {
 
 export type SerialOpenRequest = {
   readonly baudRate: number;
-  /** Ask for the worker-hosted transport (ADR-334). Advisory: a runtime that
-   * cannot transfer the port's streams into a worker returns the ordinary
-   * main-thread connection instead, and the caller cannot tell except by
-   * looking for `hostedStreaming` on the result. */
+  /** Prefer a worker-owned native port and refill. If unavailable before
+   * opening, the exact picked port remains usable on the window, with an
+   * explicit backgroundStreamingUnavailable result. */
   readonly hostedStreaming?: boolean;
 };
 
@@ -94,6 +93,7 @@ export type SerialConnection = {
   // Explicit permission revocation. Normal Disconnect must retain the pairing.
   readonly forget?: () => Promise<void>;
   readonly hostedStreaming?: HostedStreamRefill;
+  readonly backgroundStreamingUnavailable?: boolean;
 };
 
 /** Browser-exposed transport identity. VID/PID describe the USB adapter/model;

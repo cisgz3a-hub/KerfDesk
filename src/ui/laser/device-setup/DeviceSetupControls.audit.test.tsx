@@ -195,9 +195,13 @@ describe('Setup control audit', () => {
       expect(details.open).toBe(false);
     }
     const worker = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(worker.checked).toBe(true);
     act(() => worker.click());
-    expect(dispatch).toHaveBeenCalledWith({ kind: 'edit', patch: { workerHostedStreaming: true } });
-    expect(useStore.getState().project.device.workerHostedStreaming).not.toBe(true);
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'edit',
+      patch: { workerHostedStreaming: false },
+    });
+    expect(useStore.getState().project.device.workerHostedStreaming).toBeUndefined();
   });
 
   it('each Options disclosure opens and closes without editing the draft', () => {
