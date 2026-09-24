@@ -72,6 +72,31 @@ export function sampleCubics(cubics: ReadonlyArray<CubicBezier>, closed: boolean
   return out;
 }
 
+/** Fit ONE cubic from the first to the last point whose arms keep the given
+ *  unit tangents: only the two arm lengths are solved, refined by the same
+ *  Newton passes while they reduce the error. `tangentEnd` points back from
+ *  the last point into the curve, like every end tangent here. */
+export function fitCubicWithTangents(
+  points: ReadonlyArray<Vec2>,
+  tangentStart: Vec2,
+  tangentEnd: Vec2,
+): CubicBezier | null {
+  const last = points.length - 1;
+  if (last < 1) return null;
+  const u = chordParameterize(points, 0, last);
+  let cubic = generateBezier(points, 0, last, u, tangentStart, tangentEnd);
+  let errorSq = maxFitError(points, 0, last, cubic, u).maxSq;
+  for (let pass = 0; pass < MAX_REPARAM_PASSES; pass += 1) {
+    reparameterize(points, 0, last, cubic, u);
+    const next = generateBezier(points, 0, last, u, tangentStart, tangentEnd);
+    const nextErrorSq = maxFitError(points, 0, last, next, u).maxSq;
+    if (nextErrorSq >= errorSq) break;
+    cubic = next;
+    errorSq = nextErrorSq;
+  }
+  return cubic;
+}
+
 // ——— segmentation ———
 
 // A run of consecutive points between corners (inclusive endpoints). Closed
