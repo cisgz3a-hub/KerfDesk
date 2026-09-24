@@ -7,6 +7,7 @@ import {
   type CurveSubpath,
   type ImportedSvg,
 } from '../../core/scene';
+import { createPolyline } from '../../core/shapes';
 import { resetStore } from './test-helpers';
 import { useStore } from './store';
 
@@ -97,6 +98,84 @@ describe('curve node edit actions', () => {
     const object = useStore.getState().project.scene.objects[0] as ImportedSvg;
     expect(object.paths[0]?.curves).toHaveLength(1);
     expect(object.paths[0]?.curves?.[0]?.segments).toHaveLength(3);
+  });
+
+  it('deletes a selected curve anchor in one undo step and clears the node selection', () => {
+    loadCurves([twoCubicOpenCurve()]);
+    selectAnchor(1);
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    const state = useStore.getState();
+    const curve = currentCurve();
+    const path = (state.project.scene.objects[0] as ImportedSvg).paths[0];
+    expect(curve.start).toEqual({ x: 0, y: 0 });
+    expect(curve.segments).toHaveLength(1);
+    expect(curve.segments[0]).toMatchObject({ kind: 'cubic', to: { x: 20, y: 0 } });
+    expect(path?.polylines[0]?.points.at(-1)).toEqual({ x: 20, y: 0 });
+    expect(path?.polylines[0]?.points.length).toBeGreaterThan(2);
+    expect(state.selectedObjectId).toBe('curve');
+    expect(state.selectedPathNode).toBeNull();
+    expect(state.selectedPathNodes).toEqual([]);
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.dirty).toBe(true);
+
+    useStore.getState().undo();
+    expect(currentCurve()).toEqual(twoCubicOpenCurve());
+  });
+
+  it('deletes a curve node of a faired pen drawing and keeps its spec in sync', () => {
+    const pen = createPolyline({
+      id: 'curve',
+      color: '#000000',
+      spec: {
+        closed: false,
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 20, y: 0 },
+          { x: 30, y: 10 },
+          { x: 40, y: 0 },
+        ],
+      },
+    });
+    useStore.setState({
+      project: {
+        ...createProject(),
+        scene: {
+          objects: [pen],
+          layers: [createLayer({ id: '#000000', color: '#000000' })],
+          groups: [],
+        },
+      },
+    });
+    selectAnchor(2);
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    const object = useStore.getState().project.scene.objects[0];
+    if (object?.kind !== 'shape' || object.spec.kind !== 'polyline') {
+      throw new Error('expected an edited polyline shape');
+    }
+    expect(object.paths[0]?.curves?.[0]?.segments.map((segment) => segment.to)).toEqual([
+      { x: 10, y: 10 },
+      { x: 30, y: 10 },
+      { x: 40, y: 0 },
+    ]);
+    expect(object.spec.points).toEqual(object.paths[0]?.polylines[0]?.points);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('refuses a curve delete that would leave fewer anchors than a polyline allows', () => {
+    loadCurves([closedLineCurve()]);
+    selectAnchor(1);
+    const before = useStore.getState().project;
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useStore.getState().selectedPathNodes).toHaveLength(1);
   });
 });
 
@@ -201,6 +280,17 @@ function closedLineCurve(): CurveSubpath {
       { kind: 'line', to: { x: 0, y: 0 } },
     ],
     closed: true,
+  };
+}
+
+function twoCubicOpenCurve(): CurveSubpath {
+  return {
+    start: { x: 0, y: 0 },
+    segments: [
+      { kind: 'cubic', control1: { x: 3, y: 4 }, control2: { x: 7, y: 6 }, to: { x: 10, y: 6 } },
+      { kind: 'cubic', control1: { x: 13, y: 6 }, control2: { x: 17, y: 4 }, to: { x: 20, y: 0 } },
+    ],
+    closed: false,
   };
 }
 
