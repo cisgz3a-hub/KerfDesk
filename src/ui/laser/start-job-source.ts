@@ -46,6 +46,9 @@ export type StartPreparationHooks = {
    * compiled, before the exact program exists (ADR-353). A main-thread
    * preparation finishes in one turn, so it never reports them early. */
   readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
+  /** True once the Frame traces that outline while this preparation finishes:
+   * the head's motion is the Frame's own, not a setup change (ADR-353). */
+  readonly frameOwnsMotion?: () => boolean;
 };
 
 export type PreparedRecoverySource = {
@@ -136,10 +139,18 @@ async function prepareCurrentStartInBackground(args: {
   readonly signal?: AbortSignal;
   readonly hooks: StartPreparationHooks;
 }): Promise<StartJobPreparation> {
-  const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal, {
-    jobPlacement: args.jobPlacement,
-    ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
-  });
+  const owner = ownCurrentStartPreparation(
+    args.app,
+    args.laser,
+    args.signal,
+    {
+      jobPlacement: args.jobPlacement,
+      ...(args.resolvedJobOrigin === undefined
+        ? {}
+        : { resolvedJobOrigin: args.resolvedJobOrigin }),
+    },
+    args.hooks.frameOwnsMotion,
+  );
   try {
     const background = prepareStartOutputOffThread(
       {

@@ -63,6 +63,9 @@ export type ExactFramePreparation = {
    * refusal, or a preparation that failed outright). */
   readonly earlyBounds: Promise<FrameBoundsPreview | null>;
   readonly abort: () => void;
+  /** Called as the outline trace is dispatched: from then on the head's
+   * reported motion is this Frame's, so it no longer cancels the program. */
+  readonly traceDispatching: () => void;
 };
 
 export const FRAME_TRACE_PROGRAM_REFUSED_MESSAGE =
@@ -72,6 +75,7 @@ export const FRAME_TRACE_PROGRAM_MISMATCH_MESSAGE =
 
 export function startExactFramePreparation(context: FrameContext): ExactFramePreparation {
   const controller = new AbortController();
+  let tracing = false;
   let deliver: (preview: FrameBoundsPreview | null) => void = () => undefined;
   const earlyBounds = new Promise<FrameBoundsPreview | null>((resolve) => {
     deliver = resolve;
@@ -83,14 +87,21 @@ export function startExactFramePreparation(context: FrameContext): ExactFramePre
     context.jobOrigin,
     false,
     controller.signal,
-    { onFrameBounds: (preview) => deliver(preview) },
+    { onFrameBounds: (preview) => deliver(preview), frameOwnsMotion: () => tracing },
   );
   // Without an early outline the program itself is the first thing to arrive.
   void program.then(
     () => deliver(null),
     () => deliver(null),
   );
-  return { program, earlyBounds, abort: () => controller.abort() };
+  return {
+    program,
+    earlyBounds,
+    abort: () => controller.abort(),
+    traceDispatching: () => {
+      tracing = true;
+    },
+  };
 }
 
 /** Trace the outline now; bind the exact program when it arrives. */
@@ -99,7 +110,7 @@ export async function dispatchTracedFrame(
   preview: TraceableFrameBoundsPreview,
   preparation: ExactFramePreparation,
 ): Promise<boolean> {
-  const trace = await traceFrameOutline(context, preview);
+  const trace = await traceFrameOutline(context, preview, preparation.traceDispatching);
   if (trace === null) {
     // No permit can follow a trace that did not complete cleanly, so the
     // program being prepared for it has no owner; free the worker for the
@@ -122,6 +133,7 @@ export async function dispatchTracedFrame(
 async function traceFrameOutline(
   context: FrameContext,
   preview: TraceableFrameBoundsPreview,
+  traceDispatching: () => void,
 ): Promise<FrameTrace | null> {
   if (!(await requireFrameControllerQueue())) return null;
   const currentLaser = useLaserStore.getState();
@@ -145,6 +157,9 @@ async function traceFrameOutline(
   const candidate = traceCandidate(context, preview, currentLaser, returnToWorkPosition);
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);
+  // The inputs were current a moment ago; the head's motion from here on is
+  // this trace, which must not cancel the program it is waiting for.
+  traceDispatching();
   try {
     await currentLaser.traceFrame(
       preview.frameMotionBounds,

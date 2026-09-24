@@ -16,12 +16,20 @@ export const STALE_START_PREPARATION_MESSAGE =
  * Retire a preparation when its existing exact-handoff identity becomes
  * stale. Advisory controller settings do not cancel work or become a gate.
  * Each owner detaches on settlement and aborts only its own worker request.
+ *
+ * `frameOwnsMotion` turns true once a split Frame traces the outline while
+ * this preparation finishes (ADR-353). From then on the head's reported
+ * state and position belong to that Frame, not to drift: the trace's
+ * completion proves the head came back and its expiry owns every later move.
+ * Both comparisons below then read the pre-Frame report; every other
+ * controller fact stays live.
  */
 export function ownCurrentStartPreparation(
   app: ReturnType<typeof useStore.getState>,
   laser: ReturnType<typeof useLaserStore.getState>,
   callerSignal?: AbortSignal,
   placement: Partial<StartPreparationPlacement> = {},
+  frameOwnsMotion: () => boolean = () => false,
 ): {
   readonly signal: AbortSignal;
   readonly inputsChanged: () => boolean;
@@ -48,7 +56,8 @@ export function ownCurrentStartPreparation(
   const observeController = (): void => {
     // Print-and-Cut registration also depends on the native bed frame.
     observeProject();
-    const current = useLaserStore.getState();
+    const live = useLaserStore.getState();
+    const current = frameOwnsMotion() ? { ...live, statusReport: laser.statusReport } : live;
     if (
       !controllerStartPreparationStillCurrent(laser, current, {
         ignoreAdvisoryControllerEvidence: true,
