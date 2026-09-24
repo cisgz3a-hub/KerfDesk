@@ -4,6 +4,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import type { DragState } from './drag-state';
 import { isStationaryRightPanClick } from './pan-drag';
+import { finishPenByRightClick } from './pen-tool';
 import { canvasMouseToScene, type ViewState } from './view-transform';
 
 export function openContextBarForRightClick(args: {
@@ -17,6 +18,7 @@ export function openContextBarForRightClick(args: {
   if (useStore.getState().previewMode) return;
   const isRelease = args.e.type === 'mouseup' || args.e.type === 'pointerup';
   if (!isRelease || !isStationaryRightPanClick(args.drag, args.e)) return;
+  if (finishPenByRightClick(args.project, useStore.getState().drawShape)) return;
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   const hitId = point === null ? null : hitTest(args.project.scene, point);
   args.selectObject(hitId);

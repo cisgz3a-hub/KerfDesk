@@ -1,211 +1,442 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLayer, createProject, type PathSegment, type Project } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  type CurveSubpath,
+  type Project,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
+import { CURRENT_POLYLINE_FAIRING_VERSION } from '../../core/shapes';
+import { createPenPath, type PenNode } from '../../core/shapes/pen-path';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { constrainPenPoint, finishPen, penClickOutcome } from './pen-tool';
+import { CANVAS_PADDING_PX } from './canvas-layout';
+import { cancelPenNodeDrag, updatePenNodeDrag } from './pen-node-drag';
+import {
+  finishPen,
+  finishPenByRightClick,
+  finishPenNodeDrag,
+  handlePenMouseDown,
+  updatePenHover,
+} from './pen-tool';
+import { DEFAULT_SNAP_SETTINGS } from './snapping';
 
-const TRIANGLE = [
-  { x: 0, y: 0 },
-  { x: 10, y: 0 },
-  { x: 10, y: 10 },
-];
+// A 400 mm bed on a canvas this size draws at exactly 1 px per mm, so a
+// client pixel offset from the padding is the scene point itself.
+const CANVAS_SIZE = 400 + CANVAS_PADDING_PX * 2;
+const VIEW = { zoomFactor: 1, panX: 0, panY: 0 };
+const ref = {
+  current: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: CANVAS_SIZE, height: CANVAS_SIZE }),
+  } as HTMLCanvasElement,
+};
 
-describe('penClickOutcome', () => {
-  it('ignores the second mousedown of a double-click (detail>=2)', () => {
-    const out = penClickOutcome({
-      detail: 2,
-      point: { x: 5, y: 5 },
-      penDraft: { vertices: TRIANGLE, cursor: null },
-      closeDistanceMm: 1,
+type Modifiers = {
+  readonly shiftKey?: boolean;
+  readonly altKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly detail?: number;
+};
+
+function eventAt(point: Vec2, modifiers: Modifiers = {}): React.MouseEvent<HTMLCanvasElement> {
+  return {
+    button: 0,
+    detail: modifiers.detail ?? 1,
+    clientX: CANVAS_PADDING_PX + point.x,
+    clientY: CANVAS_PADDING_PX + point.y,
+    shiftKey: modifiers.shiftKey ?? false,
+    altKey: modifiers.altKey ?? false,
+    ctrlKey: modifiers.ctrlKey ?? false,
+    metaKey: false,
+  } as React.MouseEvent<HTMLCanvasElement>;
+}
+
+// One press-and-release, optionally dragged to `dragTo` before release.
+function press(
+  point: Vec2,
+  options: { readonly dragTo?: Vec2; readonly modifiers?: Modifiers } = {},
+) {
+  const { project, drawShape } = useStore.getState();
+  const drag = handlePenMouseDown({
+    e: eventAt(point, options.modifiers),
+    ref,
+    project,
+    viewState: VIEW,
+    drawShape,
+  });
+  if (drag !== null && options.dragTo !== undefined) updatePenNodeDrag(drag, options.dragTo, false);
+  if (drag !== null) finishPenNodeDrag(drag, project, drawShape);
+  return drag;
+}
+
+function finishOpen(): boolean {
+  const { project, drawShape } = useStore.getState();
+  return finishPen({ closed: false, project, drawShape });
+}
+
+function draftNodes(): ReadonlyArray<PenNode> {
+  return useUiStore.getState().penDraft?.nodes ?? [];
+}
+
+function objects(): ReadonlyArray<SceneObject> {
+  return useStore.getState().project.scene.objects;
+}
+
+function onlyCurve(object: SceneObject | undefined): CurveSubpath | undefined {
+  return object !== undefined && 'paths' in object ? object.paths[0]?.curves?.[0] : undefined;
+}
+
+function addPenDrawing(id: string, points: ReadonlyArray<Vec2>): void {
+  const nodes = points.map((point): PenNode => ({ kind: 'corner', point }));
+  const shape = createPenPath({ id, color: '#000000', nodes, closed: false });
+  if (shape === null) throw new Error('fixture drawing');
+  useStore.getState().drawShape(shape);
+  useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+}
+
+beforeEach(() => {
+  useStore.getState().newProject();
+  useUiStore.getState().resetToolMode();
+  useUiStore.getState().setActiveLayerColor(null);
+  // Grid pull is covered in pen-snap.test.ts; here it would move the clicks.
+  useUiStore.getState().setSnapSettings({ ...DEFAULT_SNAP_SETTINGS, snapToGrid: false });
+  useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+});
+
+describe('pen clicks and drags (ADR-380)', () => {
+  it('joins clicked corners with exact straight segments at the clicked points', () => {
+    const clicks = [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+      { x: 53, y: 57 },
+      { x: 93, y: 57 },
+      { x: 93, y: 97 },
+    ];
+    clicks.forEach((point) => press(point));
+    const placed = draftNodes().map((node) => node.point);
+    expect(draftNodes().every((node) => node.kind === 'corner')).toBe(true);
+    placed.forEach((point, index) => {
+      expect(point.x).toBeCloseTo(clicks[index]?.x ?? NaN, 9);
+      expect(point.y).toBeCloseTo(clicks[index]?.y ?? NaN, 9);
     });
-    expect(out).toEqual({ kind: 'ignore' });
+
+    expect(finishOpen()).toBe(true);
+
+    const [shape] = objects();
+    expect(shape?.kind === 'shape' && shape.spec).toEqual({
+      kind: 'polyline',
+      points: placed,
+      closed: false,
+    });
+    expect(onlyCurve(shape)).toEqual({
+      start: placed[0],
+      segments: placed.slice(1).map((to) => ({ kind: 'line', to })),
+      closed: false,
+    });
+    expect(shape?.kind === 'shape' && shape.fairingVersion).toBe(CURRENT_POLYLINE_FAIRING_VERSION);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
   });
 
-  it('starts a new polyline when none is in progress', () => {
-    const out = penClickOutcome({
-      detail: 1,
-      point: { x: 3, y: 4 },
-      penDraft: null,
-      closeDistanceMm: 1,
-    });
-    expect(out).toEqual({ kind: 'start', point: { x: 3, y: 4 } });
-  });
+  it('drags out a smooth node whose symmetric handles shape both cubics', () => {
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 }, { dragTo: { x: 63, y: 27 } });
+    press({ x: 93, y: 17 });
 
-  it('appends when the click is not near the first vertex', () => {
-    const out = penClickOutcome({
-      detail: 1,
-      point: { x: 50, y: 50 },
-      penDraft: { vertices: TRIANGLE, cursor: null },
-      closeDistanceMm: 2,
+    expect(draftNodes()[1]).toEqual({
+      kind: 'smooth',
+      point: { x: 53, y: 17 },
+      handleOut: { x: 63, y: 27 },
     });
-    expect(out).toEqual({ kind: 'append', point: { x: 50, y: 50 } });
-  });
-
-  it('closes when clicking near the first vertex with >=3 vertices', () => {
-    const out = penClickOutcome({
-      detail: 1,
-      point: { x: 0.5, y: 0.5 },
-      penDraft: { vertices: TRIANGLE, cursor: null },
-      closeDistanceMm: 2,
-    });
-    expect(out).toEqual({ kind: 'close' });
-  });
-
-  it('does NOT close with only 2 vertices even near the start (would be degenerate)', () => {
-    const out = penClickOutcome({
-      detail: 1,
-      point: { x: 0.1, y: 0.1 },
-      penDraft: {
-        vertices: [
-          { x: 0, y: 0 },
-          { x: 10, y: 0 },
-        ],
-        cursor: null,
+    finishOpen();
+    expect(onlyCurve(objects()[0])?.segments).toEqual([
+      {
+        kind: 'cubic',
+        control1: { x: 13, y: 17 },
+        control2: { x: 43, y: 7 },
+        to: { x: 53, y: 17 },
       },
-      closeDistanceMm: 2,
+      {
+        kind: 'cubic',
+        control1: { x: 63, y: 27 },
+        control2: { x: 93, y: 17 },
+        to: { x: 93, y: 17 },
+      },
+    ]);
+  });
+
+  it('keeps a slightly unsteady click a corner', () => {
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 }, { dragTo: { x: 54, y: 18 } });
+
+    expect(draftNodes()[1]).toEqual({ kind: 'corner', point: { x: 53, y: 17 } });
+  });
+
+  it('holds a Shift-dragged handle to 45 degree steps', () => {
+    press({ x: 13, y: 17 });
+    const drag = handlePenMouseDown({
+      e: eventAt({ x: 53, y: 17 }),
+      ref,
+      project: useStore.getState().project,
+      viewState: VIEW,
+      drawShape: useStore.getState().drawShape,
     });
-    expect(out).toEqual({ kind: 'append', point: { x: 0.1, y: 0.1 } });
+    if (drag === null) throw new Error('expected a node drag');
+    updatePenNodeDrag(drag, { x: 73, y: 19 }, true);
+
+    const node = draftNodes()[1];
+    expect(node?.kind === 'smooth' && node.handleOut.y).toBeCloseTo(17);
+  });
+
+  it('toggles corner and smooth placement with S', () => {
+    press({ x: 13, y: 17 });
+    useUiStore.getState().togglePenNodeMode();
+    press({ x: 53, y: 57 });
+    useUiStore.getState().togglePenNodeMode();
+    press({ x: 93, y: 17 });
+
+    expect(draftNodes().map((node) => node.kind)).toEqual(['corner', 'auto', 'corner']);
+    finishOpen();
+    const segments = onlyCurve(objects()[0])?.segments ?? [];
+    expect(segments.map((segment) => segment.kind)).toEqual(['cubic', 'cubic']);
+  });
+
+  it('closes the path when the first node is pressed again', () => {
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 });
+    press({ x: 53, y: 57 });
+    press({ x: 15, y: 18 });
+
+    const curve = onlyCurve(objects()[0]);
+    expect(curve?.closed).toBe(true);
+    expect(curve?.segments.at(-1)).toEqual({ kind: 'line', to: { x: 13, y: 17 } });
+    expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('ignores the second press of a double-click', () => {
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 }, { modifiers: { detail: 2 } });
+
+    expect(draftNodes()).toHaveLength(1);
+  });
+
+  it('takes a node back out when its press is cancelled', () => {
+    press({ x: 13, y: 17 });
+    const before = useUiStore.getState().penDraft;
+    const drag = handlePenMouseDown({
+      e: eventAt({ x: 53, y: 17 }),
+      ref,
+      project: useStore.getState().project,
+      viewState: VIEW,
+      drawShape: useStore.getState().drawShape,
+    });
+    if (drag === null) throw new Error('expected a node drag');
+    cancelPenNodeDrag(drag);
+
+    expect(useUiStore.getState().penDraft).toBe(before);
   });
 });
 
-describe('constrainPenPoint', () => {
-  it('returns the raw point when Shift-style constraint is not active', () => {
-    expect(
-      constrainPenPoint({ vertices: TRIANGLE, cursor: null }, { x: 17, y: 13 }, false),
-    ).toEqual({
-      x: 17,
-      y: 13,
+describe('pen continue and auto-join (ADR-380)', () => {
+  it('continues an open pen drawing from its end node', () => {
+    addPenDrawing('host', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    press({ x: 53.5, y: 17.5 });
+    expect(useUiStore.getState().penDraft?.continues?.objectId).toBe('host');
+    press({ x: 53, y: 57 });
+    finishOpen();
+
+    expect(objects()).toHaveLength(1);
+    expect(onlyCurve(objects()[0])).toEqual({
+      start: { x: 13, y: 17 },
+      segments: [
+        { kind: 'line', to: { x: 53, y: 17 } },
+        { kind: 'line', to: { x: 53, y: 57 } },
+      ],
+      closed: false,
+    });
+    expect(useStore.getState().selectedObjectId).toBe('host');
+    expect(useStore.getState().undoStack).toHaveLength(2);
+  });
+
+  it('keeps the host direction when continuing from its start node', () => {
+    addPenDrawing('host', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    press({ x: 13, y: 17 });
+    press({ x: 13, y: 57 });
+    finishOpen();
+
+    expect(onlyCurve(objects()[0])).toEqual({
+      start: { x: 13, y: 57 },
+      segments: [
+        { kind: 'line', to: { x: 13, y: 17 } },
+        { kind: 'line', to: { x: 53, y: 17 } },
+      ],
+      closed: false,
     });
   });
 
-  it('snaps the next point to the nearest 45 degree increment from the previous vertex', () => {
-    const point = constrainPenPoint(
-      { vertices: [{ x: 0, y: 0 }], cursor: null },
-      { x: 10, y: 3 },
-      true,
-    );
+  it('starts a separate path on an open end while Ctrl is held', () => {
+    addPenDrawing('host', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    press({ x: 53, y: 17 }, { modifiers: { ctrlKey: true } });
+    expect(useUiStore.getState().penDraft?.continues).toBeUndefined();
+    press({ x: 53, y: 57 });
+    finishOpen();
 
-    expect(point.x).toBeCloseTo(Math.hypot(10, 3), 5);
-    expect(point.y).toBeCloseTo(0, 5);
+    expect(objects()).toHaveLength(2);
+    expect(onlyCurve(objects()[0])?.segments).toHaveLength(1);
   });
 
-  it('snaps diagonal placement to 45 degrees while preserving distance', () => {
-    const point = constrainPenPoint(
-      { vertices: [{ x: 5, y: 5 }], cursor: null },
-      { x: 15, y: 14 },
-      true,
-    );
-    const dx = point.x - 5;
-    const dy = point.y - 5;
+  it('joins two drawings when the path finishes on the second one', () => {
+    addPenDrawing('first', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    addPenDrawing('second', [
+      { x: 93, y: 57 },
+      { x: 93, y: 97 },
+    ]);
+    press({ x: 53, y: 17 });
+    press({ x: 93, y: 17 });
+    press({ x: 93, y: 57 });
 
-    expect(dx).toBeCloseTo(dy, 5);
-    expect(Math.hypot(dx, dy)).toBeCloseTo(Math.hypot(10, 9), 5);
+    expect(objects().map((object) => object.id)).toEqual(['first']);
+    expect(onlyCurve(objects()[0])).toEqual({
+      start: { x: 13, y: 17 },
+      segments: [
+        { kind: 'line', to: { x: 53, y: 17 } },
+        { kind: 'line', to: { x: 93, y: 17 } },
+        { kind: 'line', to: { x: 93, y: 57 } },
+        { kind: 'line', to: { x: 93, y: 97 } },
+      ],
+      closed: false,
+    });
+    expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('only meets the second drawing when Ctrl is held at the finish', () => {
+    addPenDrawing('first', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    addPenDrawing('second', [
+      { x: 93, y: 57 },
+      { x: 93, y: 97 },
+    ]);
+    press({ x: 53, y: 17 });
+    press({ x: 93, y: 57 }, { modifiers: { ctrlKey: true } });
+    finishOpen();
+
+    expect(objects()).toHaveLength(2);
+    expect(onlyCurve(objects()[0])?.segments.at(-1)).toEqual({
+      kind: 'line',
+      to: { x: 93, y: 57 },
+    });
+  });
+
+  it('closes the continued path on reaching its far end', () => {
+    addPenDrawing('host', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+      { x: 53, y: 57 },
+    ]);
+    press({ x: 53, y: 57 });
+    press({ x: 13, y: 57 });
+    press({ x: 13, y: 17 });
+
+    const curve = onlyCurve(objects()[0]);
+    expect(objects()).toHaveLength(1);
+    expect(curve?.closed).toBe(true);
+    expect(curve?.segments).toHaveLength(4);
+    expect(curve?.segments.at(-1)?.to).toEqual(curve?.start);
+  });
+
+  it('reports what a press would do before it happens', () => {
+    addPenDrawing('host', [
+      { x: 13, y: 17 },
+      { x: 53, y: 17 },
+    ]);
+    const hover = (point: Vec2, modifiers?: Modifiers) => {
+      updatePenHover({
+        e: eventAt(point, modifiers),
+        ref,
+        project: useStore.getState().project,
+        viewState: VIEW,
+      });
+      return useUiStore.getState().penHover;
+    };
+
+    expect(hover({ x: 52, y: 18 })).toEqual({
+      point: { x: 53, y: 17 },
+      snap: 'endpoint',
+      intent: 'continue',
+    });
+    expect(hover({ x: 52, y: 18 }, { ctrlKey: true })?.intent).toBe('place');
+    expect(hover({ x: 33, y: 19 })).toEqual({
+      point: { x: 33, y: 17 },
+      snap: 'midpoint',
+      intent: 'place',
+    });
   });
 });
 
 describe('finishPen', () => {
-  beforeEach(() => {
-    useUiStore.getState().setPenDraft(null);
-    useUiStore.getState().setActiveLayerColor(null);
-    useUiStore.getState().setToolMode({ kind: 'select' });
-  });
+  it('keeps a single-node draft when asked to finish', () => {
+    press({ x: 13, y: 17 });
 
-  it('commits an open polyline with >=2 vertices and clears the draft', () => {
-    const drawShape = vi.fn();
-    useUiStore.getState().setPenDraft({
-      vertices: [
-        { x: 0, y: 0 },
-        { x: 10, y: 5 },
-      ],
-      cursor: null,
-    });
-    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
-    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(true);
-    expect(drawShape).toHaveBeenCalledTimes(1);
-    const shape = drawShape.mock.calls[0]?.[0];
-    expect(shape?.spec.kind).toBe('polyline');
-    expect(shape?.spec.closed).toBe(false);
-    expect(shape?.spec.points).toHaveLength(2);
-    expect(useUiStore.getState().penDraft).toBeNull();
-    // Finishing a polyline returns to Select (maintainer request, 2026-07-07).
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
-  });
-
-  it('does not commit an open finish with <2 vertices (keeps the draft)', () => {
-    const drawShape = vi.fn();
-    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
-    useUiStore.getState().setPenDraft({ vertices: [{ x: 0, y: 0 }], cursor: null });
-    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(false);
-    expect(drawShape).not.toHaveBeenCalled();
+    expect(finishOpen()).toBe(false);
     expect(useUiStore.getState().penDraft).not.toBeNull();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'polyline' });
   });
 
-  it('requires >=3 vertices to close (a 2-point closed path is degenerate)', () => {
-    const drawShape = vi.fn();
-    useUiStore.getState().setPenDraft({
-      vertices: [
-        { x: 0, y: 0 },
-        { x: 10, y: 0 },
-      ],
-      cursor: null,
-    });
-    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(false);
-    expect(drawShape).not.toHaveBeenCalled();
+  it('needs three nodes to close', () => {
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 });
+    const { project, drawShape } = useStore.getState();
+
+    expect(finishPen({ closed: true, project, drawShape })).toBe(false);
   });
 
-  it('commits a closed polyline with >=3 vertices', () => {
-    const drawShape = vi.fn();
-    useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
-    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
-    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(true);
-    expect(drawShape).toHaveBeenCalledTimes(1);
-    expect(drawShape.mock.calls[0]?.[0]?.spec.closed).toBe(true);
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
-  });
-
-  it('uses the current drawing layer color for committed pen geometry', () => {
+  it('draws on the current drawing layer', () => {
     const drawShape = vi.fn();
     useUiStore.getState().setActiveLayerColor('#00ff00');
-    useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
+    useUiStore.getState().setPenDraft({
+      nodes: [
+        { kind: 'corner', point: { x: 0, y: 0 } },
+        { kind: 'corner', point: { x: 10, y: 0 } },
+      ],
+    });
 
     expect(finishPen({ closed: false, project: twoLayerProject(), drawShape })).toBe(true);
-
-    const shape = drawShape.mock.calls[0]?.[0];
-    expect(shape?.color).toBe('#00ff00');
-    expect(shape?.paths[0]?.color).toBe('#00ff00');
+    expect(drawShape.mock.calls[0]?.[0]?.color).toBe('#00ff00');
   });
 
-  it('commits via the real store action, pushing exactly one undo entry', () => {
-    // Guards the removed redundant selectObject (delta #1): the commit must be a
-    // single store write, so one undo fully reverses it.
-    useStore.getState().newProject();
-    useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
-    expect(
-      finishPen({
-        closed: false,
-        project: useStore.getState().project,
-        drawShape: useStore.getState().drawShape,
-      }),
-    ).toBe(true);
-    expect(useStore.getState().project.scene.objects).toHaveLength(1);
-    expect(useStore.getState().undoStack).toHaveLength(1);
+  it('finishes on a right click and drops a lone node', () => {
+    press({ x: 13, y: 17 });
+    const { project, drawShape } = useStore.getState();
+    expect(finishPenByRightClick(project, drawShape)).toBe(true);
     expect(useUiStore.getState().penDraft).toBeNull();
+    expect(objects()).toHaveLength(0);
+
+    press({ x: 13, y: 17 });
+    press({ x: 53, y: 17 });
+    expect(finishPenByRightClick(useStore.getState().project, drawShape)).toBe(true);
+    expect(objects()).toHaveLength(1);
   });
 
-  it('commits dense pen drawings as tracer-faired cubic geometry', () => {
-    const drawShape = vi.fn();
-    const vertices = Array.from({ length: 11 }, (_, index) => {
-      const angle = (index / 10) * Math.PI;
-      return { x: 40 + 40 * Math.cos(angle), y: 40 * Math.sin(angle) };
-    });
-    useUiStore.getState().setPenDraft({ vertices, cursor: null });
-
-    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(true);
-
-    const curve = drawShape.mock.calls[0]?.[0]?.paths[0]?.curves?.[0];
-    expect(curve?.segments.every((segment: PathSegment) => segment.kind === 'cubic')).toBe(true);
-    expect(curve?.segments.length).toBeLessThan(vertices.length - 1);
+  it('leaves a right click alone when no path is being drawn', () => {
+    const { project, drawShape } = useStore.getState();
+    expect(finishPenByRightClick(project, drawShape)).toBe(false);
   });
 });
 

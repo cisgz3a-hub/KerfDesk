@@ -19,8 +19,8 @@ import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
 import { drawRegistrationBoxDimensions } from './draw-registration-dimensions';
-import { drawPenDraft } from './draw-pen-preview';
-import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
+import { drawPenOverlay, type PenOverlay } from './draw-pen-preview';
+import { type SelectionMarquee } from '../state/ui-store';
 import type { ArtworkRunFocus } from '../state/artwork-run-order-ui';
 import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
@@ -86,9 +86,9 @@ export type DrawOpts = {
   // accent outline so size + position are visible live before commit. Null
   // when not drawing.
   readonly draft?: SceneObject;
-  // Phase G (B6): the pen tool's in-progress polyline (placed vertices +
-  // rubber-band to the cursor). Null unless the pen is mid-draw.
-  readonly penDraft?: PenDraft;
+  // Phase G (B6, ADR-380): the pen tool's unfinished path, hover target and
+  // snap marker. Omitted unless the pen is drawing or hovering.
+  readonly penOverlay?: PenOverlay;
   readonly selectionMarquee?: SelectionMarquee;
   readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
@@ -213,7 +213,7 @@ function drawLiveWorkspaceOverlays(
   view: ViewTransform,
 ): void {
   if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
-  if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
+  if (opts.penOverlay !== undefined) drawPenOverlay(ctx, opts.penOverlay, view);
   if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
   if (opts.measureDraft !== undefined) drawMeasurement(ctx, opts.measureDraft, view);
   if (opts.cncTabLayerColor !== undefined && opts.selectedId !== null) {

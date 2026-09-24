@@ -130,7 +130,7 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'polyline',
     title: 'Draw connected lines',
-    summary: 'Click to draw connected lines or a closed outline.',
+    summary: 'Click for straight lines, drag for curves, or close an outline.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
@@ -140,25 +140,27 @@ export const DRAWING_TUTORIALS: readonly Tutorial[] = [
     steps: [
       {
         title: 'Start the path',
-        instruction: 'Choose Draw polyline. Click on the canvas to place the first point.',
+        instruction:
+          'Choose Draw polyline. Click on the canvas to place the first point, or click the open end of an existing path to continue it.',
         focus: 'First point',
         result: 'A live segment shows where the next line will go.',
       },
       {
         title: 'Add each corner',
-        instruction: 'Click each new corner. Hold Shift to keep the line in a 45-degree direction.',
+        instruction:
+          'Click each new corner, or press and drag to place a smooth curve node. Press S to switch between corner and smooth nodes, Backspace to remove the last node, and hold Shift to keep a line at 45 degrees.',
         focus: 'Click the next point',
-        result: 'Each click extends the connected path.',
+        result: 'Each click extends the connected path exactly where you clicked.',
       },
       {
         title: 'Choose open or closed',
         instruction:
-          'Press Enter to finish an open path. For a closed outline, add at least three points and click near the first point.',
+          'Press Enter or Escape to finish an open path, or finish on the open end of another path to join them. For a closed outline, add at least three points and click the first point.',
         focus: 'Finish or return to start',
         result: 'Your path is selected and ready to use.',
       },
     ],
-    tip: 'Use a closed outline when you want an enclosed fill or pocket. Escape cancels an unfinished path.',
+    tip: 'Use a closed outline when you want an enclosed fill or pocket. Points snap to nearby nodes, midpoints and crossings; hold Alt to snap from farther away, or Ctrl to start or finish on a path without joining it.',
     keywords: ['pen', 'polyline', 'line', 'closed', 'open', 'draw'],
     related: ['nodes', 'laser-fill', 'cnc-pocket'],
   },

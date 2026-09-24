@@ -20,7 +20,7 @@ import { panOffsetForDrag } from './pan-drag';
 import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
-import { handlePenMouseDown } from './pen-tool';
+import { finishPenNodeDrag, handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { dispatchPositionLaser } from './position-laser-click';
 import { hitCncTabAnchor } from './cnc-tab-editor';
@@ -218,8 +218,7 @@ function beginToolDrag(args: {
   }
   if (args.toolMode.kind === 'draw') {
     if (args.toolMode.shape === 'polyline') {
-      handlePenMouseDown(args);
-      return { kind: 'handled', drag: null };
+      return { kind: 'handled', drag: handlePenMouseDown(args) };
     }
     return { kind: 'handled', drag: beginDrawDrag({ ...args, shape: args.toolMode.shape }) };
   }
@@ -333,6 +332,10 @@ function finishWorkspaceDrag(args: {
 }): void {
   if (args.drag.kind === 'draw') {
     commitDrawDraft({ ...args, drag: args.drag });
+    return;
+  }
+  if (args.drag.kind === 'pen-node') {
+    finishPenNodeDrag(args.drag, args.project, args.drawShape);
     return;
   }
   if (args.drag.kind === 'measure') {

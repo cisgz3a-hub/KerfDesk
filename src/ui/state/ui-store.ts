@@ -16,6 +16,7 @@ import type {
 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
+import type { PenDraft } from '../workspace/pen-draft';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
 import {
   readCanvasStartMarkersVisible,
@@ -23,6 +24,7 @@ import {
 } from './canvas-motion-preferences';
 import { artworkRunOrderUiSlice, type ArtworkRunOrderUiState } from './artwork-run-order-ui';
 import { uiRailPanelSlice, type UiRailPanelState } from './ui-rail-panel';
+import { PEN_TOOL_IDLE, penToolUiSlice, type PenToolUiState } from './pen-tool-ui';
 import { snapGuideStateUpdate } from './snap-guide-state';
 
 export type { CutsLayersView, RailPanelId, RailPanelVisibility } from './ui-rail-panel';
@@ -75,14 +77,9 @@ export type ToolMode =
   | { readonly kind: 'position-laser' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
-// Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
-// `vertices` are committed clicks (scene mm); `cursor` is the live rubber-band
-// endpoint, updated on mousemove. Ephemeral like draftShape — never persisted,
-// cleared on finish/cancel. Distinct from draftShape (the single-drag snapshot).
-export type PenDraft = {
-  readonly vertices: ReadonlyArray<Vec2>;
-  readonly cursor: Vec2 | null;
-};
+// Pen-tool in-progress path (ADR-051 B6, ADR-380). Null unless the pen is
+// mid-draw; the hover point and node mode live in the pen-tool slice.
+export type { PenDraft } from '../workspace/pen-draft';
 
 export type SelectionMarquee = {
   readonly start: Vec2;
@@ -103,7 +100,8 @@ export type FloatingPanelPosition = {
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
 
 export type UiState = ArtworkRunOrderUiState &
-  UiRailPanelState & {
+  UiRailPanelState &
+  PenToolUiState & {
     readonly dragOverlay: boolean;
     readonly setDragOverlay: (next: boolean) => void;
     readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
@@ -276,9 +274,19 @@ function uiDialogSlice(
   };
 }
 
+// Esc / Select: back to the Select tool with every drawing draft cleared.
+const SELECT_TOOL_STATE = {
+  toolMode: { kind: 'select' },
+  draftShape: null,
+  penDraft: null,
+  measureDraft: null,
+  ...PEN_TOOL_IDLE,
+} as const satisfies Partial<UiState>;
+
 export const useUiStore = create<UiState>((set) => ({
   ...uiRailPanelSlice(set),
   ...artworkRunOrderUiSlice(set),
+  ...penToolUiSlice(set),
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
@@ -335,11 +343,10 @@ export const useUiStore = create<UiState>((set) => ({
       next.kind === 'draw' && next.shape === 'polyline'
         ? { toolMode: next, measureDraft: null }
         : next.kind === 'measure'
-          ? { toolMode: next, penDraft: null }
-          : { toolMode: next, penDraft: null, measureDraft: null },
+          ? { toolMode: next, penDraft: null, ...PEN_TOOL_IDLE }
+          : { toolMode: next, penDraft: null, ...PEN_TOOL_IDLE, measureDraft: null },
     ),
-  resetToolMode: () =>
-    set({ toolMode: { kind: 'select' }, draftShape: null, penDraft: null, measureDraft: null }),
+  resetToolMode: () => set(SELECT_TOOL_STATE),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,

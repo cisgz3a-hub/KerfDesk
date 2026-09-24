@@ -11,8 +11,9 @@ import type { useWorkspaceDragDeps } from './workspace-drag-deps';
 import { cancelWorkspaceDrag } from './workspace-drag-cancel';
 
 // Transforms roll back via cancelInteraction; a marquee just clears its box;
-// pan restores the exact view captured at pointer-down. Draw/measure/pen keep
-// the existing global Esc (resetToolMode) behavior.
+// pan restores the exact view captured at pointer-down; a held pen node is
+// taken back out of the path. Draw/measure and an idle pen keep the existing
+// global Esc behavior.
 const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
   'move',
   'scale',
@@ -22,6 +23,7 @@ const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
   'cnc-tab',
   'marquee',
   'pan',
+  'pen-node',
 ]);
 
 export function useEscCancelsDrag(

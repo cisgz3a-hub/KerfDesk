@@ -4,12 +4,16 @@ import type { DragState } from './drag-state';
 import { draftForDrawDrag, drawModifiersFromEvent } from './draw-tool';
 import { constrainMeasureEnd, type MeasureDraft } from './measure-tool';
 import { updatePathNodeDrag } from './path-node-drag';
-import { updatePenCursor } from './pen-tool';
+import { updatePenNodeDrag } from './pen-node-drag';
+import { updatePenHover } from './pen-tool';
+import type { ViewState } from './view-transform';
 
 type CanvasMouseEvent = React.MouseEvent<HTMLCanvasElement>;
 
 type NonTransformDragUpdateArgs = {
   readonly e: CanvasMouseEvent;
+  readonly ref: React.RefObject<HTMLCanvasElement | null>;
+  readonly viewState: ViewState;
   readonly drag: DragState | null;
   readonly point: Vec2 | null;
   readonly project: Project;
@@ -74,7 +78,8 @@ function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {
     return true;
   }
   if (args.toolMode.kind !== 'draw' || args.toolMode.shape !== 'polyline') return false;
-  updatePenCursor(args.point, args.e.shiftKey);
+  if (args.drag?.kind === 'pen-node') updatePenNodeDrag(args.drag, args.point, args.e.shiftKey);
+  else updatePenHover(args);
   return true;
 }
 

@@ -18,6 +18,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { useCanvasColorScheme } from '../theme/use-canvas-color-scheme';
 import { drawScene } from './draw-scene';
+import type { PenOverlay } from './draw-pen-preview';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import { DragOverlay, DragReadout, MeasureReadoutOverlay, ZoomControls } from './overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
@@ -229,9 +230,9 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
   const snapGuides = useUiStore((s) => s.snapGuides);
   const measureDraft = useUiStore((s) => s.measureDraft);
-  // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
-  // cursor move).
-  const penDraft = useUiStore((s) => s.penDraft);
+  // Phase G (B6): the pen tool's unfinished path and hover marker (also
+  // redraws per click / cursor move).
+  const penOverlay = usePenOverlay();
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
@@ -252,7 +253,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       previewBackgroundKey,
       displayPolylineCache,
       draftShape,
-      penDraft,
+      penOverlay,
       selectionMarquee,
       measureDraft,
       snapGuides,
@@ -284,10 +285,21 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     args.cncRemovalGrid,
     requestRasterRedraw,
     draftShape,
-    penDraft,
+    penOverlay,
     selectionMarquee,
     snapGuides,
   ]);
+}
+
+// The pen's draft, hover target and S mode, redrawn together.
+function usePenOverlay(): PenOverlay | null {
+  const draft = useUiStore((s) => s.penDraft);
+  const hover = useUiStore((s) => s.penHover);
+  const mode = useUiStore((s) => s.penNodeMode);
+  return useMemo(
+    () => (draft === null && hover === null ? null : { draft, hover, mode }),
+    [draft, hover, mode],
+  );
 }
 
 function drawWorkspaceScene(
@@ -299,7 +311,7 @@ function drawWorkspaceScene(
     readonly previewBackgroundKey: object;
     readonly displayPolylineCache: DisplayPolylineCache;
     readonly draftShape: ReturnType<typeof useUiStore.getState>['draftShape'];
-    readonly penDraft: ReturnType<typeof useUiStore.getState>['penDraft'];
+    readonly penOverlay: PenOverlay | null;
     readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
     readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
     readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
@@ -322,7 +334,7 @@ function drawWorkspaceScene(
     ...(args.previewToolpath === null ? {} : { previewToolpath: args.previewToolpath }),
     cncRemovalGrid: args.cncRemovalGrid,
     ...(state.draftShape === null ? {} : { draft: state.draftShape }),
-    ...(state.penDraft === null ? {} : { penDraft: state.penDraft }),
+    ...(state.penOverlay === null ? {} : { penOverlay: state.penOverlay }),
     ...(state.selectionMarquee === null ? {} : { selectionMarquee: state.selectionMarquee }),
     ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),

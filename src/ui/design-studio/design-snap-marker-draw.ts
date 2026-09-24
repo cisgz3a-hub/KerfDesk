@@ -28,13 +28,21 @@ export function paintSnapMarker(
   view: DesignView,
   target: SnapTarget,
 ): void {
-  const at = mmToPx(view, target.atMm);
+  paintSnapGlyph(ctx, mmToPx(view, target.atMm), target.kind);
+}
+
+/** The same glyph at a canvas-pixel point, so the workspace pen shares the vocabulary. */
+export function paintSnapGlyph(
+  ctx: CanvasRenderingContext2D,
+  atPx: Vec2,
+  kind: SnapTarget['kind'],
+): void {
   ctx.save();
   ctx.strokeStyle = canvasTheme.snapGuide;
   ctx.fillStyle = canvasTheme.snapGuide;
   ctx.lineWidth = LINE_WIDTH_PX;
   ctx.setLineDash([]);
-  drawGlyph(ctx, at, target.kind);
+  drawGlyph(ctx, atPx, kind);
   ctx.restore();
 }
 

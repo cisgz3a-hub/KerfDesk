@@ -14,6 +14,7 @@
 import { useEffect, useRef } from 'react';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
+import { handlePenShortcut } from './pen-shortcuts';
 import { usePlatform } from './platform-context';
 import {
   editShortcutContext,
@@ -38,6 +39,7 @@ export function useShortcuts(): void {
   useEffect(() => {
     const onFileEditKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
+      if (handlePenShortcut(e)) return;
       if (handleFileShortcut(e, fileShortcutContext(platformRef.current))) return;
       if (handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
       handleEditShortcut(e, editShortcutContext());

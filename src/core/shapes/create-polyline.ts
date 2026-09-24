@@ -32,7 +32,9 @@ type DrawingFairingMode = 'round' | 'corner-preserving';
 // / the fit tolerances above) changes in a way that should re-fair existing
 // drawings. The migration re-fairs any drawing stamped below this and skips any
 // stamped at it, so recognition never depends on re-deriving byte-identical
-// fitter output (ADR-214).
+// fitter output (ADR-214). The pen's exact drawings (ADR-380) carry this stamp
+// too, only so the migration leaves them alone: a bump must still skip them,
+// or it would refit their clicked corners into curves.
 export const CURRENT_POLYLINE_FAIRING_VERSION = 1;
 
 export function createPolyline(args: {

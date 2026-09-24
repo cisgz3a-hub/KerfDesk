@@ -3,7 +3,7 @@ import { createRectangle } from '../../core/shapes/primitives';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from '../workspace/snapping';
 import { useUiStore } from './ui-store';
 
-const ONE_VERTEX = { vertices: [{ x: 1, y: 2 }], cursor: null };
+const ONE_VERTEX = { nodes: [{ kind: 'corner' as const, point: { x: 1, y: 2 } }] };
 const MEASURE_DRAFT = { start: { x: 0, y: 0 }, end: { x: 12, y: 8 } };
 
 describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
@@ -78,6 +78,29 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().resetToolMode();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('keeps S mode and the hover marker only while the pen stays armed (ADR-380)', () => {
+    const hover = { point: { x: 3, y: 4 }, snap: 'endpoint' as const, intent: 'place' as const };
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+    useUiStore.getState().togglePenNodeMode();
+    useUiStore.getState().setPenHover(hover);
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+    expect(useUiStore.getState().penNodeMode).toBe('smooth');
+    expect(useUiStore.getState().penHover).toEqual(hover);
+
+    useUiStore.getState().setToolMode({ kind: 'select' });
+    expect(useUiStore.getState().penNodeMode).toBe('corner');
+    expect(useUiStore.getState().penHover).toBeNull();
+  });
+
+  it('leaves the store untouched when the pen hover lands on the same target', () => {
+    const hover = { point: { x: 3, y: 4 }, snap: null, intent: 'place' as const };
+    useUiStore.getState().setPenHover(hover);
+    const before = useUiStore.getState();
+    useUiStore.getState().setPenHover({ ...hover, point: { x: 3, y: 4 } });
+    expect(useUiStore.getState()).toBe(before);
+    useUiStore.getState().setPenHover(null);
   });
 
   it('resetToolMode clears a live shape draft', () => {

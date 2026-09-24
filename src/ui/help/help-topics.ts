@@ -108,7 +108,8 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   },
   polyline: {
     label: 'Draw polyline',
-    tooltip: 'Draw connected line segments. Press Enter or double-click to finish.',
+    tooltip:
+      'Click for corners and drag for curves; S switches node type. Press Enter, Esc or double-click to finish, or click the first node to close.',
   },
 };
 

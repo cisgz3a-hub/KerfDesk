@@ -1,156 +1,176 @@
-// pen-tool — the multi-click pen interaction (ADR-051, Phase G, B6). Extracted
-// from Workspace.tsx so useDragMove stays under the function-size cap and the
-// click->vertex decision is unit-testable. Pen state lives in ui-store.penDraft
-// (NOT a DragState variant — the pen is click-driven, not drag-driven). The pure
-// penClickOutcome decides start/append/close/ignore; thin canvas-coupled
-// wrappers apply it. Finish gestures (Enter, double-click) live in Workspace /
-// shortcuts and call finishPen.
+// pen-tool — the Draw Lines (pen) interaction (ADR-051 B6, ADR-380). A click
+// places a corner node exactly where it lands; press-and-drag places a smooth
+// node and pulls out its handles; S switches clicks between corner and smooth
+// nodes; pressing the first node closes the path. Starting on an open end of
+// an existing path continues it and finishing on one joins it, unless Ctrl/Cmd
+// is held. Pen state lives in ui-store (penDraft, penHover, penNodeMode); a
+// press that places a node returns a 'pen-node' drag so the pointer owner
+// routes the handle drag back here. Enter, double-click, Escape and a right
+// click finish the path through finishPen.
+// https://docs.lightburnsoftware.com/2.1/Reference/DrawLines/
 
-import { assertNever, type Project, type ShapeObject, type Vec2 } from '../../core/scene';
-import { createPolyline } from '../../core/shapes';
-import { type PenDraft, useUiStore } from '../state/ui-store';
+import type { Project, ShapeObject } from '../../core/scene';
+import { commitPenPlan } from '../state/pen-path-commit';
+import { planPenCommit } from '../state/pen-path-join';
+import { useUiStore } from '../state/ui-store';
 import { currentDrawingColor } from './draw-tool';
-import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
+import { appendPenNode, penNodeForMode, type PenDraft, type PenEndpointRef } from './pen-draft';
+import { PEN_DRAG_THRESHOLD_PX, type PenNodeDragState } from './pen-node-drag';
+import { penModifiers, resolvePenPointer, type PenPointer } from './pen-pointer';
+import { canvasMouseToScene, pxToMmForCanvas, type ViewState } from './view-transform';
 
-type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+type CanvasMouseEvent = React.MouseEvent<HTMLCanvasElement>;
+type CanvasRef = React.RefObject<HTMLCanvasElement | null>;
+type DrawShape = (shape: ShapeObject) => void;
 
-// A polyline needs >=2 points to finish as an open line and >=3 to close into a
-// polygon (a 2-point "closed" path is a degenerate back-and-forth — LightBurn
-// won't close one either).
-const MIN_PEN_VERTICES_OPEN = 2;
-const MIN_PEN_VERTICES_CLOSED = 3;
-// Click within this many screen pixels of the first vertex closes the path.
-// Pixel-based (converted to mm via the live scale) so the snap feels identical
-// at any zoom — matches LightBurn's snap-to-node.
-const CLOSE_THRESHOLD_PX = 10;
-
-export type PenClickOutcome =
-  | { readonly kind: 'ignore' }
-  | { readonly kind: 'start'; readonly point: Vec2 }
-  | { readonly kind: 'append'; readonly point: Vec2 }
-  | { readonly kind: 'close' };
-
-// Pure: decide what a pen click does. `detail` is the DOM click count — the
-// second mousedown of a double-click (detail>=2) is the finishing gesture, so it
-// must NOT append a stray vertex (the dblclick handler finishes the path).
-export function penClickOutcome(args: {
-  readonly detail: number;
-  readonly point: Vec2;
-  readonly penDraft: PenDraft | null;
-  readonly closeDistanceMm: number;
-}): PenClickOutcome {
-  if (args.detail >= 2) return { kind: 'ignore' };
-  if (args.penDraft === null) return { kind: 'start', point: args.point };
-  const first = args.penDraft.vertices[0];
-  const isCloseable = args.penDraft.vertices.length >= MIN_PEN_VERTICES_CLOSED;
-  if (first !== undefined && isCloseable && distance(args.point, first) < args.closeDistanceMm) {
-    return { kind: 'close' };
-  }
-  return { kind: 'append', point: args.point };
+export function isPenToolArmed(
+  toolMode: ReturnType<typeof useUiStore.getState>['toolMode'],
+): boolean {
+  return toolMode.kind === 'draw' && toolMode.shape === 'polyline';
 }
 
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-// Canvas-coupled wrapper: resolve the scene point + close threshold, then apply
-// the pure outcome. Called from Workspace's mousedown when the pen is armed.
+/**
+ * A primary press with the pen armed. Returns the drag that shapes the node it
+ * placed, or null when the press finished the path or did nothing.
+ */
 export function handlePenMouseDown(args: {
-  readonly e: React.MouseEvent<HTMLCanvasElement>;
-  readonly ref: React.RefObject<HTMLCanvasElement | null>;
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
   readonly project: Project;
-  readonly viewState: ViewArg;
-  readonly drawShape: (shape: ShapeObject) => void;
-}): void {
-  const rawPoint = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  if (rawPoint === null) return;
-  const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
-  const penDraft = useUiStore.getState().penDraft;
-  const point = constrainPenPoint(penDraft, rawPoint, args.e.shiftKey);
-  const outcome = penClickOutcome({
-    detail: args.e.detail,
-    point,
-    penDraft,
-    closeDistanceMm: CLOSE_THRESHOLD_PX * pxToMm,
-  });
-  applyPenClickOutcome(outcome, penDraft, args.project, args.drawShape);
-}
-
-function applyPenClickOutcome(
-  outcome: PenClickOutcome,
-  penDraft: PenDraft | null,
-  project: Project,
-  drawShape: (shape: ShapeObject) => void,
-): void {
-  const setPenDraft = useUiStore.getState().setPenDraft;
-  switch (outcome.kind) {
-    case 'ignore':
-      return;
-    case 'start':
-      setPenDraft({ vertices: [outcome.point], cursor: outcome.point });
-      return;
-    case 'append':
-      setPenDraft({
-        vertices: [...(penDraft?.vertices ?? []), outcome.point],
-        cursor: outcome.point,
-      });
-      return;
-    case 'close':
-      finishPen({ closed: true, project, drawShape });
-      return;
-    default:
-      return assertNever(outcome);
+  readonly viewState: ViewState;
+  readonly drawShape: DrawShape;
+}): PenNodeDragState | null {
+  // The second press of a double-click is the finishing gesture; the dblclick
+  // handler finishes the path, so it must not place a stray node.
+  if (args.e.detail >= 2) return null;
+  const at = penPointerAt(args);
+  if (at === null) return null;
+  const { pointer } = at;
+  const thresholdMm = PEN_DRAG_THRESHOLD_PX * at.pxToMm;
+  const ui = useUiStore.getState();
+  ui.setPenHover(null);
+  const draft = ui.penDraft;
+  if (draft !== null && pointer.endpoint !== null) {
+    // Reaching another open end (or the far end of the continued path)
+    // places the last node on it and finishes at once.
+    ui.setPenDraft(appendPenNode(draft, penNodeForMode(pointer.point, 'corner')));
+    finishPen({
+      closed: false,
+      project: args.project,
+      drawShape: args.drawShape,
+      joinTo: pointer.endpoint,
+    });
+    return null;
   }
+  if (draft !== null && pointer.intent === 'close') {
+    return nodeDrag(draft, draft, 0, thresholdMm, true);
+  }
+  const node = penNodeForMode(pointer.point, ui.penNodeMode);
+  const next: PenDraft =
+    draft === null
+      ? { nodes: [node], ...(pointer.endpoint === null ? {} : { continues: pointer.endpoint }) }
+      : appendPenNode(draft, node);
+  ui.setPenDraft(next);
+  return nodeDrag(next, draft, next.nodes.length - 1, thresholdMm, false);
 }
 
-// Update the rubber-band endpoint on mousemove. No-op when the pen isn't drawing.
-export function updatePenCursor(point: Vec2 | null, constrain = false): void {
-  const current = useUiStore.getState().penDraft;
-  if (current === null) return;
-  const cursor = point === null ? null : constrainPenPoint(current, point, constrain);
-  useUiStore.getState().setPenDraft({ vertices: current.vertices, cursor });
+function nodeDrag(
+  draft: PenDraft,
+  before: PenDraft | null,
+  nodeIndex: number,
+  thresholdMm: number,
+  closeOnRelease: boolean,
+): PenNodeDragState | null {
+  const original = draft.nodes[nodeIndex];
+  if (original === undefined) return null;
+  return { kind: 'pen-node', nodeIndex, original, before, closeOnRelease, thresholdMm };
 }
 
-export function constrainPenPoint(
-  penDraft: PenDraft | null,
-  point: Vec2,
-  constrain: boolean,
-): Vec2 {
-  if (!constrain) return point;
-  const anchor = penDraft?.vertices[penDraft.vertices.length - 1];
-  if (anchor === undefined) return point;
-  const dx = point.x - anchor.x;
-  const dy = point.y - anchor.y;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return point;
-  const snappedAngle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-  return {
-    x: anchor.x + Math.cos(snappedAngle) * length,
-    y: anchor.y + Math.sin(snappedAngle) * length,
-  };
+/** Release of a node press: a pressed first node closes the path. */
+export function finishPenNodeDrag(
+  drag: PenNodeDragState,
+  project: Project,
+  drawShape: DrawShape,
+): void {
+  if (drag.closeOnRelease) finishPen({ closed: true, project, drawShape });
 }
 
-// Commit the in-progress polyline as a kind:'shape' object, then clear the draft.
-// drawShape (-> applyDrawShape) already selects it + pushes one undo, so we
-// deliberately do NOT call selectObject. No-op below the min vertex count,
-// leaving the draft intact so the user can keep placing points.
+/** Pointer move with no button held: show where a press would land. */
+export function updatePenHover(args: {
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
+  readonly project: Project;
+  readonly viewState: ViewState;
+}): void {
+  const pointer = penPointerAt(args)?.pointer ?? null;
+  useUiStore
+    .getState()
+    .setPenHover(
+      pointer === null
+        ? null
+        : { point: pointer.point, snap: pointer.snap, intent: pointer.intent },
+    );
+}
+
+function penPointerAt(args: {
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
+  readonly project: Project;
+  readonly viewState: ViewState;
+}): { readonly pointer: PenPointer; readonly pxToMm: number } | null {
+  const raw = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  if (raw === null) return null;
+  const ui = useUiStore.getState();
+  const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
+  const pointer = resolvePenPointer({
+    project: args.project,
+    draft: ui.penDraft,
+    raw,
+    pxToMm,
+    settings: ui.snapSettings,
+    modifiers: penModifiers(args.e),
+  });
+  return { pointer, pxToMm };
+}
+
+/**
+ * Commit the unfinished path: a new drawing, or the existing path it continued
+ * or joined, as one undo step. Returns false, leaving the draft in place, when
+ * there are too few nodes to finish.
+ */
 export function finishPen(args: {
   readonly closed: boolean;
   readonly project: Project;
-  readonly drawShape: (shape: ShapeObject) => void;
+  readonly drawShape: DrawShape;
+  readonly joinTo?: PenEndpointRef;
 }): boolean {
-  const penDraft = useUiStore.getState().penDraft;
-  if (penDraft === null) return false;
-  const points = penDraft.vertices;
-  const min = args.closed ? MIN_PEN_VERTICES_CLOSED : MIN_PEN_VERTICES_OPEN;
-  if (points.length < min) return false;
-  const color = currentDrawingColor(args.project);
-  args.drawShape(
-    createPolyline({ id: crypto.randomUUID(), color, spec: { points, closed: args.closed } }),
-  );
-  // Return to the Select tool after finishing a polyline (maintainer request,
-  // 2026-07-07), matching the drag-drawn shapes — rule 3 lets the maintainer
-  // override the earlier sticky default. resetToolMode also clears the draft.
+  const draft = useUiStore.getState().penDraft;
+  if (draft === null) return false;
+  const plan = planPenCommit({
+    project: args.project,
+    draft,
+    closed: args.closed,
+    ...(args.joinTo === undefined ? {} : { joinTo: args.joinTo }),
+    id: crypto.randomUUID(),
+    color: currentDrawingColor(args.project),
+  });
+  if (plan === null) return false;
+  commitPenPlan(plan, args.drawShape);
+  // Return to the Select tool after finishing a path (maintainer request,
+  // 2026-07-07), matching the drag-drawn shapes. resetToolMode also clears
+  // the draft, the hover marker and S mode.
   useUiStore.getState().resetToolMode();
+  return true;
+}
+
+/**
+ * A right click ends an unfinished path, as LightBurn's Draw Lines does. A
+ * lone first node has nothing to finish and is dropped. Returns true when the
+ * click was the pen's.
+ */
+export function finishPenByRightClick(project: Project, drawShape: DrawShape): boolean {
+  const ui = useUiStore.getState();
+  if (!isPenToolArmed(ui.toolMode) || ui.penDraft === null) return false;
+  if (!finishPen({ closed: false, project, drawShape })) ui.setPenDraft(null);
   return true;
 }
