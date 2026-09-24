@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { FRAME_JOB_FIRST_MESSAGE } from './framed-run-readiness';
 import { useStartBlockerStore } from './start-blocker-store';
 import { installJobShortcuts } from './use-job-shortcuts';
 
@@ -16,6 +18,7 @@ function streamingState(): LaserState['streamer'] {
 
 const realStopJob = useLaserStore.getState().stopJob;
 const realCancelJog = useLaserStore.getState().cancelJog;
+const realSetFireActive = useLaserStore.getState().setFireActive;
 
 function press(key: string, init: KeyboardEventInit = {}): void {
   window.dispatchEvent(
@@ -39,6 +42,9 @@ afterEach(() => {
     stopJob: realStopJob,
     cancelJog: realCancelJog,
     motionOperation: null,
+    controllerOperation: null,
+    fireActive: false,
+    setFireActive: realSetFireActive,
     connection: { kind: 'disconnected' },
   });
   useUiStore.setState({ textDialog: null });
@@ -148,22 +154,25 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
       controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
     });
     const uninstall = installJobShortcuts(window);
+    try {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(event);
 
-    const event = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    window.dispatchEvent(event);
-
-    // The flow runs and (with an empty scene / unknown status) records the
-    // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
-    expect(event.defaultPrevented).toBe(true);
-    await vi.waitFor(() =>
-      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0),
-    );
-    uninstall();
+      // The flow runs and, with no completed Frame, says to Frame first instead
+      // of framing - proving the shortcut reached runStartJobFlow (ADR-372).
+      expect(event.defaultPrevented).toBe(true);
+      await vi.waitFor(() =>
+        expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE),
+      );
+      expect(useStartBlockerStore.getState().messages).toEqual([]);
+    } finally {
+      uninstall();
+    }
   });
 
   it.each([
@@ -198,5 +207,44 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     expect(alert).not.toHaveBeenCalled();
     uninstall();
     target.remove();
+  });
+});
+
+// Ctrl+. is the keyboard fallback for the Live Motion bar's ABORT MOTION and
+// LASER OFF (ADR-207). It used to act only on a streaming job or a jog/Frame,
+// so Home, Probe, Auto-focus and a latched Fire ignored it (audit
+// job-lifecycle-6 / ui-panel-4).
+describe('Ctrl+. follows the Live Motion bar', () => {
+  it.each([
+    ['homing', { kind: 'home', phase: 'command', idleReports: 0, operationId: 1 }],
+    ['probing', { kind: 'probe' }],
+  ])('aborts through the controller while %s', (_name, controllerOperation) => {
+    const stopJob = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    patchLaserStore({
+      stopJob,
+      cancelJog,
+      controllerOperation: controllerOperation as LaserState['controllerOperation'],
+    });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(stopJob).toHaveBeenCalledTimes(1);
+    expect(cancelJog).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  it('turns a latched momentary Fire off', () => {
+    const setFireActive = vi.fn(async () => undefined);
+    const stopJob = vi.fn(async () => undefined);
+    patchLaserStore({ fireActive: true, setFireActive, stopJob });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(setFireActive).toHaveBeenCalledWith(false);
+    expect(stopJob).not.toHaveBeenCalled();
+    uninstall();
   });
 });

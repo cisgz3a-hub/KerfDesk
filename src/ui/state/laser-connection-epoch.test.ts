@@ -248,7 +248,13 @@ describe('serial connection epoch guards', () => {
 
     oldConnection.emitLine('Grbl 1.1f');
     oldConnection.emitClose();
-    for (const line of ['[VER:old-stale]', '<Run|MPos:9,9,9|FS:100,1>', 'ok', 'Grbl 1.1f']) {
+    for (const line of [
+      '[VER:old-stale]',
+      '<Run|MPos:9,9,9|FS:100,1>',
+      '<Idle|MPos:9,9,9|Bf:512,65535|FS:0,0>',
+      'ok',
+      'Grbl 1.1f',
+    ]) {
       for (const callback of staleCallbacks.line) callback(line);
     }
     for (const callback of staleCallbacks.close) callback();

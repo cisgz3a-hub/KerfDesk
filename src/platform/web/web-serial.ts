@@ -11,6 +11,9 @@
 // Disconnect handling: the `disconnect` event fires when the OS drops the
 // port (USB cable yank). We surface that via the SerialConnection.onClose
 // handlers so the controller state machine can transition to "Disconnected".
+// A UART line error (framing, parity, break, overrun) is not a disconnect: the
+// port stays open and the read loop continues on a fresh stream
+// (serial-read-loop.ts, audit connect-1).
 //
 // Quirk: Chromium and Electron sometimes return a SerialPort instance from
 // requestPort() that's still flagged "open" from a previous session
@@ -27,10 +30,9 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
-import { createReadSlice, type ReadSlice } from './serial-read-slice';
-import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
-import { createWorkerSerialConnection } from './worker-serial-connection';
-import type { SerialWorkerResponse } from './serial-worker-protocol';
+import { runSerialReadLoop, type SerialReadTarget } from './serial-read-loop';
+import { encodeWireBytes, extractSerialLines } from './serial-wire';
+import { tryOpenNativeSerialConnection } from './native-serial-connection';
 
 // Re-exported: the wire primitives moved to `serial-wire.ts` so the worker
 // transport shares them byte for byte (ADR-334).
@@ -78,12 +80,18 @@ function makePortRef(port: SerialPort): SerialPortRef {
   return {
     ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
-      await openWithRetry(port, req.baudRate);
       if (req.hostedStreaming === true) {
-        const hosted = tryWorkerHostedConnection(port);
+        const hosted = await tryOpenNativeSerialConnection({
+          port,
+          options: { baudRate: req.baudRate, bufferSize: SERIAL_BUFFER_BYTES },
+        });
         if (hosted !== null) return hosted;
       }
-      return makeConnection(port);
+      await openWithRetry(port, req.baudRate);
+      return {
+        ...makeConnection(port),
+        ...(req.hostedStreaming === true ? { backgroundStreamingUnavailable: true } : {}),
+      };
     },
     forget: async () => {
       try {
@@ -93,46 +101,6 @@ function makePortRef(port: SerialPort): SerialPortRef {
       }
     },
   };
-}
-
-// The worker-hosted transport (ADR-334), or null when this runtime cannot give
-// it to us: no Worker, a blocked module worker, or a runtime that refuses to
-// transfer the port's streams. Every one of those falls back to the
-// main-thread connection rather than failing the connect, so opting in can
-// never cost the operator their machine.
-function tryWorkerHostedConnection(port: SerialPort): SerialConnection | null {
-  if (typeof Worker === 'undefined') return null;
-  let worker: Worker;
-  try {
-    worker = new Worker(new URL('./serial-stream-worker.ts', import.meta.url), {
-      type: 'module',
-    });
-  } catch (err) {
-    console.warn('Serial worker could not start; streaming stays on the main thread:', err);
-    return null;
-  }
-  const handlers = new Set<(message: SerialWorkerResponse) => void>();
-  worker.onmessage = (event: MessageEvent<SerialWorkerResponse>) => {
-    for (const handler of handlers) handler(event.data);
-  };
-  try {
-    return createWorkerSerialConnection({
-      bridge: {
-        postMessage: (message, transfer) =>
-          worker.postMessage(message, (transfer ?? []) as Transferable[]),
-        onMessage: (handler) => {
-          handlers.add(handler);
-          return () => handlers.delete(handler);
-        },
-        terminate: () => worker.terminate(),
-      },
-      port,
-    });
-  } catch (err) {
-    console.warn('Serial streams could not be handed to the worker:', err);
-    worker.terminate();
-    return null;
-  }
 }
 
 function serialPortIdentity(port: SerialPort): SerialPortIdentity | null {
@@ -188,15 +156,28 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
 
 type Subscribers<T> = Set<(value: T) => void>;
 
-function makeConnection(port: SerialPort): SerialConnection {
-  const lineSubs: Subscribers<string> = new Set();
-  const closeSubs: Subscribers<void> = new Set();
-  const ctx = {
+type ConnectionContext = SerialReadTarget & {
+  closed: boolean;
+  streamsClosed: boolean;
+  readonly writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
+};
+
+function openConnectionContext(port: SerialPort): ConnectionContext {
+  const ctx: ConnectionContext = {
+    port,
     closed: false,
     streamsClosed: false,
     reader: port.readable?.getReader(),
     writer: port.writable?.getWriter(),
+    isOpen: () => !ctx.closed && !ctx.streamsClosed,
   };
+  return ctx;
+}
+
+function makeConnection(port: SerialPort): SerialConnection {
+  const lineSubs: Subscribers<string> = new Set();
+  const closeSubs: Subscribers<void> = new Set();
+  const ctx = openConnectionContext(port);
 
   const closeStreamsOnce = async (): Promise<void> => {
     if (ctx.streamsClosed) return;
@@ -217,7 +198,7 @@ function makeConnection(port: SerialPort): SerialConnection {
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
-  void runReadLoop(ctx.reader, lineSubs, handleDroppedConnection, () => !ctx.closed);
+  void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection);
 
   const closeConnection = async (): Promise<void> => {
     if (ctx.closed) return;
@@ -285,79 +266,6 @@ function makeConnection(port: SerialPort): SerialConnection {
       await forgetConnection();
     },
   };
-}
-
-async function runReadLoop(
-  reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
-  lineSubs: Subscribers<string>,
-  onEnd: () => void,
-  isOpen: () => boolean,
-): Promise<void> {
-  if (reader === undefined) return;
-  const decoder = new TextDecoder('utf-8');
-  const slice = createReadSlice();
-  let framing = EMPTY_SERIAL_LINE_STATE;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      slice.resumed();
-      const extracted = extractSerialLines(framing, decoder.decode(value, { stream: true }));
-      framing = extracted.state;
-      const dispatched = dispatchLines(lineSubs, extracted.lines, slice, isOpen, 0);
-      if (dispatched !== true && !(await dispatched)) break;
-    }
-  } catch (err) {
-    console.error('Serial read loop terminated:', err);
-  } finally {
-    slice.close();
-    onEnd();
-  }
-}
-
-// Dispatches in wire order, synchronously while the task's slice lasts (so an
-// ordinary chunk behaves exactly as before), then continues on a later task
-// (ADR-356). A connection closed during that yield gets no further lines: they
-// are dropped exactly as bytes still in flight at close are.
-function dispatchLines(
-  lineSubs: Subscribers<string>,
-  lines: ReadonlyArray<string>,
-  slice: ReadSlice,
-  isOpen: () => boolean,
-  from: number,
-): true | Promise<boolean> {
-  for (let index = from; index < lines.length; index += 1) {
-    if (slice.spent()) return dispatchAfterYield(lineSubs, lines, slice, isOpen, index);
-    dispatchLine(lineSubs, lines[index] ?? '');
-  }
-  return true;
-}
-
-async function dispatchAfterYield(
-  lineSubs: Subscribers<string>,
-  lines: ReadonlyArray<string>,
-  slice: ReadSlice,
-  isOpen: () => boolean,
-  from: number,
-): Promise<boolean> {
-  await slice.yieldTask();
-  if (!isOpen()) return false;
-  return await dispatchLines(lineSubs, lines, slice, isOpen, from);
-}
-
-// Subscriber exceptions must not masquerade as a dropped cable: before this
-// isolation, one throwing handler exited the read loop through catch/finally,
-// closed the streams, and fired onClose — a full mid-job "port closed" — and
-// silently dropped the rest of the chunk's lines. Loop-fatal behavior is
-// reserved for genuine stream errors from reader.read().
-function dispatchLine(lineSubs: Subscribers<string>, line: string): void {
-  for (const h of lineSubs) {
-    try {
-      h(line);
-    } catch (err) {
-      console.error('Serial line handler threw; continuing with remaining lines:', err);
-    }
-  }
 }
 
 // The reader / writer must be cancelled-and-awaited before port.close() —

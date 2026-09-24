@@ -44,9 +44,14 @@ export const PARKING_STATUS = '<Door:2|MPos:4.000,0.000,1.000|FS:100,0|Ov:100,10
 export const PARKED_STATUS = '<Door:0|MPos:4.000,0.000,5.000|FS:0,0|Ov:100,100,100>';
 export const DOOR_AJAR_STATUS = '<Door:1|MPos:4.000,0.000,5.000|FS:0,0|Ov:100,100,100>';
 export const RESTORING_STATUS = '<Door:3|MPos:4.000,0.000,0.000|FS:0,12000|Ov:100,100,100|A:S>';
+// grblHAL prints `sys.parking_state` for its restore phase: Parking_Resuming,
+// 4 (grblHAL/core system.h), where GRBL 1.1 and FluidNC print Door:3.
+export const GRBLHAL_RESUMING_STATUS =
+  '<Door:4|MPos:4.000,0.000,0.000|FS:0,12000|Ov:100,100,100|A:S>';
 export const RUN_STATUS = '<Run|MPos:4.000,0.000,0.000|FS:300,12000|Ov:100,100,100|A:S>';
 export const WRONG_DIRECTION_PROGRESS_CASES = [
   { action: 'pause', status: RESTORING_STATUS },
+  { action: 'pause', status: GRBLHAL_RESUMING_STATUS },
   { action: 'resume', status: PARKING_STATUS },
 ] satisfies ReadonlyArray<{
   readonly action: 'pause' | 'resume';
@@ -192,11 +197,15 @@ export async function flushPromises(): Promise<void> {
   }
 }
 
-export async function connectAndStartCnc(harness: ConnectionHarness): Promise<void> {
+export async function connectHarness(harness: ConnectionHarness): Promise<void> {
   await useLaserStore.getState().connect(adapter(harness.connection));
   harness.connection.emitLine('Grbl 1.1f');
   harness.connection.emitLine(IDLE_STATUS);
   await settleTestGrblHandshake();
+}
+
+export async function connectAndStartCnc(harness: ConnectionHarness): Promise<void> {
+  await connectHarness(harness);
   useLaserStore.setState({
     controllerSettings: { laserModeEnabled: false },
     accessoryCache: {

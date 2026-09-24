@@ -18,20 +18,21 @@ describe('cncLiveCapsFromController', () => {
     });
   });
 
-  it('uses $30 as a spindle ceiling when the controller reports CNC mode', () => {
+  // Controller audit cnc-controller-3: a stock router reports $30=1000 with
+  // $32=0 while its spindle turns 12 000 RPM, so $30 is never an RPM ceiling.
+  it('ignores $30 as a spindle ceiling when the controller reports CNC mode', () => {
     expect(
       cncLiveCapsFromController({
         maxFeedX: 2200,
         maxFeedY: 1800,
         zMaxFeed: 300,
-        maxPowerS: 12000,
+        maxPowerS: 1000,
         laserModeEnabled: false,
       }),
     ).toEqual({
       xMaxFeedMmPerMin: 2200,
       yMaxFeedMmPerMin: 1800,
       zMaxFeedMmPerMin: 300,
-      spindleMaxRpm: 12000,
     });
   });
 

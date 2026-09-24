@@ -8,6 +8,7 @@
 
 import { useLaserStore } from '../state/laser-store';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'write-failed': 'Controller write failed',
@@ -63,7 +64,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
         {resetAvailable ? (
           <button
             type="button"
-            onClick={() => void wakeController().catch(() => undefined)}
+            onClick={() => void wakeController().catch(controllerActionFailureHandler('Reset'))}
             disabled={controllerOperation !== null}
             style={recoverStyle}
             title="Send Ctrl-X to a connected sleeping controller. This does not resume the job."

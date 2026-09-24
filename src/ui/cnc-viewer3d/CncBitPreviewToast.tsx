@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { taperedBallCuttingLengthMm, taperedBallEnvelope } from '../../core/cnc-tapered-ball';
 import type { CncTool } from '../../core/scene';
 import {
   canvasFrameStyle,
@@ -214,7 +215,9 @@ function geometryNote(tool: CncTool): string {
     const action =
       tool.kind === 'v-bit'
         ? "Enter the cutter's actual included angle before V-carving."
-        : 'Verify the cutter profile and operation settings before cutting.';
+        : tool.kind === 'tapered-ball-nose'
+          ? "Enter the cutter's ball tip diameter and taper before cutting."
+          : 'Verify the cutter profile and operation settings before cutting.';
     const shankMetadata =
       shankDiameterMm === null
         ? 'Shank diameter is unknown.'
@@ -225,6 +228,13 @@ function geometryNote(tool: CncTool): string {
     shankDiameterMm === null
       ? 'Shank diameter is unknown; the vertical stub is a display aid at cutter diameter.'
       : `Catalog shank: ${formatMillimeters(shankDiameterMm)} mm (metadata only; its transition is not modeled).`;
+  const envelope = taperedBallEnvelope(tool);
+  if (envelope !== null) {
+    // The taper's own geometry fixes where it reaches the stored diameter, so
+    // this cutter's cutting length is modeled rather than disclaimed (ADR-368).
+    const lengthMm = Number(taperedBallCuttingLengthMm(envelope).toFixed(1));
+    return `Cutting shape and diameter follow the CAM model; the taper reaches ${formatMillimeters(tool.diameterMm)} mm about ${lengthMm} mm above the tip. ${shankNote} Flutes and coating are not modeled.`;
+  }
   return `Cutting shape and diameter follow the CAM model. ${shankNote} Flutes, coating, and cutting length are not modeled.`;
 }
 

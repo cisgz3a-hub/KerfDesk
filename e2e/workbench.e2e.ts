@@ -513,7 +513,7 @@ kerfDeskTest(
     await expect
       .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
       .toContain('$J=G90 G21');
-    const startButton = page.getByRole('button', { name: 'Start framed job', exact: true });
+    const startButton = page.getByRole('button', { name: 'Start', exact: true });
     await expect(startButton).toBeEnabled();
     const frameNotice = page.getByRole('button', {
       name: 'Dismiss success notification: Frame complete — press Start to review and run this exact job.',
@@ -648,7 +648,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await page.getByRole('tab', { name: 'Machine' }).click();
   const savedRecovery = page.getByText('Interrupted job saved', { exact: true });
   await expect(savedRecovery).toBeVisible();
-  await expect(page.getByText('Last Start attempt blocked', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/^Last (Start|Frame) attempt blocked$/)).toHaveCount(0);
   await savedRecovery.click();
   await expect(
     page.getByText('It is isolated from the current canvas', { exact: false }),
@@ -679,10 +679,7 @@ async function confirmStartReview(page: Page, kerfdesk: KerfDeskFixture): Promis
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
-  const filenamePanel = page.getByRole('dialog', { name: 'Choose G-code filename' });
-  await expect(filenamePanel).toBeVisible();
-  await filenamePanel.getByRole('button', { name: 'Save', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save as…' }).click();
 }
 
 async function installFileSystemMocks(

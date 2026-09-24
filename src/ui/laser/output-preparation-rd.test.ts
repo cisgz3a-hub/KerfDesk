@@ -1,3 +1,4 @@
+import { deepStrictEqual } from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
@@ -26,7 +27,8 @@ describe('Ruida background output preparation', () => {
       if (response.kind !== 'rd' || !response.result.ok) {
         throw new Error('background fixture emission failed');
       }
-      expect(response.result.bytes).toEqual(direct.bytes);
+      // Native typed-array equality checks every byte without per-byte matcher traversal.
+      deepStrictEqual(response.result.bytes, direct.bytes);
       expect(response.result.advisories).toEqual(direct.advisories);
     },
     EQUIVALENCE_TIMEOUT_MS,

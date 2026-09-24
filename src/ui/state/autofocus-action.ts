@@ -59,6 +59,10 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
       command: `${command}\n`,
       source: 'motion',
       timeoutMs,
+      // A Falcon `$HZ1` runs like grblHAL's synchronous `$H` cycle: it reports
+      // Home or Run until it answers. Reported activity extends the budget as
+      // Home's does; a silent controller still times out (audit gap-start-7).
+      timeoutMode: 'non-idle-status-activity',
       completion: 'terminal-and-idle',
     });
     return { kind: 'ok' };

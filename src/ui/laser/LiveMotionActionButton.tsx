@@ -1,3 +1,5 @@
+import { controllerActionFailureHandler } from './report-controller-action-failure';
+
 type Action = () => Promise<void>;
 
 export function PendingPauseResumeAction(props: {
@@ -29,7 +31,7 @@ export function LiveMotionActionButton(props: {
       style={LIVE_MOTION_ACTION_BUTTON_STYLE}
       title={props.title}
       disabled={props.disabled}
-      onClick={() => void props.onClick().catch(() => undefined)}
+      onClick={() => void props.onClick().catch(controllerActionFailureHandler(props.label))}
     >
       {props.label}
     </button>

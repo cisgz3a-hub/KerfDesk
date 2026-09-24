@@ -6,6 +6,7 @@
 
 import type { ConsoleCommandResult } from '../grbl/console-command';
 import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
+import { consoleTextRefusal, normalizeConsoleSpaces } from '../console-text';
 import {
   MARLIN_CMD_EMERGENCY_STOP,
   MARLIN_CMD_FIRMWARE_INFO,
@@ -28,9 +29,11 @@ const QUERY_COMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 export function prepareMarlinConsoleCommand(input: string): ConsoleCommandResult {
-  const normalized = input.trim();
+  const normalized = normalizeConsoleSpaces(input).trim();
   if (normalized === '') return { ok: false, reason: EMPTY_REASON };
   if (/[\r\n]/.test(normalized)) return { ok: false, reason: MULTILINE_REASON };
+  const textRefusal = consoleTextRefusal(normalized);
+  if (textRefusal !== null) return { ok: false, reason: textRefusal };
   const upper = normalized.toUpperCase();
   if (upper === 'M500' || upper === 'M502') {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };

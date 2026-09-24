@@ -9,16 +9,20 @@
 //
 // Requested row spacing is scallop-driven for ball noses: a ball of radius r
 // stepping s_row leaves planar ridges of height c with
-// s_row = 2·sqrt(c·(2r − c)). The emitted stride is the largest whole number
-// of sampled rows no greater than that request. The CNC compiler materializes
-// an exact grid no coarser than that spacing; for an externally supplied coarser
-// map, one row is irreducible and the requested scallop is not qualified.
+// s_row = 2·sqrt(c·(2r − c)). A tapered ball nose uses its TIP ball radius:
+// its flank lies below that sphere's continuation beyond the tangent point,
+// so the planar ridge can only be lower than requested (ADR-368). The emitted
+// stride is the largest whole number of sampled rows no greater than that
+// request. The CNC compiler materializes an exact grid no coarser than that
+// spacing; for an externally supplied coarser map, one row is irreducible and
+// the requested scallop is not qualified.
 // Flat bits use the established fixed fraction of their diameter. Rows
 // alternate direction (serpentine).
 
 import type { ToolKernel } from '../sim';
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
+import { taperedBallEnvelope } from '../cnc-tapered-ball';
 import { partialCellCenter } from '../grid';
 import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
@@ -198,10 +202,22 @@ function appendFinishingRun(passes: CncPass[], points: ReadonlyArray<FinishingPo
 }
 
 export function scallopRowSpacingMm(tool: CncTool, scallopMm: number): number {
-  if (tool.kind === 'ball-nose') {
-    const radius = tool.diameterMm / 2;
+  const radius = reliefScallopBallRadiusMm(tool);
+  if (radius !== null) {
     const scallop = Math.min(Math.max(scallopMm, 0.001), radius);
     return 2 * Math.sqrt(scallop * (2 * radius - scallop));
   }
   return Math.max(MIN_FLAT_ROW_SPACING_MM, tool.diameterMm * FLAT_TOOL_STEPOVER_FRACTION);
+}
+
+/**
+ * The ball that governs finishing cusps: the whole cutter for a ball nose, the
+ * tip ball for a tapered ball nose, and none for a flat or pointed cutter. A
+ * tapered ball nose with invalid tip data has no ball; it plans as the flat
+ * cylinder its kernel falls back to.
+ */
+export function reliefScallopBallRadiusMm(tool: CncTool): number | null {
+  if (tool.kind === 'ball-nose') return tool.diameterMm / 2;
+  if (tool.kind === 'tapered-ball-nose') return taperedBallEnvelope(tool)?.ballRadiusMm ?? null;
+  return null;
 }

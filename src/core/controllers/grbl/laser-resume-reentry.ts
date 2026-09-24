@@ -13,8 +13,19 @@ export type LaserResumeWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
  *    so a raster row resumed mid-row ran dark, and air assist stayed off.
  * 2: re-issues the active air assist before the re-entry and makes the first
  *    resumed movement state its motion mode explicitly.
+ * 3: rebuilds the beam in the power commands of the controller the program was
+ *    written for: Smoothieware `M221`, Marlin `M3 I` and Marlin `M106`
+ *    (ADR-364). Transforms 1 and 2 always wrote GRBL's, which left those
+ *    programs dark. A GRBL-family program resumes exactly as in transform 2.
  */
-export type LaserResumeTransformVersion = 1 | 2;
+export type LaserResumeTransformVersion = 1 | 2 | 3;
+
+/** True for a transform this build can replay. */
+export function isLaserResumeTransformVersion(
+  value: unknown,
+): value is LaserResumeTransformVersion {
+  return value === 1 || value === 2 || value === 3;
+}
 
 /** Modal values needed to rebuild a beam-off laser recovery boundary. */
 export type LaserResumeModalState = {
@@ -34,7 +45,8 @@ export type LaserResumeModalState = {
   flood: boolean;
 };
 
-type GcodeWord = { readonly letter: string; readonly value: number };
+/** One address word of a line, with its number as the line spells it. */
+export type GcodeWord = { readonly letter: string; readonly value: number; readonly text: string };
 type RewrittenLine = { readonly line: string; readonly physicalPower: number };
 
 const WORD_RE = /([A-Za-z])(-?\d+(?:\.\d+)?)/g;
@@ -76,7 +88,7 @@ export function rewriteLaserResumeTail(
 /** Names the intended motion mode on the first line that would otherwise run
  * the controller's modal motion (still G0 from the re-entry). A line with its
  * own motion word settles the controller's motion mode by itself. */
-function restoreModalMotion(
+export function restoreModalMotion(
   intended: LaserResumeModalState,
   rawLine: string,
 ): { readonly line: string; readonly settled: boolean } {
@@ -93,7 +105,7 @@ function isExplicitMotionWord({ letter, value }: GcodeWord): boolean {
 
 /** GRBL runs the modal motion mode for any line with axis words and no
  * explicit axis command, whatever other modal G words (G90, G21...) it has. */
-function invokesModalMotion(words: ReadonlyArray<GcodeWord>): boolean {
+export function invokesModalMotion(words: ReadonlyArray<GcodeWord>): boolean {
   const hasAxisWord = words.some(({ letter }) => AXIS_LETTERS.has(letter));
   if (!hasAxisWord) return false;
   return !words.some(
@@ -156,18 +168,25 @@ function isBurnMotion(
   words: ReadonlyArray<GcodeWord>,
   version: LaserResumeTransformVersion,
 ): boolean {
+  return (
+    state.spindle !== 'M5' &&
+    state.sValue !== null &&
+    state.sValue > 0 &&
+    movesInBurnMotion(state, words, version)
+  );
+}
+
+/** The line moves the head in G1, G2 or G3: the moves a laser burns on. */
+export function movesInBurnMotion(
+  state: LaserResumeModalState,
+  words: ReadonlyArray<GcodeWord>,
+  version: LaserResumeTransformVersion,
+): boolean {
   const motion = motionForLine(state, words, version);
   const hasXyDestination = words.some(({ letter }) => letter === 'X' || letter === 'Y');
   const hasArcCenter = words.some(({ letter }) => letter === 'I' || letter === 'J');
   const hasDestination = hasXyDestination || ((motion === 'G2' || motion === 'G3') && hasArcCenter);
-  return (
-    hasDestination &&
-    motion !== null &&
-    motion !== 'G0' &&
-    state.spindle !== 'M5' &&
-    state.sValue !== null &&
-    state.sValue > 0
-  );
+  return hasDestination && motion !== null && motion !== 'G0';
 }
 
 function motionForLine(
@@ -189,11 +208,12 @@ function motionForLine(
   return hasOtherGCode ? null : state.motion;
 }
 
-function wordsForLine(rawLine: string): ReadonlyArray<GcodeWord> {
+export function wordsForLine(rawLine: string): ReadonlyArray<GcodeWord> {
   const line = stripComments(rawLine);
   return [...line.matchAll(WORD_RE)].map((match) => ({
     letter: (match[1] ?? '').toUpperCase(),
     value: Number(match[2]),
+    text: match[2] ?? '',
   }));
 }
 
@@ -205,6 +225,11 @@ function lastWordValue(words: ReadonlyArray<GcodeWord>, letter: string): number 
 }
 
 function withPowerWord(rawLine: string, value: number): string {
+  return withPowerText(rawLine, formatNumber(value));
+}
+
+/** Sets the line's S word to `power`, spelled exactly so, or appends one. */
+export function withPowerText(rawLine: string, power: string): string {
   const semicolon = rawLine.indexOf(';');
   const body = semicolon < 0 ? rawLine : rawLine.slice(0, semicolon);
   const comment = semicolon < 0 ? '' : rawLine.slice(semicolon);
@@ -212,12 +237,23 @@ function withPowerWord(rawLine: string, value: number): string {
   const replaced = body.replace(POWER_OR_COMMENT_RE, (match, parenthetical: string | undefined) => {
     if (parenthetical !== undefined) return match;
     found = true;
-    return `S${formatNumber(value)}`;
+    return `S${power}`;
   });
   if (found) return `${replaced}${comment}`;
   const trimmed = body.trimEnd();
   const trailing = body.slice(trimmed.length);
-  return `${trimmed} S${formatNumber(value)}${trailing}${comment}`;
+  return `${trimmed} S${power}${trailing}${comment}`;
+}
+
+/** Follows the line's motion words, as the controller's modal motion does. */
+export function applyMotionWords(
+  state: LaserResumeModalState,
+  words: ReadonlyArray<GcodeWord>,
+): void {
+  for (const { letter, value } of words) {
+    const motion = letter === 'G' ? motionFor(value) : null;
+    if (motion !== null) state.motion = motion;
+  }
 }
 
 function motionFor(value: number): Exclude<LaserResumeMotion, null> | null {
@@ -235,10 +271,10 @@ function spindleFor(value: number): LaserResumeModalState['spindle'] | null {
   return null;
 }
 
-function stripComments(line: string): string {
+export function stripComments(line: string): string {
   return line.replace(/\(.*?\)/g, '').replace(/;.*$/, '');
 }
 
-function formatNumber(value: number): string {
+export function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3);
 }

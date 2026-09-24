@@ -134,10 +134,21 @@ fill overscan worth flagging in cross-reference.
 
 ## Air assist
 
-`groupCoolantMode` / `coolantTransition` (`grbl-strategy.ts:421-431`) emit `M7`/`M8`/`M9` per group
-when the device configures a command. Per project memory (burn-quality audit 2026-07-17), air
-assist was previously found to **emit nothing** in some paths. The current code does emit
-transitions, but this was **not re-verified end-to-end in this session — UNVERIFIED.**
+`groupCoolantMode` / `coolantPlan` / `coolantTransition` (`grbl-strategy.ts:427-455`) emit the
+device's `M7` or `M8` before each operation whose Air setting (or artwork override) is on, `M9`
+before an Air-off operation, and a final `M9` before the closing `M5` and park. A device whose Air
+output is Disabled gets no air command at all; Job Review's manual-air advisory says so, and a
+saved preset in that state is offered the preset's air settings in Machine Setup (ADR-370). On a
+profile flagged `airAssistRestartUnreliable` (the Falcon A1 Pro), `bridgedAirGapIndices` holds the
+air through an Air-off operation that sits between two Air-on ones (ADR-335). The resume
+preamble replays the emitted program and re-issues the active `M7`/`M8` before its re-entry move.
+
+The burn-quality audit (2026-07-17) found air assist emitting nothing in some paths.
+`src/io/gcode/prepare-output-air-assist.test.ts` now drives projects through `prepareOutput` and
+the emitter with the shipped Falcon A1 Pro profile and pins the emitted air words, the Disabled
+case, an artwork override, and the resume preamble (2026-09-24). What the pump physically does
+remains hardware-unverified, including Creality's `$152` standby behaviour and air restoration
+after a Pause, which uses the safety-door state.
 
 ## What is NOT verified for the laser chain
 

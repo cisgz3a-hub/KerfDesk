@@ -9,6 +9,7 @@ import { usePlatform } from '../../app/platform-context';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useLaserStore, type ConnectionState } from '../../state/laser-store';
+import { waitForControllerQueueSettled } from '../../state/controller-queue-settle';
 import { useToastStore } from '../../state/toast-store';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
@@ -55,6 +56,9 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
       controllerKind,
       controllerCommandSet: state.draft.controllerCommandSet,
       baudRate: state.draft.baudRate ?? guide.defaultBaudRate,
+      // The draft's "Stream in worker" opt-in, as every other Connect honours it
+      // (audit connect-6).
+      ...(state.draft.workerHostedStreaming === true ? { hostedStreaming: true } : {}),
     });
   const reconnect = async (): Promise<void> => {
     await disconnect();
@@ -64,8 +68,16 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
     try {
       for (const command of guide.identityCommands) await sendConsoleCommand(command);
       for (const command of guide.settingsCommands) {
-        if (command === driver.commands.settingsQuery) await readMachineSettings();
-        else await sendConsoleCommand(command);
+        if (command === driver.commands.settingsQuery) {
+          // A Console line resolves when its bytes leave, not on the ok, and the
+          // settings read refuses while an ok is still owed (settings-console-3).
+          if (!(await waitForControllerQueueSettled())) {
+            throw new Error(
+              'The controller did not acknowledge the identity query in time. Check the connection, then run the checks again.',
+            );
+          }
+          await readMachineSettings();
+        } else await sendConsoleCommand(command);
       }
       pushToast(
         `${guide.label} read-only checks sent. Review the transcript and values below.`,

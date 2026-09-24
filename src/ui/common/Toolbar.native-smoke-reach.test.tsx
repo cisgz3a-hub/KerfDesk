@@ -56,24 +56,24 @@ describe('toolbar commands the packaged desktop smoke drives', () => {
   );
 });
 
-/** The smoke's own strategy (electron/native-smoke.ts), in test form. It
- * searches the whole document, as the smoke does: More may render its items
- * outside the toolbar element. */
+/** The smoke's own strategy (electron/native-smoke-renderer.ts), in test
+ * form: a toolbar button, else a More item with role="menuitem". It searches
+ * the whole document, as the smoke does: More may render its items outside
+ * the toolbar element. e2e/native-smoke-renderer.e2e.ts runs the exact script
+ * text against the real UI; this keeps the contract in the fast suite. */
 async function smokeCommandButton(label: string): Promise<HTMLButtonElement> {
-  const find = (name: string): HTMLButtonElement | undefined =>
-    [...document.querySelectorAll('button')].find(
+  const find = (selector: string, name: string): HTMLButtonElement | undefined =>
+    [...document.querySelectorAll<HTMLButtonElement>(selector)].find(
       (candidate) => candidate.getAttribute('aria-label') === name,
     );
-  let match = find(label);
-  if (match === undefined) {
-    const more = find('More commands');
-    if (more !== undefined) {
-      await act(async () => more.click());
-      match = find(label);
-    }
-  }
-  if (match === undefined) throw new Error(`${label} button missing`);
-  return match;
+  const direct = find('button', label);
+  if (direct !== undefined) return direct;
+  const more = find('button', 'More commands');
+  if (more === undefined) throw new Error(`${label} button missing`);
+  if (more.getAttribute('aria-expanded') !== 'true') await act(async () => more.click());
+  const item = find('[role="menuitem"]', label);
+  if (item === undefined) throw new Error(`${label} command missing from More`);
+  return item;
 }
 
 async function renderToolbar(commands: ReturnType<typeof fileCommands>): Promise<HTMLElement> {

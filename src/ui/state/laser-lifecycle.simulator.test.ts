@@ -61,6 +61,21 @@ async function pump(ms = 10): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms);
 }
 
+/** Unlock finishes on the controller's answer, which the simulator sends as
+ *  time passes; pump only until it settles, so later polls stay out of the
+ *  state the test inspects. */
+async function unlockThroughSimulator(): Promise<void> {
+  let settled = false;
+  const unlocking = useLaserStore
+    .getState()
+    .unlockAlarm()
+    .finally(() => {
+      settled = true;
+    });
+  for (let tick = 0; tick < 200 && !settled; tick += 1) await pump(1);
+  await unlocking;
+}
+
 /** Connect the real store to a fresh simulator and let the handshake finish. */
 async function connectSim(
   options: CreateGrblSimulatorOptions = {},
@@ -94,7 +109,8 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(s.connection.kind).toBe('connected');
     expect(sim.outbound().some((w) => w.includes('$$'))).toBe(true);
     expect(s.controllerSettings?.laserModeEnabled).toBe(true);
-    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200 }]);
+    // ADR-354: a GRBL-family profile asks for worker-hosted streaming by default.
+    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200, hostedStreaming: true }]);
   });
 
   it('polls ? on the idle cadence and stores the parsed status report', async () => {
@@ -208,7 +224,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
     });
     const positionEpoch = useLaserStore.getState().trustedPositionEpoch;
     const zEpoch = useLaserStore.getState().workZReferenceEpoch;
-    await useLaserStore.getState().unlockAlarm();
+    await unlockThroughSimulator();
     expect(useLaserStore.getState()).toMatchObject({
       homingState: 'unknown',
       homingProof: null,
@@ -259,7 +275,7 @@ describe('laser lifecycle against the GRBL simulator', () => {
     await useLaserStore.getState().stopJob();
     await pump(50);
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
-    await useLaserStore.getState().unlockAlarm();
+    await unlockThroughSimulator();
     await pump(50);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().locked).toBe(false);
@@ -352,12 +368,12 @@ describe('GRBL-family variants against the simulator', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().mpos.x).toBe(5);
     await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
-      /does not accept numeric \$ setting writes/i,
+      /does not send numeric \$ setting writes/i,
     );
     expect(sim.outbound()).not.toContain('$30=1000\n');
     await expect(
       useLaserStore.getState().sendConsoleCommand('$30=1000', { confirmed: true }),
-    ).rejects.toThrow(/does not accept numeric \$ setting writes/i);
+    ).rejects.toThrow(/does not send numeric \$ setting writes/i);
     expect(sim.outbound()).not.toContain('$30=1000\n');
   });
 

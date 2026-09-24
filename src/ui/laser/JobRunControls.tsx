@@ -21,6 +21,8 @@ export function RunningControls(props: {
   readonly isStreaming: boolean;
   readonly isPaused: boolean;
   readonly isToolChange: boolean;
+  /** Every line acknowledged while the controller still reports Run/Hold/Door. */
+  readonly isFinishingTail?: boolean;
 }): JSX.Element {
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
@@ -45,7 +47,12 @@ export function RunningControls(props: {
             : ''}
         </span>
       </div>
-      {shouldShowOverrides(props.isStreaming, props.isPaused, hasOverrides) && <OverrideControls />}
+      {shouldShowOverrides(
+        props.isStreaming,
+        props.isPaused,
+        hasOverrides,
+        props.isFinishingTail === true,
+      ) && <OverrideControls />}
     </>
   );
 }
@@ -67,12 +74,17 @@ function runningSafetyMessage(options: {
 // the live-job explanation for streaming and paused jobs (ADR-103 G3), never for a
 // controller without the capability (Marlin/Smoothieware/Ruida), whose line
 // buffer the bytes would corrupt (CTL-01). Exported for direct unit testing.
+// The finishing tail counts too: 'done' means every line was acknowledged, not
+// executed, and the firmware still honours override bytes while its planner
+// drains (the Live Motion bar keeps Pause there for the same reason; audit
+// realtime-2).
 export function shouldShowOverrides(
   isStreaming: boolean,
   isPaused: boolean,
   hasOverrides: boolean,
+  isFinishingTail = false,
 ): boolean {
-  return (isStreaming || isPaused) && hasOverrides;
+  return (isStreaming || isPaused || isFinishingTail) && hasOverrides;
 }
 
 export function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX.Element {

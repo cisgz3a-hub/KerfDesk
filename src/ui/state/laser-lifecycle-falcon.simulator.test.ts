@@ -48,7 +48,8 @@ async function connectVendorHomePort() {
 describe('Falcon profile host command lifecycle', () => {
   it('connects without settings fetch or automatic Home and does not wait for absent settings', async () => {
     const sim = await connectIdle();
-    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200 }]);
+    // ADR-354: a GRBL-family profile asks for worker-hosted streaming by default.
+    expect(sim.port.openRequests()).toEqual([{ baudRate: 115200, hostedStreaming: true }]);
     expect(sim.outbound().some((line) => line.startsWith('$$') || line.startsWith('$H'))).toBe(
       false,
     );

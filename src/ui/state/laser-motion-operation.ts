@@ -50,6 +50,10 @@ type LaserMotionOperationCommon = {
    * and an ack-owned planner-settlement marker all complete, immediately
    * before a new status query. Only a later Idle may release the owner. */
   readonly cancelStatusQueryAfterSequence?: number;
+  /** Settlements KerfDesk started by itself for this cancelled owner (no
+   * operator Cancel): a rejected line, a failed write or a Cancel that gave
+   * up. Bounded so a persistently failing settlement cannot loop. */
+  readonly automaticReleaseAttempts?: number;
 };
 
 export type LaserMotionOperation = LaserMotionOperationCommon &
@@ -134,6 +138,31 @@ export function observeMotionStatus(
   if (operation.awaitingSettlementAck === true)
     return observeSettlementStatus(operation, state, nextStatusSequence);
   return observeActiveMotionStatus(operation, state);
+}
+
+/** A Cancel settlement (operator or automatic) owns the marker -> stamped
+ * status-query boundary and sends its own status queries. Only then must the
+ * background poll stay silent: an unlabelled reply to an interleaved poll
+ * would make that boundary ambiguous. A cancelled owner with no live attempt
+ * (rejected line, failed write, MPG takeover, Cancel that gave up) must keep
+ * polling, or no Idle can ever arrive to settle it and the DRO freezes. */
+export function cancelAttemptOwnsStatusBoundary(operation: LaserMotionOperation | null): boolean {
+  return operation?.cancelRequested === true && operation.cancelAttemptId !== undefined;
+}
+
+/** Cancelled with no Cancel settlement running and no stamped query pending:
+ * nothing will release this owner unless KerfDesk settles it. An MPG-owned
+ * interruption is excluded; releasing the pendant resumes its own settlement. */
+export function isAbandonedMotionOperation(
+  operation: LaserMotionOperation | null,
+): operation is LaserMotionOperation {
+  return (
+    operation !== null &&
+    operation.cancelRequested === true &&
+    operation.cancelAttemptId === undefined &&
+    operation.cancelStatusQueryAfterSequence === undefined &&
+    operation.interruptedByMpg !== true
+  );
 }
 
 function observeCancelledMotionStatus(

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
+import { sleepUnavailableReason } from '../state/controller-sleep';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { sectionCaptionStyle } from './JobControls.styles';
@@ -44,7 +45,7 @@ export function NoHomingPositionGuide(props: {
   const homingEnabled = useStore((state) => state.project.device.homing.enabled);
   const connection = useLaserStore((state) => state.connection);
   const status = useLaserStore((state) => state.statusReport?.state ?? null);
-  const canSleep = useLaserStore((state) => state.capabilities.sleep);
+  const sleepBlockedReason = useLaserStore(sleepUnavailableReason);
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
@@ -69,7 +70,7 @@ export function NoHomingPositionGuide(props: {
         phase={phase}
         status={status}
         normalBusy={normalBusy}
-        canSleep={canSleep}
+        sleepBlockedReason={sleepBlockedReason}
         canUnlock={canUnlock}
       />
     </section>
@@ -115,6 +116,7 @@ function useGuideActions(
     setPhase('idle');
     setError(null);
   }, [originSettled, phase]);
+  useUnlockIdleDeadline(phase, setPhase, setError);
   useEffect(() => {
     if (phase !== 'waiting-idle' || status !== 'Idle') return;
     setPhase('setting-origin');
@@ -154,12 +156,46 @@ function useGuideActions(
           fail(cause);
         });
     },
-    onUnlock: () => {
-      setPhase('waiting-idle');
-      setError(null);
-      void unlockAlarm().catch(fail);
-    },
+    onUnlock: () => unlockAndWait(unlockAlarm, setPhase, setError),
   };
+}
+
+const UNLOCK_IDLE_WAIT_MS = 5_000;
+
+// A refused unlock leaves the controller locked: offer Unlock again.
+function unlockAndWait(
+  unlockAlarm: () => Promise<void>,
+  setPhase: (phase: GuidePhase) => void,
+  setError: (error: string | null) => void,
+): void {
+  setPhase('waiting-idle');
+  setError(null);
+  void unlockAlarm().catch((cause: unknown) => {
+    setPhase('alarmed');
+    setError(`Unlock failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+  });
+}
+
+// An unlock the controller acknowledged but did not honour (a limit switch
+// still pressed) keeps it in Alarm. The card used to wait for Idle with no
+// deadline and no way back; after a bounded wait it offers Unlock again with
+// the state the controller reports (controller audit gap-start-11).
+function useUnlockIdleDeadline(
+  phase: GuidePhase,
+  setPhase: (phase: GuidePhase) => void,
+  setError: (error: string | null) => void,
+): void {
+  useEffect(() => {
+    if (phase !== 'waiting-idle') return;
+    const timer = setTimeout(() => {
+      const reported = useLaserStore.getState().statusReport?.state ?? 'no status';
+      setPhase('alarmed');
+      setError(
+        `The controller did not report Idle after Unlock; it reports ${reported}. Check the limit switches and the door, then unlock again.`,
+      );
+    }, UNLOCK_IDLE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [phase, setError, setPhase]);
 }
 
 async function finishHandPosition(args: {
@@ -175,7 +211,7 @@ function GuideBody(props: {
   readonly phase: GuidePhase;
   readonly status: string | null;
   readonly normalBusy: boolean;
-  readonly canSleep: boolean;
+  readonly sleepBlockedReason: string | null;
   readonly canUnlock: boolean;
 }): JSX.Element {
   if (props.phase === 'positioning') {
@@ -196,6 +232,7 @@ function GuideBody(props: {
       <RecoveringStep
         phase={props.phase}
         canUnlock={props.canUnlock}
+        error={props.actions.error}
         onUnlock={props.actions.onUnlock}
       />
     );
@@ -206,7 +243,7 @@ function GuideBody(props: {
   return (
     <NoHomingPositionChoices
       disabled={props.normalBusy || props.phase === 'releasing'}
-      canSleep={props.canSleep}
+      sleepBlockedReason={props.sleepBlockedReason}
       error={props.actions.error}
       releasing={props.phase === 'releasing'}
       onRelease={props.actions.onRelease}
@@ -240,12 +277,14 @@ function PositioningStep(props: {
 function RecoveringStep(props: {
   readonly phase: 'waking' | 'alarmed' | 'waiting-idle' | 'setting-origin';
   readonly canUnlock: boolean;
+  readonly error: string | null;
   readonly onUnlock: () => void;
 }): JSX.Element {
   if (props.phase === 'alarmed') {
     return (
       <>
         <p style={messageStyle}>GRBL is awake but locked. Confirm the head is safely positioned.</p>
+        {props.error !== null && <p style={errorStyle}>{props.error}</p>}
         <button
           type="button"
           className="lf-btn"
@@ -291,3 +330,4 @@ const messageStyle: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };
+const errorStyle: React.CSSProperties = { ...messageStyle, color: 'var(--lf-danger-fg)' };

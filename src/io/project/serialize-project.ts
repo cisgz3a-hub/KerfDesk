@@ -12,6 +12,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
 import { stringifyProjectJson } from './stringify-project-json';
 
 export function serializeProject(
@@ -49,6 +50,9 @@ function withSerializableObject(object: SceneObject): SceneObject {
   if (object.kind === 'raster-image' && object.imageClip !== undefined)
     return { ...object, imageClip: serializablePaths(object.imageClip) };
   if (!('paths' in object)) return object;
+  if (object.kind === 'traced-image') {
+    return { ...object, paths: object.paths.map(compactLineGeometry) };
+  }
   return { ...object, paths: serializablePaths(object.paths) };
 }
 

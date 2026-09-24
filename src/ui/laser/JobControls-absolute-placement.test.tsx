@@ -83,11 +83,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// Frame-first (2026-07-17): no placement-policy gate pre-disables Start or
-// Frame. An unhomed Absolute machine frames freely — the watched trace IS the
-// placement proof — and Start's only policy gate is the completed Frame.
+// Frame-first (2026-07-17): no placement-policy gate pre-disables Frame. An
+// unhomed Absolute machine frames freely — the watched trace IS the placement
+// proof — and Start's only gate is that completed Frame, so Start stays greyed
+// out until it exists.
 describe('JobControls Absolute Coordinates frame-first', () => {
-  it('keeps Start and Frame clickable before homing and dispatches the frame trace', async () => {
+  it('keeps Frame clickable before homing, holds Start for the Frame, and dispatches the trace', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const uninstallAutoReview = installAutoJobReview('confirm');
@@ -105,12 +106,12 @@ describe('JobControls Absolute Coordinates frame-first', () => {
 
       expect(buttonByText('Home').disabled).toBe(false);
       expect(buttonByText('Frame job').disabled).toBe(false);
-      expect(buttonByText('Set up & Frame').disabled).toBe(false);
+      expect(buttonByText('Start').disabled).toBe(true);
       expect(buttonByText('Frame job').title).toBe(
         "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run.",
       );
-      expect(buttonByText('Set up & Frame').title).toBe(
-        'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
+      expect(buttonByText('Start').title).toBe(
+        'Start unlocks when a Frame of this exact job finishes cleanly. Press Frame job first.',
       );
 
       await act(async () => {

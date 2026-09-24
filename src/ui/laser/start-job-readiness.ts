@@ -70,8 +70,7 @@ export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
-export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
-  'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
+export { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE } from '../job-placement';
 
 export type StartJobPreparation =
   | {

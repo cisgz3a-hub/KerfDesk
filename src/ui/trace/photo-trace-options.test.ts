@@ -17,17 +17,18 @@ describe('photo shading settings', () => {
       smoothness: 1.3,
       optimize: 2,
     });
-    expect(options).toEqual(PHOTO);
+    expect(options).toEqual({ ...PHOTO, gamma: 1 });
     expect(isBinaryContourPreset(options)).toBe(false);
     expect(hasAggressivePreprocessing(options)).toBe(false);
   });
 
   it('isolates photo adjustments when returning to a line-art preset', () => {
-    const settings = { photoDetail: 95, photoBrightness: 20, photoContrast: -40 };
+    const settings = { photoDetail: 95, photoBrightness: 20, photoContrast: -40, photoGamma: 1.8 };
     expect(mergeLightBurnTraceSettings(PHOTO, settings)).toMatchObject({
       photoDetail: 95,
       brightness: 20,
       contrast: -40,
+      gamma: 1.8,
     });
     expect(mergeLightBurnTraceSettings(TRACE_PRESETS['Line Art']!, settings)).toEqual(
       TRACE_PRESETS['Line Art'],
@@ -40,14 +41,17 @@ describe('photo shading settings', () => {
         photoDetail: 150,
         photoBrightness: -500,
         photoContrast: 200,
+        photoGamma: 20,
       }),
-    ).toMatchObject({ photoDetail: 100, brightness: -100, contrast: 100 });
+    ).toMatchObject({ photoDetail: 100, brightness: -100, contrast: 100, gamma: 5 });
     expect(
       mergeLightBurnTraceSettings(PHOTO, {
         photoDetail: Number.NaN,
         photoBrightness: Number.POSITIVE_INFINITY,
         photoContrast: Number.NEGATIVE_INFINITY,
+        photoGamma: Number.NaN,
       }),
-    ).toEqual(PHOTO);
+    ).toEqual({ ...PHOTO, gamma: 1 });
+    expect(mergeLightBurnTraceSettings(PHOTO, { photoGamma: -1 }).gamma).toBe(0.1);
   });
 });

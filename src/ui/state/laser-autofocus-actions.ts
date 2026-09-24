@@ -9,6 +9,8 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { controllerUnlockedPatch } from './laser-console-completion';
+import { startControllerCommand } from './laser-interactive-command';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -27,32 +29,19 @@ export function autofocusActions(
       assertNoMotionOperation(set, get);
       const unlock = refs.driver.commands.unlock;
       if (unlock === null) throw new Error('This controller has no unlock command.');
-      await write(`${unlock}\n`, 'unlock');
-      set((state) => {
-        const persistentOrUnknown =
-          state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown';
-        return {
-          alarmCode: null,
-          homingState: 'unknown',
-          homingProof: null,
-          positionEvidenceSuppressed: true,
-          statusReport: null,
-          statusObservation: null,
-          wcoCache: null,
-          workOriginActive: persistentOrUnknown,
-          workOriginSource: persistentOrUnknown ? 'unknown' : 'none',
-          workZZeroEvidence: null,
-          workZReferenceEpoch: state.workZReferenceEpoch + 1,
-          frameVerification: null,
-          framedRun: null,
-          frameTrace: null,
-          trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-          log: pushLog(
-            state,
-            '[lf2] Controller unlocked. Cleared stale position, origin, Z, Home, and Frame evidence.',
-          ),
-        };
+      // Owned like the Console's `$X`: the controller's answer decides, so an
+      // `error:N` (a door still open, a locked-out build) rejects with its
+      // reason instead of clearing the alarm on the bytes alone (controller
+      // audit gap-start-11).
+      await startControllerCommand(refs, write, {
+        kind: 'interactive-command',
+        label: 'Unlock (clear alarm)',
+        command: `${unlock}\n`,
+        action: 'unlock',
+        source: 'console',
       });
+      // Shared with a Console `$X`, so both unlock paths leave the same state.
+      set(controllerUnlockedPatch);
     },
   };
 }
@@ -126,6 +115,20 @@ function completionPatch(
     state.connection.kind !== 'connected'
   ) {
     return {};
+  }
+  if (result.kind === 'ok') {
+    // The cycle moved and re-referenced Z, so a Z zero taken before it no
+    // longer holds. A Console `$HZ1` also voids XY and homing evidence,
+    // because a typed command is classified conservatively (the Falcon
+    // contract marks it 'reference'); the button's owned cycle confirms a
+    // fresh Idle and reports the new position, and focusing moves only Z.
+    // The vendor has not documented the cycle, so this narrower button effect
+    // is deliberate (controller audit gap-start-8).
+    return {
+      ...(state.controllerOperation?.kind === 'autofocus' ? { controllerOperation: null } : {}),
+      workZZeroEvidence: null,
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    };
   }
   if (result.kind !== 'timeout' && result.kind !== 'motion-uncertain') {
     return state.controllerOperation?.kind === 'autofocus' ? { controllerOperation: null } : {};

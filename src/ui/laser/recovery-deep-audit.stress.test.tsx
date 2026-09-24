@@ -31,6 +31,7 @@ import {
   drive,
   expectCapsuleFor,
   harness,
+  holdHostDigests,
   installRecoveryStressHooks,
   mulberry32,
   programLines,
@@ -198,10 +199,47 @@ describe('what a recovered job actually burns (wire bytes, independent interpret
   );
 });
 
+type BeforeArchive = { readonly clearNotice: boolean };
+
+/** Hold the Start's execution archive until after the rejection (ADR-337). */
+function holdArchive(beforeArchive: BeforeArchive | undefined): () => void {
+  return beforeArchive === undefined ? () => undefined : holdHostDigests();
+}
+
+/** Before activation the pending Start intent still owns the run, so the
+ * terminal waits; the operator may press "I made the machine safe" meanwhile. */
+function whileArchivePending(
+  h: StressHarness,
+  runId: string,
+  beforeArchive: BeforeArchive | undefined,
+): void {
+  if (beforeArchive === undefined) return;
+  expect(h.repository.getSnapshot().pendingStart?.runId).toBe(runId);
+  expect(h.repository.getSnapshot().activeRun).toBeNull();
+  expect(h.repository.getSnapshot().recoveryCapsule).toBeNull();
+  if (beforeArchive.clearNotice) useLaserStore.getState().clearSafetyNotice();
+}
+
+/** The ack in the store update that first shows the stream errored: the one
+ * the checkpoint tracker sees first. */
+function watchAckWhenErrored(): {
+  readonly ack: () => number | undefined;
+  readonly stop: () => void;
+} {
+  let ack: number | undefined;
+  const stop = useLaserStore.subscribe((state) => {
+    if (ack === undefined && state.streamer?.status === 'errored') ack = state.streamer.completed;
+  });
+  return { ack: () => ack, stop };
+}
+
 describe('a line the controller rejects mid-job', () => {
-  async function rejectedRun() {
+  /** `beforeArchive` keeps the Start's execution archive pending through the
+   * rejection, optionally with the safety notice acknowledged before it activates. */
+  async function rejectedRun(beforeArchive?: BeforeArchive) {
     const rejectLines: { pattern: RegExp; errorCode: number }[] = [];
     const h = await harness({ simulator: { rejectLines } });
+    const releaseDigests = holdArchive(beforeArchive);
     const { runId, running } = await startFramedJob(h.repository);
     const queued = (useLaserStore.getState().streamer?.queued ?? []).map((line) => line.trim());
     const target = queued.filter((line) => /^G1\b.*S[1-9]/.test(line))[11];
@@ -212,16 +250,20 @@ describe('a line the controller rejects mid-job', () => {
       pattern: new RegExp(`^${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
       errorCode: 1,
     });
+    const errored = watchAckWhenErrored();
     for (let step = 0; step < 4_000; step += 1) {
       if (useLaserStore.getState().streamer?.status === 'errored') break;
       await tick(5);
     }
+    errored.stop();
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
     await tick(3_000);
+    whileArchivePending(h, runId, beforeArchive);
+    releaseDigests();
     await drive(running);
     const capsule = await expectCapsuleFor(h.repository, runId);
     if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
-    return { h, capsule, gcode: capsule.artifact.gcode, target };
+    return { h, capsule, gcode: capsule.artifact.gcode, target, ackedAtRejection: errored.ack() };
   }
 
   it(
@@ -269,6 +311,29 @@ describe('a line the controller rejects mid-job', () => {
     },
     STRESS_TIMEOUT_MS,
   );
+
+  it.each([
+    { clearNotice: false, notice: 'still shown' },
+    { clearNotice: true, notice: 'acknowledged' },
+  ])(
+    'a rejection before the Start archive activates still restarts at the rejected line (notice $notice)',
+    async ({ clearNotice }) => {
+      const { capsule, gcode, target, ackedAtRejection } = await rejectedRun({ clearNotice });
+      // The deferred terminal records what the tracker first saw, not what the
+      // store holds once the archive activates.
+      expect(capsule.interruption).toMatchObject({
+        kind: 'controller-error',
+        rejectedLine: target,
+      });
+      expect(capsule.ackedLines).toBe(ackedAtRejection);
+      const rejectedLine = gcode.split('\n').findIndex((line) => line.trim() === target) + 1;
+      expect(automaticRestart(gcode, capsule.ackedLines, capsule.interruption)).toEqual({
+        line: rejectedLine,
+        replaysRejectedLine: true,
+      });
+    },
+    STRESS_TIMEOUT_MS,
+  );
 });
 
 describe('evidence bounds the recovery point can rely on', () => {
@@ -277,9 +342,12 @@ describe('evidence bounds the recovery point can rely on', () => {
     async (seed) => {
       const random = mulberry32(seed);
       const h = await harness();
-      const { running } = await startFramedJob(h.repository);
+      const { runId, running } = await startFramedJob(h.repository);
       await tick(80 + Math.floor(random() * 1_400));
       const acknowledged = useLaserStore.getState().streamer?.completed ?? -1;
+      // Progress checkpoints exist only once the Start archive has activated
+      // (ADR-337); the case below covers a tab that dies before that.
+      expect(h.repository.getSnapshot().activeRun?.runId).toBe(runId);
       h.stopTracking(); // the tab dies: no terminal record is written
       const restarted = new RecoveryRepository({
         backend: h.backend,
@@ -291,6 +359,43 @@ describe('evidence bounds the recovery point can rely on', () => {
       expect(capsule?.interruption.kind).toBe('unknown');
       expect(capsule?.ackedLines).toBeLessThanOrEqual(acknowledged);
       expect(acknowledged - (capsule?.ackedLines ?? 0)).toBeLessThan(CHECKPOINT_ACK_INTERVAL_LINES);
+      await drive(running);
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it(
+    'app restart before the Start archive activates: the Start intent recovers from line 0 once its lease lapses',
+    async () => {
+      const h = await harness();
+      const releaseDigests = holdHostDigests();
+      const { runId, running } = await startFramedJob(h.repository);
+      await tick(400);
+      const acknowledged = useLaserStore.getState().streamer?.completed ?? -1;
+      // The pending Start intent still owns the run, so no checkpoint was saved.
+      expect(h.repository.getSnapshot().pendingStart?.runId).toBe(runId);
+      expect(h.repository.getSnapshot().activeRun).toBeNull();
+      expect(acknowledged).toBeGreaterThanOrEqual(CHECKPOINT_ACK_INTERVAL_LINES);
+      h.stopTracking();
+      const restarted = new RecoveryRepository({
+        backend: h.backend,
+        generationStore: h.generationStore,
+        legacyStorage: { read: () => null, clear: () => undefined },
+      });
+      await drive(restarted.initialize());
+      // Inside the owner lease the window that armed the Start may still be alive.
+      expect(restarted.getSnapshot().recoveryCapsule).toBeNull();
+      expect(restarted.getSnapshot().pendingStart?.runId).toBe(runId);
+      await tick(5_000);
+      // Line 0 re-burns what already ran rather than skipping anything.
+      const capsule = restarted.getSnapshot().recoveryCapsule;
+      expect(capsule?.runId).toBe(runId);
+      expect(capsule?.interruption.kind).toBe('unknown');
+      expect(capsule?.ackedLines).toBe(0);
+      expect(capsule?.artifact.kind).toBe('legacy-fingerprint-only');
+      expect(restarted.getSnapshot().pendingStart).toBeNull();
+      // Only now may the dead tab's Start flow finish, so it cannot race the reconcile.
+      releaseDigests();
       await drive(running);
     },
     STRESS_TIMEOUT_MS,

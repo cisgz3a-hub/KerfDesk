@@ -80,7 +80,12 @@ async function planLaserRecovery(
   const fromLine =
     requestedFromLine ??
     automaticRestart(source.gcode, capsule.ackedLines, capsule.interruption).line;
-  const resume = buildLaserResumeProgram(source.gcode, fromLine, LASER_RESUME_TRANSFORM_VERSION);
+  const resume = buildLaserResumeProgram(
+    source.gcode,
+    fromLine,
+    source.project.device,
+    LASER_RESUME_TRANSFORM_VERSION,
+  );
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
@@ -310,7 +315,7 @@ async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecover
   if (source === null) return null;
   if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
     jobAwareAlert(
-      'Cannot start legacy laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
+      'Cannot start laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
     );
     return null;
   }

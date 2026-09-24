@@ -4,12 +4,14 @@ import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import {
+  cancelOwnedFramePreparation,
   useFramePreparationStore,
   type FramePreparationStage,
 } from '../state/frame-preparation-store';
 import { actionGridStyle, framedRunStatusStyle, primaryActionStyle } from './JobControls.styles';
 import { startJobTitle } from './JobEstimatePresentation';
 import { LiveJobTimeBadge } from './LiveJobTimeBadge';
+import { frameExpiredStartMessage, useFrameExpiryNote } from './frame-expiry-note';
 import { framedRunReadinessIssue } from './framed-run-readiness';
 import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { useFrameAction } from './use-frame-action';
@@ -36,6 +38,16 @@ export function JobActionControls(props: Props): JSX.Element {
       title={model.framedRunIssue ?? undefined}
     >
       {model.statusText}
+      {model.cancellablePreparation && (
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={cancelOwnedFramePreparation}
+          title="Stop preparing this Frame. This preparation will not enable Start."
+        >
+          Cancel
+        </button>
+      )}
     </span>
   );
   const estimate = <LiveJobTimeBadge estimate={model.estimate} />;
@@ -76,6 +88,8 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const framePending = useFramePreparationStore((state) => state.pending);
   const progress = useFramePreparationStore((state) => state.progress);
   const stage = useFramePreparationStore((state) => state.stage);
+  const cancellable = useFramePreparationStore((state) => state.cancellable);
+  const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
   const preparingFrame = framePending && !frameActive;
   const busy = props.disabled || props.streaming || framePending;
@@ -86,14 +100,16 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     framedRunIssue,
     framedReady,
     preparingFrame,
+    cancellablePreparation: preparingFrame && cancellable,
     frameControl: frameControlProps(busy, laser.statusReport?.state),
-    startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
     frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
+    // Frame is the only Start gate (ADR-228): Start stays greyed out until a
+    // clean Frame of this exact job completes, and then nothing else holds it.
     startControl: {
-      disabled: busy,
+      disabled: busy || !framedReady,
       title: framedReady
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : 'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
+        : 'Start unlocks when a Frame of this exact job finishes cleanly. Press Frame job first.',
     },
     statusText: framedRunStatusText({
       frameActive,
@@ -101,6 +117,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       framedReady,
       hasFramedRun: laser.framedRun !== null,
       framedRunIssue,
+      expiredBecause,
       preparingFrame,
       progress,
     }),
@@ -136,7 +153,7 @@ function JobActionButtons(props: {
       title={model.startControl.title}
     >
       {docked && <Icon name="play" size={18} />}
-      {model.startLabel}
+      Start
     </button>
   );
   return docked ? (
@@ -158,6 +175,7 @@ function framedRunStatusText(args: {
   readonly framedReady: boolean;
   readonly hasFramedRun: boolean;
   readonly framedRunIssue: string | null;
+  readonly expiredBecause: string | null;
   readonly preparingFrame: boolean;
   readonly progress: OutputCompilationProgress | null;
 }): string {
@@ -170,17 +188,26 @@ function framedRunStatusText(args: {
   }
   if (args.preparingFrame) return preparingFrameStatusText(args.progress, args.stage);
   if (args.framedReady) return 'Ready to start — framed job unchanged';
-  if (!args.hasFramedRun) return 'Not framed — prepare and Frame this job first';
-  return `Frame expired — ${args.framedRunIssue}`;
+  if (args.hasFramedRun) return `Frame expired — ${args.framedRunIssue}`;
+  if (args.expiredBecause !== null) {
+    return `Frame expired — ${frameExpiredStartMessage(args.expiredBecause)}`;
+  }
+  return 'Not framed — Frame this job to unlock Start';
 }
 
+// Alarm stays pressable: Frame offers Home or Unlock in place
+// (frame-blocker-repair). Every other non-Idle state has no in-place fix, so
+// the button waits for the controller instead of refusing after a click.
 function frameControlProps(busy: boolean, state: string | undefined) {
-  const ready = state === 'Idle';
+  const ready = state === 'Idle' || state === 'Alarm';
   return {
     disabled: busy || !ready,
-    title: ready
-      ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
-      : frameBlockedTitle(state),
+    title:
+      state === 'Idle'
+        ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
+        : state === 'Alarm'
+          ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
+          : frameBlockedTitle(state),
   };
 }
 

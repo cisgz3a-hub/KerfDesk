@@ -10,9 +10,10 @@ import { recoveryRepository, type RecoveryRepository, type RunId } from '../stat
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { currentJobStopRequest } from '../state/job-stop-request';
+import { settledCleanly } from '../state/post-job-clean-settle';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
-import { checkpointInterruption } from './checkpoint-interruption';
+import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
 import {
   checkpointArchiveHandoffIsCurrent,
   pendingCheckpointArchiveHandoff,
@@ -39,6 +40,19 @@ type PendingMissingTerminal =
       readonly interruption: JobInterruption;
       readonly settledAtIso: string;
     };
+
+/** The interruption and ack a run's terminal stream was first seen with. A
+ * terminal seen before the Start archive activates waits (ADR-337) while the
+ * store moves on: the operator acknowledges the safety notice, a later notice
+ * replaces it, trailing oks arrive. Every attempt records this first sight, as
+ * an already-active run records it at once; re-deriving it at activation
+ * dropped the rejected line a controller-error restart replays (ADR-341
+ * Amendment 3). */
+type FirstInterruption = {
+  readonly runId: RunId;
+  readonly ackedLines: number;
+  readonly interruption: JobInterruption;
+};
 
 type TrackingFailureReporter = (error: unknown) => void;
 
@@ -81,6 +95,7 @@ class JobCheckpointTracker {
   private lastPersistedAck = 0;
   private highestQueuedAck = 0;
   private terminalQueued = false;
+  private firstInterruption: FirstInterruption | null = null;
   private pendingMissingTerminal: PendingMissingTerminal | null = null;
   private queuedMissingTerminal: PendingMissingTerminal | null = null;
   private deferredArchiveHandoff: CheckpointArchiveHandoff | null = null;
@@ -121,13 +136,14 @@ class JobCheckpointTracker {
   private observeMissingStreamer(state: LaserState, priorState: LaserState | undefined): void {
     if (this.previous !== null) {
       const ended = this.previous;
+      const first = this.firstInterruption?.runId === ended.runId ? this.firstInterruption : null;
       this.pendingMissingTerminal = settledCleanly(state, priorState, ended.status)
         ? { kind: 'completed', runId: ended.runId, settledAtIso: this.nowIso() }
         : {
             kind: 'interrupted',
             runId: ended.runId,
-            ackedLines: ended.completed,
-            interruption: disappearedStreamInterruption(ended.status, state),
+            ackedLines: first?.ackedLines ?? ended.completed,
+            interruption: first?.interruption ?? disappearedStreamInterruption(ended.status, state),
             settledAtIso: this.nowIso(),
           };
     }
@@ -147,6 +163,7 @@ class JobCheckpointTracker {
       streamer.status,
       state.safetyNotice,
       currentJobStopRequest(state),
+      currentRunPlannerBacklog(state),
     );
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
@@ -154,7 +171,8 @@ class JobCheckpointTracker {
       // A terminal streamer still counts the trailing oks for lines GRBL had
       // buffered. The interruption records the exact ack it saw; a progress
       // write carrying a later ack would only raise it or fail as a no-op.
-      if (!this.terminalQueued) this.queueInterruption(runId, streamer.completed, interruption);
+      const first = this.firstSight({ runId, ackedLines: streamer.completed, interruption });
+      if (!this.terminalQueued) this.queueInterruption(runId, first.ackedLines, first.interruption);
       return;
     }
 
@@ -162,6 +180,13 @@ class JobCheckpointTracker {
     const due = streamer.completed - pendingBaseline >= CHECKPOINT_ACK_INTERVAL_LINES;
     const statusProgressDue = statusChanged && streamer.completed > this.highestQueuedAck;
     if (due || statusProgressDue) this.queueProgress(runId, streamer.completed);
+  }
+
+  /** The run's first terminal sight; a later sight of the same run keeps it. */
+  private firstSight(seen: FirstInterruption): FirstInterruption {
+    const first = this.firstInterruption?.runId === seen.runId ? this.firstInterruption : seen;
+    this.firstInterruption = first;
+    return first;
   }
 
   private queueInterruption(runId: RunId, ackedLines: number, interruption: JobInterruption): void {
@@ -237,6 +262,7 @@ class JobCheckpointTracker {
   private retireTerminal(runId: RunId): void {
     this.supersededTerminalRunId = runId;
     this.clearDeferredArchiveHandoff(runId);
+    if (this.firstInterruption?.runId === runId) this.firstInterruption = null;
     if (this.pendingMissingTerminal?.runId === runId) this.pendingMissingTerminal = null;
     if (this.watermarkRunId === runId) this.clearRunWatermarks();
   }
@@ -291,6 +317,7 @@ class JobCheckpointTracker {
   private beginRun(runId: RunId): void {
     if (this.pendingMissingTerminal?.runId !== runId) this.pendingMissingTerminal = null;
     if (this.deferredArchiveHandoff?.runId !== runId) this.deferredArchiveHandoff = null;
+    if (this.firstInterruption?.runId !== runId) this.firstInterruption = null;
     this.previous = null;
     this.watermarkRunId = runId;
     this.lastPersistedAck = cachedAck(this.repository, runId);
@@ -407,27 +434,17 @@ function cachedAck(repository: RecoveryRepository, runId: RunId): number {
   return active?.runId === runId ? active.ackedLines : 0;
 }
 
-function settledCleanly(
-  state: LaserState,
-  priorState: LaserState | undefined,
-  previousStatus: StreamerStatus,
-): boolean {
-  return (
-    previousStatus === 'done' &&
-    priorState?.streamer?.status === 'done' &&
-    priorState.controllerOperation?.kind === 'post-job-settle' &&
-    priorState.controllerOperation.phase === 'awaiting-idle' &&
-    state.connection.kind === 'connected' &&
-    state.statusReport?.state === 'Idle'
-  );
-}
-
 function disappearedStreamInterruption(
   previousStatus: StreamerStatus,
   state: LaserState,
 ): JobInterruption {
   return (
-    checkpointInterruption(previousStatus, state.safetyNotice, currentJobStopRequest(state)) ?? {
+    checkpointInterruption(
+      previousStatus,
+      state.safetyNotice,
+      currentJobStopRequest(state),
+      currentRunPlannerBacklog(state),
+    ) ?? {
       kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
       message:
         state.connection.kind === 'connected'

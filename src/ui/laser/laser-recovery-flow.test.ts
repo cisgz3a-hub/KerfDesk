@@ -130,7 +130,11 @@ describe('exact laser recovery activation', () => {
     const started = await runLaserRecoveryCapsuleFlow(capsule, repository);
 
     expect(started).toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    // $32 is acknowledged immediately before the resume review, never after it.
+    const prompts = vi.mocked(jobAwareConfirm).mock.calls.map(([message]) => message);
+    const laserModePrompt = prompts.indexOf(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(laserModePrompt).toBeGreaterThanOrEqual(0);
+    expect(prompts[laserModePrompt + 1]).toMatch(/Review resume/i);
     expect(recoveryStart).toHaveBeenCalledWith(
       expect.stringContaining('resume preamble'),
       expect.objectContaining({
@@ -169,6 +173,9 @@ describe('exact laser recovery activation', () => {
 
     expect(started).toBe(false);
     expect(recoveryStart).not.toHaveBeenCalled();
+    // Declining $32 ends the flow before the resume review is shown.
+    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(jobAwareConfirm).not.toHaveBeenCalledWith(expect.stringMatching(/Review resume/i));
     const retained = repository.getSnapshot().recoveryCapsule;
     expect(retained).toMatchObject({
       runId: capsule.runId,
@@ -229,7 +236,11 @@ describe('exact laser recovery activation', () => {
     );
     if (movement === undefined) throw new Error('Expected a burn movement.');
     const fromLine = movement.rawLineIndex + 1;
-    const expected = buildLaserResumeProgram(capsule.artifact.gcode, fromLine);
+    const expected = buildLaserResumeProgram(
+      capsule.artifact.gcode,
+      fromLine,
+      DEFAULT_DEVICE_PROFILE,
+    );
     if (expected.kind !== 'ok') throw new Error(expected.reason);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob, frameVerification: null, framedRun: null });
@@ -239,7 +250,7 @@ describe('exact laser recovery activation', () => {
     expect(startJob).toHaveBeenCalledWith(expected.lines.join('\n'), expect.anything());
     const firstRun = repository.getSnapshot().activeRun;
     if (firstRun === null) throw new Error('Expected tracked recovery.');
-    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine, version: 2 }]);
+    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine, version: 3 }]);
     expect(firstRun.artifact.provenance).toMatchObject({
       workflow: { requestedFromLine: fromLine, effectiveFromLine: fromLine },
     });

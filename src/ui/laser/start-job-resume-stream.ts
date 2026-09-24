@@ -1,4 +1,5 @@
 import { buildResumeProgram } from '../../core/controllers/grbl';
+import { laserResumeDialectForDevice } from '../../core/controllers/grbl/laser-resume-dialect';
 import { streamingModeForController } from '../../core/devices';
 import { markResumeInFlight, type JobCheckpoint } from '../../core/recovery';
 import { machineKindOf, type Project } from '../../core/scene';
@@ -28,39 +29,15 @@ export async function streamResumeFromRawLine(
   fromLine: number,
   originalCanvasPlan: CanvasMotionPlan,
   laserModeStartSnapshot: LaserModeStartSnapshot,
-  checkpointToResume?: JobCheckpoint,
   preparedController = useLaserStore.getState(),
+  placementNote?: string,
 ): Promise<boolean> {
-  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
-  if (resume.kind === 'error') {
-    jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
-    return false;
-  }
-  const resumeGcode = resume.lines.join('\n');
-  const laserModeStartEvidence = confirmLaserModeStartEvidence(
-    project,
-    laserModeStartSnapshot,
-    jobAwareConfirm,
-    resumeGcode,
-  );
-  if (laserModeStartEvidence === null) return false;
-  const proceed = jobAwareConfirm(
-    resumeConfirmation(machineKindOf(project.machine), fromLine, resume.fromLine),
-  );
-  if (!proceed) return false;
+  const reviewed = reviewResume(project, gcode, fromLine, laserModeStartSnapshot, placementNote);
+  if (reviewed === null) return false;
+  const { resumeGcode, laserModeStartEvidence } = reviewed;
   const checkpointBeforeStart = readJobCheckpoint();
   const checkpointMarkedAtIso = new Date().toISOString();
-  const checkpointUpdate = markOwnedResumeCheckpoint(
-    gcode,
-    checkpointToResume,
-    checkpointMarkedAtIso,
-  );
-  if (checkpointUpdate === 'changed') {
-    jobAwareAlert(
-      'Cannot resume the interrupted job:\n\nThe recovery record changed while resume was being prepared. No controller command was sent; review the current recovery banner and try again.',
-    );
-    return false;
-  }
+  const checkpointUpdate = markOwnedResumeCheckpoint(gcode, checkpointMarkedAtIso);
   let finalAuthorizationPassed = false;
   try {
     const laser = preparedController;
@@ -153,6 +130,44 @@ function restoreUnacceptedResumeCheckpoint(
 
 const RESUME_PLUNGE_MM_PER_MIN = 300;
 
+// Builds the resume and takes the operator's two confirmations, or null when
+// it cannot be built or the operator declines.
+function reviewResume(
+  project: Project,
+  gcode: string,
+  fromLine: number,
+  laserModeStartSnapshot: LaserModeStartSnapshot,
+  placementNote: string | undefined,
+): {
+  readonly resumeGcode: string;
+  readonly laserModeStartEvidence: Exclude<ReturnType<typeof confirmLaserModeStartEvidence>, null>;
+} | null {
+  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
+  if (resume.kind === 'error') {
+    jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
+    return null;
+  }
+  const resumeGcode = resume.lines.join('\n');
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    project,
+    laserModeStartSnapshot,
+    jobAwareConfirm,
+    resumeGcode,
+  );
+  if (laserModeStartEvidence === null) return null;
+  const machineKind = machineKindOf(project.machine);
+  const question = resumeConfirmation(
+    machineKind,
+    fromLine,
+    resume.fromLine,
+    'manual',
+    placementNote,
+  );
+  return jobAwareConfirm(question) ? { resumeGcode, laserModeStartEvidence } : null;
+}
+
+// The project emitted `gcode`, so its device names the power commands the
+// resume re-arms the beam with (ADR-364).
 function resumeBuildOptions(project: Project) {
   const machine = project.machine;
   return {
@@ -160,5 +175,6 @@ function resumeBuildOptions(project: Project) {
     safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
     spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
     plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
+    laserDialect: laserResumeDialectForDevice(project.device),
   } as const;
 }

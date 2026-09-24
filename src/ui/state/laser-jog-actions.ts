@@ -5,9 +5,8 @@
 // active driver), and the connection-bound safe write. Type-only LaserState /
 // LiveRefs import — no runtime cycle.
 
-import { firstZoneCrossedBySegment } from '../../core/preflight';
-import { isRotaryActive, machineBoundsForDevice, rotaryYLimitMm } from '../../core/devices';
-import { inferCurrentMachinePosition } from './infer-machine-position';
+import { isAtOrAboveSafeZ } from './cnc-frame-lines';
+import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
 import {
@@ -21,9 +20,13 @@ import { type LaserSafetyAction } from './laser-safety-notice';
 import { settleOwnedMotionPhase } from './laser-owned-motion-settlement';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
-import { useToastStore } from './toast-store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
+import { warnJogMotionPolicy } from './laser-jog-warnings';
+import {
+  assertManualMotionNotCancelled,
+  manualMotionCancelGeneration,
+} from './manual-motion-intent';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
@@ -42,11 +45,6 @@ type JogActionContext = {
   readonly get: GetFn;
   readonly refs: LiveRefs;
   readonly safeWrite: SafeWriteFn;
-};
-type JogParams = Parameters<LaserState['jog']>[0];
-type JogXyPath = {
-  readonly start: { readonly x: number; readonly y: number };
-  readonly target: { readonly x: number; readonly y: number };
 };
 
 // Below this XY delta (mm) a "jog to point" is treated as already-there: GRBL
@@ -83,8 +81,7 @@ async function runJogToMachinePosition(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'moving to a machine position');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
-  assertJogFrameReady(set, get);
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   const current = inferCurrentMachinePosition(
     get().statusReport,
     get().wcoCache,
@@ -104,12 +101,13 @@ async function runJogToMachinePosition(
   const params = { dx, dy, feed };
   warnJogMotionPolicy(set, get, params);
   const operation = startSettledJogOperation(refs);
+  assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
   // CNC: after readiness is proven, lift Z to the configured safe height
   // before the XY traverse so the bit does not drag across stock or clamps.
   // Laser projects have no Z retract seam and keep the flat move (F105).
   try {
-    const retracted = await retractToCncSafeZ(refs, safeWrite, feed);
+    const retracted = await retractToCncSafeZ(get, refs, safeWrite, feed);
     if (retracted) {
       await settleOwnedMotionPhase(
         get,
@@ -131,16 +129,16 @@ async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
 ): Promise<void> {
-  const { set, get, refs, safeWrite } = context;
+  const { set, get, refs } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
-  assertJogFrameReady(set, get);
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   warnJogMotionPolicy(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
-  const operation = startSettledJogOperation(context.refs);
+  const operation = startSettledJogOperation(refs);
+  assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
   try {
     await dispatchOwnedJog(context, params, operation);
@@ -182,8 +180,7 @@ async function runFrame(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'framing again');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'frame' });
-  assertJogFrameReady(set, get);
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'frame');
   // A new physical Frame voids every earlier proof, traced or permitted.
   set({ frameVerification: null, framedRun: null, frameTrace: null });
   const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate);
@@ -213,6 +210,7 @@ async function runFrame(
     undefined,
     frameSettlementLine,
   );
+  assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation });
   try {
     assertMotionOperationOwner(get, operation.operationId, 'Frame');
@@ -228,6 +226,22 @@ async function runFrame(
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
   }
+}
+
+// Proves fresh Idle before a Jog/Frame owner exists. Returns the Cancel
+// generation it started under: the caller re-checks it synchronously right
+// before installing its owner, so a release that lands during the status
+// round-trip cancels the move before any of it is written (audit
+// jog-home-origin-2; see manual-motion-intent).
+async function confirmUncancelledFreshIdle(
+  context: JogActionContext,
+  action: 'jog' | 'frame',
+): Promise<number> {
+  const { set, get, refs, safeWrite } = context;
+  const cancelGeneration = manualMotionCancelGeneration(refs);
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action, cancelGeneration });
+  assertJogFrameReady(set, get);
+  return cancelGeneration;
 }
 
 function assertMotionOperationOwner(
@@ -293,8 +307,11 @@ function resetOwnedMotionPhase(set: SetFn, operationId: LaserMotionOperationId):
 // Emit the driver's Z-safe retract for a CNC project before an XY traverse, so a
 // return-to-zero (or any point move) lifts the bit clear of stock/clamps. Mirrors
 // the retract prefix frame() uses; laser projects and drivers without a jog-based
-// Z retract return undefined and skip it (F105).
+// Z retract return undefined and skip it (F105). A bit already at or above safe
+// Z stays there: the absolute jog would lower it, into a probe plate still under
+// it after a probe park (ADR-192 Amendment 1). An unknown height keeps the retract.
 async function retractToCncSafeZ(
+  get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
   feed: number,
@@ -302,6 +319,13 @@ async function retractToCncSafeZ(
   const machine = useStore.getState().project.machine;
   const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
   if (safeZMm === undefined) return false;
+  const state = get();
+  const workZMm = currentWorkZMm(
+    state.statusReport,
+    state.wcoCache,
+    state.controllerSettings?.reportInches === true,
+  );
+  if (workZMm !== null && isAtOrAboveSafeZ(workZMm, safeZMm)) return false;
   const retractLine = refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
   if (retractLine === undefined) return false;
   await safeWrite(retractLine, 'jog');
@@ -341,88 +365,3 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
 // policy findings, not transport facts: warn prominently and send the exact
 // requested jog unchanged. Board-point moves still require a live position
 // because the host factually cannot derive their relative controller command.
-function warnJogMotionPolicy(set: SetFn, get: GetFn, params: JogParams): void {
-  const path = resolveJogXyPath(get, params);
-  if (path === null) {
-    warnUnresolvedJogXyPath(set, get, params);
-    return;
-  }
-  warnJogTargetOutsideConfiguredBounds(set, get, path.target);
-  warnJogNoGoZoneCrossing(set, get, path);
-}
-
-function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
-  const hasX = params.dx !== undefined;
-  const hasY = params.dy !== undefined;
-  if (!hasX && !hasY) return null;
-  const start = inferCurrentMachinePosition(
-    get().statusReport,
-    get().wcoCache,
-    get().controllerSettings?.reportInches === true,
-  );
-  if (start === null) return null;
-  const relative = params.relative !== false;
-  const target = relative
-    ? { x: start.x + (params.dx ?? 0), y: start.y + (params.dy ?? 0) }
-    : { x: params.dx ?? start.x, y: params.dy ?? start.y };
-  return { start, target };
-}
-
-// Warn-only by mandate (rule 7 / ADR-232): configured bed bounds are policy,
-// not a guard. The move is still sent — the controller's soft-limits remain
-// the real bounds authority — so this surfaces a toast and never throws.
-function warnJogTargetOutsideConfiguredBounds(
-  set: SetFn,
-  get: GetFn,
-  target: JogXyPath['target'],
-): void {
-  const device = useStore.getState().project.device;
-  const baseBounds = machineBoundsForDevice(device);
-  const bounds = isRotaryActive(device.rotary)
-    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(device.rotary) }
-    : baseBounds;
-  if (
-    target.x >= bounds.minX &&
-    target.x <= bounds.maxX &&
-    target.y >= bounds.minY &&
-    target.y <= bounds.maxY
-  ) {
-    return;
-  }
-  const message =
-    `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
-    `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
-    `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  publishJogPolicyWarning(set, get, message);
-}
-
-function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
-  if (params.dx === undefined && params.dy === undefined) return;
-  publishJogPolicyWarning(
-    set,
-    get,
-    'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
-  );
-}
-
-// DEV-04 / ADR-232: configured no-go zones are operator guidance. Frame is the
-// sole ordinary policy guard, so a direct jog crossing produces the same
-// prominent warning as other configured-envelope findings and never rewrites
-// or refuses the requested controller command.
-function warnJogNoGoZoneCrossing(set: SetFn, get: GetFn, path: JogXyPath): void {
-  if (path.start.x === path.target.x && path.start.y === path.target.y) return;
-  const zones = useStore.getState().project.device.noGoZones;
-  if (zones === undefined || zones.length === 0) return;
-  const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
-  if (zone === null) return;
-  publishJogPolicyWarning(
-    set,
-    get,
-    `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
-  );
-}
-
-function publishJogPolicyWarning(set: SetFn, get: GetFn, message: string): void {
-  useToastStore.getState().pushToast(message, 'warning');
-  set({ log: pushLog(get(), `[lf2] ${message}`) });
-}

@@ -7,12 +7,15 @@ import { expandMachineUtilities, selectWorkspacePanel } from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
 
 export const IDLE = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
-const REALTIME_BYTES = new Set([
-  '?',
-  '!',
-  '~',
-  ...[0x18, 0x84, 0x85].map((code) => String.fromCharCode(code)),
-]);
+const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
+
+/** GRBL takes these out of the stream before its line buffer: the ASCII
+ * realtime commands and every extended-ASCII byte (0x80 and up), which covers
+ * door, jog cancel, and the feed/rapid/spindle override resets a laser Start
+ * sends ahead of its first line (ADR-355). Program lines compare without them. */
+function isRealtimeByte(character: string): boolean {
+  return ASCII_REALTIME_BYTES.has(character) || character.charCodeAt(0) >= 0x80;
+}
 
 export type FixtureEvents = readonly Readonly<Record<string, unknown>>[];
 
@@ -79,7 +82,12 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
             ackedLines: number;
             sendableLines: number;
             interruption: { kind: string; message: string };
-            artifact: { kind: string; gcode?: string; laserResumeChain?: readonly unknown[] };
+            artifact: {
+              kind: string;
+              gcode?: string;
+              laserResumeChain?: readonly unknown[];
+              prepared?: { project: { device: unknown } };
+            };
           } | null;
         };
       };
@@ -96,13 +104,16 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
       buildLaserResumeProgram: (
         gcode: string,
         fromLine: number,
+        device: unknown,
       ) => { kind: 'ok'; lines: readonly string[] } | { kind: 'error'; reason: string };
     };
     const capsule = recoveryRepository.getSnapshot().recoveryCapsule;
     if (capsule === null || capsule.artifact.kind !== 'exact-execution') return null;
     const gcode = capsule.artifact.gcode ?? '';
     const resumeLine = automaticRestart(gcode, capsule.ackedLines, capsule.interruption).line;
-    const program = buildLaserResumeProgram(gcode, resumeLine);
+    // The recovery flow resumes in the power commands of the archived profile (ADR-364).
+    const device = capsule.artifact.prepared?.project.device;
+    const program = buildLaserResumeProgram(gcode, resumeLine, device);
     const sendable = (line: string): boolean => line.trim() !== '' && !line.trim().startsWith(';');
     return {
       runId: capsule.runId,
@@ -134,7 +145,7 @@ export function programLinesSince(events: FixtureEvents, fromEventIndex: number)
     .filter((event) => event['kind'] === 'serial-write')
     .flatMap((event) =>
       [...String(event['text'])]
-        .filter((character) => !REALTIME_BYTES.has(character))
+        .filter((character) => !isRealtimeByte(character))
         .join('')
         .split('\n'),
     )
@@ -197,7 +208,7 @@ export async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Pr
   await expect
     .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
     .toContain('$J=G90 G21');
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
 }
 
 export async function confirmJobReview(

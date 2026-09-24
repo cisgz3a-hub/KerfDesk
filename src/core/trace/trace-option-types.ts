@@ -60,6 +60,10 @@ export type TraceOptions = {
   readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
+  // Explicit faint-line detection adds coherent narrow local-contrast strokes
+  // to this preset's actual brightness/Otsu mask, retaining its solid areas.
+  // Alpha tracing takes precedence; UI manual/sketch detection clears this flag.
+  readonly faintLineRecovery?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
   //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer

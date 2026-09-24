@@ -9,6 +9,7 @@ import {
 import { boundsForPaths } from './path-node-edit-geometry';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
+import { curveCommandPath } from './path-node-command-geometry';
 
 type UnchangedCurveJoinPlan = { readonly kind: 'unchanged'; readonly message: string };
 
@@ -82,8 +83,10 @@ function resolveJoinContext(
   if (object === undefined || !isCurveCommandObject(object)) {
     return unchanged('The selected artwork no longer supports curve editing.');
   }
-  const path = object.paths[left.pathIndex];
-  if (path?.curves === undefined) return unavailableAnchors();
+  const source = object.paths[left.pathIndex];
+  if (source === undefined) return unavailableAnchors();
+  const path = curveCommandPath(source, [left, right]);
+  if (path === null) return unavailableAnchors();
 
   const [firstRef, secondRef] =
     compareSourcePosition(left, right) <= 0 ? [left, right] : [right, left];

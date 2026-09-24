@@ -7,7 +7,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   vendor: 'Creality',
   model: 'Falcon A1 Pro',
   name: 'Creality Falcon A1 Pro (vendor command set)',
-  catalogVersion: '2026-09-19',
+  catalogVersion: '2026-09-24',
   machineFamily: 'creality-falcon',
   controllerKind: 'grblhal',
   controllerCommandSet: 'creality-falcon-a1-pro',
@@ -29,7 +29,13 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   // cycled over it (ADR-335).
   airAssistRestartUnreliable: true,
   autofocusCommand: '$HZ1',
-  maxFeed: 10000,
+  // The output ceiling follows Creality's rated 600 mm/s (36000 mm/min). The
+  // vendor contract disables `$$`, so $110/$111 can never correct this value,
+  // and the old 10000 (chosen to speed up Frame) held every layer at 28% of the
+  // rating with no way to go faster from the Speed field (controller audit
+  // 2026-09-23, realtime-1/speed-1). The firmware still slows each move to its
+  // own $110/$111, so a ceiling above them costs nothing but estimate accuracy.
+  maxFeed: 36000,
   framingFeedMmPerMin: 10000,
   capabilities: [
     'grbl',
@@ -43,6 +49,11 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
     'low-power-fire',
   ],
   evidence: [
+    {
+      label: 'Creality Falcon A1 Pro rated speed',
+      status: 'public-spec-starter',
+      note: 'Creality lists the Falcon A1 Pro at 600 mm/s maximum working speed (36000 mm/min); its consumable parameter guide recommends material speeds up to 10000 mm/min. The firmware max rates $110/$111 are not published and cannot be read under the vendor command set. Sources: https://www.creality.com/products/falcon-a1-pro-20w, https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/consumable-parameter-guide',
+    },
     {
       label: 'Creality Falcon A1 Pro manufacturer configuration',
       status: 'public-spec-starter',

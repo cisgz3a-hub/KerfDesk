@@ -50,7 +50,10 @@ export function* traceCenterlineStrokePathsSteps(
   // diagonal can otherwise present many tiny corridors instead of its drawn
   // through-stroke. Condensation only contracts bridges between junctions;
   // it creates no new leaves or degree-two nodes requiring a second prune.
-  const pruned = yield* pruneSpursSteps(graph, distSq, mask.width, DEFAULT_SPUR_OPTIONS);
+  const pruned = yield* pruneSpursSteps(graph, distSq, mask.width, {
+    ...DEFAULT_SPUR_OPTIONS,
+    pixelScale: effectivePixelScale(options),
+  });
   const condensed = condenseJunctions(pruned, distSq, mask.width);
   if (cooperate) yield;
   const polylines = yield* assembleStrokePathsSteps(condensed, distSq, mask, {

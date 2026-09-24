@@ -5,6 +5,7 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function MomentaryFireControl(): JSX.Element | null {
   const project = useStore((state) => state.project);
@@ -74,7 +75,7 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
     held.current = false;
     releasePending.current = true;
     void setFireActive(false)
-      .catch(() => undefined)
+      .catch(controllerActionFailureHandler('Fire off'))
       .finally(() => {
         releasePending.current = false;
       });

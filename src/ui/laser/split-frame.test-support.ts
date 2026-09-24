@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { prepareOutputRequestForTest } from '../../__fixtures__/output-preparation-request';
+import type { StatusReport } from '../../core/controllers/grbl';
 import type { JobBounds } from '../../core/job';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
@@ -141,6 +142,36 @@ export function installCompletingTraceFrame(events: string[]) {
   );
   useLaserStore.setState({ traceFrame });
   return traceFrame;
+}
+
+/** A `traceFrame` mock shaped like a real trace: the status polls report the
+ * head travelling the outline, then Idle back at its pre-Frame position, and
+ * only then does the clean completion publish the trace. */
+export function installTravellingTraceFrame(events: string[]) {
+  const traceFrame = vi.fn(
+    async (bounds: JobBounds, _feed: number, candidate: FrameTraceCandidate) => {
+      events.push('trace');
+      dispatchedFrameOperation(candidate);
+      const before = useLaserStore.getState().statusReport;
+      if (before === null) throw new Error('The trace fixture needs a pre-Frame status report.');
+      reportStatusForTest({
+        ...before,
+        state: 'Jog',
+        mPos: { x: bounds.maxX, y: bounds.maxY, z: 0 },
+      });
+      reportStatusForTest({ ...before });
+      completeTraceForTest(candidate);
+    },
+  );
+  useLaserStore.setState({ traceFrame });
+  return traceFrame;
+}
+
+function reportStatusForTest(statusReport: StatusReport): void {
+  useLaserStore.setState((laser) => ({
+    statusSequence: laser.statusSequence + 1,
+    statusReport,
+  }));
 }
 
 export function lastToast(): { readonly message: string; readonly variant: string } | undefined {

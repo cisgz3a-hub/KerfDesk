@@ -26,6 +26,7 @@ import {
   traceImageToColoredPaths,
 } from '../../core/trace';
 import type { TraceSteps } from '../../core/trace/trace-steps';
+import type { TracePhase, TraceProgress } from '../../core/trace/trace-progress';
 
 export type TraceWorkerRequest = {
   readonly id: number;
@@ -52,7 +53,7 @@ export type TraceWorkerResponse =
   // dense line drawing legitimately traces for minutes, and a fixed execution
   // deadline killed it and showed the operator "Trace worker timed out" for
   // artwork that was never going to finish inside it.
-  | { readonly id: number; readonly kind: 'progress' }
+  | { readonly id: number; readonly kind: 'progress'; readonly phase?: TracePhase }
   | {
       readonly id: number;
       readonly kind: 'ok';
@@ -75,7 +76,12 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
   self.postMessage(startedAck);
   void (async (): Promise<void> => {
     try {
-      const paths = await traceImageToColoredPaths(image, options, heartbeatRunner(id));
+      const paths = await traceImageToColoredPaths(
+        image,
+        options,
+        heartbeatRunner(id),
+        phaseReporter(id),
+      );
       const bounds = boundsFromColoredPaths(paths);
       const response: TraceWorkerResponse = {
         id,
@@ -96,6 +102,16 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
     }
   })();
 };
+
+function phaseReporter(id: number): TraceProgress {
+  let previous: TracePhase | undefined;
+  return (phase) => {
+    if (phase === previous) return;
+    previous = phase;
+    const response: TraceWorkerResponse = { id, kind: 'progress', phase };
+    self.postMessage(response);
+  };
+}
 
 /**
  * Drain the trace exactly as runTraceSteps does, reporting that it is alive.

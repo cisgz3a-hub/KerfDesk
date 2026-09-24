@@ -4,7 +4,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useUiStore } from '../state/ui-store';
 import { useStore } from '../state/store';
 import { useToastStore } from '../state/toast-store';
-import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type TracedImage,
+} from '../../core/scene';
+import type { PathNodeRef } from '../state/path-node-edit-actions';
+import { hitPathNode } from './path-node-hit-test';
 import { ToolStrip } from './ToolStrip';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 
@@ -201,6 +209,39 @@ describe('ToolStrip', () => {
     expect(useStore.getState().undoStack.at(-1)?.scene.objects[0]).toBe(object);
   });
 
+  it('shows actions for a compact trace without materialising until the user edits', async () => {
+    const canonical = curveObject([
+      {
+        start: { x: 0, y: 0 },
+        segments: [{ kind: 'line', to: { x: 10, y: 0 } }],
+        closed: false,
+      },
+    ]);
+    const compact: TracedImage = {
+      ...canonical,
+      kind: 'traced-image',
+      traceMode: 'filled-contours',
+      paths: canonical.paths.map(({ curves: _curves, ...path }) => path),
+    };
+    loadNodeProject(compact, []);
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const selected = hitPathNode(useStore.getState().project.scene, { x: 0, y: 0 }, 0.01);
+    expect(selected).not.toBeNull();
+    useStore.getState().selectPathNode(selected);
+    const h = await render(<ToolStrip />);
+    expect(useStore.getState().project.scene.objects[0]).toBe(compact);
+    const curve = h.querySelector<HTMLButtonElement>('button[aria-label="Curve"]');
+    expect(curve).not.toBeNull();
+    expect(curve?.disabled).toBe(false);
+    expect(h.querySelector<HTMLButtonElement>('button[aria-label="Line"]')?.disabled).toBe(true);
+    await act(async () => curve?.click());
+    const edited = useStore.getState().project.scene.objects[0] as TracedImage;
+    expect(edited.paths[0]?.curves?.[0]?.segments[0]?.kind).toBe('cubic');
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    await act(async () => useStore.getState().undo());
+    expect(useStore.getState().project.scene.objects[0]).toBe(compact);
+  });
+
   it('does not turn unsupported interior anchors into a narrower disabled-state guard', async () => {
     const object = curveObject([
       {
@@ -291,14 +332,8 @@ function curveObject(curves: NonNullable<ImportedSvg['paths'][number]['curves']>
 }
 
 function loadNodeProject(
-  object: ImportedSvg,
-  refs: ReadonlyArray<{
-    readonly objectId: string;
-    readonly pathIndex: number;
-    readonly polylineIndex: number;
-    readonly pointIndex: number;
-    readonly geometry: 'curve';
-  }>,
+  object: ImportedSvg | TracedImage,
+  refs: ReadonlyArray<PathNodeRef>,
 ): void {
   useStore.setState({
     project: {

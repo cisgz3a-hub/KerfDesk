@@ -46,7 +46,7 @@ describe('LaserWindow Console disclosure', () => {
       expect(summary).toBeInstanceOf(HTMLElement);
       expect(disclosure).toBeInstanceOf(HTMLDetailsElement);
       expect((disclosure as HTMLDetailsElement).open).toBe(false);
-      expect(disclosure?.contains(button(host, 'Set up & Frame'))).toBe(false);
+      expect(disclosure?.contains(button(host, 'Start'))).toBe(false);
 
       await toggle(summary);
       expect((disclosure as HTMLDetailsElement).open).toBe(true);

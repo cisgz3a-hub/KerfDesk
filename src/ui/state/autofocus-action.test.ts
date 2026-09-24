@@ -284,3 +284,33 @@ describe('describeAutofocusResult', () => {
     expect(result.variant).toBe('success');
   });
 });
+
+// Controller audit gap-start-7: a cycle that keeps reporting activity is not
+// cut off at the fixed budget; a silent one still is.
+describe('runAutofocus — activity extends the budget', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps waiting while the controller reports the focus cycle', async () => {
+    vi.useFakeTimers();
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ timeoutMs: 1_000 }));
+    await vi.advanceTimersByTimeAsync(0);
+    for (let tick = 0; tick < 5; tick += 1) {
+      await vi.advanceTimersByTimeAsync(800);
+      harness.emit('<Home|MPos:0.000,0.000,-4.000|FS:0,0>');
+    }
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    expect(await pending).toEqual({ kind: 'ok' });
+  });
+
+  it('still times out a controller that reports nothing', async () => {
+    vi.useFakeTimers();
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ timeoutMs: 1_000 }));
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect((await pending).kind).toBe('timeout');
+  });
+});

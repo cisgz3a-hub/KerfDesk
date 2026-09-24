@@ -291,7 +291,6 @@ describe('feature controller and workspace regressions', () => {
       machineKind: 'laser',
       laser: {},
       completedReceipt: null,
-      checkpointToReplace: null,
       repository: {},
       reviewedAtIso: new Date().toISOString(),
       reviewModel: {},
@@ -307,8 +306,26 @@ describe('feature controller and workspace regressions', () => {
     await flush();
     expect(startJob).toHaveBeenCalledOnce();
     expect(mocks.activate).toHaveBeenCalled();
-    useLaserStore.setState({ streamer: { ...started, status: 'done' } });
-    useLaserStore.setState({ streamer: null });
+    // A clean finish: the post-job settle waits for Idle and an Idle report
+    // from the connected controller releases the stream (post-job-clean-settle).
+    useLaserStore.setState({
+      streamer: { ...started, status: 'done' },
+      controllerOperation: { kind: 'post-job-settle', phase: 'awaiting-idle', idleReports: 0 },
+    });
+    useLaserStore.setState({
+      streamer: null,
+      controllerOperation: null,
+      connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+    });
     activation.resolve(undefined);
     await pending;
     expect(advance).toHaveBeenCalledExactlyOnceWith(withVariables, 'successful-stream');

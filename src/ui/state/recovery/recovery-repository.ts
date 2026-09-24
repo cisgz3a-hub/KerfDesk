@@ -131,9 +131,13 @@ export class RecoveryRepository {
   getArchivedExecution = (runId: RunId): Promise<RecoveryRepositoryResult<ExecutionArtifactV1>> =>
     this.artifactStore.archived(runId);
 
-  async discardStagedRun(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.artifactStore.discard(runId);
-  }
+  discardStagedRun = (runId: RunId): Promise<RecoveryRepositoryResult<boolean>> =>
+    this.artifactStore.discard(runId);
+
+  /** Stop renewing this window's Start lease, for good. A window that dies
+   * does so implicitly; a test modelling a crashed window says so. Records are
+   * left for another window to reconcile once the lease lapses. */
+  abandonStartLease = (): void => this.startHandoff.abandon();
 
   async armFreshStart(
     runId: RunId,

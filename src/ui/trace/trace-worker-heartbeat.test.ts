@@ -6,6 +6,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TraceSteps } from '../../core/trace/trace-steps';
+import type { TraceProgress } from '../../core/trace/trace-progress';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 
 const mocks = vi.hoisted(() => ({
@@ -91,6 +92,35 @@ async function runWorker(args: {
 }
 
 describe('trace worker heartbeat', () => {
+  it('posts each real phase change once with its request identity', async () => {
+    const posted: TraceWorkerResponse[] = [];
+    const scope: WorkerScope = {
+      onmessage: null,
+      postMessage: (response) => posted.push(response),
+    };
+    mocks.trace.mockImplementation(
+      async (_image: unknown, _options: unknown, _run: unknown, progress: TraceProgress) => {
+        progress('preparing');
+        progress('preparing');
+        progress('tracing');
+        progress('tracing');
+        progress('refining');
+        return [];
+      },
+    );
+    vi.stubGlobal('self', scope);
+    vi.resetModules();
+    await import('./trace-worker');
+    scope.onmessage?.({ data: request(11) } as MessageEvent<TraceWorkerRequest>);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(posted.filter((response) => response.kind === 'progress')).toEqual([
+      { id: 11, kind: 'progress', phase: 'preparing' },
+      { id: 11, kind: 'progress', phase: 'tracing' },
+      { id: 11, kind: 'progress', phase: 'refining' },
+    ]);
+    expect(posted.at(-1)?.kind).toBe('ok');
+  });
   it('reports progress through a long trace and finishes with the result', async () => {
     // Twelve yields, a second apart: a beat is due at every one after the
     // first interval has passed.

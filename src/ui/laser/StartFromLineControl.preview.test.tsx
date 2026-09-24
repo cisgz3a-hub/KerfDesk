@@ -101,10 +101,11 @@ describe('manual laser restart preview', () => {
       selectedLine,
       source.canvasPlan,
       source.laserModeStartSnapshot,
-      undefined,
       source.controllerSnapshot,
+      // Where the restart is anchored, for its confirmation (audit recovery-4).
+      expect.stringContaining('Placement:'),
     );
-    const [project, gcode, , plan, , , controller] =
+    const [project, gcode, , plan, , controller] =
       vi.mocked(streamResumeFromRawLine).mock.calls[0]!;
     expect(project).toBe(source.project);
     expect(gcode).toBe(source.gcode);
@@ -184,7 +185,7 @@ describe('manual laser restart preview', () => {
       await act(async () => button('Start selected remainder').click());
       expect(streamResumeFromRawLine).toHaveBeenCalledTimes(2);
       expect(vi.mocked(streamResumeFromRawLine).mock.calls[1]?.[2]).toBe(selectedLine);
-      expect(vi.mocked(streamResumeFromRawLine).mock.calls[1]?.[6]).toBe(source.controllerSnapshot);
+      expect(vi.mocked(streamResumeFromRawLine).mock.calls[1]?.[5]).toBe(source.controllerSnapshot);
       expect(prepareRecoverySource).toHaveBeenCalledTimes(1);
       expect(host.querySelector('[role="dialog"]')).toBeNull();
     },

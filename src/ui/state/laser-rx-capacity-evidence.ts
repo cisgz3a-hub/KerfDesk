@@ -12,13 +12,20 @@
 // grblHAL, firmware build unconfirmed) reported `Bf:512,65535`.
 
 import type { StatusReport } from '../../core/controllers/grbl';
-import { hasUnsettledStreamAcks } from './laser-store-helpers';
+import { hasUnsettledStreamAcks, isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
 export type RxCapacityEvidence = {
   /** Largest free RX byte count reported while the host had nothing in flight. */
   readonly rxBytesFree: number;
-  /** Planner blocks free in that same report — the planner's size when idle. */
+  /** Planner blocks free in that same report; not a proof of planner capacity. */
+  readonly plannerBlocksFree: number;
+  readonly sessionEpoch: number;
+  readonly observedAt: number;
+};
+
+export type PlannerCapacityEvidence = {
+  /** Blocks free at a controller Idle report with no unsettled host ACKs. */
   readonly plannerBlocksFree: number;
   readonly sessionEpoch: number;
   readonly observedAt: number;
@@ -26,7 +33,11 @@ export type RxCapacityEvidence = {
 
 type EvidenceSource = Pick<
   LaserState,
-  'streamer' | 'pendingUntrackedAcks' | 'controllerSessionEpoch' | 'rxCapacityEvidence'
+  | 'streamer'
+  | 'pendingUntrackedAcks'
+  | 'controllerSessionEpoch'
+  | 'rxCapacityEvidence'
+  | 'plannerCapacityEvidence'
 >;
 
 /** True when no job line and no owed-ack command can still occupy the RX ring. */
@@ -70,4 +81,95 @@ export function currentRxCapacityEvidence(
   return evidence !== null && evidence.sessionEpoch === state.controllerSessionEpoch
     ? evidence
     : null;
+}
+
+// Acknowledged motion can still occupy planner blocks while RX is empty.
+// Only Idle proves those blocks have drained. Refresh independently of RX's
+// high-water mark, since the first quiescent RX report may arrive during Jog.
+function plannerCapacityEvidencePatch(
+  state: EvidenceSource,
+  report: StatusReport,
+  now: number,
+): Partial<Pick<LaserState, 'plannerCapacityEvidence'>> {
+  const buffer = report.buffer;
+  if (buffer == null || report.state !== 'Idle' || !hostHasNothingInFlight(state)) return {};
+  return {
+    plannerCapacityEvidence: {
+      plannerBlocksFree: buffer.plannerBlocksFree,
+      sessionEpoch: state.controllerSessionEpoch,
+      observedAt: now,
+    },
+  };
+}
+
+function currentPlannerCapacityEvidence(
+  state: Pick<LaserState, 'controllerSessionEpoch' | 'plannerCapacityEvidence'>,
+): PlannerCapacityEvidence | null {
+  const evidence = state.plannerCapacityEvidence ?? null;
+  return evidence !== null && evidence.sessionEpoch === state.controllerSessionEpoch
+    ? evidence
+    : null;
+}
+
+export type StreamPlannerSnapshot = {
+  readonly streamerEpoch: number;
+  /** Session that owned the stream when this report arrived. */
+  readonly sessionEpoch: number;
+  /** Lines acknowledged when the report arrived. */
+  readonly ackedLines: number;
+  /** Planner blocks still waiting to move: idle size less `Bf` blocks free. */
+  readonly queuedBlocks: number;
+};
+
+type PlannerSnapshotSource = EvidenceSource &
+  Pick<LaserState, 'streamerEpoch' | 'streamPlannerSnapshot'>;
+
+/** Independently qualify RX and planner capacities, then record the active
+ *  run's planner backlog behind its acknowledgements. */
+export function statusBufferPatch(
+  state: PlannerSnapshotSource,
+  report: StatusReport,
+  now: number,
+): Partial<
+  Pick<LaserState, 'rxCapacityEvidence' | 'plannerCapacityEvidence' | 'streamPlannerSnapshot'>
+> {
+  const plannerPatch = plannerCapacityEvidencePatch(state, report, now);
+  return {
+    ...rxCapacityEvidencePatch(state, report, now),
+    ...plannerPatch,
+    ...streamPlannerSnapshotPatch({ ...state, ...plannerPatch }, report),
+  };
+}
+
+// The planner size comes from this session's idle `Bf`. Without it the
+// backlog is unknown and no snapshot is taken (controller audit recovery-6).
+function streamPlannerSnapshotPatch(
+  state: PlannerSnapshotSource,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'streamPlannerSnapshot'>> {
+  const buffer = report.buffer;
+  const streamer = state.streamer;
+  if (buffer === null || buffer === undefined || !isActiveJob(streamer) || streamer === null) {
+    return {};
+  }
+  // A reboot can leave the interrupted stream mounted for recovery. Fresh
+  // Idle capacity belongs to the replacement controller session, and must not
+  // erase the last backlog of the run whose planner the reboot discarded.
+  const previous = state.streamPlannerSnapshot;
+  if (
+    previous?.streamerEpoch === state.streamerEpoch &&
+    previous.sessionEpoch !== state.controllerSessionEpoch
+  ) {
+    return {};
+  }
+  const capacity = currentPlannerCapacityEvidence(state)?.plannerBlocksFree;
+  if (capacity === undefined) return {};
+  return {
+    streamPlannerSnapshot: {
+      streamerEpoch: state.streamerEpoch,
+      sessionEpoch: state.controllerSessionEpoch,
+      ackedLines: streamer.completed,
+      queuedBlocks: Math.max(0, capacity - buffer.plannerBlocksFree),
+    },
+  };
 }

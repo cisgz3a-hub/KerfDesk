@@ -3,7 +3,6 @@
 
 import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
 import { isChiploadMaterialKey } from '../../core/cnc';
-import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -22,15 +21,14 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   type CncMachineConfig,
   type CncCoolantMode,
-  type CncTool,
   type CncTiling,
-  DEFAULT_CNC_TOOLS,
   isCncCoolantMode,
   type Project,
 } from '../../core/scene';
 import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
+import { normalizeCncTools } from './normalize-cnc-tools';
 import { normalizeLayer } from './normalize-layer';
 import { normalizeTileRegistration } from './normalize-tile-registration';
 import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
@@ -222,92 +220,15 @@ function normalizeStockOriginOffset(
   return { x, y };
 }
 
-// Tools are rebuilt field-by-field like stock/params: `diameterMm: 1e999`
-// parses to Infinity and previously rode `> 0` straight into the CNC offset
-// math, then poisoned Save (Infinity serializes to null, the round-trip drops
-// the tool, and the semantic-drift guard refuses without naming it). A tool
-// failing the load-bearing fields is dropped; junk in optional fields drops
-// the field, and an unknown kind degrades to end-mill (same junk-to-default
-// contract as coolantModeOrOff).
-const CNC_TOOL_KINDS = ['end-mill', 'ball-nose', 'v-bit', 'engraving'] as const;
-const MAX_TOOL_METADATA_LENGTH = 120;
-
-function normalizeCncTools(raw: unknown): Array<CncTool> {
-  if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-  const tools: Array<CncTool> = [];
-  for (const tool of raw) {
-    const normalized = normalizeCncTool(tool);
-    if (normalized !== null) tools.push(normalized);
-  }
-  return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
-}
-
-function normalizeCncTool(tool: unknown): CncTool | null {
-  if (!isObject(tool)) return null;
-  const core = normalizeCncToolCore(tool);
-  if (core === null) return null;
-  return { ...core, ...normalizeCncToolMetadata(tool) };
-}
-
-function normalizeCncToolCore(tool: Record<string, unknown>): CncTool | null {
-  if (typeof tool['id'] !== 'string') return null;
-  if (typeof tool['name'] !== 'string') return null;
-  const diameterMm = tool['diameterMm'];
-  if (!isFiniteNumber(diameterMm) || diameterMm <= 0) return null;
-  return {
-    id: tool['id'],
-    name: tool['name'],
-    kind: isCncToolKindValue(tool['kind']) ? tool['kind'] : 'end-mill',
-    diameterMm,
-  };
-}
-
-function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string, unknown> {
-  const metadata: Record<string, unknown> = {};
-  const family = boundedToolString(tool['family']);
-  const catalogId = boundedToolString(tool['catalogId']);
-  if (isValidCncTipAngleDeg(tool['tipAngleDeg'])) {
-    metadata['tipAngleDeg'] = tool['tipAngleDeg'];
-  }
-  // Keep an explicit finite malformed flat visible. Dropping the field would
-  // silently turn the saved cutter into the supported pointed law on reload.
-  if (tool['kind'] === 'engraving' && isFiniteNumber(tool['tipDiameterMm'])) {
-    metadata['tipDiameterMm'] = tool['tipDiameterMm'];
-  }
-  if (family !== null) metadata['family'] = family;
-  if (isFiniteNumber(tool['shankDiameterMm']) && tool['shankDiameterMm'] > 0) {
-    metadata['shankDiameterMm'] = tool['shankDiameterMm'];
-  }
-  if (validFluteCount(tool['fluteCount'])) metadata['fluteCount'] = tool['fluteCount'];
-  if (catalogId !== null) metadata['catalogId'] = catalogId;
-  return metadata;
-}
-
-function validFluteCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
-}
-
-function boundedToolString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_TOOL_METADATA_LENGTH
-    ? value
-    : null;
-}
-
-function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[number] {
-  return typeof value === 'string' && (CNC_TOOL_KINDS as ReadonlyArray<string>).includes(value);
-}
-
 /**
- * Profile flags that are only ever stored as `true`: the worker transport
- * (ADR-334) and the unreliable air restart (ADR-335).
- *
- * Absent must stay absent rather than become `false`, so a project that never
- * chose one round-trips unchanged, and every consumer compares against `true`
- * so a junk value carried in from an edited file reads as off.
+ * Preserve an explicit worker-transport opt-out as well as opt-in. Absent stays
+ * absent so old projects use the compatible driver's default. The unreliable
+ * air restart flag remains true-only; malformed values gain no authority.
  */
-function optionalDeviceFlags(dev: Record<string, unknown>): Record<string, true> {
+function optionalDeviceFlags(dev: Record<string, unknown>): Record<string, boolean | undefined> {
   return {
-    ...(dev['workerHostedStreaming'] === true ? { workerHostedStreaming: true as const } : {}),
+    workerHostedStreaming:
+      typeof dev['workerHostedStreaming'] === 'boolean' ? dev['workerHostedStreaming'] : undefined,
     ...(dev['airAssistRestartUnreliable'] === true
       ? { airAssistRestartUnreliable: true as const }
       : {}),

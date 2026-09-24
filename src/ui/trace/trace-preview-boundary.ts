@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { normalizeTraceBoundary, type TraceBoundary } from '../../core/trace/trace-boundary';
 import { fitTracePreviewImage } from './trace-preview-image-space';
 
 export type TracePreviewBoundaryProps = {
+  readonly boundaryDisabled?: boolean;
   readonly imageSize?: { readonly width: number; readonly height: number };
   readonly boundary?: TraceBoundary | null;
   readonly onBoundaryChange?: (boundary: TraceBoundary) => void;
@@ -21,6 +22,12 @@ export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
 } {
   const dragStart = useRef<DragPoint | null>(null);
   const [draftBoundary, setDraftBoundary] = useState<TraceBoundary | null>(null);
+  useEffect(() => {
+    if (props.boundaryDisabled === true) {
+      dragStart.current = null;
+      setDraftBoundary(null);
+    }
+  }, [props.boundaryDisabled]);
 
   function cancelDrag(): void {
     dragStart.current = null;
@@ -28,7 +35,12 @@ export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
   }
 
   function onMouseDown(event: StageMouseEvent): void {
-    if (event.button !== 0 || props.onBoundaryChange === undefined) return;
+    if (
+      props.boundaryDisabled === true ||
+      event.button !== 0 ||
+      props.onBoundaryChange === undefined
+    )
+      return;
     const point = imagePointFromMouse(event, props.imageSize);
     if (point === null) return;
     dragStart.current = point;
@@ -37,7 +49,7 @@ export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
   }
 
   function onMouseMove(event: StageMouseEvent): void {
-    if (dragStart.current === null) return;
+    if (props.boundaryDisabled === true || dragStart.current === null) return;
     const point = imagePointFromMouse(event, props.imageSize);
     setDraftBoundary(point === null ? null : boundaryFromPoints(dragStart.current, point));
   }
@@ -46,6 +58,7 @@ export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
     const start = dragStart.current;
     const point = imagePointFromMouse(event, props.imageSize);
     cancelDrag();
+    if (props.boundaryDisabled === true) return;
     if (start === null || point === null || props.imageSize === undefined) return;
     const boundary = normalizeTraceBoundary(
       boundaryFromPoints(start, point),

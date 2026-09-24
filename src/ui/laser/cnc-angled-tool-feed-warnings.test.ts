@@ -10,6 +10,7 @@ import {
   type Project,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
+import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
 import { detectMachineJobWarnings } from './machine-job-warnings';
 
@@ -77,6 +78,19 @@ describe('detectCncAngledToolFeedWarnings', () => {
     expect(warning).toContain('plunge 120 mm/min');
     expect(warning).toContain('spindle 12000 RPM');
     expect(warning).toContain('0.75 mm/pass');
+  });
+
+  it('names the ball tip the diameter-band recipe ignores on a tapered ball nose', () => {
+    const advisory = cncAngledToolFeedAdvisory({
+      id: 'tbn',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    });
+    expect(advisory).toContain('Tapered ball-nose rough guide');
+    expect(advisory).toContain('stored 6.25 mm diameter band, not the 1.5875 mm ball tip');
   });
 
   it('is wired into the shared Job Review warning collector', () => {

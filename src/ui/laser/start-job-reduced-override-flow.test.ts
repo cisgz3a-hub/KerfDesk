@@ -17,6 +17,7 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { runStartJobFlow } from './start-job-flow';
+import { runFrameNow } from './use-frame-action';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -115,7 +116,7 @@ describe('CNC reduced-override Start flow', () => {
   it('binds the acknowledged feed/rapid reduction to setup attestation', async () => {
     const review = captureJobReviewModels();
 
-    await runStartJobFlow();
+    await runFrameNow();
     await runStartJobFlow();
 
     review.stop();

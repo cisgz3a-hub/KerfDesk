@@ -69,7 +69,7 @@ describe('JobControls machine gating (ADR-101 §5)', () => {
       // setup entry — the point is that it survives the CNC switch at all.
       expect(labels).toContain('Set up homing');
       expect(labels).toContain('Frame job');
-      expect(labels).toContain('Set up & Frame');
+      expect(labels).toContain('Start');
       expect(labels).not.toContain('Resume from line');
       expect(host.querySelector('input[aria-label="Resume from G-code line"]')).toBeNull();
       expect(host.textContent).toContain('CNC interruption recovery');

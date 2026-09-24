@@ -7,6 +7,13 @@
 
 import type { RawImageData } from '../../core/trace';
 import { freezeGif, isGif } from '../import/freeze-gif';
+import { readImageHeader } from './image-header-reader';
+import {
+  awaitTraceSignal,
+  checkTraceSignal,
+  isTraceAbort,
+  traceAbortError,
+} from './trace-cancellation';
 
 // Cap on the longest image edge after decode, in pixels. Two competing
 // forces: trace runtime is O(width × height × colors) (imagetracerjs and
@@ -48,7 +55,6 @@ export function burnDecodeMaxEdge(naturalWidth: number, naturalHeight: number): 
 }
 
 const PAPER_WHITE = 255;
-const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
 // The PLATFORM's real 2D-canvas ceiling, measured in Chromium rather than
 // assumed: a 16384x16384 OffscreenCanvas allocates, draws and reads back;
 // 16385x16385 fails outright. Above these the browser factually cannot
@@ -70,15 +76,20 @@ export type ImageDimensions = { readonly width: number; readonly height: number 
 export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
+  signal?: AbortSignal,
 ): Promise<RawImageData> {
-  if (isGif(file)) file = await freezeGif(file);
-  const headerDimensions = await readHeaderImageDimensions(file);
+  checkTraceSignal(signal);
+  if (isGif(file)) file = await awaitTraceSignal(freezeGif(file), signal);
+  checkTraceSignal(signal);
+  const headerDimensions = await awaitTraceSignal(readHeaderImageDimensions(file, signal), signal);
+  checkTraceSignal(signal);
   if (headerDimensions !== null) {
     assertSafeDecodeDimensions(headerDimensions);
     const target = scaleToCap(headerDimensions.width, headerDimensions.height, maxEdge);
-    const resizedBitmap = await decodeResizedImageBitmap(file, headerDimensions, target);
+    const resizedBitmap = await decodeResizedImageBitmap(file, headerDimensions, target, signal);
     if (resizedBitmap !== null) {
       try {
+        checkTraceSignal(signal);
         return rasterizeImage(resizedBitmap, target.width, target.height);
       } finally {
         resizedBitmap.close();
@@ -93,7 +104,8 @@ export async function loadImageAsRawData(
   // the Blob on every import. Keep them in lockstep. R-L3 audit note.
   const url = URL.createObjectURL(file);
   try {
-    const img = await decodeImage(url);
+    const img = await decodeImage(url, signal);
+    checkTraceSignal(signal);
     const { width, height } = scaleToCap(img.width, img.height, maxEdge);
     return rasterizeImage(img, width, height);
   } finally {
@@ -105,16 +117,25 @@ async function decodeResizedImageBitmap(
   file: File,
   source: ImageDimensions,
   target: ImageDimensions,
+  signal?: AbortSignal,
 ): Promise<ImageBitmap | null> {
   const needsResize = source.width !== target.width || source.height !== target.height;
   if (!needsResize || typeof createImageBitmap !== 'function') return null;
   try {
-    return await createImageBitmap(file, {
+    const decoded = createImageBitmap(file, {
       resizeWidth: target.width,
       resizeHeight: target.height,
       resizeQuality: 'high',
     });
-  } catch {
+    void decoded.then(
+      (bitmap) => {
+        if (signal?.aborted === true) bitmap.close();
+      },
+      () => undefined,
+    );
+    return await awaitTraceSignal(decoded, signal);
+  } catch (error) {
+    if (isTraceAbort(error)) throw error;
     // Safari/WebView variants may expose createImageBitmap without supporting
     // resize options. The object-URL HTMLImageElement path remains compatible.
     return null;
@@ -175,17 +196,41 @@ export async function readImageNaturalSize(
   }
 }
 
-function decodeImage(url: string): Promise<HTMLImageElement> {
+function decodeImage(url: string, signal?: AbortSignal): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = (): void => resolve(img);
-    img.onerror = (): void => reject(new Error('Failed to decode image — unsupported format?'));
+    const cleanup = (): void => {
+      signal?.removeEventListener('abort', abort);
+      img.onload = null;
+      img.onerror = null;
+    };
+    const abort = (): void => {
+      cleanup();
+      img.src = '';
+      reject(traceAbortError());
+    };
+    if (signal?.aborted === true) {
+      abort();
+      return;
+    }
+    signal?.addEventListener('abort', abort, { once: true });
+    img.onload = (): void => {
+      cleanup();
+      resolve(img);
+    };
+    img.onerror = (): void => {
+      cleanup();
+      reject(new Error('Failed to decode image — unsupported format?'));
+    };
     img.src = url;
   });
 }
 
-async function readHeaderImageDimensions(file: File): Promise<ImageDimensions | null> {
-  const header = await readImageHeader(file);
+async function readHeaderImageDimensions(
+  file: File,
+  signal?: AbortSignal,
+): Promise<ImageDimensions | null> {
+  const header = await readImageHeader(file, signal);
   return parsePngDimensions(header) ?? parseJpegDimensions(header);
 }
 
@@ -202,31 +247,6 @@ export function embeddedCanvasSupportsImageDimensions(dimensions: ImageDimension
     dimensions.height <= MAX_SAFE_DECODE_EDGE_PX &&
     pixels <= MAX_SAFE_DECODE_PIXELS
   );
-}
-
-async function readImageHeader(file: File): Promise<Uint8Array> {
-  return new Uint8Array(await readBlobAsArrayBuffer(file.slice(0, IMAGE_HEADER_PROBE_BYTES)));
-}
-
-function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
-  const readWithArrayBuffer = (blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> })
-    .arrayBuffer;
-  if (typeof readWithArrayBuffer === 'function') {
-    return readWithArrayBuffer.call(blob);
-  }
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (): void => {
-      if (reader.result instanceof ArrayBuffer) {
-        resolve(reader.result);
-      } else {
-        reject(new Error('FileReader returned a non-buffer result for the image header.'));
-      }
-    };
-    reader.onerror = (): void => reject(new Error('FileReader failed to read the image header.'));
-    reader.readAsArrayBuffer(blob);
-  });
 }
 
 function assertSafeDecodeDimensions(dimensions: ImageDimensions): void {

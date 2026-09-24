@@ -4,8 +4,13 @@ import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 
 const FRAME_QUEUE_SETTLE_TIMEOUT_MS = 1_500;
 const FRAME_QUEUE_POLL_MS = 25;
+// A reply that never comes (a line the controller dropped, or a write that
+// failed part-way) keeps this fence closed for the whole session, so the
+// message names the one step that always clears it (controller audit
+// gap-start-5).
 const FRAME_QUEUE_BUSY_MESSAGE =
-  'The controller is still finishing a previous command. Wait for its acknowledgement, then Frame again.';
+  'The controller is still finishing a previous command. Wait for its acknowledgement, then ' +
+  'Frame again. If no acknowledgement arrives, disconnect and reconnect the controller to clear it.';
 
 export type FrameWcsNormalization =
   | { readonly ok: true; readonly warning?: string }
@@ -16,15 +21,22 @@ export type FrameWcsNormalization =
     };
 
 /** Wait until no earlier owned or untracked write can cross Frame preparation. */
-export async function frameControllerQueueIssue(): Promise<string | null> {
+export async function frameControllerQueueIssue(signal?: AbortSignal): Promise<string | null> {
   const deadline = Date.now() + FRAME_QUEUE_SETTLE_TIMEOUT_MS;
   while (hasPendingControllerWrite(useLaserStore.getState())) {
+    signal?.throwIfAborted();
     if (Date.now() > deadline) return FRAME_QUEUE_BUSY_MESSAGE;
     await new Promise<void>((resolve) => {
       setTimeout(resolve, FRAME_QUEUE_POLL_MS);
     });
   }
+  signal?.throwIfAborted();
   return null;
+}
+
+/** Recheck after an asynchronous queue fence, immediately before dispatch. */
+export function assertFramePreparationActive(signal?: AbortSignal): void {
+  signal?.throwIfAborted();
 }
 
 /** Select the emitted G54 frame and retain disclosure of any named WCS change. */

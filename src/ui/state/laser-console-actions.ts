@@ -1,16 +1,12 @@
-import {
-  idleCollector,
-  type PreparedConsoleCommand,
-  type SettingsCollectorState,
-} from '../../core/controllers/grbl';
+import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
+import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
 import { machineKindOf } from '../../core/scene';
 import * as detectedSettings from './detected-settings-action';
 import {
   beginReportUnitsWrite,
-  retainControllerReportUnits,
   unqualifiedControllerSettingsPatch,
 } from './controller-report-units';
 import {
@@ -24,7 +20,13 @@ import {
 } from './console-command-readiness';
 import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
-import { interactiveControllerOperation } from './laser-controller-operation';
+import {
+  beginConsoleSettingsRead,
+  controllerUnlockedPatch,
+  finishConsoleSettingsRead,
+  releaseConsoleSettingsRead,
+  reportUnitsStayUnconfirmed,
+} from './laser-console-completion';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { pushLog } from './laser-store-helpers';
@@ -174,42 +176,51 @@ async function dispatchPreparedConsoleCommand(
   command: PreparedConsoleCommand,
   source: TranscriptSource,
 ): Promise<void> {
-  if (/^\$0*13\s*=/.test(command.normalized)) set(beginReportUnitsWrite());
-  beginConsoleSettingsRead(set, get, refs, command);
+  const reportUnitsWrite = /^\$0*13\s*=/.test(command.normalized);
+  const settingsQuery = command.kind === 'settings-query';
+  if (reportUnitsWrite) set(beginReportUnitsWrite());
+  if (settingsQuery) beginConsoleSettingsRead(set, get, refs);
   try {
     await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
-    if (command.kind === 'settings-query') releaseFailedConsoleSettingsRead(set, get, refs);
+    if (settingsQuery) releaseConsoleSettingsRead(set, get, refs);
     throw error;
   }
-  const stateEffect = command.stateEffect;
-  if (stateEffect !== 'read-only') {
-    set((state) => consoleStateEffectPatch(state, stateEffect, command.normalized));
-  }
+  if (settingsQuery) finishConsoleSettingsRead(set, get, refs);
+  applyConsoleStateEffect(set, command);
   // Track the operator's active WCS selection so save/start advisories can
   // warn when it is not the G54 that emission pins (audit C6).
   trackConsoleWcsSelection(set, command.normalized);
+  if (reportUnitsWrite) await rereadSettingsAfterReportUnitsWrite(set, get, refs, write);
 }
 
-function beginConsoleSettingsRead(
+// A `$13=` write leaves machine position hidden until a settings dump confirms
+// the report units, so the Console reads `$$` itself, as the settings dialog
+// verifies its writes (audit regressions-1).
+async function rereadSettingsAfterReportUnitsWrite(
   set: SetFn,
   get: GetFn,
   refs: ConsoleActionRefs,
-  command: PreparedConsoleCommand,
-): void {
-  if (command.kind !== 'settings-query') return;
-  detectedSettings.beginSettingsCollection(refs, get().controllerSessionEpoch);
-  set({
-    controllerOperation: interactiveControllerOperation(
-      detectedSettings.SETTINGS_READ_OPERATION_LABEL,
-      'terminal-exchange',
-    ),
-    detectedSettings: null,
-    controllerSettings: retainControllerReportUnits(get().controllerSettings),
-    controllerSettingsObservation: null,
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
-  });
+  write: ConsoleWriteFn,
+): Promise<void> {
+  const settingsRead = refs.driver.prepareConsoleCommand(
+    refs.driver.commands.settingsQuery ?? '$$',
+  );
+  try {
+    if (!settingsRead.ok) throw new Error(settingsRead.reason);
+    await dispatchPreparedConsoleCommand(set, get, refs, write, settingsRead.command, 'system');
+  } catch (error) {
+    reportUnitsStayUnconfirmed(set, error);
+  }
+}
+
+function applyConsoleStateEffect(set: SetFn, command: PreparedConsoleCommand): void {
+  // An acknowledged `$X` leaves exactly what the Alarm banner's Unlock does,
+  // alarm cleared included (audit cnc-controller-1).
+  if (command.kind === 'unlock') return set(controllerUnlockedPatch);
+  const stateEffect = command.stateEffect;
+  if (stateEffect === 'read-only') return;
+  set((state) => consoleStateEffectPatch(state, stateEffect, command.normalized));
 }
 
 function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCommand): void {
@@ -224,24 +235,6 @@ function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCo
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),
   }));
-}
-
-function releaseFailedConsoleSettingsRead(set: SetFn, get: GetFn, refs: ConsoleActionRefs): void {
-  const sessionEpoch = get().controllerSessionEpoch;
-  if (refs.settingsCollectorSessionEpoch === sessionEpoch) {
-    refs.settingsCollector = idleCollector();
-    refs.settingsCollectorSessionEpoch = null;
-  }
-  set((state) =>
-    isSettingsReadOperation(state.controllerOperation) ? { controllerOperation: null } : {},
-  );
-}
-
-function isSettingsReadOperation(operation: LaserState['controllerOperation']): boolean {
-  return (
-    operation?.kind === 'interactive-command' &&
-    operation.label === detectedSettings.SETTINGS_READ_OPERATION_LABEL
-  );
 }
 
 function consoleOwnershipBlockReason(
@@ -264,11 +257,11 @@ function consoleSettingWriteBlockReason(
     machineKindOf(useStore.getState().project.machine),
     command.normalized,
   );
-  if (machineKindIssue !== null) return machineKindIssue;
-  if (command.kind !== 'setting-write' || driver.capabilities.settings === 'grbl-dollar') {
-    return null;
-  }
-  return `${driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`;
+  // A profile policy, not a claim about the firmware: the Falcon A1 Pro's
+  // grblHAL answers `$N=` writes, but its vendor configuration keeps settings
+  // out of host software apart from the air settings Creality documents for
+  // console use (audit settings-console-10, ADR-370).
+  return machineKindIssue ?? consoleSettingWriteIssue(driver, command);
 }
 
 async function confirmFreshConsoleIdle(

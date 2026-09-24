@@ -28,6 +28,7 @@ import {
 } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function OverrideControls(): JSX.Element {
   const ovCache = useLaserStore((s) => s.ovCache);
@@ -36,7 +37,7 @@ export function OverrideControls(): JSX.Element {
   const projectMachineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const isCncJob = (activeJobMachineKind ?? projectMachineKind) === 'cnc';
   const fire = (byte: RealtimeOverrideByte): void => {
-    void send(byte).catch(() => undefined);
+    void send(byte).catch(controllerActionFailureHandler('Override'));
   };
   return (
     <div style={boxStyle} aria-label="Job overrides">

@@ -18,6 +18,29 @@ test.beforeEach(async ({ page }) => {
   await dismissNotifications(page);
 });
 
+test('saves prepared G-code with Save As without asking for a directory', async ({
+  page,
+  kerfdesk,
+}) => {
+  const eventCount = (await kerfdesk.events()).length;
+  await runMenuCommand(page, 'File', 'Save G-code...');
+  const dialog = page.getByRole('dialog', { name: 'Save G-code', exact: true });
+  await expect(dialog).toContainText('Downloads or Desktop');
+  await choosePreparedGcodeDestination(page);
+
+  expect(await savedText(kerfdesk, '.gcode')).toContain('G21');
+  const saveEvents = (await kerfdesk.events()).slice(eventCount);
+  expect(saveEvents.filter((event) => event.kind === 'picker-save')).toEqual([
+    expect.objectContaining({ name: 'project-basic.gcode' }),
+  ]);
+  expect(
+    saveEvents.filter((event) =>
+      ['picker-open', 'picker-directory', 'picker-directory-file'].includes(event.kind),
+    ),
+  ).toEqual([]);
+  await expect(page.getByRole('dialog', { name: 'Choose G-code filename' })).toHaveCount(0);
+});
+
 test('creates arrays, nests them, previews them, and saves one undoable project', async ({
   page,
   kerfdesk,
@@ -531,12 +554,12 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   );
   await kerfdesk.setAutoAcknowledge(true);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
   await dismissNotifications(page);
 
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   const pauseBytesBefore = serialWriteBytes(await kerfdesk.events()).length;
@@ -556,7 +579,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   const abortWritesBefore = serialWrites(await kerfdesk.events()).length;
   await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
-  await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await expect
     .poll(async () => serialWrites(await kerfdesk.events()).slice(abortWritesBefore))
     .toContain('M9\n');
@@ -583,7 +606,10 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await kerfdesk.acknowledgeSerial(1);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('alert')).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Set up & Frame', exact: true })).toBeEnabled();
+  // The aborted run consumed its Frame: Frame is available again, and Start
+  // stays greyed out until that new Frame completes.
+  await expect(page.getByRole('button', { name: 'Frame job', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeDisabled();
 });
 
 test('shows controller-reported canvas progress without treating acknowledgements as motion', async ({
@@ -597,7 +623,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
   const beforeAck = Number(await probe.getAttribute('data-confirmed-route-mm'));
@@ -656,7 +682,7 @@ test('keeps the finished route and confirms it only after the stream settles Idl
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   const probe = page.getByTestId('canvas-motion-probe');
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
@@ -681,7 +707,7 @@ test('offers a selected-area second pass after completion with the Machine panel
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
   const focusReturn = page.getByRole('button', { name: 'Open...', exact: true });
@@ -723,7 +749,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   page.on('dialog', (dialog) => void dialog.accept());
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
 
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect
@@ -934,7 +960,7 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   await fillAndCommit(page, 'Selection height', '20');
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(page.getByTestId('canvas-motion-probe')).toHaveAttribute(
     'data-lifecycle',
@@ -1107,7 +1133,7 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
   await expect
     .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
     .toContain('$J=G90 G21');
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
 }
 
 // ADR-224: every Start now opens the Job Review dialog; its single Start
@@ -1170,8 +1196,7 @@ async function reviewStartBoundary(page: Page): Promise<{
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
-  await acceptGcodeFilename(page);
+  await dialog.getByRole('button', { name: 'Save as…' }).click();
 }
 
 async function dismissNotifications(page: Page): Promise<void> {
@@ -1186,12 +1211,6 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
   await input.fill(value);
   await input.press('Tab');
   await expect(input).toHaveValue(value);
-}
-
-async function acceptGcodeFilename(page: Page): Promise<void> {
-  const panel = page.getByRole('dialog', { name: 'Choose G-code filename' });
-  await expect(panel).toBeVisible();
-  await panel.getByRole('button', { name: 'Save', exact: true }).click();
 }
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {

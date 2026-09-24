@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { createProject } from '../../core/scene';
+import { resolveCameraSafeFramePlacement } from '../laser/camera-frame-placement';
 import { useLaserStore } from './laser-store';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 
@@ -85,11 +87,80 @@ afterEach(async () => {
     workOriginActive: false,
     frameVerification: null,
     homingState: 'unknown',
+    positionEvidenceSuppressed: false,
   });
   vi.restoreAllMocks();
 });
 
 describe('home command timeout', () => {
+  it.each([
+    { source: 'g54-persistent', name: 'zero G54', wco: '0.000,0.000,7.000', active: false },
+    { source: 'g54-persistent', name: 'retained G54', wco: '200.398,170.323,7.000', active: true },
+    { source: 'g92', name: 'zero G92', wco: '0.000,0.000,7.000', active: false },
+    { source: 'g92', name: 'retained G92', wco: '200.398,170.323,7.000', active: true },
+  ] as const)(
+    'reconciles the $name XY offset only after fresh post-Home WCO',
+    async ({ source, wco, active }) => {
+      const writes: string[] = [];
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+      });
+      await connectWith(connection);
+      useLaserStore.setState({ workOriginActive: true, workOriginSource: source });
+      writes.length = 0;
+
+      const home = useLaserStore.getState().home();
+      await flush();
+      connection.emitLine('ok');
+      await flush();
+      connection.emitLine('ok');
+      await flush();
+      connection.emitLine(`<Idle|MPos:-399.000,-399.000,0.000|WCO:${wco}|FS:0,0>`);
+      await home;
+      expect(useLaserStore.getState().homingState).toBe('confirmed');
+      expect(useLaserStore.getState().workOriginSource).toBe('unknown');
+      expect(useLaserStore.getState().wcoCache).toBeNull();
+      expect(useLaserStore.getState().statusReport).toMatchObject({
+        state: 'Idle',
+        mPos: null,
+        wPos: null,
+        wco: null,
+      });
+
+      for (const position of ['MPos:-399.000,-399.000,0.000', 'WPos:0.000,0.000,0.000']) {
+        connection.emitLine(`<Idle|${position}|FS:0,0>`);
+        await flush();
+        const snapshot = useLaserStore.getState();
+        expect(
+          resolveCameraSafeFramePlacement(
+            createProject(),
+            { startFrom: 'absolute', anchor: 'front-left' },
+            { ...snapshot, trustedPositionEpoch: snapshot.trustedPositionEpoch },
+          ).ok,
+        ).toBe(false);
+      }
+
+      connection.emitLine(`<Idle|MPos:-399.000,-399.000,0.000|WCO:${wco}|FS:0,0>`);
+      await flush();
+      const state = useLaserStore.getState();
+      expect(state.workOriginActive).toBe(active);
+      expect(state.workOriginSource).toBe(active ? 'unknown' : 'none');
+      expect(state.wcoCache?.z).toBe(7);
+      expect(state.wcoCache?.x).toBe(active ? 200.398 : 0);
+      expect(state.wcoCache?.y).toBe(active ? 170.323 : 0);
+      expect(writes.some((line) => /\b(?:G92|G10)/.test(line))).toBe(false);
+      if (!active) {
+        expect(
+          resolveCameraSafeFramePlacement(
+            createProject(),
+            { startFrom: 'absolute', anchor: 'front-left' },
+            { ...state, trustedPositionEpoch: state.trustedPositionEpoch },
+          ).ok,
+        ).toBe(true);
+      }
+    },
+  );
+
   it.each(['Run', 'Hold', 'Jog'] as const)(
     'writes no Home command while the controller is known %s',
     async (controllerState) => {
@@ -238,5 +309,157 @@ describe('home command timeout', () => {
     expect(useLaserStore.getState().homingState).toBe('unknown');
     expect(useLaserStore.getState().homingProof).toBeNull();
     expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(true);
+  });
+});
+
+// Audit status-2. GRBL services a pending '?' at the end-of-line checkpoint
+// before it executes the line (gnea/grbl protocol.c protocol_main_loop:
+// protocol_execute_realtime() runs before system_execute_line()), and $H only
+// enters the homing state inside system_execute_line. A status query written
+// before the operator clicked Home can therefore be answered '<Alarm|...>'
+// after KerfDesk wrote $H.
+describe('Home from Alarm and a status reply generated before $H executed', () => {
+  async function connectInAlarm(writes: string[]): Promise<FakeConnection> {
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    // grblHAL raises ALARM:11 (homing required) at power-up.
+    connection.emitLine('ALARM:11');
+    connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    writes.length = 0;
+    return connection;
+  }
+
+  it('completes Home and clears the startup alarm when that stale Alarm reply lands', async () => {
+    const writes: string[] = [];
+    const connection = await connectInAlarm(writes);
+
+    const home = useLaserStore.getState().home();
+    await flush();
+    expect(writes).toEqual(['$H\n']);
+    connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({ kind: 'home' });
+    expect(useLaserStore.getState().homingState).toBe('homing');
+
+    connection.emitLine('ok');
+    await flush();
+    expect(writes).toEqual(['$H\n', 'G4 P0.01\n']);
+    connection.emitLine('ok');
+    await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
+
+    await home;
+    const state = useLaserStore.getState();
+    expect(state.homingState).toBe('confirmed');
+    expect(state.alarmCode).toBeNull();
+    expect(state.safetyNotice).toBeNull();
+  });
+
+  it('still fails Home on an Alarm report after the controller reported homing', async () => {
+    const writes: string[] = [];
+    const connection = await connectInAlarm(writes);
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('Controller entered Alarm.');
+    await flush();
+    connection.emitLine('<Home|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    await failure;
+
+    expect(useLaserStore.getState().homingState).toBe('unknown');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+  });
+
+  it('still fails a Home started from Idle on any Alarm report', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('Controller entered Alarm.');
+    await flush();
+    connection.emitLine('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    await failure;
+
+    expect(useLaserStore.getState().homingState).toBe('unknown');
+  });
+
+  it('records a Home that a homing-fail ALARM ended', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('ALARM:8');
+    await flush();
+    connection.emitLine('ALARM:8');
+    await failure;
+
+    expect(useLaserStore.getState().log.at(-1)).toContain('Home failed: ALARM:8');
+  });
+});
+
+// Audit regressions-2. GRBL-family firmware answers error:N for a Home line it
+// will not run (error:5 when $22 homing is disabled; error:3 for $HX when
+// HOMING_SINGLE_AXIS_COMMANDS is not compiled in, gnea/grbl config.h) before
+// any motion, so the positions it keeps reporting are real.
+describe('position evidence after a failed Home', () => {
+  const IDLE_AT_5_6 = '<Idle|MPos:5.000,6.000,0.000|FS:0,0>';
+
+  it('reports the controller position again after it refused the Home line', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('error:5');
+    await flush();
+    connection.emitLine('error:5');
+    await failure;
+    connection.emitLine(IDLE_AT_5_6);
+    await flush();
+
+    const state = useLaserStore.getState();
+    expect(state.positionEvidenceSuppressed).toBe(false);
+    expect(state.statusReport?.mPos).toEqual({ x: 5, y: 6, z: 0 });
+    // Nothing was homed: no proof, and the failure is still reported.
+    expect(state.homingState).toBe('unknown');
+    expect(state.homingProof).toBeNull();
+    expect(state.lastWriteError).toBe('error:5');
+  });
+
+  it('keeps positions hidden after a homing cycle that ended in ALARM', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('ALARM:9');
+    await flush();
+    connection.emitLine('<Home|MPos:3.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('ALARM:9');
+    await failure;
+    connection.emitLine(IDLE_AT_5_6);
+    await flush();
+
+    expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(true);
+    expect(useLaserStore.getState().statusReport?.mPos).toBeNull();
+  });
+
+  it('keeps a suppression that predates the refused Home', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({ positionEvidenceSuppressed: true });
+
+    const home = useLaserStore.getState().home();
+    const failure = expect(home).rejects.toThrow('error:5');
+    await flush();
+    connection.emitLine('error:5');
+    await failure;
+    connection.emitLine(IDLE_AT_5_6);
+    await flush();
+
+    expect(useLaserStore.getState().positionEvidenceSuppressed).toBe(true);
+    expect(useLaserStore.getState().statusReport?.mPos).toBeNull();
   });
 });

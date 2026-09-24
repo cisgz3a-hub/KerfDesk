@@ -36,10 +36,30 @@ describe('variable advancement ownership', () => {
       streamerEpoch: state.streamerEpoch + 1,
       streamer: started,
     }));
+  // A clean finish: the post-job settle waits for Idle, and an Idle report
+  // from the connected controller releases the stream.
   const finish = (): void => {
-    useLaserStore.setState({ streamer: { ...started, status: 'done' } });
-    useLaserStore.setState({ streamer: null });
+    useLaserStore.setState({
+      streamer: { ...started, status: 'done' },
+      controllerOperation: { kind: 'post-job-settle', phase: 'awaiting-idle', idleReports: 0 },
+    });
+    releaseAtIdle();
   };
+  const releaseAtIdle = (): void =>
+    useLaserStore.setState({
+      streamer: null,
+      controllerOperation: null,
+      connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+    });
 
   it('remembers a settled stream until the initial transport write is accepted', () => {
     const observer = armVariableStreamAdvancement(project, runId);
@@ -49,6 +69,18 @@ describe('variable advancement ownership', () => {
     observer.accept();
     observer.accept();
     expect(advance).toHaveBeenCalledExactlyOnceWith(project, 'successful-stream');
+  });
+
+  // Controller audit gap-start-6: the settle failed, so the stream stayed
+  // 'done' until a later Idle report released it; the recovery ledger records
+  // that run as interrupted, and the variables must not advance either.
+  it('does not advance when the stream was released without a clean settle', () => {
+    const observer = armVariableStreamAdvancement(project, runId);
+    start();
+    observer.accept();
+    useLaserStore.setState({ streamer: { ...started, status: 'done' }, controllerOperation: null });
+    releaseAtIdle();
+    expect(advance).not.toHaveBeenCalled();
   });
 
   it('starts after a prior completed run whose recovery ID remains in the store', () => {
@@ -101,15 +133,23 @@ describe('variable stream advancement outcome', () => {
   it('accepts only a completed stream released after controller settle', () => {
     const started = step(createStreamer('G1 X1')).state;
     const done = { ...started, status: 'done' as const };
-    expect(variableStreamOutcome(started, done)).toBe('pending');
-    expect(variableStreamOutcome(done, null)).toBe('successful');
+    expect(variableStreamOutcome(started, done, false)).toBe('pending');
+    expect(variableStreamOutcome(done, null, true)).toBe('successful');
+  });
+
+  // Controller audit gap-start-6: a 'done' stream released at Idle after its
+  // settle failed is not a successful stream; the recovery ledger records it
+  // as interrupted too.
+  it('rejects a completed stream released without a clean settle', () => {
+    const done = { ...step(createStreamer('G1 X1')).state, status: 'done' as const };
+    expect(variableStreamOutcome(done, null, false)).toBe('failed');
   });
 
   it('rejects cancellation, error, and disconnect transitions', () => {
     const started = step(createStreamer('G1 X1')).state;
-    expect(variableStreamOutcome(started, cancel(started))).toBe('pending');
-    expect(variableStreamOutcome(cancel(started), null)).toBe('failed');
-    expect(variableStreamOutcome(started, markErrored(started))).toBe('failed');
-    expect(variableStreamOutcome(started, null)).toBe('failed');
+    expect(variableStreamOutcome(started, cancel(started), false)).toBe('pending');
+    expect(variableStreamOutcome(cancel(started), null, true)).toBe('failed');
+    expect(variableStreamOutcome(started, markErrored(started), false)).toBe('failed');
+    expect(variableStreamOutcome(started, null, true)).toBe('failed');
   });
 });

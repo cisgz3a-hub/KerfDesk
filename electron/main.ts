@@ -62,10 +62,15 @@ import {
   type SerialDiagnosticPolicy,
 } from './serial-port-diagnostics.js';
 import {
+  waitForSerialPorts,
+  type NoPortsPrompt,
+  type SerialPortEventSource,
+} from './serial-port-wait.js';
+import { mainWindowWebPreferences } from './desktop-window-options.js';
+import {
   resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
-  shouldGrantDevicePermission,
   shouldGrantPermissionCheck,
   shouldGrantPermissionRequest,
 } from './trusted-renderer-policy.js';
@@ -238,13 +243,7 @@ function createMainWindow(): BrowserWindow {
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
     title: DESKTOP_PRODUCT_NAME,
-    webPreferences: {
-      contextIsolation: true,
-      devTools: shouldEnableDesktopDevTools(app.isPackaged),
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
+    webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(app.isPackaged)),
   });
 }
 
@@ -261,14 +260,25 @@ function installContentSecurityPolicy(ses: Session): void {
 
 async function chooseSerialPortId(
   webContents: WebContents,
-  portList: ReadonlyArray<ElectronSerialPort>,
+  portList: ReadonlyArray<ElectronSerialPortSummary>,
 ): Promise<string> {
-  if (portList.length === 0) {
+  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
+  const showMessageBox: NoPortsPrompt = (options) =>
+    owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options);
+  // An empty list waits with the operator for a port (serial-port-wait.ts).
+  const ports =
+    portList.length > 0
+      ? portList
+      : await waitForSerialPorts(
+          webContents.session as unknown as SerialPortEventSource,
+          webContents,
+          showMessageBox,
+        );
+  if (ports.length === 0) {
     console.log('[serial] No ports - is the laser plugged in and powered on?');
     return '';
   }
-  const buttons = serialPortDialogButtons(portList);
-  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
+  const buttons = serialPortDialogButtons(ports);
   const options = {
     type: 'question' as const,
     buttons: [...buttons],
@@ -276,13 +286,10 @@ async function chooseSerialPortId(
     defaultId: 0,
     noLink: true,
     message: 'Select laser serial port',
-    detail: portList.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
+    detail: ports.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
   };
-  const result =
-    owner === undefined
-      ? await dialog.showMessageBox(options)
-      : await dialog.showMessageBox(owner, options);
-  return serialPortIdForDialogResponse(portList, result.response);
+  const result = await showMessageBox(options);
+  return serialPortIdForDialogResponse(ports, result.response);
 }
 
 function logSerialPorts(portList: ReadonlyArray<ElectronSerialPort>): void {
@@ -334,12 +341,15 @@ function installPermissionHandlers(ses: Session): void {
       TRUSTED_RENDERER_ORIGINS,
     );
   });
-  ses.setDevicePermissionHandler((details) => {
-    return shouldGrantDevicePermission(
-      { deviceType: details.deviceType, origin: details.origin },
-      TRUSTED_RENDERER_ORIGINS,
-    );
-  });
+  // No setDevicePermissionHandler, deliberately (ADR-366). With any handler
+  // installed, Electron asks it about every serial port it can persist (on
+  // Windows, every port with a device instance ID) and no longer records the
+  // port the operator picks, so a handler that trusts the origin grants every
+  // attached adapter. Electron's own store keeps only the picked ports, matched
+  // on Windows by device instance ID. getPorts() in the window and in the
+  // background-streaming worker (ADR-354) then lists the picked adapter and not
+  // an identical twin, and Forget revokes it. Only the trusted origin reaches
+  // the picker: requestPort is gated by the permission check handler above.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
     const mediaTypes =
       'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
@@ -460,14 +470,15 @@ async function createWindow(): Promise<void> {
   // Permission gate: deny everything by default, allow only what the app
   // actually uses.
   //
-  // WebSerial (Phase B) needs four cooperating hooks; missing any of them
+  // WebSerial (Phase B) needs three cooperating hooks; missing any of them
   // and the renderer's `navigator.serial.requestPort()` either errors
   // silently or never shows a picker:
   //   1) setPermissionCheckHandler   - accept 'serial' so the API isn't
   //      gated out before requestPort even fires.
-  //   2) setDevicePermissionHandler  - approve serial-device grants per-device.
-  //   3) select-serial-port event    - pick which port to return.
-  //   4) setPermissionRequestHandler - accept 'serial' explicitly.
+  //   2) select-serial-port event    - pick which port to return. Electron
+  //      grants that port alone; there is deliberately no device permission
+  //      handler, which would grant every port (ADR-366).
+  //   3) setPermissionRequestHandler - accept 'serial' explicitly.
   //
   // File System Access (Phase A: SVG import, .lf2 save/open) is gated
   // on Electron 33+ via these same handlers. Chromium uses several

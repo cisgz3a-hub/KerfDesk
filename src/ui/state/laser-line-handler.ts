@@ -15,7 +15,6 @@ import {
   idleCollector,
   markErrored,
   wipeInFlight,
-  type GrblPins,
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
@@ -48,9 +47,10 @@ import {
   takeNextAcknowledgedFramePrefixLine,
 } from './laser-motion-operation';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
-import { frameHitLimitNotice } from './laser-safety-notice';
+import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
+import { handleAlarmLine } from './laser-alarm-line';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
-import { advanceStream, settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
+import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
 import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
@@ -111,6 +111,9 @@ function handleNonBannerLine(
   // already rejected above; continue into the shared alarm handler as well.
   if (commandConsumed && !['alarm', 'error', 'resend'].includes(cls.kind)) return;
   if (cls.kind === 'status') {
+    // The controller answered after its last ALARM:N, so a later banner is a
+    // new boot, not the reset that raised it (laser-reset-alarm.ts).
+    forgetAlarmBeforeBanner(refs);
     handleStatusLine(set, get, refs, safeWrite, cls.report);
     return;
   }
@@ -347,7 +350,10 @@ function handleWelcomeLine(
     detectedSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
-    alarmCode: null,
+    // An ALARM:N the reset itself raised (Abort mid-motion) is still the
+    // controller's alarm after the banner; any other code belonged to the
+    // previous boot (audit streaming-4).
+    alarmCode: takeAlarmBeforeBanner(refs),
     wcoCache: null,
     // A reset re-initializes the parser's modal state ($N runs fresh), so the
     // cached WCS selection is stale until re-qualification re-reads $G (C6).
@@ -357,8 +363,9 @@ function handleWelcomeLine(
     pendingTransportWrites: 0,
     accessoryCache: null,
     mpgActive: null,
-    // The rebooted firmware may expose a different receive ring; re-prove it.
+    // Re-prove the rebooted firmware's RX and planner capacities.
     rxCapacityEvidence: null,
+    plannerCapacityEvidence: null,
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
     ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),
@@ -427,65 +434,6 @@ function rebootDuringJobPatch(
     // First notice wins — an earlier root cause is what the operator needs.
     safetyNotice: state.safetyNotice ?? controllerRebootNotice(),
   };
-}
-
-// GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
-const HARD_LIMIT_ALARM_CODE = 1;
-
-function handleAlarmLine(
-  set: SetFn,
-  get: GetFn,
-  refs: HandlerRefs,
-  safeWrite: SafeWriteFn,
-  code: number,
-): void {
-  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
-  // A hard-limit alarm that fires while a Verified Frame is tracing means the
-  // job box runs past the travel from this origin — name the limit so the
-  // operator knows which way to move (ADR-053 P3). The alarm also clears the
-  // origin + frame verification.
-  const prev = get();
-  const frameLimitPatch =
-    prev.motionOperation?.kind === 'frame' && code === HARD_LIMIT_ALARM_CODE
-      ? { safetyNotice: frameHitLimitNotice(activeLimitAxisLabel(prev.statusReport?.pins ?? null)) }
-      : {};
-  set({
-    alarmCode: code,
-    // ALARM:N supersedes any prior Run/Hold report. Clearing it lets the
-    // numbered alarm itself be the exact recovery evidence for Home.
-    statusReport: null,
-    wcoCache: null,
-    accessoryCache: null,
-    // ALARM:N is not a new transport session, so it cannot clear a latched
-    // pendant owner. Only explicit MPG:0 or session replacement may do that.
-    mpgActive: prev.mpgActive ?? null,
-    ...originUnknownAfterControllerReset(prev),
-    motionOperation: null,
-    controllerOperation: null,
-    fireActive: false,
-    frameVerification: null,
-    framedRun: null,
-    frameTrace: null,
-    statusObservation: null,
-    homingState: 'unknown',
-    homingProof: null,
-    trustedPositionEpoch: (prev.trustedPositionEpoch ?? 0) + 1,
-    // The alarmed controller discards its pending work; owed acks are gone.
-    pendingUntrackedAcks: 0,
-    pendingTransportWrites: 0,
-    ...frameLimitPatch,
-  });
-  cancelControllerLifecycleRefs(refs, `ALARM:${code}`);
-  advanceStream(set, get, refs, safeWrite, 'alarm');
-}
-
-function activeLimitAxisLabel(pins: GrblPins | null): string | null {
-  if (pins === null) return null;
-  const axes: string[] = [];
-  if (pins.limitX) axes.push('X');
-  if (pins.limitY) axes.push('Y');
-  if (pins.limitZ) axes.push('Z');
-  return axes.length > 0 ? axes.join('/') : null;
 }
 
 function nextTranscriptId(refs: HandlerRefs): number {

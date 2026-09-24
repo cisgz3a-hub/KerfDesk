@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import type { DeviceProfile } from '../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import {
+  presetAirAssistUpdate,
+  type PresetAirAssistUpdate,
+} from '../../core/devices/preset-air-assist';
 import { useStore } from '../state';
 import {
   projectAirAssistDefaultSyncSummary,
   type AirAssistDefaultSyncSummary,
 } from '../state/air-assist-default-actions';
-import { useLaserStore } from '../state/laser-store';
+import { manualAirBlockMessage, useLaserStore } from '../state/laser-store';
 import { openMachineSetup } from './device-setup';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 // Manual Air has two distinct "not ready" states and they need different
 // exits (maintainer, 2026-09-19 — the old single Proceed card silently did
@@ -31,12 +37,12 @@ export function JogPadAirAssist(): JSX.Element {
       return;
     }
     if (!enabled) setNoticeOpen(false);
-    void setAirAssistEnabled(enabled).catch(() => undefined);
+    void setAirAssistEnabled(enabled).catch(controllerActionFailureHandler('Air assist'));
   };
   const proceedWithDefaults = (): void => {
     syncProjectAirAssistDefaults();
     setNoticeOpen(false);
-    void setAirAssistEnabled(true).catch(() => undefined);
+    void setAirAssistEnabled(true).catch(controllerActionFailureHandler('Air assist'));
   };
   const openAirOutputSetup = (): void => {
     setNoticeOpen(false);
@@ -52,6 +58,7 @@ export function JogPadAirAssist(): JSX.Element {
       />
       {noticeOpen && readiness === 'no-output' ? (
         <AirOutputUnsetNotice
+          preset={presetAirAssistUpdate(project.device)}
           onOpenSetup={openAirOutputSetup}
           onCancel={() => setNoticeOpen(false)}
         />
@@ -81,14 +88,19 @@ function AirAssistControl(props: {
   readonly readiness: AirAssistReadiness;
   readonly onToggle: (enabled: boolean) => void;
 }): JSX.Element {
+  // The store's own refusal for this click, if any. A 'no-output' or
+  // 'defaults' button stays clickable: its click opens the setup notice.
+  const blocked = useLaserStore((s) => manualAirBlockMessage(s, !s.airAssistOn));
+  const disabled = blocked !== null && props.readiness === 'ready';
   const label = props.enabled
     ? 'Turn manual air assist off (M9)'
     : `Turn manual air assist on (${controlSuffix(props.readiness, props.command)})`;
-  const title = controlTitle(props.readiness, label);
+  const title = disabled ? blocked : controlTitle(props.readiness, label);
   return (
     <button
       type="button"
       onClick={() => props.onToggle(!props.enabled)}
+      disabled={disabled}
       aria-label={label}
       aria-pressed={props.enabled}
       className="lf-manual-air"
@@ -131,6 +143,7 @@ function controlTitle(readiness: AirAssistReadiness, label: string): string {
 }
 
 function AirOutputUnsetNotice(props: {
+  readonly preset: PresetAirAssistUpdate | null;
   readonly onOpenSetup: () => void;
   readonly onCancel: () => void;
 }): JSX.Element {
@@ -139,8 +152,9 @@ function AirOutputUnsetNotice(props: {
       <div style={airSetupWarningTextStyle}>
         <strong>Manual Air has no M7/M8 output to switch.</strong>
         <span>
-          Set the air output in Machine Setup only after a hardware test, or run the external air
-          pump by hand.
+          {props.preset === null
+            ? 'Set the air output in Machine Setup only after a hardware test, or run the external air pump by hand.'
+            : `The ${props.preset.presetName} preset uses ${props.preset.patch.airAssistCommand}; Machine Setup offers to apply it.`}
         </span>
       </div>
       <div style={airSetupWarningActionStyle}>
@@ -208,7 +222,11 @@ function airSetupSummaryText(summary: AirAssistDefaultSyncSummary): string {
   if (summary.disabledObjectOverrideCount > 0) {
     changes.push(`clear ${summary.disabledObjectOverrideCount} stale object air override(s)`);
   }
-  return changes.length === 0 ? '' : `This will ${changes.join(', ')}, then turn manual air on.`;
+  // Those are job settings: a completed Frame no longer matches afterwards, so
+  // the next Start frames the job again (controller audit gap-start-9).
+  return changes.length === 0
+    ? ''
+    : `This will ${changes.join(', ')}, then turn manual air on. The job changes, so Start frames it again first.`;
 }
 
 function airAssistButtonStyle(

@@ -7,6 +7,10 @@ import { buildPortClosePatch, disconnectStopCommands } from './laser-store-helpe
 import { useStore } from './store';
 
 const originalProject = useStore.getState().project;
+// G1 selects a laser-cut motion mode so GRBL laser mode lights a stationary
+// M3; F defines the feed an explicit G1 needs (laser-fire-modal-state.test.ts
+// checks these bytes against a port of GRBL's laser-mode parser).
+const FIRE_ON = 'G1 F1000 M3 S20\n';
 
 function readyState(): LaserState {
   return {
@@ -65,6 +69,7 @@ beforeEach(() => {
         capabilities: [...(originalProject.device.capabilities ?? []), 'low-power-fire'],
         fireControl: { enabled: true, maxPowerPercent: 2 },
         maxPowerS: 1000,
+        framingFeedMmPerMin: 1000,
       },
     },
   });
@@ -82,7 +87,7 @@ describe('momentary low-power Fire action', () => {
     const test = harness();
 
     await test.setFireActive(true, 50);
-    expect(test.write).toHaveBeenCalledWith('M3 S20\n', 'fire', 'console');
+    expect(test.write).toHaveBeenCalledWith(FIRE_ON, 'fire', 'console');
     expect(test.get().fireActive).toBe(true);
     expect(test.get().accessoryCache).toBeNull();
 
@@ -114,7 +119,7 @@ describe('momentary low-power Fire action', () => {
   it('finishes with M5 when release wins an in-flight activation', async () => {
     let resolveStart: (() => void) | undefined;
     const write = vi.fn((line: string) =>
-      line.startsWith('M3')
+      line === FIRE_ON
         ? new Promise<void>((resolve) => {
             resolveStart = resolve;
           })
@@ -128,14 +133,14 @@ describe('momentary low-power Fire action', () => {
     resolveStart?.();
     await starting;
 
-    expect(write.mock.calls.map(([line]) => line)).toEqual(['M3 S20\n', 'M5\n', 'M5\n']);
+    expect(write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON, 'M5\n', 'M5\n']);
     expect(test.get().fireActive).toBe(false);
   });
 
   it('compensates with M5 when MPG takeover wins an in-flight activation', async () => {
     let resolveStart: (() => void) | undefined;
     const write = vi.fn((line: string) =>
-      line.startsWith('M3')
+      line === FIRE_ON
         ? new Promise<void>((resolve) => {
             resolveStart = resolve;
           })
@@ -149,7 +154,7 @@ describe('momentary low-power Fire action', () => {
     resolveStart?.();
     await starting;
 
-    expect(write.mock.calls.map(([line]) => line)).toEqual(['M3 S20\n', 'M5\n']);
+    expect(write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON, 'M5\n']);
     expect(test.get().fireActive).toBe(false);
   });
 
@@ -177,7 +182,7 @@ describe('momentary low-power Fire action', () => {
 
   it('retains the uncertain Fire-on latch when the activation write rejects', async () => {
     const write = vi.fn(async (line: string) => {
-      if (line.startsWith('M3')) throw new Error('ambiguous activation write');
+      if (line === FIRE_ON) throw new Error('ambiguous activation write');
     });
     const test = harness(write);
 

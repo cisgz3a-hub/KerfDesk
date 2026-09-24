@@ -44,7 +44,7 @@ for (const acked of [0, 1, 3, 5]) {
     await frameCurrentJob(page, kerfdesk);
     await kerfdesk.setAutoAcknowledge(false);
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
-    await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
     await confirmJobReview(page, kerfdesk);
     await expect
       .poll(async () => serialWriteLineCount(await kerfdesk.events()))
@@ -135,7 +135,7 @@ test('records a disconnect during post-job settle as an interruption of every li
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await acknowledgeJobLinesOnly(page, kerfdesk, baselineLines);
   const settling = await streamProbe(page);
@@ -209,7 +209,7 @@ test('chains three disconnect-and-resume cycles from the same engraving', async 
   for (let cycle = 0; cycle < 3; cycle += 1) {
     const baselineLines = serialWriteLineCount(await kerfdesk.events());
     if (cycle === 0) {
-      await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
       await confirmJobReview(page, kerfdesk);
     } else {
       await recovery.getByText('Interrupted job saved', { exact: true }).click();
@@ -259,7 +259,7 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
   const paint = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
 
   let baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(complete).toHaveCount(0);
   await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
@@ -312,7 +312,7 @@ test('holds the completion offer behind an open dialog and shows it once that di
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await runMenuCommand(page, 'Tools', 'Labs...');
   const labs = page.getByRole('dialog', { name: 'Labs', exact: true });
@@ -347,7 +347,7 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await acknowledgeExactly(page, kerfdesk, baselineLines, 150);
   const probe = await streamProbe(page);

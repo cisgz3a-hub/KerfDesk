@@ -1,14 +1,21 @@
 // Pure Ruida UDP session state machine (ADR-097 groundwork). Ruida network
 // transport per public research: datagrams to port 50200, each carrying a
 // 2-byte checksum (16-bit sum of the swizzled payload) followed by at most
-// ~1470 payload bytes; the controller answers 0xCC (ACK) or 0xCE (error) per
-// datagram. This module only slices/frames/acks — no sockets — so it is
+// ~1470 payload bytes. The controller answers each datagram with one byte,
+// swizzled with the same magic as the payload: 0xCC (ACK) accepts it and 0xCF
+// (NAK) asks for it again (MeerK40t rdjob.py); 0xCE (ENQ) is a keepalive, not a
+// verdict on the datagram. Comparing the raw wire byte with 0xCC would read
+// every real ACK (0xC6 with magic 0x88) as a failure (controller audit
+// drivers-6). This module only slices/frames/acks — no sockets — so it is
 // fully testable; the Electron UDP socket + IPC bridge that would feed it is
 // NOT built yet, which is why Ruida profiles stay transport:'file-only'.
 
+import { RUIDA_SWIZZLE_MAGIC, unswizzleByte } from './swizzle';
+
 export const RUIDA_UDP_PORT = 50200;
 export const RUIDA_ACK = 0xcc;
-export const RUIDA_ERR = 0xce;
+export const RUIDA_NAK = 0xcf;
+export const RUIDA_ENQ = 0xce;
 const MAX_PAYLOAD_BYTES = 1470;
 
 export type RuidaSessionStatus = 'idle' | 'sending' | 'awaiting-ack' | 'done' | 'errored';
@@ -18,6 +25,9 @@ export type RuidaSessionState = {
   readonly packets: ReadonlyArray<Uint8Array>;
   readonly nextPacket: number;
   readonly retriesLeft: number;
+  /** The swizzle magic of the payload, which the replies share. It varies by
+   *  controller (0x88 for RDC644x; EduTech notes 0x11 for the 634XG). */
+  readonly magic: number;
 };
 
 export type RuidaSessionStep = {
@@ -40,7 +50,10 @@ export function frameDatagram(payload: Uint8Array): Uint8Array {
   return out;
 }
 
-export function createRuidaSession(swizzledJob: Uint8Array): RuidaSessionState {
+export function createRuidaSession(
+  swizzledJob: Uint8Array,
+  magic: number = RUIDA_SWIZZLE_MAGIC,
+): RuidaSessionState {
   const packets: Uint8Array[] = [];
   for (let offset = 0; offset < swizzledJob.length; offset += MAX_PAYLOAD_BYTES) {
     packets.push(frameDatagram(swizzledJob.slice(offset, offset + MAX_PAYLOAD_BYTES)));
@@ -50,6 +63,7 @@ export function createRuidaSession(swizzledJob: Uint8Array): RuidaSessionState {
     packets,
     nextPacket: 0,
     retriesLeft: DEFAULT_RETRIES,
+    magic,
   };
 }
 
@@ -61,11 +75,13 @@ export function stepRuidaSession(state: RuidaSessionState): RuidaSessionStep {
   return { state: { ...state, status: 'awaiting-ack' }, toSend: packet };
 }
 
-/** Consume one controller response byte (ACK/ERR). ERR retries the same
- *  datagram up to the retry budget, then the session is terminal. */
-export function onRuidaResponse(state: RuidaSessionState, byte: number): RuidaSessionStep {
+/** Consume one controller response byte as it arrived on the wire. ACK
+ *  advances; NAK retries the same datagram up to the retry budget, then the
+ *  session is terminal; ENQ and unknown bytes are no verdict and change nothing. */
+export function onRuidaResponse(state: RuidaSessionState, wireByte: number): RuidaSessionStep {
   if (state.status !== 'awaiting-ack') return { state, toSend: null };
-  if (byte === RUIDA_ACK) {
+  const reply = unswizzleByte(wireByte, state.magic);
+  if (reply === RUIDA_ACK) {
     const nextPacket = state.nextPacket + 1;
     const finished = nextPacket >= state.packets.length;
     return {
@@ -78,6 +94,7 @@ export function onRuidaResponse(state: RuidaSessionState, byte: number): RuidaSe
       toSend: null,
     };
   }
+  if (reply !== RUIDA_NAK) return { state, toSend: null };
   if (state.retriesLeft <= 0) {
     return { state: { ...state, status: 'errored' }, toSend: null };
   }

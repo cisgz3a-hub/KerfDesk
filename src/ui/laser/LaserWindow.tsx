@@ -19,6 +19,7 @@ import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
+import { AlarmRecoveryActions } from './AlarmRecoveryActions';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { openMachineSetup } from './device-setup';
@@ -30,6 +31,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { clearStartBlockers } from './start-blocker-invalidation';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useToastStore } from '../state/toast-store';
 import './LaserWindow.css';
 
@@ -86,14 +88,12 @@ export function LaserWindow({
           controllerKind={controllerKind}
           homingEnabled={homingEnabled}
           canUnlock={control.canUnlock}
-          onHome={() => void control.home().catch(() => undefined)}
+          onHome={control.runHome}
           onConfigureHoming={openHomingSetup}
-          onUnlock={() => void control.unlockAlarm().catch(() => undefined)}
+          onUnlock={control.runUnlock}
         />
       )}
-      {controllerDisplay.sleep && (
-        <SleepBanner onWake={() => void control.wakeController().catch(() => undefined)} />
-      )}
+      {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(
@@ -154,14 +154,24 @@ function useControllerActions(): {
   readonly unlockAlarm: ReturnType<typeof useLaserStore.getState>['unlockAlarm'];
   readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
   readonly canUnlock: boolean;
+  // Banner click handlers: a refusal becomes a toast instead of silence.
+  readonly runHome: () => void;
+  readonly runUnlock: () => void;
+  readonly runWake: () => void;
 } {
+  const home = useLaserStore((s) => s.home);
+  const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
+  const wakeController = useLaserStore((s) => s.wakeController);
   return {
     connect: useLaserStore((s) => s.connect),
     disconnect: useLaserStore((s) => s.disconnect),
-    home: useLaserStore((s) => s.home),
-    unlockAlarm: useLaserStore((s) => s.unlockAlarm),
-    wakeController: useLaserStore((s) => s.wakeController),
+    home,
+    unlockAlarm,
+    wakeController,
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
+    runHome: () => void home().catch(controllerActionFailureHandler('Home')),
+    runUnlock: () => void unlockAlarm().catch(controllerActionFailureHandler('Unlock')),
+    runWake: () => void wakeController().catch(controllerActionFailureHandler('Wake')),
   };
 }
 
@@ -310,53 +320,9 @@ function alarmRecoveryAction(
   return action ?? STATUS_ALARM_START_MESSAGE;
 }
 
-function AlarmRecoveryActions(props: {
-  readonly homingEnabled: boolean;
-  readonly canUnlock: boolean;
-  readonly onHome: () => void;
-  readonly onConfigureHoming: () => void;
-  readonly onUnlock: () => void;
-}): JSX.Element {
-  return (
-    <>
-      {props.homingEnabled ? (
-        <button
-          type="button"
-          onClick={props.onHome}
-          title="Send $H. Use this only when the machine has working homing switches."
-        >
-          Home ($H)
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={props.onConfigureHoming}
-          title="Homing is off for this machine. Open Machine Setup to turn on $H homing."
-        >
-          Set up homing
-        </button>
-      )}
-      {!props.homingEnabled && (
-        <span style={alarmHintStyle}>
-          Turn on homing in Machine Setup if this machine has homing switches.
-        </span>
-      )}
-      {props.canUnlock && (
-        <button
-          type="button"
-          onClick={props.onUnlock}
-          title="Send $X to unlock the controller after you have confirmed the machine is safe."
-        >
-          $X — Unlock
-        </button>
-      )}
-    </>
-  );
-}
-
 const panelStyle: React.CSSProperties = {
   // Explicit width + flexShrink: 0 so this rail cannot push the workspace
-  // canvas off-screen when its sub-panels (DeviceSettings, ConsolePanel, etc.)
+  // canvas off-screen when its sub-panels (ConsolePanel, etc.)
   // collectively grow. overflowY scrolls the column internally instead of
   // forcing the parent flexbox to stretch — without this, on a narrower
   // window the canvas (flex:1, minWidth:0) collapses to zero.
@@ -385,4 +351,3 @@ const sleepStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 const alarmDetailStyle: React.CSSProperties = { margin: '4px 0' };
-const alarmHintStyle: React.CSSProperties = { display: 'block', fontSize: 11, lineHeight: 1.3 };

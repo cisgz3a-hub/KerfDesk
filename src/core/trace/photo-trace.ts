@@ -1,17 +1,12 @@
 // A photograph's tone is represented by filled vector area, without a binary
 // threshold or a colour palette. Vertical ribbons vary in width along their
 // length; horizontal fill scanlines therefore retain even very light shades.
-import {
-  polylineToCurveSubpath,
-  type ColoredPath,
-  type CurveSubpath,
-  type Polyline,
-  type Vec2,
-} from '../scene';
+import { type ColoredPath } from '../scene';
 import { finiteOr } from '../util';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { isValidRawImageData, type RawImageData, type TraceOptions } from './trace-image';
 import type { TraceSteps } from './trace-steps';
+import { photoRibbonsSteps, type PhotoGrid } from './photo-ribbons';
 
 const DEFAULT_PHOTO_DETAIL = 60;
 const MIN_BANDS = 48;
@@ -19,34 +14,19 @@ const MAX_BANDS = 320;
 const SAMPLES_PER_BAND = 2;
 const CHECKPOINT_PIXELS = 16384;
 
-type PhotoGrid = { readonly columns: number; readonly rows: number };
-
 export function* traceImageToPhotoPathsSteps(
   image: RawImageData,
   options: TraceOptions,
 ): TraceSteps<ColoredPath[]> {
-  const cooperate = yield;
+  yield;
   if (!isValidRawImageData(image)) return [];
   const grid = photoGrid(image, options.photoDetail);
   const darkness = yield* sampleDarknessSteps(image, grid, photoToneLookup(options));
-  const polylines: Polyline[] = [];
-  const curves: CurveSubpath[] = [];
-  for (let x = 0; x < grid.columns; x += 1) {
-    let y = 0;
-    while (y < grid.rows) {
-      if ((darkness[y * grid.columns + x] ?? 0) === 0) {
-        y += 1;
-        continue;
-      }
-      const start = y;
-      while (y < grid.rows && (darkness[y * grid.columns + x] ?? 0) > 0) y += 1;
-      const ribbon = photoRibbon(image, grid, darkness, x, start, y);
-      polylines.push(ribbon);
-      curves.push(polylineToCurveSubpath(ribbon));
-    }
-    if (cooperate) yield;
-  }
-  return polylines.length === 0 ? [] : [{ color: '#000000', polylines, curves }];
+  const polylines =
+    (yield* photoRibbonsSteps(image, grid, darkness, true)) ??
+    (yield* photoRibbonsSteps(image, grid, darkness, false)) ??
+    [];
+  return polylines.length === 0 ? [] : [{ color: '#000000', polylines }];
 }
 
 function photoGrid(image: RawImageData, requestedDetail: number | undefined): PhotoGrid {
@@ -142,44 +122,4 @@ function adjustedChannel(
     ? Math.max(0, Math.min(255, Math.round(255 - (255 - value) / alpha)))
     : value;
   return tone[straight * 4] ?? 0;
-}
-
-function photoRibbon(
-  image: RawImageData,
-  grid: PhotoGrid,
-  darkness: Float64Array,
-  column: number,
-  start: number,
-  end: number,
-): Polyline {
-  const left: Vec2[] = [];
-  const right: Vec2[] = [];
-  const minX = (column * image.width) / grid.columns;
-  const maxX = ((column + 1) * image.width) / grid.columns;
-  const centerX = (minX + maxX) / 2;
-  for (let boundary = start; boundary <= end; boundary += 1) {
-    const before = darkness[Math.max(start, boundary - 1) * grid.columns + column] ?? 0;
-    const after = darkness[Math.min(end - 1, boundary) * grid.columns + column] ?? 0;
-    const halfWidth = ((before + after) * (maxX - minX)) / 4;
-    const y = (boundary * image.height) / grid.rows;
-    appendStraightened(left, { x: Math.max(minX, centerX - halfWidth), y });
-    appendStraightened(right, { x: Math.min(maxX, centerX + halfWidth), y });
-  }
-  // Averaged internal boundary widths plus unchanged endpoint widths have
-  // exactly the same integral as the sampled cells. White cells split runs
-  // above, so interpolation never bridges a completely white gap.
-  return { points: [...left, ...right.reverse()], closed: true };
-}
-
-function appendStraightened(points: Vec2[], point: Vec2): void {
-  const a = points[points.length - 2];
-  const b = points[points.length - 1];
-  if (a !== undefined && b !== undefined) {
-    const cross = (b.x - a.x) * (point.y - b.y) - (b.y - a.y) * (point.x - b.x);
-    if (Math.abs(cross) < 1e-12) {
-      points[points.length - 1] = point;
-      return;
-    }
-  }
-  points.push(point);
 }

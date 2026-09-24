@@ -21,6 +21,24 @@ type FireRuntime = { requestToken: number; activationPending: boolean };
 
 const FIRE_OFF_COMMAND = 'M5\n';
 
+/**
+ * In GRBL laser mode ($32=1) only a G1/G2/G3 block may energize the laser:
+ * any other motion mode sets GC_PARSER_LASER_DISABLE and the M3 is synced at
+ * power 0 (gnea/grbl gcode.c; grblHAL's motion_is_lasercut applies the same
+ * rule). The modal state is G0 after power-up, a soft reset, Home and every
+ * KerfDesk job, so a bare `M3 S<n>` lit nothing while the UI showed ON.
+ * Naming G1 in the block without axis words selects a lasercut mode without
+ * moving. The F word is required because an explicit G1 with the feed still
+ * undefined (F0 after reset) is rejected with error:22. With $32=0 the same
+ * block is an ordinary spindle-on.
+ * https://github.com/gnea/grbl/blob/master/grbl/gcode.c
+ * https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode
+ */
+function fireOnCommand(powerS: number, feedMmPerMin: number): string {
+  const feed = Math.max(1, Math.round(feedMmPerMin));
+  return `G1 F${feed} M3 S${powerS}\n`;
+}
+
 export function fireActions(
   set: SetFn,
   get: GetFn,
@@ -83,7 +101,7 @@ async function activateFire(
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
   }));
   try {
-    await safeWrite(`M3 S${powerS}\n`, 'fire', 'console');
+    await safeWrite(fireOnCommand(powerS, device.framingFeedMmPerMin), 'fire', 'console');
     if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {
       // Same latch rule as deactivateFire: this compensating M5 may race a
       // failed release write, so only a successful write may clear the latch.

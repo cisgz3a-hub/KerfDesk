@@ -33,6 +33,7 @@ import { completeFramedRunCandidateForTest } from '../framed-run-testing';
 import { prepareCurrentStartJob } from '../start-job-source';
 import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
+import { runFrameNow } from '../use-frame-action';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
 import { captureJobReviewModels } from './testing';
@@ -205,7 +206,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     useLaserStore.setState({ detectedControllerKind: 'marlin' });
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -227,7 +227,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     const capture = captureJobReviewModels();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -256,7 +255,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
 
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -278,12 +276,12 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     capture.stop();
   });
 
-  // ADR-237: the first Start press Frames dialog-free; the single Job Review
-  // opens on the next press against the review-pending permit.
+  // ADR-237: Frame runs dialog-free; the single Job Review opens when Start is
+  // pressed against the review-pending permit. Start never Frames on its own.
 
   it('cancel closes the review with zero side effects', async () => {
     const repository = recoveryHarness();
-    await runStartJobFlow(repository);
+    await runFrameNow();
     expect(frameSpy()).toHaveBeenCalledTimes(1);
     expect(reviewState().kind).toBe('idle');
 
@@ -302,12 +300,12 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });
 
-  it('Frames dialog-free on the first press, then reviews and starts those exact CNC bytes', async () => {
+  it('Frames dialog-free, then Start reviews and starts those exact CNC bytes', async () => {
     configureReadyCncStart();
     const repository = recoveryHarness();
     const capture = captureJobReviewModels();
 
-    await runStartJobFlow(repository);
+    await runFrameNow();
 
     expect(capture.models).toHaveLength(0);
     expect(frameSpy()).toHaveBeenCalledTimes(1);
@@ -341,7 +339,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
   it('does not stream a CNC program when the review is cancelled', async () => {
     configureReadyCncStart();
     const repository = recoveryHarness();
-    await runStartJobFlow(repository);
+    await runFrameNow();
 
     const flow = runStartJobFlow(repository);
     await vi.waitFor(() => expect(reviewState().kind).toBe('open'));
@@ -354,7 +352,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
   it('an in-review edit voids the framed permit; re-Framing streams the edited bytes', async () => {
     configureReadyCncStart();
     const repository = recoveryHarness();
-    await runStartJobFlow(repository);
+    await runFrameNow();
     expect(useLaserStore.getState().framedRun).not.toBeNull();
 
     const flow = runStartJobFlow(repository);
@@ -384,7 +382,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     await flow;
     expect(startSpy()).not.toHaveBeenCalled();
 
-    await runStartJobFlow(repository);
+    await runFrameNow();
     expect(frameSpy()).toHaveBeenCalledTimes(2);
 
     const secondReview = runStartJobFlow(repository);
@@ -408,7 +406,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
 
   it('a refused re-prepare blocks Confirm in place until the operator fixes it', async () => {
     const repository = recoveryHarness();
-    await runStartJobFlow(repository);
+    await runFrameNow();
 
     const flow = runStartJobFlow(repository);
     await vi.waitFor(() => expect(reviewState().kind).toBe('open'));
@@ -439,7 +437,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     await flow;
     expect(startSpy()).not.toHaveBeenCalled();
 
-    await runStartJobFlow(repository);
+    await runFrameNow();
     expect(frameSpy()).toHaveBeenCalledTimes(2);
 
     const retry = runStartJobFlow(repository);
