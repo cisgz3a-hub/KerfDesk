@@ -13,6 +13,11 @@ import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { buildCanvasMotionPlan, mapControllerPointToScene } from '../state/canvas-motion-plan';
 import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
 import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
+import {
+  createStartIntent,
+  START_INTENT_INTERRUPTION_MESSAGE,
+  startIntentStandInArtifact,
+} from '../state/recovery/start-intent';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 
 // React DOM's test renderer reads this conventional global. The optional
@@ -54,14 +59,22 @@ describe('LaserRecoveryReviewDialog', () => {
     expect(capsule).toEqual(original);
   });
 
-  it('makes a legacy record limitation explicit without importing anything', () => {
+  // ADR-337: a Start stand-in has the migrated checkpoint's kind, so one copy
+  // must be true for both and must not call either record old.
+  it.each([
+    { source: 'a migrated checkpoint', capsule: legacyCapsule },
+    { source: 'a Start stand-in', capsule: standInCapsule },
+  ])('makes the limitation of $source explicit without importing anything', ({ capsule }) => {
     const onStart = vi.fn(async () => false);
-    renderDialog(legacyCapsule(), vi.fn(), onStart);
+    renderDialog(capsule(), vi.fn(), onStart);
 
-    expect(host?.textContent).toContain('Legacy fingerprint-only record');
-    expect(host?.textContent).toContain('does not contain the exact emitted G-code');
+    expect(host?.textContent).toContain('Fingerprint-only record');
+    expect(host?.textContent).toContain(
+      'holds only the program fingerprint, not the exact emitted G-code',
+    );
     expect(host?.textContent).toContain('current project compiles to the same fingerprint');
     expect(host?.textContent).toContain('Nothing is imported into the open project automatically');
+    expect(host?.textContent).not.toMatch(/\b(?:older|migrated|legacy)\b/i);
     expect(onStart).not.toHaveBeenCalled();
   });
 
@@ -319,6 +332,29 @@ function legacyCapsule(): RecoveryCapsule {
       message: 'Controller greeting received during the job',
     },
     updatedAtIso: '2026-07-15T09:00:00.000Z',
+    artifact,
+  };
+}
+
+/** The capsule crash reconciliation writes when the app died before a fresh
+ * Start's archive was stored (ADR-337). */
+function standInCapsule(): RecoveryCapsule {
+  const armedAtIso = '2026-09-24T09:00:00.000Z';
+  const intent = createStartIntent({
+    gcode: 'G0 X1 Y1\nM3 S500\nG1 X9 Y9 F1200\nM5\n',
+    machineKind: 'laser',
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    nowIso: armedAtIso,
+  });
+  const artifact = startIntentStandInArtifact('run-stand-in-laser', intent, armedAtIso);
+  return {
+    runId: artifact.runId,
+    artifactKind: artifact.kind,
+    revision: 1,
+    ackedLines: 0,
+    sendableLines: artifact.sendableLines,
+    interruption: { kind: 'unknown', message: START_INTENT_INTERRUPTION_MESSAGE },
+    updatedAtIso: armedAtIso,
     artifact,
   };
 }

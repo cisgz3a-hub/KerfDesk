@@ -58,6 +58,11 @@ export function cncPassRecoveryDefaultPoint(capsule: RecoveryCapsule): CncResume
   });
 }
 
+/** Why pass recovery refuses a fingerprint-only record: a migrated checkpoint
+ * or an ADR-337 Start stand-in. Shared by the wizard and its flow. */
+export const FINGERPRINT_ONLY_PASS_RECOVERY_REASON =
+  'This fingerprint-only record has no sealed prepared job, so pass recovery cannot use it. Use the advanced mid-pass runway review instead; it continues only if the current project compiles to the same fingerprint.';
+
 export function buildCncPassRecoveryModel(
   capsule: RecoveryCapsule,
   liveWco: WorkCoordinateOffset | null,
@@ -67,11 +72,7 @@ export function buildCncPassRecoveryModel(
     return { kind: 'unavailable', reason: 'The retained checkpoint is not a CNC job.' };
   }
   if (artifact.kind !== 'exact-execution') {
-    return {
-      kind: 'unavailable',
-      reason:
-        'This migrated fingerprint-only record has no sealed prepared job. Use the legacy recovery review instead.',
-    };
+    return { kind: 'unavailable', reason: FINGERPRINT_ONLY_PASS_RECOVERY_REASON };
   }
   const resumePoint = cncPassRecoveryDefaultPoint(capsule);
   const spans = deriveCncArtifactPassSpans(artifact);

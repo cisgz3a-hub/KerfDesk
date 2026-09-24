@@ -150,6 +150,8 @@ function RecoveryDescription({
   readonly claimActive: boolean;
 }): JSX.Element {
   const startedAt = formatStartedAt(capsule.artifact.createdAtIso);
+  // A fingerprint-only record is a migrated checkpoint or an ADR-337 Start
+  // stand-in, so this copy never calls it older, migrated or legacy.
   const exact = capsule.artifact.kind === 'exact-execution';
   return (
     <div role="status">
@@ -161,7 +163,7 @@ function RecoveryDescription({
       <p style={textStyle}>
         {exact
           ? 'Review uses the sealed exact G-code and prepared execution artifact. Archived controller observations are diagnostics only.'
-          : 'This migrated legacy record contains only a fingerprint. Explicit review may use the current project only when its compiled fingerprint matches.'}
+          : 'This record holds only the program fingerprint, not the exact G-code. Recovery may use the current project only when it compiles to the same fingerprint.'}
       </p>
       <p style={causeStyle}>
         <strong>Recorded cause:</strong> {capsule.interruption.message}

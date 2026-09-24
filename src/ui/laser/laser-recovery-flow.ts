@@ -314,7 +314,7 @@ async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecover
   if (source === null) return null;
   if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
     jobAwareAlert(
-      'Cannot start legacy laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
+      'Cannot start laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
     );
     return null;
   }
