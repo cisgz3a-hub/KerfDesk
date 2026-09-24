@@ -22,7 +22,7 @@ for (const viewport of viewports) {
     await expectWithinViewport(page, panels);
     await expectWithinViewport(page, page.getByRole('region', { name: 'Job actions' }));
     await expectWithinViewport(page, page.getByRole('button', { name: 'Frame job', exact: true }));
-    await expectWithinViewport(page, page.getByRole('button', { name: 'Set up & Frame' }));
+    await expectWithinViewport(page, page.getByRole('button', { name: 'Start', exact: true }));
     await expectWithinViewport(page, page.getByRole('group', { name: 'Workspace status details' }));
     const canvas = await page.getByLabel('KerfDesk workspace', { exact: true }).boundingBox();
     expect(canvas?.width).toBeGreaterThan(viewport.width * 0.5);

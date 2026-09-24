@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { FRAME_JOB_FIRST_MESSAGE } from './framed-run-readiness';
 import { useStartBlockerStore } from './start-blocker-store';
 import { installJobShortcuts } from './use-job-shortcuts';
 
@@ -145,7 +147,6 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
   });
 
   it('Ctrl+Enter claims the event when connected and idle', async () => {
-    vi.useFakeTimers();
     patchLaserStore({
       streamer: null,
       connection: { kind: 'connected' },
@@ -162,15 +163,15 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
       });
       window.dispatchEvent(event);
 
-      // The flow runs and (with an empty scene / unknown status) records the
-      // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
-      // With no status yet, the Frame first asks the controller for one.
+      // The flow runs and, with no completed Frame, says to Frame first instead
+      // of framing - proving the shortcut reached runStartJobFlow (ADR-372).
       expect(event.defaultPrevented).toBe(true);
-      await vi.advanceTimersByTimeAsync(3_500);
-      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0);
+      await vi.waitFor(() =>
+        expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE),
+      );
+      expect(useStartBlockerStore.getState().messages).toEqual([]);
     } finally {
       uninstall();
-      vi.useRealTimers();
     }
   });
 

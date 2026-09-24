@@ -82,7 +82,7 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
       performance.now();
   });
   await page.getByRole('button', { name: 'Frame job', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled({
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({
     timeout: 240_000,
   });
   const frameMs = Date.now() - frameStarted;
@@ -98,7 +98,7 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   }
 
   const startClicked = Date.now();
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   const review = page.getByRole('dialog', { name: 'Review job before starting' });
   await expect(review).toBeVisible({ timeout: 240_000 });
   const reviewMs = Date.now() - startClicked;

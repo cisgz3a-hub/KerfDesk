@@ -97,7 +97,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
-- **Job actions dock**: Frame and the primary **Set up & Frame** / **Start framed job** action sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
+- **Job actions dock**: **Frame job** and the primary **Start** action (greyed out until a clean Frame of the exact job completes) sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
 - **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
@@ -671,8 +671,8 @@ other preflight finding is an advisory reported after a successful save.
 
 For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
 seven compile-integrity codes cover unproducible or unstreamable output. Pressing
-Frame, or pressing Start without a live exact permit, prepares the candidate and
-runs the physical tool-off Frame dialog-free. Calculated bed bounds, configured
+Frame prepares the candidate and runs the physical tool-off Frame dialog-free;
+Start stays greyed out until that Frame completes and never runs one (ADR-372). Calculated bed bounds, configured
 no-go zones, and live output-setting findings travel with that exact candidate;
 they surface as warnings when the operator presses Start on the review-pending
 permit after a clean Frame. They do not refuse Frame or Start. The actual
@@ -1110,9 +1110,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. With no live exact permit, the ordinary primary action reads **Set up & Frame**. The user clicks
-   it while connected and idle (or invokes Cmd/Ctrl+Return). The separate **Frame job** button runs
-   the same dialog-free prepare-and-Frame path.
+1. With no live exact permit, the primary **Start** action is greyed out and the status line reads
+   **Not framed — Frame this job to unlock Start** (or why the last Frame expired). The user clicks
+   **Frame job** while connected and idle; it runs the dialog-free prepare-and-Frame path. Start
+   never launches a Frame itself, and Cmd/Ctrl+Return with no permit only says to Frame first
+   (ADR-372).
 2. App prepares the exact program and runs F-A10. A factual compile-integrity, construction-input,
    or transport failure stops before Frame and reports its fix; policy findings do not. Job Review
    does not open. Calculated bounds, no-go, controller-setting, and other advisory findings travel
@@ -1122,11 +1124,14 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
    acknowledgement and the controller must reach final clean Idle without interruption or spatial
    session/origin drift. Advisory settings and build-info observations may refresh.
-4. Clean completion issues a one-run, review-pending `FramedRunPermit`. The controls read **Ready to
-   start — framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
-   one-use. Any project, output-scope, placement, or registration edit, Jog, Home,
-   origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
-5. The user clicks **Start framed job**. The app opens the single **Job Review** dialog (ADR-224,
+4. Clean completion issues a one-run, review-pending `FramedRunPermit` and enables **Start**. The
+   controls read **Ready to start — framed job unchanged**, **Start**, and **Frame again**. For a
+   split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
+   never cancels that program. The permit is exact and one-use. Any project,
+   output-scope, placement, or registration edit, Jog, Home, origin/probe/reset/disconnect, or
+   controller drift expires it and greys Start out again, with the reason in the status line.
+   Camera-only UI state does not.
+5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237) against the permit's exact prepared program plus current controller state; it neither
    recompiles nor streams before confirmation. A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
@@ -1221,7 +1226,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Edge — cancel the review
 1. **Cancel** or Escape sends no job bytes. If the exact artifact and evidence remain current, the
-   review-pending permit stays armed so the operator may press **Start framed job** and review it
+   review-pending permit stays armed so the operator may press **Start** and review it
    again. Edits already made in review are ordinary project edits and are kept (undo applies as
    usual); an edit that changes the exact artifact invalidates the permit and requires Frame again.
 2. If Frame preparation selected G54 from an original G55-G59, cancelling the later Start-time
@@ -1938,7 +1943,7 @@ their archive before transmission.
    that no physical motion occurred.
 
 #### Start, recovery, replay, and discard are separate intents
-1. Ordinary **Set up & Frame**, **Start framed job**, and Ctrl+Return ignore
+1. Ordinary **Frame job**, **Start**, and Ctrl+Return ignore
    archived recovery records and use the current project's exact-artifact flow
    from line 1. Merely showing, opening, or closing recovery cannot import
    archived G-code, settings, origins, or controller observations into the live
@@ -2013,7 +2018,7 @@ their archive before transmission.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
+   stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
@@ -2746,8 +2751,8 @@ row of the hardware status table in `docs/architecture/08-invariants-and-verific
 For a device profile with Homing disabled, a newly created or opened project
 starts in **User Origin** (2026-07-16 maintainer amendment; previously Current
 Position): User Origin cannot resolve placement until an origin exists, so the
-default flow is position the head, **Set origin here**, **Set up & Frame**, then
-**Start framed job**. The missing origin is a factual placement/compile input;
+default flow is position the head, **Set origin here**, **Frame job**, then
+**Start**. The missing origin is a factual placement/compile input;
 every ordinary placement mode still requires the exact completed Frame. The machine panel
 offers two positioning paths (per ADR-225 the **Position job** card sits last
 on the rail, below the job actions, as the hand-placement fallback):
