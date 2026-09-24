@@ -43,7 +43,6 @@ function secondPassClaim(executionSignature: string, chainStage: LaserSecondPass
 function authorize(claim: FramedRunStartClaim) {
   return currentLaserForAuthorizedStartNow({
     preparedAgainst: useLaserStore.getState(),
-    checkpointToReplace: null,
     completedReceipt: null,
     expectedExecutionSignature: claim.permit.candidate.executionSignature,
     repository: {} as unknown as RecoveryRepository,

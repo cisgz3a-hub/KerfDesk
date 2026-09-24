@@ -66,7 +66,6 @@ async function openReviewWithLongLine(): Promise<{
       prepared: { ...prepared, gcode: LONG_SENDABLE_LINE },
       laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     },
-    checkpointToReplace: null,
     completedReceipt: null,
     purpose: 'start',
   });

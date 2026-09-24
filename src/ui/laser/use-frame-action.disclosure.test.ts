@@ -21,7 +21,6 @@ vi.mock('./job-review', () => ({
 
 type ReviewGateArgs = {
   readonly initial: ReviewedStartBundle;
-  readonly checkpointToReplace: null;
   readonly completedReceipt: null;
   readonly purpose?: 'start' | 'frame';
 };

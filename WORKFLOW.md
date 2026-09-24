@@ -1846,9 +1846,11 @@ authorization, Frame proof, controller command, or safety boundary.
   No physical result, browser-minimisation behaviour or Falcon qualification follows from
   the software tests alone.
 
-While a job streams, the app owns an immutable exact execution artifact in
-IndexedDB plus a small `activeRun` slot keyed by a unique run ID. Progress is
-updated every 25 acknowledgements and at state transitions. Interruption moves
+Once a streaming run is activated, the app owns an immutable exact execution
+artifact in IndexedDB plus a small `activeRun` slot keyed by a unique run ID; a
+fresh Start is activated only after the controller accepts the program and its
+archive is stored (ADR-337). Progress is then updated every 25 acknowledgements
+and at state transitions. Interruption moves
 that run into the single newest recovery capsule; clean settled Idle creates a
 separate exact replay receipt.
 
@@ -1859,9 +1861,11 @@ archive reads, and export decoding fail closed on tampering. Explicit schema-1 h
 migration-only and never authorizes a downgraded current artifact.
 Progress checkpoints update the verified in-memory record only when the IndexedDB transaction began
 from the same generation/revision/run; a cross-window change forces an authoritative slot refresh
-and hydrates only new or unverified artifacts. Combined raster archive data is capped at 32 MiB
-before a streamed row provider is called, and the complete artifact is bounded by a conservative
-64 MiB allocation-free estimate including G-code and embedded project data. A larger job may still
+and hydrates only new or unverified artifacts. A raster with a streamed row provider is archived as
+a deterministic `prepared-project` recipe without calling the provider; recovery rebuilds the
+provider from the archived project and refuses unless the re-emitted program matches the archived
+G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
+including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
 warning. Durable activation reuses the artifact verified before transmission, so no full artifact
 clone/hash runs after the first controller bytes are accepted.
@@ -1878,9 +1882,10 @@ clone/hash runs after the first controller bytes are accepted.
 4. Review is a read-only sandbox until its final Start action. Opening, closing,
    or cancelling it cannot change the canvas, project/profile, controller
    settings, origins, Work Z, G-code, or recovery ownership.
-5. Laser Review uses the capsule's exact archived G-code. A migrated legacy
-   fingerprint-only record alone may use the explicitly named current-project
-   fingerprint fallback.
+5. Laser Review uses the capsule's exact archived G-code. Only a fingerprint-only
+   record may use the explicitly named current-project fingerprint fallback: a
+   migrated legacy checkpoint, or the stand-in for a fresh Start whose app closed
+   or crashed before its archive was stored (ADR-337).
    The archived program remains the source of truth, while the generated
    re-entry hard-offs with `M5`/`S0`, repositions without power, and restores
    positive power only on actual burn motion. The live session's `$32` evidence
@@ -1935,8 +1940,9 @@ clone/hash runs after the first controller bytes are accepted.
 1. Exact capsules do not depend on the current project and therefore cannot fail
    merely because the open canvas changed. Artifact integrity or archived
    semantic-manifest mismatch refuses before any controller command.
-2. A migrated legacy fingerprint-only capsule may refuse when the current project,
-   scope, or resolved placement no longer compiles to the archived fingerprint.
+2. A fingerprint-only capsule (a migrated legacy checkpoint or an ADR-337 Start
+   stand-in) may refuse when the current project, scope, or resolved placement
+   no longer compiles to the archived fingerprint.
 
 #### Edge — controller lost power too
 1. Acknowledged lines may include a buffer's worth GRBL never executed; the

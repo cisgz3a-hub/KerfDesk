@@ -8,7 +8,6 @@
 // produces the same LaserModeStartEvidence / CncSetupAttestation objects
 // the transmission layer already consumes.
 
-import type { JobCheckpoint } from '../../../core/recovery';
 import { streamingModeForController } from '../../../core/devices';
 import { machineKindOf, type OutputScope } from '../../../core/scene';
 import { useStore } from '../../state';
@@ -25,7 +24,6 @@ import { useLaserStore } from '../../state/laser-store';
 import type { LastCompletedReceipt } from '../../state/recovery';
 import { confirmCncSetup } from '../cnc-setup-acknowledgement';
 import { confirmLaserModeStartEvidence } from '../laser-mode-start-acknowledgement';
-import { checkpointProgramIssue } from '../start-job-checkpoint-policy';
 import {
   COMPLETED_REPLAY_CHANGED_MESSAGE,
   currentReplayExecutionSignature,
@@ -76,7 +74,6 @@ export type ConfirmedJobReview = {
 
 export async function runJobReviewGate(args: {
   readonly initial: ReviewedStartBundle;
-  readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly purpose?: JobReviewPurpose;
   readonly onCompletedReplayChanged?: () => Promise<void> | void;
@@ -98,7 +95,6 @@ export async function runJobReviewGate(args: {
       // stale bytes or stale live evidence.
       useJobReviewStore.getState().beginPrepare();
       const rebuilt = await rebuildReviewedStart(
-        args.checkpointToReplace,
         args.completedReceipt,
         purpose,
         current,
@@ -336,13 +332,12 @@ function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: fal
   return false;
 }
 
-// Mirrors the pre-review sequence of runStartJobFlowWithCheckpoint against
+// Mirrors the pre-review sequence of runStartJobFlowWithReceipt against
 // the LIVE store state, minus its side effects: a refusal here becomes an
 // in-dialog blocker (the same edit would refuse Start today) and never
 // writes the StartBlocker store or discards receipts — Cancel after a failed
 // rebuild must leave the app exactly as the operator found it.
 async function rebuildReviewedStart(
-  checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
   purpose: JobReviewPurpose,
   previousBundle: ReviewedStartBundle,
@@ -352,7 +347,6 @@ async function rebuildReviewedStart(
   return purpose === 'laser-second-pass'
     ? refreshFrozenReview(previousBundle)
     : rebuildCurrentStart(
-        checkpointToReplace,
         completedReceipt,
         purpose,
         previousBundle,
@@ -362,7 +356,6 @@ async function rebuildReviewedStart(
 }
 
 async function rebuildCurrentStart(
-  checkpointToReplace: JobCheckpoint | null,
   completedReceipt: LastCompletedReceipt | null,
   purpose: JobReviewPurpose,
   previousBundle: ReviewedStartBundle,
@@ -404,8 +397,6 @@ async function rebuildCurrentStart(
     await onCompletedReplayChanged?.();
     return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
   }
-  const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
-  if (programIssue !== null) return { ok: false, messages: [programIssue] };
   return { ok: true, bundle };
 }
 
