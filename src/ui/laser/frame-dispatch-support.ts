@@ -112,7 +112,7 @@ export function frameVerificationBounds(
 }
 
 export function reportFrameRefusal(messages: ReadonlyArray<string>): void {
-  reportStartBlockers(messages);
+  reportStartBlockers(messages, 'frame');
   useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
 }
 

@@ -1957,7 +1957,9 @@ clone/hash runs after the first controller bytes are accepted.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream); the blocked-Start dialog offers Unlock/Home in place.
+   stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
+   Alarm (ADR-364); after Unlock the operator sets the origin again, since Unlock does not
+   restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,

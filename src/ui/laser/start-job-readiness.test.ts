@@ -337,7 +337,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.messages).toContain(
-        'Controller status is not known yet. Wait for an Idle status report before starting.',
+        'The controller has not reported its status. Check that it is powered and connected, then try again. If it still does not report, disconnect and reconnect.',
       );
     }
   });
@@ -350,13 +350,19 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages).toContain('Machine must be Idle before starting (currently Run).');
+      expect(result.messages).toContain(
+        'Machine must be Idle first (currently Run). Wait for it to finish and report Idle, then try again.',
+      );
     }
   });
 
-  it.each(['Hold', 'Jog', 'Home'] satisfies GrblState[])(
-    'blocks Start while the controller reports %s',
-    (state) => {
+  it.each([
+    ['Hold', 'Release the feed hold with cycle start on the machine, then try again.'],
+    ['Jog', 'Wait for it to finish and report Idle, then try again.'],
+    ['Home', 'Wait for it to finish and report Idle, then try again.'],
+  ] satisfies ReadonlyArray<readonly [GrblState, string]>)(
+    'blocks Start while the controller reports %s and names the remedy',
+    (state, remedy) => {
       const result = prepareStartJob(calibratedProject(), readyController, {
         ...readyMachine,
         statusReport: { ...idleStatus, state },
@@ -365,7 +371,7 @@ describe('prepareStartJob', () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.messages).toContain(
-          `Machine must be Idle before starting (currently ${state}).`,
+          `Machine must be Idle first (currently ${state}). ${remedy}`,
         );
       }
     },
@@ -381,7 +387,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.messages).toContain(
-        'Controller is in alarm state. Clear the alarm before starting.',
+        'Controller is in Alarm. Home it if the machine has homing switches, or Unlock it once the head is safe, then try again.',
       );
     }
   });
