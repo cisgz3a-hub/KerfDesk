@@ -6,12 +6,8 @@
 // constructors use consistent literal-shape orderings, so output is
 // byte-deterministic given a byte-deterministic Project.
 
-import {
-  compactLineGeometry,
-  polylineToCurveSubpath,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
+import { polylineToCurveSubpath, type Project, type SceneObject } from '../../core/scene';
+import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
 import { stringifyProjectJson } from './stringify-project-json';
 
 export function serializeProject(

@@ -87,7 +87,6 @@ export {
   polylineToCurveSubpath,
   transformCurveSubpathUniform,
 } from './curve-path';
-export { compactLineGeometry } from './compact-line-geometry';
 export {
   breakCurveAtNode,
   cornerCurveNode,
