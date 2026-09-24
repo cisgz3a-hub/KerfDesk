@@ -312,7 +312,7 @@ export async function recoverAndComplete(h: StressHarness, runId: string): Promi
   if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
   const gcode = capsule.artifact.gcode;
   const resumeLine = rawResumeLine(gcode, capsule.ackedLines);
-  const expected = buildLaserResumeProgram(gcode, resumeLine);
+  const expected = buildLaserResumeProgram(gcode, resumeLine, useStore.getState().project.device);
   if (expected.kind !== 'ok') throw new Error(expected.reason);
   const expectedSent = expected.lines.filter(isSendableGcodeLine);
   // The resume point sits exactly after the acknowledged sendable lines.

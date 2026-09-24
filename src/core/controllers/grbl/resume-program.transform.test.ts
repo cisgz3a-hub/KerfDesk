@@ -36,9 +36,10 @@ function resume(gcode: string, fromLine: number, transform?: LaserResumeTransfor
   return result;
 }
 
-describe('laser resume transform 2 (current)', () => {
-  it('is the transform new resumes use', () => {
-    expect(LASER_RESUME_TRANSFORM_VERSION).toBe(2);
+describe('laser resume transform 2', () => {
+  it('builds what new resumes of GRBL-family programs build', () => {
+    // Transform 3 changed only Smoothieware and Marlin programs (ADR-364).
+    expect(LASER_RESUME_TRANSFORM_VERSION).toBe(3);
     expect(resume(RASTER_WITH_AIR, 7).lines).toEqual(resume(RASTER_WITH_AIR, 7, 2).lines);
   });
 

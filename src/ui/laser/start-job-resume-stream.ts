@@ -1,4 +1,5 @@
-import { buildResumeProgram, type ResumeProgramResult } from '../../core/controllers/grbl';
+import { buildResumeProgram } from '../../core/controllers/grbl';
+import { laserResumeDialectForDevice } from '../../core/controllers/grbl/laser-resume-dialect';
 import { streamingModeForController } from '../../core/devices';
 import { markResumeInFlight, type JobCheckpoint } from '../../core/recovery';
 import { machineKindOf, type Project } from '../../core/scene';
@@ -14,7 +15,6 @@ import { useLaserStore } from '../state/laser-store';
 import { recoveryRepository } from '../state/recovery';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
-import { laserResumeDialectRefusal } from './laser-resume-program';
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
@@ -153,7 +153,7 @@ function reviewResume(
   readonly resumeGcode: string;
   readonly laserModeStartEvidence: Exclude<ReturnType<typeof confirmLaserModeStartEvidence>, null>;
 } | null {
-  const resume = buildProjectResume(project, gcode, fromLine);
+  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
@@ -177,21 +177,8 @@ function reviewResume(
   return jobAwareConfirm(question) ? { resumeGcode, laserModeStartEvidence } : null;
 }
 
-// A laser program in a dialect the builder cannot restore power for is
-// refused before anything is built (laserResumeDialectRefusal).
-function buildProjectResume(
-  project: Project,
-  gcode: string,
-  fromLine: number,
-): ResumeProgramResult {
-  const dialectRefusal =
-    machineKindOf(project.machine) === 'laser'
-      ? laserResumeDialectRefusal(project.device.controllerKind)
-      : null;
-  if (dialectRefusal !== null) return { kind: 'error', reason: dialectRefusal };
-  return buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
-}
-
+// The project emitted `gcode`, so its device names the power commands the
+// resume re-arms the beam with (ADR-364).
 function resumeBuildOptions(project: Project) {
   const machine = project.machine;
   return {
@@ -199,5 +186,6 @@ function resumeBuildOptions(project: Project) {
     safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
     spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
     plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
+    laserDialect: laserResumeDialectForDevice(project.device),
   } as const;
 }
