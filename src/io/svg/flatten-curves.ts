@@ -4,8 +4,9 @@
 // of C/c, S/s, Q/q, T/t, A/a commands.
 //
 // Tolerance: max distance from curve to straight chord. Smaller → more
-// segments, smoother curve. Default 0.25 mm matches LightBurn's "smooth"
-// import preset on a typical bed.
+// segments, smoother curve. The 0.25 mm default shapes import-time display
+// polylines; job compilation re-flattens native curves at the much finer
+// DEFAULT_MACHINE_CURVE_TOLERANCE_MM (compilation-polylines.ts).
 
 import type { Vec2 } from '../../core/scene';
 
