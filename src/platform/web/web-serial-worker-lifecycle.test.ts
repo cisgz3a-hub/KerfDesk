@@ -1,16 +1,18 @@
 // @vitest-environment node
 //
-// The worker-hosted transport (ADR-334) end to end: the production webSerial
-// adapter, a Worker whose boundary is a real MessageChannel (so the port's
-// streams are genuinely TRANSFERRED, and the originals stay locked by the
-// spec's transfer pipes exactly as in Chromium), the real worker core, and a
-// SerialPort double that behaves like Chromium's (serial-port-double).
+// The worker-hosted transport end to end, on the native worker that ADR-354
+// made the hosted path: the production webSerial adapter, a Worker whose
+// boundary is a real MessageChannel, the real native runtime and worker core
+// owning the port inside that worker, and a SerialPort double that behaves
+// like Chromium's (serial-port-double). The audit fixes first made for the
+// transferred-stream transport (connect-1, transport-3, transport-4) must hold
+// on this path too.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessageChannel, type MessagePort } from 'node:worker_threads';
 import type { SerialConnection } from '../types';
 import { SerialPortDouble, waitFor } from './serial-port-double.test-support';
-import { createSerialWorkerCore } from './serial-worker-core';
+import { createNativeSerialWorkerRuntime } from './native-serial-worker-runtime';
 import { webSerial } from './web-serial';
 
 const channels: MessagePort[] = [];
@@ -18,6 +20,8 @@ const workers: FakeWorker[] = [];
 
 class FakeWorker {
   onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onmessageerror: ((event: MessageEvent) => void) | null = null;
   terminated = false;
   private readonly main: MessagePort;
   private readonly inner: MessagePort;
@@ -27,18 +31,21 @@ class FakeWorker {
     this.main = port1;
     this.inner = port2;
     channels.push(port1, port2);
-    const core = createSerialWorkerCore({
+    // The worker's own navigator.serial grants the same port the window
+    // picked, as Chromium does for a dedicated worker.
+    const runtime = createNativeSerialWorkerRuntime({
+      serial: (globalThis.navigator as { serial?: Pick<Serial, 'getPorts'> }).serial ?? null,
       post: (message) => {
         if (!this.terminated) port2.postMessage(message);
       },
     });
-    port2.on('message', (data) => core.handle(data));
+    port2.on('message', (data) => runtime.handle(data));
     port1.on('message', (data) => this.onmessage?.({ data } as MessageEvent));
     workers.push(this);
   }
 
-  postMessage(message: unknown, transfer?: Transferable[]): void {
-    this.main.postMessage(message, (transfer ?? []) as never);
+  postMessage(message: unknown): void {
+    this.main.postMessage(message);
   }
 
   terminate(): void {

@@ -53,7 +53,12 @@ const DEFAULT_WCS = 'G54';
 export function controllerReviewSummary(args: ControllerReviewArgs): string {
   if (!args.isConnected) return 'not connected';
   const state = args.statusReport?.state ?? 'no status yet';
-  return overridesAreBaseline(args.overrides) ? `${state}` : `${state} · overrides active`;
+  if (overridesAreBaseline(args.overrides)) return `${state}`;
+  // A laser Start resets leftover overrides (ADR-355); CNC keeps its own
+  // override policy and only flags them.
+  return args.machineKind === 'laser'
+    ? `${state} · overrides reset to 100% at Start`
+    : `${state} · overrides active`;
 }
 
 export function buildControllerReviewFacts(
@@ -71,7 +76,9 @@ export function buildControllerReviewFacts(
     ),
     fact(
       'Overrides',
-      describeOverrides(args.overrides),
+      overridesAreBaseline(args.overrides) || args.machineKind !== 'laser'
+        ? describeOverrides(args.overrides)
+        : `${describeOverrides(args.overrides)} — reset to 100% when this job starts`,
       overridesAreBaseline(args.overrides) ? 'default' : 'warning',
     ),
     ...settingsFacts(args),

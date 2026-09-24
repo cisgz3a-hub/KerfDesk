@@ -10,7 +10,6 @@ import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
-import { DeviceSettings } from './DeviceSettings';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { FocusJogControls } from './FocusJogControls';
 import { JobPlacementControls } from './JobPlacementControls';
@@ -85,7 +84,6 @@ describe('Machine utility control audit', () => {
         </CollapsibleRailSection>
       ),
     ],
-    ['device profile', () => <DeviceSettings />],
     ['execution archive', () => <ExecutionArchivePanel />],
     ['controller backup', () => <MachineSettingsPanel />],
     ['probe', () => <ProbePanel />],

@@ -1,5 +1,4 @@
 import { streamingModeForController } from '../../core/devices';
-import type { JobCheckpoint } from '../../core/recovery';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
@@ -37,7 +36,6 @@ export type PreparedStartArgs = {
   readonly reviewModel: JobReviewModel;
   readonly laserModeStartEvidence: LaserModeStartEvidence | undefined;
   readonly cncSetupAttestation: CncSetupAttestation | undefined;
-  readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly repository: RecoveryRepository;
   readonly framedRunClaim?: FramedRunStartClaim;

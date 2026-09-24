@@ -1,7 +1,9 @@
 // The rail's Connect must open the transport with the same options as the menu
-// Connect, including the profile's "Stream in worker" opt-in (ADR-334). It
-// rebuilt the options by hand without it, so the stop-and-go mitigation was
-// silently ignored (controller audit 2026-09-23, connect-6 / ui-panel-7).
+// Connect, including the profile's background streaming choice. It rebuilt the
+// options by hand without it, so the stop-and-go mitigation was silently
+// ignored (controller audit 2026-09-23, connect-6 / ui-panel-7). GRBL-family
+// connections stream in the worker by default (ADR-354), so an opt-out must
+// travel as an explicit false for the default not to override it.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -86,8 +88,11 @@ describe('rail Connect options', () => {
     });
   });
 
-  it('leaves the worker off when the profile does not opt in', async () => {
+  it('carries the profile opt-out so the worker stays off', async () => {
     setDevice(false);
-    expect(await clickConnect()).not.toHaveProperty('hostedStreaming');
+    expect(await clickConnect()).toMatchObject({
+      controllerKind: 'grblhal',
+      hostedStreaming: false,
+    });
   });
 });

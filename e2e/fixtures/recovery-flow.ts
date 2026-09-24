@@ -7,12 +7,15 @@ import { expandMachineUtilities, selectWorkspacePanel } from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
 
 export const IDLE = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
-const REALTIME_BYTES = new Set([
-  '?',
-  '!',
-  '~',
-  ...[0x18, 0x84, 0x85].map((code) => String.fromCharCode(code)),
-]);
+const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
+
+/** GRBL takes these out of the stream before its line buffer: the ASCII
+ * realtime commands and every extended-ASCII byte (0x80 and up), which covers
+ * door, jog cancel, and the feed/rapid/spindle override resets a laser Start
+ * sends ahead of its first line (ADR-355). Program lines compare without them. */
+function isRealtimeByte(character: string): boolean {
+  return ASCII_REALTIME_BYTES.has(character) || character.charCodeAt(0) >= 0x80;
+}
 
 export type FixtureEvents = readonly Readonly<Record<string, unknown>>[];
 
@@ -142,7 +145,7 @@ export function programLinesSince(events: FixtureEvents, fromEventIndex: number)
     .filter((event) => event['kind'] === 'serial-write')
     .flatMap((event) =>
       [...String(event['text'])]
-        .filter((character) => !REALTIME_BYTES.has(character))
+        .filter((character) => !isRealtimeByte(character))
         .join('')
         .split('\n'),
     )

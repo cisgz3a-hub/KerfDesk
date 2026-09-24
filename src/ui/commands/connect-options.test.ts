@@ -3,6 +3,12 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { connectOptionsForDevice } from './connect-options';
 
 describe('connectOptionsForDevice', () => {
+  it.each([true, false])('preserves the explicit background streaming choice %s', (enabled) => {
+    expect(
+      connectOptionsForDevice({ ...DEFAULT_DEVICE_PROFILE, workerHostedStreaming: enabled })
+        .hostedStreaming,
+    ).toBe(enabled);
+  });
   it('carries a vendor command contract to menu connections', () => {
     expect(
       connectOptionsForDevice({

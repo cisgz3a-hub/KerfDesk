@@ -14,7 +14,7 @@ afterEach(() => {
   });
 });
 
-async function requestTransport(controllerKind?: ControllerKind, hostedStreaming = true) {
+async function requestTransport(controllerKind?: ControllerKind, hostedStreaming?: boolean) {
   const open = vi.fn(async (_request: SerialOpenRequest) => {
     // Inspect the real connect/open boundary without creating a serial session.
     throw new Error('Captured transport request');
@@ -40,21 +40,26 @@ describe('worker transport firmware eligibility', () => {
   it.each(['marlin', 'smoothieware'] as const)(
     'ignores a saved worker opt-in when the selected driver is %s',
     async (controllerKind) => {
-      const open = await requestTransport(controllerKind);
+      const open = await requestTransport(controllerKind, true);
       expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
     },
   );
 
   it.each(['grbl-v1.1', 'grblhal', 'fluidnc', undefined] as const)(
-    'keeps an explicit worker opt-in for the GRBL-family driver %s',
+    'prefers a native worker by default for the GRBL-family driver %s',
     async (controllerKind) => {
       const open = await requestTransport(controllerKind);
       expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000, hostedStreaming: true });
     },
   );
 
-  it('keeps the ordinary transport when the compatible driver has no worker opt-in', async () => {
+  it('keeps the ordinary transport when the operator explicitly opts out', async () => {
     const open = await requestTransport('grbl-v1.1', false);
     expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
+  });
+
+  it('preserves an explicit worker opt-in', async () => {
+    const open = await requestTransport('grbl-v1.1', true);
+    expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000, hostedStreaming: true });
   });
 });

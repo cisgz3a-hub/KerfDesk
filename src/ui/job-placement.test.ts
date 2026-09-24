@@ -317,7 +317,7 @@ describe('resolveExportJobPlacement (Save G-code)', () => {
     if (!resolved.ok) expect(resolved.messages.join('\n')).toMatch(/Current Position/);
   });
 
-  it('exports absolute even while a custom origin is active (Start still refuses)', () => {
+  it('uses the same known custom offset for Absolute export and live preparation', () => {
     const machine = {
       statusReport: idleAtMachinePosition(120, 80),
       workOriginActive: true,
@@ -327,7 +327,7 @@ describe('resolveExportJobPlacement (Save G-code)', () => {
       resolveExportJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine),
     ).toEqual({ ok: true, preflightMotionOffset: { x: 120, y: 80 } });
     expect(resolveJobPlacement({ startFrom: 'absolute', anchor: 'front-left' }, machine).ok).toBe(
-      false,
+      true,
     );
   });
 });

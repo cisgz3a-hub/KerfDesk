@@ -15,6 +15,8 @@ export function connectOptionsForDevice(device: DeviceProfile): ConnectControlle
     ...(device.controllerCommandSet === undefined
       ? {}
       : { controllerCommandSet: device.controllerCommandSet }),
-    ...(device.workerHostedStreaming === true ? { hostedStreaming: true } : {}),
+    ...(typeof device.workerHostedStreaming === 'boolean'
+      ? { hostedStreaming: device.workerHostedStreaming }
+      : {}),
   };
 }
