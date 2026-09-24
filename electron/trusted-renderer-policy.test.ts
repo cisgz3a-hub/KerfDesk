@@ -7,7 +7,6 @@ import {
   resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
-  shouldGrantDevicePermission,
   shouldGrantPermissionCheck,
   shouldGrantPermissionRequest,
 } from './trusted-renderer-policy';
@@ -268,27 +267,6 @@ describe('Electron trusted renderer policy', () => {
     ).toBe(false);
   });
 
-  it('grants serial device permission only to trusted renderer origins', () => {
-    expect(
-      shouldGrantDevicePermission({ deviceType: 'serial', origin: 'app://app' }, trustedOrigins),
-    ).toBe(true);
-    expect(
-      shouldGrantDevicePermission(
-        { deviceType: 'serial', origin: 'http://localhost:5173' },
-        trustedOrigins,
-      ),
-    ).toBe(true);
-    expect(
-      shouldGrantDevicePermission(
-        { deviceType: 'serial', origin: 'https://evil.example' },
-        trustedOrigins,
-      ),
-    ).toBe(false);
-    expect(
-      shouldGrantDevicePermission({ deviceType: 'hid', origin: 'app://app' }, trustedOrigins),
-    ).toBe(false);
-  });
-
   it('denies renderer popups even when the URL is otherwise trusted', () => {
     expect(shouldAllowWindowOpen('app://app/help', trustedOrigins)).toBe(false);
     expect(shouldAllowWindowOpen('https://evil.example/', trustedOrigins)).toBe(false);
@@ -305,8 +283,19 @@ describe('Electron main-process security wiring', () => {
     expect(main).toContain('shouldGrantPermissionCheck');
     expect(main).toContain('requestingOrigin');
     expect(main).toContain('details.requestingUrl');
-    expect(main).toContain('shouldGrantDevicePermission');
     expect(main).toContain("webContents.on('will-navigate'");
     expect(main).toContain('setWindowOpenHandler');
+  });
+
+  // ADR-366: any device permission handler replaces Electron's per-port store,
+  // and one that trusts the origin grants every attached serial adapter. The
+  // background-streaming worker (ADR-354) then cannot tell the picked adapter
+  // from an identical twin, and Forget revokes nothing. Serial grants must come
+  // from the operator's pick alone.
+  it('leaves serial grants to the port the operator picks', () => {
+    const main = readMainProcessSource();
+
+    expect(main).toContain("'select-serial-port'");
+    expect(main).not.toMatch(/\.setDevicePermissionHandler\(/);
   });
 });

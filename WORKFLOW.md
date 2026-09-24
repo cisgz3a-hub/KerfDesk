@@ -956,6 +956,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
 5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   its Select dialog, so an identical second adapter (a laser controller and an Arduino that
+   both use a CH340, for example) no longer stops background streaming. A pick lasts until
+   Forget Controller or an app restart; picking both identical adapters in one run is still
+   ambiguous and uses the window port (ADR-366).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
