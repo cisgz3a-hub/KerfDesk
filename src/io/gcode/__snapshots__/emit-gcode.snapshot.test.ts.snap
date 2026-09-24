@@ -795,7 +795,7 @@ G1 X80.000 Y53.000 F1500 S0 ; kerfdesk:laser-off-motion
 G1 X40.000 Y53.000 F1500 S300
 G1 X35.000 Y53.000 F1500 S0 ; kerfdesk:laser-off-motion
 ; image layer image-#808080 color #808080 power 30%
-; 10 × 5 px, 10.000 × 5.000 mm
+; 10 x 5 px, 10.000 x 5.000 mm
 ; feed 1500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0
@@ -957,7 +957,7 @@ G1 X90.000 Y348.000 F1500 S0 ; kerfdesk:laser-off-motion
 G1 X50.000 Y348.000 F1500 S300
 G1 X45.000 Y348.000 F1500 S0 ; kerfdesk:laser-off-motion
 ; image layer image-#808080 color #808080 power 30%
-; 10 × 5 px, 10.000 × 5.000 mm
+; 10 x 5 px, 10.000 x 5.000 mm
 ; feed 1500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0
@@ -993,7 +993,7 @@ G54
 G94
 M4 S0
 ; image layer image-#808080 color #808080 power 30%
-; 10 × 5 px, 10.000 × 5.000 mm
+; 10 x 5 px, 10.000 x 5.000 mm
 ; feed 1500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0

@@ -56,9 +56,13 @@ export function straightInlayPocketDepthMm(settings: CncLayerSettings): number {
   return settings.inlayPocketDepthMm ?? Math.min(3, settings.depthMm);
 }
 
-// A single linked plan keeps both halves on the same finish tool. Opening the
-// design by the tool radius gives the male and female the same machinable corner
-// radii; the allowance then expands the pocket and contracts the insert by half
+// A single linked plan keeps both halves on the same finish tool. Closing and
+// then opening the design by the tool radius gives the male and female the same
+// machinable corner radii: the pocket cannot cut a sharp convex corner and the
+// insert's outside profile cannot cut a sharp inside corner, so both kinds are
+// rounded by the radius. An opening alone left the insert with a fillet where
+// the pocket kept a sharp corner, and the plug could not seat at any inside
+// corner. The allowance then expands the pocket and contracts the insert by half
 // each, producing the requested per-side clearance.
 export function planStraightInlayPair(
   polylines: ReadonlyArray<Polyline>,
@@ -83,17 +87,20 @@ export function planStraightInlayPair(
   // as a dropped layer by findDroppedCncLayers. A checked variant would just
   // make a string nobody reads more accurate; route the reason to Job Review
   // first, then converting is worth it.
-  const opened = offsetClosedPolylinesWithRoundJoins(
-    offsetClosedPolylinesWithRoundJoins(closed, -radius),
+  const canonical = offsetClosedPolylinesWithRoundJoins(
+    offsetClosedPolylinesWithRoundJoins(
+      offsetClosedPolylinesWithRoundJoins(closed, radius),
+      -2 * radius,
+    ),
     radius,
   );
-  if (opened.length === 0) {
+  if (canonical.length === 0) {
     return failure('The selected bit cannot reproduce this design after corner compensation.');
   }
 
   const halfAllowance = options.allowanceMm / 2;
-  const femaleContours = offsetOrIdentity(opened, halfAllowance);
-  const maleBase = offsetOrIdentity(opened, -halfAllowance);
+  const femaleContours = offsetOrIdentity(canonical, halfAllowance);
+  const maleBase = offsetOrIdentity(canonical, -halfAllowance);
   if (femaleContours.length === 0 || maleBase.length === 0) {
     return failure('The fit allowance removes geometry from one half of the inlay.');
   }

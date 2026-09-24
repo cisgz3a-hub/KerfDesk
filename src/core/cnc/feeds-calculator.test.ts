@@ -100,6 +100,17 @@ describe('calculateFeeds', () => {
     expect(alu.depthPerPassMm).toBeLessThan(wood.depthPerPassMm / 3);
   });
 
+  it('rounds depth per pass to a clean 0.1 mm value', () => {
+    for (const bitDiameterMm of [1.588, 3.175, 4.76, 6.35, 12.7]) {
+      for (const material of ['plywood-mdf', 'hardwood', 'acrylic', 'aluminum'] as const) {
+        const r = expectCalculatedFeeds(
+          calculateFeeds({ material, bitDiameterMm, flutes: 2, rpm: 12000 }),
+        );
+        expect(String(r.depthPerPassMm)).toMatch(/^\d+(\.\d)?$/);
+      }
+    }
+  });
+
   it('floors tiny results instead of emitting zero feeds', () => {
     const r = expectCalculatedFeeds(
       calculateFeeds({ material: 'aluminum', bitDiameterMm: 1, flutes: 1, rpm: 1000 }),

@@ -8,6 +8,7 @@ import {
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_TILING,
 } from '../../core/scene';
+import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { prepareOutput } from '../../io/gcode';
 import type { TiledOutputPreparationRequest } from '../laser/output-preparation-protocol';
@@ -330,7 +331,9 @@ describe('handleSaveTiledGcode', () => {
     for (const file of written) {
       expect(file).toContain('; commit:');
       expect(file).toContain('; emitter:');
-      expect(file).toContain(`; profile-name: ${tiledCncProject().device.name}`);
+      expect(file).toContain(
+        `; profile-name: ${sanitizeGcodeCommentValue(tiledCncProject().device.name)}`,
+      );
       expect(file).toContain(`; profile-id: ${tiledCncProject().device.profileId}`);
       expect(file).toContain('GRBL $30=12000');
       expect(file).toMatch(/; tile: row \d+, column \d+/);
