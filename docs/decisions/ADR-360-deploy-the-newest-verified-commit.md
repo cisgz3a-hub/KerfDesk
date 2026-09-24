@@ -118,6 +118,13 @@ lane order, and lane order follows CI completion order.
   - A revert without the `This reverts commit` line is not recognized.
   - Deploy runs from before this change have no `Deploy <sha>` run-name, so only CI records
     identify them as verified.
+  - A newer verified commit that is itself withheld still supersedes an older candidate. A
+    commit containing B, whose revert R is still in CI, is one example. Production then waits
+    for R's own run, or for the next green commit if R's CI fails. This is slower, never wrong.
+  - A non-tip candidate that production already serves is rebuilt and republished. This is
+    harmless but costs one gate (~50 minutes) of lane time.
+  - A GitHub API blip, like the TLS handshake timeouts seen on 2026-09-24 at 00:06Z, turns a
+    non-tip candidate's deploy red. The tip needs no lookup and still publishes.
 
 ### Alternatives rejected
 
