@@ -2455,8 +2455,12 @@ or traced image) with at least one closed polyline.
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
   The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
-  Scan Line, a stored Overscan value of zero uses the bounded 5 mm generic runway default rather
-  than allowing a rapid-to-powered start; Frame includes that effective motion.
+  Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
+  scanline's outer entry and exit), and a stored value of zero uses the bounded 5 mm generic runway
+  default rather than allowing a rapid-to-powered start; Frame includes that effective motion.
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+  runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
+  ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before

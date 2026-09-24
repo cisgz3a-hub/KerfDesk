@@ -118,6 +118,24 @@ describe('generic Scan Line feed-matched runway emission', () => {
     ]);
   });
 
+  it('emits an overscan above 5 mm in full at the scanline ends and shares the split gap', () => {
+    const group = fillGroup([segment(20, 21), segment(27, 28)], 10);
+
+    expect(fillMotionLines(group).slice(0, 8)).toEqual([
+      'G0 X10.000 Y4.000 S0',
+      'G1 X20.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
+      'G1 X21.000 Y4.000 F1500 S300',
+      'G1 X24.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
+      'G0 X24.000 Y4.000 S0',
+      'G1 X27.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
+      'G1 X28.000 Y4.000 F1500 S300',
+      'G1 X38.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
+    ]);
+    expect(emit({ groups: [group] })).toContain(
+      'overscan 10.000 mm (feed-matched entry and exit up to 10.000 mm on every Scan Line sweep)',
+    );
+  });
+
   it('changes only laser-off travel geometry between positive runway lengths', () => {
     const segments = [segment(0, 1), segment(7, 8)];
     const poweredTargets = (overscanMm: number): ReadonlyArray<string> =>
