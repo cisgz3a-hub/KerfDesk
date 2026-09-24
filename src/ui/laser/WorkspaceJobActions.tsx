@@ -5,6 +5,7 @@ import { jobControlsBusy } from './job-controls-busy';
 import { runStartJobFlow } from './start-job-flow';
 import './WorkspaceJobActions.css';
 import { CompletedJobNotice } from './CompletedJobNotice';
+import { RotaryModeSwitch } from './RotaryModeSwitch';
 
 /** Mount once outside the sidebar scroller so Frame/Start stay reachable in either tab. */
 export function WorkspaceJobActions(): JSX.Element {
@@ -15,6 +16,7 @@ export function WorkspaceJobActions(): JSX.Element {
   return (
     <section className="lf-workspace-job-actions" aria-label="Job actions">
       <CompletedJobNotice />
+      <RotaryModeSwitch />
       <JobActionControls
         docked
         disabled={disabled}
