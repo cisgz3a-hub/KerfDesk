@@ -39,6 +39,30 @@ describe('layer default settings helpers', () => {
     });
   });
 
+  it('never carries a calibration-coupon marker into new layers', () => {
+    const calibration = {
+      ...createLayer({ id: '#0000ff', color: '#0000ff', mode: 'fill' }),
+      scanOffsetCalibrationMode: 'baseline' as const,
+      bindingOperationId: 'op-1',
+      power: 21,
+    };
+
+    const captured = captureLayerDefaultSettings(calibration);
+    expect(captured).toMatchObject({ power: 21 });
+    expect(captured).not.toHaveProperty('scanOffsetCalibrationMode');
+    expect(captured).not.toHaveProperty('bindingOperationId');
+
+    // A default saved before this rule still holds the marker; it must not apply.
+    const applied = applyLayerDefaultSettings(createLayer({ id: '#00ff00', color: '#00ff00' }), {
+      power: 21,
+      scanOffsetCalibrationMode: 'baseline',
+      bindingOperationId: 'op-1',
+    });
+    expect(applied).toMatchObject({ power: 21 });
+    expect(applied).not.toHaveProperty('scanOffsetCalibrationMode');
+    expect(applied).not.toHaveProperty('bindingOperationId');
+  });
+
   it('keys defaults by device profile name', () => {
     expect(layerDefaultsStorageKey('GRBL4040')).toBe('laserforge.layer-defaults.v1.GRBL4040');
   });
