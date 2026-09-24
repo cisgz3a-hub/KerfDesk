@@ -1,4 +1,4 @@
-## ADR-364 - The ordinary Frame offers its blocker fixes in place (2026-09-24)
+## ADR-367 - The ordinary Frame offers its blocker fixes in place (2026-09-24)
 
 **Status:** Accepted. | **Date:** 2026-09-24
 

@@ -1981,7 +1981,7 @@ clone/hash runs after the first controller bytes are accepted.
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
    stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
-   Alarm (ADR-364), except a grblHAL E-stop alarm, which must be released first; after Unlock
+   Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/

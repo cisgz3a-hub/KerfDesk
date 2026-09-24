@@ -1,4 +1,4 @@
-// Regression (ADR-364): an ordinary Frame or Start answered an alarm or a
+// Regression (ADR-367): an ordinary Frame or Start answered an alarm or a
 // missing origin with a red refusal only; the in-place Home, Unlock and Set
 // origin offers were reachable from the checkpoint Start alone. Drives the
 // real store against the scripted GRBL controller.

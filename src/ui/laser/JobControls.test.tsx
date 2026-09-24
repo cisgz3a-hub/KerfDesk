@@ -227,7 +227,7 @@ describe('JobControls Frame action', () => {
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        // Past the bounded status-query wait for the offset (ADR-364).
+        // Past the bounded status-query wait for the offset (ADR-367).
         await vi.advanceTimersByTimeAsync(3_500);
       });
 

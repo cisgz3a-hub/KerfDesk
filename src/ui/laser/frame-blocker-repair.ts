@@ -1,5 +1,5 @@
 // In-place fixes before an ordinary Frame (maintainer, 2026-07-17: blocks ask
-// to fix in place, not dead-end in an alert; ADR-364). Start with no permit
+// to fix in place, not dead-end in an alert; ADR-367). Start with no permit
 // runs this same Frame, so both buttons reach them. The offers used to be
 // reachable only from the checkpoint Start flow, so a plain Frame or Start
 // answered an alarm or a missing origin with a red refusal and nothing else.
