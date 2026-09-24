@@ -19215,7 +19215,9 @@ minimizes tool changes.
 ## ADR-311 - Exact owners govern machine commands, async documents, and release publication (2026-08-30)
 
 **Status:** Accepted and implemented in audit remediation; focused software verification recorded,
-exact-final repository and hosted verification pending, external qualification excluded
+exact-final repository and hosted verification pending, external qualification excluded.
+Clause 4 amended by Amendment 1 (publication phase) and by ADR-360 (candidate phase: the newest
+verified commit on main, not only the tip).
 
 ### Context
 
@@ -21654,7 +21656,7 @@ The repair converts the three original defect characterisations into correctness
 
 ## ADR-311 Amendment 1 - publication asks whether the commit is still ON main, not whether it is still the tip (2026-09-22)
 
-**Status:** Accepted. | **Date:** 2026-09-22
+**Status:** Accepted; candidate phase amended by ADR-360. | **Date:** 2026-09-22
 
 ### Context
 
@@ -21677,7 +21679,9 @@ because the maintainer noticed the site had not picked up ADR-339's light theme.
 The two checks ask different questions, and only the first keeps the tip test.
 
 - **Candidate phase (before the build)** is unchanged: build only main's exact tip, so an
-  obsolete historical rerun never burns a build slot.
+  obsolete historical rerun never burns a build slot. **[Amended by ADR-360 (2026-09-24): the
+  tip test starved this phase too; it now builds the newest verified commit on main, and an
+  obsolete rerun is refused because a newer commit is verified.]**
 - **Publication phase (immediately before the provider command)** now requires only that the
   verified commit is still ON main — `git merge-base --is-ancestor <sha> origin/main`. A
   newer tip is no longer a reason to withhold a commit that main still contains.

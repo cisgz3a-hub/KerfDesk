@@ -9,6 +9,23 @@ function repoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
+// The body of one workflow step, from its `- name:` line to the next step.
+function stepBody(workflow: string, name: string): string {
+  const start = workflow.indexOf(`- name: ${name}`);
+  expect(start, `missing workflow step: ${name}`).toBeGreaterThanOrEqual(0);
+  const next = workflow.indexOf('\n      - name: ', start + 1);
+  return workflow.slice(start, next === -1 ? undefined : next);
+}
+
+// One resolver invocation within a step, from its phase flag to its end.
+function callBody(step: string, phaseFlag: string): string {
+  const start = step.indexOf(phaseFlag);
+  expect(start, `missing resolver call: ${phaseFlag}`).toBeGreaterThanOrEqual(0);
+  const end = step.indexOf('--github-output=', start);
+  expect(end).toBeGreaterThan(start);
+  return step.slice(start, end);
+}
+
 function commandIndex(source: string, command: string): number {
   const index = source.indexOf(`run: ${command}`);
   expect(index, `missing workflow command: ${command}`).toBeGreaterThanOrEqual(0);
@@ -105,6 +122,89 @@ describe('Cloudflare production deploy gate', () => {
     expect(prePublishIndex).toBeLessThan(publishIndex);
   });
 
+  // ADR-360: the candidate phase starved like the publication phase had. Main's
+  // CI verifies one commit at a time, so any merge during a run left the
+  // verified commit behind the tip and every deploy recorded an obsolete no-op.
+  // A candidate main has moved past now builds when no newer commit on main has
+  // passed CI or been published and main has not reverted anything it contains;
+  // a superseded or reverted one still never builds.
+  it('builds the newest verified commit on main, not only the tip', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const candidateStep = stepBody(workflow, 'Resolve current-main deployment identity');
+    const publicationStep = stepBody(
+      workflow,
+      'Confirm the verified commit is still on main before publication',
+    );
+
+    expect(workflow).toMatch(
+      /^permissions:\n {2}contents: read\n(?: {2}#.*\n)* {2}actions: read\n/mu,
+    );
+    // Only a push to main is a production candidate; a fork PR can name its
+    // head branch main and still match `branches: [main]`.
+    expect(workflow).toContain("github.event.workflow_run.event == 'push'");
+
+    // The lookup runs exactly for a non-tip candidate still on main, and writes
+    // its lists only there, so a guard that skipped it leaves the resolver
+    // without a list it needs and the step fails instead of publishing.
+    expect(candidateStep).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(candidateStep).toContain(
+      'if [ "${EVENT_NAME}" = workflow_run ] && [ "${checkout_sha}" != "${current_main_sha}" ] && [ "${checkout_on_main}" = true ]; then',
+    );
+    expect(candidateStep).not.toMatch(/^\s*: >/mu);
+    expect(candidateStep).toContain('git rev-list "${checkout_sha}..${current_main_sha}"');
+    expect(candidateStep).toContain('actions/workflows/ci.yml/runs');
+    expect(candidateStep).toContain(
+      '-f branch=main -f event=push -f status=success -f per_page=100',
+    );
+    // Published means a deploy's publish step succeeded - in any attempt,
+    // however the run ended - for the tree named in its run-name; not a
+    // dispatch's head_sha or a green no-op.
+    expect(candidateStep).toContain('actions/workflows/deploy.yml/runs');
+    expect(candidateStep).toContain('-f status=completed -f per_page=100');
+    expect(candidateStep).toContain('select(.conclusion != "skipped")');
+    expect(candidateStep).toContain('.display_title');
+    expect(candidateStep).toContain('published_sha="${title#Deploy }"');
+    expect(candidateStep).toContain('/actions/runs/${run_id}/jobs');
+    expect(candidateStep).toContain('-f filter=all');
+    expect(candidateStep).toContain(
+      'select(.name == "Publish to Cloudflare Pages" and .conclusion == "success")',
+    );
+    expect(workflow).toContain('- name: Publish to Cloudflare Pages');
+    expect(candidateStep).not.toContain('event=workflow_dispatch');
+
+    // A revert adds a commit, so the reverted tree stays on main; both phases
+    // look for one with the tested helper, loaded from the control revision.
+    expect(candidateStep).toContain(
+      'git show "${WORKFLOW_CONTROL_SHA}:scripts/list-reverted-in-candidate.mjs"',
+    );
+    for (const step of [candidateStep, publicationStep]) {
+      expect(step).toContain('node "${RUNNER_TEMP}/list-reverted-in-candidate.mjs"');
+      expect(step).toContain('--reverted-in-candidate-file=');
+      expect(step).not.toContain('grep -oE');
+    }
+    expect(workflow).not.toContain('node scripts/list-reverted-in-candidate.mjs');
+
+    const candidateCall = callBody(candidateStep, '--phase=candidate');
+    expect(candidateCall).toContain('--checkout-on-main="${checkout_on_main}"');
+    expect(candidateCall).toContain('--newer-main-commits-file=');
+    expect(candidateCall).toContain('--verified-shas-file=');
+    expect(candidateCall).toContain('--reverted-in-candidate-file=');
+    const publicationCall = callBody(publicationStep, '--phase=publication');
+    expect(publicationCall).toContain('--checkout-on-main="${checkout_on_main}"');
+    expect(publicationCall).toContain('--reverted-in-candidate-file="${reverted_in_candidate}"');
+
+    // The run list names the commit each run decided about, a dispatch builds
+    // the tree it was dispatched on, and a run that publishes nothing says so
+    // instead of ending as an unexplained green.
+    expect(workflow).toContain(
+      "Deploy ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}",
+    );
+    expect(workflow).toContain(
+      "ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}",
+    );
+    expect(workflow.match(/::notice title=Production not published::/gu)).toHaveLength(2);
+  });
+
   it('uses current-main control code when an obsolete candidate predates the resolver', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
 
@@ -142,7 +242,7 @@ describe('Cloudflare production deploy gate', () => {
     );
     expect(workflow).not.toContain('name: release-readiness-deploy-${{ github.sha }}');
     expect(workflow).toContain(
-      "github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/main'",
+      "github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha",
     );
     expect(workflow).toContain('CI_STATE: ${{ steps.release_check.outcome }}');
     expect(workflow).toContain('validated-run=${TRIGGER_RUN_URL}');
