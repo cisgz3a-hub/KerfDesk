@@ -1056,7 +1056,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    stock top.
 2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
    retracted, then restores a zero or positive pre-Frame Work-Z. If Frame began below Work Z0, it
-   deliberately stays at safe Z instead of plunging back into stock. Missing Work-Z, unknown return Z, or a driver
+   deliberately stays at safe Z instead of plunging back into stock. The retract only ever raises: a
+   bit already at or above safe Z (for example parked above the touch plate after a probe) traces and
+   returns at its own height with no Z move, and click/command point moves skip their safe-Z prefix
+   the same way (ADR-192 Amendment 1). Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
 3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
    positions are converted to millimetres before any G21 restore is built.
