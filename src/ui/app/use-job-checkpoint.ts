@@ -171,10 +171,7 @@ class JobCheckpointTracker {
       // A terminal streamer still counts the trailing oks for lines GRBL had
       // buffered. The interruption records the exact ack it saw; a progress
       // write carrying a later ack would only raise it or fail as a no-op.
-      if (this.firstInterruption?.runId !== runId) {
-        this.firstInterruption = { runId, ackedLines: streamer.completed, interruption };
-      }
-      const first = this.firstInterruption;
+      const first = this.firstSight({ runId, ackedLines: streamer.completed, interruption });
       if (!this.terminalQueued) this.queueInterruption(runId, first.ackedLines, first.interruption);
       return;
     }
@@ -183,6 +180,13 @@ class JobCheckpointTracker {
     const due = streamer.completed - pendingBaseline >= CHECKPOINT_ACK_INTERVAL_LINES;
     const statusProgressDue = statusChanged && streamer.completed > this.highestQueuedAck;
     if (due || statusProgressDue) this.queueProgress(runId, streamer.completed);
+  }
+
+  /** The run's first terminal sight; a later sight of the same run keeps it. */
+  private firstSight(seen: FirstInterruption): FirstInterruption {
+    const first = this.firstInterruption?.runId === seen.runId ? this.firstInterruption : seen;
+    this.firstInterruption = first;
+    return first;
   }
 
   private queueInterruption(runId: RunId, ackedLines: number, interruption: JobInterruption): void {
