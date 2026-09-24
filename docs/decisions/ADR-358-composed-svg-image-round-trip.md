@@ -13,11 +13,15 @@ Software evidence does not establish browser rendering, independent-editor inter
    preparation pipeline. PNG can use its streamed/paged decoder. SVG local bounds and composed
    transforms determine physical placement; embedded bitmap DPI does not resize the artwork.
    Image translation, rotation, unequal scale and mirroring remain editable. Unrepresentable
-   shear, aspect fitting, opacity and SVG filters/masks report an error.
+   shear, aspect fitting, opacity and SVG filters/masks report an error. Numeric and percentage
+   opacity use the same range before this check, including opacity on ancestor groups.
 3. One source file receives one common translation, one batch offset and one Undo entry. Its
    authored millimetre size and relative registration survive negative coordinates and artwork
    larger than the bed. No per-object fitting or whole-document rasterisation is involved.
    Saved operation preferences cannot override authored Line/Fill/Image structure or image density.
+   New Fill fragments materialise SVG's implicit subpath closure and default nonzero fill rule in
+   both sampled paths and native curves. Stroke fragments retain their authored open paths. The
+   legacy vector aggregate and previously saved projects keep their existing geometry and defaults.
    Bounds remain Job Review warnings under the existing Frame-first policy of ADR-228/230/232/237.
 4. `RasterImage.imageClip` owns a compound even-odd clip in image-local coordinates. It is not a
    scene object or operation. The supported SVG subset is a userSpaceOnUse clip containing one

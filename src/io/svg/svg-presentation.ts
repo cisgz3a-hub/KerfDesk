@@ -175,9 +175,14 @@ function styleMap(style: string | null): Map<string, string> {
 
 function parseOpacity(input: string | null): number {
   if (input === null) return 1;
-  const value = Number.parseFloat(input);
+  const normalized = input
+    .trim()
+    .replace(/\s*!important$/i, '')
+    .trim();
+  const value = Number.parseFloat(normalized);
   if (!Number.isFinite(value)) return 1;
-  return Math.min(1, Math.max(0, value));
+  const fraction = normalized.endsWith('%') ? value / 100 : value;
+  return Math.min(1, Math.max(0, fraction));
 }
 
 function clipReferences(
