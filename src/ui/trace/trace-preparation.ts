@@ -1,4 +1,5 @@
 import type { RawImageData } from '../../core/trace';
+import type { TracePhase } from '../../core/trace/trace-progress';
 import { traceImageWithBoundaryMode } from './region-enhance-trace';
 import { traceBoundaryForWorkingGrid } from './trace-boundary-grid';
 import { checkTraceSignal, traceAbortError } from './trace-cancellation';
@@ -19,7 +20,7 @@ export function createTracePreparation(
   request: TracePreparationRequest,
   decoded: Promise<DecodedTraceImage>,
   delay: number,
-  tracing: (image: DecodedTraceImage) => void,
+  tracing: (image: DecodedTraceImage, phase: TracePhase) => void,
 ): TracePreparation {
   const cancellation = new AbortController();
   let started = false;
@@ -80,11 +81,11 @@ async function prepare(
   request: TracePreparationRequest,
   decoded: Promise<DecodedTraceImage>,
   signal: AbortSignal,
-  tracing: (image: DecodedTraceImage) => void,
+  tracing: (image: DecodedTraceImage, phase: TracePhase) => void,
 ): Promise<TraceResult> {
   const image = await decoded;
   checkTraceSignal(signal);
-  tracing(image);
+  tracing(image, 'preparing');
   const boundary = traceBoundaryForWorkingGrid(request.boundary, request.sourceGrid, image.img);
   return traceImageWithBoundaryMode(
     image.img,
@@ -92,5 +93,6 @@ async function prepare(
     boundary,
     request.boundaryMode,
     signal,
+    (phase) => tracing(image, phase),
   );
 }

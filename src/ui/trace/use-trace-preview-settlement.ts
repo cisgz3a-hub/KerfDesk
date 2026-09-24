@@ -25,6 +25,7 @@ type PreviewOwner = {
   readonly setState: (state: TracePreviewState) => void;
   readonly preparation?: () => PendingPreparedTrace | undefined;
   readonly settlePreparation?: (outcome: TracePreviewSettlement) => void;
+  readonly readyPreview?: typeof readyTracePreview;
 };
 
 export function preparedTraceEntry(preview: TracePreviewState): {
@@ -72,7 +73,7 @@ export function useTracePreviewSettlement(
           captured.settlePreparation?.(outcome);
           captured.setState(
             outcome.kind === 'ready'
-              ? readyTracePreview(
+              ? (captured.readyPreview ?? readyTracePreview)(
                   captured.request,
                   outcome.result,
                   captured.sourceHasTransparency(),
@@ -112,7 +113,7 @@ export function readyTracePreview(
   request: TracePreparationRequest,
   result: TraceResult,
   sourceHasTransparency: boolean | undefined,
-): TracePreviewState {
+): Extract<TracePreviewState, { kind: 'ready' }> {
   return {
     kind: 'ready',
     svg: coloredPathsToSvg(

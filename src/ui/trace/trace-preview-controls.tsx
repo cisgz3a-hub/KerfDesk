@@ -45,7 +45,7 @@ export function TracePreviewControls(props: Props): JSX.Element {
             disabled={props.view === 'original'}
             onClick={props.onTogglePoints}
             className="lf-btn"
-            title="Show or hide traced vector points in the preview."
+            title="Show traced vector points. Dense overlapping markers combine on screen; zoom in to separate them."
           >
             Show Points
           </button>

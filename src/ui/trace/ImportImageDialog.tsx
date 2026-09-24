@@ -181,6 +181,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
           boundarySelection={boundarySelection}
           photoShading={options.photoDetail !== undefined}
           busy={busy}
+          isRasterizing={busy && effectiveTraceOutput === 'raster' && preview.kind === 'ready'}
         />
       }
       deleteSource={deleteSourceAfterTrace}
@@ -229,6 +230,7 @@ function traceSourceHasTransparency(
 
 function TracePreviewPanel(props: {
   readonly busy: boolean;
+  readonly isRasterizing: boolean;
   readonly photoShading: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
@@ -243,6 +245,7 @@ function TracePreviewPanel(props: {
         imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
         boundary={selection.boundary}
         boundaryDisabled={props.busy}
+        isRasterizing={props.isRasterizing}
         onBoundaryChange={selection.setBoundary}
         onBoundaryClear={selection.clearBoundary}
       />

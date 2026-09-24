@@ -9,9 +9,7 @@
 // load as trace-image.ts (cached promise — no re-download).
 
 import {
-  curveSubpathBounds,
   polylineToCurveSubpath,
-  type Bounds,
   type ColoredPath,
   type CubicPathSegment,
   type CurveSubpath,
@@ -35,9 +33,12 @@ import { prepareContourTraceInput, type ContourTraceInput } from './contour-inpu
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { prepareUpscaledTraceInput } from './trace-upscale-input';
-import { runTraceSteps, type TraceStepRunner } from './trace-steps';
+import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
+import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
+
+export { boundsFromColoredPaths } from './trace-bounds';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -143,14 +144,14 @@ async function loadTracer(): Promise<ImageTracerModule> {
 export async function traceImageToColoredPaths(
   image: RawImageData,
   requestedOptions: TraceOptions,
-  run: TraceStepRunner = runTraceSteps,
+  runner: TraceStepRunner = runTraceSteps,
+  progress?: TraceProgress,
 ): Promise<ColoredPath[]> {
+  const run = reportingTraceRunner(runner, progress);
   // Photo tone is encoded in ribbon coverage, before any binary detection or
   // contour supersampling can discard it. The backend owns its bounded grid.
   if (requestedOptions.photoDetail !== undefined) {
-    return withCanonicalTraceCurves(
-      await run(traceImageToPhotoPathsSteps(image, requestedOptions)),
-    );
+    return run(traceImageToPhotoPathsSteps(image, requestedOptions));
   }
   const options = resolveTraceSourceOptions(image, requestedOptions);
   // Sparse small/thin sources trace poorly at native resolution, so their
@@ -255,6 +256,15 @@ async function dispatchTrace(
   if (isBinaryContourPreset(options))
     return run(traceImageToContourColoredPathsSteps(image, options, contourInput));
   const tracer = await loadTracer();
+  return run(traceLegacyImageSteps(image, options, tracer));
+}
+
+function* traceLegacyImageSteps(
+  image: RawImageData,
+  options: TraceOptions,
+  tracer: ImageTracerModule,
+): TraceSteps<ColoredPath[]> {
+  yield;
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));
   return tracedataToColoredPaths(td);
@@ -488,38 +498,4 @@ function paletteToHex(p: PaletteEntry): string {
 function byteToHex(n: number): string {
   const v = Math.max(0, Math.min(255, Math.round(n)));
   return v.toString(16).padStart(2, '0');
-}
-
-// Tight bounding box around every point in every ColoredPath. Used by
-// ImportImageDialog (and any future caller) to construct the
-// TracedImage's `bounds` field — analogous to parseSvg's viewBox-based
-// bounds but always reflecting the actual traced geometry. Empty input
-// returns a zero-area bounds at the origin.
-export function boundsFromColoredPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const path of paths) {
-    if (path.curves !== undefined) {
-      for (const curve of path.curves) {
-        const bounds = curveSubpathBounds(curve);
-        minX = Math.min(minX, bounds.minX);
-        minY = Math.min(minY, bounds.minY);
-        maxX = Math.max(maxX, bounds.maxX);
-        maxY = Math.max(maxY, bounds.maxY);
-      }
-      continue;
-    }
-    for (const pl of path.polylines) {
-      for (const p of pl.points) {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.y > maxY) maxY = p.y;
-      }
-    }
-  }
-  if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return { minX, minY, maxX, maxY };
 }

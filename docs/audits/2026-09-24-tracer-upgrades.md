@@ -79,7 +79,7 @@ will also qualify later caching and progress changes against these contracts.
 
 ## Batch 3: responsive previews
 
-Status: pending.
+Status: implemented; focused cache/overlay checks pass, integrated gates pending.
 
 - Reuse prepared input and recent preset results with a bounded cache keyed by
   source, resolved settings and boundary.
@@ -87,6 +87,28 @@ Status: pending.
 - Display real processing stages and elapsed time.
 - Add at most one idle warmup worker only if measurements show it helps without
   delaying foreground work or imposing excessive memory use.
+
+The file-owned cache retains up to three recent completed results within a
+conservative 32 MiB geometry/SVG accounting budget. It keys all resolved option
+values, boundary mode and coordinates, source grid and File identity. Reuse
+restamps submission ownership without copying geometry or regenerating SVG.
+Oversized results are not cached. Closing/replacing the source clears retention.
+The initial switch-away/back regression observed three traces; it now observes
+two traces and one decode. Cubic control-point objects are included in accounting.
+
+Show Points uses one viewport canvas, capped at 4,194,304 backing pixels and
+4,096 pixels per side. Screen-overlapping markers combine without modifying
+trace vertices. Focused component tests cover pan, zoom, resize and retirement;
+an independent real-Chrome component probe passes with 200,000 vertices, one
+childless canvas, clean unmount and no page errors. Prototype matched-input
+paint work fell from seconds of SVG-node creation to tens of milliseconds, but
+this is not a whole-application or tracing-speed claim.
+
+Progress reports actual preparing/tracing/refining boundaries and elapsed time,
+with a separate raster-output state. Heartbeats remain liveness signals, not
+percentages or UI updates. The additional speculative worker remains off:
+first-visit benefit and peak-memory cost have not been established. Recent-result
+reuse provides the measured switching benefit without concurrent tracing work.
 
 ## Batch 4: dense geometry and processing
 

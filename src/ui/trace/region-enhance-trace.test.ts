@@ -69,6 +69,7 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
       expect.objectContaining({ width: 10, height: 10 }),
       options,
       undefined,
+      undefined,
     );
     expect(result.paths).toEqual([
       {
@@ -108,7 +109,7 @@ describe('traceImageWithBoundaryMode — crop mode', () => {
     const result = await traceImageWithBoundaryMode(image, options, null, 'enhance');
 
     expect(traceImageWithFallback).toHaveBeenCalledTimes(1);
-    expect(traceImageWithFallback).toHaveBeenCalledWith(image, options, undefined);
+    expect(traceImageWithFallback).toHaveBeenCalledWith(image, options, undefined, undefined);
     expect(result.paths).toEqual(fullPaths);
     expect(result).toMatchObject({ width: 20, height: 20 });
   });
@@ -174,7 +175,13 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
 
     // Two traces: the full image, then the supersampled crop.
     expect(traceImageWithFallback).toHaveBeenCalledTimes(2);
-    expect(traceImageWithFallback).toHaveBeenNthCalledWith(1, image, options, owner.signal);
+    expect(traceImageWithFallback).toHaveBeenNthCalledWith(
+      1,
+      image,
+      options,
+      owner.signal,
+      undefined,
+    );
     expect(traceImageWithFallback).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ width: 20, height: 20 }),
@@ -186,6 +193,7 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
         upscaleSmallSmoothSources: false,
       }),
       owner.signal,
+      undefined,
     );
 
     const polylines = result.paths.flatMap((p) => p.polylines);

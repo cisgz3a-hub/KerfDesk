@@ -12,11 +12,14 @@ import { useTracePreviewBoundary, type TracePreviewBoundaryProps } from './trace
 import { TracePreviewControls, type TracePreviewView } from './trace-preview-controls';
 import { useTracePreviewZoom } from './trace-preview-zoom';
 import { useTracePreviewImageSpace } from './trace-preview-image-space';
+import { TracePointsOverlay } from './TracePointsOverlay';
+import { TracePreviewLoading } from './TracePreviewLoading';
 import './trace-preview.css';
 
 type Props = TracePreviewBoundaryProps & {
   readonly state: TracePreviewState;
   readonly sourceDataUrl?: string;
+  readonly isRasterizing?: boolean;
   readonly onBoundaryClear?: () => void;
 };
 
@@ -30,7 +33,7 @@ export function TracePreview(props: Props): JSX.Element {
   const { zoom, viewportRef, zoomTo } = useTracePreviewZoom();
   const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
   const view = hasSource ? selectedView : 'trace';
-  const isLoading = state.kind === 'decoding' || state.kind === 'tracing';
+  const isLoading = isPreviewLoading(state, props.isRasterizing);
   return (
     <div className="lf-trace-preview">
       <TracePreviewControls
@@ -67,7 +70,16 @@ export function TracePreview(props: Props): JSX.Element {
             shouldShowPoints={shouldShowPoints}
           />
         </div>
-        {isLoading ? <PreviewLoading isDecoding={state.kind === 'decoding'} /> : null}
+        {isLoading ? (
+          <TracePreviewLoading
+            isDecoding={state.kind === 'decoding'}
+            isRasterizing={props.isRasterizing}
+            phase={state.kind === 'tracing' ? state.phase : undefined}
+            startedAt={
+              state.kind === 'decoding' || state.kind === 'tracing' ? state.startedAt : undefined
+            }
+          />
+        ) : null}
       </div>
       <PreviewStatus state={state} />
       <p className="lf-trace-preview__help">
@@ -83,6 +95,10 @@ export function TracePreview(props: Props): JSX.Element {
         : null}
     </div>
   );
+}
+
+function isPreviewLoading(state: TracePreviewState, isRasterizing?: boolean): boolean {
+  return state.kind === 'decoding' || state.kind === 'tracing' || isRasterizing === true;
 }
 
 function PreviewFrame(
@@ -137,26 +153,6 @@ function PreviewFrame(
   );
 }
 
-function PreviewLoading({ isDecoding }: { readonly isDecoding: boolean }): JSX.Element {
-  return (
-    <div className="lf-trace-preview__loading">
-      <div
-        className="lf-trace-preview__loading-card"
-        role="progressbar"
-        aria-label={isDecoding ? 'Preparing image for tracing' : 'Tracing image'}
-      >
-        <span className="lf-trace-preview__spinner" aria-hidden="true" />
-        <strong>{isDecoding ? 'Preparing image' : 'Tracing image'}</strong>
-        <p>
-          {isDecoding
-            ? 'Reading the image before tracing begins.'
-            : 'Finding and refining the trace. Detailed images can take a moment.'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function TraceArtwork(props: {
   readonly state: ReadyPreview;
   readonly hidden: boolean;
@@ -180,7 +176,9 @@ function TraceArtwork(props: {
         dangerouslySetInnerHTML={{ __html: state.svg }}
         aria-label={`Trace preview (${state.width}x${state.height} px)`}
       />
-      {props.shouldShowPoints ? <TracePointsOverlay state={state} /> : null}
+      {props.shouldShowPoints ? (
+        <TracePointsOverlay paths={state.paths} width={state.width} height={state.height} />
+      ) : null}
     </div>
   );
 }
@@ -244,40 +242,6 @@ function previewPhaseMessage(state: Exclude<TracePreviewState, ReadyPreview>): s
     case 'error':
       return `Preview failed: ${state.message}`;
   }
-}
-
-function TracePointsOverlay({ state }: { readonly state: ReadyPreview }): JSX.Element {
-  // Keep all requested points, and cache the JSX by paths identity. View,
-  // magnification and boundary drags must not rebuild a dense point overlay.
-  const circles = useMemo(
-    () =>
-      state.paths
-        .flatMap((path) => path.polylines.flatMap((polyline) => polyline.points))
-        .map((point, index) => (
-          <circle
-            key={`${index}:${point.x}:${point.y}`}
-            cx={point.x}
-            cy={point.y}
-            r={1.6}
-            fill="#7c3aed"
-            stroke="#ffffff"
-            strokeWidth={0.45}
-          />
-        )),
-    [state.paths],
-  );
-  return (
-    <svg
-      aria-label="Trace points"
-      className="lf-trace-preview__points"
-      viewBox={`0 0 ${state.width} ${state.height}`}
-      width="100%"
-      height="100%"
-      preserveAspectRatio="none"
-    >
-      {circles}
-    </svg>
-  );
 }
 
 function BoundaryOverlay(props: {

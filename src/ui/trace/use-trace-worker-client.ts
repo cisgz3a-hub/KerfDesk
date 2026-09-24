@@ -35,6 +35,7 @@ import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trac
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 import { createCooperativeTraceRunner } from './cooperative-trace-runner';
 import type { TraceNotice } from './trace-notices';
+import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export type TraceResult = {
   readonly paths: ColoredPath[];
@@ -68,6 +69,7 @@ type Pending = {
   // 'started' ack — the moment the request stops queueing and starts
   // computing — and on every heartbeat from inside that computation.
   readonly restartWatchdog: () => void;
+  readonly progress: TraceProgress | undefined;
 };
 
 // Clears / restarts the single timer that bounds one in-flight request.
@@ -140,6 +142,7 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
     // worker has just proved it is alive, which is the only thing the budget
     // below is entitled to judge.
     pending.restartWatchdog();
+    if (e.data.kind === 'progress' && e.data.phase !== undefined) pending.progress?.(e.data.phase);
     return;
   }
   pendingByRequestId.delete(e.data.id);
@@ -197,6 +200,7 @@ export async function traceImage(
   image: RawImageData,
   options: TraceOptions,
   signal?: AbortSignal,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   if (signal?.aborted === true) throw new TraceRequestSupersededError();
   const epoch = ++latestTraceEpoch;
@@ -211,7 +215,9 @@ export async function traceImage(
   };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
-    return await traceImageForEpoch(image, options, epoch);
+    return await traceImageForEpoch(image, options, epoch, (phase) => {
+      if (epoch === latestTraceEpoch) progress?.(phase);
+    });
   } finally {
     signal?.removeEventListener('abort', cancel);
   }
@@ -221,6 +227,7 @@ async function traceImageForEpoch(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   if (workerInstance !== null && pendingByRequestId.size > 0) {
     rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
@@ -233,15 +240,15 @@ async function traceImageForEpoch(
     worker = ensureWorker();
   }
   if (worker === null) {
-    return traceInlineIfSafe(image, options, epoch);
+    return traceInlineIfSafe(image, options, epoch, progress);
   }
   try {
-    return await traceInWorker(worker, image, options);
+    return await traceInWorker(worker, image, options, progress);
   } catch (err) {
     checkTraceEpoch(epoch);
     if (isTraceRequestSuperseded(err)) throw err;
     if (canTraceInline(image)) {
-      return recoverSmallTrace(image, options, epoch, err);
+      return recoverSmallTrace(image, options, epoch, err, progress);
     }
     throw err instanceof Error ? err : new Error(String(err));
   }
@@ -256,6 +263,7 @@ async function recoverSmallTrace(
   options: TraceOptions,
   epoch: number,
   error: unknown,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   // Request-level errors keep their existing fallback route. Only actual
   // runtime death gets one fresh worker attempt; it can never retry forever.
@@ -263,14 +271,14 @@ async function recoverSmallTrace(
     const worker = ensureWorker();
     if (worker !== null) {
       try {
-        return await traceInWorker(worker, image, options);
+        return await traceInWorker(worker, image, options, progress);
       } catch (retryError) {
         checkTraceEpoch(epoch);
         if (isTraceRequestSuperseded(retryError)) throw retryError;
       }
     }
   }
-  return traceInline(image, options, epoch);
+  return traceInline(image, options, epoch, progress);
 }
 
 export function canTraceInline(image: {
@@ -284,24 +292,27 @@ async function traceInlineIfSafe(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   if (!canTraceInline(image)) {
     throw new Error(
       'Trace worker is unavailable for this large image. Reload the app and try again.',
     );
   }
-  return traceInline(image, options, epoch);
+  return traceInline(image, options, epoch, progress);
 }
 
 async function traceInline(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   const paths = await traceImageToColoredPaths(
     image,
     options,
     createCooperativeTraceRunner(() => checkTraceEpoch(epoch)),
+    progress,
   );
   checkTraceEpoch(epoch);
   return {
@@ -336,6 +347,7 @@ function traceInWorker(
   worker: Worker,
   image: RawImageData,
   options: TraceOptions,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
@@ -352,6 +364,7 @@ function traceInWorker(
         reject(err);
       },
       restartWatchdog: watchdog.restart,
+      progress,
     });
     // Keep the decoded source alive for subsequent preview changes, but move a
     // dedicated copy into the worker. Supplying its buffer as a transferable
@@ -386,13 +399,14 @@ export async function traceImageWithFallback(
   image: RawImageData,
   options: TraceOptions,
   signal?: AbortSignal,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
-  const first = await traceImage(image, options, signal);
+  const first = await traceImage(image, options, signal, progress);
   if (first.paths.length > 0) return first;
   if (!hasAggressivePreprocessing(options)) return first;
   // Keep the same palette/backend and disclose that Otsu, ink despeckle,
   // and short-path filtering were relaxed. Preview and commit carry this
   // result together so recovered artwork never masquerades as the first pass.
-  const retried = await traceImage(image, relaxAggressivePreprocessing(options), signal);
+  const retried = await traceImage(image, relaxAggressivePreprocessing(options), signal, progress);
   return { ...retried, notices: ['relaxed-settings'] };
 }

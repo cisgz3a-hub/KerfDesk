@@ -11,11 +11,15 @@ import {
 import type { TracePreviewState } from './use-trace-preview';
 import { readyTracePreview } from './use-trace-preview-settlement';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
+import type { TraceResult } from './use-trace-worker-client';
+import { TracePreviewCache } from './trace-preview-cache';
 
 export type DecodedSource = {
   readonly file: File;
   readonly controller: AbortController;
   readonly promise: Promise<DecodedTraceImage>;
+  readonly cache: TracePreviewCache;
+  readonly retryFailedDecode: () => void;
   decoded?: DecodedTraceImage;
 };
 
@@ -29,17 +33,40 @@ type PreviewRefs = {
 
 export function decodeTraceSource(file: File): DecodedSource {
   const controller = new AbortController();
+  let failed = false;
   const source: DecodedSource = {
     file,
     controller,
-    promise: loadImageAsRawData(file, PREVIEW_MAX_EDGE_PX, controller.signal).then((img) => {
-      checkTraceSignal(controller.signal);
-      const decoded = { img, hasTransparency: rawImageHasTransparency(img) };
-      source.decoded = decoded;
-      return decoded;
-    }),
+    cache: new TracePreviewCache(file),
+    get promise() {
+      return promise;
+    },
+    retryFailedDecode: () => {
+      if (!failed || controller.signal.aborted) return;
+      failed = false;
+      promise = decode();
+    },
   };
-  void source.promise.catch(() => undefined);
+  // Keep the same File owner so cleanup aborts every retry and valid cached
+  // geometry survives a transient decoder failure. Pending/successful decodes
+  // remain shared; only a later preview request can retry a rejected attempt.
+  function decode(): Promise<DecodedTraceImage> {
+    const attempt = loadImageAsRawData(file, PREVIEW_MAX_EDGE_PX, controller.signal).then(
+      (img) => {
+        checkTraceSignal(controller.signal);
+        const decoded = { img, hasTransparency: rawImageHasTransparency(img) };
+        source.decoded = decoded;
+        return decoded;
+      },
+      (error: unknown) => {
+        failed = true;
+        throw error;
+      },
+    );
+    void attempt.catch(() => undefined);
+    return attempt;
+  }
+  let promise = decode();
   return source;
 }
 
@@ -54,18 +81,42 @@ export function beginTracePreview(
     return undefined;
   }
   const current = (): boolean => token === refs.token.current;
+  const cached = source.cache.get(request);
+  if (cached !== undefined) {
+    refs.setState({
+      ...cached,
+      sourceHasTransparency: source.decoded?.hasTransparency ?? cached.sourceHasTransparency,
+    });
+    refs.preparation.current = undefined;
+    return () => {
+      refs.token.current += 1;
+    };
+  }
+  source.retryFailedDecode();
+  const startedAt = Date.now();
   refs.setState(
     source.decoded === undefined
-      ? { kind: 'decoding' }
-      : { kind: 'tracing', sourceHasTransparency: source.decoded.hasTransparency },
+      ? { kind: 'decoding', startedAt }
+      : {
+          kind: 'tracing',
+          phase: 'preparing',
+          startedAt,
+          sourceHasTransparency: source.decoded.hasTransparency,
+        },
   );
   const preparation = createTracePreparation(
     request,
     source.promise,
     source.decoded === undefined ? 0 : 300,
-    (image) => {
+    (image, phase) => {
       if (current())
-        refs.setState({ kind: 'tracing', sourceHasTransparency: image.hasTransparency });
+        refs.setState((previous) =>
+          previous.kind === 'tracing' &&
+          previous.phase === phase &&
+          previous.startedAt === startedAt
+            ? previous
+            : { kind: 'tracing', phase, startedAt, sourceHasTransparency: image.hasTransparency },
+        );
     },
   );
   refs.preparation.current = preparation;
@@ -86,11 +137,14 @@ function publishPreparation(
   const current = (): boolean => token === refs.token.current;
   void preparation.result.then(
     (result) => {
-      if (current() && refs.settled.current !== token) {
-        refs.setState(
-          readyTracePreview(preparation.request, result, source.decoded?.hasTransparency),
-        );
-      }
+      if (!current()) return;
+      const ready = readyPreparedPreview(
+        source,
+        preparation.request,
+        result,
+        source.decoded?.hasTransparency,
+      );
+      if (refs.settled.current !== token) refs.setState(ready);
     },
     (error: unknown) => {
       if (
@@ -118,4 +172,18 @@ function publishPreparation(
     },
     () => undefined,
   );
+}
+
+export function readyPreparedPreview(
+  source: DecodedSource | null,
+  request: TracePreparationRequest,
+  result: TraceResult,
+  hasTransparency: boolean | undefined,
+): Extract<TracePreviewState, { kind: 'ready' }> {
+  const cached = source?.cache.get(request);
+  if (cached?.preparedTrace?.result === result)
+    return { ...cached, sourceHasTransparency: hasTransparency ?? cached.sourceHasTransparency };
+  const ready = readyTracePreview(request, result, hasTransparency);
+  source?.cache.remember(request, ready);
+  return ready;
 }

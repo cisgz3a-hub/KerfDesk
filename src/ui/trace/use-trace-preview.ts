@@ -1,6 +1,7 @@
 // Preview and Submit share one preparation, including decode and debounce.
 import { type Ref, useEffect, useRef, useState } from 'react';
 import type { ColoredPath } from '../../core/scene';
+import type { TracePhase } from '../../core/trace/trace-progress';
 import {
   type RawImageData,
   type TraceBoundary,
@@ -20,13 +21,19 @@ import type { TracePreparation } from './trace-preparation';
 import {
   beginTracePreview,
   decodeTraceSource,
+  readyPreparedPreview,
   type DecodedSource,
 } from './trace-preview-preparation';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'decoding' }
-  | { readonly kind: 'tracing'; readonly sourceHasTransparency?: boolean | undefined }
+  | { readonly kind: 'decoding'; readonly startedAt?: number }
+  | {
+      readonly kind: 'tracing';
+      readonly phase?: TracePhase;
+      readonly startedAt?: number;
+      readonly sourceHasTransparency?: boolean | undefined;
+    }
   | {
       readonly kind: 'ready';
       readonly svg: string;
@@ -72,6 +79,8 @@ export function useTracePreview(
     preparation: () =>
       preparationRef.current?.failed === true ? undefined : preparationRef.current,
     settlePreparation: (outcome) => preparationRef.current?.settle(outcome),
+    readyPreview: (request, result, transparent) =>
+      readyPreparedPreview(decodedRef.current, request, result, transparent),
   });
   useEffect(() => {
     if (file === null) {
@@ -81,6 +90,7 @@ export function useTracePreview(
     const source = decodeTraceSource(file);
     decodedRef.current = source;
     return () => {
+      source.cache.clear();
       source.controller.abort();
     };
   }, [file]);

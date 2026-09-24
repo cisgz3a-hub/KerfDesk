@@ -3,6 +3,18 @@ import type { RawImageData } from '../../core/trace';
 import { TRACE_PRESETS } from '../../core/trace/trace-presets';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 
+// This suite exercises worker ownership only. Keep cold algorithm transforms
+// outside its fake-timer lifecycle and fail if cancellation ever starts inline work.
+const { traceInline } = vi.hoisted(() => ({
+  traceInline: vi.fn(() => {
+    throw new Error('Cancelled worker must not fall back to inline tracing');
+  }),
+}));
+vi.mock('../../core/trace', () => ({
+  traceImageToColoredPaths: traceInline,
+  boundsFromColoredPaths: vi.fn(),
+}));
+
 const workers: ControlledWorker[] = [];
 class ControlledWorker {
   onmessage: ((event: MessageEvent<TraceWorkerResponse>) => void) | null = null;
@@ -48,6 +60,8 @@ async function client() {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  expect(traceInline).not.toHaveBeenCalled();
+  traceInline.mockClear();
 });
 
 describe('trace cancellation belongs to one request', () => {

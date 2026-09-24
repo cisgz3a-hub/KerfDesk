@@ -529,7 +529,9 @@ async function installWorkerProbe(page: Page): Promise<void> {
             window.dispatchEvent(new Event('centerline-worker-started'));
           } else if (reply.kind === 'progress') {
             // Still computing: the request is not settled by a heartbeat.
-            request.beats++;
+            // Phase changes are real status messages, but do not prove the
+            // native generator continued reporting at the heartbeat interval.
+            if (reply.phase === undefined) request.beats++;
           } else {
             request.settledAt = now;
             request.ticksAtEnd = probe.ticks;
