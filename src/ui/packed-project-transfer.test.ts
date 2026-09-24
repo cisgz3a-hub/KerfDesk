@@ -1,3 +1,4 @@
+import { deepStrictEqual } from 'node:assert/strict';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -125,7 +126,9 @@ describe('packed project transfer', () => {
         expect(packed.transfer.length).toBeGreaterThan(0);
         // What postMessage would do: clone the message and detach the buffers.
         const received = structuredClone(packed.message, { transfer: packed.transfer });
-        expect(unpackProjectMessage(received)).toEqual(project);
+        // Retain all dense geometry in every generated case. Node's native
+        // comparator avoids matcher bookkeeping for these 600,000+ points.
+        deepStrictEqual(unpackProjectMessage(received), project);
         expect(JSON.stringify(project)).toBe(before);
       }),
       { numRuns: 60 },

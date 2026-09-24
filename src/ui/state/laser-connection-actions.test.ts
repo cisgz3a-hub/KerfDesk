@@ -64,6 +64,17 @@ describe('connect port-picker failures', () => {
       controllerSettings: { bedWidth: 999, maxPowerS: 24000 },
       grblSettingsRows: settingsMapToRows(new Map([[30, '24000']])),
       lastSettingsReadAt: 1,
+      rxCapacityEvidence: {
+        rxBytesFree: 128,
+        plannerBlocksFree: 14,
+        sessionEpoch: useLaserStore.getState().controllerSessionEpoch,
+        observedAt: 1,
+      },
+      plannerCapacityEvidence: {
+        plannerBlocksFree: 15,
+        sessionEpoch: useLaserStore.getState().controllerSessionEpoch,
+        observedAt: 2,
+      },
     });
     const adapter = adapterWithRequestPort(async () => null);
 
@@ -76,6 +87,8 @@ describe('connect port-picker failures', () => {
       controllerSettings: null,
       grblSettingsRows: [],
       lastSettingsReadAt: null,
+      rxCapacityEvidence: null,
+      plannerCapacityEvidence: null,
     });
   });
 

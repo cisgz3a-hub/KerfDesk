@@ -42,7 +42,7 @@ export function JobActionControls(props: Props): JSX.Element {
           type="button"
           className="lf-btn"
           onClick={cancelOwnedFramePreparation}
-          title="Stop preparing this Frame. Nothing has been sent to the machine."
+          title="Stop preparing this Frame. This preparation will not enable Start."
         >
           Cancel
         </button>
