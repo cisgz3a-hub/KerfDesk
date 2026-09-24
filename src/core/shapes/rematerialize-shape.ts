@@ -4,7 +4,12 @@ import { createPolygon } from './primitives/create-polygon';
 import { createRectangle } from './primitives/create-rectangle';
 import { createStar } from './primitives/create-star';
 
-export type ParametricShapeSpec = Exclude<ShapeSpec, { readonly kind: 'polyline' }>;
+// Barcodes re-encode their data rather than resize by field, so they are not
+// parametric in this sense (ADR-372).
+export type ParametricShapeSpec = Exclude<
+  ShapeSpec,
+  { readonly kind: 'polyline' } | { readonly kind: 'barcode' }
+>;
 
 const MIN_COUNT = 3;
 const MAX_COUNT = 64;

@@ -40,6 +40,7 @@ import { publishFramePreparationProgress } from '../state/frame-preparation-stor
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import { machineSnapshot } from './start-machine-snapshot';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 /** Optional observers of one Start preparation. */
 export type StartPreparationHooks = {
@@ -197,9 +198,7 @@ async function prepareCurrentStartInBackground(args: {
 }
 
 function hasVariableText(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-  );
+  return projectHasVariableData(project);
 }
 
 /** True when a compile of this project is bound to the moment it ran — a
