@@ -19,7 +19,7 @@ import { finishedJobStateReset } from './laser-session-reset';
 import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
-import { rxCapacityEvidencePatch } from './laser-rx-capacity-evidence';
+import { statusBufferPatch } from './laser-rx-capacity-evidence';
 import { statusObservationPatch } from './laser-status-observation';
 import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
@@ -109,7 +109,7 @@ export function handleStatusLine(
     ...positionPatch,
     statusSequence: nextSequence,
     ...statusObservationPatch(state, nextSequence, positionInvalidated),
-    ...rxCapacityEvidencePatch(state, report, Date.now()),
+    ...statusBufferPatch(state, report, Date.now()),
     ...controllerHoldLogPatch(state, report),
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,

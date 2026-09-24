@@ -46,7 +46,7 @@ import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { ResetAlarmRefs } from './laser-reset-alarm';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
-import type { RxCapacityEvidence } from './laser-rx-capacity-evidence';
+import type { RxCapacityEvidence, StreamPlannerSnapshot } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
 import type { JobStopRequest } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
@@ -217,6 +217,10 @@ export type LaserState = LaserStoreActions &
      * proof that bounds the buffered streaming window at Start (ADR-331).
      * Session-scoped; null/undefined means the controller never reported it. */
     readonly rxCapacityEvidence?: RxCapacityEvidence | null;
+    /** Planner blocks still waiting at the latest status report of the active
+     * run, for the recovery restart after a stop that discards them
+     * (planner-backlog-restart.ts). */
+    readonly streamPlannerSnapshot?: StreamPlannerSnapshot | null;
     /** The controller keeps answering status queries but has stopped
      * acknowledging the lines already sent to it. Named in the live bar and
      * logged once per episode; null while acknowledgements flow or no job

@@ -12,7 +12,7 @@ import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { currentJobStopRequest } from '../state/job-stop-request';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
-import { checkpointInterruption } from './checkpoint-interruption';
+import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
 import {
   checkpointArchiveHandoffIsCurrent,
   pendingCheckpointArchiveHandoff,
@@ -147,6 +147,7 @@ class JobCheckpointTracker {
       streamer.status,
       state.safetyNotice,
       currentJobStopRequest(state),
+      currentRunPlannerBacklog(state),
     );
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
@@ -427,7 +428,12 @@ function disappearedStreamInterruption(
   state: LaserState,
 ): JobInterruption {
   return (
-    checkpointInterruption(previousStatus, state.safetyNotice, currentJobStopRequest(state)) ?? {
+    checkpointInterruption(
+      previousStatus,
+      state.safetyNotice,
+      currentJobStopRequest(state),
+      currentRunPlannerBacklog(state),
+    ) ?? {
       kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
       message:
         state.connection.kind === 'connected'
