@@ -41,6 +41,19 @@ type PendingMissingTerminal =
       readonly settledAtIso: string;
     };
 
+/** The interruption and ack a run's terminal stream was first seen with. A
+ * terminal seen before the Start archive activates waits (ADR-337) while the
+ * store moves on: the operator acknowledges the safety notice, a later notice
+ * replaces it, trailing oks arrive. Every attempt records this first sight, as
+ * an already-active run records it at once; re-deriving it at activation
+ * dropped the rejected line a controller-error restart replays (ADR-341
+ * Amendment 3). */
+type FirstInterruption = {
+  readonly runId: RunId;
+  readonly ackedLines: number;
+  readonly interruption: JobInterruption;
+};
+
 type TrackingFailureReporter = (error: unknown) => void;
 
 /** The one progress write allowed to wait behind the write in flight. */
@@ -82,6 +95,7 @@ class JobCheckpointTracker {
   private lastPersistedAck = 0;
   private highestQueuedAck = 0;
   private terminalQueued = false;
+  private firstInterruption: FirstInterruption | null = null;
   private pendingMissingTerminal: PendingMissingTerminal | null = null;
   private queuedMissingTerminal: PendingMissingTerminal | null = null;
   private deferredArchiveHandoff: CheckpointArchiveHandoff | null = null;
@@ -122,13 +136,14 @@ class JobCheckpointTracker {
   private observeMissingStreamer(state: LaserState, priorState: LaserState | undefined): void {
     if (this.previous !== null) {
       const ended = this.previous;
+      const first = this.firstInterruption?.runId === ended.runId ? this.firstInterruption : null;
       this.pendingMissingTerminal = settledCleanly(state, priorState, ended.status)
         ? { kind: 'completed', runId: ended.runId, settledAtIso: this.nowIso() }
         : {
             kind: 'interrupted',
             runId: ended.runId,
-            ackedLines: ended.completed,
-            interruption: disappearedStreamInterruption(ended.status, state),
+            ackedLines: first?.ackedLines ?? ended.completed,
+            interruption: first?.interruption ?? disappearedStreamInterruption(ended.status, state),
             settledAtIso: this.nowIso(),
           };
     }
@@ -156,7 +171,11 @@ class JobCheckpointTracker {
       // A terminal streamer still counts the trailing oks for lines GRBL had
       // buffered. The interruption records the exact ack it saw; a progress
       // write carrying a later ack would only raise it or fail as a no-op.
-      if (!this.terminalQueued) this.queueInterruption(runId, streamer.completed, interruption);
+      if (this.firstInterruption?.runId !== runId) {
+        this.firstInterruption = { runId, ackedLines: streamer.completed, interruption };
+      }
+      const first = this.firstInterruption;
+      if (!this.terminalQueued) this.queueInterruption(runId, first.ackedLines, first.interruption);
       return;
     }
 
@@ -239,6 +258,7 @@ class JobCheckpointTracker {
   private retireTerminal(runId: RunId): void {
     this.supersededTerminalRunId = runId;
     this.clearDeferredArchiveHandoff(runId);
+    if (this.firstInterruption?.runId === runId) this.firstInterruption = null;
     if (this.pendingMissingTerminal?.runId === runId) this.pendingMissingTerminal = null;
     if (this.watermarkRunId === runId) this.clearRunWatermarks();
   }
@@ -293,6 +313,7 @@ class JobCheckpointTracker {
   private beginRun(runId: RunId): void {
     if (this.pendingMissingTerminal?.runId !== runId) this.pendingMissingTerminal = null;
     if (this.deferredArchiveHandoff?.runId !== runId) this.deferredArchiveHandoff = null;
+    if (this.firstInterruption?.runId !== runId) this.firstInterruption = null;
     this.previous = null;
     this.watermarkRunId = runId;
     this.lastPersistedAck = cachedAck(this.repository, runId);
