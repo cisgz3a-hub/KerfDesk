@@ -1,6 +1,8 @@
 export type DesktopCloseNotice = {
   readonly kind: 'pending' | 'failed' | 'unconfirmed';
   readonly message: string;
+  /** Offers Retry: a failed Abort, or a Fire the app could not confirm off. */
+  readonly retry?: boolean;
 };
 
 export type DesktopCloseReply =
@@ -9,6 +11,9 @@ export type DesktopCloseReply =
 
 export interface DesktopCloseSnapshot {
   readonly active: boolean;
+  /** Momentary Fire is latched on. Closing turns it off first, as it aborts a
+   *  running job (controller audit electron-native-3). */
+  readonly fireLatched?: boolean;
   readonly epoch: number;
   readonly dirty: boolean;
   readonly warning: string | null;
@@ -56,9 +61,10 @@ export class DesktopCloseController {
     if (this.attempt !== null) return this.attempt.promise;
     let resolve: (reply: DesktopCloseReply) => void = () => undefined;
     const promise = new Promise<DesktopCloseReply>((done) => (resolve = done));
+    const snapshot = this.read();
     const attempt: CloseAttempt = {
       id,
-      wasActive: this.read().active || this.stopFlight !== null,
+      wasActive: snapshot.active || snapshot.fireLatched === true || this.stopFlight !== null,
       promise,
       resolve,
       preparedEpoch: null,
@@ -86,7 +92,7 @@ export class DesktopCloseController {
   }
 
   readonly retryStop = (): void => {
-    if (this.attempt !== null && this.notice?.kind === 'failed') {
+    if (this.attempt !== null && this.notice?.retry === true) {
       void this.stopForAttempt(this.attempt);
     }
   };
@@ -129,7 +135,10 @@ export class DesktopCloseController {
 
   /** Browser fallback also joins an outstanding close stop after Keep open. */
   bestEffortStop(): void {
-    if (this.read().active) void this.requestStop().catch(() => undefined);
+    const snapshot = this.read();
+    if (snapshot.active || snapshot.fireLatched === true) {
+      void this.requestStop().catch(() => undefined);
+    }
   }
 
   private requestStop(): Promise<void> {
@@ -157,10 +166,12 @@ export class DesktopCloseController {
   }
 
   private async stopForAttempt(attempt: CloseAttempt): Promise<void> {
+    const jobActive = this.read().active;
     this.setNotice({
       kind: 'pending',
       message:
-        'Sending Abort before closing. Keep this window available while the request finishes. ' +
+        (jobActive ? 'Sending Abort before closing. ' : 'Turning Fire off before closing. ') +
+        'Keep this window available while the request finishes. ' +
         'A completed software request does not confirm the machine is physically stopped.',
     });
     try {
@@ -168,8 +179,15 @@ export class DesktopCloseController {
       if (this.attempt === attempt) this.prepareResult(attempt);
     } catch (error) {
       if (this.attempt !== attempt) return;
+      // Without a job, only Fire was being turned off: its unconfirmed warning
+      // can be acknowledged, so a link that refuses M5 cannot trap the window.
+      if (!this.read().active) {
+        this.prepareResult(attempt);
+        return;
+      }
       this.setNotice({
         kind: 'failed',
+        retry: true,
         message:
           'The Abort request failed. The app is staying open. Use the physical E-stop or power ' +
           'cutoff if unsafe. ' +
@@ -186,6 +204,7 @@ export class DesktopCloseController {
     if (snapshot.active) {
       this.setNotice({
         kind: 'failed',
+        retry: true,
         message: 'The job is still active in KerfDesk. Keep the app open or retry Abort.',
       });
       return;
@@ -195,7 +214,11 @@ export class DesktopCloseController {
       (acknowledged?.warning !== snapshot.warning || acknowledged.epoch !== snapshot.epoch)
     ) {
       this.shownWarning = snapshot;
-      this.setNotice({ kind: 'unconfirmed', message: snapshot.warning });
+      this.setNotice({
+        kind: 'unconfirmed',
+        message: snapshot.warning,
+        retry: snapshot.fireLatched === true,
+      });
       return;
     }
     attempt.preparedEpoch = snapshot.epoch;

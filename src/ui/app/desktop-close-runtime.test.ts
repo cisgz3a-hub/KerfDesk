@@ -87,6 +87,7 @@ describe('main-to-renderer fixed close protocol with actual unload hooks', () =>
     expect(desktopCloseController.getNotice()).toEqual({
       kind: 'unconfirmed',
       message: 'Abort was not written',
+      retry: false,
     });
     desktopCloseController.keepOpen();
     expect(await pending).toEqual({ status: 'cancelled' });
@@ -109,5 +110,21 @@ describe('main-to-renderer fixed close protocol with actual unload hooks', () =>
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
+  });
+});
+
+describe('desktop close runtime with Fire latched (audit electron-native-3)', () => {
+  it('writes the Fire release, not an Abort, when no job runs', async () => {
+    const setFireActive = vi.fn(async () => {
+      useLaserStore.setState({ fireActive: false });
+    });
+    const stopJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ fireActive: true, setFireActive, stopJob });
+    install();
+
+    await expect(request('prepare')).resolves.toEqual({ status: 'ready', dirty: false });
+
+    expect(setFireActive).toHaveBeenCalledWith(false);
+    expect(stopJob).not.toHaveBeenCalled();
   });
 });
