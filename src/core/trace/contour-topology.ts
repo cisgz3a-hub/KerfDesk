@@ -12,11 +12,19 @@ export type ContourRefinement = {
   readonly baseline: Polyline;
   readonly refine: (amount: number) => Polyline;
 };
-export type FinishedContour = ContourRefinement & { readonly source: Polyline };
+export type FinishedContour = ContourRefinement & {
+  readonly source: Polyline;
+  /** The same boundary finished without its rebuilt corners. Tried once, on
+   *  the contour's first conflict, before its smoothing is backed off. */
+  readonly withoutRebuiltCorners?: () => ContourRefinement;
+};
 
 // These are refinement attempts, not an output-distance floor. Valid small
 // positive gaps stay byte-identical, and the earlier geometry remains available.
-const REFINEMENT_ATTEMPTS = 12;
+// Four halvings reach 1/16 of the finishing tolerance (0.35 px becomes about
+// 0.02 px), below the boundary's own noise. Further halvings barely move the
+// curve, yet each one costs a full check of the drawing.
+const REFINEMENT_ATTEMPTS = 4;
 const REFINEMENT_REDUCTION = 0.5;
 
 /** Keep a final curve candidate together with the geometry it refines. */
@@ -41,6 +49,7 @@ export function* preserveContourTopologySteps(
   const cooperate = yield;
   const current = contours.map((contour) => contour.polyline);
   const attempts = contours.map(() => 0);
+  const repair: TopologyRepair = { current, attempts, finishes: [...contours] };
   const membership = new ContourMembership();
   const contacts = new ContourContactCache();
   for (;;) {
@@ -50,23 +59,48 @@ export function* preserveContourTopologySteps(
     for (const index of conflicts) {
       if (cooperate) yield;
       const contour = contours[index];
-      const attempt = attempts[index];
-      if (contour === undefined || attempt === undefined || attempt > REFINEMENT_ATTEMPTS + 1)
-        continue;
-      const next = attempt + 1;
-      attempts[index] = next;
-      current[index] =
-        next <= REFINEMENT_ATTEMPTS
-          ? contour.refine(REFINEMENT_REDUCTION ** next)
-          : next === REFINEMENT_ATTEMPTS + 1
-            ? contour.baseline
-            : contour.source;
-      changed = true;
+      if (contour !== undefined && backOffContour(contour, index, repair)) changed = true;
     }
-    // Each conflicting contour moves only toward an earlier representation.
-    // Once source boundaries are reached, any inherited source contact is kept.
+    // Each conflicting contour moves only toward its source boundary: the
+    // finish without rebuilt corners, weaker refinements, the smoothed
+    // baseline, then the source. Once source boundaries are reached, any
+    // inherited source contact is kept.
     if (!changed) return current;
   }
+}
+
+type TopologyRepair = {
+  readonly current: Polyline[];
+  /** The finish each contour is backing off: its own, or the one without
+   *  rebuilt corners once that has been swapped in. */
+  readonly finishes: ContourRefinement[];
+  readonly attempts: number[];
+};
+
+/** Move one conflicting contour a step toward its source boundary. False once
+ *  it is already there. */
+function backOffContour(contour: FinishedContour, index: number, repair: TopologyRepair): boolean {
+  const finish = repair.finishes[index] ?? contour;
+  const attempt = repair.attempts[index] ?? 0;
+  if (attempt > REFINEMENT_ATTEMPTS + 1) return false;
+  // Retry this contour alone without its rebuilt corners, keeping full
+  // smoothing. Stepping the smoothing down first would strip it from both
+  // contours of the pair and, after the halvings, from each whole outline.
+  if (finish === contour && contour.withoutRebuiltCorners !== undefined) {
+    const alternate = contour.withoutRebuiltCorners();
+    repair.finishes[index] = alternate;
+    repair.current[index] = alternate.polyline;
+    return true;
+  }
+  const next = attempt + 1;
+  repair.attempts[index] = next;
+  repair.current[index] =
+    next <= REFINEMENT_ATTEMPTS
+      ? finish.refine(REFINEMENT_REDUCTION ** next)
+      : next === REFINEMENT_ATTEMPTS + 1
+        ? finish.baseline
+        : contour.source;
+  return true;
 }
 
 function* addNestingConflictsSteps(

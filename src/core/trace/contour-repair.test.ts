@@ -41,6 +41,35 @@ describe('contour refinement correction', () => {
     expect(result[2]).toBe(distant.polyline);
     expect(distant.refine).not.toHaveBeenCalled();
   });
+  it('tries the finish without rebuilt corners before backing off the smoothing', () => {
+    const withoutCorners = { ...candidate(square(0, 1.05)), refine: vi.fn(() => square(0, 1)) };
+    const first = {
+      ...candidate(square(0, 1), square(0, 2)),
+      withoutRebuiltCorners: () => withoutCorners,
+    };
+    const second = candidate(square(1.1, 1));
+    const result = runTraceSteps(preserveContourTopologySteps([first, second]));
+    expect(result[0]).toBe(withoutCorners.polyline);
+    expect(first.refine).not.toHaveBeenCalled();
+    expect(withoutCorners.refine).not.toHaveBeenCalled();
+  });
+  it('backs off the finish without rebuilt corners when it still conflicts', () => {
+    const crossing = square(0, 2);
+    const withoutCorners = {
+      polyline: crossing,
+      baseline: crossing,
+      refine: vi.fn(() => crossing),
+    };
+    const first = {
+      ...candidate(square(0, 1), crossing),
+      withoutRebuiltCorners: () => withoutCorners,
+    };
+    const second = candidate(square(1.1, 1));
+    const result = runTraceSteps(preserveContourTopologySteps([first, second]));
+    expect(result[0]).toBe(first.source);
+    expect(withoutCorners.refine).toHaveBeenCalledWith(0.5);
+    expect(first.refine).not.toHaveBeenCalled();
+  });
   it('retains source boundaries if earlier fitting geometry is also invalid', () => {
     const source = square(0, 2);
     const invalid: Polyline = {

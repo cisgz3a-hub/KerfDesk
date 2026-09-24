@@ -276,45 +276,51 @@ function* finishLoopSteps(
   const sharpened = inSharpenRange
     ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors)
     : { points: dense, corners: NO_CORNERS };
-  const fixedPoints =
-    featureAnchors.size === 0
-      ? sharpened.corners
-      : new Set([...sharpened.corners, ...featureAnchors]);
-  const evened = smoothChainCurvature(sharpened.points, true, fixedPoints);
-  // Mid-wavelength curvature noise (the "small wobble in the O") is evened
-  // on the DENSE chain, where a local moving circle fit has rich statistics
-  // and cannot average away drawn structure the way long-span fits do
-  // (measured: run-level arc replacement cost 10 IoU points on real art).
-  // LARGE loops only — the same size class as the corner rebuild: glyph
-  // bowls at counter scale already render correctly and a ±7px window is a
-  // large fraction of such a feature.
-  const arcSmoothed =
-    dense.length >= sharpenMin
-      ? smoothArcNoise(evened, true, sharpened.corners, arcStrengthEff, finish.pixelScale)
-      : evened;
-  // Measured loops with an evidence-based corner set (sharpener range) take
-  // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
-  // points replace simplify+flatten+spline — the fit averages ~0.1px noise
-  // into fair curves with no chord joints and no per-vertex facets
-  // (research brief #2). Tiny glyphs and beyond-range art loops keep the
-  // approved legacy tail until the fit path earns them.
-  const refined =
-    subPixelInformed && dense.length >= sharpenMin
-      ? finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish)
-      : finishLegacyLoop(
-          arcSmoothed,
-          sharpened.corners,
-          flattenStrengthEff,
-          finish,
-          featureAnchors,
-        );
-  // The area policy has already admitted this boundary. A tolerance larger
-  // than the loop can collapse the finishing tail to two anchors; Optimize
-  // must not become another area-removal control. Retain the measured crack
-  // boundary in that case (one bounded fallback, no new fitting search), and
-  // include it in the same topology repair as every other admitted contour.
-  const retained = refined ?? contourRefinement(crack.points, () => crack.points);
-  return { ...retained, source: closeContour(crack.points) };
+  const finishFrom = (bends: typeof sharpened): ContourRefinement => {
+    const fixedPoints =
+      featureAnchors.size === 0 ? bends.corners : new Set([...bends.corners, ...featureAnchors]);
+    const evened = smoothChainCurvature(bends.points, true, fixedPoints);
+    // Mid-wavelength curvature noise (the "small wobble in the O") is evened
+    // on the DENSE chain, where a local moving circle fit has rich statistics
+    // and cannot average away drawn structure the way long-span fits do
+    // (measured: run-level arc replacement cost 10 IoU points on real art).
+    // LARGE loops only — the same size class as the corner rebuild: glyph
+    // bowls at counter scale already render correctly and a ±7px window is a
+    // large fraction of such a feature.
+    const arcSmoothed =
+      dense.length >= sharpenMin
+        ? smoothArcNoise(evened, true, bends.corners, arcStrengthEff, finish.pixelScale)
+        : evened;
+    // Measured loops with an evidence-based corner set (sharpener range) take
+    // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
+    // points replace simplify+flatten+spline — the fit averages ~0.1px noise
+    // into fair curves with no chord joints and no per-vertex facets
+    // (research brief #2). Tiny glyphs and beyond-range art loops keep the
+    // approved legacy tail until the fit path earns them.
+    const refined =
+      subPixelInformed && dense.length >= sharpenMin
+        ? finishMeasuredLoop(arcSmoothed, bends, inSharpenRange, finish)
+        : finishLegacyLoop(arcSmoothed, bends.corners, flattenStrengthEff, finish, featureAnchors);
+    // The area policy has already admitted this boundary. A tolerance larger
+    // than the loop can collapse the finishing tail to two anchors; Optimize
+    // must not become another area-removal control. Retain the measured crack
+    // boundary in that case (one bounded fallback, no new fitting search), and
+    // include it in the same topology repair as every other admitted contour.
+    return refined ?? contourRefinement(crack.points, () => crack.points);
+  };
+  const retained = finishFrom(sharpened);
+  const source = closeContour(crack.points);
+  if (sharpened.corners.size === 0) return { ...retained, source };
+  // A rebuilt corner extends the bend's straight sides to where they meet,
+  // bounded by the bend's own size, not by neighbouring outlines, so on dense
+  // art it is the usual reason a finished loop crosses a neighbour. The
+  // topology repair tries this finish without rebuilt corners, with full
+  // smoothing, before it backs the smoothing off.
+  return {
+    ...retained,
+    source,
+    withoutRebuiltCorners: () => finishFrom({ points: dense, corners: NO_CORNERS }),
+  };
 }
 
 // Measured loops end in the fairing-by-fitting tail: least-squares cubics

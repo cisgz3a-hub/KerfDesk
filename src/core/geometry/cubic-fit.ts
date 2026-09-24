@@ -213,10 +213,21 @@ function generateBezier(
     x1 += a1x * rx + a1y * ry;
   }
   const det = c00 * c11 - c01 * c01;
-  const chord = Math.hypot(p3.x - p0.x, p3.y - p0.y);
+  const lineX = p3.x - p0.x;
+  const lineY = p3.y - p0.y;
+  const chord = Math.hypot(lineX, lineY);
   let armL = det !== 0 ? (x0 * c11 - x1 * c01) / det : 0;
   let armR = det !== 0 ? (c00 * x1 - c01 * x0) / det : 0;
-  if (armL < MIN_ARM_FRACTION * chord || armR < MIN_ARM_FRACTION * chord) {
+  // Degenerate arms fall back to Wu/Barsky's chord/3. So do arms whose
+  // projections onto the chord add up to more than the chord: the control
+  // points are out of order and the curve loops between the data points,
+  // which the point-wise error test cannot see (Paper.js PathFitter's check).
+  // The split recursion then refits if chord/3 misses the tolerance.
+  if (
+    armL < MIN_ARM_FRACTION * chord ||
+    armR < MIN_ARM_FRACTION * chord ||
+    (t1.x * lineX + t1.y * lineY) * armL - (t2.x * lineX + t2.y * lineY) * armR > chord * chord
+  ) {
     armL = chord / 3;
     armR = chord / 3;
   }
