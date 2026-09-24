@@ -33,4 +33,25 @@ describe('cncToolGeometryLabel', () => {
       }),
     ).toBe('6 mm, 60° V-bit');
   });
+
+  it('labels a tapered ball nose by its tip and per-side taper, as sellers list it', () => {
+    const taperedBall: CncTool = {
+      id: 'tbn',
+      name: 'tbn',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    };
+    expect(cncToolGeometryLabel(taperedBall)).toBe(
+      '6.25 mm, 1.5875 mm tip, 5.4° per side, Tapered ball nose',
+    );
+    const { tipDiameterMm: _tip, ...noTip } = taperedBall;
+    expect(cncToolGeometryLabel(noTip)).toBe(
+      '6.25 mm, tip diameter missing, 5.4° per side, Tapered ball nose',
+    );
+    expect(cncToolGeometryLabel({ ...taperedBall, tipDiameterMm: 7, tipAngleDeg: 0 })).toBe(
+      '6.25 mm, invalid tip diameter, taper angle missing, Tapered ball nose',
+    );
+  });
 });

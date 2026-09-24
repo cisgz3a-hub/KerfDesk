@@ -1,6 +1,6 @@
 # Generated learning pictures
 
-The built-in image generation tool produced the pictures. Research, source review and visual inspection guide their use; generated output is not evidence of a real machining or engraving result.
+The built-in image generation tool produced the pictures, except the tapered ball-nose bit picture, which is rendered from the modeled cutter law (ADR-368). Research, source review and visual inspection guide their use; neither generated nor rendered output is evidence of a real machining or engraving result.
 
 The final web assets are in `public/tutorial-images/`. The metadata modules `tutorial-photo-assets.ts` and `bit-photo-assets.ts` contain filenames, dimensions and byte counts only. The complete prompt sets and local original-image provenance are in [generated-image-sources.json](generated-image-sources.json) and [bit-image-sources.json](bit-image-sources.json). Original PNG paths are production records, not runtime dependencies. Only the compressed files are shipped.
 
@@ -14,7 +14,7 @@ The final web assets are in `public/tutorial-images/`. The metadata modules `tut
 - **V-carve:** the two channels show sloping faces and increased width with increased depth; no arbitrary depth or angle is presented as a setting.
 - **Profile / tabs:** one photograph shows an oval retained by four bridges. It explains attachment, while the actual job controls determine tab dimensions and positions.
 - **Box:** a single assembled open-top box illustrates the physical result. An earlier storyboard with inaccurate panel relationships was rejected. Flat assembly layout and the distinct fit-coupon tool retain their dedicated diagrams.
-- **CNC cutters:** all 15 family pictures follow the manufacturer references recorded in the bit prompt set. Visual review checked flat versus hemispherical versus pointed/tipped-off ends, straight versus spiral flutes, opposite upcut/downcut directions, the compression cutter's opposing flute sections, and broad mortise/core-box heads. The O-flute ball-nose image was edited to correct its helix. These are generic family illustrations, not photographs of an exact catalogue SKU or scaled tool measurements.
+- **CNC cutters:** the 15 generated family pictures follow the manufacturer references recorded in the bit prompt set. Visual review checked flat versus hemispherical versus pointed/tipped-off ends, straight versus spiral flutes, opposite upcut/downcut directions, the compression cutter's opposing flute sections, and broad mortise/core-box heads. The O-flute ball-nose image was edited to correct its helix. These are generic family illustrations, not photographs of an exact catalogue SKU or scaled tool measurements. The tapered ball-nose picture is a three.js render of Amana 46282's modeled geometry from [its scene file](bit-renders/bit-tapered-ball-nose.html); its right-hand upcut flutes, shank length and lighting are illustrative.
 
 The app implementation is the primary source for its labels, gestures, supported geometry and availability. The [design](accuracy-audit-design.md) and [machine](accuracy-audit-machine.md) audits document principal-source checks across all 93 lessons. External sources validate physical concepts and image briefs without importing another product's UI or machine settings:
 

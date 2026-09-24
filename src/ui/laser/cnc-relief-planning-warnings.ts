@@ -8,6 +8,8 @@ import {
   MAX_HEIGHTMAP_CELLS,
   scallopRowSpacingMm,
 } from '../../core/relief';
+// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel.
+import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
@@ -108,27 +110,30 @@ function compiledReliefScallopWarnings(
   project: Project,
   plan: CncReliefPlan,
 ): ReadonlyArray<string> {
-  if (!hasBallNoseScallopAboveRadius(plan)) return [];
+  const ball = compiledScallopBall(plan);
+  if (plan.stage !== 'finishing' || ball === null || plan.scallopMm === undefined) return [];
+  if (!(plan.scallopMm > ball.radiusMm)) return [];
   return [
     scallopWarning(
       plan.source,
       layerNameFor(project, plan.layerId),
       plan.scallopMm,
-      plan.toolDiameterMm,
+      ball,
       plan.rowSpacingMm ?? plan.toolDiameterMm,
     ),
   ];
 }
 
-function hasBallNoseScallopAboveRadius(
-  plan: CncReliefPlan,
-): plan is CncReliefPlan & { readonly scallopMm: number } {
-  return (
-    plan.stage === 'finishing' &&
-    plan.toolKind === 'ball-nose' &&
-    plan.scallopMm !== undefined &&
-    plan.scallopMm > plan.toolDiameterMm / 2
-  );
+type ScallopBall = { readonly radiusMm: number; readonly label: 'cutter' | 'tip' };
+
+// A ball nose's cusp is bounded by the cutter radius; a tapered ball nose's by
+// its tip ball, which only its compiled evidence carries (ADR-368).
+function compiledScallopBall(plan: CncReliefPlan): ScallopBall | null {
+  if (plan.toolKind === 'ball-nose') return { radiusMm: plan.toolDiameterMm / 2, label: 'cutter' };
+  if (plan.toolKind === 'tapered-ball-nose' && plan.toolTipDiameterMm !== undefined) {
+    return { radiusMm: plan.toolTipDiameterMm / 2, label: 'tip' };
+  }
+  return null;
 }
 
 function sourceReliefPlanningWarnings(
@@ -178,9 +183,15 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
     if (!layer.output) return [];
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     const finishTool = machine.tools.find((tool) => tool.id === settings.reliefFinishToolId);
-    if (finishTool?.kind !== 'ball-nose') return [];
+    if (finishTool === undefined) return [];
+    const radiusMm = reliefScallopBallRadiusMm(finishTool);
+    if (radiusMm === null) return [];
+    const ball: ScallopBall = {
+      radiusMm,
+      label: finishTool.kind === 'tapered-ball-nose' ? 'tip' : 'cutter',
+    };
     const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-    if (scallopMm <= finishTool.diameterMm / 2) return [];
+    if (scallopMm <= radiusMm) return [];
     return project.scene.objects.flatMap((object) =>
       object.kind === 'relief' && sceneObjectUsesOperation(object, layer)
         ? [
@@ -188,7 +199,7 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
               object.source,
               layer.name,
               scallopMm,
-              finishTool.diameterMm,
+              ball,
               scallopRowSpacingMm(finishTool, scallopMm),
             ),
           ]
@@ -216,14 +227,14 @@ function scallopWarning(
   source: string,
   layerName: string,
   scallopMm: number,
-  toolDiameterMm: number,
+  ball: ScallopBall,
   rowSpacingMm: number,
 ): string {
   return (
     `Relief "${source}" on layer "${layerName}" requests a ${format(
       scallopMm,
-    )} mm ball-nose scallop target, above the ${format(toolDiameterMm / 2)} mm cutter radius. ` +
-    `That target is outside the minor-sagitta cusp domain. The established planner retains the stored value, limits the cusp calculation to the cutter radius, and uses ${format(
+    )} mm ball-nose scallop target, above the ${format(ball.radiusMm)} mm ${ball.label} radius. ` +
+    `That target is outside the minor-sagitta cusp domain. The established planner retains the stored value, limits the cusp calculation to the ${ball.label} radius, and uses ${format(
       rowSpacingMm,
     )} mm row spacing. Check the finishing preview before running.`
   );

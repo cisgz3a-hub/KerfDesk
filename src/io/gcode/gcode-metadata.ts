@@ -48,9 +48,10 @@ export type GcodeMetadata = {
  * plus preserved converted artwork, clearing dependencies and final-grid
  * containment in the V-carve audit repair, plus ADR-322's native Marlin and
  * Smoothieware laser contracts, fractional raster power correction, and
- * explicit Marlin inline off/re-arm boundaries across LASER_POWER_SYNC builds.
+ * explicit Marlin inline off/re-arm boundaries across LASER_POWER_SYNC builds,
+ * and ADR-368's tapered ball-nose cutter envelope and tip provenance.
  */
-export const EMITTER_REVISION = 'machine-compatibility-20260919-v2';
+export const EMITTER_REVISION = 'tapered-ball-nose-20260924-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

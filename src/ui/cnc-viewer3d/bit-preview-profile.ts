@@ -6,6 +6,7 @@
 
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
+import { isValidTaperedBallTipDiameterMm } from '../../core/cnc-tapered-ball';
 import type { CncTool } from '../../core/scene';
 import { toolProfile, type ToolProfilePoint } from '../../core/sim';
 
@@ -16,6 +17,7 @@ export function bitPreviewProfile(tool: CncTool): ReadonlyArray<ToolProfilePoint
 }
 
 export function bitPreviewGeometryIssue(tool: CncTool): string | null {
+  if (tool.kind === 'tapered-ball-nose') return taperedBallPreviewIssue(tool);
   if (tool.kind === 'engraving') {
     // An engraving bit is a truncated cone: the included angle gives the flank,
     // and tipDiameterMm the flat land at the tip (absent = a true point, like a
@@ -36,6 +38,17 @@ export function bitPreviewGeometryIssue(tool: CncTool): string | null {
   return tool.kind === 'v-bit' && !isValidCncTipAngleDeg(tool.tipAngleDeg)
     ? 'A valid 1–179° included angle is required; no V-bit cone was modeled.'
     : null;
+}
+
+// The simulator falls back to a flat cylinder for incomplete tapered-ball
+// data. Drawing that would show a shape the operator never described.
+function taperedBallPreviewIssue(tool: CncTool): string | null {
+  if (!isValidTaperedBallTipDiameterMm(tool.tipDiameterMm, tool.diameterMm)) {
+    return `A ball tip diameter above 0 and under ${tool.diameterMm} mm is required; no tapered ball nose was modeled.`;
+  }
+  return isValidCncTipAngleDeg(tool.tipAngleDeg)
+    ? null
+    : 'A valid 1–179° included taper angle is required; no tapered ball nose was modeled.';
 }
 
 export function bitPreviewShankDiameterMm(tool: CncTool): number | null {

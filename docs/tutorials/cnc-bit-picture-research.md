@@ -23,16 +23,17 @@ All briefs use a single isolated cutter, shank up and tip down, a clear three-qu
 | `bit-v-groove` | Symmetrical conical V ending in a point; broad router cutting wings, no flat land or bearing. The representative angle is not the selected tool's measurement. | [Inventables 60-degree V-bit](https://www.inventables.com/products/carbide-tip-v-bit-60-degree-1-4-in-cutting-x-1-8-in-shank). |
 | `bit-engraving-point` | Slender pointed taper with a relieved/split cutting face. No pyramid or radius tip. | [Harvey pointed engraving cutters](https://www.harveytool.com/products/specialty-profiles/engraving-cutters/pointed). |
 | `bit-engraving-flat` | Slender taper ending in a small visible flat land, not a rounded tip or a full-width cylindrical bottom. | [Harvey tipped-off engraving cutters](https://www.harveytool.com/products-en-ca/specialty-profiles/engraving-cutters/tipped-off). |
+| `bit-tapered-ball-nose` | Small full-radius ball tip blending tangentially into a long, slender straight taper, then the shank. Rendered from the modeled law, not generated (ADR-368). | [Amana 46282](https://www.amanatool.com/46282-u-cnc-2d-and-3d-carving-5-4-deg-tapered-angle-ball-tip-1-16-dia-x-1-32-radius-x-1-x-1-4-shank-x-3-inch-long-x-4-flute-solid-carbide-up-cut-spiral-router-bit.html): 1/16" ball tip, 5.4° per side, 1" flutes, 1/4" shank. |
 
 ## Mapping and supported shape boundaries
 
-`src/core/scene/cnc-tool.ts` defines four geometry kinds: `end-mill`, `ball-nose`, `v-bit`, and `engraving`. Family is descriptive metadata, not a CAM branch. The picture mapper checks the geometry kind before accepting a known family, so a conflicting or unknown custom family cannot override the modeled shape. Unknown flat/ball families receive explicitly generic geometry examples, without claiming their actual flute design.
+`src/core/scene/cnc-tool.ts` defines five geometry kinds: `end-mill`, `ball-nose`, `v-bit`, `engraving`, and `tapered-ball-nose` (ADR-368). Family is descriptive metadata, not a CAM branch. The picture mapper checks the geometry kind before accepting a known family, so a conflicting or unknown custom family cannot override the modeled shape. Unknown flat/ball families receive explicitly generic geometry examples, without claiming their actual flute design.
 
 `src/core/cnc/radial-envelope.ts` uses a conical envelope for pointed tools and a truncated cone for engraving tools with a valid positive tip diameter. A blank or zero engraving tip diameter means a point. The pre-existing reference-only catalog reason that describes legacy engraving as a full flat cylinder is stale and was not reused. These UI changes do not alter its catalog availability or any CAM behavior.
 
-The existing modeled catalog has 13 cutter families; engraving is also a selectable custom kind. The 15 image keys cover those catalog families plus pointed and flat-tip engraving. O-flute ball-nose entries exist in the catalog but previously fell into the generic optgroup; the chooser label now names the family. Its missing flute-count metadata is deliberately not inferred from a picture.
+The modeled catalog has 14 cutter families, including the tapered ball-nose carving bits added by ADR-368; engraving is also a selectable custom kind. The 16 image keys cover those catalog families plus pointed and flat-tip engraving. O-flute ball-nose entries exist in the catalog but previously fell into the generic optgroup; the chooser label now names the family. Its missing flute-count metadata is deliberately not inferred from a picture.
 
-Reference-only cutters, including tapered balls, corner-radius tools, bearings and undercut profiles, receive no selectable photo cards. The picture does not validate a tool, set a feed, change dimensions or make an unsupported cutter available.
+Reference-only cutters, including tapered square and corner-radius tools, bearings and undercut profiles, receive no selectable photo cards. The picture does not validate a tool, set a feed, change dimensions or make an unsupported cutter available.
 
 ## Delivery and interaction
 
@@ -40,4 +41,4 @@ Cards appear beside the Startup default bit, each Tool Plan stage, the custom-bi
 
 Only the small URL/metadata module `src/ui/tutorials/bit-photo-assets.ts` is imported. No tutorial catalog or image binary is imported into the selector. Responsive WebP candidates use `BASE_URL`, matching hosted subpaths and Electron's relative asset path. Photo dimensions come from the generated manifest. If an image fails, the sourced shape description remains available.
 
-Visual acceptance must distinguish the opposing upcut/downcut helices, the compression junction, the O-flute ball's upcut direction, the full ball radius, and the engraving tip flat. Root owns image generation, this visual review, compression, and file-integrity verification.
+Visual acceptance must distinguish the opposing upcut/downcut helices, the compression junction, the O-flute ball's upcut direction, the full ball radius, the engraving tip flat, and the tapered ball nose's small rounded tip on a long taper. Root owns image generation, this visual review, compression, and file-integrity verification.

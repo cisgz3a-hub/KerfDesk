@@ -72,6 +72,27 @@ describe('.lf2 CNC tip-diameter persistence', () => {
     expect(loadTool({ ...FLAT_ENGRAVER, tipDiameterMm: '0.2' })?.tipDiameterMm).toBeUndefined();
   });
 
+  it('round-trips a tapered ball nose with its ball tip and included angle', () => {
+    const taperedBall: CncTool = {
+      id: 'tbn',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    };
+    const prepared = prepareProjectForPersistence(projectWithTool(taperedBall));
+    if (prepared.kind !== 'ok') throw new Error(prepared.reason);
+
+    const loaded = deserializeOk(prepared.json);
+    expect(loaded.machine?.kind === 'cnc' ? loaded.machine.tools[0] : undefined).toEqual(
+      taperedBall,
+    );
+    // A missing or malformed ball stays visible as such instead of becoming a V-bit.
+    const invalid = loadTool({ ...taperedBall, tipDiameterMm: 0 });
+    expect(invalid).toMatchObject({ kind: 'tapered-ball-nose', tipDiameterMm: 0 });
+  });
+
   it('drops a tip diameter from a V-bit so pointed V-bit behavior stays unchanged', () => {
     const tool = loadTool({
       ...FLAT_ENGRAVER,
