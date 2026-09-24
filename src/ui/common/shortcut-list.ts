@@ -57,6 +57,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
         { keys: 'Ctrl+G', action: 'group' },
         { keys: 'Ctrl+U', action: 'ungroup' },
         { keys: 'Delete/Backspace', action: 'remove' },
+        { keys: 'Alt+D', action: 'delete duplicates' },
         { keys: 'Escape', action: 'deselect' },
       ],
     },

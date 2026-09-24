@@ -83,6 +83,7 @@ export type EditCtx = {
   readonly groupSelection: () => void;
   readonly ungroupSelection: () => void;
   readonly duplicateSelection: () => void;
+  readonly deleteDuplicates: () => void;
   readonly resetToolMode: () => void;
 };
 
@@ -271,6 +272,13 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
     // is typing in a field rather than working with canvas objects.
     match: (e) => hasMeta(e) && e.key.toLowerCase() === 'd' && !e.shiftKey,
     invoke: (c) => c.duplicateSelection(),
+  },
+  {
+    // Alt+D — Delete Duplicates, LightBurn's binding (ADR-377). The key code
+    // also catches macOS, where Option+D types a symbol instead of 'd'.
+    match: (e) =>
+      e.altKey && !hasMeta(e) && !e.shiftKey && (e.key.toLowerCase() === 'd' || e.code === 'KeyD'),
+    invoke: (c) => c.deleteDuplicates(),
   },
   {
     match: (e) => !hasMeta(e) && (e.key === 'Delete' || e.key === 'Backspace'),

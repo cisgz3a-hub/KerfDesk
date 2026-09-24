@@ -71,6 +71,7 @@ export function editShortcutContext(): EditCtx {
     groupSelection: app.groupSelection,
     ungroupSelection: app.ungroupSelection,
     duplicateSelection: app.duplicateSelection,
+    deleteDuplicates: app.deleteDuplicates,
     resetToolMode: useUiStore.getState().resetToolMode,
   };
 }

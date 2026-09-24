@@ -66,5 +66,20 @@ export function vectorBooleanCommands(ctx: AppCommandContext): ReadonlyArray<App
           ctx.excludeSelection,
         )
       : disabled('tools.exclude', 'tools', 'Exclude', NEEDS_SELECTION, ctx.excludeSelection),
+    ctx.hasSelection
+      ? enabled(
+          'tools.rubber-band-outline',
+          'tools',
+          'Rubber-band outline',
+          'Wrap the selection in its tightest convex outline on a new Line operation',
+          ctx.createRubberBandOutline,
+        )
+      : disabled(
+          'tools.rubber-band-outline',
+          'tools',
+          'Rubber-band outline',
+          'Select artwork to wrap first.',
+          ctx.createRubberBandOutline,
+        ),
   ];
 }

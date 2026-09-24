@@ -42,6 +42,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.deleteSelection,
       'Delete',
     ),
+    deleteDuplicatesCommand(ctx),
     enabled(
       'edit.clear-selection',
       'edit',
@@ -51,6 +52,27 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Esc',
     ),
   ];
+}
+
+// ADR-377: works on the selection, or on the whole design when nothing is selected.
+function deleteDuplicatesCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canDeleteDuplicates
+    ? enabled(
+        'edit.delete-duplicates',
+        'edit',
+        'Delete Duplicates',
+        'Delete repeated paths',
+        ctx.deleteDuplicates,
+        'Alt+D',
+      )
+    : disabled(
+        'edit.delete-duplicates',
+        'edit',
+        'Delete Duplicates',
+        'Add unlocked vector artwork first.',
+        ctx.deleteDuplicates,
+        'Alt+D',
+      );
 }
 
 function lockSelectionCommand(ctx: AppCommandContext): AppCommand {

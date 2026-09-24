@@ -20,6 +20,7 @@ import {
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
+import { selectionCleanupActions, type SelectionCleanupActions } from './selection-cleanup-actions';
 import { orderedSelectionIds } from './selection-order';
 
 export type SelectionTransformEdit = {
@@ -27,7 +28,9 @@ export type SelectionTransformEdit = {
   readonly transform: Transform;
 };
 
-export type SelectionTransformActions = {
+// Selection cleanup (ADR-377) rides on this slice so the root store keeps
+// within its size cap.
+export type SelectionTransformActions = SelectionCleanupActions & {
   readonly applySelectionTransforms: (edits: ReadonlyArray<SelectionTransformEdit>) => void;
   readonly alignSelection: (kind: SelectionAlignKind) => void;
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
@@ -49,6 +52,7 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function selectionTransformActions(set: Setter): SelectionTransformActions {
   return {
+    ...selectionCleanupActions(set),
     applySelectionTransforms: (edits) =>
       set((state) => applySelectionTransformsToState(state, edits)),
     alignSelection: (kind) => set((state) => applySelectionAlignToState(state, kind)),

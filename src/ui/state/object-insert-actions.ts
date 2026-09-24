@@ -241,7 +241,7 @@ function applyTextAndEmbeddedFont(
   return { ...next, project: { ...next.project, embeddedFonts } };
 }
 
-function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(
+export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(
   previousLayers: ReadonlyArray<Layer>,
   result: T,
   defaults: LayerDefaultsState,

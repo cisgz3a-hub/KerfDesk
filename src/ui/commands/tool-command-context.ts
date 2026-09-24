@@ -50,6 +50,7 @@ export function toolCommandContext(
   | 'subtractSelection'
   | 'intersectSelection'
   | 'excludeSelection'
+  | 'createRubberBandOutline'
   | 'convertToBitmap'
   | 'fillSelectionSeparately'
   | 'closeSelectedOpenFillContours'
@@ -85,6 +86,7 @@ export function toolCommandContext(
     subtractSelection: () => app.booleanSelection('subtract'),
     intersectSelection: () => app.booleanSelection('intersect'),
     excludeSelection: () => app.booleanSelection('exclude'),
+    createRubberBandOutline: app.createRubberBandOutline,
     convertToBitmap: callbacks.requestConvertToBitmap,
     fillSelectionSeparately: app.fillSelectionSeparately,
     closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,

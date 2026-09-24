@@ -45,6 +45,7 @@ export type CommandId =
   | 'edit.unlock-all'
   | 'edit.duplicate'
   | 'edit.delete'
+  | 'edit.delete-duplicates'
   | 'edit.clear-selection'
   | 'tools.measure'
   | 'tools.add-text'
@@ -77,6 +78,7 @@ export type CommandId =
   | 'tools.subtract'
   | 'tools.intersect'
   | 'tools.exclude'
+  | 'tools.rubber-band-outline'
   | 'tools.convert-to-bitmap'
   | 'tools.fill-selection'
   | 'tools.close-open-fill-contours'
@@ -165,6 +167,8 @@ export type AppCommandContext = {
   readonly canUngroupSelection: boolean;
   readonly canLockSelection: boolean;
   readonly hasLockedObjects: boolean;
+  // ADR-377: vector artwork to check, in the selection or else the design.
+  readonly canDeleteDuplicates: boolean;
   // LU18 dirty-project guard: resolves true when the destructive action
   // may proceed (clean, saved, or explicitly discarded). Async because it
   // can show the Save / Don't Save / Cancel dialog and run a save.
@@ -194,6 +198,7 @@ export type AppCommandContext = {
   readonly unlockAllObjects: () => void;
   readonly duplicateSelection: () => void;
   readonly deleteSelection: () => void;
+  readonly deleteDuplicates: () => void;
   readonly clearSelection: () => void;
   readonly measureTool: () => void;
   readonly measureActive: boolean;
@@ -230,6 +235,7 @@ export type AppCommandContext = {
   readonly subtractSelection: () => void;
   readonly intersectSelection: () => void;
   readonly excludeSelection: () => void;
+  readonly createRubberBandOutline: () => void;
   readonly convertToBitmap: () => void;
   readonly fillSelectionSeparately: () => void;
   readonly closeSelectedOpenFillContours: () => void;

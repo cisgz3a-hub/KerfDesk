@@ -56,6 +56,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'edit',
     tooltip: 'Delete the selected artwork from the scene.',
   },
+  'edit.delete-duplicates': {
+    family: 'edit',
+    tooltip:
+      'Delete paths that repeat another path within 0.01 mm, in the selection or the whole design (Alt+D).',
+  },
   'edit.clear-selection': {
     family: 'edit',
     tooltip: 'Clear the current selection and return to the workspace.',
@@ -181,6 +186,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip:
       'Cut later-selected shapes or groups out of the first one you selected (boolean difference).',
+  },
+  'tools.rubber-band-outline': {
+    family: 'tools',
+    tooltip:
+      'Add the tightest convex outline around the selection as a new shape on its own Line operation.',
   },
   'tools.intersect': {
     family: 'tools',

@@ -32,6 +32,7 @@ import {
   selectedObjectIds,
   selectionCanBreakApart,
   selectionCanCombine,
+  selectionCanDeleteDuplicates,
   selectionCanWeld,
   unionSilhouetteOperations,
   selectionCanJoinPaths,
@@ -156,6 +157,7 @@ function appCommandContext(
     canUngroupSelection: selectionTouchesGroup(app.project, selectedIds),
     canLockSelection: selectionHasUnlockedObject(app.project, selectedIds),
     hasLockedObjects: app.project.scene.objects.some((object) => object.locked === true),
+    canDeleteDuplicates: selectionCanDeleteDuplicates(app.project, selectedIds),
     canTransformSelection: selected !== null,
     canAlignSelection: arrangeUnits >= 2,
     canDistributeSelection: arrangeUnits >= 3,
@@ -219,6 +221,7 @@ function editCommandContext(
   | 'unlockAllObjects'
   | 'duplicateSelection'
   | 'deleteSelection'
+  | 'deleteDuplicates'
   | 'clearSelection'
   | 'measureTool'
   | 'measureActive'
@@ -240,6 +243,7 @@ function editCommandContext(
     unlockAllObjects: app.unlockAllObjects,
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
+    deleteDuplicates: app.deleteDuplicates,
     clearSelection: () => app.selectObject(null),
     measureTool: dialogs.measureTool,
     measureActive: dialogs.measureActive,

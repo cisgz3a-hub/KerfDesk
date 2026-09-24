@@ -106,6 +106,7 @@ function editCtx(
     pasteClipboard: vi.fn(),
     groupSelection: vi.fn(),
     ungroupSelection: vi.fn(),
+    deleteDuplicates: vi.fn(),
     resetToolMode: vi.fn(),
     ...overrides,
   };

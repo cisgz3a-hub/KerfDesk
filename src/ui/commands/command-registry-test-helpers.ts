@@ -16,6 +16,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     ...baseCtxArrangeActions(),
     unionSilhouette: vi.fn(),
     joinPaths: vi.fn(),
+    deleteDuplicates: vi.fn(),
+    createRubberBandOutline: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;
@@ -52,6 +54,7 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     canUngroupSelection: false,
     canLockSelection: false,
     hasLockedObjects: false,
+    canDeleteDuplicates: false,
     measureActive: false,
     focusTestAvailable: false,
     canTransformSelection: false,

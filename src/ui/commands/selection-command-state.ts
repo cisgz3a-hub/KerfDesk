@@ -144,6 +144,21 @@ export function selectionCanCombine(project: Project, selectedIds: ReadonlyArray
   );
 }
 
+// ADR-377: Delete Duplicates checks the selection, or the whole design when
+// nothing is selected, and only ever touches unlocked vector artwork.
+export function selectionCanDeleteDuplicates(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): boolean {
+  const selected = new Set(selectedIds);
+  return project.scene.objects.some(
+    (object) =>
+      (selected.size === 0 || selected.has(object.id)) &&
+      object.locked !== true &&
+      (object.kind === 'imported-svg' || object.kind === 'shape' || object.kind === 'text'),
+  );
+}
+
 export function selectionCanBreakApart(
   project: Project,
   selectedIds: ReadonlyArray<string>,
