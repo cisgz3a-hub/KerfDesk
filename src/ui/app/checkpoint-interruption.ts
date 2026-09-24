@@ -2,14 +2,41 @@ import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
 import { jobStopRequestMessage, type JobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+import type { StreamPlannerSnapshot } from '../state/laser-rx-capacity-evidence';
 
 /** The recorded cause of a terminal stream: a safety notice names its fault;
  * without one, a stop KerfDesk was asked for (Abort, the app closing) is a
- * cancellation, and only a stop nobody asked for is unexplained. */
+ * cancellation, and only a stop nobody asked for is unexplained. A cause that
+ * discarded the controller's planner also records its backlog, so recovery
+ * restarts before the moves it threw away (controller audit recovery-6). */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
   stopRequest: JobStopRequest | null = null,
+  plannerBacklog?: JobInterruption['plannerBacklog'],
+): JobInterruption | null {
+  const interruption = interruptionCause(status, notice, stopRequest);
+  if (interruption === null || plannerBacklog === undefined) return interruption;
+  // The stop sent while the app closed may never have arrived.
+  const stopMayNotHaveArrived = stopRequest?.reason === 'app-closing';
+  return PLANNER_DISCARDING_KINDS.includes(interruption.kind) && !stopMayNotHaveArrived
+    ? { ...interruption, plannerBacklog }
+    : interruption;
+}
+
+// Abort and an ALARM stop with a soft reset or alarm; an auto-abort follows a
+// rejected line; a reboot loses everything. A lost link, a failed write or a
+// stall leaves the controller running what it had.
+const PLANNER_DISCARDING_KINDS: ReadonlyArray<JobInterruption['kind']> = [
+  'cancelled',
+  'controller-error',
+  'controller-reboot',
+];
+
+function interruptionCause(
+  status: StreamerStatus,
+  notice: LaserSafetyNotice | null,
+  stopRequest: JobStopRequest | null,
 ): JobInterruption | null {
   if (!['cancelled', 'disconnected', 'errored'].includes(status)) return null;
   if (notice === null && stopRequest !== null) {
@@ -23,6 +50,17 @@ export function checkpointInterruption(
       ? { rejectedLine: notice.rejectedLine }
       : {}),
   };
+}
+
+/** The backlog the current run's latest status report showed, if any. */
+export function currentRunPlannerBacklog(state: {
+  readonly streamerEpoch: number;
+  readonly streamPlannerSnapshot?: StreamPlannerSnapshot | null;
+}): JobInterruption['plannerBacklog'] {
+  const snapshot = state.streamPlannerSnapshot ?? null;
+  if (snapshot === null || snapshot.streamerEpoch !== state.streamerEpoch) return undefined;
+  if (snapshot.queuedBlocks === 0) return undefined;
+  return { ackedAtStatus: snapshot.ackedLines, queuedBlocks: snapshot.queuedBlocks };
 }
 
 function noticeKind(status: StreamerStatus, notice: LaserSafetyNotice): JobInterruption['kind'] {

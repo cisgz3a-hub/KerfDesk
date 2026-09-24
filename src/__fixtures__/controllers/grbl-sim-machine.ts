@@ -210,12 +210,22 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     // persistent G54 offset survives.
     g92: null,
   };
-  const effects: GrblSimEffect[] = [emit(opts.firmwareBanner, opts)];
   if (alarms) {
-    effects.push(emit('ALARM:3', opts), emit("[MSG:'$H'|'$X' to unlock]", opts));
+    // Firmware order: protocol_exec_rt_system reports the abort alarm, then
+    // returns on EXEC_RESET; the reboot prints the banner and, because the
+    // state is Alarm, protocol_main_loop adds the unlock message. Emitting the
+    // banner first hid a store bug where the banner erased ALARM:3.
+    const effects: GrblSimEffect[] = [
+      emit('ALARM:3', opts),
+      emit(opts.firmwareBanner, opts),
+      emit("[MSG:'$H'|'$X' to unlock]", opts),
+    ];
     return { state: { ...base, machine: 'Alarm', locked: true }, effects };
   }
-  return { state: { ...base, machine: 'Idle', locked: false }, effects };
+  return {
+    state: { ...base, machine: 'Idle', locked: false },
+    effects: [emit(opts.firmwareBanner, opts)],
+  };
 }
 
 function reduceLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {

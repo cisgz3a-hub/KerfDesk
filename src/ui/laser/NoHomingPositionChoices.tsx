@@ -8,12 +8,12 @@ const HAND_POSITION_INSTRUCTION =
 const RELEASE_MOTORS_LABEL = 'Release motors to move by hand';
 const RELEASING_MOTORS_LABEL = 'Releasing motors...';
 const RELEASE_MOTORS_TITLE = 'Release the motors before physically moving the laser head.';
-const NO_SLEEP_COMMAND_TITLE = 'Controller has no sleep command.';
 
 /** Renders the motor-release entry to hand positioning. */
 export function NoHomingPositionChoices(props: {
   readonly disabled: boolean;
-  readonly canSleep: boolean;
+  /** Why the controller cannot release its motors, or null when it can. */
+  readonly sleepBlockedReason: string | null;
   readonly error: string | null;
   readonly releasing: boolean;
   readonly onRelease: () => void;
@@ -25,9 +25,9 @@ export function NoHomingPositionChoices(props: {
         type="button"
         className="lf-btn"
         style={choiceButtonStyle}
-        disabled={props.disabled || !props.canSleep}
+        disabled={props.disabled || props.sleepBlockedReason !== null}
         onClick={props.onRelease}
-        title={props.canSleep ? RELEASE_MOTORS_TITLE : NO_SLEEP_COMMAND_TITLE}
+        title={props.sleepBlockedReason ?? RELEASE_MOTORS_TITLE}
       >
         {props.releasing ? RELEASING_MOTORS_LABEL : RELEASE_MOTORS_LABEL}
       </button>

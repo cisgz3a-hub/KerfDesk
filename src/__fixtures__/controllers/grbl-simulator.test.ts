@@ -127,7 +127,13 @@ describe('grbl-simulator', () => {
     await pump(2);
     await conn.write('\x18');
     await pump(5);
-    expect(lines).toContain('ALARM:3');
+    // GRBL reports the abort alarm before it reboots (audit streaming-4).
+    const alarmAt = lines.indexOf('ALARM:3');
+    expect(alarmAt).toBeGreaterThanOrEqual(0);
+    expect(lines.slice(alarmAt + 1, alarmAt + 3)).toEqual([
+      "Grbl 1.1f ['$' for help]",
+      "[MSG:'$H'|'$X' to unlock]",
+    ]);
     lines.length = 0;
     await conn.write('M9\n');
     await pump(5);

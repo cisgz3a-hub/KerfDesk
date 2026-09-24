@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomXyOrigin, useLaserStore } from '../state/laser-store';
+import { sleepUnavailableReason } from '../state/controller-sleep';
 import { useToastStore } from '../state/toast-store';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { sectionCaptionStyle } from './JobControls.styles';
@@ -44,7 +45,7 @@ export function NoHomingPositionGuide(props: {
   const homingEnabled = useStore((state) => state.project.device.homing.enabled);
   const connection = useLaserStore((state) => state.connection);
   const status = useLaserStore((state) => state.statusReport?.state ?? null);
-  const canSleep = useLaserStore((state) => state.capabilities.sleep);
+  const sleepBlockedReason = useLaserStore(sleepUnavailableReason);
   const canUnlock = useLaserStore((state) => state.capabilities.unlock);
   const workOriginActive = useLaserStore((state) => state.workOriginActive);
   const wcoCache = useLaserStore((state) => state.wcoCache);
@@ -69,7 +70,7 @@ export function NoHomingPositionGuide(props: {
         phase={phase}
         status={status}
         normalBusy={normalBusy}
-        canSleep={canSleep}
+        sleepBlockedReason={sleepBlockedReason}
         canUnlock={canUnlock}
       />
     </section>
@@ -175,7 +176,7 @@ function GuideBody(props: {
   readonly phase: GuidePhase;
   readonly status: string | null;
   readonly normalBusy: boolean;
-  readonly canSleep: boolean;
+  readonly sleepBlockedReason: string | null;
   readonly canUnlock: boolean;
 }): JSX.Element {
   if (props.phase === 'positioning') {
@@ -206,7 +207,7 @@ function GuideBody(props: {
   return (
     <NoHomingPositionChoices
       disabled={props.normalBusy || props.phase === 'releasing'}
-      canSleep={props.canSleep}
+      sleepBlockedReason={props.sleepBlockedReason}
       error={props.actions.error}
       releasing={props.phase === 'releasing'}
       onRelease={props.actions.onRelease}

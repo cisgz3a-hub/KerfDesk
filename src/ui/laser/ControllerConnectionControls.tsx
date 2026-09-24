@@ -1,6 +1,7 @@
 import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
+import { connectOptionsForDevice } from '../commands/connect-options';
 import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -26,24 +27,18 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
-  const profileBaudRate = useStore((state) => state.project.device.baudRate);
-  const controllerCommandSet = useStore((state) => state.project.device.controllerCommandSet);
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
+  // One builder with the menu Connect, read at click time, so the profile's
+  // "Stream in worker" opt-in (ADR-334) is honoured on every Connect surface;
+  // the rail used to rebuild the options without it (audit connect-6/ui-panel-7).
+  const connectOptions = () => connectOptionsForDevice(useStore.getState().project.device);
   const connect = (): void => {
-    void connectController(platform, {
-      controllerKind,
-      controllerCommandSet,
-      baudRate: profileBaudRate,
-    });
+    void connectController(platform, connectOptions());
   };
   const reconnect = async (): Promise<void> => {
     await disconnectController();
-    await connectController(platform, {
-      controllerKind,
-      controllerCommandSet,
-      baudRate: profileBaudRate,
-    });
+    await connectController(platform, connectOptions());
   };
   return (
     <>

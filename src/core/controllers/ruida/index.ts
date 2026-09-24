@@ -21,7 +21,7 @@ export {
   onRuidaResponse,
   stepRuidaSession,
   RUIDA_ACK,
-  RUIDA_ERR,
+  RUIDA_NAK,
   RUIDA_UDP_PORT,
   type RuidaSessionState,
 } from './ruida-udp-session';

@@ -4,7 +4,7 @@
 import { useRef, useState } from 'react';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { runStartFromLineFlow } from './start-job-flow';
-import { prepareRecoverySource, type PreparedRecoverySource } from './start-job-source';
+import { prepareManualRestartSource, type ManualRestartSource } from './manual-restart-source';
 import { ManualLaserRestartDialog } from './ManualLaserRestartDialog';
 
 const MIN_LINE = 1;
@@ -17,7 +17,7 @@ export function StartFromLineControl(props: {
 }): JSX.Element {
   const [line, setLine] = useState(MIN_LINE);
   const [preparing, setPreparing] = useState(false);
-  const [preview, setPreview] = useState<PreparedRecoverySource | null>(null);
+  const [preview, setPreview] = useState<ManualRestartSource | null>(null);
   const inFlight = useRef(false);
   const blocked = props.disabled || props.busy || preparing || preview !== null;
   const resume = async (chooseOnCanvas = false): Promise<void> => {
@@ -25,7 +25,7 @@ export function StartFromLineControl(props: {
     inFlight.current = true;
     setPreparing(true);
     try {
-      if (chooseOnCanvas) setPreview(await prepareRecoverySource());
+      if (chooseOnCanvas) setPreview(await prepareManualRestartSource());
       else await runStartFromLineFlow(line);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -82,7 +82,7 @@ export function StartFromLineControl(props: {
       <ManualRestartGuidance />
       {preview === null ? null : (
         <ManualLaserRestartDialog
-          source={preview}
+          restart={preview}
           initialLine={line}
           onClose={() => setPreview(null)}
         />
@@ -94,9 +94,10 @@ export function StartFromLineControl(props: {
 function ManualRestartGuidance(): JSX.Element {
   return (
     <p style={hintStyle}>
-      Requires the same work zero as the original run. The head moves to the recorded position with
-      the beam off, then the remaining laser program is replayed. This manual tool is not an exact
-      sealed replay and creates no execution-archive or recovery record.
+      Requires the same work zero as the original run, and uses that run&apos;s job placement when
+      the project still matches it. The head moves to the recorded position with the beam off, then
+      the remaining laser program is replayed. This manual tool is not an exact sealed replay and
+      creates no execution-archive or recovery record.
     </p>
   );
 }

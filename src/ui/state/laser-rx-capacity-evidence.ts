@@ -12,7 +12,7 @@
 // grblHAL, firmware build unconfirmed) reported `Bf:512,65535`.
 
 import type { StatusReport } from '../../core/controllers/grbl';
-import { hasUnsettledStreamAcks } from './laser-store-helpers';
+import { hasUnsettledStreamAcks, isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
 export type RxCapacityEvidence = {
@@ -70,4 +70,47 @@ export function currentRxCapacityEvidence(
   return evidence !== null && evidence.sessionEpoch === state.controllerSessionEpoch
     ? evidence
     : null;
+}
+
+export type StreamPlannerSnapshot = {
+  readonly streamerEpoch: number;
+  /** Lines acknowledged when the report arrived. */
+  readonly ackedLines: number;
+  /** Planner blocks still waiting to move: idle size less `Bf` blocks free. */
+  readonly queuedBlocks: number;
+};
+
+/** Both `Bf:` readings a status report feeds: the quiescent receive capacity
+ *  and, during a run, the planner backlog behind its acknowledgements. */
+export function statusBufferPatch(
+  state: EvidenceSource & Pick<LaserState, 'streamerEpoch'>,
+  report: StatusReport,
+  now: number,
+): Partial<Pick<LaserState, 'rxCapacityEvidence' | 'streamPlannerSnapshot'>> {
+  return {
+    ...rxCapacityEvidencePatch(state, report, now),
+    ...streamPlannerSnapshotPatch(state, report),
+  };
+}
+
+// The planner size comes from this session's idle `Bf`. Without it the
+// backlog is unknown and no snapshot is taken (controller audit recovery-6).
+function streamPlannerSnapshotPatch(
+  state: EvidenceSource & Pick<LaserState, 'streamerEpoch'>,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'streamPlannerSnapshot'>> {
+  const buffer = report.buffer;
+  const streamer = state.streamer;
+  if (buffer === null || buffer === undefined || !isActiveJob(streamer) || streamer === null) {
+    return {};
+  }
+  const capacity = currentRxCapacityEvidence(state)?.plannerBlocksFree;
+  if (capacity === undefined) return {};
+  return {
+    streamPlannerSnapshot: {
+      streamerEpoch: state.streamerEpoch,
+      ackedLines: streamer.completed,
+      queuedBlocks: Math.max(0, capacity - buffer.plannerBlocksFree),
+    },
+  };
 }

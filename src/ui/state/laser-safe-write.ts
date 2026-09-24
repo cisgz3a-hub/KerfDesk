@@ -23,6 +23,7 @@ import {
   serialWriteErrorMessage,
   setupBlockingJobCommandBlockMessage,
 } from './laser-store-helpers';
+import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
   TranscriptBufferRefs &
@@ -116,22 +117,24 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
   };
 }
 
-// A job makes `$` lines off limits, with one exception: the operator's jog
-// inside a drained, fresh-Idle tool-change hold. GRBL's native jog is itself a
-// `$J=` line (https://github.com/gnea/grbl/wiki/Grbl-v1.1-Jogging), the M0 is
-// held host-side so the controller really is Idle and accepts it, and runJog
-// has already admitted the move through this same setup-motion gate. Before,
-// the strict gate refused that jog here, so the touch-off the hold asks for
-// was impossible without aborting (audit drivers-2). Every other action keeps
-// the strict gate: Frame, Home, Unlock, `$$` and setting writes stay refused
-// for the whole job, and Start never unblocks at a tool change.
+// A job makes `$` lines off limits, with two exceptions inside a tool-change
+// hold. The operator's jog in a drained, fresh-Idle hold: GRBL's native jog is
+// itself a `$J=` line (https://github.com/gnea/grbl/wiki/Grbl-v1.1-Jogging),
+// the M0 is held host-side so the controller really is Idle and accepts it,
+// and runJog has already admitted the move through this same setup-motion
+// gate. Before, the strict gate refused that jog here, so the touch-off the
+// hold asks for was impossible without aborting (audit drivers-2). And the
+// `$X` that unlocks a hold a missed touch-off probe stopped, which the hold
+// survives (audit streaming-3). Every other action keeps the strict gate:
+// Frame, Home, `$$` and setting writes stay refused for the whole job, and
+// Start never unblocks at a tool change.
 function setupPayloadBlockMessage(
   state: LaserState,
   action: LaserSafetyAction | undefined,
 ): string | null {
-  return action === 'jog'
-    ? setupBlockingJobCommandBlockMessage(state)
-    : activeJobCommandBlockMessage(state);
+  if (action === 'jog') return setupBlockingJobCommandBlockMessage(state);
+  if (action === 'unlock' && isProbeAlarmedToolChangeHold(state)) return null;
+  return activeJobCommandBlockMessage(state);
 }
 
 // A line the wire cannot carry is refused before anything is reserved for it.

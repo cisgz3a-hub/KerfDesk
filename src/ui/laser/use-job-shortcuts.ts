@@ -42,12 +42,28 @@ export function useJobShortcuts(): void {
 }
 
 function handleStopShortcut(e: KeyboardEvent): void {
-  const laser = useLaserStore.getState();
-  const activeJob = isActiveJob(laser.streamer);
-  const activeMotion = laser.motionOperation !== null;
-  if (!activeJob && !activeMotion) return;
+  const action = stopShortcutAction(useLaserStore.getState());
+  if (action === null) return;
   e.preventDefault();
-  void (activeJob ? laser.stopJob() : laser.cancelJog()).catch(
-    controllerActionFailureHandler(activeJob ? 'Abort' : 'Stop motion'),
-  );
+  void action.run().catch(controllerActionFailureHandler(action.label));
+}
+
+type LaserSnapshot = ReturnType<typeof useLaserStore.getState>;
+
+// Same precedence as the Live Motion bar (LiveMotionBar describeLiveMotion):
+// the keyboard Abort must stop whatever the bar offers ABORT or LASER OFF for.
+// It used to act only on a streaming job or a jog/Frame, so during Home,
+// Probe, Auto-focus, Start arming or with momentary Fire latched on, Ctrl+.
+// silently did nothing (audit job-lifecycle-6 / ui-panel-4). Jog and Frame
+// keep the gentler jog-cancel.
+function stopShortcutAction(
+  laser: LaserSnapshot,
+): { readonly label: string; readonly run: () => Promise<void> } | null {
+  if (isActiveJob(laser.streamer)) return { label: 'Abort', run: () => laser.stopJob() };
+  if (laser.controllerOperation !== null) {
+    return { label: 'Abort motion', run: () => laser.stopJob() };
+  }
+  if (laser.motionOperation !== null) return { label: 'Stop motion', run: () => laser.cancelJog() };
+  if (laser.fireActive) return { label: 'Laser off', run: () => laser.setFireActive(false) };
+  return null;
 }

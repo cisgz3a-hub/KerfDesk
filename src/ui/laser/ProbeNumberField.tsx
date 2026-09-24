@@ -4,7 +4,7 @@ const PROBE_VALUE_MIN_MM = 0.1;
 const PROBE_VALUE_MAX_MM = 100;
 
 const NUMBER_FIELD_TITLES: Readonly<Record<string, string>> = {
-  'Plate thickness': 'Distance from the plate top to its underside â€” sets where work Z0 lands.',
+  'Plate thickness': 'Distance from the plate top to its underside — sets where work Z0 lands.',
   'Max travel': 'How far a probe move may travel before failing with ALARM:5.',
   'Bit diameter': 'Used to offset the X and Y zeros by one bit radius at side contact.',
   'Plate center X offset': 'Measured starting cutter-center distance from the X stock face.',

@@ -324,7 +324,8 @@ describe('cncGrblStrategy tool changes', () => {
     const afterPause = lines.slice(m0Index + 1);
     const clearanceIndex = afterPause.findIndex((line) => line.startsWith('G0 Z'));
     const spindleIndex = afterPause.findIndex((line) => line.startsWith('M3 S'));
-    expect(clearanceIndex).toBe(0);
+    // Only the restated modal state (audit streaming-3) comes before the lift.
+    expect(afterPause.slice(0, clearanceIndex)).toEqual(['G21', 'G90', 'G54', 'G94', 'G17']);
     expect(spindleIndex).toBeGreaterThan(clearanceIndex);
   });
 
@@ -358,14 +359,28 @@ describe('cncGrblStrategy tool changes', () => {
     const lines = emit(scene).split('\n');
     const m0Index = lines.indexOf('M0');
     expect(m0Index).toBeGreaterThan(0);
-    const firstMotion = lines
-      .slice(m0Index + 1)
-      .find((line) => line.startsWith('G0') || line.startsWith('G1'));
+    const firstMotion = lines.slice(m0Index + 1).find((line) => /^G[01] /.test(line));
     expect(firstMotion).toMatch(/^G0 Z/);
     const afterPause = lines.slice(m0Index + 1);
     expect(afterPause.findIndex((line) => line.startsWith('G0 Z'))).toBeLessThan(
       afterPause.findIndex((line) => line.startsWith('M3 S')),
     );
+  });
+
+  it('restates the modal state after the M0, before the safe-Z lift', () => {
+    // A touch-off probe that stopped on its alarm leaves G91 behind, and $X does
+    // not reset it: the lift must not run incremental (audit streaming-3).
+    const scene = sceneOf(
+      [squareObject('A', '#111111', 10, 30), squareObject('B', '#222222', 60, 30)],
+      [
+        layerWith('#111111', { cutType: 'pocket', toolId: 'em-3175', depthMm: 2 }),
+        layerWith('#222222', { cutType: 'engrave', toolId: 'em-6350', depthMm: 1 }),
+      ],
+    );
+    const lines = emit(scene).split('\n');
+    const m0Index = lines.indexOf('M0');
+    expect(lines.slice(m0Index + 1, m0Index + 6)).toEqual(['G21', 'G90', 'G54', 'G94', 'G17']);
+    expect(lines[m0Index + 6]).toMatch(/^G0 Z/);
   });
 
   it('single-bit jobs contain no M0 and no tool comments', () => {

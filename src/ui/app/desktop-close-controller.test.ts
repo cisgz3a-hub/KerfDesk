@@ -231,3 +231,45 @@ describe('desktop application close handoff', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 });
+
+// Controller audit electron-native-3: a latched momentary Fire is turned off
+// before the window closes, and a Fire the app cannot confirm off leaves an
+// acknowledgeable warning with Retry instead of an Abort failure with no exit.
+describe('desktop close with Fire latched', () => {
+  it('turns Fire off before approving the close', async () => {
+    const h = harness(false);
+    h.patch({ fireLatched: true });
+    const pending = h.controller.prepare(1);
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(h.controller.getNotice()?.message).toContain('Turning Fire off');
+    h.patch({ fireLatched: false });
+    h.pending.resolve();
+    expect(await pending).toEqual({ status: 'ready', dirty: true });
+  });
+
+  it('offers Retry when Fire cannot be confirmed off', async () => {
+    const h = harness(false);
+    h.patch({ fireLatched: true, warning: 'Fire may still be on.' });
+    void h.controller.prepare(1);
+    h.pending.reject(new Error('M5 write rejected'));
+    await vi.waitFor(() => expect(h.controller.getNotice()?.kind).toBe('unconfirmed'));
+    expect(h.controller.getNotice()).toMatchObject({
+      message: 'Fire may still be on.',
+      retry: true,
+    });
+    h.controller.retryStop();
+    expect(h.stop).toHaveBeenCalledTimes(2);
+    expect(h.controller.getNotice()?.kind).toBe('pending');
+  });
+
+  it('closes once the operator acknowledges the unconfirmed Fire warning', async () => {
+    const h = harness(false);
+    h.patch({ fireLatched: true, warning: 'Fire may still be on.' });
+    const pending = h.controller.prepare(1);
+    h.pending.reject(new Error('M5 write rejected'));
+    await vi.waitFor(() => expect(h.controller.getNotice()?.kind).toBe('unconfirmed'));
+    const notice = h.controller.getNotice();
+    if (notice !== null) h.controller.acknowledgeWarning(notice);
+    expect(await pending).toEqual({ status: 'ready', dirty: true });
+  });
+});

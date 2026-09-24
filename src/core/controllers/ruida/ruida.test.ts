@@ -18,7 +18,8 @@ import {
   frameDatagram,
   onRuidaResponse,
   RUIDA_ACK,
-  RUIDA_ERR,
+  RUIDA_ENQ,
+  RUIDA_NAK,
   stepRuidaSession,
 } from './ruida-udp-session';
 import { swizzleByte, unswizzleByte } from './swizzle';
@@ -227,24 +228,43 @@ describe('ruida UDP session state machine', () => {
       state = step.state;
       if (step.toSend === null) break;
       sent += 1;
-      const acked = onRuidaResponse(state, RUIDA_ACK);
+      const acked = onRuidaResponse(state, swizzleByte(RUIDA_ACK));
       state = acked.state;
     }
     expect(sent).toBe(3);
     expect(state.status).toBe('done');
   });
 
-  it('retries on ERR then goes terminal when the budget is spent', () => {
+  // Controller audit drivers-6: replies arrive swizzled like the payload.
+  it('reads the swizzled wire ACK (0xC6 with magic 0x88) as an ACK', () => {
+    expect(swizzleByte(RUIDA_ACK)).toBe(0xc6);
+    const state = stepRuidaSession(createRuidaSession(new Uint8Array(10))).state;
+    expect(onRuidaResponse(state, 0xc6).state.status).toBe('done');
+    // The raw, unswizzled 0xCC is not what the controller sends: no verdict.
+    expect(onRuidaResponse(state, RUIDA_ACK)).toEqual({ state, toSend: null });
+  });
+
+  it('uses the session magic for its replies', () => {
+    const state = stepRuidaSession(createRuidaSession(new Uint8Array(10), 0x11)).state;
+    expect(onRuidaResponse(state, swizzleByte(RUIDA_ACK, 0x11)).state.status).toBe('done');
+  });
+
+  it('ignores ENQ keepalives instead of retransmitting', () => {
+    const state = stepRuidaSession(createRuidaSession(new Uint8Array(10))).state;
+    expect(onRuidaResponse(state, swizzleByte(RUIDA_ENQ))).toEqual({ state, toSend: null });
+  });
+
+  it('retries on NAK then goes terminal when the budget is spent', () => {
     let state = createRuidaSession(new Uint8Array(10));
     const first = stepRuidaSession(state);
     state = first.state;
     expect(first.toSend).not.toBeNull();
     for (let i = 0; i < 3; i += 1) {
-      const retry = onRuidaResponse(state, RUIDA_ERR);
+      const retry = onRuidaResponse(state, swizzleByte(RUIDA_NAK));
       state = retry.state;
       expect(retry.toSend).not.toBeNull(); // same packet retransmitted
     }
-    const dead = onRuidaResponse(state, RUIDA_ERR);
+    const dead = onRuidaResponse(state, swizzleByte(RUIDA_NAK));
     expect(dead.state.status).toBe('errored');
     expect(dead.toSend).toBeNull();
   });
