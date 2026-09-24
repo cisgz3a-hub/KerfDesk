@@ -5,6 +5,7 @@ import {
   type TraceOptions,
 } from './trace-image';
 import { edgeTraceInputMatches, prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
+import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 
 const INK_LUMA_CUTOFF = 128;
 const MAX_THIN_RUN_PX = 3;
@@ -42,6 +43,7 @@ export function contourDetailProfile(
   image: RawImageData,
   options: TraceOptions,
   edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
 ): ContourDetailProfile {
   if (!isValidRawImageData(image)) return { hasThinDetail: false, transitionDensity: 0 };
   if (options.traceMode === 'edge') {
@@ -51,7 +53,12 @@ export function contourDetailProfile(
         : prepareEdgeTraceInput(image, options);
     return profileInk(input.bitmap.data, input.bitmap.width, input.bitmap.height);
   }
-  const prepared = prepareTraceForContour(image, { ...options, pixelScale: 1 }).prepared;
+  const prepared =
+    contourInput !== undefined &&
+    (options.pixelScale ?? 1) === 1 &&
+    contourTraceInputMatches(contourInput, image, options)
+      ? contourInput.prepared
+      : prepareTraceForContour(image, { ...options, pixelScale: 1 }).prepared;
   return profileInk(inkMask(prepared), prepared.width, prepared.height);
 }
 
@@ -61,6 +68,25 @@ function profileInk(ink: Uint8Array, width: number, height: number): ContourDeta
     hasThinDetail: hasCoherentThinCluster(thin, width, height),
     transitionDensity: maskTransitionDensity(ink, width, height),
   };
+}
+
+/** The same coherent thin features used by the quality planner, before any
+ * enlargement can erase them. Specks and isolated AA boundary cells are not
+ * sufficient to qualify a source region for support restoration. */
+export function coherentContourDetailMask(prepared: RawImageData): Uint8Array {
+  const { width, height } = prepared;
+  const thin = thinRunMask(inkMask(prepared), width, height);
+  const visited = new Uint8Array(thin.length);
+  const coherent = new Uint8Array(thin.length);
+  for (let index = 0; index < thin.length; index += 1) {
+    if (thin[index] === 0 || visited[index] === 1) continue;
+    const pixels: number[] = [];
+    const cluster = consumeThinCluster(thin, visited, index, width, height, pixels);
+    if (isCoherentThinCluster(cluster)) {
+      for (const pixel of pixels) coherent[pixel] = 1;
+    }
+  }
+  return coherent;
 }
 
 function inkMask(image: RawImageData): Uint8Array {
@@ -141,12 +167,14 @@ function hasCoherentThinCluster(thin: Uint8Array, width: number, height: number)
   for (let index = 0; index < thin.length; index += 1) {
     if (thin[index] === 0 || visited[index] === 1) continue;
     const cluster = consumeThinCluster(thin, visited, index, width, height);
-    const span = Math.max(cluster.maxX - cluster.minX + 1, cluster.maxY - cluster.minY + 1);
-    if (cluster.pixelCount >= MIN_THIN_CLUSTER_PIXELS && span >= MIN_THIN_CLUSTER_SPAN_PX) {
-      return true;
-    }
+    if (isCoherentThinCluster(cluster)) return true;
   }
   return false;
+}
+
+function isCoherentThinCluster(cluster: ThinCluster): boolean {
+  const span = Math.max(cluster.maxX - cluster.minX + 1, cluster.maxY - cluster.minY + 1);
+  return cluster.pixelCount >= MIN_THIN_CLUSTER_PIXELS && span >= MIN_THIN_CLUSTER_SPAN_PX;
 }
 
 function consumeThinCluster(
@@ -155,6 +183,7 @@ function consumeThinCluster(
   start: number,
   width: number,
   height: number,
+  pixels?: number[],
 ): ThinCluster {
   const stack = [start];
   visited[start] = 1;
@@ -170,6 +199,7 @@ function consumeThinCluster(
     const x = index % width;
     const y = Math.floor(index / width);
     pixelCount += 1;
+    pixels?.push(index);
     minX = Math.min(minX, x);
     maxX = Math.max(maxX, x);
     minY = Math.min(minY, y);

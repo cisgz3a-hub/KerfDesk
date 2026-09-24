@@ -321,7 +321,9 @@ describe('LaserWindow jog gating during a job (H6)', () => {
         'select[aria-label="Jog step size"]',
       );
       expect(stepSelect?.disabled).toBe(true);
-      expect(button(host, 'Frame job').disabled).toBe(true);
+      // Frame stays pressable in Alarm: it offers Home or Unlock in place.
+      expect(button(host, 'Frame job').disabled).toBe(false);
+      expect(button(host, 'Frame job').title).toContain('Frame offers Home or Unlock first');
 
       await act(async () => {
         button(host, '$X').click();

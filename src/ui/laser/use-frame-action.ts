@@ -20,7 +20,7 @@ import { isOutputPreparationAbort } from './output-preparation-errors';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
-import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
+import { resolveLiveFramePlacement } from './camera-frame-placement';
 import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
 import {
   waitForAbsoluteFrameOffset,
@@ -34,6 +34,7 @@ import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidat
 import { resolveFrameCandidate } from './frame-candidate';
 import { reviewedFrameIsCurrent } from './reviewed-frame-current';
 import { traceableFrameBoundsPreview } from './frame-bounds-preview';
+import { offerFrameBlockerFixes } from './frame-blocker-repair';
 import {
   currentWorkXy,
   FRAME_COMPLETE_MESSAGE,
@@ -77,6 +78,7 @@ export function runFrameNow(): Promise<boolean> {
     ensureFramedRunInvalidationSubscriptions();
     clearStartBlockers();
     clearFrameExpiryNote();
+    if (!(await offerFrameBlockerFixes())) return false;
     const context = await prepareFrameContext();
     if (context === null) return false;
     const preparation = startExactFramePreparation(context);
@@ -195,14 +197,7 @@ async function prepareFrameContext(): Promise<FrameContext | null> {
   );
   if (laser === null) return null;
   const camera = useCameraStore.getState();
-  const placement = resolveCameraSafeFramePlacement(app.project, app.jobPlacement, {
-    statusReport: laser.statusReport,
-    workOriginActive: laser.workOriginActive,
-    wcoCache: laser.wcoCache,
-    homingState: laser.homingState,
-    trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
-    reportInches: laser.controllerSettings?.reportInches === true,
-  });
+  const placement = resolveLiveFramePlacement(app, laser);
   if (!placement.ok) {
     reportFramePreparationRefusal(placement.messages, wcsNormalization.warning);
     return null;

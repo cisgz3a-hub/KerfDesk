@@ -9,7 +9,7 @@
 
 import { createStore } from 'zustand/vanilla';
 import { useStore } from '../state/store';
-import { useStartBlockerStore, type BlockedAction } from './start-blocker-store';
+import { useStartBlockerStore, type BlockedAttempt } from './start-blocker-store';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
 
@@ -24,10 +24,10 @@ const invalidationLifecycle = createStore<InvalidationLifecycle>(() => ({ owner:
  */
 export function reportStartBlockers(
   messages: ReadonlyArray<string>,
-  action: BlockedAction = 'start',
+  attempt: BlockedAttempt = 'start',
 ): void {
   ensureStartBlockerInvalidationSubscription();
-  useStartBlockerStore.getState().report(messages, action);
+  useStartBlockerStore.getState().report(messages, attempt);
 }
 
 /** Retire the retained refusal because a fresh Start or Frame is under way. */

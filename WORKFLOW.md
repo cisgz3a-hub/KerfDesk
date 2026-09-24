@@ -671,8 +671,8 @@ other preflight finding is an advisory reported after a successful save.
 
 For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
 seven compile-integrity codes cover unproducible or unstreamable output. Pressing
-Frame, or pressing Start without a live exact permit, prepares the candidate and
-runs the physical tool-off Frame dialog-free. Calculated bed bounds, configured
+Frame prepares the candidate and runs the physical tool-off Frame dialog-free;
+Start stays greyed out until that Frame completes and never runs one (ADR-372). Calculated bed bounds, configured
 no-go zones, and live output-setting findings travel with that exact candidate;
 they surface as warnings when the operator presses Start on the review-pending
 permit after a clean Frame. They do not refuse Frame or Start. The actual
@@ -956,6 +956,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
 5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   its Select dialog, so an identical second adapter (a laser controller and an Arduino that
+   both use a CH340, for example) no longer stops background streaming. A pick lasts until
+   Forget Controller or an app restart; picking both identical adapters in one run is still
+   ambiguous and uses the window port (ADR-366).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -1058,7 +1063,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    stock top.
 2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
    retracted, then restores a zero or positive pre-Frame Work-Z. If Frame began below Work Z0, it
-   deliberately stays at safe Z instead of plunging back into stock. Missing Work-Z, unknown return Z, or a driver
+   deliberately stays at safe Z instead of plunging back into stock. The retract only ever raises: a
+   bit already at or above safe Z (for example parked above the touch plate after a probe) traces and
+   returns at its own height with no Z move, and click/command point moves skip their safe-Z prefix
+   the same way (ADR-192 Amendment 1). Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
 3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
    positions are converted to millimetres before any G21 restore is built.
@@ -1106,7 +1114,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    **Not framed — Frame this job to unlock Start** (or why the last Frame expired). The user clicks
    **Frame job** while connected and idle; it runs the dialog-free prepare-and-Frame path. Start
    never launches a Frame itself, and Cmd/Ctrl+Return with no permit only says to Frame first
-   (ADR-367).
+   (ADR-372).
 2. App prepares the exact program and runs F-A10. A factual compile-integrity, construction-input,
    or transport failure stops before Frame and reports its fix; policy findings do not. Job Review
    does not open. Calculated bounds, no-go, controller-setting, and other advisory findings travel
@@ -1119,7 +1127,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. Clean completion issues a one-run, review-pending `FramedRunPermit` and enables **Start**. The
    controls read **Ready to start — framed job unchanged**, **Start**, and **Frame again**. For a
    split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
-   never cancels that program (ADR-367). The permit is exact and one-use. Any project,
+   never cancels that program (ADR-372). The permit is exact and one-use. Any project,
    output-scope, placement, or registration edit, Jog, Home, origin/probe/reset/disconnect, or
    controller drift expires it and greys Start out again, with the reason in the status line.
    Camera-only UI state does not.
@@ -1871,8 +1879,15 @@ provider from the archived project and refuses unless the re-emitted program mat
 G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
 including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
-warning. Durable activation reuses the artifact verified before transmission, so no full artifact
-clone/hash runs after the first controller bytes are accepted.
+warning. A fresh Start arms only its small start intent before the wire (ADR-337); the execution
+archive, including its full G-code hashing and IndexedDB clone, is built and stored after the
+controller accepts the program, off the Start-to-motion path. Until activation hands the run to
+`activeRun`, the `pendingStart` intent owns it and no progress checkpoint is written. A crash in
+that window reconciles, once the 5 s Start owner lease has expired, into a capsule at 0
+acknowledged lines with an `unknown` interruption, backed by the fingerprint-only stand-in; if the
+archive was already stored, that verified archive backs the capsule instead and the run is added
+to the execution history (ADR-341 Amendment 3). Supervised recovery Starts still stage and verify
+their archive before transmission.
 
 #### Success — resume after a crash
 1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
@@ -1961,8 +1976,12 @@ clone/hash runs after the first controller bytes are accepted.
    the newest capsule with zero diagnostic acknowledgements and an explicit
    acceptance-unknown reason. It may be a conservative false positive when the
    app died before the first program byte, but the older source is never offered
-   after a newer Start may have changed machine state. A short owner lease lets a
-   still-live tab commit or cancel without another tab misclassifying it as a crash.
+   after a newer Start may have changed machine state. A still-live tab renews a
+   five-second owner lease every second until its handoff closes, including while
+   it stores the execution archive after the controller has accepted the program.
+   Another tab reconciles the Start only after that lease has gone unrenewed for a
+   whole lease on its own clock, which a live tab avoids unless it is frozen for
+   several seconds (ADR-369).
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires
@@ -1993,7 +2012,9 @@ clone/hash runs after the first controller bytes are accepted.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream); the blocked-Start dialog offers Unlock/Home in place.
+   stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
+   Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
+   the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
@@ -2016,11 +2037,10 @@ clone/hash runs after the first controller bytes are accepted.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; CNC **Startup Setup** links open the same flow. Old `MachineSetupDialog`
-callers and deep links from read-only Artwork references resolve to the same global flow rather than
-a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
-current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
-undoable project change.
+Setup** button; CNC **Startup Setup** links open the same flow. Deep links from read-only Artwork
+references resolve to the same global flow rather than a competing live-edit dialog. Every edit
+remains in one `DeviceProfile` + `MachineConfig` + current-job CNC draft until **Save machine
+setup**, which commits the complete configuration as one undoable project change.
 
 Machine output-kind metadata describes the researched configuration and supplies advisory warnings:
 
@@ -2270,7 +2290,9 @@ settings and Job Review keep their existing read-only setup references.
    Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
-   thin line coverage before applying the Image operation. CNC keeps the editable shapes;
+   thin line coverage before applying the Image operation. Full-photo raster conversion uses
+   compact contour buffers and checks its geometry and pixel memory before starting. A
+   geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
@@ -2667,7 +2689,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
     bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
-11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
+    Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
+    saved before the preset gained `M8` (2026-09-19) still reads
+    Disabled and sends no air command at all; the Air output row then
+    offers **Use preset air settings** (ADR-370), which sets both. With
+    an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
     operator left on stays on. With the first operation's Air off, Job
@@ -2678,7 +2705,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     "Air restart" ticked the program must contain exactly one `M8` and
     one `M9`, the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=0`. Untick "Air restart" and the same job must
+    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
+    page defines `$152` as the standby wait, so `100` keeps the pump
+    powered and `0` idles it immediately; the A1 Pro page does not list
+    it). Send `$152=100` from the Console while Idle: on the Falcon
+    command set it accepts `$150`, `$151` and `$152` (whole numbers
+    0-100) and still refuses every other numeric setting write
+    (ADR-370). The write clears the Frame proof, so Frame again before
+    Start. Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
@@ -4941,8 +4975,9 @@ as the pane's design record.
 1. An incomplete physical checklist, a retained-position choice without its
    evidence, a boundary pass that does not exist in the sealed job, or a failed
    preflight refuses with the specific reason; no controller command is sent.
-2. Legacy fingerprint-only capsules cannot use pass recovery and are directed
-   to the legacy review path.
+2. Fingerprint-only capsules (a migrated legacy checkpoint or an ADR-337 Start
+   stand-in) cannot use pass recovery and are directed to the runway review
+   (F-CNC27), which uses the current-project fingerprint fallback.
 
 #### Empty
 1. Without a retained CNC capsule no recovery card is shown (unchanged).

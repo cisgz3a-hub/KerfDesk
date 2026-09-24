@@ -42,7 +42,7 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
         <Row label="Origin then">
           {artifact.kind === 'exact-execution'
             ? describeOffset(saved, 'Not reported when the job started')
-            : 'Not saved in this older record'}
+            : 'Not saved in a fingerprint-only record'}
         </Row>
         <Row label="Origin now">
           {describeOffset(

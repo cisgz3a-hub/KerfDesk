@@ -82,7 +82,9 @@ function requestBitmap(
     };
     const message: ConvertBitmapWorkerRequest = { id, rasterId, vectors, options };
     try {
-      worker.postMessage(message);
+      const photo = options.photoRibbons;
+      if (photo === undefined) worker.postMessage(message);
+      else worker.postMessage(message, [photo.points.buffer, photo.offsets.buffer]);
     } catch (err) {
       rejectRequest(request, err instanceof Error ? err : new Error(String(err)));
     }

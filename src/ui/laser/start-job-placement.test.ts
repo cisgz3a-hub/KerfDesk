@@ -13,7 +13,7 @@ import type { FrameVerification } from '../state/frame-verification';
 import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import { frameVerificationForProject } from './frame-verification-testing';
-import { prepareStartJob } from './start-job-readiness';
+import { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE, prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -330,8 +330,7 @@ describe('prepareStartJob job placement', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/custom origin/i);
-      expect(result.messages.join('\n')).toMatch(/not known/i);
+      expect(result.messages).toContain(CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE);
     }
   });
 

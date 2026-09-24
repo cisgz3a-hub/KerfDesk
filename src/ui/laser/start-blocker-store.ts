@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 
-/** Which operator action the retained refusal answered. Frame job and Start
- * are separate buttons, so the notice names the one that was refused. */
-export type BlockedAction = 'start' | 'frame';
+/** The button whose attempt was refused. Frame job and Start are separate
+ * buttons, and Start never runs a Frame, so the notice names the one pressed. */
+export type BlockedAttempt = 'start' | 'frame';
 
 type StartBlockerState = {
   readonly messages: ReadonlyArray<string>;
-  readonly action: BlockedAction;
-  readonly report: (messages: ReadonlyArray<string>, action?: BlockedAction) => void;
+  readonly attempt: BlockedAttempt;
+  readonly report: (messages: ReadonlyArray<string>, attempt?: BlockedAttempt) => void;
   readonly clear: () => void;
 };
 
@@ -15,7 +15,7 @@ type StartBlockerState = {
 // to remember or dismiss a modal before correcting the blocking condition.
 export const useStartBlockerStore = create<StartBlockerState>((set) => ({
   messages: [],
-  action: 'start',
-  report: (messages, action = 'start') => set({ messages: [...messages], action }),
+  attempt: 'start',
+  report: (messages, attempt = 'start') => set({ messages: [...messages], attempt }),
   clear: () => set({ messages: [] }),
 }));

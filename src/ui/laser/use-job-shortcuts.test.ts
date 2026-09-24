@@ -154,19 +154,18 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
       controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
     });
     const uninstall = installJobShortcuts(window);
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    window.dispatchEvent(event);
-
-    // The flow runs and, with no completed Frame, says to Frame first instead
-    // of framing — proving the shortcut reached runStartJobFlow (ADR-367).
-    expect(event.defaultPrevented).toBe(true);
     try {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(event);
+
+      // The flow runs and, with no completed Frame, says to Frame first instead
+      // of framing - proving the shortcut reached runStartJobFlow (ADR-372).
+      expect(event.defaultPrevented).toBe(true);
       await vi.waitFor(() =>
         expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE),
       );

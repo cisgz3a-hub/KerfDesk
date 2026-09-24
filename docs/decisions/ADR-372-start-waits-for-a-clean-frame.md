@@ -1,4 +1,4 @@
-## ADR-367 - Start stays greyed out until a clean Frame, and the Frame's own motion never cancels its program (2026-09-24)
+## ADR-372 - Start stays greyed out until a clean Frame, and the Frame's own motion never cancels its program (2026-09-24)
 
 **Status:** Accepted. | **Date:** 2026-09-24
 

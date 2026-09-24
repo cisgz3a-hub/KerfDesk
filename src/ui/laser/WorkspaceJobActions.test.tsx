@@ -185,7 +185,9 @@ describe('Workspace job dock', () => {
     expect(host.querySelector('[aria-label="Console command"]')).not.toBeNull();
     const dock = host.querySelector('[aria-label="Job actions"]');
     expect(dock?.textContent).toContain('Wait for the controller to reconnect.');
-    expect(host.querySelector('aside')?.textContent).not.toContain('Last Start attempt blocked');
+    expect(host.querySelector('aside')?.textContent).not.toMatch(
+      /Last (Start|Frame) attempt blocked/,
+    );
     const placement = [...host.querySelectorAll('summary')].find(
       (summary) => summary.textContent === 'Placement & output',
     )?.parentElement;

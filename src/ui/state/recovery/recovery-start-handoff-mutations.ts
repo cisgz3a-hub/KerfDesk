@@ -1,7 +1,7 @@
 import type { JobCheckpoint } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RecoveryArtifactV1, RunId } from './execution-artifact';
 import { appendBoundedExecutionHistory } from './execution-history';
-import type { PersistedRecoverySlots } from './recovery-model';
+import type { PendingStartRecord, PersistedRecoverySlots } from './recovery-model';
 import type { SlotMutation } from './recovery-slot-mutations';
 import { START_INTENT_INTERRUPTION_MESSAGE as START_HANDOFF_UNCERTAIN_MESSAGE } from './start-intent';
 
@@ -56,6 +56,28 @@ export function armFreshStartIntentMutation(
         armedAtIso,
         intent,
       },
+    },
+    value: true,
+  };
+}
+
+/** The live owner of an intent-armed Start renews its lease. Bound to the run
+ * and its arm time, so a handoff reconciled, cancelled or purged meanwhile —
+ * or a newer Start armed after it — is never revived. */
+export function renewPendingStartLeaseMutation(
+  slots: PersistedRecoverySlots,
+  owned: { readonly runId: RunId; readonly armedAtIso: string },
+  renewedAtIso: string,
+): SlotMutation<boolean> {
+  const pending = slots.pendingStart;
+  if (pending?.runId !== owned.runId || pending.armedAtIso !== owned.armedAtIso) {
+    return unchanged(slots, false);
+  }
+  return {
+    slots: {
+      ...slots,
+      revision: slots.revision + 1,
+      pendingStart: { ...pending, leaseRenewedAtIso: renewedAtIso },
     },
     value: true,
   };
@@ -120,6 +142,9 @@ export function reconcilePendingStartMutation(
   backing?: {
     readonly runId: RunId;
     readonly armedAtIso: string;
+    /** The lease the reconciler watched lapse; a renewal since then means the
+     * owner is alive after all. */
+    readonly leaseRenewedAtIso?: string;
     readonly artifactKind: RecoveryArtifactV1['kind'];
     /** The archive's own size estimate, when an exact archive backs the run. */
     readonly estimatedArtifactBytes?: number;
@@ -127,12 +152,7 @@ export function reconcilePendingStartMutation(
 ): SlotMutation<boolean> {
   const pending = slots.pendingStart;
   if (pending === null) return unchanged(slots, false);
-  if (
-    backing !== undefined &&
-    (pending.runId !== backing.runId || pending.armedAtIso !== backing.armedAtIso)
-  ) {
-    return unchanged(slots, false);
-  }
+  if (backing !== undefined && !sameStartLease(pending, backing)) return unchanged(slots, false);
   const revision = slots.revision + 1;
   // The archive may have committed before the app died. Hydration must use
   // that exact kind, or the stand-in written when no archive exists.
@@ -175,6 +195,19 @@ export function reconcilePendingStartMutation(
     },
     value: true,
   };
+}
+
+/** One run, armed once, renewed last at the same moment: the lease a
+ * reconciler observed is still the one in the record. */
+export function sameStartLease(
+  left: Pick<PendingStartRecord, 'runId' | 'armedAtIso' | 'leaseRenewedAtIso'>,
+  right: Pick<PendingStartRecord, 'runId' | 'armedAtIso' | 'leaseRenewedAtIso'>,
+): boolean {
+  return (
+    left.runId === right.runId &&
+    left.armedAtIso === right.armedAtIso &&
+    left.leaseRenewedAtIso === right.leaseRenewedAtIso
+  );
 }
 
 function unchanged<T>(slots: PersistedRecoverySlots, value: T): SlotMutation<T> {

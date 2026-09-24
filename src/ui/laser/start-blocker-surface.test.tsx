@@ -8,6 +8,7 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { JobControls } from './JobControls';
+import { reportStartBlockers } from './start-blocker-invalidation';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runFrameNow } from './use-frame-action';
 
@@ -78,5 +79,16 @@ describe('Start blocker surface', () => {
     expect(host.textContent).toContain('Last Frame attempt blocked');
     expect(host.textContent).not.toContain('Last Start attempt blocked');
     expect(host.textContent).toContain('No output layers. Enable Output on at least one layer.');
+  });
+
+  it('names Start when a Start refusal is retained', async () => {
+    reportStartBlockers(['The controller did not accept the job.']);
+    await act(async () => {
+      root = createRoot(host);
+      root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+    });
+
+    expect(host.textContent).toContain('Last Start attempt blocked');
+    expect(host.textContent).not.toContain('Last Frame attempt blocked');
   });
 });
