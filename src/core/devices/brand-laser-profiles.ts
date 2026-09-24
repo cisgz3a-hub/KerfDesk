@@ -61,22 +61,31 @@ function diodeProfile(args: {
 
 const XTOOL_SOURCE =
   'https://xtool.zendesk.com/hc/en-us/articles/14109952045463-D1-Pro-Product-Introduction';
-const XTOOL_40W_SOURCE =
-  'https://www.xtool.com/products/40w-laser-module-for-d1-pro/make-money-shopping-guide';
+const XTOOL_40W_SOURCE = 'https://uk.xtool.com/products/40w-laser-module-for-d1-pro';
+// xTool's own LightBurn device file for the D1 Pro sets "MirrorY": true (origin
+// at the rear, +Y toward the operator), "BaudRate": 230400 and
+// "EnableGrblJCommand": false.
+const XTOOL_LIGHTBURN_DEVICE =
+  'https://xtool.zendesk.com/hc/article_attachments/7316804567447/xTool-D1ProV3.lbdev';
 
 function xtoolProfile(power: 5 | 10 | 20 | 40, bedHeight: number): DeviceProfile {
-  return diodeProfile({
-    // Retain the original ID for its existing 430 x 390 mm (20 W) geometry.
-    profileId: power === 20 ? 'xtool-d1-pro' : `xtool-d1-pro-${power}w`,
-    vendor: 'xTool',
-    model: `D1 Pro (${power} W)`,
-    machineFamily: 'xtool-d1-pro',
-    bedWidth: 430,
-    bedHeight,
-    opticalPowerW: power,
-    source: power === 40 ? XTOOL_40W_SOURCE : XTOOL_SOURCE,
-    note: `${power} W head on the standard frame: 430 x ${bedHeight} mm. Extension rails and other heads need their own dimensions.`,
-  });
+  return {
+    ...diodeProfile({
+      // Retain the original ID for its existing 430 x 390 mm (20 W) geometry.
+      profileId: power === 20 ? 'xtool-d1-pro' : `xtool-d1-pro-${power}w`,
+      vendor: 'xTool',
+      model: `D1 Pro (${power} W)`,
+      machineFamily: 'xtool-d1-pro',
+      bedWidth: 430,
+      bedHeight,
+      opticalPowerW: power,
+      source: `${power === 40 ? XTOOL_40W_SOURCE : XTOOL_SOURCE}; ${XTOOL_LIGHTBURN_DEVICE}`,
+      note: `${power} W head on the standard frame: 430 x ${bedHeight} mm. Extension rails and other heads need their own dimensions. xTool's LightBurn device file puts the origin at the rear-left, uses 230400 baud and disables $J jogging; confirm jogging on your firmware.`,
+    }),
+    origin: 'rear-left',
+    homing: { enabled: false, direction: 'rear-left' },
+    baudRate: 230400,
+  };
 }
 
 export const XTOOL_D1_PRO_PROFILES: ReadonlyArray<DeviceProfile> = [
@@ -91,12 +100,16 @@ const SCULPFUN_S30_BASE = diodeProfile({
   vendor: 'Sculpfun',
   model: 'S30 (5 W, stock automatic air)',
   machineFamily: 'sculpfun-s30',
-  bedWidth: 410,
-  bedHeight: 400,
+  // The cited product page gives the standard engraving area as 380 x 385 mm
+  // (its Y-axis kit gives 380 x 920, so 380 is X). Sculpfun's firmware sets
+  // $130=400 / $131=410 with soft limits off, so larger values can drive X into
+  // the frame.
+  bedWidth: 380,
+  bedHeight: 385,
   opticalPowerW: 5,
   source:
     'https://www.sculpfun.com/products/sculpfun-s30-5w-laser-engraver-rotary-roller-40-40cm-honeycomb-panel',
-  note: 'Base S30: 410 x 400 mm and a supplied M8-controlled pump. Supplied limit switches do not establish enabled or configured homing. Pro/Max heads and extension kits differ.',
+  note: 'Base S30: 380 x 385 mm engraving area and a supplied M8-controlled pump. Sculpfun firmware ships with homing and hard limits on ($22=1, $21=1) and M9 drops the pump to low air rather than off. Pro/Max heads and extension kits differ.',
 });
 
 export const SCULPFUN_S30_PROFILE: DeviceProfile = {
