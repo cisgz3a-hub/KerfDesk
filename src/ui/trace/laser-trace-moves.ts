@@ -19,6 +19,7 @@ import {
   type Transform,
 } from '../../core/scene';
 import { simplifyToolpathPolyline, type ToolpathSimplifyOptions } from '../../core/toolpath';
+import { preserveLaserTraceTopology } from './laser-trace-topology';
 
 // The tree-wide hard-corner convention, as in the CNC fairing: the sharpener,
 // curve refinement and dense corner detection all pin at 60 degrees.
@@ -57,7 +58,8 @@ export function simplifyTracedPathsForLaser(
         ? DEFAULT_MACHINE_CURVE_TOLERANCE_MM / largestScale
         : null,
   };
-  return paths.map((path) => conditionPath(path, moves));
+  const candidates = paths.map((path) => conditionPath(path, moves));
+  return preserveLaserTraceTopology(paths, candidates, placement);
 }
 
 function conditionPath(path: ColoredPath, moves: LaserMoves): ColoredPath {

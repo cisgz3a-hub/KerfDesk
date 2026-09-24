@@ -77,6 +77,11 @@ curved path, not only traces, so it is left to its own change.
      the publisher's page could not be opened from the build environment). Vertices turning at least
      60 degrees, open-chain ends and ring seams are always kept at their exact positions. A ring that
      would drop below three distinct vertices is kept as traced, so no mark is deleted.
+   - Closed boundaries are checked together after simplification, including neighbours in other
+     colored paths. A distance bound on each outline alone can make a narrow hole cross its outer
+     outline. The existing topology repair restores only conflicting simplified subpaths, comparing
+     canonical compiled boundaries at the commit placement. Unrelated simplifications and native
+     fitted curves are retained; compatibility polylines stay paired with the curves compile reads.
 3. CNC commits keep ADR-260's fairing. Photo shading keeps its ribbons, whose widths encode tone.
    Raster scan output burns pixels, not traced moves, and is not conditioned.
 
@@ -132,6 +137,9 @@ curved path, not only traces, so it is left to its own change.
   property test), `trace-curves.test.ts` (the cubics reach a traced path), `laser-trace-moves.test.ts`,
   `trace-machine-conditioning.test.ts`, `ImportImageDialog.cnc-fairing.test.ts`, and
   `arch-house-laser-moves.test.ts`, which traces, commits, compiles and emits the logo end to end.
+  `laser-trace-topology.test.ts` checks narrow holes with independent intersection and containment
+  predicates on compiled output, cross-path neighbours, stale compatibility samples, and retention
+  of unrelated simplification and native fitted curves.
 
 Not part of this decision: chord-optimal cubic flattening in compile; keeping cubics through the
 downscale route and region enhance; fitting the unfitted finish and Centerline strokes;
