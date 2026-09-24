@@ -1866,8 +1866,15 @@ provider from the archived project and refuses unless the re-emitted program mat
 G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
 including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
-warning. Durable activation reuses the artifact verified before transmission, so no full artifact
-clone/hash runs after the first controller bytes are accepted.
+warning. A fresh Start arms only its small start intent before the wire (ADR-337); the execution
+archive, including its full G-code hashing and IndexedDB clone, is built and stored after the
+controller accepts the program, off the Start-to-motion path. Until activation hands the run to
+`activeRun`, the `pendingStart` intent owns it and no progress checkpoint is written. A crash in
+that window reconciles, once the 5 s Start owner lease has expired, into a capsule at 0
+acknowledged lines with an `unknown` interruption, backed by the fingerprint-only stand-in; if the
+archive was already stored, that verified archive backs the capsule instead and the run is added
+to the execution history (ADR-341 Amendment 3). Supervised recovery Starts still stage and verify
+their archive before transmission.
 
 #### Success — resume after a crash
 1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
