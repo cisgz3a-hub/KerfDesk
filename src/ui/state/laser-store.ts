@@ -408,20 +408,23 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
   };
 }
 
+/** Why a manual air command would be refused, or null. The rail disables the
+ *  Manual Air button with the same reason instead of letting a click fail
+ *  silently (audit ui-panel-6). Air OFF stays reachable during an MPG takeover. */
+export function manualAirBlockMessage(state: LaserState, enabling: boolean): string | null {
+  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  if (!enabling && state.mpgActive === true) return null;
+  return enabling
+    ? (mpgCommandBlockMessage(state) ??
+        airAssistCommandBlockMessage(state) ??
+        controllerOperationCommandBlockMessage(state.controllerOperation))
+    : (airAssistCommandBlockMessage(state) ??
+        controllerOperationCommandBlockMessage(state.controllerOperation));
+}
+
 function assertAirAssistReady(set: SetFn, get: GetFn, enabling: boolean): void {
   const state = get();
-  const takeoverFailOff = !enabling && state.mpgActive === true;
-  const blockedMessage =
-    state.connection.kind !== 'connected'
-      ? 'Connect to the laser first.'
-      : takeoverFailOff
-        ? null
-        : enabling
-          ? (mpgCommandBlockMessage(state) ??
-            airAssistCommandBlockMessage(state) ??
-            controllerOperationCommandBlockMessage(state.controllerOperation))
-          : (airAssistCommandBlockMessage(state) ??
-            controllerOperationCommandBlockMessage(state.controllerOperation));
+  const blockedMessage = manualAirBlockMessage(state, enabling);
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,

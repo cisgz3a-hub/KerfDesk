@@ -22,6 +22,20 @@ const originalSetAirAssistEnabled = useLaserStore.getState().setAirAssistEnabled
 
 // jsdom's selector engine mis-parses '+' inside quoted attribute values, so
 // queries scan getAttribute instead of using querySelector.
+// Manual Air is enabled only where the store would accept it (audit ui-panel-6).
+const CONNECTED_IDLE = {
+  connection: { kind: 'connected' },
+  statusReport: {
+    state: 'Idle',
+    subState: null,
+    mPos: { x: 0, y: 0, z: 0 },
+    wPos: null,
+    wco: null,
+    feed: 0,
+    spindle: 0,
+  },
+} as Partial<ReturnType<typeof useLaserStore.getState>>;
+
 function buttonByLabel(host: HTMLElement, label: string): HTMLButtonElement | null {
   return (
     [...host.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === label) ?? null
@@ -56,6 +70,7 @@ afterEach(() => {
     airAssistOn: false,
     statusReport: null,
     wcoCache: null,
+    connection: { kind: 'disconnected' },
   });
   // Reset the whole project INCLUDING the device profile. newProject() now
   // preserves the machine profile (DEV-01, LightBurn parity), so a
@@ -133,7 +148,7 @@ describe('JogPad accessible labels', () => {
 
   it('calls the manual air assist action when toggled', async () => {
     const setAirAssistEnabled = vi.fn(async () => undefined);
-    useLaserStore.setState({ setAirAssistEnabled });
+    useLaserStore.setState({ setAirAssistEnabled, ...CONNECTED_IDLE });
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M7' });
     const { host, unmount } = await renderJogPad();
 
@@ -150,7 +165,7 @@ describe('JogPad accessible labels', () => {
 
   it('keeps air assist clickable when jog arrows are disabled', async () => {
     const setAirAssistEnabled = vi.fn(async () => undefined);
-    useLaserStore.setState({ setAirAssistEnabled });
+    useLaserStore.setState({ setAirAssistEnabled, ...CONNECTED_IDLE });
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
     const { host, unmount } = await renderJogPad(true);
 

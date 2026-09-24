@@ -19,6 +19,7 @@ import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
+import { AlarmRecoveryActions } from './AlarmRecoveryActions';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { openMachineSetup } from './device-setup';
@@ -319,50 +320,6 @@ function alarmRecoveryAction(
   return action ?? STATUS_ALARM_START_MESSAGE;
 }
 
-function AlarmRecoveryActions(props: {
-  readonly homingEnabled: boolean;
-  readonly canUnlock: boolean;
-  readonly onHome: () => void;
-  readonly onConfigureHoming: () => void;
-  readonly onUnlock: () => void;
-}): JSX.Element {
-  return (
-    <>
-      {props.homingEnabled ? (
-        <button
-          type="button"
-          onClick={props.onHome}
-          title="Send $H. Use this only when the machine has working homing switches."
-        >
-          Home ($H)
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={props.onConfigureHoming}
-          title="Homing is off for this machine. Open Machine Setup to turn on $H homing."
-        >
-          Set up homing
-        </button>
-      )}
-      {!props.homingEnabled && (
-        <span style={alarmHintStyle}>
-          Turn on homing in Machine Setup if this machine has homing switches.
-        </span>
-      )}
-      {props.canUnlock && (
-        <button
-          type="button"
-          onClick={props.onUnlock}
-          title="Send $X to unlock the controller after you have confirmed the machine is safe."
-        >
-          $X — Unlock
-        </button>
-      )}
-    </>
-  );
-}
-
 const panelStyle: React.CSSProperties = {
   // Explicit width + flexShrink: 0 so this rail cannot push the workspace
   // canvas off-screen when its sub-panels (DeviceSettings, ConsolePanel, etc.)
@@ -394,4 +351,3 @@ const sleepStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 const alarmDetailStyle: React.CSSProperties = { margin: '4px 0' };
-const alarmHintStyle: React.CSSProperties = { display: 'block', fontSize: 11, lineHeight: 1.3 };
