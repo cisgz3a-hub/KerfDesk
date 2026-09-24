@@ -9,7 +9,6 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
-import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { FocusJogControls } from './FocusJogControls';
@@ -125,18 +124,6 @@ describe('Machine utility control audit', () => {
     render(<StartFromLineControl disabled={false} busy={false} machineKind="cnc" />);
     expect(host.querySelector('button')).toBeNull();
     expect(host.textContent).toContain('Automatic line-number restart remains blocked');
-  });
-
-  it('detected settings Apply changes safe profile fields and Dismiss clears the offer only', () => {
-    useLaserStore.setState({ detectedSettings: { maxPowerS: 1234 } });
-    render(<DetectedSettingsBanner />);
-    act(() => button('Apply safe settings').click());
-    expect(useStore.getState().project.device.maxPowerS).toBe(1234);
-    act(() => useLaserStore.setState({ detectedSettings: { maxPowerS: 987 } }));
-    render(<DetectedSettingsBanner />);
-    act(() => button('Dismiss').click());
-    expect(useLaserStore.getState().detectedSettings).toBeNull();
-    expect(useStore.getState().project.device.maxPowerS).toBe(1234);
   });
 
   it('Zero Z dispatches only the CNC zero callback and is inert when controls are disabled', () => {

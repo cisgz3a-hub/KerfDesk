@@ -51,12 +51,6 @@ export const zoneGridStyle: React.CSSProperties = {
   gap: 8,
   alignItems: 'end',
 };
-export const firmwareGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto auto',
-  gap: 8,
-  alignItems: 'end',
-};
 export const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
