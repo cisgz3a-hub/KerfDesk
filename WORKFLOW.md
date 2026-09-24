@@ -102,7 +102,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
-- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
+- **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen; the Pen follows F-A5b), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
 - **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains available when its existing receipt checks allow it. Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
@@ -302,6 +302,59 @@ Identical to the format-specific import flows except:
 1. Join is endpoint-only because one canonical curve subpath represents one continuous traversal.
    Interior anchors do not create a disconnected third cutting run or silently reinterpret stored
    endpoints.
+
+---
+
+### F-A5b. Draw lines with the pen (ADR-380)
+
+Follows LightBurn's Draw Lines tool
+(https://docs.lightburnsoftware.com/2.1/Reference/DrawLines/).
+
+#### Success — corners and curves
+1. Arm **Pen** (`Cmd/Ctrl+L`). Each click places a corner node exactly where it lands. Corners are
+   joined by straight segments and are never refitted into curves, on finishing or on any later
+   load.
+2. Press and drag to place a smooth node. The drag sets its outgoing handle and the incoming handle
+   mirrors it, so both neighbouring segments become cubic curves. A drag under 3 screen pixels
+   stays a click. Shift holds the segment or the handle to 45° steps.
+3. `S` switches the nodes that clicks place between corner and smooth. A smooth (auto) node takes
+   its tangent from its neighbours; the open ends of a path stay corners. A badge beside the
+   pointer shows smooth mode, and choosing another tool resets it to corners.
+4. `Backspace` or `Delete` removes the last node placed. Removing the only node abandons the path.
+5. `Enter`, `Escape`, a right-click or a double-click finishes an open path of two or more nodes as
+   one undo step, selects it and returns to Select. Pressing the first node of a path with three
+   or more nodes closes it; dragging there shapes that node.
+
+#### Success — continue and join (Auto-Join)
+1. Pressing on the open end of an unlocked pen drawing or path artwork (imported SVG, trace)
+   continues it. Finishing extends that object in place, keeping its operation and direction; its
+   start point moves only when the pen continues from that start. A ring marks an end under the
+   pointer.
+2. Finishing on another path's open end joins it. A new drawing that ends on a path becomes part
+   of that path. A continued path absorbs the path it reaches only when both cut the same way:
+   equal operation settings, power scale, override, fill rule and stroke. Otherwise the new line
+   meets that end exactly and both paths stay separate. Finishing on the far end of the path being
+   continued closes it.
+3. Hold `Cmd/Ctrl` while pressing to start or finish on an end without joining.
+
+#### Success — snapping while drawing
+1. With snapping on (the `#` toggle beside the zoom controls), the pointer snaps within 8 screen
+   pixels to existing nodes and image corners, then crossings, then segment midpoints, then the
+   nearest point on a line. Hold Alt to reach three times farther. A marker shows what it snapped
+   to.
+2. With no geometry in reach, grid snapping pulls each axis onto a grid line within the move-snap
+   distance (2 mm), so zoomed-out drawing is not locked to the grid.
+3. Object-move snapping is unchanged.
+
+#### Edge — paths the pen will not change
+1. Locked artwork and artwork with CNC tabs are never extended or absorbed. An image mask or a
+   path-text guide can be extended but is never absorbed into another path. Artwork on hidden
+   operations is neither a snap target nor a join target.
+
+#### Edge — drawings from earlier versions
+1. Earlier versions smoothed pen drawings into curves when they were drawn. Those drawings load,
+   render and cut exactly as stored, and continuing one keeps its curves. The fairing migration
+   still upgrades only drawings that predate its version stamp (ADR-214).
 
 ---
 
@@ -980,7 +1033,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
 - `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
-- `Cmd/Ctrl+L` - Line/pen
+- `Cmd/Ctrl+L` - Line/pen (F-A5b). While it is armed: `S` switches between corner and smooth
+  nodes, `Backspace`/`Delete` removes the last node, `Enter` or `Escape` finishes an open path
+  (`Escape` with fewer than two nodes still cancels), Shift holds 45° steps, Alt snaps from three
+  times farther and `Cmd/Ctrl` starts or finishes on a path without joining it
 - `Alt+M` - Measure
 - `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
   single convertible vector is selected)
