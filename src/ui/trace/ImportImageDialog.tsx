@@ -26,7 +26,7 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
-import { fairTracedImageForCnc, shouldFairTracedImageForCnc } from './fair-traced-image-for-cnc';
+import { conditionTracedImageForMachine } from './trace-machine-conditioning';
 import { useTracePreset } from './use-trace-preset';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import {
@@ -418,12 +418,12 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     }
     // Photo ribbon width encodes tone; generic contour fairing changes that
     // coverage and can erase narrow highlights. Keep its reviewed geometry.
-    // CNC conditioning uses the exact live placement that the store will
+    // Machine conditioning uses the exact live placement that the store will
     // apply. Transform-only source changes are intentionally accepted, so
-    // fairing before this point would use stale physical units.
-    const commitTraced = shouldFairTracedImageForCnc(liveProject.machine?.kind, args.options)
-      ? fairTracedImageForCnc(traced, positionTraceOverRasterSource(liveSource, traced).transform)
-      : traced;
+    // conditioning before this point would use stale physical units.
+    const placement = positionTraceOverRasterSource(liveSource, traced).transform;
+    const machineKind = liveProject.machine?.kind;
+    const commitTraced = conditionTracedImageForMachine(traced, placement, machineKind, args);
     const outputArgs = {
       ...args,
       photoShading: args.options.photoDetail !== undefined,
