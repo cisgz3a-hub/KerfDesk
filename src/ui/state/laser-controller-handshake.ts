@@ -11,6 +11,7 @@ import {
   failedControllerQualificationPatch,
   qualifiedController,
   qualifyingController,
+  resumeQualificationInSession,
 } from './laser-controller-qualification';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -78,17 +79,20 @@ export async function runControllerHandshake(
   const connection = refs.connection;
   if (connection === null) return;
   const guard = createHandshakeEpochGuard(get, refs, connection, onQualificationEpoch);
+  // An in-session Alarm/Sleep, not a reboot, ends the await (audit connect-2).
+  const resume = (): void =>
+    resumeQualificationInSession(set, get, refs, connection, guard.expectedSessionEpoch);
   const response = await awaitControllerResponse(refs, safeWrite, guard);
-  if (response === 'stale') return;
+  if (response === 'stale') return resume();
   if (response === 'timeout') {
     reportMissingControllerResponse(set, get, refs, baudRate, guard.expectedSessionEpoch);
     return;
   }
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
-  if (!guard.acceptControllerLineEpoch()) return;
+  if (!guard.acceptControllerLineEpoch()) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await waitForHandshakeIdle(get, refs, safeWrite);
-  if (!guard.acceptControllerLineEpoch()) return;
+  if (!guard.acceptControllerLineEpoch()) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await qualifyConnectedController(set, get, refs, safeWrite, connection, guard);
 }
@@ -200,12 +204,7 @@ async function qualifyConnectedController(
   });
   beginSettingsCollection(refs, qualificationEpoch);
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
-  await startControllerCommand(refs, safeWrite, {
-    kind: 'connection-handshake',
-    label: 'controller settings query',
-    command: `${settingsQuery}\n`,
-    source: 'system',
-  });
+  await queryHandshakeSettings(refs, safeWrite, settingsQuery, connection, guard);
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   if (!qualificationCompleted(get(), qualificationEpoch)) {
@@ -240,6 +239,38 @@ async function qualifyConnectedController(
     'connection-handshake',
   );
   parkHandshakeForMpg(set, get, refs, connection, guard);
+}
+
+async function queryHandshakeSettings(
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  settingsQuery: string,
+  connection: NonNullable<LiveRefs['connection']>,
+  guard: HandshakeEpochGuard,
+): Promise<void> {
+  const qualificationEpoch = guard.expectedSessionEpoch;
+  try {
+    await startControllerCommand(refs, safeWrite, {
+      kind: 'connection-handshake',
+      label: 'controller settings query',
+      command: `${settingsQuery}\n`,
+      source: 'system',
+    });
+  } catch (error) {
+    // An error reply or a timeout ends the owned $$ without a dump. A collector
+    // left collecting refused every later settings read, the Retry button's
+    // included, as "already being read" (audit settings-console-4). An ALARM
+    // that moved the write epoch keeps it: grblHAL still delivers the dump
+    // after a critical alarm, and that collector finishes qualification.
+    if (
+      handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch) &&
+      refs.settingsCollectorSessionEpoch === qualificationEpoch
+    ) {
+      refs.settingsCollector = idleCollector();
+      refs.settingsCollectorSessionEpoch = null;
+    }
+    throw error;
+  }
 }
 
 async function refreshHandshakeBuildInfo(
