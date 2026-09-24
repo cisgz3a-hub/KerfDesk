@@ -118,14 +118,14 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     machine: 'cnc',
     minutes: 4,
     location:
-      'Artwork / Operations → Settings → Operation → Tool & material; Startup Setup → Bit library',
+      'Artwork / Operations → Settings → Operation → Tool & material; Machine Setup → Bit library',
     prerequisites: 'CNC mode and the specifications of the cutters you intend to use.',
     visual: 'library',
     steps: [
       {
         title: 'Identify the cutter geometry',
         instruction:
-          'In Tool & material, use Show picture to recognise the cutter family. Choose the matching bit, or open Add another bit to browse the catalog or add a custom bit with its name, kind, diameter and actual flute count. The same library is available in Startup Setup.',
+          'In Tool & material, use Show picture to recognise the cutter family. Choose the matching bit, or open Add another bit to browse the catalog or add a custom bit with its name, kind, diameter and actual flute count. The same library is available in Machine Setup.',
         focus: 'Bit library',
         result:
           'The picture explains the cutter shape; its actual specifications define the geometry the planner uses.',
@@ -141,7 +141,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Assign default and operation bits',
         instruction:
-          'In Artwork / Operations → Settings → Operation → Tool & material, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit. Use job default bit removes an operation override. Change the job default in Startup Setup.',
+          'In Artwork / Operations → Settings → Operation → Tool & material, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit. Use job default bit removes an operation override. Change the job default in Machine Setup.',
         focus: 'Tool & material · Bit',
         result:
           'Each operation has a visible cutter assignment, including any separate clearing stage.',
@@ -150,7 +150,7 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Save and inspect the plan',
         instruction:
-          'Operation choices update immediately and are saved with the project. If editing inside Startup Setup instead, choose Save machine setup to apply its draft. Inspect the operation cutting values and preview any tool changes before running.',
+          'Operation choices update immediately and are saved with the project. If editing inside Machine Setup instead, choose Save CNC machine setup to apply its draft. Inspect the operation cutting values and preview any tool changes before running.',
         focus: 'Operation settings and preview',
         result:
           'The job uses the saved bit assignments and shows their effect in the generated route.',

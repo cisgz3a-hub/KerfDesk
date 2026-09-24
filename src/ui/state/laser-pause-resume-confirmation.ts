@@ -1,6 +1,7 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { waitForFreshControllerStatus } from './laser-controller-status-wait';
+import { isDoorTransitionProgress } from './laser-pause-resume-evidence';
 import {
   assertPauseResumeTransitionOwner,
   hasCurrentPauseResumeTransportFence,
@@ -53,6 +54,8 @@ type PauseResumeConfirmationOptions = {
   readonly timeoutMessage: string;
   readonly action: PauseResumeTransitionAction;
   readonly liveness: PauseResumeLivenessPolicy;
+  /** Sees every fresh same-session report after the command write settled. */
+  readonly observeFreshReport?: (report: StatusReport) => void;
 };
 
 const STATUS_WAIT_TIMEOUT_MS =
@@ -110,15 +113,12 @@ export async function sendRealtimeAndConfirmPauseResume(
   const confirmation = waitForFreshControllerStatus(context.refs, {
     after: { sessionEpoch: expectedSession, sequence: afterCommand.statusSequence },
     accept,
-    ...(trackCncDoorProgress
-      ? {
-          onFreshReport: (report: StatusReport) => {
-            if (isStatusWriteSettled && (isCncDoorProgress(report, action) || accept(report))) {
-              refreshPauseResumeTransitionLiveness(context.refs, token);
-            }
-          },
-        }
-      : {}),
+    onFreshReport: (report: StatusReport) => {
+      options.observeFreshReport?.(report);
+      if (isStatusWriteSettled && extendsLiveness(liveness, report, action, accept)) {
+        refreshPauseResumeTransitionLiveness(context.refs, token);
+      }
+    },
     timeoutMs: STATUS_WAIT_TIMEOUT_MS,
     timeoutMessage,
   });
@@ -147,9 +147,27 @@ function assertExpectedSession(
   throw new Error(`Controller session changed ${stage}.`);
 }
 
-function isCncDoorProgress(report: StatusReport, action: PauseResumeTransitionAction): boolean {
-  if (report.state !== 'Door') return false;
-  return action === 'pause' ? report.subState === 2 : report.subState === 3;
+// Progress only refreshes the silence deadline; the absolute maximum still
+// bounds the transition, and only an accepted report releases a refill.
+function extendsLiveness(
+  liveness: PauseResumeLivenessPolicy,
+  report: StatusReport,
+  action: PauseResumeTransitionAction,
+  accept: (report: StatusReport) => boolean,
+): boolean {
+  switch (liveness) {
+    case 'none':
+      return false;
+    case 'cnc-door':
+      return isDoorTransitionProgress(report, action) || accept(report);
+    case 'door-restore':
+      // A laser keeps the beam dark through the whole restore: GRBL and
+      // grblHAL skip the spin-up delay in laser mode and switch the laser on
+      // only when the cycle restarts. The coolant (air) delay can still
+      // outlast the heartbeat, and fresh restore reports prove the controller
+      // is alive and working toward Run.
+      return action === 'resume' && isDoorTransitionProgress(report, 'resume');
+  }
 }
 
 function clearSettledPauseResumeUiState(

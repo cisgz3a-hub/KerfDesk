@@ -48,9 +48,13 @@ export class IndexedDbRecoveryStorageBackend implements RecoveryStorageBackend {
       const current = await request<StoredSlotEnvelope | undefined>(store.get(SLOT_KEY));
       const mutation = mutate(current?.value ?? null);
       value = mutation.value;
-      await request(
-        store.put({ key: SLOT_KEY, value: mutation.slots } satisfies StoredSlotEnvelope),
-      );
+      // A no-op still costs a structured clone and a disk write; progress
+      // checkpoints for a run this window no longer owns are all no-ops.
+      if (mutation.unchanged !== true) {
+        await request(
+          store.put({ key: SLOT_KEY, value: mutation.slots } satisfies StoredSlotEnvelope),
+        );
+      }
       await transactionFinished(tx);
     } catch (error) {
       abortIfActive(tx);
@@ -76,9 +80,11 @@ export class IndexedDbRecoveryStorageBackend implements RecoveryStorageBackend {
         return { artifactExists: false };
       }
       const mutation = mutate(current?.value ?? null);
-      await request(
-        slotStore.put({ key: SLOT_KEY, value: mutation.slots } satisfies StoredSlotEnvelope),
-      );
+      if (mutation.unchanged !== true) {
+        await request(
+          slotStore.put({ key: SLOT_KEY, value: mutation.slots } satisfies StoredSlotEnvelope),
+        );
+      }
       await transactionFinished(tx);
       return { artifactExists: true, value: mutation.value };
     } catch (error) {

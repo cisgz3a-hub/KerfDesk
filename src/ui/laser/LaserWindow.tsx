@@ -1,6 +1,8 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
+import { useState } from 'react';
+import type { GrblState } from '../../core/controllers/grbl';
 import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
 import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
@@ -28,6 +30,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { clearStartBlockers } from './start-blocker-invalidation';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useToastStore } from '../state/toast-store';
 import './LaserWindow.css';
 
@@ -44,14 +47,17 @@ export function LaserWindow({
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const statusReport = useLaserStore((s) => s.statusReport);
+  // By value: the report object is replaced on every 250 ms poll, and this
+  // rail derives only Idle / Sleep / Alarm from it. Selecting the object
+  // re-rendered the whole machine rail on each poll of a running job.
+  const controllerState = useLaserStore((s) => s.statusReport?.state ?? null);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
   const jogBlocked = useJogBlocked();
-  const controllerDisplay = controllerDisplayState(statusReport, alarmCode);
+  const controllerDisplay = controllerDisplayState(controllerState, alarmCode);
   const connected = connection.kind === 'connected';
   // Homing lives on the Confirm settings step, which is not collapsed, so the
   // deep-link needs no section highlight.
@@ -81,14 +87,12 @@ export function LaserWindow({
           controllerKind={controllerKind}
           homingEnabled={homingEnabled}
           canUnlock={control.canUnlock}
-          onHome={() => void control.home().catch(() => undefined)}
+          onHome={control.runHome}
           onConfigureHoming={openHomingSetup}
-          onUnlock={() => void control.unlockAlarm().catch(() => undefined)}
+          onUnlock={control.runUnlock}
         />
       )}
-      {controllerDisplay.sleep && (
-        <SleepBanner onWake={() => void control.wakeController().catch(() => undefined)} />
-      )}
+      {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(
@@ -149,14 +153,24 @@ function useControllerActions(): {
   readonly unlockAlarm: ReturnType<typeof useLaserStore.getState>['unlockAlarm'];
   readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
   readonly canUnlock: boolean;
+  // Banner click handlers: a refusal becomes a toast instead of silence.
+  readonly runHome: () => void;
+  readonly runUnlock: () => void;
+  readonly runWake: () => void;
 } {
+  const home = useLaserStore((s) => s.home);
+  const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
+  const wakeController = useLaserStore((s) => s.wakeController);
   return {
     connect: useLaserStore((s) => s.connect),
     disconnect: useLaserStore((s) => s.disconnect),
-    home: useLaserStore((s) => s.home),
-    unlockAlarm: useLaserStore((s) => s.unlockAlarm),
-    wakeController: useLaserStore((s) => s.wakeController),
+    home,
+    unlockAlarm,
+    wakeController,
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
+    runHome: () => void home().catch(controllerActionFailureHandler('Home')),
+    runUnlock: () => void unlockAlarm().catch(controllerActionFailureHandler('Unlock')),
+    runWake: () => void wakeController().catch(controllerActionFailureHandler('Wake')),
   };
 }
 
@@ -182,31 +196,37 @@ function MachineRailHeading(props: {
   );
 }
 
+// The docked console follows the transcript, which publishes several times a
+// second during a job; behind a closed summary it re-rendered at that rate for
+// nobody. While the section is closed it holds its last transcript instead,
+// and it stays mounted so its filters and unsent draft survive a close.
 function MachineConsoleSection(): JSX.Element {
+  const [open, setOpen] = useState(false);
   return (
     <CollapsibleRailSection
       label="Console"
       title="Show advanced controller commands and communication history."
+      onOpenChange={setOpen}
     >
-      <ConsolePanel />
+      <ConsolePanel active={open} />
       <SuperConsoleLauncher />
     </CollapsibleRailSection>
   );
 }
 
-function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
+function hasAlarmRecovery(code: number | null, state: GrblState | null): boolean {
   return code !== null || state === 'Alarm';
 }
 
 function controllerDisplayState(
-  report: ReturnType<typeof useLaserStore.getState>['statusReport'],
+  state: GrblState | null,
   alarmCode: number | null,
 ): { readonly idle: boolean; readonly sleep: boolean; readonly showAlarmBanner: boolean } {
-  const sleep = report?.state === 'Sleep';
+  const sleep = state === 'Sleep';
   return {
-    idle: report?.state === 'Idle',
+    idle: state === 'Idle',
     sleep,
-    showAlarmBanner: !sleep && hasAlarmRecovery(alarmCode, report?.state),
+    showAlarmBanner: !sleep && hasAlarmRecovery(alarmCode, state),
   };
 }
 

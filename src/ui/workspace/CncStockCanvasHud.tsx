@@ -15,7 +15,7 @@ export function CncStockCanvasHud(): JSX.Element | null {
 
   return (
     <section
-      aria-label="Stock from Startup Setup"
+      aria-label="Stock from Machine Setup"
       className="lf-chip"
       style={isExpanded ? styles.panel : { ...styles.panel, ...styles.collapsedPanel }}
     >
@@ -51,8 +51,8 @@ function StockHeader(props: {
       }
       aria-expanded={props.isExpanded}
       aria-controls={STOCK_DETAILS_ID}
-      aria-label={`${action} stock reference from Startup Setup`}
-      title="Read-only here. Select to view the saved stock or edit it in Startup Setup."
+      aria-label={`${action} stock reference from Machine Setup`}
+      title="Read-only here. Select to view the saved stock or edit it in Machine Setup."
       onClick={props.onToggle}
     >
       {props.isExpanded ? (
@@ -75,7 +75,7 @@ function StockReferenceDetails(props: { readonly stock: CncStock }): JSX.Element
   return (
     <div id={STOCK_DETAILS_ID} style={styles.body}>
       <p style={styles.note}>
-        Read-only here. Stock size, thickness, and origin are managed in CNC Startup Setup.
+        Read-only here. Stock size, thickness, and origin are managed in CNC Machine Setup.
       </p>
       <dl style={styles.factGrid}>
         <dt style={styles.factLabel}>Dimensions</dt>
@@ -87,9 +87,9 @@ function StockReferenceDetails(props: { readonly stock: CncStock }): JSX.Element
         <button
           type="button"
           onClick={() => openMachineSetup({ kind: 'cnc', field: 'stock' })}
-          title="Open CNC Startup Setup at the stock fields."
+          title="Open CNC Machine Setup at the stock fields."
         >
-          Edit in Startup Setup
+          Edit in Machine Setup
         </button>
       </div>
     </div>

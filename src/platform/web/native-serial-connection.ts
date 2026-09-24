@@ -82,7 +82,7 @@ function openedConnection(
   return createWorkerSerialConnection({
     bridge: {
       postMessage: (message) => {
-        if (message.kind === 'attach')
+        if (message.kind === 'attach' || message.kind === 'reattach-readable')
           throw new Error('Native serial streams stay in their worker.');
         bridge.post(message);
       },

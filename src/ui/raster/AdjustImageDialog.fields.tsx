@@ -30,6 +30,13 @@ export function AdjustFields(props: {
   const { draft, update, applyPreset, userPresets, savePreset, deletePreset } = props;
   return (
     <div style={styles.fieldsGridStyle}>
+      {draft.passThrough ? (
+        <p role="status" style={{ gridColumn: '1 / -1', margin: 0, color: 'var(--lf-text-muted)' }}>
+          Original pixels and density are in use. Brightness, contrast, gamma, negative and dither
+          settings are kept for when Pass-through is off. The selected power range, placement, masks
+          and dot-width correction still apply.
+        </p>
+      ) : null}
       <PresetField
         value={draft.presetId}
         userPresets={userPresets}
@@ -262,11 +269,11 @@ function displayNumber(value: number, decimals: number): number {
 function numberFieldTitle(name: string, label: string): string {
   switch (name) {
     case 'lineIntervalMm':
-      return 'Distance between raster scan lines. Smaller values engrave denser images.';
+      return 'Distance between raster scan lines. Smaller values pack rows closer and burn more energy per area at the same power and speed.';
     case 'imageDpi':
       return 'Image engraving resolution in dots per inch.';
     case 'dotWidthCorrectionMm':
-      return 'Compensate for physical laser dot width when raster engraving.';
+      return 'Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan.';
     case 'minPower':
       return 'Lowest laser power used by grayscale image engraving.';
     default:

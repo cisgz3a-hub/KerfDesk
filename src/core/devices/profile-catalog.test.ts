@@ -62,13 +62,16 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       throw new Error('Falcon profiles missing');
 
     expect(specific.profile.controllerKind).toBe('grblhal');
-    // ADR-331: grblHAL rings are >= 1 KiB; the stock 120-byte window starved
-    // the Falcon's 512-block planner on dense raster jobs.
+    // ADR-331: grblHAL rings are >= 1 KiB; the stock 120-byte window can starve
+    // a 512-block planner on dense raster jobs (simulator-shown).
     expect(specific.profile.rxBufferBytes).toBe(1024);
     expect(profileCatalogEntryById('generic-grblhal')?.profile.rxBufferBytes).toBe(1024);
     expect(fallback.profile.rxBufferBytes).toBe(120);
     expect(specific.profile.name).toBe('Creality Falcon A1 Pro (vendor command set)');
-    expect(specific.profile.maxFeed).toBe(10000);
+    // Creality's rated 600 mm/s. The vendor contract cannot read $110/$111, so
+    // a 10000 ceiling capped every layer at 28% of the rating (audit speed-1).
+    expect(specific.profile.maxFeed).toBe(36000);
+    expect(specific.profile.catalogVersion).toBe('2026-09-24');
     expect(specific.profile.framingFeedMmPerMin).toBe(10000);
     expect(profileConfidenceLabel(specific.profile)).toBe('Public-spec starter');
     expect(fallback.profile.name).toBe('Creality Falcon-compatible GRBL diode');

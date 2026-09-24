@@ -1,13 +1,8 @@
 import { type DeviceProfile } from '../devices';
 import { clamp } from '../math';
-import {
-  applyImageMaskToLuma,
-  applyLumaAdjustments,
-  dither,
-  maybeInvertLuma,
-  pixelExtentForMm,
-  resampleLumaNearest,
-} from '../raster';
+import { applyImageMaskToLuma, dither, pixelExtentForMm, resampleLuma } from '../raster';
+import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processing';
+import { burnGridKernel } from '../raster/luma-resample';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
@@ -101,8 +96,7 @@ function compileRasterGroup(
   const scanDirection = resolveImageScanDirection(device, layer);
   const sourceLuma = sourceLumaForRaster(obj, options.sourceLumaOverride);
   if (sourceLuma === null) return null;
-  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
-  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
+  const preparedLuma = prepareImageLuma(sourceLuma, obj, layer);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
   const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
   const compilationMaxS = rasterCompilationPowerScale(device);
@@ -191,7 +185,8 @@ function rasterValuesFor(
     maskObject: input.maskObject,
     device: input.device,
     bounds: input.bounds,
-    algorithm: input.layer.ditherAlgorithm,
+    algorithm: imageDitherAlgorithm(input.layer),
+    passThrough: input.layer.passThrough,
     sMax: input.sMax,
     sMin: input.sMin,
   });
@@ -234,17 +229,19 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         bounds: input.bounds,
         pixelWidth: input.pixelWidth,
         pixelHeight: input.pixelHeight,
+        kernel: burnGridKernel(imageDitherAlgorithm(input.layer)),
+        passThrough: input.layer.passThrough,
       },
       input.maskObject,
     );
     return dither(
       { luma: rotatedLuma, width: input.pixelWidth, height: input.pixelHeight },
-      { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+      { algorithm: imageDitherAlgorithm(input.layer), sMax: input.sMax, sMin: input.sMin },
     );
   }
   const luma = input.layer.passThrough
     ? input.preparedLuma
-    : resampleLumaNearest(
+    : resampleLuma(
         {
           luma: input.preparedLuma,
           width: input.obj.pixelWidth,
@@ -252,6 +249,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         },
         input.pixelWidth,
         input.pixelHeight,
+        burnGridKernel(imageDitherAlgorithm(input.layer)),
       );
   const maskedLuma = applyImageMaskToLuma({
     image: input.obj,
@@ -269,7 +267,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
   );
   return dither(
     { luma: orientedLuma, width: input.pixelWidth, height: input.pixelHeight },
-    { algorithm: input.layer.ditherAlgorithm, sMax: input.sMax, sMin: input.sMin },
+    { algorithm: imageDitherAlgorithm(input.layer), sMax: input.sMax, sMin: input.sMin },
   );
 }
 

@@ -11,6 +11,7 @@ import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage } from './laser-store-helpers';
 import { liveCanvasExecutionAcceptedPatch } from './live-canvas-run';
+import { steppedStreamerPatch } from './tool-change-hold-entry';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -42,13 +43,20 @@ export async function refillResumedStream(
     context.set((state) => {
       if (state.streamer?.status !== 'paused') return {};
       foundPausedStream = true;
-      const stepped = step(resumeStreamer(state.streamer));
+      const resumed = resumeStreamer(state.streamer);
+      const stepped = step(resumed);
       toSend = stepped.toSend;
       finishedWithoutRefill = stepped.state.status === 'done';
-      if (toSend.length === 0) return { streamer: stepped.state };
+      // An empty step is where a resumed CNC stream enters a tool-change hold:
+      // the M0 is at the queue head, either already or on the pass after the
+      // pre-M0 tail below was written. The shared entry patch voids the old
+      // bit's Z0 and names the new one, exactly as an ack-driven entry does.
+      if (toSend.length === 0) return steppedStreamerPatch(state, resumed, stepped.state);
       // Reserve these bytes before the transport write so an immediate ack has
       // an owner. Keep the sender paused until the owned write settles: acks may
-      // drain this reservation, but cannot dispatch another refill.
+      // drain this reservation, but cannot dispatch another refill. A fill that
+      // stopped at an M0 stays paused too, so a failed write leaves a
+      // retryable paused stream rather than a hold with unsent in-flight bytes.
       return { streamer: { ...stepped.state, status: 'paused' } };
     });
     if (!foundPausedStream) {

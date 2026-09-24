@@ -5,24 +5,30 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function MomentaryFireControl(): JSX.Element | null {
   const project = useStore((state) => state.project);
   const labsEnabled = useExperimentalLaserFeatures((state) => state.features.lowPowerFire);
-  const laser = useLaserStore();
-  const control = availableFireControl(project, labsEnabled, laser);
-  const { held, release } = useMomentaryRelease(laser.setFireActive);
+  // Only what this control reads, never the whole store: it is always mounted
+  // in the jog pad, and a whole-store subscription re-rendered it on every
+  // acknowledged line of a running job.
+  const controllerSupportsFire = useLaserStore((state) => state.capabilities.lowPowerFire);
+  const fireActive = useLaserStore((state) => state.fireActive);
+  const setFireActive = useLaserStore((state) => state.setFireActive);
+  const disabled = useLaserStore(fireControlDisabled);
+  const control = availableFireControl(project, labsEnabled, controllerSupportsFire);
+  const { held, release } = useMomentaryRelease(setFireActive);
 
   useEffect(() => {
     if (control === null) release();
   }, [control, release]);
   if (control === null) return null;
 
-  const disabled = fireControlDisabled(laser);
   const press = (): void => {
     if (disabled || held.current) return;
     held.current = true;
-    void laser.setFireActive(true, control.maxPowerPercent).catch(() => {
+    void setFireActive(true, control.maxPowerPercent).catch(() => {
       held.current = false;
     });
   };
@@ -31,7 +37,7 @@ export function MomentaryFireControl(): JSX.Element | null {
     <button
       type="button"
       aria-label={`Hold for low-power Fire at ${control.maxPowerPercent}%`}
-      aria-pressed={laser.fireActive}
+      aria-pressed={fireActive}
       disabled={disabled}
       onPointerDown={(event) => {
         event.preventDefault();
@@ -48,11 +54,11 @@ export function MomentaryFireControl(): JSX.Element | null {
       onKeyUp={(event) => {
         if (isFireKey(event.key)) release();
       }}
-      style={fireButtonStyle(laser.fireActive)}
+      style={fireButtonStyle(fireActive)}
       title={`Hold to turn on the positioning beam at no more than ${control.maxPowerPercent}%. Release always sends M5.`}
     >
       <span style={titleStyle}>Fire</span>
-      <span style={stateStyle}>{laser.fireActive ? 'ON' : `HOLD ${control.maxPowerPercent}%`}</span>
+      <span style={stateStyle}>{fireActive ? 'ON' : `HOLD ${control.maxPowerPercent}%`}</span>
     </button>
   );
 }
@@ -69,7 +75,7 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
     held.current = false;
     releasePending.current = true;
     void setFireActive(false)
-      .catch(() => undefined)
+      .catch(controllerActionFailureHandler('Fire off'))
       .finally(() => {
         releasePending.current = false;
       });
@@ -102,10 +108,10 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
 function availableFireControl(
   project: Project,
   labsEnabled: boolean,
-  laser: LaserState,
+  controllerSupportsFire: boolean,
 ): LaserFireControl | null {
   if (!labsEnabled || machineKindOf(project.machine) !== 'laser') return null;
-  if (!laser.capabilities.lowPowerFire) return null;
+  if (!controllerSupportsFire) return null;
   if (!profileSupportsCapability(project.device, 'low-power-fire')) return null;
   return project.device.fireControl?.enabled === true ? project.device.fireControl : null;
 }

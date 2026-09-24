@@ -262,6 +262,32 @@ describe('CanvasMotionBadge spindle RPM (ADR-220)', () => {
 });
 
 describe('CanvasMotionBadge artwork-relative laser status', () => {
+  it('discloses previous marker positions during rebuilding and retains the physical-position caveat', async () => {
+    const plan: CanvasMotionPlan = {
+      ...laserPlan(),
+      framePerimeter: [{ x: 0, y: 0 }],
+      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+    };
+    for (const current of [false, true]) {
+      const { host, unmount } = await renderBadge({ plan, run: null, planIsCurrent: current });
+      try {
+        const status = host.querySelector('[data-testid="canvas-motion-status"]');
+        const probe = host.querySelector('[data-testid="canvas-motion-probe"]');
+        expect(status?.textContent).toContain('physical bed position unverified');
+        expect(status?.textContent?.includes('Updating start markers')).toBe(!current);
+        expect(status?.getAttribute('aria-busy')).toBe(String(!current));
+        expect(probe?.getAttribute('data-plan-current')).toBe(String(current));
+        expect(probe?.getAttribute('aria-label')).toBe(
+          current
+            ? 'Frame start planned; Job start planned'
+            : 'Frame start updating; Job start updating; showing previous planned positions',
+        );
+      } finally {
+        await unmount();
+      }
+    }
+  });
+
   it('does not label a valid running laser job as physically unverified', async () => {
     const plan: CanvasMotionPlan = {
       ...laserPlan(),

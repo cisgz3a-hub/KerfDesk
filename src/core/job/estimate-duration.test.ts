@@ -437,7 +437,7 @@ describe('estimateJobDuration', () => {
   });
 
   it('detail-heavy short-move jobs predict realistically (regression for the 3.4× v1 bug)', () => {
-    // Hardware test on Falcon A1 Pro reported v1 estimate = 50 s,
+    // An informal Falcon A1 Pro run (not qualification) saw v1 estimate = 50 s,
     // actual = 170 s (3.4× under). Root cause: v1 assumed length/feed,
     // ignoring accel. Short moves never reach maxFeed on real machines.
     //

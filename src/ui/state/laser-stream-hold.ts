@@ -17,13 +17,14 @@
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { LaserSafetyNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import { pushLog } from './laser-store-helpers';
 import {
   detectStreamStall,
-  pushLog,
   STREAM_STALL_RUNNING_TIMEOUT_MS,
   type StallProbe,
-} from './laser-store-helpers';
+} from './laser-stream-stall';
 import { hostedRefillArmed } from './laser-hosted-refill';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 type StallObservationRefs = Parameters<typeof hostedRefillArmed>[0] & { stallProbe: StallProbe };
 
@@ -140,7 +141,7 @@ function holdBeganLine(
     `for ${streamHoldSeconds(hold)} s; window ${streamer?.rxBufferBytes ?? 0} B; ` +
     `${streamer?.completed ?? 0} acknowledged, ${queued} queued; ${bufferText}; ` +
     `untracked acks owed ${state.pendingUntrackedAcks}, transport writes pending ` +
-    `${state.pendingTransportWrites ?? 0}, refill ${hostedRefillArmed(refs) ? 'worker' : 'host'}. ` +
+    `${pendingTransportWriteCount(state)}, refill ${hostedRefillArmed(refs) ? 'worker' : 'host'}. ` +
     'KerfDesk is connected and waiting; it has not reset the controller.'
   );
 }

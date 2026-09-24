@@ -2,9 +2,11 @@ import type { SerialPortIdentity } from '../types';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 
 /** A native worker opens its own port. Transferred window streams are never
- * accepted here: their underlying I/O still depends on the window's realm. */
+ * accepted here: their underlying I/O still depends on the window's realm.
+ * That includes a replacement readable after a line error; the worker takes
+ * its own port's fresh stream instead. */
 export type NativeSerialWorkerRequest =
-  | Exclude<SerialWorkerRequest, { readonly kind: 'attach' }>
+  | Exclude<SerialWorkerRequest, { readonly kind: 'attach' | 'reattach-readable' }>
   | { readonly kind: 'native-probe'; readonly id: number; readonly identity: SerialPortIdentity }
   | { readonly kind: 'native-open'; readonly id: number; readonly options: SerialOptions }
   | { readonly kind: 'native-start' };

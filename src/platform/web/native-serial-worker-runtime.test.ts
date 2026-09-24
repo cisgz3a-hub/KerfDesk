@@ -15,7 +15,7 @@ function deferred() {
 }
 
 function fakePort(
-  options: { opening?: Promise<void>; closing?: Promise<void>; aborting?: Promise<void> } = {},
+  options: { opening?: Promise<void>; closing?: Promise<void>; draining?: Promise<void> } = {},
 ) {
   const bytes: string[] = [];
   const controller: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
@@ -28,7 +28,9 @@ function fakePort(
     write(chunk) {
       bytes.push(new TextDecoder().decode(chunk));
     },
-    abort: () => options.aborting,
+    // The core drains its writer with a bounded close, never a first-move
+    // abort (audit transport-4), so a sink that cannot drain is the stall.
+    close: () => options.draining,
   });
   const closeLocks: boolean[] = [];
   const port = Object.assign(new EventTarget(), {
@@ -277,12 +279,12 @@ describe('worker-owned native serial transport', () => {
     expect(h.posted).toEqual([{ kind: 'native-closing' }, { kind: 'closed' }]);
   });
 
-  it.each(['abort', 'close'] as const)(
+  it.each(['drain', 'close'] as const)(
     'notifies the client before unsolicited EOF waits on a stalled native %s',
     async (stage) => {
       const blocked = deferred();
       const h = harness(
-        fakePort(stage === 'abort' ? { aborting: blocked.promise } : { closing: blocked.promise }),
+        fakePort(stage === 'drain' ? { draining: blocked.promise } : { closing: blocked.promise }),
       );
       await open(h);
       h.runtime.handle({ kind: 'native-start' });

@@ -18,9 +18,11 @@ import {
   type LiveJobEstimateOptions,
 } from './live-job-estimate';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type LaserState } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { resolvePreviewJobPlacement, type ResolvedJobPlacement } from '../job-placement';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
+import type { ResolvedJobPlacement } from '../job-placement';
 import {
   isPreparationSuperseded,
   prepareJobEstimateOffThread,
@@ -33,6 +35,7 @@ import {
   useRuntimeCoordinatePreparation,
   type RuntimeCoordinatePreparation,
 } from '../use-runtime-coordinate-preparation';
+import { usePreviewJobPlacement } from '../use-preview-job-placement';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -41,8 +44,11 @@ export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 // a 90k-segment trace costs ~300 ms per estimate (the duration planner emits
 // and times the whole program), so the UI thread paid that twice per edit.
 // Memoize per immutable Project identity and exact inputs so the second mount
-// reads the first one's result (ADR-346).
+// reads the first one's result (ADR-346). Each Project keeps only its few most
+// recent inputs: Current Position keys on the head position, so an unbounded
+// map grew one entry per position for as long as the project lived.
 const memoizedEstimates = new WeakMap<Project, Map<string, LiveJobEstimate>>();
+const ESTIMATES_KEPT_PER_PROJECT = 4;
 
 function memoizedLiveEstimate(
   project: Project,
@@ -57,9 +63,14 @@ function memoizedLiveEstimate(
     memoizedEstimates.set(project, byKey);
   }
   const cached = byKey.get(key);
-  if (cached !== undefined) return cached;
-  const estimate = estimateLiveJob(project, outputScope, jobOrigin, options);
+  // Re-inserting marks the entry most recent; Map iterates in insertion order.
+  byKey.delete(key);
+  const estimate = cached ?? estimateLiveJob(project, outputScope, jobOrigin, options);
   byKey.set(key, estimate);
+  if (byKey.size > ESTIMATES_KEPT_PER_PROJECT) {
+    const oldest = byKey.keys().next().value;
+    if (oldest !== undefined) byKey.delete(oldest);
+  }
   return estimate;
 }
 
@@ -85,11 +96,22 @@ export function useJobEstimate(): LiveJobEstimate {
   const positionEpoch = useLaserStore((state) => state.trustedPositionEpoch ?? 0);
   const firstRegistrationPoint = usePrintCutSessionStore((state) => state.first);
   const secondRegistrationPoint = usePrintCutSessionStore((state) => state.second);
-  const resolvedPlacement = useEstimatePlacement(jobPlacement);
+  // Estimate and preview must resolve placement identically: the worker client
+  // caches by jobOrigin, so a divergent resolution made the SAME over-budget
+  // project prepare twice, serially (ADR-327).
+  const resolvedPlacement = usePreviewJobPlacement(jobPlacement);
   const coordinateOptions = useRuntimeCoordinatePreparation(project.device, resolvedPlacement);
   const placementKey = useMemo(() => JSON.stringify(resolvedPlacement), [resolvedPlacement]);
   const jobOrigin = useHeldJobOrigin(resolvedPlacement, placementKey);
   const initialPosition = useEstimateInitialPosition();
+  // Preview draws this estimate (its scrub timeline and total), so there an edit
+  // made during a run still re-estimates; the held placement keeps the moving
+  // head out of the key either way.
+  const previewMode = useStore((s) => s.previewMode);
+  // A Frame's own compile of the same job runs meanwhile; a background
+  // estimate beside it only slows the Frame the operator is waiting for.
+  const framePreparing = useFramePreparationStore((s) => s.pending);
+  const frozen = (useLaserStore(selectJobRunning) || framePreparing) && !previewMode;
   const registrationKey = JSON.stringify({
     positionEpoch,
     firstRegistrationPoint,
@@ -111,7 +133,23 @@ export function useJobEstimate(): LiveJobEstimate {
     initialRegistration,
     initialPosition,
     initiallyAsync,
+    frozen,
   });
+}
+
+// While a job runs, the badge shows the run's own timing, yet a Current Position
+// estimate re-keyed with the moving head and recompiled the whole job each
+// debounce (on the UI thread for a scene under the preparation budget). Outside
+// Preview, leave the settled estimate alone until the job ends; inputs that
+// changed meanwhile then settle once.
+function selectJobRunning(state: LaserState): boolean {
+  const lifecycle = state.liveCanvasRun?.lifecycle;
+  return (
+    isActiveJob(state.streamer) ||
+    lifecycle === 'running' ||
+    lifecycle === 'paused' ||
+    lifecycle === 'tool-change'
+  );
 }
 
 // The physical head reaches the estimate only once it is settled; while a
@@ -123,30 +161,9 @@ function useEstimateInitialPosition(): LiveJobEstimateOptions['initialPosition']
   return useSettledHeadPosition();
 }
 
-function useEstimatePlacement(jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement']) {
-  const statusReport = useLaserStore((state) => state.statusReport);
-  const workOriginActive = useLaserStore((state) => state.workOriginActive);
-  const wcoCache = useLaserStore((state) => state.wcoCache);
-  const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
-  return useMemo(() => {
-    // Estimate and preview must resolve placement identically: the worker
-    // client caches by jobOrigin, so a divergent resolution here made the
-    // SAME over-budget project prepare twice, serially. The shared rule lives
-    // in resolvePreviewJobPlacement (work-zero-relative modes fall back to the
-    // export placement while the live resolution fails).
-    return resolvePreviewJobPlacement(jobPlacement, {
-      statusReport,
-      workOriginActive,
-      wcoCache,
-      reportInches,
-    });
-  }, [jobPlacement, statusReport, workOriginActive, wcoCache, reportInches]);
-}
-
-// A connected controller stores a freshly parsed status report on every poll,
-// so useEstimatePlacement re-resolves each time and every resolver in
-// job-placement.ts returns a NEW jobOrigin literal — even when the resolved
-// placement is byte-identical. useSettledEstimate's debounce effect tracks
+// Every re-resolution in job-placement.ts returns a NEW jobOrigin literal, even
+// when the resolved placement is byte-identical, and a connected controller used
+// to re-resolve on every status poll. useSettledEstimate's debounce effect tracks
 // jobOrigin BY REFERENCE, so that churn cancelled and re-armed the 250 ms timer
 // once per poll: on a connected machine the estimate could never settle. Hold
 // the resolved jobOrigin until its semantic key changes so identity follows
@@ -175,6 +192,7 @@ type EstimateInputs = Omit<Settled, 'project' | 'estimate'> & {
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly initialRegistration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly initiallyAsync: boolean;
+  readonly frozen: boolean;
 };
 
 function initialSettledEstimate(inputs: EstimateInputs): Settled {
@@ -205,6 +223,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     coordinateOptions,
     jobOrigin,
     initialPosition,
+    frozen,
   } = inputs;
   // Compute cheap jobs synchronously; background jobs begin pending.
   const [settled, setSettled] = useState<Settled>(() => initialSettledEstimate(inputs));
@@ -222,12 +241,13 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
   );
   useEffect(() => {
     if (
-      settled.project === project &&
-      settled.outputScopeKey === outputScopeKey &&
-      settled.registrationKey === registrationKey &&
-      settled.placementKey === placementKey &&
-      settled.coordinateOptions === coordinateOptions &&
-      settled.initialPosition === initialPosition
+      frozen ||
+      (settled.project === project &&
+        settled.outputScopeKey === outputScopeKey &&
+        settled.registrationKey === registrationKey &&
+        settled.placementKey === placementKey &&
+        settled.coordinateOptions === coordinateOptions &&
+        settled.initialPosition === initialPosition)
     ) {
       return undefined;
     }
@@ -275,6 +295,7 @@ function useSettledEstimate(inputs: EstimateInputs): LiveJobEstimate {
     coordinateOptions,
     jobOrigin,
     initialPosition,
+    frozen,
   ]);
   return settled.estimate;
 }

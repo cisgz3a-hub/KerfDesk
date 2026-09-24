@@ -1,13 +1,13 @@
 import type { Layer, LayerOperationSettings } from '../../core/scene';
-import { useStore } from '../state';
+import { FeedCeilingNotice, useFeedCeiling } from './feed-ceiling';
 import { genericRunwayFallbackText } from './fill-overscan-fallback';
+import { clamp, numericValue, SpeedInput, targetAriaContext } from './LayerSpeedInput';
 import { LayerImageFields } from './LayerImageFields';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
 import './laser-operation-settings.css';
 
 const inputStyle: React.CSSProperties = { width: 88, minWidth: 0 };
-const wideInputStyle: React.CSSProperties = { width: 100, minWidth: 0 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const FALLBACK_TEXT_STYLE: React.CSSProperties = {
   fontSize: 11,
@@ -23,29 +23,18 @@ export type LayerOperationControlTarget = {
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 };
 
-export function LayerRowSettingsFields(props: {
+type LayerRowSettingsFieldsProps = {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
-}): JSX.Element {
+  readonly compact?: boolean;
+};
+
+export function LayerRowSettingsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
   const { layer, operationTarget } = props;
   const { settings } = operationTarget;
   return (
     <>
-      <section className="lf-laser-essentials" aria-label="Power, speed, passes and scan direction">
-        <h4 className="lf-laser-section-title">Essential settings</h4>
-        <div className="lf-laser-essentials__grid">
-          <FieldRow label="Power" unit="%">
-            <PowerInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-          <FieldRow label="Speed" unit="mm/min">
-            <SpeedInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-          <FieldRow label="Passes" unit="times">
-            <PassesInput layer={layer} operationTarget={operationTarget} />
-          </FieldRow>
-        </div>
-        <ScanDirectionField layer={layer} operationTarget={operationTarget} />
-      </section>
+      <LaserEssentialsFields {...props} />
       {!operationTarget.mixedFields?.mode ? (
         <details className="lf-laser-options">
           <summary title="Show extra settings for the selected laser process">
@@ -96,6 +85,42 @@ export function LayerRowSettingsFields(props: {
         </details>
       ) : null}
     </>
+  );
+}
+
+function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
+  const { layer, operationTarget } = props;
+  // Keyed on the operation, not reconcileKey: that changes with every committed
+  // value, which would drop the request the moment its capped value is saved.
+  // A new artwork selection remounts these fields anyway.
+  const speedCeiling = useFeedCeiling(
+    operationTarget.mixedFields?.speed === true ? null : operationTarget.settings.speed,
+    layer.id,
+  );
+  return (
+    <section
+      className={`lf-laser-essentials${props.compact ? ' lf-laser-essentials--compact' : ''}`}
+      aria-label="Power, speed, passes and scan direction"
+    >
+      {props.compact ? null : <h4 className="lf-laser-section-title">Essential settings</h4>}
+      <div className="lf-laser-essentials__grid">
+        <FieldRow label="Power" unit="%">
+          <PowerInput layer={layer} operationTarget={operationTarget} />
+        </FieldRow>
+        <FieldRow label="Speed" unit="mm/min">
+          <SpeedInput layer={layer} operationTarget={operationTarget} ceiling={speedCeiling} />
+        </FieldRow>
+        <FieldRow label="Passes" unit="times">
+          <PassesInput layer={layer} operationTarget={operationTarget} />
+        </FieldRow>
+      </div>
+      {/* Outside the <label> rows: the note carries its own button. */}
+      <FeedCeilingNotice
+        ceiling={speedCeiling}
+        onRaise={(speed) => operationTarget.commit({ speed })}
+      />
+      <ScanDirectionField layer={layer} operationTarget={operationTarget} />
+    </section>
   );
 }
 
@@ -332,35 +357,6 @@ function PowerInput(props: {
   );
 }
 
-function SpeedInput(props: {
-  readonly layer: Layer;
-  readonly operationTarget: LayerOperationControlTarget;
-}): JSX.Element {
-  const { layer, operationTarget } = props;
-  const maxFeed = useStore((s) => s.project.device.maxFeed);
-  const debounced = useMixedOperationNumber({
-    value: operationTarget.settings.speed,
-    mixed: operationTarget.mixedFields?.speed,
-    reconcileKey: operationTarget.reconcileKey,
-    commit: (speed) => operationTarget.commit({ speed }),
-    parse: (s) => clamp(numericValue(s, operationTarget.settings.speed), 1, maxFeed),
-  });
-  return (
-    <input
-      type="number"
-      min={1}
-      max={maxFeed}
-      value={debounced.displayValue}
-      {...debounced.inputProps}
-      onChange={debounced.onChange}
-      onBlur={debounced.onBlur}
-      style={wideInputStyle}
-      aria-label={`Speed for ${targetAriaContext(layer, operationTarget)}`}
-      title="Feed rate in millimeters per minute for this layer."
-    />
-  );
-}
-
 function PassesInput(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
@@ -387,17 +383,4 @@ function PassesInput(props: {
       title="Number of times this layer is repeated in the job."
     />
   );
-}
-
-function targetAriaContext(layer: Layer, target: LayerOperationControlTarget): string {
-  return target.ariaContext ?? layer.name;
-}
-
-function numericValue(s: string, fallback: number): number {
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
 }

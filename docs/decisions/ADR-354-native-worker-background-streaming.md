@@ -44,9 +44,15 @@ of USB, firmware or physical motion.
    M0. A late ready reply cannot resume a cancelled or replacement run.
 6. Stream locks and the native port are released on EOF, disconnect, explicit close and worker
    failure. Close observers are isolated so one throwing subscriber cannot prevent the others
-   or transport cleanup. An early closing message bounds unsolicited cleanup even if stream
-   abort or native close never resolves; final closed still acknowledges completed cleanup.
-   New writes are refused while closing and pending writes are rejected when ownership ends.
+   or transport cleanup. An early closing message bounds unsolicited cleanup even if the
+   stream drain or native close never resolves; final closed still acknowledges completed
+   cleanup. New writes are refused while closing and pending writes are rejected when
+   ownership ends.
+7. The transport fixes of ADR-361 hold on this path. A UART line error (framing, parity, break,
+   overrun) leaves the port open, so the worker reads on from its own port's fresh readable,
+   within the shared recovery budget; it never accepts a window-realm replacement stream.
+   Cleanup drains the writer with the bounded close rather than aborting it, so the M5/M9 a
+   Disconnect queues last reach the controller before the port closes.
 
 ### Consequences and verification
 

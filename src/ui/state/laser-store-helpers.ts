@@ -4,12 +4,7 @@
 // build), so this module depends only on the controller + safety-notice modules
 // at runtime.
 
-import {
-  disconnect as disconnectStreamer,
-  queuedLineCount,
-  type StatusReport,
-  type StreamerState,
-} from '../../core/controllers/grbl';
+import { disconnect as disconnectStreamer, type StreamerState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import * as controllerOperation from './laser-controller-operation';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
@@ -104,34 +99,9 @@ export function toolChangeReady(state: LaserState): boolean {
   return streamer.inFlight.length === 0 && state.toolChangeIdleSeen;
 }
 
-// The state patch applied whenever a RUNNING job enters a tool-change hold: at
-// the ack-driven transition (advanceStream) and when a Continue step lands
-// directly in the next hold within one fill (F22). A new bit is going in, so
-// void the prior tool's Z0 and bump the epoch, require a FRESH Idle before the
-// setup gate / Continue unlock, and advance the pending-tool label + id to name
-// the incoming bit. Both entry sites must share this so they cannot drift.
-export function toolChangeHoldEntryPatch(
-  state: LaserState,
-): Pick<
-  LaserState,
-  | 'workZZeroEvidence'
-  | 'workZReferenceEpoch'
-  | 'toolChangeIdleSeen'
-  | 'pendingToolLabel'
-  | 'pendingToolId'
-  | 'toolChangeLabels'
-  | 'toolChangeToolIds'
-> {
-  return {
-    workZZeroEvidence: null,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    toolChangeIdleSeen: false,
-    pendingToolLabel: state.toolChangeLabels[0] ?? null,
-    pendingToolId: state.toolChangeToolIds[0] ?? null,
-    toolChangeLabels: state.toolChangeLabels.slice(1),
-    toolChangeToolIds: state.toolChangeToolIds.slice(1),
-  };
-}
+// Entering a hold voids the prior tool's Z0 and re-arms toolChangeIdleSeen;
+// every entry site applies that through steppedStreamerPatch
+// (tool-change-hold-entry.ts) so the sites cannot drift.
 
 // Continue is stronger than setup readiness. Fresh Idle only proves the old
 // tool's retract/park completed; the new tool must also have a freshly
@@ -252,78 +222,13 @@ export function assertNoActiveJob(state: LaserState): void {
   if (message !== null) throw new Error(message);
 }
 
-// M13 (AUDIT-2026-06-10): ack watchdog. The streamer is purely ack-driven —
-// if GRBL stops answering while lines are in flight, the job froze silently
-// forever. The status poll feeds this detector each tick. Use a longer grace
-// window while the controller is still in Run so slow moves do not look like
-// dead USB. Feed hold / door states legitimately silence acks, so they reset
-// the clock.
-export const STREAM_STALL_TIMEOUT_MS = 10_000;
-export const STREAM_STALL_RUNNING_TIMEOUT_MS = 90_000;
-
-export type StallProbe = {
-  readonly completed: number;
-  readonly inFlightBytes: number;
-  readonly queuedCount: number;
-  readonly statusReport: StatusReport | null;
-  readonly at: number;
-} | null;
-
-export function detectStreamStall(
-  streamer: StreamerState | null,
-  statusReport: StatusReport | null,
-  prev: StallProbe,
-  now: number,
-): { readonly probe: StallProbe; readonly stalled: boolean } {
-  if (!isStallWatchActive(streamer)) return { probe: null, stalled: false };
-  if (statusPausesStallWatch(statusReport)) return { probe: null, stalled: false };
-  const unchanged = streamPositionUnchanged(prev, streamer) && !freshRunStatus(prev, statusReport);
-  const at = unchanged ? prev.at : now;
-  const timeoutMs = streamStallTimeoutMs(statusReport);
-  return {
-    probe: {
-      completed: streamer.completed,
-      inFlightBytes: streamer.inFlightBytes,
-      queuedCount: queuedLineCount(streamer),
-      statusReport,
-      at,
-    },
-    stalled: now - at >= timeoutMs,
-  };
-}
-
-function streamStallTimeoutMs(statusReport: StatusReport | null): number {
-  return statusReport?.state === 'Run' ? STREAM_STALL_RUNNING_TIMEOUT_MS : STREAM_STALL_TIMEOUT_MS;
-}
-
-function isStallWatchActive(streamer: StreamerState | null): streamer is StreamerState {
-  return streamer !== null && streamer.status === 'streaming' && streamer.inFlight.length > 0;
-}
-
-function statusPausesStallWatch(statusReport: StatusReport | null): boolean {
-  return statusReport?.state === 'Hold' || statusReport?.state === 'Door';
-}
-
-function freshRunStatus(prev: StallProbe, statusReport: StatusReport | null): boolean {
-  return (
-    prev !== null &&
-    statusReport !== null &&
-    prev.statusReport !== statusReport &&
-    statusReport.state === 'Run'
-  );
-}
-
-function streamPositionUnchanged(
-  prev: StallProbe,
-  streamer: StreamerState,
-): prev is NonNullable<StallProbe> {
-  return (
-    prev !== null &&
-    prev.completed === streamer.completed &&
-    prev.inFlightBytes === streamer.inFlightBytes &&
-    prev.queuedCount === queuedLineCount(streamer)
-  );
-}
+// The ack watchdog lives in laser-stream-stall; re-exported for its callers.
+export {
+  detectStreamStall,
+  STREAM_STALL_RUNNING_TIMEOUT_MS,
+  STREAM_STALL_TIMEOUT_MS,
+  type StallProbe,
+} from './laser-stream-stall';
 
 type InitialLaserState = Pick<
   LaserState,
@@ -387,6 +292,7 @@ type InitialLaserState = Pick<
   | 'pendingToolId'
   | 'frameVerification'
   | 'framedRun'
+  | 'frameTrace'
   | 'framedRunStartClaim'
 >;
 
@@ -433,6 +339,7 @@ export function initialLaserState(): InitialLaserState {
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     framedRunStartClaim: null,
   };
 }
@@ -476,6 +383,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     motionOperation: null,
     controllerOperation: null,
     probeBusy: false,

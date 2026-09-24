@@ -48,6 +48,8 @@ export function createNativeSerialWorkerRuntime(deps: RuntimeDeps): NativeSerial
     onClosing: () => void close(),
     post: (message) => {
       if (message.kind === 'closed') void close();
+      else if (message.kind === 'read-error')
+        readOnAfterLineError(state, core, close, message.name);
       else if (state.phase !== 'closed') deps.post(message);
     },
   });
@@ -167,6 +169,32 @@ function startReading(
   state.phase = 'started';
   try {
     core.handle({ kind: 'attach', ...state.streams });
+  } catch {
+    void close();
+  }
+}
+
+// A UART line error (framing, parity, break, overrun) errored the port's
+// readable but left the port open, and the Web Serial spec hands out a fresh
+// readable on the next access (audit connect-1, serial-read-recovery.ts). This
+// worker owns the port, so it reads on from that stream itself; a window-realm
+// stream is never accepted here. The core keeps its writer and any armed
+// refill, and its recovery budget still ends a port that fails every stream.
+// No fresh readable ends the session as a dropped cable would.
+function readOnAfterLineError(
+  state: RuntimeState,
+  core: SerialWorkerCore,
+  close: () => Promise<void>,
+  errorName: string,
+): void {
+  const readable = state.phase === 'started' ? (state.port?.readable ?? null) : null;
+  if (readable === null || readable.locked) {
+    void close();
+    return;
+  }
+  try {
+    core.handle({ kind: 'reattach-readable', readable });
+    console.warn(`Serial line error (${errorName}); the port is still open, so reading continues.`);
   } catch {
     void close();
   }

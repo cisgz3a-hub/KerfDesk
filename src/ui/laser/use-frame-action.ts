@@ -8,27 +8,41 @@ import {
   type FramedRunReviewEvidence,
 } from '../state/framed-run';
 import { useCameraStore } from '../state/camera-store';
-import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
-import type { LaserMotionOperation } from '../state/laser-motion-operation';
 import { useToastStore } from '../state/toast-store';
 import { runOwnedFrame } from '../state/frame-preparation-store';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
-import {
-  frameControllerQueueIssue,
-  normalizeFrameWorkCoordinateSystem,
-} from './frame-controller-readiness';
+import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
-import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
-import { prepareCurrentStartJob } from './start-job-source';
+import { clearStartBlockers } from './start-blocker-invalidation';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { resolveFrameCandidate } from './frame-candidate';
 import { reviewedFrameIsCurrent } from './reviewed-frame-current';
+import { traceableFrameBoundsPreview } from './frame-bounds-preview';
+import {
+  currentWorkXy,
+  FRAME_COMPLETE_MESSAGE,
+  FRAME_COMPLETED_BUT_CHANGED_MESSAGE,
+  FRAME_NOT_DISPATCHED_MESSAGE,
+  FRAME_SETUP_CHANGED_BEFORE_DISPATCH_MESSAGE,
+  FRAME_WORK_POSITION_UNKNOWN_MESSAGE,
+  frameVerificationBounds,
+  reportFramePreparationRefusal,
+  reportFrameRefusal,
+  requireFrameControllerQueue,
+  waitForFrameOutcome,
+} from './frame-dispatch-support';
+import {
+  dispatchTracedFrame,
+  startExactFramePreparation,
+  type FrameContext,
+} from './frame-trace-flow';
+import type { StartJobPreparation } from './start-job-readiness';
 
 export function useFrameAction(): () => void {
   return () => {
@@ -42,14 +56,23 @@ export function useFrameAction(): () => void {
  * The controller store promotes the candidate to `framedRun` only after the
  * final clean Idle; dispatch, cancel, Alarm, reset, or write failure earns
  * no permit.
+ *
+ * A job prepared off-thread reports its outline as soon as it is compiled,
+ * seconds before its exact program on a dense fill. That outline is traced
+ * at once and the permit is minted when the program arrives and reproduces
+ * it (ADR-353). Everything else Frames the exact program as before.
  */
 export function runFrameNow(): Promise<boolean> {
   return runOwnedFrame(async () => {
     ensureFramedRunInvalidationSubscriptions();
     clearStartBlockers();
-    const initial = await prepareFrameReviewBundle();
-    if (initial === null) return false;
-    return dispatchPreparedFrame(initial);
+    const context = await prepareFrameContext();
+    if (context === null) return false;
+    const preparation = startExactFramePreparation(context);
+    const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
+    if (preview !== null) return dispatchTracedFrame(context, preview, preparation);
+    const bundle = exactFrameBundle(context, await preparation.program);
+    return bundle === null ? false : dispatchPreparedFrame(bundle);
   });
 }
 
@@ -123,7 +146,9 @@ export async function dispatchLaserSecondPassFrame(
     : null;
 }
 
-async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
+/** The queue, WCS, controller and placement boundary every ordinary Frame
+ * owns before compiling anything. */
+async function prepareFrameContext(): Promise<FrameContext | null> {
   if (!(await requireFrameControllerQueue())) return null;
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
@@ -150,20 +175,34 @@ async function prepareFrameReviewBundle(): Promise<ReviewedStartBundle | null> {
     reportFramePreparationRefusal(placement.messages, wcsNormalization.warning);
     return null;
   }
-  const prepared = await prepareCurrentStartJob(app, laser, camera, placement.jobOrigin, false);
+  return {
+    app,
+    laser,
+    camera,
+    jobOrigin: placement.jobOrigin,
+    ...(wcsNormalization.warning === undefined
+      ? {}
+      : { wcsNormalizationWarning: wcsNormalization.warning }),
+  };
+}
+
+function exactFrameBundle(
+  context: FrameContext,
+  prepared: StartJobPreparation,
+): ReviewedStartBundle | null {
   if (!prepared.ok) {
-    reportFramePreparationRefusal(prepared.messages, wcsNormalization.warning);
+    reportFramePreparationRefusal(prepared.messages, context.wcsNormalizationWarning);
     return null;
   }
   return {
-    app,
-    project: app.project,
-    laser,
+    app: context.app,
+    project: context.app.project,
+    laser: context.laser,
     prepared,
-    laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-    ...(wcsNormalization.warning === undefined
+    laserModeStartSnapshot: captureLaserModeStartSnapshot(context.laser),
+    ...(context.wcsNormalizationWarning === undefined
       ? {}
-      : { frameWcsNormalizationWarning: wcsNormalization.warning }),
+      : { frameWcsNormalizationWarning: context.wcsNormalizationWarning }),
   };
 }
 
@@ -193,9 +232,7 @@ async function dispatchPreparedFrame(
   if (!(await requireFrameControllerQueue())) return false;
   const currentLaser = useLaserStore.getState();
   if (!reviewedFrameIsCurrent(bundle, currentLaser, options.authorizationContext)) {
-    reportFrameRefusal([
-      'The job or machine setup changed before Frame could run. Frame the current job again.',
-    ]);
+    reportFrameRefusal([FRAME_SETUP_CHANGED_BEFORE_DISPATCH_MESSAGE]);
     return false;
   }
   const frameCandidate = resolveFrameCandidate(bundle.prepared);
@@ -211,9 +248,7 @@ async function dispatchPreparedFrame(
   );
   const returnToWorkPosition = currentWorkXy(currentLaser);
   if (returnToWorkPosition === undefined) {
-    reportFrameRefusal([
-      'The controller did not report a usable work position. Wait for a complete status report, then Frame again.',
-    ]);
+    reportFrameRefusal([FRAME_WORK_POSITION_UNKNOWN_MESSAGE]);
     return false;
   }
   const candidateOptions = reviewedFrameCandidateOptions(bundle, options);
@@ -244,9 +279,7 @@ async function dispatchPreparedFrame(
     return false;
   }
   if (!completion.observeAfterDispatch()) {
-    reportFrameRefusal([
-      'The controller did not dispatch framing motion. No job was authorized to start.',
-    ]);
+    reportFrameRefusal([FRAME_NOT_DISPATCHED_MESSAGE]);
     return false;
   }
   return reportFrameCompletion(candidate, await completion.result);
@@ -263,28 +296,13 @@ function reviewedFrameCandidateOptions(
     : { outputScope, authorizationContext: options.authorizationContext };
 }
 
-function frameVerificationBounds(
-  machineKind: 'laser' | 'cnc' | undefined,
-  jobBounds: Parameters<typeof frameBoundsSignature>[0],
-  motionBounds: Parameters<typeof frameBoundsSignature>[0],
-): Parameters<typeof frameBoundsSignature>[0] {
-  return machineKind === 'cnc' ? jobBounds : motionBounds;
-}
-
 function reportFrameCompletion(candidate: FramedRunCandidate, accepted: boolean): boolean {
   if (!accepted) return false;
   if (useLaserStore.getState().framedRun?.candidate !== candidate) {
-    useToastStore
-      .getState()
-      .pushToast(
-        'Frame completed, but the job or machine setup changed. Frame the current job again before starting.',
-        'warning',
-      );
+    useToastStore.getState().pushToast(FRAME_COMPLETED_BUT_CHANGED_MESSAGE, 'warning');
     return false;
   }
-  useToastStore
-    .getState()
-    .pushToast('Frame complete — press Start to review and run this exact job.', 'success');
+  useToastStore.getState().pushToast(FRAME_COMPLETE_MESSAGE, 'success');
   return true;
 }
 
@@ -331,91 +349,4 @@ async function prepareFrameLaser(
     );
     return null;
   }
-}
-
-function currentWorkXy(
-  laser: ReturnType<typeof useLaserStore.getState>,
-): { readonly x: number; readonly y: number } | undefined {
-  const position = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
-  return position === null ? undefined : { x: position.x, y: position.y };
-}
-
-function waitForFrameOutcome(candidate: FramedRunCandidate): {
-  readonly result: Promise<boolean>;
-  readonly cancel: () => void;
-  readonly observeAfterDispatch: () => boolean;
-} {
-  let settled = false;
-  let sawOwnedFrame = false;
-  let finish: (value: boolean) => void = () => undefined;
-  const result = new Promise<boolean>((resolve) => {
-    finish = resolve;
-  });
-  const complete = (value: boolean): void => {
-    if (settled) return;
-    settled = true;
-    unsubscribe();
-    finish(value);
-  };
-  const unsubscribe = useLaserStore.subscribe((state, previous) => {
-    const ownedOperation = candidateFrameOperation(state.motionOperation, candidate);
-    if (ownedOperation !== null) {
-      sawOwnedFrame = true;
-      if (ownedOperation.cancelRequested === true) {
-        complete(false);
-        return;
-      }
-    }
-    if (state.framedRun?.candidate === candidate) {
-      complete(true);
-      return;
-    }
-    if (
-      sawOwnedFrame &&
-      candidateFrameOperation(previous.motionOperation, candidate) !== null &&
-      state.motionOperation === null
-    ) {
-      complete(false);
-    }
-  });
-  const observeAfterDispatch = (): boolean => {
-    const state = useLaserStore.getState();
-    if (state.framedRun?.candidate === candidate) {
-      complete(true);
-      return true;
-    }
-    const operation = candidateFrameOperation(state.motionOperation, candidate);
-    const dispatched = operation !== null && operation.cancelRequested !== true;
-    if (!dispatched) complete(false);
-    return dispatched;
-  };
-  return { result, cancel: () => complete(false), observeAfterDispatch };
-}
-
-function candidateFrameOperation(
-  operation: LaserMotionOperation | null,
-  candidate: FramedRunCandidate,
-): (LaserMotionOperation & { readonly kind: 'frame' }) | null {
-  return operation?.kind === 'frame' && operation.candidate === candidate ? operation : null;
-}
-
-function reportFrameRefusal(messages: ReadonlyArray<string>): void {
-  reportStartBlockers(messages);
-  useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
-}
-
-function reportFramePreparationRefusal(
-  messages: ReadonlyArray<string>,
-  wcsNormalizationWarning: string | undefined,
-): void {
-  reportFrameRefusal(
-    wcsNormalizationWarning === undefined ? messages : [...messages, wcsNormalizationWarning],
-  );
-}
-
-async function requireFrameControllerQueue(): Promise<boolean> {
-  const issue = await frameControllerQueueIssue();
-  if (issue === null) return true;
-  reportFrameRefusal([issue]);
-  return false;
 }

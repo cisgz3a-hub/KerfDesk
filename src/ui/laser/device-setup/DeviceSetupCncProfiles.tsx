@@ -68,7 +68,7 @@ export function DeviceSetupCncProfiles(props: {
           onChange={(event) => setSaveName(event.target.value)}
           placeholder="Setup profile name"
           aria-label="New setup profile name"
-          title="Name the app-level profile that will snapshot the current Startup Setup draft."
+          title="Name the app-level profile that will snapshot the current Machine Setup draft."
         />
         <button
           type="button"

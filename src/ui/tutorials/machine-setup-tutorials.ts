@@ -8,7 +8,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
-    location: 'Machine Setup, or CNC Startup Setup in CNC mode',
+    location: 'Machine Setup, or CNC Machine Setup in CNC mode',
     prerequisites:
       'The machine specifications, controller type and, for CNC, measured stock and cutter details.',
     visual: 'machine',

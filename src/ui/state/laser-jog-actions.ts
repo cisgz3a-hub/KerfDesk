@@ -24,8 +24,13 @@ import { useStore } from './store';
 import { useToastStore } from './toast-store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
+import {
+  assertManualMotionNotCancelled,
+  manualMotionCancelGeneration,
+} from './manual-motion-intent';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -57,7 +62,10 @@ export function jogActions(
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-): Pick<LaserState, 'home' | 'jog' | 'jogToMachinePosition' | 'cancelJog' | 'frame'> {
+): Pick<
+  LaserState,
+  'home' | 'jog' | 'jogToMachinePosition' | 'cancelJog' | 'frame' | 'traceFrame'
+> {
   const context: JogActionContext = { set, get, refs, safeWrite };
   return {
     home: () => runHomeAction(set, get, refs, safeWrite, refs.driver),
@@ -65,6 +73,7 @@ export function jogActions(
     jog: (params) => runJog(context, params),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
     frame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
+    traceFrame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
   };
 }
 
@@ -78,8 +87,7 @@ async function runJogToMachinePosition(
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'moving to a machine position');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
-  assertJogFrameReady(set, get);
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   const current = inferCurrentMachinePosition(
     get().statusReport,
     get().wcoCache,
@@ -99,7 +107,8 @@ async function runJogToMachinePosition(
   const params = { dx, dy, feed };
   warnJogMotionPolicy(set, get, params);
   const operation = startSettledJogOperation(refs);
-  set({ motionOperation: operation, frameVerification: null, framedRun: null });
+  assertManualMotionNotCancelled(refs, cancelGeneration);
+  set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
   // CNC: after readiness is proven, lift Z to the configured safe height
   // before the XY traverse so the bit does not drag across stock or clamps.
   // Laser projects have no Z retract seam and keep the flat move (F105).
@@ -126,17 +135,17 @@ async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
 ): Promise<void> {
-  const { set, get, refs, safeWrite } = context;
+  const { set, get, refs } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'jog' });
-  assertJogFrameReady(set, get);
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
   warnJogMotionPolicy(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
-  const operation = startSettledJogOperation(context.refs);
-  set({ motionOperation: operation, frameVerification: null, framedRun: null });
+  const operation = startSettledJogOperation(refs);
+  assertManualMotionNotCancelled(refs, cancelGeneration);
+  set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
   try {
     await dispatchOwnedJog(context, params, operation);
   } catch (error) {
@@ -171,15 +180,15 @@ async function runFrame(
   context: JogActionContext,
   bounds: Parameters<LaserState['frame']>[0],
   feed: number,
-  candidate: Parameters<LaserState['frame']>[2],
+  candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
 ): Promise<void> {
   const { set, get, refs, safeWrite } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'framing again');
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'frame' });
-  assertJogFrameReady(set, get);
-  set({ frameVerification: null, framedRun: null });
+  const cancelGeneration = await confirmUncancelledFreshIdle(context, 'frame');
+  // A new physical Frame voids every earlier proof, traced or permitted.
+  set({ frameVerification: null, framedRun: null, frameTrace: null });
   const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate);
   if (plan.kind === 'blocked') {
     set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
@@ -207,6 +216,7 @@ async function runFrame(
     undefined,
     frameSettlementLine,
   );
+  assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation });
   try {
     assertMotionOperationOwner(get, operation.operationId, 'Frame');
@@ -222,6 +232,22 @@ async function runFrame(
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
   }
+}
+
+// Proves fresh Idle before a Jog/Frame owner exists. Returns the Cancel
+// generation it started under: the caller re-checks it synchronously right
+// before installing its owner, so a release that lands during the status
+// round-trip cancels the move before any of it is written (audit
+// jog-home-origin-2; see manual-motion-intent).
+async function confirmUncancelledFreshIdle(
+  context: JogActionContext,
+  action: 'jog' | 'frame',
+): Promise<number> {
+  const { set, get, refs, safeWrite } = context;
+  const cancelGeneration = manualMotionCancelGeneration(refs);
+  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action, cancelGeneration });
+  assertJogFrameReady(set, get);
+  return cancelGeneration;
 }
 
 function assertMotionOperationOwner(
@@ -241,7 +267,7 @@ function assertMotionOperationOwner(
 
 function assertMotionQueueSettled(set: SetFn, get: GetFn, action: string): void {
   const state = get();
-  if (state.pendingUntrackedAcks === 0 && (state.pendingTransportWrites ?? 0) === 0) return;
+  if (state.pendingUntrackedAcks === 0 && pendingTransportWriteCount(state) === 0) return;
   const message = `Wait for the previous controller write and acknowledgement to settle before ${action}.`;
   set({ lastWriteError: message, log: pushLog(state, `[lf2] Motion command blocked: ${message}`) });
   throw new Error(message);
@@ -250,7 +276,7 @@ function assertMotionQueueSettled(set: SetFn, get: GetFn, action: string): void 
 function failOwnedMotionOperation(
   state: LaserState,
   operationId: LaserMotionOperationId,
-): Partial<Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun'>> {
+): Partial<Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun' | 'frameTrace'>> {
   if (
     state.motionOperation?.operationId !== operationId ||
     state.motionOperation.mpgInterruptionId !== undefined
@@ -260,6 +286,7 @@ function failOwnedMotionOperation(
     motionOperation: { ...state.motionOperation, cancelRequested: true },
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 

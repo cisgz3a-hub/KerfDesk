@@ -1,5 +1,5 @@
 import type { StreamerState } from '../../core/controllers/grbl';
-import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
+import { DEFAULT_PROJECT_VARIABLE_DATA, type OutputScope, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import type { RunId } from '../state/recovery';
@@ -9,6 +9,7 @@ let cancelObserver: (() => void) | null = null;
 export function armVariableStreamAdvancement(
   project: Project,
   runId: RunId,
+  outputScope?: OutputScope,
 ): {
   readonly accept: () => void;
   readonly cancel: () => void;
@@ -41,7 +42,9 @@ export function armVariableStreamAdvancement(
       return;
     }
     cancel();
-    useStore.getState().advanceVariablesAfter(project, 'successful-stream');
+    if (outputScope === undefined)
+      useStore.getState().advanceVariablesAfter(project, 'successful-stream');
+    else useStore.getState().advanceVariablesAfter(project, 'successful-stream', outputScope);
   };
   cancelObserver = cancel;
   unsubscribe = useLaserStore.subscribe((state) => {

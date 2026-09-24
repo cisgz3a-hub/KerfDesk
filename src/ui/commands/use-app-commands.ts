@@ -1,29 +1,20 @@
+import { fileCommandContext } from './file-command-context';
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
-import { confirmDiscardAsync } from '../app/confirm-discard';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import { editImageAction } from './edit-image-action';
-import { handleImportDxf, handleImportSvg, handleSaveProject } from '../app/file-actions';
-import {
-  inspectCurrentGcodeAction,
-  openGcodeInspectorAction,
-  type GcodeActionDeps,
-} from './gcode-command-actions';
 import { connectOptionsForDevice } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
 import { useCommandStoreState } from './use-command-store-state';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
-import { useLaserStore } from '../state/laser-store';
+import type { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { setAppThemePreference } from '../theme/app-theme';
 import { useAppThemePreference } from '../theme/use-app-theme';
-import { projectWithCurrentJobSetup } from '../state/project-job-setup';
-import { handleUnifiedArtworkImport } from '../app/import-dispatch';
-import { openProjectCommand } from './open-project-command';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -36,19 +27,21 @@ import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
 import { deleteSelection } from './selection-delete-action';
-import { handleImportHeightMaps } from '../app/height-map-import-action';
 import {
   selectedObject,
   selectedObjectIds,
   selectionCanBreakApart,
   selectionCanCombine,
   selectionCanWeld,
+  unionSilhouetteOperations,
+  selectionCanJoinPaths,
   selectedConvertibleVectors,
   selectionHasUnlockedObject,
   selectionHasUnlockedVectorObject,
   selectionHasVectorObject,
   selectionTouchesGroup,
 } from './selection-command-state';
+import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
 
@@ -141,6 +134,8 @@ function appCommandContext(
     hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
     canWeldSelection: selectionCanWeld(app.project, selectedIds),
+    canUnionSilhouette: unionSilhouetteOperations(app.project.scene, selectedIds).length > 0,
+    canJoinPaths: selectionCanJoinPaths(app.project, selectedIds),
     canCombineSelection: selectionCanCombine(app.project, selectedIds),
     hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
     canApplyImageMask: imageMaskPair !== null,
@@ -200,81 +195,6 @@ function connectionCommandContext(
       laser.controllerOperation !== null ||
       activeStreamer,
     homingEnabled: app.project.device.homing.enabled,
-  };
-}
-
-function fileCommandContext(
-  callbacks: CommandShellCallbacks,
-  platform: ReturnType<typeof usePlatform>,
-  app: ReturnType<typeof useStore.getState>,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): Pick<
-  AppCommandContext,
-  | 'confirmDiscard'
-  | 'newProject'
-  | 'openProject'
-  | 'saveProject'
-  | 'saveProjectAs'
-  | 'importArtwork'
-  | 'importSvg'
-  | 'importDxf'
-  | 'importImage'
-  | 'importHeightMap'
-  | 'saveGcode'
-  | 'openGcodePreview'
-  | 'inspectCurrentGcode'
-> {
-  // Save and the Inspector compile from the stores as they stand at CLICK
-  // time, not from the render that built this context. Reading them here is
-  // what lets the command surface skip the status-poll and mousemove
-  // re-renders that used to be the only thing keeping a captured snapshot
-  // current (use-command-store-state).
-  const gcodeDeps = (): GcodeActionDeps => ({
-    platform,
-    app: useStore.getState(),
-    laser: useLaserStore.getState(),
-    pushToast,
-    openInspector: callbacks.requestGcodeInspector,
-  });
-  return {
-    confirmDiscard: (action) => confirmDiscardAsync(platform, action),
-    newProject: app.newProject,
-    openProject: () => void openProjectCommand(platform, pushToast),
-    saveProject: () => saveProject(platform, useStore.getState(), pushToast, false),
-    saveProjectAs: () => saveProject(platform, useStore.getState(), pushToast, true),
-    importArtwork: () =>
-      void handleUnifiedArtworkImport(platform, {
-        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
-        importSvgObject: app.importSvgObject,
-        importRasterImage: app.importRasterImage,
-        pushToast,
-      }),
-    importSvg: () =>
-      void handleImportSvg(
-        platform,
-        app.importSvgObject,
-        pushToast,
-        () => useStore.getState().projectDocumentEpoch,
-      ),
-    importDxf: () =>
-      void handleImportDxf(
-        platform,
-        app.importSvgObject,
-        pushToast,
-        () => useStore.getState().projectDocumentEpoch,
-      ),
-    importImage: callbacks.requestImportImage,
-    importHeightMap: () => {
-      const current = useStore.getState();
-      void handleImportHeightMaps(platform, {
-        getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
-        importObject: current.importSvgObject,
-        pushToast,
-      });
-    },
-    saveGcode: () => useUiStore.getState().openGcodeSaveDialog(),
-    openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
-    inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),
   };
 }
 
@@ -357,8 +277,9 @@ function laserCommandContext(
   return {
     connectLaser: () =>
       void laser.connect(platform, connectOptionsForDevice(useStore.getState().project.device)),
-    disconnectLaser: () => void laser.disconnect().catch(() => undefined),
-    homeLaser: () => void laser.home().catch(() => undefined),
+    disconnectLaser: () =>
+      void laser.disconnect().catch(controllerActionFailureHandler('Disconnect')),
+    homeLaser: () => void laser.home().catch(controllerActionFailureHandler('Home')),
   };
 }
 
@@ -384,30 +305,4 @@ function windowHelpCommandContext(
     showConnectionHelp: callbacks.showConnectionHelp,
     showSafety: callbacks.showSafety,
   };
-}
-
-function saveProject(
-  platform: ReturnType<typeof usePlatform>,
-  app: ReturnType<typeof useStore.getState>,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-  forceDialog: boolean,
-): void {
-  void handleSaveProject(
-    {
-      platform,
-      project: projectWithCurrentJobSetup(app),
-      expectedProject: app.project,
-      projectDocumentEpoch: app.projectDocumentEpoch,
-      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
-      claimProjectSaveRequest: app.claimProjectSaveRequest,
-      getProjectSaveRequestEpoch: () => useStore.getState().projectSaveRequestEpoch,
-      projectSaveWriteCoordinator: app.projectSaveWriteCoordinator,
-      savedName: app.savedName,
-      lastSaveTarget: app.lastSaveTarget,
-      markSaved: app.markSaved,
-      markProjectSaveUncertain: app.markProjectSaveUncertain,
-      pushToast,
-    },
-    forceDialog,
-  );
 }

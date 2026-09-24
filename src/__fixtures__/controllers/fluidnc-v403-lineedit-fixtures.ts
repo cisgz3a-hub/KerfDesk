@@ -1,6 +1,6 @@
 /**
  * ASCII direct-Lineedit boundaries transcribed from FluidNC v4.0.3 source.
- * These literals are a test oracle, not a CurveDesk parser or a support claim.
+ * These literals are a test oracle, not a KerfDesk parser or a support claim.
  */
 export const FLUIDNC_V403_LINEEDIT_FIXTURES = [
   { payloadBytes: 127, retainedBytes: 127, parserResult: 'accepted' },

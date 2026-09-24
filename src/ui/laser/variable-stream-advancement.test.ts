@@ -61,6 +61,20 @@ describe('variable advancement ownership', () => {
     expect(advance).toHaveBeenCalledExactlyOnceWith(project, 'successful-stream');
   });
 
+  it('retains the exact prepared output scope through later selection changes', () => {
+    const outputScope = {
+      cutSelectedGraphics: true,
+      useSelectionOrigin: false,
+      selectedObjectIds: ['slot-3'],
+    };
+    const observer = armVariableStreamAdvancement(project, runId, outputScope);
+    start();
+    useStore.setState({ selectedObjectId: 'later-slot', additionalSelectedIds: new Set() });
+    observer.accept();
+    finish();
+    expect(advance).toHaveBeenCalledExactlyOnceWith(project, 'successful-stream', outputScope);
+  });
+
   it.each(['failed write', 'session replacement', 'stream replacement'] as const)(
     'does not advance after %s',
     (reason) => {

@@ -169,9 +169,8 @@ describe('streamed raster execution artifact persistence', () => {
       kind: 'raster-image',
       id: 'large-source-image',
       source: 'large-source.png',
-      dataUrl: `data:image/png;base64,${'A'.repeat(
-        Math.floor(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES / 3) + 1,
-      )}`,
+      // Base64 is ASCII and stores at one byte per character.
+      dataUrl: `data:image/png;base64,${'A'.repeat(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES + 1)}`,
       pixelWidth: 1,
       pixelHeight: 1,
       bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },

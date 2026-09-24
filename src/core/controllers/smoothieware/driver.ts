@@ -50,7 +50,7 @@ export const smoothiewareDriver: ControllerDriver = {
   realtime: {
     statusQuery: RT_STATUS,
     // Smoothieware handles !/~ only on its USB CDC transport and only when
-    // enable_feed_hold is configured. CurveDesk has no session-bound evidence
+    // enable_feed_hold is configured. KerfDesk has no session-bound evidence
     // for either prerequisite, so the generic driver must not claim these bytes
     // as controller realtime commands.
     hold: null,
@@ -61,7 +61,9 @@ export const smoothiewareDriver: ControllerDriver = {
   },
   commands: {
     // M400 first also gives a terminal rejection while halted; the shell's
-    // fire-off command itself is silently ignored in that state.
+    // fire-off command itself is silently ignored in that state. That
+    // rejection also keeps `$H`, which clears a halt before homing, from ever
+    // unlocking a halted board behind the operator's back.
     home: ['M400', ...SMOOTHIE_FRAME_TOOL_OFF_LINES, SMOOTHIE_CMD_HOME].join('\n'),
     unlock: SMOOTHIE_CMD_UNLOCK,
     sleep: null,

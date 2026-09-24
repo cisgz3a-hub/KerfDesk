@@ -9,11 +9,14 @@ import { useDebouncedCommit } from './use-debounced-commit';
 export function Row(props: {
   readonly label: string;
   readonly children: React.ReactNode;
+  readonly stacked?: boolean;
 }): JSX.Element {
   return (
-    <div className="lf-cnc-setting-row" style={rowStyle}>
-      {props.label.length > 0 ? <span style={labelStyle}>{props.label}</span> : null}
-      <div className="lf-cnc-setting-value" style={valueStyle}>
+    <div className="lf-cnc-setting-row" style={props.stacked ? stackedRowStyle : rowStyle}>
+      {props.label.length > 0 ? (
+        <span style={props.stacked ? stackedLabelStyle : labelStyle}>{props.label}</span>
+      ) : null}
+      <div className="lf-cnc-setting-value" style={props.stacked ? stackedValueStyle : valueStyle}>
         {props.children}
       </div>
     </div>
@@ -32,6 +35,7 @@ type NumberFieldProps = {
   readonly step: number;
   readonly title: string;
   readonly onCommit: (value: number) => void;
+  readonly stacked?: boolean;
 } & NumberFieldRange;
 
 export function NumberField(props: NumberFieldProps): JSX.Element {
@@ -46,7 +50,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
     },
   });
   return (
-    <Row label={props.label}>
+    <Row label={props.label} {...(props.stacked ? { stacked: true } : {})}>
       <input
         type="number"
         {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
@@ -54,7 +58,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         value={debounced.displayValue}
         onChange={debounced.onChange}
         onBlur={debounced.onBlur}
-        style={inputStyle}
+        style={props.stacked ? { ...inputStyle, flex: 1, minWidth: 0 } : inputStyle}
         aria-label={`${props.label} for ${props.layer.color}`}
         title={props.title}
       />
@@ -98,3 +102,20 @@ export const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 export const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
+
+const stackedRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  minWidth: 0,
+  alignContent: 'start',
+};
+const stackedLabelStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: 'var(--lf-text)',
+};
+const stackedValueStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  minWidth: 0,
+};

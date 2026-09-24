@@ -92,7 +92,7 @@ describe('DeviceSetupWizard', () => {
         await act(async () => button(view.host, 'Review setup').click());
         expect(view.host.textContent).toContain('Step 3 of 3');
         expect(
-          button(view.host, kind === 'cnc' ? 'Save CNC startup setup' : 'Save machine setup')
+          button(view.host, kind === 'cnc' ? 'Save CNC machine setup' : 'Save machine setup')
             .disabled,
         ).toBe(false);
         expect(connect).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe('DeviceSetupWizard', () => {
       expect(input(view.host, 'Spindle maximum').value).toBe('10000');
       await changeInput(view.host, 'Safe Z', '9');
       await advanceToReview(view.host);
-      await act(async () => button(view.host, 'Save CNC startup setup').click());
+      await act(async () => button(view.host, 'Save CNC machine setup').click());
 
       const machine = useStore.getState().project.machine;
       expect(machine?.kind).toBe('cnc');
@@ -308,7 +308,7 @@ describe('DeviceSetupWizard', () => {
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
       expect(button(view.host, 'Check essentials').disabled).toBe(false);
       await advanceToReview(view.host);
-      expect(button(view.host, 'Save CNC startup setup').disabled).toBe(true);
+      expect(button(view.host, 'Save CNC machine setup').disabled).toBe(true);
       expect(view.host.textContent).toContain('cannot run KerfDesk CNC jobs');
     } finally {
       await view.unmount();

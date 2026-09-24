@@ -452,6 +452,7 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
     reduceTravelMoves: travelPolicy === 'nearest-neighbor',
     travelPolicy,
     insideFirst: booleanOrDefault(value['insideFirst'], DEFAULT_PROJECT_OPTIMIZATION.insideFirst),
+    removeOverlappingLines: booleanOrDefault(value['removeOverlappingLines'], false),
     layerPriority:
       value['layerPriority'] === 'reverse-project-order'
         ? 'reverse-project-order'

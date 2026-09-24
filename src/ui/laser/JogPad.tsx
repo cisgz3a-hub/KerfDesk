@@ -18,6 +18,7 @@ import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
 import { clampJogFeed, type JogVector } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useJogShortcuts } from './use-jog-shortcuts';
 import { useZeroZAction } from './use-zero-z-action';
 
@@ -36,30 +37,28 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
-  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
   const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
-  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
   const focusReady = focusJogReady(device, machineKind);
 
   const sendVector = useCallback(
     (vector: JogVector): void => {
-      void jog(vector).catch(() => undefined);
+      void jog(vector).catch(controllerActionFailureHandler('Jog'));
     },
     [jog],
   );
   const sendFocus = useCallback(
     (direction: 1 | -1): void => {
-      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(() => undefined);
+      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(
+        controllerActionFailureHandler('Z jog'),
+      );
     },
     [focusFeed, focusStep, jog],
   );
   const cancelContinuousJog = useCallback((): void => {
-    void cancelJog().catch(() => undefined);
+    void cancelJog().catch(controllerActionFailureHandler('Stop jog'));
   }, [cancelJog]);
   const handleZeroZ = useZeroZAction();
 
@@ -79,12 +78,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         onFeed={setSelectedFeed}
       />
       <div className="lf-jog-controls" style={jogRowStyle}>
-        <JogArrowGrid
+        <JogArrows
           disabled={disabled}
           stepMm={step}
           feed={feed}
           signs={signs}
-          position={position}
           bounds={bounds}
           continuousJogSupported={continuousJogSupported}
           onJog={sendVector}
@@ -104,6 +102,18 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       />
     </div>
   );
+}
+
+// The head position only aims a continuous jog. A disabled pad (a job, Frame or
+// another motion owns the machine) cannot start one, so it does not follow the
+// status report either; before, the whole jog panel re-rendered on every poll
+// of a running job (ADR-352).
+function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
+  const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
+  const wcoCache = useLaserStore((s) => s.wcoCache);
+  const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
+  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
+  return <JogArrowGrid {...props} position={position} />;
 }
 
 function useJogPadShortcuts(

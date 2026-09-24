@@ -65,7 +65,7 @@ describe('DeviceSetupWizard router commit', () => {
       expect(view.host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
 
       await act(async () => button(view.host, 'Review setup').click());
-      await act(async () => button(view.host, 'Save CNC startup setup').click());
+      await act(async () => button(view.host, 'Save CNC machine setup').click());
 
       const state = useStore.getState();
       const machine = state.project.machine;

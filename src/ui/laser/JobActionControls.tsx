@@ -3,7 +3,10 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
-import { useFramePreparationStore } from '../state/frame-preparation-store';
+import {
+  useFramePreparationStore,
+  type FramePreparationStage,
+} from '../state/frame-preparation-store';
 import { actionGridStyle, framedRunStatusStyle, primaryActionStyle } from './JobControls.styles';
 import { startJobTitle } from './JobEstimatePresentation';
 import { LiveJobTimeBadge } from './LiveJobTimeBadge';
@@ -72,7 +75,9 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const estimate = useJobEstimate();
   const framePending = useFramePreparationStore((state) => state.pending);
   const progress = useFramePreparationStore((state) => state.progress);
-  const preparingFrame = framePending && laser.motionOperation?.kind !== 'frame';
+  const stage = useFramePreparationStore((state) => state.stage);
+  const frameActive = laser.motionOperation?.kind === 'frame';
+  const preparingFrame = framePending && !frameActive;
   const busy = props.disabled || props.streaming || framePending;
   const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
   const framedReady = framedRunIssue === null;
@@ -90,13 +95,15 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
         : 'Prepare and Frame the exact job with the tool off. After a clean Frame, press Start again to review and run.',
     },
-    statusText: framedRunStatusText(
-      laser.motionOperation?.kind === 'frame',
+    statusText: framedRunStatusText({
+      frameActive,
+      stage,
       framedReady,
-      laser.framedRun !== null,
+      hasFramedRun: laser.framedRun !== null,
       framedRunIssue,
-      preparingFrame ? preparingFrameStatusText(progress) : null,
-    ),
+      preparingFrame,
+      progress,
+    }),
     estimate,
   };
 }
@@ -145,18 +152,26 @@ function JobActionButtons(props: {
   );
 }
 
-function framedRunStatusText(
-  frameOperationActive: boolean,
-  framedReady: boolean,
-  hasFramedRun: boolean,
-  framedRunIssue: string | null,
-  preparingText: string | null,
-): string {
-  if (frameOperationActive) return 'Framing exact job…';
-  if (preparingText !== null) return preparingText;
-  if (framedReady) return 'Ready to start — framed job unchanged';
-  if (!hasFramedRun) return 'Not framed — prepare and Frame this job first';
-  return `Frame expired — ${framedRunIssue}`;
+function framedRunStatusText(args: {
+  readonly frameActive: boolean;
+  readonly stage: FramePreparationStage;
+  readonly framedReady: boolean;
+  readonly hasFramedRun: boolean;
+  readonly framedRunIssue: string | null;
+  readonly preparingFrame: boolean;
+  readonly progress: OutputCompilationProgress | null;
+}): string {
+  if (args.frameActive) {
+    // A split Frame traces the compiled outline while the exact program is
+    // still being prepared (ADR-353); no permit exists until it arrives.
+    return args.stage === 'tracing'
+      ? 'Framing the job outline — the exact job is still being prepared…'
+      : 'Framing exact job…';
+  }
+  if (args.preparingFrame) return preparingFrameStatusText(args.progress, args.stage);
+  if (args.framedReady) return 'Ready to start — framed job unchanged';
+  if (!args.hasFramedRun) return 'Not framed — prepare and Frame this job first';
+  return `Frame expired — ${args.framedRunIssue}`;
 }
 
 function frameControlProps(busy: boolean, state: string | undefined) {
@@ -180,11 +195,18 @@ const PREPARING_PHASE_TEXT: Record<OutputCompilationProgress['phase'], string> =
   finalizing: 'finishing',
 };
 
-function preparingFrameStatusText(progress: OutputCompilationProgress | null): string {
-  if (progress === null) return 'Preparing the exact job for Frame…';
+function preparingFrameStatusText(
+  progress: OutputCompilationProgress | null,
+  stage: FramePreparationStage,
+): string {
+  const lead =
+    stage === 'finishing'
+      ? 'Frame traced — finishing the exact job before Start is authorized'
+      : 'Preparing the exact job for Frame';
+  if (progress === null) return `${lead}…`;
   const phase = PREPARING_PHASE_TEXT[progress.phase];
-  if (progress.total <= 0) return `Preparing the exact job for Frame — ${phase}…`;
-  return `Preparing the exact job for Frame — ${phase} ${progress.completed}/${progress.total}…`;
+  if (progress.total <= 0) return `${lead} — ${phase}…`;
+  return `${lead} — ${phase} ${progress.completed}/${progress.total}…`;
 }
 
 function frameBlockedTitle(state: string | undefined): string {

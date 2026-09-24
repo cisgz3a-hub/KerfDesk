@@ -95,8 +95,8 @@ export type StatusReport = {
   /**
    * Planner blocks free and RX ring bytes free from `Bf:`. Free counts, not
    * capacity: while the host has nothing in flight the RX value IS the usable
-   * receive capacity (stock GRBL idles at `Bf:15,128`, a grblHAL Falcon A1 Pro
-   * at `Bf:512,65535`). Optional so hand-built test mocks need not set it;
+   * receive capacity (stock GRBL idles at `Bf:15,128`; a Falcon A1 Pro profiled as
+   * grblHAL reported `Bf:512,65535`). Optional so hand-built test mocks need not set it;
    * null when the frame omits the field or it is malformed.
    */
   readonly buffer?: BufferState | null;
@@ -299,7 +299,7 @@ function pickAxisField(
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
     const parts = f.slice(label.length + 1).split(',');
-    // grblHAL/Falcon reports include additional axes after XYZ. Keep the
+    // grblHAL and Falcon reports can include axes after XYZ. Keep the
     // coordinates KerfDesk uses, while still rejecting malformed vectors.
     if (parts.length < 3 || parts.some((token) => parseCanonicalStatusNumber(token) === null)) {
       return null;
@@ -332,7 +332,10 @@ function pickFsValue(fields: ReadonlyArray<string>, index: 0 | 1): number | null
   return null;
 }
 
-function parseCanonicalStatusNumber(token: string | undefined): number | null {
+/** A decimal exactly as GRBL-family firmware prints it (no exponent, no empty
+ *  token, no stray sign or leading zeros), or null. Shared with the `$#`
+ *  work-offset readback, which prints its axis vectors the same way. */
+export function parseCanonicalStatusNumber(token: string | undefined): number | null {
   if (token === undefined || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(token)) return null;
   const value = Number(token);
   return Number.isFinite(value) ? value : null;

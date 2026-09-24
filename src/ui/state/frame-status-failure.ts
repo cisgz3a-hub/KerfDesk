@@ -22,13 +22,17 @@ export function frameStatusFailurePatch(
   state: LaserState,
   message: string | null,
 ): Partial<
-  Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun' | 'lastWriteError' | 'log'>
+  Pick<
+    LaserState,
+    'motionOperation' | 'frameVerification' | 'framedRun' | 'frameTrace' | 'lastWriteError' | 'log'
+  >
 > {
   if (message === null) return {};
   return {
     motionOperation: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     lastWriteError: message,
     log: pushLog(state, `[lf2] ${message}`),
   };
@@ -38,7 +42,10 @@ export function jogMpgInterruptionPatch(
   state: LaserState,
   mpgOwnsControl: boolean,
 ): Partial<
-  Pick<LaserState, 'motionOperation' | 'frameVerification' | 'framedRun' | 'lastWriteError' | 'log'>
+  Pick<
+    LaserState,
+    'motionOperation' | 'frameVerification' | 'framedRun' | 'frameTrace' | 'lastWriteError' | 'log'
+  >
 > {
   const operation = state.motionOperation;
   if (!mpgOwnsControl || operation?.kind !== 'jog' || operation.interruptedByMpg === true) {
@@ -61,6 +68,7 @@ export function jogMpgInterruptionPatch(
     },
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     lastWriteError: message,
     log: pushLog(state, `[lf2] ${message}`),
   };

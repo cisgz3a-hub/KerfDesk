@@ -52,16 +52,16 @@ function ToolbarProjectName(): JSX.Element {
   const savedName = useStore((state) => state.savedName);
   const dirty = useStore((state) => state.dirty);
   const name = savedName ?? 'Untitled project';
+  const status =
+    savedName === null ? 'Not saved to file' : dirty ? 'Unsaved changes' : 'File up to date';
   return (
     <span
       className="lf-toolbar-project-name"
-      title={dirty ? `${name} (unsaved changes)` : name}
+      title={`${name} · ${status}`}
       role="group"
       aria-label="Current project"
     >
-      <span className="lf-toolbar-project-caption" aria-hidden="true">
-        Project
-      </span>
+      <span className="lf-toolbar-project-caption">{status}</span>
       <span className="lf-toolbar-project-title">
         {name}
         {dirty ? (

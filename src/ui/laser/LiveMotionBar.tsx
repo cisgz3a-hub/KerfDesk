@@ -17,6 +17,7 @@ import {
   PendingPauseResumeAction,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 const TOOL_CHANGE_CONTINUE_TITLE =
@@ -79,7 +80,7 @@ export function LiveMotionBar(): JSX.Element | null {
           className="lf-btn lf-btn--danger"
           style={abortButtonStyle}
           title={SOFTWARE_ABORT_TITLE}
-          onClick={() => void abort().catch(() => undefined)}
+          onClick={() => void abort().catch(controllerActionFailureHandler('Abort'))}
         >
           {description.abortLabel}
         </button>
@@ -139,12 +140,21 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   return null;
 }
 
-// The controller's own hold, as opposed to a host-requested pause. Scalars, so
-// the 250 ms status poll cannot re-render this bar unless one of them changes.
+// The controller's own hold, as opposed to a host-requested pause. One shared
+// constant per state: a fresh object compared unequal on every store write, so
+// a held job re-rendered this bar per status poll and per store update.
+const CONTROLLER_HOLDS = {
+  Hold: { closed: { state: 'Hold', doorPin: false }, open: { state: 'Hold', doorPin: true } },
+  Door: { closed: { state: 'Door', doorPin: false }, open: { state: 'Door', doorPin: true } },
+} as const satisfies Record<
+  'Hold' | 'Door',
+  Record<'closed' | 'open', NonNullable<ControllerHold>>
+>;
+
 function selectControllerHold(state: LaserSnapshot): ControllerHold {
   const reported = state.statusReport?.state ?? null;
   if (reported !== 'Hold' && reported !== 'Door') return null;
-  return { state: reported, doorPin: state.statusReport?.pins?.door === true };
+  return CONTROLLER_HOLDS[reported][state.statusReport?.pins?.door === true ? 'open' : 'closed'];
 }
 
 function describeLiveMotion(

@@ -72,6 +72,47 @@ export type FramedRunCandidate = {
   readonly authorizationContext?: 'transient-camera' | 'laser-second-pass';
 };
 
+/** The candidate a split Frame traces before its exact program exists: every
+ * FramedRunCandidate field except the program and review evidence. The trace
+ * runs against the compiled job's bounds while the exact preparation finishes
+ * off-thread; a permit is minted only when that program arrives with the same
+ * bounds (ADR-353). The marker keeps it from ever being read as a permit
+ * candidate. */
+export type FrameTraceCandidate = Omit<FramedRunCandidate, 'preparedStart' | 'review'> & {
+  readonly exactProgram: 'deferred';
+};
+
+/** What a Frame motion may carry: an exact candidate, which completion turns
+ * into a permit, or a trace candidate, which completion records as a trace. */
+export type FrameMotionCandidate = FramedRunCandidate | FrameTraceCandidate;
+
+/** Only a candidate that declares its program deferred is a trace; the
+ * marker is required on every trace candidate, so the exact path never has
+ * to prove a negative. */
+export function isFramedRunCandidate(
+  candidate: FrameMotionCandidate,
+): candidate is FramedRunCandidate {
+  return !('exactProgram' in candidate && candidate.exactProgram === 'deferred');
+}
+
+/** Completion-issued record of a clean trace whose exact program was still
+ * being prepared. Never a Start authorization by itself: the Frame flow binds
+ * the exact program to it with `mintDeferredFramedRunPermit`, or it expires
+ * under the same drift rules as a permit. */
+export type FrameTrace = {
+  readonly kind: 'traced';
+  readonly candidate: FrameTraceCandidate;
+  readonly completedStatusSequence: number;
+  readonly controller: FramedRunControllerSnapshot;
+};
+
+/** The shape readiness and expiry compare, shared by a permit and a trace. */
+export type FramedRunEvidence = {
+  readonly candidate: FrameMotionCandidate;
+  readonly completedStatusSequence: number;
+  readonly controller: FramedRunControllerSnapshot;
+};
+
 export type FramedRunControllerSnapshot = {
   readonly controllerSessionEpoch: number;
   /** Review/provenance evidence only. Frame remains the sole ordinary Start
@@ -156,8 +197,39 @@ export function createFramedRunPermit(
   };
 }
 
+export function createFrameTrace(
+  candidate: FrameTraceCandidate,
+  source: FramedRunControllerSource,
+): FrameTrace {
+  return {
+    kind: 'traced',
+    candidate,
+    completedStatusSequence: source.statusSequence,
+    controller: framedRunControllerSnapshot(source),
+  };
+}
+
+/** Bind the exact program to a completed trace. The caller has already proved
+ * that the program's frame bounds equal the traced ones and that nothing
+ * drifted since completion; this only assembles the permit from the trace's
+ * own completion evidence, so the permit reads exactly like one minted at the
+ * clean Idle of an ordinary Frame (ADR-353). */
+export function mintDeferredFramedRunPermit(
+  trace: FrameTrace,
+  preparedStart: PreparedStartProgram,
+): FramedRunPermit {
+  const { exactProgram, ...candidate } = trace.candidate;
+  void exactProgram;
+  return {
+    kind: 'ready',
+    candidate: { ...candidate, preparedStart },
+    completedStatusSequence: trace.completedStatusSequence,
+    controller: trace.controller,
+  };
+}
+
 export function framedRunCompletionIssue(
-  candidate: FramedRunCandidate,
+  candidate: FrameMotionCandidate,
   source: FramedRunControllerSource,
 ): string | null {
   const completed = framedRunControllerSnapshot(source);

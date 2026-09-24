@@ -61,6 +61,14 @@ describe('OptimizationSettingsDialog', () => {
       );
       expect(host.textContent).toContain('saved but bypassed');
       expect(host.textContent).toContain('Layer priority still applies');
+      const overlaps = host.querySelector<HTMLInputElement>('input[name="removeOverlappingLines"]');
+      expect(overlaps?.checked).toBe(false);
+      expect(overlaps?.disabled).toBe(false);
+      if (overlaps === null) throw new Error('overlap setting missing');
+      await act(async () => {
+        overlaps.checked = true;
+        Simulate.change(overlaps);
+      });
       await act(async () => {
         const form = host.querySelector('form');
         if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
@@ -71,6 +79,7 @@ describe('OptimizationSettingsDialog', () => {
         ...DEFAULT_PROJECT_OPTIMIZATION,
         reduceTravelMoves: false,
         travelPolicy: 'source-order',
+        removeOverlappingLines: true,
       });
     } finally {
       await act(async () => root.unmount());

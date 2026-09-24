@@ -34,6 +34,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   // Existing paths keep their original semantics. New converted paths carry
   // explicit winding and pen geometry that older readers cannot safely ignore.
   6: (raw) => ({ ...raw, schemaVersion: 7 }),
+  // Existing text has no copy offset and keeps its original shared context.
+  7: (raw) => ({ ...raw, schemaVersion: 8 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

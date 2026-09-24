@@ -13,7 +13,11 @@ export type VariableTemplateToken =
   | { readonly kind: 'csv'; readonly column: string }
   | { readonly kind: 'cut-setting'; readonly field: VariableCutSettingField };
 
-export type VariableTemplate = { readonly tokens: readonly VariableTemplateToken[] };
+export type VariableTemplate = {
+  readonly tokens: readonly VariableTemplateToken[];
+  /** Ordered copy slot relative to the project's current record/serial. */
+  readonly sequenceOffset?: number;
+};
 
 export type VariableCsvDataset = {
   readonly sourceName: string;

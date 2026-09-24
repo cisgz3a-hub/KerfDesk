@@ -7,7 +7,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   vendor: 'Creality',
   model: 'Falcon A1 Pro',
   name: 'Creality Falcon A1 Pro (vendor command set)',
-  catalogVersion: '2026-09-19',
+  catalogVersion: '2026-09-24',
   machineFamily: 'creality-falcon',
   controllerKind: 'grblhal',
   controllerCommandSet: 'creality-falcon-a1-pro',
@@ -16,10 +16,10 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   bedWidth: 358,
   bedHeight: 268,
   baudRate: 115200,
-  // grblHAL keeps a >= 1 KiB serial receive ring (the live-verified A1 Pro
-  // idles at `Bf:512,65535`); the stock 120-byte window starved its planner
-  // on dense raster jobs. Start still bounds this by the controller's own
-  // `Bf:` capacity report (ADR-331).
+  // grblHAL keeps a >= 1 KiB serial receive ring; a maintainer's A1 Pro, profiled as
+  // grblHAL, reported `Bf:512,65535` on 2026-07-19 (informal, not qualification). The
+  // stock 120-byte window can starve the planner on dense raster jobs (simulator-shown,
+  // ADR-331). Start still bounds this by the controller's own `Bf:` capacity report.
   rxBufferBytes: GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
   airAssistCommand: 'M8',
   // The A1's own air control is timer-backed, so a mid-program M9 is not a
@@ -29,7 +29,13 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   // cycled over it (ADR-335).
   airAssistRestartUnreliable: true,
   autofocusCommand: '$HZ1',
-  maxFeed: 10000,
+  // The output ceiling follows Creality's rated 600 mm/s (36000 mm/min). The
+  // vendor contract disables `$$`, so $110/$111 can never correct this value,
+  // and the old 10000 (chosen to speed up Frame) held every layer at 28% of the
+  // rating with no way to go faster from the Speed field (controller audit
+  // 2026-09-23, realtime-1/speed-1). The firmware still slows each move to its
+  // own $110/$111, so a ceiling above them costs nothing but estimate accuracy.
+  maxFeed: 36000,
   framingFeedMmPerMin: 10000,
   capabilities: [
     'grbl',
@@ -44,9 +50,14 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   ],
   evidence: [
     {
+      label: 'Creality Falcon A1 Pro rated speed',
+      status: 'public-spec-starter',
+      note: 'Creality lists the Falcon A1 Pro at 600 mm/s maximum working speed (36000 mm/min); its consumable parameter guide recommends material speeds up to 10000 mm/min. The firmware max rates $110/$111 are not published and cannot be read under the vendor command set. Sources: https://www.creality.com/products/falcon-a1-pro-20w, https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/consumable-parameter-guide',
+    },
+    {
       label: 'Creality Falcon A1 Pro manufacturer configuration',
       status: 'public-spec-starter',
-      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (grblHAL 512-block planner, 64 KiB receive ring), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
+      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (512 planner blocks and 65535 receive-buffer bytes free; informal, not qualification), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
     },
   ],
 };

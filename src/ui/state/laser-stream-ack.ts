@@ -10,11 +10,8 @@ import {
 } from '../../core/controllers/grbl';
 import { beginPostJobSettle } from './laser-post-job-settle';
 import type { LaserState } from './laser-store';
-import {
-  hasUnsettledStreamAcks,
-  streamerCanPauseForMpg,
-  toolChangeHoldEntryPatch,
-} from './laser-store-helpers';
+import { hasUnsettledStreamAcks, streamerCanPauseForMpg } from './laser-store-helpers';
+import { steppedStreamerPatch } from './tool-change-hold-entry';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import {
@@ -84,31 +81,38 @@ export function advanceStream(
   safeWrite: SafeWriteFn,
   ack: 'ok' | 'error' | 'alarm',
 ): void {
+  advanceStreamBy(set, get, refs, safeWrite, ack, 1);
+}
+
+/**
+ * Applies up to `count` consecutive acknowledgements of one kind exactly as that
+ * many advanceStream calls would, with one store write and one refill write.
+ * The pure onAck/step sequence is the same; it stops after the first ack that
+ * changes the stream's status, so every transition keeps its side effects in
+ * order. Returns how many it applied (ADR-352).
+ */
+export function advanceStreamBy(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  ack: 'ok' | 'error' | 'alarm',
+  count: number,
+): number {
   const s: StreamerState | null = get().streamer;
-  if (s === null) return;
+  if (s === null) return count;
   const writeOwner = streamWriteOwner(get());
-  const acked = onAck(s, ack);
-  const stepped = step(
-    get().mpgActive === true && streamerCanPauseForMpg(acked.state)
-      ? pauseStreamer(acked.state)
-      : acked.state,
-  );
-  const enteredToolChange = s.status !== 'tool-change' && stepped.state.status === 'tool-change';
+  const stepped = stepAcks(s, ack, count, get().mpgActive === true);
   const finishedStreaming = s.status !== 'done' && stepped.state.status === 'done';
+  // An ack refill that reaches an M0 enters the tool-change hold: the shared
+  // patch voids the previous bit's Z0, re-arms the fresh-Idle latch and names
+  // the incoming bit in the same update (ADR-171, Codex audit P1, R5).
+  // stepAcks stops at the first status change, so comparing with the streamer
+  // the batch started from detects exactly the step that entered the hold.
   set((state) => ({
-    streamer: stepped.state,
+    ...steppedStreamerPatch(state, s, stepped.state),
     ...(stepped.state.status === 'errored' ? liveCanvasLifecyclePatch(state, 'errored') : {}),
   }));
-  // Entering a tool-change hold means a new bit is going in: the previous bit's
-  // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
-  // (the setup gate allows it during the hold). Invalidate so the no-work-zero
-  // advisory is honest again until they do (Codex audit P1).
-  if (enteredToolChange) {
-    // New bit going in: void the prior Z0, require a FRESH Idle before the setup
-    // gate / Continue unlock, and consume the next tool label so the pause UI can
-    // name the bit (R5). Shared with the Continue entry site (F22).
-    set((state) => toolChangeHoldEntryPatch(state));
-  }
   if (finishedStreaming) {
     beginPostJobSettle(set, get, refs, safeWrite);
   }
@@ -129,4 +133,31 @@ export function advanceStream(
       containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', writeOwner);
     });
   }
+  return stepped.applied;
+}
+
+// The same pure onAck -> step pair advanceStream ran per acknowledgement,
+// repeated until one of them changes the stream's status. The refill bytes of
+// every step are concatenated in order, so the controller receives exactly the
+// bytes the per-ack path would have written, in one write.
+function stepAcks(
+  initial: StreamerState,
+  ack: 'ok' | 'error' | 'alarm',
+  count: number,
+  mpgActive: boolean,
+): { readonly state: StreamerState; readonly toSend: string; readonly applied: number } {
+  let state = initial;
+  let toSend = '';
+  let applied = 0;
+  while (applied < count) {
+    const acked = onAck(state, ack);
+    const stepped = step(
+      mpgActive && streamerCanPauseForMpg(acked.state) ? pauseStreamer(acked.state) : acked.state,
+    );
+    state = stepped.state;
+    toSend += stepped.toSend;
+    applied += 1;
+    if (state.status !== initial.status) break;
+  }
+  return { state, toSend, applied };
 }

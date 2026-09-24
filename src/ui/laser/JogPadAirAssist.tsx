@@ -7,6 +7,7 @@ import {
 } from '../state/air-assist-default-actions';
 import { useLaserStore } from '../state/laser-store';
 import { openMachineSetup } from './device-setup';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 // Manual Air has two distinct "not ready" states and they need different
 // exits (maintainer, 2026-09-19 — the old single Proceed card silently did
@@ -31,12 +32,12 @@ export function JogPadAirAssist(): JSX.Element {
       return;
     }
     if (!enabled) setNoticeOpen(false);
-    void setAirAssistEnabled(enabled).catch(() => undefined);
+    void setAirAssistEnabled(enabled).catch(controllerActionFailureHandler('Air assist'));
   };
   const proceedWithDefaults = (): void => {
     syncProjectAirAssistDefaults();
     setNoticeOpen(false);
-    void setAirAssistEnabled(true).catch(() => undefined);
+    void setAirAssistEnabled(true).catch(controllerActionFailureHandler('Air assist'));
   };
   const openAirOutputSetup = (): void => {
     setNoticeOpen(false);

@@ -11,6 +11,9 @@
 // Disconnect handling: the `disconnect` event fires when the OS drops the
 // port (USB cable yank). We surface that via the SerialConnection.onClose
 // handlers so the controller state machine can transition to "Disconnected".
+// A UART line error (framing, parity, break, overrun) is not a disconnect: the
+// port stays open and the read loop continues on a fresh stream
+// (serial-read-loop.ts, audit connect-1).
 //
 // Quirk: Chromium and Electron sometimes return a SerialPort instance from
 // requestPort() that's still flagged "open" from a previous session
@@ -27,7 +30,8 @@ import type {
   SerialPortRef,
 } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
-import { EMPTY_SERIAL_LINE_STATE, encodeWireBytes, extractSerialLines } from './serial-wire';
+import { runSerialReadLoop, type SerialReadTarget } from './serial-read-loop';
+import { encodeWireBytes, extractSerialLines } from './serial-wire';
 import { tryOpenNativeSerialConnection } from './native-serial-connection';
 
 // Re-exported: the wire primitives moved to `serial-wire.ts` so the worker
@@ -152,15 +156,28 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
 
 type Subscribers<T> = Set<(value: T) => void>;
 
-function makeConnection(port: SerialPort): SerialConnection {
-  const lineSubs: Subscribers<string> = new Set();
-  const closeSubs: Subscribers<void> = new Set();
-  const ctx = {
+type ConnectionContext = SerialReadTarget & {
+  closed: boolean;
+  streamsClosed: boolean;
+  readonly writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
+};
+
+function openConnectionContext(port: SerialPort): ConnectionContext {
+  const ctx: ConnectionContext = {
+    port,
     closed: false,
     streamsClosed: false,
     reader: port.readable?.getReader(),
     writer: port.writable?.getWriter(),
+    isOpen: () => !ctx.closed && !ctx.streamsClosed,
   };
+  return ctx;
+}
+
+function makeConnection(port: SerialPort): SerialConnection {
+  const lineSubs: Subscribers<string> = new Set();
+  const closeSubs: Subscribers<void> = new Set();
+  const ctx = openConnectionContext(port);
 
   const closeStreamsOnce = async (): Promise<void> => {
     if (ctx.streamsClosed) return;
@@ -181,7 +198,7 @@ function makeConnection(port: SerialPort): SerialConnection {
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
-  void runReadLoop(ctx.reader, lineSubs, handleDroppedConnection);
+  void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection);
 
   const closeConnection = async (): Promise<void> => {
     if (ctx.closed) return;
@@ -249,44 +266,6 @@ function makeConnection(port: SerialPort): SerialConnection {
       await forgetConnection();
     },
   };
-}
-
-async function runReadLoop(
-  reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
-  lineSubs: Subscribers<string>,
-  onEnd: () => void,
-): Promise<void> {
-  if (reader === undefined) return;
-  const decoder = new TextDecoder('utf-8');
-  let framing = EMPTY_SERIAL_LINE_STATE;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const extracted = extractSerialLines(framing, decoder.decode(value, { stream: true }));
-      framing = extracted.state;
-      for (const line of extracted.lines) dispatchLine(lineSubs, line);
-    }
-  } catch (err) {
-    console.error('Serial read loop terminated:', err);
-  } finally {
-    onEnd();
-  }
-}
-
-// Subscriber exceptions must not masquerade as a dropped cable: before this
-// isolation, one throwing handler exited the read loop through catch/finally,
-// closed the streams, and fired onClose — a full mid-job "port closed" — and
-// silently dropped the rest of the chunk's lines. Loop-fatal behavior is
-// reserved for genuine stream errors from reader.read().
-function dispatchLine(lineSubs: Subscribers<string>, line: string): void {
-  for (const h of lineSubs) {
-    try {
-      h(line);
-    } catch (err) {
-      console.error('Serial line handler threw; continuing with remaining lines:', err);
-    }
-  }
 }
 
 // The reader / writer must be cancelled-and-awaited before port.close() —

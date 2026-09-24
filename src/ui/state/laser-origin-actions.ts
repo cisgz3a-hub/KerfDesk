@@ -343,6 +343,7 @@ function transientXyOriginPatch(
     wcoCache: axisHonestWco,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 
@@ -360,6 +361,7 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 
@@ -372,5 +374,6 @@ function clearedOriginPatch(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }

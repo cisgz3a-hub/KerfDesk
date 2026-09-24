@@ -107,6 +107,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
     pathGuide,
   } = values;
   const variableEnabled = values.variableTemplate !== undefined;
+  const sequenceOffset = values.variableTemplate?.sequenceOffset;
   const guideObjectId = values.pathText?.guideObjectId;
   const offsetMm = values.pathText?.offsetMm ?? 0;
   const reverse = values.pathText?.reverse ?? false;
@@ -125,7 +126,14 @@ function useStableTextValues(values: DialogValues): DialogValues {
       ...(importedFont === undefined ? {} : { importedFont }),
       ...(pathGuide === undefined ? {} : { pathGuide }),
       ...(guideObjectId === undefined ? {} : { pathText: { guideObjectId, offsetMm, reverse } }),
-      ...(variableEnabled ? { variableTemplate: { tokens: [] } } : {}),
+      ...(variableEnabled
+        ? {
+            variableTemplate: {
+              tokens: [],
+              ...(sequenceOffset === undefined ? {} : { sequenceOffset }),
+            },
+          }
+        : {}),
     }),
     [
       content,
@@ -144,6 +152,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
       offsetMm,
       reverse,
       variableEnabled,
+      sequenceOffset,
     ],
   );
 }

@@ -53,7 +53,7 @@ export function AdjustImageDialog(props: {
     initialDraft(props.image, props.layer),
   );
   const presetControls = useImagePresetControls(draft, setDraft);
-  usePreviewEffects(sourceRef, processedRef, props.image, draft);
+  usePreviewEffects(sourceRef, processedRef, props.image, draft, props.layer.power);
   const update = (patch: Partial<AdjustImageDraft>): void =>
     setDraft((prev) => normalizeDraft({ ...prev, ...patch }));
   const submit = (event: React.FormEvent): void => {
@@ -138,14 +138,16 @@ function usePreviewEffects(
   processedRef: React.RefObject<HTMLCanvasElement>,
   image: RasterImage,
   draft: AdjustImageDraft,
+  maximumPowerPercent: number,
 ): void {
   useEffect(
-    () => drawAdjustImagePreview(sourceRef.current, image, draft, 'source'),
-    [sourceRef, image, draft],
+    () => drawAdjustImagePreview(sourceRef.current, image, draft, 'source', maximumPowerPercent),
+    [sourceRef, image, draft, maximumPowerPercent],
   );
   useEffect(
-    () => drawAdjustImagePreview(processedRef.current, image, draft, 'processed'),
-    [processedRef, image, draft],
+    () =>
+      drawAdjustImagePreview(processedRef.current, image, draft, 'processed', maximumPowerPercent),
+    [processedRef, image, draft, maximumPowerPercent],
   );
 }
 
