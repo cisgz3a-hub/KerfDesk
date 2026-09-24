@@ -70,6 +70,9 @@ dead ends on the same path:
    (frame-status-wait). The WCO refresh counts reports, not time, so the
    offset arrives within about a second. Controllers without realtime status
    queries are not waited on. The Frame's own gates judge whatever arrives.
+   Absolute placements skip this wait: the preparation already waits the
+   same way for their offset (ADR-343 Amendment 1), and they have no setup
+   offer.
 4. **A repair is followed by a report taken after it.** After Home or Set
    origin the Frame waits, the same bounded way, for a fresh Idle report with
    a usable work position before it prepares.

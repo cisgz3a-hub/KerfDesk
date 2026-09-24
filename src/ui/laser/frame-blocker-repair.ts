@@ -81,10 +81,13 @@ async function waitForPostRepairPosition(): Promise<void> {
 // A placement that refuses while the controller has not reported its offset
 // may resolve once it does (a persistent G54 origin surfacing after a
 // reconnect, or the offset of an origin set before Home). A known offset, or a
-// placement that already resolves, needs no wait.
+// placement that already resolves, needs no wait. Absolute has no setup offer
+// and its own offset wait in the preparation (ADR-343 Amendment 1).
 function placementNotWaitingOnOffset(laser: LaserState): boolean {
+  const app = useStore.getState();
+  if (app.jobPlacement.startFrom === 'absolute') return true;
   if (laser.wcoCache !== null || (laser.statusReport?.wco ?? null) !== null) return true;
-  return resolveLiveFramePlacement(useStore.getState(), laser).ok;
+  return resolveLiveFramePlacement(app, laser).ok;
 }
 
 function soleLivePlacementRefusal(): string | null {

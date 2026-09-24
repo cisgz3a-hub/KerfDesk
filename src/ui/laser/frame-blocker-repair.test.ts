@@ -238,6 +238,18 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     expect(jobAwareConfirm).not.toHaveBeenCalled();
   });
 
+  it('leaves an Absolute placement to the offset wait in the preparation', async () => {
+    useStore.getState().setJobPlacement({ startFrom: 'absolute' });
+    useLaserStore.setState({
+      workOriginActive: true,
+      wcoCache: null,
+      statusReport: status('Idle'),
+    });
+    await expect(offerFrameBlockerFixes()).resolves.toBe(true);
+    expect(useLaserStore.getState().requestControllerStatus).not.toHaveBeenCalled();
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+  });
+
   it('asks for a first status report before judging the machine', async () => {
     useLaserStore.setState({
       statusReport: null,
