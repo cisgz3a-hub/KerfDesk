@@ -90,7 +90,7 @@ const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   // mm exactly where it moves slowest, which is the mechanism behind corner
   // scorching. No scorching defect was observed in this project — this is a
   // prevention and parity change (see ADR-257 Context). GRBL's own
-  // laser_mode doc says M3 needs added lead-in/lead-out motions "for a clean cut and
+  // laser_mode doc recommends lead-in/lead-out motions with M3 "for a clean cut and
   // prevent scorching", which our default profiles do not emit (ADR-239 entry runways
   // are 4040-scoped). M4 scales S by actual/programmed feed instead, so energy per mm
   // stays flat through the corner, and the beam is dark whenever motion stops.
@@ -110,8 +110,8 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     label: 'GRBL Compatible',
     description: 'Conservative GRBL v1.1 output with constant-power vector cuts.',
     // ADR-257 deliberately leaves this one constant: it is the escape hatch for
-    // firmware without dynamic power (GRBL 1.1e and older, where M4 does not exist),
-    // mirroring LightBurn's separate "GRBL-M3" device profile for the same firmware.
+    // firmware without usable dynamic power (GRBL before 1.1f), mirroring
+    // LightBurn, which sends Grbl 1.1e-or-older users to its "GRBL-M3" device.
     cutPowerMode: 'constant',
     fillPowerMode: 'constant',
     rasterPowerMode: 'constant',
@@ -119,7 +119,7 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     parkAtOriginAfterJob: true,
     emitSOnEveryBurnMove: false,
     modalFeedrate: true,
-    // The escape hatch for pre-1.1 firmware keeps the verbose spelling.
+    // The escape hatch for older (pre-1.1f) firmware keeps the verbose spelling.
     compactMotionWords: false,
   },
   GRBL_DYNAMIC_DIALECT,
