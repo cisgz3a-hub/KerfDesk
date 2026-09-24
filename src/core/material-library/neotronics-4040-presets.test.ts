@@ -38,7 +38,12 @@ describe('NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS', () => {
     );
     expect(isUnsupportedPreset(clearAcrylic!)).toBe(true);
     expect(materialPresetWarnings(clearAcrylic!)).toContain(
-      'Clear acrylic is not recommended for a 450/455 nm diode laser.',
+      'A 450/455 nm diode laser cannot cut or engrave clear acrylic.',
     );
+
+    const blackAcrylic = NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS.find((preset) =>
+      preset.id.includes('black-acrylic'),
+    );
+    expect(materialPresetWarnings(blackAcrylic!).join(' ')).toMatch(/clear, white or blue/);
   });
 });
