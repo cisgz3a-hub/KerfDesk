@@ -256,6 +256,7 @@ function handleInvalidatingStatus(
     fireActive: false,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
@@ -350,6 +351,7 @@ function mpgOwnershipPatch(
     | 'workZZeroEvidence'
     | 'frameVerification'
     | 'framedRun'
+    | 'frameTrace'
     | 'statusObservation'
     | 'homingState'
     | 'homingProof'
@@ -367,5 +369,6 @@ function mpgOwnershipPatch(
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }

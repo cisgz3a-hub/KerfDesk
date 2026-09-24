@@ -30,6 +30,7 @@ export function dispatchQueuedMotionLine(
               motionOperation: { ...state.motionOperation, cancelRequested: true },
               frameVerification: null,
               framedRun: null,
+              frameTrace: null,
             }
           : {},
       );

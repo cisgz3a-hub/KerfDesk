@@ -5,10 +5,11 @@ import {
   evaluateRasterBudget,
   pixelExtentForMm,
   rasterPreviewRgba,
-  resampleLumaNearest,
+  resampleLuma,
   whiteLuma,
 } from '../../core/raster';
 import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
+import { burnGridKernel } from '../../core/raster/luma-resample';
 import type { Layer, RasterImage, SceneObject } from '../../core/scene';
 
 const PERCENT_MAX = 100;
@@ -49,25 +50,17 @@ export function buildProcessedRasterBitmap(
     return { kind: 'too-large', width, height, reason: budget.reason };
   }
   const decodedLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
-  const previewResamplesSource =
-    options.maxEdge !== undefined && (width !== image.pixelWidth || height !== image.pixelHeight);
-  const sourceLuma = previewResamplesSource
-    ? resampleLumaNearest(
-        { luma: decodedLuma, width: image.pixelWidth, height: image.pixelHeight },
-        width,
-        height,
-      )
-    : decodedLuma;
-  const preparedLuma = prepareImageLuma(sourceLuma, image, layer);
-  const sourceWidth = previewResamplesSource ? width : image.pixelWidth;
-  const sourceHeight = previewResamplesSource ? height : image.pixelHeight;
+  // Adjust at source resolution, then resample once — the burn's own order.
+  // Averaging first and adjusting after would differ for any non-linear curve.
+  const preparedLuma = prepareImageLuma(decodedLuma, image, layer);
   const luma =
-    width === sourceWidth && height === sourceHeight
+    width === image.pixelWidth && height === image.pixelHeight
       ? preparedLuma
-      : resampleLumaNearest(
-          { luma: preparedLuma, width: sourceWidth, height: sourceHeight },
+      : resampleLuma(
+          { luma: preparedLuma, width: image.pixelWidth, height: image.pixelHeight },
           width,
           height,
+          burnGridKernel(imageDitherAlgorithm(layer)),
         );
   const maskedLuma = applyImageMaskToLuma({
     image,

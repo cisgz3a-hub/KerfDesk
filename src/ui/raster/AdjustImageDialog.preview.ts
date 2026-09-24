@@ -1,5 +1,7 @@
-import { dither, rasterPreviewRgba, resampleLumaNearest, whiteLuma } from '../../core/raster';
+import { decodeRasterLuma } from '../../core/job/raster-luma-decode';
+import { dither, rasterPreviewRgba, resampleLuma } from '../../core/raster';
 import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
+import { burnGridKernel } from '../../core/raster/luma-resample';
 import type { Layer, RasterImage } from '../../core/scene';
 
 type PreviewDraft = {
@@ -36,18 +38,39 @@ export function drawAdjustImagePreview(
   ctx.putImageData(new ImageData(imageData, size.width, size.height), 0, 0);
 }
 
+// Scene objects are immutable, so an image's unadjusted preview stays valid
+// for as long as the same object is on screen. Every draft edit redraws both
+// panes; only the processed one depends on the draft. The decoded source comes
+// from compile's own identity-keyed cache, so it is held once per object.
+const sourcePreviewCache = new WeakMap<RasterImage, Uint8Array>();
+
 function previewLuma(
   image: RasterImage,
   draft: PreviewDraft,
   mode: 'source' | 'processed',
   size: { readonly width: number; readonly height: number },
 ): Uint8Array {
-  const sourceLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
-  const base = mode === 'source' ? sourceLuma : prepareImageLuma(sourceLuma, draft, draft);
-  return resampleLumaNearest(
-    { luma: base, width: image.pixelWidth, height: image.pixelHeight },
+  const sourceLuma = decodeRasterLuma(image);
+  if (mode === 'source') {
+    const cached = sourcePreviewCache.get(image);
+    if (cached?.length === size.width * size.height) return cached;
+    const preview = resampleLuma(
+      { luma: sourceLuma, width: image.pixelWidth, height: image.pixelHeight },
+      size.width,
+      size.height,
+    );
+    sourcePreviewCache.set(image, preview);
+    return preview;
+  }
+  return resampleLuma(
+    {
+      luma: prepareImageLuma(sourceLuma, draft, draft),
+      width: image.pixelWidth,
+      height: image.pixelHeight,
+    },
     size.width,
     size.height,
+    burnGridKernel(imageDitherAlgorithm(draft)),
   );
 }
 
@@ -88,19 +111,6 @@ function invertRgba(rgba: Uint8ClampedArray): Uint8ClampedArray {
     out[i] = 255 - (out[i] ?? 0);
     out[i + 1] = 255 - (out[i + 1] ?? 0);
     out[i + 2] = 255 - (out[i + 2] ?? 0);
-  }
-  return out;
-}
-
-function decodeLuma(base64: string | undefined, expectedLength: number): Uint8Array {
-  const out = whiteLuma(expectedLength);
-  if (base64 === undefined) return out;
-  try {
-    const binary = atob(base64);
-    const n = Math.min(binary.length, expectedLength);
-    for (let i = 0; i < n; i += 1) out[i] = binary.charCodeAt(i);
-  } catch {
-    return out;
   }
   return out;
 }

@@ -1,6 +1,6 @@
 import type { GrblState } from '../../core/controllers/grbl';
 import type { FrameVerification } from './frame-verification';
-import type { FramedRunCandidate } from './framed-run';
+import type { FrameMotionCandidate } from './framed-run';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 export type LaserMotionOperationId = number | symbol;
@@ -53,12 +53,15 @@ type LaserMotionOperationCommon = {
 };
 
 export type LaserMotionOperation = LaserMotionOperationCommon &
-  ({ readonly kind: 'jog' } | { readonly kind: 'frame'; readonly candidate?: FramedRunCandidate });
+  (
+    | { readonly kind: 'jog' }
+    | { readonly kind: 'frame'; readonly candidate?: FrameMotionCandidate }
+  );
 
 export function startMotionOperation(
   kind: LaserMotionOperationKind,
   pendingLines: ReadonlyArray<string> = [],
-  candidate?: FramedRunCandidate,
+  candidate?: FrameMotionCandidate,
   acknowledgedPrefixLinesRemaining = 0,
   pendingMotionTransportWrites = 0,
   operationId: LaserMotionOperationId = Symbol('motion-operation'),

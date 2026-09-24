@@ -16,8 +16,16 @@ import {
   type PartialCellAxis,
   type PartialCellGrid,
 } from '../../core/grid';
-import type { AABB, RasterImage, Transform as ObjTransform } from '../../core/scene';
+import type { LumaAdjustments } from '../../core/raster';
 import { closedImageClipContours } from '../../core/raster/image-mask';
+import type { AABB, Layer, RasterImage, Transform as ObjTransform } from '../../core/scene';
+import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import {
+  adjustedRasterDisplay,
+  adjustmentToken,
+  hasLumaAdjustments,
+  pruneAdjustedRasterDisplays,
+} from './raster-adjusted-display';
 import type { ViewTransform } from './view-transform';
 
 type RasterImageCacheEntry = {
@@ -39,7 +47,10 @@ const DEG_TO_RAD = Math.PI / 180;
 const TRACE_SOURCE_TINT_COLOR = canvasTheme.traceSourceTint;
 const TRACE_SOURCE_TINT_ALPHA = 0.4;
 
-export function pruneRasterImageCaches(liveDataUrls: ReadonlySet<string>): void {
+export function pruneRasterImageCaches(
+  liveDataUrls: ReadonlySet<string>,
+  liveAdjusted: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+): void {
   for (const [dataUrl, entry] of rasterImageCache) {
     if (liveDataUrls.has(dataUrl)) continue;
     entry.onReady.clear();
@@ -48,6 +59,29 @@ export function pruneRasterImageCaches(liveDataUrls: ReadonlySet<string>): void 
   for (const dataUrl of tintedTraceSourceCache.keys()) {
     if (!liveDataUrls.has(dataUrl)) tintedTraceSourceCache.delete(dataUrl);
   }
+  pruneAdjustedRasterDisplays(liveAdjusted);
+}
+
+/** Adjustments each source bitmap is still drawn with (ADR-359). */
+export function liveAdjustedDisplayKeys(
+  objects: ReadonlyArray<{ readonly kind: string }>,
+  layerByColor: ReadonlyMap<string, Layer>,
+): Map<string, Set<string>> {
+  const live = new Map<string, Set<string>>();
+  for (const obj of objects) {
+    if (!isRasterImage(obj) || obj.role === 'trace-source') continue;
+    const adjustments = burnedImageAdjustments(obj, layerByColor);
+    if (!hasLumaAdjustments(adjustments)) continue;
+    const sourceKey = rasterDisplayDataUrl(obj);
+    const tokens = live.get(sourceKey) ?? new Set<string>();
+    tokens.add(adjustmentToken(adjustments));
+    live.set(sourceKey, tokens);
+  }
+  return live;
+}
+
+function isRasterImage(obj: { readonly kind: string }): obj is RasterImage {
+  return obj.kind === 'raster-image';
 }
 
 function rasterImageEntry(dataUrl: string): RasterImageCacheEntry {
@@ -72,6 +106,8 @@ function rasterImageEntry(dataUrl: string): RasterImageCacheEntry {
 
 export type DrawRasterImageOptions = {
   readonly onBitmapReady?: () => void;
+  /** The adjustments that reach the burn; defaults to the object's own. */
+  readonly adjustments?: LumaAdjustments;
 };
 
 // Return a copy of `img` whose opaque pixels are washed with the tint
@@ -106,6 +142,9 @@ export function drawRasterImage(
     readonly transform: ObjTransform;
     readonly role?: 'trace-source';
     readonly imageClip?: RasterImage['imageClip'];
+    readonly brightness?: number;
+    readonly contrast?: number;
+    readonly gamma?: number;
   },
   view: ViewTransform,
   options: DrawRasterImageOptions = {},
@@ -120,10 +159,42 @@ export function drawRasterImage(
     return; // still decoding
   }
 
-  // Trace-source backings draw tinted so the operator can tell the
-  // deletable original apart from the trace stacked on top (ADR-026).
-  const paint = obj.role === 'trace-source' ? (tintedTraceSource(displayDataUrl, img) ?? img) : img;
-  drawBitmapAtTransform(ctx, paint, obj.bounds, obj.transform, view, obj.imageClip);
+  drawBitmapAtTransform(
+    ctx,
+    rasterPaint(obj, displayDataUrl, img, options.adjustments ?? obj),
+    obj.bounds,
+    obj.transform,
+    view,
+    obj.imageClip,
+  );
+}
+
+// Trace-source backings draw tinted so the operator can tell the deletable
+// original apart from the trace stacked on top (ADR-026). An adjusted image
+// draws the grey tone that burns (ADR-359); an unadjusted one, its source.
+function rasterPaint(
+  obj: Parameters<typeof drawRasterImage>[1],
+  displayDataUrl: string,
+  img: HTMLImageElement,
+  adjustments: LumaAdjustments,
+): CanvasImageSource {
+  if (obj.role === 'trace-source') return tintedTraceSource(displayDataUrl, img) ?? img;
+  if (!hasLumaAdjustments(adjustments)) return img;
+  return adjustedRasterDisplay(displayDataUrl, img, adjustments) ?? img;
+}
+
+/**
+ * The image adjustments that reach the burn (ADR-359): the object's own,
+ * except on a Pass-Through operation, which burns the source pixels as they
+ * are. Images bind to their operation by colour.
+ */
+export function burnedImageAdjustments(
+  obj: RasterImage,
+  layerByColor: ReadonlyMap<string, Layer>,
+): LumaAdjustments {
+  const layer = layerByColor.get(obj.color);
+  if (layer !== undefined && effectiveOperationForObject(layer, obj).passThrough) return {};
+  return obj;
 }
 
 export function rasterDisplayDataUrl(obj: Pick<RasterImage, 'dataUrl' | 'imageAsset'>): string {

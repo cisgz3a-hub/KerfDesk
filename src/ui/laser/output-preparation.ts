@@ -22,11 +22,16 @@ import { runCanvasCompilationTasks } from '../workspace/canvas-compilation-worke
 import { renderVariableText } from '../text/render-variable-text';
 import { detectMachineJobWarnings } from './machine-job-warnings';
 import { finalizeTiledOutput } from '../app/tiled-output-preparation';
+import type { FrameBoundsPreview } from './frame-bounds-preview';
 
 export type OutputPreparationContext = {
   readonly jobId: string;
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: OutputCompilationProgress) => void;
+  /** Start only: the Frame rectangles, reported as soon as the job is
+   * compiled so a split Frame can trace them while the exact program is still
+   * being finished (ADR-353). */
+  readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   readonly runCncTasks?: CncCompilationTaskRunner;
 };
 
@@ -132,6 +137,7 @@ async function prepareStartOutput(
           request.resolvedJobOrigin,
           request.requireFrame,
           prepare,
+          context.onFrameBounds,
         )
       : await prepareStartJobSnapshot(
           request.project,
@@ -148,6 +154,9 @@ async function prepareStartOutput(
               : { resolvedJobOrigin: request.resolvedJobOrigin }),
             requireFrame: request.requireFrame,
             prepare,
+            ...(context.onFrameBounds === undefined
+              ? {}
+              : { onFrameBounds: context.onFrameBounds }),
           },
         );
   return result.ok

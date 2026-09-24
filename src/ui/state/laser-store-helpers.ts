@@ -317,6 +317,7 @@ type InitialLaserState = Pick<
   | 'pendingToolId'
   | 'frameVerification'
   | 'framedRun'
+  | 'frameTrace'
   | 'framedRunStartClaim'
 >;
 
@@ -363,6 +364,7 @@ export function initialLaserState(): InitialLaserState {
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     framedRunStartClaim: null,
   };
 }
@@ -406,6 +408,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     motionOperation: null,
     controllerOperation: null,
     probeBusy: false,

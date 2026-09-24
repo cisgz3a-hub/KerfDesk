@@ -2,7 +2,12 @@
 // They classify former policy blockers as Job Review warnings while preserving
 // the small set of emit failures that cannot produce an executable program.
 
-import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
+import {
+  findOversizedLine,
+  type OverrideValues,
+  type StatusReport,
+} from '../../core/controllers/grbl';
+import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
 import { scenePreparationTooComplex, type Job } from '../../core/job';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
@@ -91,4 +96,32 @@ function cncOverrideStartIssues(
 ): ReadonlyArray<string> {
   const issue = cncOverrideStartIssue(machineKindOf(project.machine), overrides);
   return issue === null ? [] : [issue];
+}
+
+/** The two program-text failures that can never stream: nothing sendable, or
+ * one line longer than the controller's receive buffer. Everything else the
+ * emitter reports is a Job Review warning (ADR-228). */
+export function preparedProgramIntegrityIssue(
+  gcode: string,
+  rxBufferBytes: number,
+  preflight: { readonly issues: ReadonlyArray<{ readonly message: string }> },
+): ReadonlyArray<string> | null {
+  if (!hasSendableGcodeLine(gcode)) {
+    return nonExecutableProgramMessages(preflight);
+  }
+  const oversized = findOversizedLine(gcode, rxBufferBytes);
+  if (oversized === null) return null;
+  return [
+    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
+      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
+  ];
+}
+
+function nonExecutableProgramMessages(preflight: {
+  readonly issues: ReadonlyArray<{ readonly message: string }>;
+}): ReadonlyArray<string> {
+  const messages = preflight.issues.map((issue) => issue.message);
+  return messages.length > 0
+    ? messages
+    : ['The prepared job contains no executable controller commands. Nothing was framed or sent.'];
 }

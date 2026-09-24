@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import { initialLaserState, type StallProbe } from './laser-store-helpers';
+import { initialLaserState } from './laser-store-helpers';
+import type { StallProbe } from './laser-stream-stall';
 import type { LaserState } from './laser-store';
 import {
   controllerUnresponsiveNotice,
