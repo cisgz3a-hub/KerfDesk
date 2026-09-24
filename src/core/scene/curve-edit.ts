@@ -165,27 +165,44 @@ export function setCurveStartNode(path: CurveSubpath, nodeIndex: number): CurveS
   if (!path.closed || nodeIndex <= 0 || nodeIndex >= curveNodeCount(path)) return null;
   const start = curveNodePoint(path, nodeIndex);
   if (start === null) return null;
+  // Rotating an implicitly closed ring would drop its closing line, so it is
+  // written out as a real segment first.
+  const segments = explicitlyClosedSegments(path);
   return {
     ...path,
     start,
-    segments: [...path.segments.slice(nodeIndex), ...path.segments.slice(0, nodeIndex)],
+    segments: [...segments.slice(nodeIndex), ...segments.slice(0, nodeIndex)],
   };
 }
 
+// Opens a closed path at the node without losing a segment: the node becomes
+// both the new start and the new end, as LightBurn's Break does.
 export function breakCurveAtNode(path: CurveSubpath, nodeIndex: number): CurveSubpath | null {
-  if (!path.closed) return null;
-  const rotated = nodeIndex === 0 ? path : setCurveStartNode(path, nodeIndex);
-  if (rotated === null || rotated.segments.length === 0) return null;
-  return { ...rotated, segments: rotated.segments.slice(0, -1), closed: false };
+  if (!path.closed || path.segments.length === 0) return null;
+  const explicit = { ...path, segments: explicitlyClosedSegments(path) };
+  const rotated = nodeIndex === 0 ? explicit : setCurveStartNode(explicit, nodeIndex);
+  return rotated === null ? null : { ...rotated, closed: false };
 }
 
-function incomingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
+export function incomingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
   if (nodeIndex > 0) return nodeIndex - 1;
-  return path.closed && path.segments.length > 0 ? path.segments.length - 1 : null;
+  // Node 0's incoming edge is the last stored segment only when that segment
+  // returns to the start. Otherwise the closing line is implicit and the last
+  // segment ends at the last node, which must not move with node 0.
+  const last = path.segments.at(-1)?.to;
+  return path.closed && last !== undefined && samePoint(last, path.start)
+    ? path.segments.length - 1
+    : null;
 }
 
-function outgoingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
+export function outgoingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
   return nodeIndex < path.segments.length ? nodeIndex : null;
+}
+
+function explicitlyClosedSegments(path: CurveSubpath): ReadonlyArray<PathSegment> {
+  const last = path.segments.at(-1)?.to;
+  if (last === undefined || samePoint(last, path.start)) return path.segments;
+  return [...path.segments, { kind: 'line', to: path.start }];
 }
 
 function translateIncoming(segment: PathSegment, delta: Vec2): PathSegment {

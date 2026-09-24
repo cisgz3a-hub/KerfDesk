@@ -65,7 +65,9 @@ describe('curve node edit actions', () => {
     useStore.getState().breakSelectedCurve();
     curve = currentCurve();
     expect(curve.closed).toBe(false);
-    expect(curve.segments).toHaveLength(1);
+    // Break opens the path at the node; no segment is lost.
+    expect(curve.segments).toHaveLength(2);
+    expect(curve.segments.at(-1)?.to).toEqual(curve.start);
   });
 
   it('smooths, corners, and joins selected curve subpaths', () => {

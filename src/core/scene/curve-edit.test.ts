@@ -88,7 +88,7 @@ describe('curve editing', () => {
     });
   });
 
-  it('rotates a closed start node and breaks there', () => {
+  it('rotates a closed start node and breaks there without losing a segment', () => {
     expect(curveNodeCount(CLOSED)).toBe(2);
     const rotated = setCurveStartNode(CLOSED, 1);
     expect(rotated?.start).toEqual({ x: 10, y: 0 });
@@ -96,6 +96,52 @@ describe('curve editing', () => {
     const broken = breakCurveAtNode(CLOSED, 1);
     expect(broken?.closed).toBe(false);
     expect(broken?.start).toEqual({ x: 10, y: 0 });
-    expect(broken?.segments).toHaveLength(1);
+    // Both sides of the break end at the node: the path is opened, not cut.
+    expect(broken?.segments).toHaveLength(2);
+    expect(broken?.segments.at(-1)?.to).toEqual({ x: 10, y: 0 });
+  });
+
+  it('keeps the implicit closing line when rotating or breaking a closed path', () => {
+    const triangle: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      segments: [
+        { kind: 'line', to: { x: 10, y: 0 } },
+        { kind: 'line', to: { x: 10, y: 10 } },
+      ],
+      closed: true,
+    };
+    expect(curveNodeCount(triangle)).toBe(3);
+    const rotated = setCurveStartNode(triangle, 1);
+    expect(rotated?.start).toEqual({ x: 10, y: 0 });
+    expect(rotated?.segments.map((segment) => segment.to)).toEqual([
+      { x: 10, y: 10 },
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ]);
+    expect(curveNodeCount(rotated!)).toBe(3);
+    const broken = breakCurveAtNode(triangle, 0);
+    expect(broken).toMatchObject({ start: { x: 0, y: 0 }, closed: false });
+    expect(broken?.segments.map((segment) => segment.to)).toEqual([
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 0 },
+    ]);
+  });
+
+  it('moves the start of an implicitly closed path without dragging its last node', () => {
+    const triangle: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      segments: [
+        { kind: 'line', to: { x: 10, y: 0 } },
+        { kind: 'line', to: { x: 10, y: 10 } },
+      ],
+      closed: true,
+    };
+    const moved = moveCurveAnchor(triangle, 0, { x: 1, y: 1 });
+    expect(moved?.start).toEqual({ x: 1, y: 1 });
+    expect(moved?.segments.map((segment) => segment.to)).toEqual([
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ]);
   });
 });

@@ -299,7 +299,9 @@ function cubicPoint(from: Vec2, segment: CubicPathSegment, t: number): Vec2 {
   };
 }
 
-type CenterArc = {
+// Centre parameterization of an SVG endpoint arc (radii already scaled up when
+// the stored radii cannot reach both endpoints). Node editing splits arcs on it.
+export type CenterArc = {
   readonly center: Vec2;
   readonly radiusX: number;
   readonly radiusY: number;
@@ -308,7 +310,7 @@ type CenterArc = {
   readonly delta: number;
 };
 
-function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc | null {
+export function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc | null {
   if (samePoint(from, segment.to)) return null;
   let rx = Math.abs(segment.radiusX);
   let ry = Math.abs(segment.radiusY);
@@ -347,7 +349,7 @@ function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc |
   return { center, radiusX: rx, radiusY: ry, rotationRad: phi, theta1, delta };
 }
 
-function pointOnArc(arc: CenterArc, theta: number): Vec2 {
+export function pointOnArc(arc: CenterArc, theta: number): Vec2 {
   const cosPhi = Math.cos(arc.rotationRad);
   const sinPhi = Math.sin(arc.rotationRad);
   return {
