@@ -29,7 +29,6 @@ export async function streamResumeFromRawLine(
   fromLine: number,
   originalCanvasPlan: CanvasMotionPlan,
   laserModeStartSnapshot: LaserModeStartSnapshot,
-  checkpointToResume?: JobCheckpoint,
   preparedController = useLaserStore.getState(),
   placementNote?: string,
 ): Promise<boolean> {
@@ -38,17 +37,7 @@ export async function streamResumeFromRawLine(
   const { resumeGcode, laserModeStartEvidence } = reviewed;
   const checkpointBeforeStart = readJobCheckpoint();
   const checkpointMarkedAtIso = new Date().toISOString();
-  const checkpointUpdate = markOwnedResumeCheckpoint(
-    gcode,
-    checkpointToResume,
-    checkpointMarkedAtIso,
-  );
-  if (checkpointUpdate === 'changed') {
-    jobAwareAlert(
-      'Cannot resume the interrupted job:\n\nThe recovery record changed while resume was being prepared. No controller command was sent; review the current recovery banner and try again.',
-    );
-    return false;
-  }
+  const checkpointUpdate = markOwnedResumeCheckpoint(gcode, checkpointMarkedAtIso);
   let finalAuthorizationPassed = false;
   try {
     const laser = preparedController;
