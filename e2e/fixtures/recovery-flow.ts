@@ -79,7 +79,12 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
             ackedLines: number;
             sendableLines: number;
             interruption: { kind: string; message: string };
-            artifact: { kind: string; gcode?: string; laserResumeChain?: readonly unknown[] };
+            artifact: {
+              kind: string;
+              gcode?: string;
+              laserResumeChain?: readonly unknown[];
+              prepared?: { project: { device: unknown } };
+            };
           } | null;
         };
       };
@@ -96,13 +101,16 @@ export async function capsuleProbe(page: Page): Promise<CapsuleProbe | null> {
       buildLaserResumeProgram: (
         gcode: string,
         fromLine: number,
+        device: unknown,
       ) => { kind: 'ok'; lines: readonly string[] } | { kind: 'error'; reason: string };
     };
     const capsule = recoveryRepository.getSnapshot().recoveryCapsule;
     if (capsule === null || capsule.artifact.kind !== 'exact-execution') return null;
     const gcode = capsule.artifact.gcode ?? '';
     const resumeLine = automaticRestart(gcode, capsule.ackedLines, capsule.interruption).line;
-    const program = buildLaserResumeProgram(gcode, resumeLine);
+    // The recovery flow resumes in the power commands of the archived profile (ADR-364).
+    const device = capsule.artifact.prepared?.project.device;
+    const program = buildLaserResumeProgram(gcode, resumeLine, device);
     const sendable = (line: string): boolean => line.trim() !== '' && !line.trim().startsWith(';');
     return {
       runId: capsule.runId,
