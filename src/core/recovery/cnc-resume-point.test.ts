@@ -133,6 +133,53 @@ describe('resolveCncResumePoint', () => {
     expect(point).toMatchObject({ kind: 'resume-at-pass', groupIndex: 1, passIndex: 0 });
   });
 
+  // Controller audit cnc-controller-2: Continue past a tool-change M0 waits for
+  // the drained planner and a fresh Idle, so the planner reserve must not
+  // rewind across it into the previous bit's section.
+  describe('never rewinds across an acknowledged tool change', () => {
+    const multiTool: Job = {
+      groups: [
+        testGroup([longLine(0), longLine(5)], 'tool-a'),
+        testGroup([longLine(10), longLine(15)], 'tool-b'),
+      ],
+    };
+    const emission = emitCncJobWithPassSpans(multiTool, DEFAULT_DEVICE_PROFILE);
+    const lines = emission.gcode.split('\n');
+    const m0Raw = lines.findIndex((line) => line === 'M0') + 1;
+    const throughM0 = lines.slice(0, m0Raw).filter(isSendableGcodeLine).length;
+
+    for (const controllerKind of ['grbl-v1.1', 'grblhal'] as const) {
+      for (const pastM0 of [0, 2, 8]) {
+        it(`${controllerKind}: acked M0 + ${pastM0} resumes at tool-b's first pass`, () => {
+          const point = resolveCncResumePoint(
+            args({
+              gcode: emission.gcode,
+              spans: emission.spans,
+              ackedLines: throughM0 + pastM0,
+              controllerKind,
+            }),
+          );
+          expect(point).toMatchObject({
+            kind: 'resume-at-pass',
+            groupIndex: 1,
+            passIndex: 0,
+            provenCompletePassCount: 2,
+          });
+          if (point.kind !== 'resume-at-pass') return;
+          expect(point.firstUnprovenRawLine).toBeGreaterThan(m0Raw);
+        });
+      }
+    }
+
+    it('keeps the planner reserve while the M0 itself is unacknowledged', () => {
+      // Continue never ran, so tool-a's tail is not proven executed.
+      const point = resolveCncResumePoint(
+        args({ gcode: emission.gcode, spans: emission.spans, ackedLines: throughM0 - 1 }),
+      );
+      expect(point).toMatchObject({ kind: 'resume-at-pass', groupIndex: 0 });
+    });
+  });
+
   it('reports after-last-pass when the proven frontier clears every span', () => {
     const tail = Array.from({ length: 40 }, (_, i) => `G1 X${i} Y0`).join('\n') + '\n';
     const point = resolveCncResumePoint(

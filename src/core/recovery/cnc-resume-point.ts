@@ -13,8 +13,16 @@
 // executed, so rewinding can only recut already-cleared kerf — it can never
 // skip uncut material. Both reserves deliberately overestimate: the safe
 // failure direction is an earlier boundary and extra recut time.
+//
+// A tool-change M0 caps that rewind. The stream only moves past it after
+// Continue, which waits for the drained planner and a fresh Idle, and firmware
+// that is sent the M0 itself (GRBL, Marlin) synchronizes its planner before
+// acknowledging it. Everything before an acknowledged M0 has therefore run,
+// and rewinding across it would preselect the previous bit's pass while the
+// next bit is in the spindle (controller audit cnc-controller-2).
 
 import { isSendableGcodeLine } from '../controllers/grbl';
+import { isToolChangeLine } from '../controllers/grbl/streamer';
 import type { ControllerKind } from '../devices';
 import type { GrblStreamingMode } from '../grbl-streaming';
 import type { CncPassSpan } from '../output';
@@ -72,7 +80,7 @@ export function resolveCncResumePoint(args: CncResumePointArgs): CncResumePoint 
   const sendableTotal = countSendableLines(args.gcode);
   const acked = Math.min(Math.max(Math.floor(args.ackedLines), 0), sendableTotal);
   const reserve = CNC_RESUME_PLANNER_RESERVE_LINES[args.controllerKind];
-  const proven = Math.max(0, acked - reserve);
+  const proven = Math.max(0, acked - reserve, lastAcknowledgedToolChange(args.gcode, acked));
   if (proven >= sendableTotal) return { kind: 'after-last-pass' };
 
   const firstUnprovenRawLine = rawResumeLine(args.gcode, proven);
@@ -86,6 +94,20 @@ export function resolveCncResumePoint(args: CncResumePointArgs): CncResumePoint 
     firstUnprovenRawLine,
     lastPossiblyExecutedRawLine: lastPossiblyExecutedRawLine(rawLines, args, acked, sendableTotal),
   };
+}
+
+// The sendable ordinal of the last tool-change M0 within the acknowledged
+// lines, or 0. The streamer counts a held M0 complete only when Continue runs.
+function lastAcknowledgedToolChange(gcode: string, acked: number): number {
+  let sendable = 0;
+  let last = 0;
+  for (const line of gcode.split('\n')) {
+    if (!isSendableGcodeLine(line)) continue;
+    sendable += 1;
+    if (sendable > acked) break;
+    if (isToolChangeLine(line)) last = sendable;
+  }
+  return last;
 }
 
 // Ascending, non-overlapping, in-range spans — anything else means the sidecar
