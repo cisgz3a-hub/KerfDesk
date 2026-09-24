@@ -35,9 +35,9 @@ export function LaserRecoveryRestartPicker(props: {
         />
       ) : (
         <p style={hintStyle}>
-          This older record has no saved route to display. Reopen the original project and choose a
-          line from its matching G-code, or use the transport estimate. Recovery first checks that
-          the project still produces the saved fingerprint.
+          This fingerprint-only record has no saved route to display. Reopen the original project
+          and choose a line from its matching G-code, or use the transport estimate. Recovery first
+          checks that the project still produces the saved fingerprint.
         </p>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

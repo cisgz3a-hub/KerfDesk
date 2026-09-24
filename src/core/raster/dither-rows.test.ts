@@ -36,6 +36,46 @@ function collectRows(
 }
 
 describe('createErrorDiffusionRowDitherer', () => {
+  it.each([
+    { pixel: 'black', luma: [64, 0, 120], expected: [1000, 1000, 0] },
+    { pixel: 'white', luma: [192, 255, 140], expected: [0, 0, 1000] },
+  ])('carries nonzero error through an exact $pixel source pixel', ({ luma, expected }) => {
+    const rowAt = createErrorDiffusionRowDitherer({
+      width: 3,
+      height: 1,
+      algorithm: 'floyd-steinberg',
+      sMax: S_MAX,
+      lumaRowAt: () => Uint8Array.from(luma),
+    });
+    // Two 7/16 propagation steps put the last pixel at 132.25 or
+    // 127.94140625. Dropping the middle binary pixel's incoming error
+    // leaves it at 120 or 140, on the opposite side of the 128 cutoff.
+    expect(rowAt(0)).toEqual(new Float64Array(expected));
+  });
+
+  it.each(ALL_MODES)('preserves binary margins and incoming gray-pixel error for %s', (mode) => {
+    const width = 17;
+    const height = 9;
+    const luma = Uint8Array.from({ length: width * height }, (_, i) =>
+      i % width < width / 2 ? 0 : 255,
+    );
+    // Exact binary rows have zero error; later gray pixels diffuse across
+    // both scan directions into those same black/white source values.
+    luma[width * 3 + 7] = 64;
+    luma[width * 4 + 9] = 192;
+    const reference = materialized(luma, width, height, mode);
+    const rowAt = createErrorDiffusionRowDitherer({
+      width,
+      height,
+      algorithm: mode,
+      sMax: S_MAX,
+      lumaRowAt: lumaRowAtFor(luma, width),
+    });
+    const order = Array.from({ length: height }, (_, y) => y);
+    expect(collectRows(rowAt, width, height, order)).toEqual(reference);
+    expect(collectRows(rowAt, width, height, order.reverse())).toEqual(reference);
+  });
+
   it('reproduces dither() bit-for-bit across every kernel (property)', () => {
     fc.assert(
       fc.property(

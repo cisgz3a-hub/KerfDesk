@@ -161,9 +161,7 @@ describe('LaserForge machine profile documents', () => {
   });
 
   it('round-trips the optional firmware-trait flags and refuses a junk value', () => {
-    // Only ever written as `true` (ADR-334, ADR-335). Absent must stay absent
-    // rather than become `false`, or a saved profile stops matching the
-    // catalog entry it came from, and a junk value must not read as on.
+    // Absent must stay absent, and malformed values must gain no authority.
     const set = deserializeProfilePatch({
       airAssistRestartUnreliable: true,
       workerHostedStreaming: true,

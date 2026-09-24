@@ -102,8 +102,8 @@ it('preserves the after-dispatch control', async () => {
   await act(async () => vi.advanceTimersByTimeAsync(300));
   expect(requests).toHaveLength(2);
   await submitSettlement(mounted.host);
-  expect(requests).toHaveLength(3);
-  await act(async () => requests[2]!.resolve(settlementResult));
+  expect(requests).toHaveLength(2);
+  await act(async () => requests[1]!.resolve(settlementResult));
   expect(useUiStore.getState().imageDialog).toBeNull();
   expect(useStore.getState().undoStack).toHaveLength(1);
 });
@@ -140,17 +140,16 @@ it('settles a pending failure and recovers through a new prepared preview', asyn
   expect(useStore.getState().undoStack).toHaveLength(1);
 });
 
-it('allows a genuinely newer settings request to cancel Submit and own prepared reuse', async () => {
-  const { host, before } = await pendingSubmit();
-  await detection(host, 'preset');
+it('keeps submitted settings frozen until the adopted preparation finishes', async () => {
+  const { host, before, submitted } = await pendingSubmit();
+  expect(host.querySelector('[aria-label="Trace detection"]')?.matches(':disabled')).toBe(true);
   await act(async () => vi.advanceTimersByTimeAsync(300));
-  expect(requests).toHaveLength(3);
+  expect(requests).toHaveLength(2);
   expect(settlementSnapshot()).toEqual(before);
   expect(useToastStore.getState().toasts).toHaveLength(0);
-  await act(async () => requests[2]!.resolve(settlementResult));
-  expect(settlementReady(host)).toBe(true);
-  await submitSettlement(host);
-  expect(requests).toHaveLength(3);
+  await act(async () => submitted.resolve(settlementResult));
+  expect(useUiStore.getState().imageDialog).toBeNull();
+  expect(requests).toHaveLength(2);
   expect(useStore.getState().undoStack).toHaveLength(1);
 });
 

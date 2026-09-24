@@ -13,11 +13,13 @@ export type LightBurnTraceSettingOverrides = {
   readonly photoDetail?: number;
   readonly photoBrightness?: number;
   readonly photoContrast?: number;
+  readonly photoGamma?: number;
   readonly detectionMode?: TraceDetectionMode;
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly ignoreLessThanPixels?: number;
   readonly despeckleMinPixels?: number;
+  readonly fillPinholeCracks?: boolean;
   readonly smoothness?: number;
   readonly optimize?: number;
   readonly traceTransparency?: boolean;
@@ -27,7 +29,7 @@ export type LightBurnTraceSettingOverrides = {
   readonly edgeMinimumLinePx?: number;
 };
 
-export type TraceDetectionMode = 'preset' | 'manual' | 'sketch';
+export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
 
 export const DEFAULT_EDGE_SENSITIVITY = 50;
 export const DEFAULT_EDGE_DETAIL = 68;
@@ -45,6 +47,9 @@ export function mergeLightBurnTraceSettings(
   }
   if (settings.despeckleMinPixels !== undefined) {
     out['despeckleMinPixels'] = Math.max(0, Math.round(settings.despeckleMinPixels));
+  }
+  if (settings.fillPinholeCracks !== undefined && preset.traceMode !== 'edge') {
+    out['fillPinholeCracks'] = settings.fillPinholeCracks;
   }
   if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
   if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
@@ -68,6 +73,7 @@ function mergePhotoSettings(
     photoDetail: photoValue(settings.photoDetail, preset.photoDetail ?? 60, 0, 100),
     brightness: photoValue(settings.photoBrightness, preset.brightness ?? 0, -100, 100),
     contrast: photoValue(settings.photoContrast, preset.contrast ?? 0, -100, 100),
+    gamma: photoValue(settings.photoGamma, preset.gamma ?? 1, 0.1, 5),
   };
 }
 
@@ -80,6 +86,7 @@ export function traceDetectionMode(
   settings: LightBurnTraceSettingOverrides,
 ): TraceDetectionMode {
   if (settings.detectionMode !== undefined) return settings.detectionMode;
+  if (preset.faintLineRecovery === true) return 'faint-lines';
   if ((settings.sketchTrace ?? preset.sketchTrace) === true) return 'sketch';
   return settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined
     ? 'manual'
@@ -94,7 +101,16 @@ function applyDetectionSettings(
   // Returning to preset detection restores its complete detection policy while
   // retaining the operator's manual band for a later deliberate switch back.
   if (settings.detectionMode === 'preset') return;
+  if (settings.detectionMode === 'faint-lines') {
+    if (preset.traceMode === 'edge') return;
+    out['faintLineRecovery'] = true;
+    out['sketchTrace'] = false;
+    // The faint flag already takes precedence over automatic sketch masking.
+    // Retain the preset's color workload policy if alpha owns detection.
+    return;
+  }
   if (settings.detectionMode === 'sketch') {
+    delete out['faintLineRecovery'];
     out['sketchTrace'] = true;
     return;
   }
@@ -106,6 +122,7 @@ function applyDetectionSettings(
   // explicit mode so automatic settings never masquerade as a manual band.
   const manualThreshold = settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined;
   if (manualThreshold) {
+    delete out['faintLineRecovery'];
     delete out['useOtsuThreshold'];
     out['autoSketchTrace'] = false;
   }
@@ -123,6 +140,7 @@ function applyManualDetection(
   preset: TraceOptions,
   settings: LightBurnTraceSettingOverrides,
 ): void {
+  delete out['faintLineRecovery'];
   delete out['useOtsuThreshold'];
   out['autoSketchTrace'] = false;
   out['sketchTrace'] = false;

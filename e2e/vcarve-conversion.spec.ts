@@ -191,7 +191,7 @@ test('reports unrepresentable stroke geometry without saving partial G-code', as
   await command(page, 'File', 'Save G-code...');
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('No final file was selected or modified');
-  await expect(dialog.getByRole('button', { name: 'Choose destination…' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Save as…' })).toBeDisabled();
   expect(await kerfdesk.savedFiles()).toEqual({});
   expect((await kerfdesk.events()).filter((event) => event.kind.startsWith('serial'))).toEqual([]);
   expect(errors).toEqual([]);
@@ -222,11 +222,7 @@ async function exportGcode(page: Page, kerfdesk: KerfDeskFixture): Promise<strin
   await command(page, 'File', 'Save G-code...');
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
-  await page
-    .getByRole('dialog', { name: 'Choose G-code filename' })
-    .getByRole('button', { name: 'Save', exact: true })
-    .click();
+  await dialog.getByRole('button', { name: 'Save as…' }).click();
   await expect
     .poll(
       async () => (await kerfdesk.events()).filter((event) => event.kind === 'file-saved').length,

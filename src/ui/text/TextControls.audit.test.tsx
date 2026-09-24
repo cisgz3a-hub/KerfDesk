@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { FONT_REGISTRY } from '../../core/text';
 import {
@@ -29,7 +29,16 @@ beforeEach(() => {
   useUiStore.setState({ textDialog: null });
 });
 
-it('font picker opens, chooses every built-in and the embedded font, then closes each time', async () => {
+it.each(FONT_REGISTRY)('font picker chooses $displayName and closes', async (font) => {
+  const change = vi.fn();
+  const host = await mountControl(<FontPicker value="roboto-regular" onChange={change} />);
+  await clickControl(host, 'Open the font picker and choose the text typeface.');
+  await clickControl(host, `Use ${font.displayName} for this text object.`);
+  expect(change).toHaveBeenCalledExactlyOnceWith(font.key);
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+});
+
+it('font picker chooses an embedded font and closes', async () => {
   const change = vi.fn();
   const host = await mountControl(
     <FontPicker
@@ -38,16 +47,43 @@ it('font picker opens, chooses every built-in and the embedded font, then closes
       embeddedFonts={[{ key: 'embedded-audit', fileName: 'Audit.ttf', dataBase64: '' }]}
     />,
   );
-  for (const font of FONT_REGISTRY) {
-    await clickControl(host, 'Open the font picker and choose the text typeface.');
-    await clickControl(host, `Use ${font.displayName} for this text object.`);
-    expect(change).toHaveBeenLastCalledWith(font.key);
-    expect(host.querySelector('[role="listbox"]')).toBeNull();
-  }
   await clickControl(host, 'Open the font picker and choose the text typeface.');
   await clickControl(host, 'Use embedded font Audit.ttf.');
   expect(change).toHaveBeenLastCalledWith('embedded-audit');
   expect(host.querySelector('[role="listbox"]')).toBeNull();
+});
+
+it('the same font picker reopens between built-in and embedded selections', async () => {
+  const change = vi.fn();
+  const first = FONT_REGISTRY[0]!;
+  const second = FONT_REGISTRY[1]!;
+  function Harness() {
+    const [value, setValue] = useState('roboto-regular');
+    return (
+      <FontPicker
+        value={value}
+        onChange={(key) => {
+          change(key);
+          setValue(key);
+        }}
+        embeddedFonts={[{ key: 'embedded-audit', fileName: 'Audit.ttf', dataBase64: '' }]}
+      />
+    );
+  }
+  const host = await mountControl(<Harness />);
+  const selections = [
+    [`Use ${first.displayName} for this text object.`, first.key],
+    ['Use embedded font Audit.ttf.', 'embedded-audit'],
+    [`Use ${second.displayName} for this text object.`, second.key],
+  ] as const;
+  for (const [index, [title, key]] of selections.entries()) {
+    await clickControl(host, 'Open the font picker and choose the text typeface.');
+    expect(host.querySelector('[role="listbox"]')).not.toBeNull();
+    await clickControl(host, title);
+    expect(change).toHaveBeenCalledTimes(index + 1);
+    expect(change).toHaveBeenNthCalledWith(index + 1, key);
+    expect(host.querySelector('[role="listbox"]')).toBeNull();
+  }
 });
 
 it('font Import opens the native picker boundary and sends the selected file to the import callback', async () => {

@@ -75,11 +75,11 @@ describe('camera capture enters Trace as an atomic registered import', () => {
         ]);
       } else {
         expect(added.kind).toBe('raster-image');
-        expect(buildBitmapFromVectors).toHaveBeenCalledWith(expect.any(Array), {
-          dpi: 254,
-          renderType: 'fill-all',
-          brightnessPercent: 0,
-        });
+        expect(buildBitmapFromVectors).toHaveBeenCalledWith(
+          expect.any(Array),
+          { dpi: 254, renderType: 'fill-all', brightnessPercent: 0 },
+          expect.any(AbortSignal),
+        );
         const op = committed.scene.layers.find((l) => added.operationIds?.includes(l.id))!;
         expect(op.mode).toBe('image');
         expect(op.linesPerMm).toBe(10);

@@ -6,7 +6,7 @@
 // Original needs the source bitmap kept in the scene. Pure UI pieces live in
 // dialog-parts.tsx.
 
-import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { useMemo, useRef, useState, type Ref } from 'react';
 import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
@@ -18,9 +18,8 @@ import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
-import { readRasterSourceFile } from '../import/paged-raster-source';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
-import type { PreparedTrace } from './prepared-trace';
+import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
@@ -46,6 +45,8 @@ import {
   type TracePreviewSettlement,
 } from './use-trace-preview-settlement';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
+import { isTraceAbort, traceAbortError } from './trace-cancellation';
+import { useTraceSourceFile } from './use-trace-source-file';
 
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
@@ -73,9 +74,11 @@ type TraceCommitArgs = {
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
   readonly preparedTrace?: PreparedTrace;
+  readonly pendingTrace?: PendingPreparedTrace;
 };
 
 type TraceCommitContext = {
+  readonly signal?: AbortSignal;
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
   readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
@@ -126,7 +129,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
-  const onSubmit = (): void => {
+  const onSubmit = (): void =>
     submitTraceDialog({
       file,
       options,
@@ -147,7 +150,6 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       captureLifetime,
       previewControl: previewControl.current,
     });
-  };
 
   // kit Dialog owns the a11y wiring (Escape, focus trap, focus return).
   return (
@@ -178,6 +180,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
           seed={seed}
           boundarySelection={boundarySelection}
           photoShading={options.photoDetail !== undefined}
+          submission={{ busy, output: effectiveTraceOutput }}
         />
       }
       deleteSource={deleteSourceAfterTrace}
@@ -224,32 +227,8 @@ function traceSourceHasTransparency(
     : undefined;
 }
 
-function useTraceSourceFile(
-  seed: RasterImage,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): File | null {
-  const [file, setFile] = useState<File | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    setFile(null);
-    readRasterSourceFile(seed, seed.source)
-      .then((f) => {
-        if (!cancelled) setFile(f);
-      })
-      .catch(() => {
-        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
-      });
-    return (): void => {
-      cancelled = true;
-    };
-    // Depends on the whole seed: a page-backed raster's bytes are reached
-    // through imageAsset, not dataUrl. Scene objects are immutable, so the
-    // identity only changes when the image itself does.
-  }, [seed, pushToast]);
-  return file;
-}
-
 function TracePreviewPanel(props: {
+  readonly submission: { readonly busy: boolean; readonly output: TraceOutput };
   readonly photoShading: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
@@ -263,6 +242,12 @@ function TracePreviewPanel(props: {
         sourceDataUrl={rasterDisplayDataUrl(props.seed)}
         imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
         boundary={selection.boundary}
+        boundaryDisabled={props.submission.busy}
+        isRasterizing={
+          props.submission.busy &&
+          props.submission.output === 'raster' &&
+          props.preview.kind === 'ready'
+        }
         onBoundaryChange={selection.setBoundary}
         onBoundaryClear={selection.clearBoundary}
       />
@@ -271,6 +256,7 @@ function TracePreviewPanel(props: {
           value={selection.boundaryMode}
           onChange={selection.setBoundaryMode}
           allowEnhance={!props.photoShading}
+          disabled={props.submission.busy}
         />
       ) : null}
     </>
@@ -319,7 +305,7 @@ function submitTraceDialog(deps: {
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
   readonly setBusy: (v: boolean) => void;
   readonly requestToken: string;
-  readonly captureLifetime: () => () => boolean;
+  readonly captureLifetime: ReturnType<typeof useTraceCommitLifetime>;
   readonly previewControl: TracePreviewCommitControl | null;
 }): void {
   if (deps.file === null) {
@@ -327,8 +313,14 @@ function submitTraceDialog(deps: {
     return;
   }
   const owner = captureTraceCommitOwner(deps.seed, deps.requestToken);
-  const isCurrent = deps.captureLifetime();
-  if (owner === null || !isCurrent()) return;
+  if (owner === null) return;
+  const isCurrent = deps.captureLifetime(() => claimTraceCommitOwner(owner) !== null);
+  if (isCurrent === null) return;
+  if (!isCurrent()) {
+    isCurrent.dispose();
+    return;
+  }
+  const pendingTrace = deps.previewControl?.preparation?.();
   const settlePreview = deps.previewControl?.capture();
   const traceArgs = {
     file: deps.file,
@@ -340,6 +332,7 @@ function submitTraceDialog(deps: {
     boundary: deps.boundary,
     boundaryMode: deps.boundaryMode,
     ...preparedTraceEntry(deps.preview),
+    ...(pendingTrace === undefined ? {} : { pendingTrace }),
     ...(deps.replaceTraceId === undefined ? {} : { replaceTraceId: deps.replaceTraceId }),
   };
   void commit(traceArgs, {
@@ -349,7 +342,14 @@ function submitTraceDialog(deps: {
     close: () => closeOwnedTraceDialog(owner.dialogRequestToken),
     setBusy: deps.setBusy,
     claimOwner: () => (isCurrent() ? claimTraceCommitOwner(owner) : null),
+    signal: isCurrent.signal,
     ...(settlePreview === undefined ? {} : { settlePreview }),
+  }).finally(() => {
+    if (isCurrent.ownsDialog()) {
+      if (isCurrent.signal.aborted) settlePreview?.({ kind: 'error', error: traceAbortError() });
+      deps.setBusy(false);
+    }
+    isCurrent.dispose();
   });
 }
 
@@ -372,6 +372,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     const result = await resolveTraceCommitResult({
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
+      signal: ctx.signal,
     });
     const owner = ctx.claimOwner();
     if (owner === null) return;
@@ -439,6 +440,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
 function reportTraceCommitError(source: string, err: unknown, ctx: TraceCommitContext): void {
   if (ctx.claimOwner() === null) return;
   if (isTraceRequestSuperseded(err)) return;
+  if (isTraceAbort(err)) return;
   settleTracePreview(ctx, { kind: 'error', error: err });
   ctx.pushToast(
     `Could not trace ${source}: ${err instanceof Error ? err.message : String(err)}`,

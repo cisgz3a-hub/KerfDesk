@@ -119,7 +119,6 @@ describe('Job Review reuse of the displayed compile', () => {
     const capture = captureJobReviewModels();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -137,7 +136,6 @@ describe('Job Review reuse of the displayed compile', () => {
     const capture = captureJobReviewModels();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -166,7 +164,6 @@ describe('Job Review reuse of the displayed compile', () => {
     const capture = captureJobReviewModels();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });

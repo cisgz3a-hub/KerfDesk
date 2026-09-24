@@ -9,7 +9,8 @@
 // maintainer's Falcon A1 Pro this showed as air that "works for a few minutes
 // and then stops" and a machine that sits Idle for about a minute mid-burn
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
-// vendor contract forbids `$$`), so the remedy is named rather than checked.
+// vendor contract forbids `$$`), so the remedy is named rather than checked;
+// the Console can write it (ADR-370).
 //
 // Advisory only (rule 7 / ADR-228, ADR-345): it never refuses a Start.
 
@@ -21,8 +22,8 @@ type StandbyDevice = Pick<DeviceProfile, 'airAssistCommand' | 'airAssistRestartU
 export const AIR_STANDBY_WARNING =
   'This controller idles its air pump and laser module on its own standby timer ($152, default ' +
   '30 s, 100 = never) and its 1.0.6 firmware has been seen dropping the pump mid-job. If air ' +
-  'stops after a few minutes or the machine sits Idle mid-burn and then continues, set $152=100 ' +
-  'on the controller (or update the firmware past 1.0.6). KerfDesk names such a hold in the live ' +
+  'stops after a few minutes or the machine sits Idle mid-burn and then continues, send $152=100 ' +
+  'from the Console (or update the firmware past 1.0.6). KerfDesk names such a hold in the live ' +
   'bar and keeps waiting; it does not reset the controller.';
 
 export function detectAirAssistStandbyWarnings(

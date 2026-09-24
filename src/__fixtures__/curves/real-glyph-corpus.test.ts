@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { TextRenderResult } from '../../core/text';
 import {
+  distanceToPolyline,
   measureGlyphRender,
   REAL_GLYPH_CORPUS,
   renderGlyphFixture,
@@ -76,3 +77,81 @@ function requiredRender(name: string): TextRenderResult {
   if (rendered === undefined) throw new Error(`Missing glyph corpus render: ${name}`);
   return rendered;
 }
+
+describe('glyph fixture point-to-segment distance', () => {
+  it.each([
+    {
+      name: 'interior perpendicular projection',
+      point: { x: 4, y: 3 },
+      polyline: [
+        { x: -5, y: 0 },
+        { x: 5, y: 0 },
+      ],
+      expected: 3,
+    },
+    {
+      name: 'clamped endpoint',
+      point: { x: 5, y: 4 },
+      polyline: [
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+      ],
+      expected: 5,
+    },
+    {
+      name: 'degenerate segment',
+      point: { x: 3, y: 4 },
+      polyline: [
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+      ],
+      expected: 5,
+    },
+    {
+      name: 'farther segments after a nearer one',
+      point: { x: 0, y: 0 },
+      polyline: [
+        { x: 0, y: 1 },
+        { x: 0, y: 2 },
+        { x: 10, y: 2 },
+      ],
+      expected: 1,
+    },
+    {
+      name: 'subnormal distance',
+      point: { x: Number.MIN_VALUE, y: 0 },
+      polyline: [
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+      ],
+      expected: Number.MIN_VALUE,
+    },
+    {
+      name: 'Infinity with a NaN coordinate',
+      point: { x: Number.POSITIVE_INFINITY, y: Number.NaN },
+      polyline: [
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+      ],
+      expected: Number.POSITIVE_INFINITY,
+    },
+    {
+      name: 'no segment',
+      point: { x: 0, y: 0 },
+      polyline: [{ x: 0, y: 0 }],
+      expected: Number.POSITIVE_INFINITY,
+    },
+  ])('preserves $name', ({ point, polyline, expected }) => {
+    expect(distanceToPolyline(point, polyline)).toBe(expected);
+  });
+
+  it('still propagates a later NaN segment after an exact match', () => {
+    expect(
+      distanceToPolyline({ x: 0, y: 0 }, [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: NaN, y: 0 },
+      ]),
+    ).toBeNaN();
+  });
+});

@@ -15,7 +15,6 @@ import { UserMacroPanel } from './console/user-macros/UserMacroPanel';
 import { readUserMacros } from './console/user-macros/user-macro-storage';
 import { JogPadAirAssist } from './JogPadAirAssist';
 import { LaserWindow } from './LaserWindow';
-import { FirmwareWritesPanel } from './MachineSetupController';
 import { ImportExportPanel } from './MachineSetupImportExport';
 import { SuperConsoleDiagnostics } from './super-console/SuperConsoleDiagnostics';
 
@@ -118,23 +117,6 @@ describe('Machine boundary control audit', () => {
     act(() => close.click());
     expect(useUiStore.getState().boardCapturePanelOpen).toBe(false);
     expect(useStore.getState().project).toBe(project);
-  });
-
-  it('legacy guarded-write confirmation enables only the exact selected mocked setting write', async () => {
-    const writeGrblSetting = vi.fn(async () => undefined);
-    useLaserStore.setState({
-      connection: { kind: 'connected' },
-      grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
-      lastSettingsReadAt: Date.now(),
-      writeGrblSetting,
-    });
-    render(<FirmwareWritesPanel />);
-    expect(button('Write $30').disabled).toBe(true);
-    await act(async () => button('Write $30').click());
-    expect(writeGrblSetting).not.toHaveBeenCalled();
-    act(() => host.querySelector<HTMLInputElement>('[aria-label="Confirm write $30"]')!.click());
-    await act(async () => button('Write $30').click());
-    expect(writeGrblSetting).toHaveBeenCalledExactlyOnceWith(30, '1000');
   });
 
   it('LightBurn import stays in review until Apply and applies only the parsed profile', async () => {

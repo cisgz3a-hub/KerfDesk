@@ -4,6 +4,7 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { controllerStartPreparationStillCurrent } from './start-job-authorization';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
+import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import {
   startPreparationCoordinateKey,
   type StartPreparationPlacement,
@@ -22,6 +23,7 @@ export function ownCurrentStartPreparation(
   laser: ReturnType<typeof useLaserStore.getState>,
   callerSignal?: AbortSignal,
   placement: Partial<StartPreparationPlacement> = {},
+  frameMotionOwner?: FramePreparationMotionOwner,
 ): {
   readonly signal: AbortSignal;
   readonly inputsChanged: () => boolean;
@@ -48,8 +50,11 @@ export function ownCurrentStartPreparation(
   const observeController = (): void => {
     // Print-and-Cut registration also depends on the native bed frame.
     observeProject();
-    const current = useLaserStore.getState();
+    const live = useLaserStore.getState();
+    const current =
+      frameMotionOwner === undefined ? live : frameMotionOwner.controllerForPreparation(live);
     if (
+      current === null ||
       !controllerStartPreparationStillCurrent(laser, current, {
         ignoreAdvisoryControllerEvidence: true,
       }) ||

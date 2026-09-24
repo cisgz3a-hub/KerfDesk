@@ -9,9 +9,7 @@
 // load as trace-image.ts (cached promise — no re-download).
 
 import {
-  curveSubpathBounds,
   polylineToCurveSubpath,
-  type Bounds,
   type ColoredPath,
   type CubicPathSegment,
   type CurveSubpath,
@@ -26,16 +24,21 @@ import {
   effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
+import { downscaleTracedPaths } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
 import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
+import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
-import { runTraceSteps, type TraceStepRunner } from './trace-steps';
+import { prepareUpscaledTraceInput } from './trace-upscale-input';
+import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
+import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
+
+export { boundsFromColoredPaths } from './trace-bounds';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -141,14 +144,14 @@ async function loadTracer(): Promise<ImageTracerModule> {
 export async function traceImageToColoredPaths(
   image: RawImageData,
   requestedOptions: TraceOptions,
-  run: TraceStepRunner = runTraceSteps,
+  runner: TraceStepRunner = runTraceSteps,
+  progress?: TraceProgress,
 ): Promise<ColoredPath[]> {
+  const run = reportingTraceRunner(runner, progress);
   // Photo tone is encoded in ribbon coverage, before any binary detection or
   // contour supersampling can discard it. The backend owns its bounded grid.
   if (requestedOptions.photoDetail !== undefined) {
-    return withCanonicalTraceCurves(
-      await run(traceImageToPhotoPathsSteps(image, requestedOptions)),
-    );
+    return run(traceImageToPhotoPathsSteps(image, requestedOptions));
   }
   const options = resolveTraceSourceOptions(image, requestedOptions);
   // Sparse small/thin sources trace poorly at native resolution, so their
@@ -161,8 +164,15 @@ export async function traceImageToColoredPaths(
   // SOURCE-pixel semantics on the supersampled raster.
   const edgeInput =
     options.traceMode === 'edge' ? prepareEdgeTraceInput(image, options) : undefined;
-  const scalePlan = traceScalePlan(image, options, edgeInput);
+  let contourInput =
+    options.supersampleContour === true && isBinaryContourPreset(options)
+      ? prepareContourTraceInput(image, options)
+      : undefined;
+  const scalePlan = traceScalePlan(image, options, edgeInput, contourInput);
   if (scalePlan.kind === 'downscale') {
+    // The native mask was only needed for the resolution decision. Release
+    // its scalar buffers before allocating and tracing the bounded raster.
+    contourInput = undefined;
     const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
     // Convert the two source-area controls once, using both actual raster
     // dimensions. Keep fractional working thresholds; UI integer rounding
@@ -204,25 +214,26 @@ export async function traceImageToColoredPaths(
   }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
-    // AUTO repairs source-grid impulses once. An explicit forced median keeps
-    // its existing working-grid order, after enlargement. Both paths measure
-    // a fresh local mask and threshold field at the enlarged resolution.
-    const reuseCleanedEdge = edgeInput !== undefined && options.edgeMedianFilter !== true;
-    const scaledOptions: TraceOptions = {
-      ...options,
-      pixelScale: factor,
-      ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
-    };
-    const upscaled = withCanonicalTraceCurves(
-      await dispatchTrace(
-        upscaleBy(reuseCleanedEdge ? edgeInput.source : image, factor),
-        scaledOptions,
-        run,
-      ),
-    );
-    return downscaleTracedPaths(upscaled, factor);
+    return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
-  return withCanonicalTraceCurves(await dispatchTrace(image, options, run, edgeInput));
+  return withCanonicalTraceCurves(
+    await dispatchTrace(image, options, run, edgeInput, contourInput),
+  );
+}
+
+async function traceUpscaledImage(
+  image: RawImageData,
+  options: TraceOptions,
+  factor: number,
+  run: TraceStepRunner,
+  edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
+): Promise<ColoredPath[]> {
+  const enlarged = prepareUpscaledTraceInput(image, options, factor, edgeInput, contourInput);
+  const upscaled = withCanonicalTraceCurves(
+    await dispatchTrace(enlarged.image, enlarged.options, run, undefined, enlarged.contourInput),
+  );
+  return downscaleTracedPaths(upscaled, factor);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.
@@ -233,6 +244,7 @@ async function dispatchTrace(
   options: TraceOptions,
   run: TraceStepRunner,
   edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
 ): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline')
     return run(traceCenterlineStrokePathsSteps(image, options));
@@ -242,8 +254,17 @@ async function dispatchTrace(
   // the in-house contour backend (ADR-123). imagetracerjs remains only for
   // the multi-colour, no-fixed-palette path below.
   if (isBinaryContourPreset(options))
-    return run(traceImageToContourColoredPathsSteps(image, options));
+    return run(traceImageToContourColoredPathsSteps(image, options, contourInput));
   const tracer = await loadTracer();
+  return run(traceLegacyImageSteps(image, options, tracer));
+}
+
+function* traceLegacyImageSteps(
+  image: RawImageData,
+  options: TraceOptions,
+  tracer: ImageTracerModule,
+): TraceSteps<ColoredPath[]> {
+  yield;
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));
   return tracedataToColoredPaths(td);
@@ -477,38 +498,4 @@ function paletteToHex(p: PaletteEntry): string {
 function byteToHex(n: number): string {
   const v = Math.max(0, Math.min(255, Math.round(n)));
   return v.toString(16).padStart(2, '0');
-}
-
-// Tight bounding box around every point in every ColoredPath. Used by
-// ImportImageDialog (and any future caller) to construct the
-// TracedImage's `bounds` field — analogous to parseSvg's viewBox-based
-// bounds but always reflecting the actual traced geometry. Empty input
-// returns a zero-area bounds at the origin.
-export function boundsFromColoredPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const path of paths) {
-    if (path.curves !== undefined) {
-      for (const curve of path.curves) {
-        const bounds = curveSubpathBounds(curve);
-        minX = Math.min(minX, bounds.minX);
-        minY = Math.min(minY, bounds.minY);
-        maxX = Math.max(maxX, bounds.maxX);
-        maxY = Math.max(maxY, bounds.maxY);
-      }
-      continue;
-    }
-    for (const pl of path.polylines) {
-      for (const p of pl.points) {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.y > maxY) maxY = p.y;
-      }
-    }
-  }
-  if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return { minX, minY, maxX, maxY };
 }

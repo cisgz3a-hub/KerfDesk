@@ -9,20 +9,22 @@ import {
 } from '../../core/trace';
 import { traceImageWithFallback, type TraceResult } from './use-trace-worker-client';
 import { resolveTraceSourceOptions } from '../../core/trace/trace-alpha';
+import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export async function traceImageRegion(
   image: RawImageData,
   requestedOptions: TraceOptions,
   boundary: TraceBoundary | null | undefined,
   signal?: AbortSignal,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   const options = resolveTraceSourceOptions(image, requestedOptions);
   const normalized = normalizeTraceBoundary(boundary, image.width, image.height);
   if (normalized === null) {
-    return traceImageWithFallback(image, options, signal);
+    return traceImageWithFallback(image, options, signal, progress);
   }
   const cropped = cropRawImageData(image, normalized);
-  const traced = await traceImageWithFallback(cropped, options, signal);
+  const traced = await traceImageWithFallback(cropped, options, signal, progress);
   return {
     ...traced,
     paths: offsetColoredPaths(traced.paths, normalized.x, normalized.y),

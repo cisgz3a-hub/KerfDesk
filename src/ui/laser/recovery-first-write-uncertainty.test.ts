@@ -57,6 +57,9 @@ beforeEach(() => {
     controllerSettings: { maxPowerS: 1_000, minPowerS: 0, laserModeEnabled: true },
     controllerSettingsObservation: { sessionEpoch: 9, observedAt: 1 },
     controllerQualification: { kind: 'qualified', epoch: 9, settings: 'verified' },
+    // Overrides reported at 100%, so Start sends no ADR-355 reset ahead of the
+    // program and the first write these tests reject is the program's own.
+    ovCache: { feed: 100, rapid: 100, spindle: 100 },
   });
 });
 
@@ -103,7 +106,7 @@ describe('recovery source and first-write authority', () => {
       expect(retained?.interruption.kind).toBe('write-failed');
       expect(retained?.ackedLines).toBe(0);
       if (retained?.artifact.kind !== 'exact-execution') throw new Error('Lost attempted resume.');
-      expect(retained.artifact.laserResumeChain).toEqual([{ fromLine, version: 2 }]);
+      expect(retained.artifact.laserResumeChain).toEqual([{ fromLine, version: 3 }]);
       expect(retained.artifact.gcode).toContain('resume preamble');
       expect(repository.getSnapshot().pendingStart).toBeNull();
       expect(retained.claim).toBeUndefined();

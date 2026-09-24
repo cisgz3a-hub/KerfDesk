@@ -148,25 +148,40 @@ function directedDeviation(from: ReadonlyArray<Vec2>, to: ReadonlyArray<Vec2>): 
   return max;
 }
 
-function distanceToPolyline(point: Vec2, polyline: ReadonlyArray<Vec2>): number {
+export function distanceToPolyline(point: Vec2, polyline: ReadonlyArray<Vec2>): number {
   let best = Number.POSITIVE_INFINITY;
   for (let index = 1; index < polyline.length; index += 1) {
     const from = polyline[index - 1];
     const to = polyline[index];
     if (from !== undefined && to !== undefined)
-      best = Math.min(best, distanceToSegment(point, from, to));
+      best = Math.min(best, distanceToSegment(point, from, to, best));
   }
   return best;
 }
 
-function distanceToSegment(point: Vec2, from: Vec2, to: Vec2): number {
+function distanceToSegment(point: Vec2, from: Vec2, to: Vec2, best: number): number {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) return Math.hypot(point.x - from.x, point.y - from.y);
+  if (lengthSquared === 0) return distanceIfCloser(point.x - from.x, point.y - from.y, best);
   const t = Math.max(
     0,
     Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared),
   );
-  return Math.hypot(point.x - (from.x + t * dx), point.y - (from.y + t * dy));
+  return distanceIfCloser(point.x - (from.x + t * dx), point.y - (from.y + t * dy), best);
+}
+
+function distanceIfCloser(dx: number, dy: number, best: number): number {
+  // Either coordinate is a lower bound on the Euclidean distance. Project
+  // every pair exactly as before, but avoid a norm that cannot improve best.
+  // Keep non-finite pairs on Math.hypot's original NaN/Infinity path, even
+  // after a previous segment matched the point exactly.
+  if (
+    Number.isFinite(dx) &&
+    Number.isFinite(dy) &&
+    (Math.abs(dx) >= best || Math.abs(dy) >= best)
+  ) {
+    return best;
+  }
+  return Math.hypot(dx, dy);
 }

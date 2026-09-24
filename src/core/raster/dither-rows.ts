@@ -105,7 +105,11 @@ class DiffusionWindow {
       const quantized = old < ERROR_DIFFUSION_QUANTIZE_LUMA ? 0 : WHITE_LUMA;
       const err = old - quantized;
       out[x] = quantized === 0 ? this.input.sMax : 0;
-      this.diffuse(x, y, ltr, err);
+      // Exact black/white pixels often carry no quantization error. Skipping
+      // zero additions avoids a full kernel walk for blank image margins.
+      // Test the accumulated error, not the source luma: nearby gray pixels
+      // can still diffuse into an otherwise black or white pixel.
+      if (err !== 0) this.diffuse(x, y, ltr, err);
     }
     this.rotate();
     this.nextY = y + 1;

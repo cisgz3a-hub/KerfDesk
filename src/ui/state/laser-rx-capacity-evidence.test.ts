@@ -109,12 +109,19 @@ describe('statusBufferPatch planner snapshot', () => {
   it('records the backlog of an active run', () => {
     const streamer = { ...step(createStreamer('G1 X1\nG1 X2\n')).state, completed: 400 };
     const patch = statusBufferPatch(
-      { ...QUIET, streamer, streamerEpoch: 5, rxCapacityEvidence: CAPACITY },
+      {
+        ...QUIET,
+        streamer,
+        streamerEpoch: 5,
+        rxCapacityEvidence: CAPACITY,
+        plannerCapacityEvidence: CAPACITY,
+      },
       RUNNING,
       2,
     );
     expect(patch.streamPlannerSnapshot).toEqual({
       streamerEpoch: 5,
+      sessionEpoch: 3,
       ackedLines: 400,
       queuedBlocks: 380,
     });
@@ -122,12 +129,16 @@ describe('statusBufferPatch planner snapshot', () => {
 
   it('records nothing without a run or without the idle planner size', () => {
     expect(
-      statusBufferPatch({ ...QUIET, streamerEpoch: 5, rxCapacityEvidence: CAPACITY }, RUNNING, 2),
+      statusBufferPatch(
+        { ...QUIET, streamerEpoch: 5, plannerCapacityEvidence: CAPACITY },
+        RUNNING,
+        2,
+      ),
     ).not.toHaveProperty('streamPlannerSnapshot');
     const streamer = step(createStreamer('G1 X1\n')).state;
     expect(
       statusBufferPatch(
-        { ...QUIET, streamer, streamerEpoch: 5, rxCapacityEvidence: null },
+        { ...QUIET, streamer, streamerEpoch: 5, rxCapacityEvidence: CAPACITY },
         RUNNING,
         2,
       ),

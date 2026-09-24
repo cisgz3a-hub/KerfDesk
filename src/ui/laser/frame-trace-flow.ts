@@ -31,8 +31,10 @@ import {
 } from './frame-dispatch-support';
 import { frameTraceReadinessIssue, transientMachineActivity } from './framed-run-invalidation';
 import { frameInputsAreCurrent } from './reviewed-frame-current';
+import { ownFramePreparationMotion } from './frame-preparation-motion-owner';
 import type { StartJobPreparation } from './start-job-readiness';
 import { prepareCurrentStartJob } from './start-job-source';
+import { STALE_START_PREPARATION_MESSAGE } from './start-preparation-owner';
 import type { StartPreparationPlacement } from './start-preparation-coordinate-key';
 
 /**
@@ -62,6 +64,8 @@ export type ExactFramePreparation = {
    * program settles without reporting one (main-thread preparation, an early
    * refusal, or a preparation that failed outright). */
   readonly earlyBounds: Promise<FrameBoundsPreview | null>;
+  readonly signal: AbortSignal;
+  readonly claimTrace: (candidate: FrameTraceCandidate) => void;
   readonly abort: () => void;
 };
 
@@ -72,6 +76,7 @@ export const FRAME_TRACE_PROGRAM_MISMATCH_MESSAGE =
 
 export function startExactFramePreparation(context: FrameContext): ExactFramePreparation {
   const controller = new AbortController();
+  const motionOwner = ownFramePreparationMotion(context.laser);
   let deliver: (preview: FrameBoundsPreview | null) => void = () => undefined;
   const earlyBounds = new Promise<FrameBoundsPreview | null>((resolve) => {
     deliver = resolve;
@@ -83,14 +88,20 @@ export function startExactFramePreparation(context: FrameContext): ExactFramePre
     context.jobOrigin,
     false,
     controller.signal,
-    { onFrameBounds: (preview) => deliver(preview) },
+    { onFrameBounds: (preview) => deliver(preview), frameMotionOwner: motionOwner },
   );
   // Without an early outline the program itself is the first thing to arrive.
   void program.then(
     () => deliver(null),
     () => deliver(null),
   );
-  return { program, earlyBounds, abort: () => controller.abort() };
+  return {
+    program,
+    earlyBounds,
+    signal: controller.signal,
+    claimTrace: motionOwner.claim,
+    abort: () => controller.abort(),
+  };
 }
 
 /** Trace the outline now; bind the exact program when it arrives. */
@@ -99,7 +110,7 @@ export async function dispatchTracedFrame(
   preview: TraceableFrameBoundsPreview,
   preparation: ExactFramePreparation,
 ): Promise<boolean> {
-  const trace = await traceFrameOutline(context, preview);
+  const trace = await traceFrameOutline(context, preview, preparation);
   if (trace === null) {
     // No permit can follow a trace that did not complete cleanly, so the
     // program being prepared for it has no owner; free the worker for the
@@ -112,6 +123,7 @@ export async function dispatchTracedFrame(
   let prepared: StartJobPreparation;
   try {
     prepared = await preparation.program;
+    preparation.signal.throwIfAborted();
   } catch (error) {
     discardTrace(trace);
     throw error;
@@ -122,8 +134,10 @@ export async function dispatchTracedFrame(
 async function traceFrameOutline(
   context: FrameContext,
   preview: TraceableFrameBoundsPreview,
+  preparation: ExactFramePreparation,
 ): Promise<FrameTrace | null> {
-  if (!(await requireFrameControllerQueue())) return null;
+  if (!(await requireFrameControllerQueue(preparation.signal))) return null;
+  preparation.signal.throwIfAborted();
   const currentLaser = useLaserStore.getState();
   if (
     !frameInputsAreCurrent({
@@ -143,6 +157,7 @@ async function traceFrameOutline(
     return null;
   }
   const candidate = traceCandidate(context, preview, currentLaser, returnToWorkPosition);
+  preparation.claimTrace(candidate);
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);
   try {
@@ -215,6 +230,10 @@ function bindExactProgramToTrace(
 ): boolean {
   if (!prepared.ok) {
     discardTrace(trace);
+    if (prepared.messages.includes(STALE_START_PREPARATION_MESSAGE)) {
+      useToastStore.getState().pushToast(FRAME_COMPLETED_BUT_CHANGED_MESSAGE, 'warning');
+      return false;
+    }
     reportFramePreparationRefusal(
       [FRAME_TRACE_PROGRAM_REFUSED_MESSAGE, ...prepared.messages],
       context.wcsNormalizationWarning,

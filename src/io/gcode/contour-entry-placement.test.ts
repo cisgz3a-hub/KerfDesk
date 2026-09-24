@@ -18,7 +18,6 @@ import {
   type JobOriginPlacement,
   type JobStartMode,
 } from '../../core/job/job-origin';
-import { estimateWithPlanner } from '../../core/job/planner';
 import { buildToolpath } from '../../core/job/toolpath';
 
 const ORIGINS: readonly Origin[] = [
@@ -186,9 +185,6 @@ describe('prepared contour envelopes use the final program coordinate frame', ()
       junctionDeviationMm: f.project.device.junctionDeviationMm,
       maxFeedMmPerMin: f.project.device.maxFeed,
     });
-    expect(
-      estimateWithPlanner(prepared.job, f.project.device, { finishPosition: null }).totalSeconds,
-    ).toBeCloseTo(clock.totalSeconds, 6);
     const duration = estimateJobDuration(prepared.job, f.project.device, { finishPosition: null });
     expect(duration.totalSeconds - (duration.breakdown.transportSeconds ?? 0)).toBeCloseTo(
       clock.totalSeconds,

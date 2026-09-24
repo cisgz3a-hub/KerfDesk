@@ -50,6 +50,9 @@ export function createWorkerRefillHandover(deps: HandoverDeps): {
     },
     receive: (message) => {
       if (message.kind !== 'refill-stopped') return receive(state, deps, message);
+      // A stop marker queued before native teardown cannot revive an owner
+      // that close has already retired while its final acknowledgement waits.
+      if (state.phase === 'closed') return true;
       state.handedOver = false;
       state.phase = 'main';
       finish(state);
