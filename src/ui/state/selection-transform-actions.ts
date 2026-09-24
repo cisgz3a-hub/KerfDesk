@@ -76,7 +76,7 @@ function applyAnchorToRegistrationBoxToState(
   const artIds = selectedObjectIds(state).filter((id) => id !== box.id);
   if (artIds.length === 0) return state;
   const objects = [...selectedObjects(state.project.scene, artIds), box];
-  const result = buildBoxAnchorAlign(objects, box.id, anchor);
+  const result = buildBoxAnchorAlign(objects, box.id, anchor, state.project.scene.groups ?? []);
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }
@@ -110,10 +110,12 @@ function applySelectionAlignToState(
   const ids = selectedObjectIds(state);
   const referenceId = ids[ids.length - 1];
   if (referenceId === undefined) return state;
-  const result = buildSelectionAlignEdit(selectedObjects(state.project.scene, ids), {
-    kind,
-    referenceId,
-  });
+  const scene = state.project.scene;
+  const result = buildSelectionAlignEdit(
+    selectedObjects(scene, ids),
+    { kind, referenceId },
+    scene.groups ?? [],
+  );
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }
@@ -123,9 +125,12 @@ function applySelectionDistributeToState(
   kind: SelectionDistributeKind,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
-  const result = buildSelectionDistributeEdit(selectedObjects(state.project.scene, ids), {
-    kind,
-  });
+  const scene = state.project.scene;
+  const result = buildSelectionDistributeEdit(
+    selectedObjects(scene, ids),
+    { kind },
+    scene.groups ?? [],
+  );
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }

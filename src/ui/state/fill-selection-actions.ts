@@ -12,7 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
-import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
+import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
@@ -77,7 +77,11 @@ function isolateSelectionToNewFillOperation(
     mode: 'fill',
     name: selectedIds.size === 1 ? `${artworkOperationName(first)} Fill` : 'Selection Fill',
   });
-  const defaults = defaultSettingsForColor(state.layerDefaults, created.operation.color);
+  const defaults = defaultSettingsForOperation(
+    state.layerDefaults,
+    [created.object],
+    created.operation,
+  );
   const withDefaults = {
     ...applyLayerDefaultSettings(created.operation, defaults),
     mode: 'fill' as const,

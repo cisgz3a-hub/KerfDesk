@@ -16,8 +16,11 @@ Software evidence does not establish browser rendering, independent-editor inter
    shear, aspect fitting, opacity and SVG filters/masks report an error. Numeric and percentage
    opacity use the same range before this check, including opacity on ancestor groups.
 3. One source file receives one common translation, one batch offset and one Undo entry. Its
-   authored millimetre size and relative registration survive negative coordinates and artwork
-   larger than the bed. No per-object fitting or whole-document rasterisation is involved.
+   authored millimetre size and relative registration survive negative coordinates. Integration
+   with ADR-125 Amendment 1 fits artwork larger than the bed as one complete selection, using a
+   shared uniform scale and a separate Undo entry. The first Undo restores the complete authored
+   size; the next removes the atomic import. No per-object fitting or whole-document rasterisation
+   is involved, and clip coordinates stay local to their image.
    Saved operation preferences cannot override authored Line/Fill/Image structure or image density.
    New Fill fragments materialise SVG's implicit subpath closure and default nonzero fill rule in
    both sampled paths and native curves. Stroke fragments retain their authored open paths. The

@@ -76,6 +76,22 @@ describe('readSvgDocumentFromBlob', () => {
     );
   });
 
+  it('applies a CDATA stylesheet streamed one byte at a time', async () => {
+    const svgText = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+      <defs><style><![CDATA[ g > .cut { fill: none; stroke: #ff0000 } ]]></style></defs>
+      <g><path class="cut" d="M0 0 L9 9"/></g>
+    </svg>`;
+    const args = { id: 'stylesheet', source: 'stylesheet.svg' };
+
+    const streamed = parseSvgWorkerDocument(
+      await readSvgDocumentFromBlob(oneByteChunkBlob(svgText)),
+      args,
+    );
+
+    expect(streamed.object?.paths.map((path) => path.color)).toEqual(['#ff0000']);
+    expect(streamed).toEqual(parseSvgInWorker({ svgText, ...args }));
+  });
+
   it('imports a document whose element name starts with an astral code point', async () => {
     // The literal tab is what makes the tag take the raw-replay path, so a scanner
     // that hands out the wrong tag here shows up as a changed attribute value.

@@ -110,6 +110,28 @@ describe('HPGL import worker and file action', () => {
     expect(ctx.pushToast).toHaveBeenCalledWith('Imported 2 paths from part.plt.', 'success');
   });
 
+  it('reports a scale-to-fit after its diagnostics and success notice', async () => {
+    const ctx = context();
+    const outcome = {
+      kind: 'added' as const,
+      bedFit: { scale: 0.36, widthMm: 1000, heightMm: 500, bedWidthMm: 400, bedHeightMm: 400 },
+    };
+    ctx.importObject.mockReturnValue(outcome);
+    const pending = importHpglFile(file(), ctx);
+    await settleQueue();
+    worker().reply(parsedResponse(worker()));
+    await pending;
+
+    expect(ctx.pushToast.mock.calls.slice(-2)).toEqual([
+      ['Imported 2 paths from part.plt.', 'success'],
+      [
+        'part.plt is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% ' +
+          'to fit. Undo restores the original size.',
+        'warning',
+      ],
+    ]);
+  });
+
   it('exposes command diagnostics and does not claim an index for unsupported partial artwork', async () => {
     const ctx = context();
     const pending = importHpglFile(file('unsupported.hpgl'), ctx);
@@ -249,7 +271,7 @@ describe('HPGL import worker and file action', () => {
     await settleQueue();
     worker().reply(parsedResponse(worker()));
     await pending;
-    expect(pushToast).toHaveBeenCalledWith(
+    expect(pushToast).toHaveBeenLastCalledWith(
       'Re-imported part.plt — layer settings preserved (2 kept)',
       'success',
     );

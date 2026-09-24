@@ -74,6 +74,30 @@ describe('buildBoxAnchorAlign', () => {
     }
   });
 
+  it('snaps a group as one unit, keeping its members offset from each other', () => {
+    const a = createRectangle({
+      id: 'a',
+      color: '#000000',
+      spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const b = createRectangle({
+      id: 'b',
+      color: '#000000',
+      spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x: 30, y: 20 },
+    });
+    const result = buildBoxAnchorAlign([a, b, BOX], 'box', 'top-left', [
+      { id: 'group', name: 'Group 1', objectIds: ['a', 'b'] },
+    ]);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    // The group's box (0,0)-(50,30) moves by +150, +160 to the box's top-left.
+    expect(result.transforms.map((t) => [t.id, t.transform.x, t.transform.y])).toEqual([
+      ['a', 150, 160],
+      ['b', 180, 180],
+    ]);
+  });
+
   it('returns ok with no transforms when only the reference box is passed', () => {
     // The one input where the old buildSelectionAlignEdit path returned a
     // 'not-enough-objects' error; the box-anchor path returns ok/[] instead.

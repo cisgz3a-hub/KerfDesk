@@ -92,6 +92,11 @@ function prioritizeLayerGroups(
   policy: PathOptimizationSettings['layerPriority'],
 ): Group[] {
   if (policy === 'project-order') return [...groups];
+  // Layer priority is a laser setting. CNC groups keep their compiled order:
+  // compileCncJob runs all clearing before any profile (ADR-310), so a
+  // reversal carried over from laser mode would profile a part free before
+  // its pocket is cut.
+  if (groups.some((group) => group.kind === 'cnc')) return [...groups];
   if (!groups.some((group) => group.sourceObjectId !== undefined)) {
     return reverseLayerGroups(groups);
   }

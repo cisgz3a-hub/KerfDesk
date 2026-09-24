@@ -77,6 +77,24 @@ describe('fill selection action', () => {
     expect(layerByColor('#000000').mode).toBe('line');
   });
 
+  it('gives the isolated fill operation the default saved for the artwork color', () => {
+    loadScene({
+      objects: [shapeObj('outer', '#ff0000'), shapeObj('inner', '#ff0000')],
+      colors: ['#ff0000'],
+      selectedObjectId: 'inner',
+    });
+    useStore.getState().setLayerDefaults({
+      byColor: { '#ff0000': { power: 44, speed: 2222 } },
+      allColors: null,
+    });
+
+    useStore.getState().fillSelectionSeparately();
+
+    const fillOperation = operationForShape(shapeById('inner'));
+    expect(fillOperation.color).not.toBe('#ff0000');
+    expect(fillOperation).toMatchObject({ mode: 'fill', power: 44, speed: 2222 });
+  });
+
   it('does nothing when the selection has no vector artwork', () => {
     loadScene({
       objects: [rasterObj('image')],

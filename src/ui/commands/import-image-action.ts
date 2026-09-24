@@ -1,5 +1,6 @@
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import { readFileAsDataUrl } from '../trace/image-loader';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
 import {
@@ -8,6 +9,7 @@ import {
   rasterImportGeometry,
 } from '../common/image-import';
 import type { ImageDensity } from '../common/image-density';
+import { describeImportBedFit } from '../app/import-bed-fit-notice';
 import { largeImportAdvisory } from '../app/import-size-advisory';
 import {
   shouldDecodeDimensionQualifiedPng,
@@ -21,7 +23,7 @@ import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-ima
  * when skipped or failed) so callers like Image Studio can chain onto it. */
 export async function importImageFile(
   file: File,
-  importRasterImage: (object: SceneObject) => void,
+  importRasterImage: (object: SceneObject) => ImportOutcome | undefined,
   pushToast: (message: string, variant?: ToastVariant) => void,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<SceneObject | null> {
@@ -50,13 +52,15 @@ export async function importImageFile(
     assertImportActive(options.signal);
     const imported = await importedRasterObject(file, loaded);
     assertImportActive(options.signal);
-    importRasterImage(imported.object);
+    const outcome = importRasterImage(imported.object);
     rollback = null;
     pushToast(
       `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)} · ${describeImportDensity(imported.geometry)})`,
       'success',
     );
     if (gif) pushToast('GIF imported as a still image of its first frame.', 'info');
+    const fitNotice = describeImportBedFit(file.name, outcome);
+    if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
     return imported.object;
   } catch (err) {
     return handleFailedImport(file.name, err, rollback, pushToast);

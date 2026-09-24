@@ -39,7 +39,7 @@ export type FileCtx = {
   readonly project: Project;
   readonly importSvgFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
-  readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => void;
+  readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
   readonly projectDocumentEpoch: number;

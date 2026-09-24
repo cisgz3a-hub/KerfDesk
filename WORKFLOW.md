@@ -188,10 +188,21 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 2. Toast (warning): `<filename> has no drawable content`. No state change.
 
 #### Edge — SVG is larger than the machine bed
-1. Import preserves the complete source size; it never shrinks individual components to fit.
-2. Out-of-bounds geometry shows the workspace warning overlay and remains a Job Review warning.
-3. Operators can resize or reposition the artwork. A completed Frame for the exact reviewed job
-   remains the sole ordinary Start policy gate (ADRs 228, 230, 232 and 237).
+1. Art that fits the bed keeps its file size, including art exactly the bed size. Only an import
+   larger than the bed in either axis is scaled down, uniformly, to fit inside 90% of the bed,
+   centered (a staggered multi-file import keeps its 10 mm offset). The margin keeps the scaled
+   outline clear of the bed edges for overscan, kerf, and Frame.
+   Composed SVG artwork is fitted as one complete selection; its components retain their relative
+   placement, transforms and shared scale.
+2. A warning toast, after the import's other toasts, reports it:
+   `design.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% to fit. Undo restores the original size.`
+   DXF, image, and STL imports follow the same rule and notice; a height-map relief keeps its
+   authored size and is only centered.
+3. The scale-to-fit is its own undo step: the first Undo returns the design to its file size,
+   centered and extending past the bed; a second Undo removes the import.
+4. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
+5. Out-of-bounds geometry remains a Job Review warning. A completed Frame for the exact reviewed
+   job remains the sole ordinary Start policy gate (ADRs 228, 230, 232 and 237).
 
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
@@ -432,6 +443,12 @@ destination and cannot overwrite the template source.
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
+- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+  the operation's applied settings for the colour it names: the colour of the artwork the operation
+  was created for, or the operation's own colour when it has no artwork. New operations and **Reset
+  to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
+  automatic operation colour is never matched for artwork, so a default saved for black artwork
+  does not reach other artwork whose operation happens to be black.
 - CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
   sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
   machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
@@ -2499,8 +2516,12 @@ or traced image) with at least one closed polyline.
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
   The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
-  Scan Line, a stored Overscan value of zero uses the bounded 5 mm generic runway default rather
-  than allowing a rapid-to-powered start; Frame includes that effective motion.
+  Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
+  scanline's outer entry and exit), and a stored value of zero uses the bounded 5 mm generic runway
+  default rather than allowing a rapid-to-powered start; Frame includes that effective motion.
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+  runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
+  ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
@@ -2528,6 +2549,7 @@ correct M4-mode raster G-code from Compile.
 2. App decodes the image, computes intrinsic mm-bounds from the
    image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
    ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
+   An image larger than the bed is scaled down to fit, with a warning (F-A3).
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)
@@ -3544,7 +3566,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at 100 mm wide (height by aspect),
    5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count. The
+   layer created automatically. Toast reports the triangle count; a relief
+   larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
 3. The canvas shows the relief as a grayscale depth map — light = stock

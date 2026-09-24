@@ -73,6 +73,9 @@ const PLUNGE_FACTOR: Readonly<Record<CncMaterialFamily, number>> = {
 const MIN_FEED_MM_PER_MIN = 50;
 const ROUND_FEED_TO_MM = 10;
 const ROUND_DEPTH_TO_MM = 0.1;
+// Divide by a whole step count: Math.round(x / 0.1) * 0.1 leaves binary noise
+// such as 5.1000000000000005, which then reaches G-code comments and the UI.
+const DEPTH_STEPS_PER_MM = Math.round(1 / ROUND_DEPTH_TO_MM);
 
 export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): number {
   const chart = CHIPLOAD_CHART[cncMaterialFamilyFor(material)];
@@ -112,8 +115,8 @@ export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResu
   const depthPerPassMm =
     Math.max(
       ROUND_DEPTH_TO_MM,
-      Math.round((input.bitDiameterMm * DEPTH_FACTOR[family]) / ROUND_DEPTH_TO_MM) *
-        ROUND_DEPTH_TO_MM,
+      Math.round(input.bitDiameterMm * DEPTH_FACTOR[family] * DEPTH_STEPS_PER_MM) /
+        DEPTH_STEPS_PER_MM,
     ) || ROUND_DEPTH_TO_MM;
   return { kind: 'ok', chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
 }

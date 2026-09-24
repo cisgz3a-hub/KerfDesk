@@ -7,6 +7,7 @@ import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../impor
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { describeImportBedFit } from './import-bed-fit-notice';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   describeImportError,
@@ -40,14 +41,7 @@ export async function importSvgFiles(
         controls.options.signal,
       );
       if (outcome !== null) successIndex += 1;
-      if (outcome?.kind === 'replaced') {
-        const toast = describeReimportOutcome(outcome);
-        pushToast(toast.message, toast.variant);
-        continue;
-      }
-      for (const toast of describeImportResult(file.name, result)) {
-        pushToast(toast.message, toast.variant);
-      }
+      reportSvgImport(file.name, result, outcome, pushToast);
     } catch (error) {
       const toast = describeImportError(file.name, error);
       pushToast(
@@ -58,6 +52,25 @@ export async function importSvgFiles(
       controls.dispose();
     }
   }
+}
+
+function reportSvgImport(
+  name: string,
+  result: ParseSvgResult,
+  outcome: ImportOutcome | null,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): void {
+  if (outcome?.kind === 'replaced') {
+    const toast = describeReimportOutcome(outcome);
+    pushToast(toast.message, toast.variant);
+    return;
+  }
+  for (const toast of describeImportResult(name, result)) {
+    pushToast(toast.message, toast.variant);
+  }
+  // Last, so the three-toast stack cannot push it out of view.
+  const fitNotice = describeImportBedFit(name, outcome ?? undefined);
+  if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
 }
 
 async function parseFile(

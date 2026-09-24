@@ -67,6 +67,30 @@ describe('raster-image import resolution', () => {
     expect(pushToast).not.toHaveBeenCalledWith(expect.stringContaining('worker'), 'info');
   });
 
+  it('reports a scale-to-fit after the Added image toast', async () => {
+    pngImport.shouldPageBackPng.mockReturnValue(false);
+    imageLoader.readImageNaturalSize.mockResolvedValue({ width: 64, height: 32 });
+    imageLoader.loadImageAsRawData.mockResolvedValue({
+      width: 64,
+      height: 32,
+      data: new Uint8ClampedArray(4),
+    });
+    const bedFit = { scale: 0.25, widthMm: 1600, heightMm: 800, bedWidthMm: 400, bedHeightMm: 400 };
+    const pushToast = vi.fn();
+
+    await importImageFile(
+      new File(['png'], 'poster.png', { type: 'image/png' }),
+      vi.fn(() => ({ kind: 'added' as const, bedFit })),
+      pushToast,
+    );
+
+    expect(pushToast.mock.calls.at(-2)?.[0]).toMatch(/^Added image: poster\.png/);
+    expect(pushToast).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^poster\.png is larger than the 400 × 400 mm bed.*scaled to 25%/),
+      'warning',
+    );
+  });
+
   it('keeps a compressed oversize-edge PNG embedded after incremental worker sampling', async () => {
     pngImport.shouldPageBackPng.mockReturnValue(false);
     pngImport.shouldDecodeDimensionQualifiedPng.mockResolvedValue(true);

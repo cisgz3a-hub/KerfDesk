@@ -19,7 +19,7 @@ function segment(x0: number, x1: number): FillSegment {
   };
 }
 
-function job(segments: ReadonlyArray<FillSegment>): Job {
+function job(segments: ReadonlyArray<FillSegment>, overscanMm = DEFAULT_RUNWAY_MM): Job {
   const group: FillGroup = {
     kind: 'fill',
     layerId: 'trace-fill',
@@ -30,7 +30,7 @@ function job(segments: ReadonlyArray<FillSegment>): Job {
     airAssist: false,
     fillStyle: 'scanline',
     fillRunwayPolicy: 'feed-matched-every-sweep',
-    overscanMm: DEFAULT_RUNWAY_MM,
+    overscanMm,
     segments,
   };
   return { groups: [group] };
@@ -85,6 +85,20 @@ describe('generic Scan Line Frame motion envelope', () => {
       maxX: 13,
       maxY: 4,
     });
+    expect({
+      minX: Math.min(...emittedPoints.map((point) => point.x)),
+      minY: Math.min(...emittedPoints.map((point) => point.y)),
+      maxX: Math.max(...emittedPoints.map((point) => point.x)),
+      maxY: Math.max(...emittedPoints.map((point) => point.y)),
+    }).toEqual(motionBounds);
+  });
+
+  it('includes an overscan above 5 mm in full, exactly as emitted', () => {
+    const compiled = job([segment(20, 21), segment(27, 28)], 10);
+    const motionBounds = computeJobMotionBounds(compiled, DEFAULT_DEVICE_PROFILE);
+    const emittedPoints = emittedJobMotionPoints(compiled);
+
+    expect(motionBounds).toEqual({ minX: 10, minY: 4, maxX: 38, maxY: 4 });
     expect({
       minX: Math.min(...emittedPoints.map((point) => point.x)),
       minY: Math.min(...emittedPoints.map((point) => point.y)),

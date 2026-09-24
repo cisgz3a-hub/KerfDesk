@@ -284,7 +284,7 @@ describe('cncGrblStrategy', () => {
   });
 
   describe('helical contour passes', () => {
-    it('descends through native full-circle arcs before linking into the contour', () => {
+    it('descends through native half-circle arcs before linking into the contour', () => {
       const gcode = cncGrblStrategy.emit(
         {
           groups: [
@@ -310,8 +310,14 @@ describe('cncGrblStrategy', () => {
       );
 
       expect(gcode).toContain('G0 X15.000 Y10.000\nG1 Z0.000 F300');
-      expect(gcode).toContain('G3 X15.000 Y10.000 Z-1.000 I-5.000 J0.000 F300');
-      expect(gcode).toContain('G3 X15.000 Y10.000 Z-2.000 I-5.000 J0.000 F300');
+      expect(gcode).toContain(
+        [
+          'G3 X5.000 Y10.000 Z-0.500 I-5.000 J0.000 F300',
+          'G3 X15.000 Y10.000 Z-1.000 I5.000 J0.000 F300',
+          'G3 X5.000 Y10.000 Z-1.500 I-5.000 J0.000 F300',
+          'G3 X15.000 Y10.000 Z-2.000 I5.000 J0.000 F300',
+        ].join('\n'),
+      );
       expect(gcode).toContain('G1 X0.000 Y0.000 F1000\nG1 X20.000 Y0.000 F1000');
       expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
     });

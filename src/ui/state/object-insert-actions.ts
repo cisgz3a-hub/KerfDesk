@@ -23,10 +23,9 @@ import { createRegistrationBox, createRegistrationCircle } from '../../core/shap
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
+import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
-import { sourceColorForOperation } from './operation-source-color';
 import {
   applyFreshImport,
   applyReimport,
@@ -35,6 +34,7 @@ import {
   type TextInsertOptions,
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
+import { applyImportBedFit } from './import-bed-fit';
 import {
   applyAddRegistrationBox,
   applyRemoveRegistrationBox,
@@ -115,17 +115,22 @@ export function objectInsertActions(
 
 function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObject'] {
   return (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
+    let outcome: ImportOutcome = { kind: 'added' };
     set((state) => {
-      return applyLayerDefaultsToFreshLayers(
-        state.project.scene.layers,
-        applyFreshImport(state, object, batchOffsetIdx),
-        state.layerDefaults,
-        state.cncLiveCaps,
+      const fitted = applyImportBedFit(
+        applyLayerDefaultsToFreshLayers(
+          state.project.scene.layers,
+          applyFreshImport(state, object, batchOffsetIdx),
+          state.layerDefaults,
+          state.cncLiveCaps,
+        ),
       );
+      outcome = fitted.outcome;
+      return fitted.state;
     });
     // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
     fitAllObjects(get);
-    return { kind: 'added' };
+    return outcome;
   };
 }
 
@@ -251,10 +256,7 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
   let changed = false;
   const layers = result.project.scene.layers.map((layer) => {
     if (existing.has(layer.id)) return layer;
-    const settings = defaultSettingsForColor(
-      defaults,
-      sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color,
-    );
+    const settings = defaultSettingsForOperation(defaults, result.project.scene.objects, layer);
     const withDefaults =
       Object.keys(settings).length === 0 ? layer : applyLayerDefaultSettings(layer, settings);
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op
@@ -286,16 +288,21 @@ function svgFragmentActions(
 ): Pick<AppState, 'importSvgFragment' | 'reimportSvgFragment'> {
   return {
     importSvgFragment: (fragment, batchIndex = 0) => {
-      set((state) =>
-        applyLayerDefaultsToFreshLayers(
-          state.project.scene.layers,
-          applySvgFragmentImport(state, fragment, batchIndex),
-          svgStructuralDefaults(state.layerDefaults),
-          state.cncLiveCaps,
-        ),
-      );
+      let outcome: ImportOutcome = { kind: 'added' };
+      set((state) => {
+        const fitted = applyImportBedFit(
+          applyLayerDefaultsToFreshLayers(
+            state.project.scene.layers,
+            applySvgFragmentImport(state, fragment, batchIndex),
+            svgStructuralDefaults(state.layerDefaults),
+            state.cncLiveCaps,
+          ),
+        );
+        outcome = fitted.outcome;
+        return fitted.state;
+      });
       fitAllObjects(get);
-      return { kind: 'added' };
+      return outcome;
     },
     reimportSvgFragment: (targetId, fragment) => {
       let outcome: ImportOutcome | null = null;

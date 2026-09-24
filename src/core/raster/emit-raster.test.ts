@@ -72,7 +72,7 @@ describe('emitRasterGroup — preamble + postamble', () => {
   it('header comments carry layer, color, power, dimensions, feed', () => {
     const out = emitRasterGroup(makeInput({ powerPercent: 75 }));
     expect(out).toMatch(/^; image layer L1 color #000000 power 75%/);
-    expect(out).toMatch(/2 × 2 px/);
+    expect(out).toMatch(/2 x 2 px/);
     expect(out).toMatch(/feed 6000 mm\/min, overscan 0\.000 mm/);
   });
 });

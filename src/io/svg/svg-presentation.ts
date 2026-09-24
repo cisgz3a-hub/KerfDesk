@@ -2,6 +2,7 @@ import type { ColoredPath } from '../../core/scene';
 import type { SvgMatrix } from './svg-curve-transform';
 import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute';
 import { inheritedSvgFillRule } from './svg-fill-rule';
+import type { SvgStyleCascade } from './svg-stylesheet';
 
 export type SvgClipReference = { readonly id: string; readonly transform: SvgMatrix };
 
@@ -97,10 +98,16 @@ export const INITIAL_PRESENTATION_STATE: PresentationState = {
   visibility: null,
 };
 
-export function presentationStateFor(el: Element, parent: PresentationState): PresentationState {
+export function presentationStateFor(
+  el: Element,
+  parent: PresentationState,
+  cascadeStyles: SvgStyleCascade,
+): PresentationState {
   // Parsed once and passed down: each of the eight lookups below used to re-read
-  // and re-split the whole style attribute for the same element.
-  const styles = styleMap(el.getAttribute('style'));
+  // and re-split the whole style attribute for the same element. Matching
+  // <style> rules merge in here, so paint, opacity, clips and effects all see
+  // the winning declaration while retaining the fragment's ownership state.
+  const styles = cascadeStyles(el, styleMap(el.getAttribute('style')));
   const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
   const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
   const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;

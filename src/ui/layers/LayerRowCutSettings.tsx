@@ -1,5 +1,6 @@
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { defaultColorForOperation } from '../state/operation-source-color';
 import { CutSettingsDialog } from './CutSettingsDialog';
 import type { LayerPatch } from './cut-settings-draft';
 
@@ -15,6 +16,9 @@ export function LayerRowCutSettings(props: {
   const makeLayerDefault = useStore((s) => s.makeLayerDefault);
   const makeLayerDefaultForAll = useStore((s) => s.makeLayerDefaultForAll);
   const resetLayerToDefault = useStore((s) => s.resetLayerToDefault);
+  const makeDefaultColor = useStore((s) =>
+    defaultColorForOperation(s.project.scene.objects, layer),
+  );
   const dialog = (
     <CutSettingsDialog
       layer={layer}
@@ -31,6 +35,7 @@ export function LayerRowCutSettings(props: {
             onMakeDefault: () => makeLayerDefault(layer.id),
             onMakeDefaultForAll: () => makeLayerDefaultForAll(layer.id),
             onResetToDefault: () => resetLayerToDefault(layer.id),
+            makeDefaultColor,
           }
         : {})}
     />

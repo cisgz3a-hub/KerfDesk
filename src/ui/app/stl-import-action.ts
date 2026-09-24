@@ -18,7 +18,9 @@ import {
   type StlImportPreparationOptions,
   prepareParsedStlImport,
 } from '../import/stl-import-preparation';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
+import { describeImportBedFit } from './import-bed-fit-notice';
 import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
@@ -36,7 +38,7 @@ const STL_PREPARATION_OPTIONS: StlImportPreparationOptions = {
 };
 
 type StlImportContext = {
-  readonly importObject: (obj: SceneObject, batchIdx?: number) => unknown;
+  readonly importObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome | undefined;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly nextSuccessIndex?: () => number;
 };
@@ -72,12 +74,14 @@ export async function importStlFiles(
       if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
       const claimed = claimImportSuccessIndex(ctx.nextSuccessIndex, successIdx);
       successIdx = claimed.nextLocalIndex;
-      ctx.importObject(relief, claimed.batchIndex);
+      const outcome = ctx.importObject(relief, claimed.batchIndex);
       ctx.pushToast(
         `Imported relief "${file.name}" (${triangles} triangles) at ` +
           `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${CNC_OUTPUT_NOTE}`,
         'success',
       );
+      const fitNotice = describeImportBedFit(file.name, outcome);
+      if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
     } catch (err) {
       ctx.pushToast(
         isImportCancellation(err)

@@ -10,6 +10,7 @@ const calls = vi.hoisted(() => ({
   importImageFile: vi.fn(),
   importStlFiles: vi.fn(),
   openGcodeFileInInspector: vi.fn(),
+  requestPagedArtwork: vi.fn(),
 }));
 
 vi.mock('./svg-import-action', () => ({
@@ -26,6 +27,9 @@ vi.mock('./stl-import-action', () => ({
 }));
 vi.mock('./gcode-open-action', () => ({
   openGcodeFileInInspector: calls.openGcodeFileInInspector,
+}));
+vi.mock('../import/request-paged-artwork', () => ({
+  requestPagedArtwork: calls.requestPagedArtwork,
 }));
 
 function object(id: string): SceneObject {
@@ -121,6 +125,61 @@ describe('dispatchImportFilesInOrder', () => {
       2,
     );
   });
+
+  it('returns the raster fit outcome to the image importer for its resize notice', async () => {
+    const outcome = {
+      kind: 'added' as const,
+      bedFit: { scale: 0.25, widthMm: 1600, heightMm: 800, bedWidthMm: 400, bedHeightMm: 400 },
+    };
+    const receivedOutcome = vi.fn();
+    calls.importImageFile.mockImplementationOnce(async (file, importObject) => {
+      receivedOutcome(importObject(object(file.name)));
+    });
+    const ctx = actions();
+    ctx.importRasterImage.mockReturnValue(outcome);
+
+    await dispatchImportFilesInOrder([new File([''], 'oversize.png', { type: 'image/png' })], ctx);
+
+    expect(receivedOutcome).toHaveBeenCalledWith(outcome);
+    expect(ctx.importRasterImage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'oversize.png' }),
+      0,
+    );
+  });
+
+  it.each([
+    { name: 'page.pdf', kind: 'imported-svg' },
+    { name: 'page.tiff', kind: 'raster-image' },
+  ] as const)(
+    'reports the final $name page fit after its success notice',
+    async ({ name, kind }) => {
+      const page = { id: 'selected-page', kind } as SceneObject;
+      const outcome = {
+        kind: 'added' as const,
+        bedFit: { scale: 0.25, widthMm: 1600, heightMm: 800, bedWidthMm: 400, bedHeightMm: 400 },
+      };
+      calls.requestPagedArtwork.mockImplementationOnce(async (_file, _kind, _isCurrent, commit) => {
+        commit(page);
+        return page;
+      });
+      const ctx = actions();
+      ctx.importSvgObject.mockReturnValue(outcome);
+      ctx.importRasterImage.mockReturnValue(outcome);
+
+      await dispatchImportFilesInOrder([new File([''], name)], ctx);
+
+      const sink = kind === 'raster-image' ? ctx.importRasterImage : ctx.importSvgObject;
+      expect(sink).toHaveBeenCalledWith(page, 0);
+      expect(ctx.pushToast.mock.calls).toEqual([
+        ['Added artwork: ' + name, 'success'],
+        [
+          `${name} is larger than the 400 × 400 mm bed (1600 × 800 mm), so it was scaled to 25% ` +
+            'to fit. Undo restores the original size.',
+          'warning',
+        ],
+      ]);
+    },
+  );
 
   it('isolates an unexpected per-file failure and continues with the next original file', async () => {
     calls.importDxfFiles.mockRejectedValueOnce(new Error('parser crashed'));

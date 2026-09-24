@@ -134,7 +134,8 @@ describe('estimateJobDuration follows emitted CNC commands', () => {
     const program = cncGrblStrategy.emit(job, DEVICE);
     const result = estimateJobDuration(job, DEVICE);
 
-    expect(program.match(/^G3 .*F60$/gm)).toHaveLength(46);
+    // Two half-circle arcs per revolution (GRBL 1.1h full-circle rounding).
+    expect(program.match(/^G3 .*F60$/gm)).toHaveLength(92);
     // F60 is 1 mm/s. The true 3D helix is at least hypot(46*2π,5) mm;
     // integer output rounding of per-turn Z cannot shorten this uniform-slope
     // lower bound. Add 5 mm entry at F60 and the 40 mm contour at F1200.

@@ -1,7 +1,7 @@
 // fitObjectToRegion — returns the SceneObject with its transform set so the
 // object fits inside a target region (any rectangle in scene mm) and is centered
-// in it. Generalizes fitObjectToBed (which fits the whole bed with a fixed 10%
-// margin and never grows small designs): here the region and margin are
+// in it. Generalizes fitObjectToBed (which shrinks only over-bed art, into 90%
+// of the bed, and never grows small designs): here the region and margin are
 // caller-supplied, and `grow` decides whether a design smaller than the region
 // is scaled UP to fill it. "Fit artwork to the placed board" wants grow=true;
 // the bed-import path wants grow=false.

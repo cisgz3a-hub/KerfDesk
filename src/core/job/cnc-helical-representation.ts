@@ -22,14 +22,14 @@ export function cncHelicalContourCanEmit(pass: CncHelicalContourPass): boolean {
   );
 }
 
-/** Controller-represented Z at each emitted full-circle helix boundary. */
+/** Controller-represented Z at each emitted helix revolution boundary. */
 export function cncHelicalContourRepresentedSeamZs(
   pass: CncHelicalContourPass,
 ): ReadonlyArray<number> {
   return cncHelicalContourRepresentedSeams(pass).map((seam) => seam.value);
 }
 
-/** One exact text/value pair for every emitted full-circle helix boundary. */
+/** One exact text/value pair for every emitted helix revolution boundary. */
 export function cncHelicalContourRepresentedSeams(
   pass: CncHelicalContourPass,
 ): ReadonlyArray<CncCoordinateRepresentation> {
@@ -40,6 +40,25 @@ export function cncHelicalContourRepresentedSeams(
   return Array.from({ length: revolutions + 1 }, (_, index) =>
     cncCoordinateRepresentationMm(
       pass.startZMm + ((pass.zMm - pass.startZMm) * index) / revolutions,
+    ),
+  );
+}
+
+/**
+ * One exact text/value pair for the half-way depth of every revolution. The
+ * emitter writes each revolution as two half-circle arcs (see
+ * cnc-grbl-helical.ts), and this is the depth the first half ends at.
+ */
+export function cncHelicalContourRepresentedMidSeams(
+  pass: CncHelicalContourPass,
+): ReadonlyArray<CncCoordinateRepresentation> {
+  const revolutions = Math.max(1, Math.floor(pass.revolutions));
+  if (!Number.isFinite(revolutions)) {
+    return [cncCoordinateRepresentationMm((pass.startZMm + pass.zMm) / 2)];
+  }
+  return Array.from({ length: revolutions }, (_, index) =>
+    cncCoordinateRepresentationMm(
+      pass.startZMm + ((pass.zMm - pass.startZMm) * (2 * index + 1)) / (2 * revolutions),
     ),
   );
 }
@@ -56,10 +75,12 @@ export function cncHelicalContourPoints(
   const circle = sampleCircularArcPoints({ ...pass, end: pass.start });
   const revolutions = Math.max(1, Math.floor(pass.revolutions));
   const seamZs = cncHelicalContourRepresentedSeamZs(pass);
+  const midZs = cncHelicalContourRepresentedMidSeams(pass).map((seam) => seam.value);
   const points: HelicalRepresentationPoint[] = [];
   for (let revolution = 0; revolution < revolutions; revolution += 1) {
     const fromZ = seamZs[revolution] ?? 0;
     const toZ = seamZs[revolution + 1] ?? fromZ;
+    const midZ = midZs[revolution] ?? (fromZ + toZ) / 2;
     for (let index = 0; index < circle.length; index += 1) {
       const point = circle[index];
       if (point === undefined || (revolution > 0 && index === 0)) continue;
@@ -67,7 +88,10 @@ export function cncHelicalContourPoints(
       points.push({
         x: point.x,
         y: point.y,
-        z: fromZ + (toZ - fromZ) * progress,
+        z:
+          progress <= 0.5
+            ? fromZ + (midZ - fromZ) * progress * 2
+            : midZ + (toZ - midZ) * (progress - 0.5) * 2,
       });
     }
   }

@@ -7,6 +7,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { describeReimportOutcome } from './import-toasts';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
+import { describeImportBedFit } from './import-bed-fit-notice';
 
 type ImportHpglContext = {
   readonly importObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
@@ -56,6 +57,8 @@ function applyHpglResult(name: string, result: ParseHpglResult, ctx: ImportHpglC
     `Imported ${result.pathCount} path${result.pathCount === 1 ? '' : 's'} from ${name}.`,
     'success',
   );
+  const fitNotice = describeImportBedFit(name, outcome);
+  if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
 }
 
 async function parseHpglFile(

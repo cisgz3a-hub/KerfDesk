@@ -55,6 +55,8 @@ export async function pageArtworkObject(
         source,
         bounds: { minX: 0, minY: 0, maxX: page.widthMm, maxY: page.heightMm },
       });
+      // The page dispatcher reports placement using the final page bounds.
+      return undefined;
     },
     (message, variant) => {
       if (variant === 'error') failure = message;

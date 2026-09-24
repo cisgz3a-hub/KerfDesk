@@ -1,6 +1,8 @@
-import { transformedBBox, type AABB } from './hit-test';
+import type { AABB } from './hit-test';
+import type { SceneGroup } from './scene';
 import type { SceneObject, Transform } from './scene-object';
 import type { SelectionTransform } from './selection-transform';
+import { selectionUnits, type SelectionUnit } from './selection-units';
 
 export type SelectionDistributeKind =
   | 'horizontal-centers'
@@ -18,43 +20,40 @@ export type SelectionDistributeResult =
   | { readonly kind: 'ok'; readonly transforms: ReadonlyArray<SelectionTransform> }
   | { readonly kind: 'error'; readonly reason: SelectionDistributeError };
 
-type PositionedObject = {
-  readonly object: SceneObject;
-  readonly box: AABB;
-  readonly index: number;
-};
+type PositionedUnit = SelectionUnit & { readonly index: number };
 
+/**
+ * Evenly space the units of `objects` (see selectionUnits) between the two
+ * outermost ones, so a selected group counts as one item and all its members
+ * move by the same delta. Without `groups` every object is its own unit.
+ */
 export function buildSelectionDistributeEdit(
   objects: ReadonlyArray<SceneObject>,
   edit: SelectionDistributeEdit,
+  groups: ReadonlyArray<SceneGroup> = [],
 ): SelectionDistributeResult {
   if (objects.length === 0) return { kind: 'error', reason: 'empty-selection' };
-  if (objects.length < 3) return { kind: 'error', reason: 'not-enough-objects' };
+  const units = selectionUnits(objects, groups);
+  if (units.length < 3) return { kind: 'error', reason: 'not-enough-objects' };
 
-  const positioned = objects.map((object, index) => ({
-    object,
-    box: transformedBBox(object),
-    index,
-  }));
+  const positioned = units.map((unit, index) => ({ ...unit, index }));
   const sorted = [...positioned].sort((a, b) => comparePositioned(a, b, edit.kind));
-  const transforms = distributeSortedObjects(sorted, edit.kind).filter(
-    (item): item is SelectionTransform => item !== null,
-  );
+  const transforms = distributeSortedUnits(sorted, edit.kind).flat();
   return { kind: 'ok', transforms };
 }
 
-function distributeSortedObjects(
-  sorted: ReadonlyArray<PositionedObject>,
+function distributeSortedUnits(
+  sorted: ReadonlyArray<PositionedUnit>,
   kind: SelectionDistributeKind,
-): ReadonlyArray<SelectionTransform | null> {
+): ReadonlyArray<ReadonlyArray<SelectionTransform>> {
   if (isCenterKind(kind)) return distributeCenters(sorted, kind);
   return distributeEdgeSpacing(sorted, kind);
 }
 
 function distributeCenters(
-  sorted: ReadonlyArray<PositionedObject>,
+  sorted: ReadonlyArray<PositionedUnit>,
   kind: SelectionDistributeKind,
-): ReadonlyArray<SelectionTransform | null> {
+): ReadonlyArray<ReadonlyArray<SelectionTransform>> {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   if (first === undefined || last === undefined) return [];
@@ -65,14 +64,14 @@ function distributeCenters(
   return sorted.slice(1, -1).map((item, interiorIndex) => {
     const targetCenter = firstCenter + centerStep * (interiorIndex + 1);
     const delta = targetCenter - centerOnAxis(item.box, axis);
-    return distributeTransform(item.object, axis, delta);
+    return distributeTransforms(item, axis, delta);
   });
 }
 
 function distributeEdgeSpacing(
-  sorted: ReadonlyArray<PositionedObject>,
+  sorted: ReadonlyArray<PositionedUnit>,
   kind: SelectionDistributeKind,
-): ReadonlyArray<SelectionTransform | null> {
+): ReadonlyArray<ReadonlyArray<SelectionTransform>> {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   if (first === undefined || last === undefined) return [];
@@ -85,25 +84,25 @@ function distributeEdgeSpacing(
   return sorted.slice(1, -1).map((item) => {
     const delta = cursor - minOnAxis(item.box, axis);
     cursor += sizeOnAxis(item.box, axis) + gap;
-    return distributeTransform(item.object, axis, delta);
+    return distributeTransforms(item, axis, delta);
   });
 }
 
-function distributeTransform(
-  object: SceneObject,
+function distributeTransforms(
+  unit: SelectionUnit,
   axis: 'x' | 'y',
   delta: number,
-): SelectionTransform | null {
-  if (delta === 0) return null;
-  return {
+): ReadonlyArray<SelectionTransform> {
+  if (delta === 0) return [];
+  return unit.objects.map((object) => ({
     id: object.id,
     transform: translateTransform(object.transform, axis, delta),
-  };
+  }));
 }
 
 function comparePositioned(
-  a: PositionedObject,
-  b: PositionedObject,
+  a: PositionedUnit,
+  b: PositionedUnit,
   kind: SelectionDistributeKind,
 ): number {
   const axis = isHorizontalKind(kind) ? 'x' : 'y';

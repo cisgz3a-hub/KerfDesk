@@ -11,6 +11,7 @@ import { openGcodeFileInInspector } from './gcode-open-action';
 import { importStlFiles } from './stl-import-action';
 import { importSvgFiles } from './svg-import-action';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
+import { describeImportBedFit } from './import-bed-fit-notice';
 
 export const ARTWORK_IMPORT_EXTENSIONS = [
   '.svg',
@@ -33,7 +34,10 @@ export type ImportDispatchActions = {
   readonly getProjectDocumentEpoch: () => number;
   readonly importSvgFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
-  readonly importRasterImage: (object: SceneObject, batchIndex?: number) => void;
+  readonly importRasterImage: (
+    object: SceneObject,
+    batchIndex?: number,
+  ) => ImportOutcome | undefined;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
@@ -111,8 +115,9 @@ function countSuccessfulInsertions(
       return outcome;
     },
     importRasterImage: (object, batchIndex) => {
-      actions.importRasterImage(object, batchIndex);
+      const outcome = actions.importRasterImage(object, batchIndex);
       inserted();
+      return outcome;
     },
     ...(fragmentSink === undefined
       ? {}
@@ -221,7 +226,7 @@ export function bindImportActionsToDocument(
     },
     importRasterImage: (object, batchIndex) => {
       assertCurrent();
-      actions.importRasterImage(object, batchIndex);
+      return actions.importRasterImage(object, batchIndex);
     },
     pushToast: (message, variant) => {
       if (owner.isCurrent()) actions.pushToast(message, variant);
@@ -253,9 +258,13 @@ async function dispatchOneFile(
 ): Promise<void> {
   if (kind === 'pdf' || kind === 'tiff') {
     await requestPagedArtwork(file, kind, owner.isCurrent, (object) => {
-      if (object.kind === 'raster-image') actions.importRasterImage(object, nextSuccessIndex());
-      else actions.importSvgObject(object, nextSuccessIndex());
+      const outcome =
+        object.kind === 'raster-image'
+          ? actions.importRasterImage(object, nextSuccessIndex())
+          : actions.importSvgObject(object, nextSuccessIndex());
       actions.pushToast('Added artwork: ' + file.name, 'success');
+      const fitNotice = describeImportBedFit(file.name, outcome);
+      if (fitNotice !== null) actions.pushToast(fitNotice.message, fitNotice.variant);
     });
     return;
   }

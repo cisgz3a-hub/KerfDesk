@@ -35,7 +35,7 @@ describe('composed SVG through real parsing, PNG hydration and the store', () =>
     await resetSvgImageTestEnvironment();
   });
 
-  it('inserts ordered vectors and a real bitmap at shared physical scale in one undo step', async () => {
+  it('inserts a complete composition with a separate undo step for its shared oversize fit', async () => {
     const source = roundTripSource();
     const before = useStore.getState().project;
     const calls = actions();
@@ -56,12 +56,14 @@ describe('composed SVG through real parsing, PNG hydration and the store', () =>
       'image',
       'line',
     ]);
-    expect(after.undoStack).toEqual([before]);
+    expect(after.undoStack).toHaveLength(2);
+    expect(after.undoStack[0]).toBe(before);
     expect(after.additionalSelectedIds.size).toBe(2);
     const back = after.project.scene.objects[0];
     const imported = after.project.scene.objects[1];
     const original = source.scene.objects[1];
-    expect(back?.transform.scaleX).toBe(1); // 1100 mm artwork exceeds the bed, deliberately unshrunk.
+    const scale = 360 / 1100;
+    expect(back?.transform.scaleX).toBeCloseTo(scale);
     if (
       imported?.kind !== 'raster-image' ||
       original?.kind !== 'raster-image' ||
@@ -82,13 +84,21 @@ describe('composed SVG through real parsing, PNG hydration and the store', () =>
     ]) {
       const sourcePoint = applyTransform(point, original.transform);
       const importedPoint = applyTransform(point, imported.transform);
-      expect(importedPoint.x - sourcePoint.x).toBeCloseTo(back.transform.x, 9);
-      expect(importedPoint.y - sourcePoint.y).toBeCloseTo(back.transform.y, 9);
+      expect(importedPoint.x - sourcePoint.x * scale).toBeCloseTo(back.transform.x, 9);
+      expect(importedPoint.y - sourcePoint.y * scale).toBeCloseTo(back.transform.y, 9);
     }
     const serialized = serializeProject(after.project);
     expect(deserializeProject(serialized).kind).toBe('ok');
     useStore.getState().undo();
+    const authored = useStore.getState().project;
+    expect(authored.scene.objects[0]?.transform.scaleX).toBe(1);
+    const authoredImage = authored.scene.objects[1];
+    expect(authoredImage?.transform.scaleX).toBeCloseTo(original.transform.scaleX);
+    expect(authoredImage?.transform.scaleY).toBeCloseTo(original.transform.scaleY);
+    useStore.getState().undo();
     expect(useStore.getState().project).toBe(before);
+    useStore.getState().redo();
+    expect(useStore.getState().project).toBe(authored);
     useStore.getState().redo();
     expect(useStore.getState().project).toBe(after.project);
   });
@@ -106,7 +116,7 @@ describe('composed SVG through real parsing, PNG hydration and the store', () =>
         (objects[index + 3]?.transform.y ?? NaN) - (objects[index]?.transform.y ?? NaN),
       ).toBeCloseTo(10);
     }
-    expect(useStore.getState().undoStack).toHaveLength(2);
+    expect(useStore.getState().undoStack).toHaveLength(4);
   });
 
   it('hydrates multiple overlapping images while preserving their interleaved vector order', async () => {
@@ -135,9 +145,11 @@ describe('composed SVG through real parsing, PNG hydration and the store', () =>
       'raster-image',
     ]);
     expect(pngWorkerRequests).toHaveLength(2);
-    expect((objects[3]?.transform.x ?? NaN) - (objects[1]?.transform.x ?? NaN)).toBeCloseTo(5);
+    expect((objects[3]?.transform.x ?? NaN) - (objects[1]?.transform.x ?? NaN)).toBeCloseTo(
+      (5 * 360) / 1100,
+    );
     expect(objects[3]?.transform.y).toBeCloseTo(objects[1]?.transform.y ?? NaN);
-    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(useStore.getState().undoStack).toHaveLength(2);
   });
 
   it('does not consume placement or history when actual store insertion exceeds its layer capacity', async () => {

@@ -15,7 +15,7 @@ export type ImagePickActionContext = {
   readonly platform: PlatformAdapter;
   readonly getProjectDocumentEpoch: () => number;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
-  readonly importRasterImage: (object: SceneObject, batchIndex?: number) => void;
+  readonly importRasterImage: (object: SceneObject, batchIndex?: number) => ImportOutcome;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 

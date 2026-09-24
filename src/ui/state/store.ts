@@ -118,7 +118,7 @@ import {
   pathNodeCurveCommandActions,
   type PathNodeCurveCommandActions,
 } from './path-node-curve-command-actions';
-import type { TraceExistingImageOptions } from './scene-mutations';
+import type { ImportOutcome, TraceExistingImageOptions } from './scene-mutations';
 import type { TextInsertOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
@@ -258,7 +258,7 @@ export type AppState = ObjectPropertiesActions &
     // display filename. Explicit re-import is a separate selected-target
     // action so filename collisions cannot silently replace artwork.
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
-    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
+    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
     readonly traceExistingImage: (
       sourceId: string,
