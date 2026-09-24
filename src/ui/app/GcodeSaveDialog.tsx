@@ -62,7 +62,7 @@ export function GcodeSaveDialog(props: { readonly onClose: () => void }): JSX.El
           disabled={preparation.kind === 'preparing' || preparation.kind === 'failed'}
           onClick={save}
         >
-          Choose destination…
+          Save as…
         </Button>
       </DialogActions>
     </Dialog>
@@ -101,9 +101,9 @@ function saveContext(
 function preparationMessage(state: PreparationState): string {
   switch (state.kind) {
     case 'preparing':
-      return 'Preparing the complete export before a final file is selected…';
+      return 'Preparing your G-code file…';
     case 'ready':
-      return 'The complete export is ready. Choose a destination; the final file is written only from this prepared artifact.';
+      return 'The complete export is ready. Choose a filename and folder, such as Downloads or Desktop. You can create a new file.';
     case 'direct':
       return 'Choose a destination for this prebuilt multi-file or controller-specific export.';
     case 'failed':
