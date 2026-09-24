@@ -30,6 +30,12 @@ for (const detail of [60, 100]) {
     await (await toolbarCommand(page, 'Import...')).click();
     const trace = await toolbarCommand(page, 'Trace Image...');
     await expect(trace).toBeEnabled({ timeout: 30_000 });
+    const width = page.getByRole('spinbutton', { name: 'Selection width', exact: true });
+    const height = page.getByRole('spinbutton', { name: 'Selection height', exact: true });
+    await width.fill('64');
+    await width.blur();
+    await height.fill('64');
+    await height.blur();
     await trace.click();
     const dialog = page.getByRole('dialog', { name: 'Trace image' });
     await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Photo shading');
@@ -95,7 +101,7 @@ for (const detail of [60, 100]) {
       };
     });
     expect(summary.objects).toBe(1);
-    expect(summary.width).toBeGreaterThanOrEqual(512);
+    expect(summary.width).toBe(640);
     expect(summary.height).toBe(summary.width);
     expect(summary.partialFraction).toBeGreaterThan(0.15);
     expect(summary.tonalLevels).toBeGreaterThan(30);

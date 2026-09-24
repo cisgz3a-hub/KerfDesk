@@ -43,9 +43,12 @@ Integration notes: the initial repository typecheck was interrupted during
 concurrent implementation and is not a pass. The next complete typecheck found a
 single exact-optional test argument; it is corrected and awaits confirmation.
 Two cold dev-browser startup probes timed out with modules still pending and no
-captured runtime errors. A production build and two uncropped Photo raster browser
-regressions are being qualified. Browser and repository gates remain required
-before release; focused checks are not being used as substitutes for them.
+captured runtime errors. The production build and startup browser check now pass,
+with no captured runtime errors. Both uncropped Photo raster browser regressions
+pass at 64 mm: Detail 60 and 100 each save a 640 by 640 image with all 256 gray
+levels, a matching PNG, one committed source replacement and its Image operation.
+The first browser test assumed an import size; it was corrected to set the actual
+physical size explicitly. Repository gates remain required before release.
 
 ## Batch 2: reliable submission and cancellation
 
