@@ -33,6 +33,7 @@ import {
 } from './start-blocked-alarm-offers';
 import { SET_ORIGIN_OFFER_PROMPT } from './start-blocked-setup-offers';
 import { useStartBlockerStore } from './start-blocker-store';
+import { clearFrameExpiryNote } from './frame-expiry-note';
 import { FRAME_JOB_FIRST_MESSAGE } from './framed-run-readiness';
 import { runStartJobFlow } from './start-job-flow';
 import { runFrameNow } from './use-frame-action';
@@ -59,6 +60,8 @@ beforeEach(() => {
   localStorage.clear();
   resetStore();
   useLaserStore.setState(initialLaserState());
+  // A permit expired by an earlier case leaves its reason for Start to show.
+  clearFrameExpiryNote();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   disposeReview = installAutoJobReview('confirm');
 });

@@ -35,9 +35,10 @@ It reproduced every time for any job slow enough to be split. The primary button
 **Set up & Frame**, ran the Frame itself, and filed the failure under "Last Start attempt
 blocked".
 
-**Fixed by ADR-372.** Once the trace is dispatched, the owner reads the pre-Frame status report.
-The trace's completion check and its expiry own the head's position from then on. Start now reads
-**Start**, stays greyed out until a clean Frame, and never runs a Frame itself.
+**Fixed by #901** (merged as `67851490c`), which binds the preparation to the exact Frame
+operation that owns the motion. This branch's regression test, a trace that reports the head
+moving, passes against it. This branch (ADR-372) changes the primary button: it reads **Start**,
+stays greyed out until a clean Frame, and never runs a Frame itself.
 
 ## The block after homing (second screenshot)
 
@@ -72,7 +73,7 @@ button pressed.
 | **Absolute with a reported work offset** ("requires the custom work origin to be cleared") | `job-placement.ts` `resolveAbsolute` | Presented as P | **Defect: not factual, and a dead end. Fixed by #852 (`6b6250b52`).** Export already compensated the known offset. The advice pointed at **Reset origin**, which is disabled for an offset KerfDesk did not set. It fired right after homing on the maintainer's machine. |
 | Job active, jog/frame active, controller operation, auto-focus, alarm, no status, not Idle | `start-job-input.ts:56` `findMachineStartIssues` | T | Keep |
 | Compile failed, compile-integrity preflight codes, nothing sendable, line longer than RX buffer, worker unavailable | `start-job-readiness.ts:294` `finalizeStartPreparation`, `start-job-readiness-policy.ts`, `start-job-source.ts` | P | Keep |
-| **Inputs changed during preparation** | `start-preparation-owner.ts:27` | H | **Defect: fired on the Frame's own motion. Fixed (ADR-372)** |
+| **Inputs changed during preparation** | `start-preparation-owner.ts:27` | H | **Defect: fired on the Frame's own motion. Fixed by #901 (`67851490c`)** |
 | Inputs changed between press and trace dispatch | `frame-trace-flow.ts:133` `traceFrameOutline`, `use-frame-action.ts` `dispatchPreparedFrame` | H | Keep |
 | No usable work position; motion not dispatched | `frame-dispatch-support.ts` | T | Keep |
 | Frame cancelled, alarm (limit switch), error, reset or disconnect before the clean Idle | `waitForFrameOutcome`, `laser-frame-status.ts` | Frame did not complete | Keep. This is the one gate |
@@ -112,7 +113,7 @@ warning (ADR-232).
 | Line longer than RX buffer; FluidNC 127-byte line limit | `laser-start-program-assertions.ts` | P | Keep |
 
 **Result:** two refusals were defects, both before the permit: the split Frame cancelling its
-own program (ADR-372) and Absolute refusing a reported work offset (#852). After a clean
+own program (#901) and Absolute refusing a reported work offset (#852). After a clean
 Frame, no policy refusal remains. Every refusal in section 3 is either
 a live transport fact or a check that the exact framed bytes are what will be sent. Section 2 is
 the Frame no longer describing the machine or the job.

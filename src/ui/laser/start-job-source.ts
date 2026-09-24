@@ -38,6 +38,7 @@ import {
 } from './start-preparation-owner';
 import { publishFramePreparationProgress } from '../state/frame-preparation-store';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
+import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import { machineSnapshot } from './start-machine-snapshot';
 
 /** Optional observers of one Start preparation. */
@@ -46,9 +47,7 @@ export type StartPreparationHooks = {
    * compiled, before the exact program exists (ADR-353). A main-thread
    * preparation finishes in one turn, so it never reports them early. */
   readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
-  /** True once the Frame traces that outline while this preparation finishes:
-   * the head's motion is the Frame's own, not a setup change (ADR-353). */
-  readonly frameOwnsMotion?: () => boolean;
+  readonly frameMotionOwner?: FramePreparationMotionOwner;
 };
 
 export type PreparedRecoverySource = {
@@ -149,7 +148,7 @@ async function prepareCurrentStartInBackground(args: {
         ? {}
         : { resolvedJobOrigin: args.resolvedJobOrigin }),
     },
-    args.hooks.frameOwnsMotion,
+    args.hooks.frameMotionOwner,
   );
   try {
     const background = prepareStartOutputOffThread(

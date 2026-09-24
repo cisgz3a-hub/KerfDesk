@@ -13,15 +13,20 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
   framePreparationCancelled,
+  publishFramePreparationStage,
   registerFramePreparationAbort,
   runOwnedFrame,
+  useFramePreparationStore,
 } from '../state/frame-preparation-store';
 import { isOutputPreparationAbort } from './output-preparation-errors';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveLiveFramePlacement } from './camera-frame-placement';
-import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
+import {
+  assertFramePreparationActive,
+  normalizeFrameWorkCoordinateSystem,
+} from './frame-controller-readiness';
 import {
   waitForAbsoluteFrameOffset,
   waitForFreshIdleFramePosition,
@@ -85,9 +90,14 @@ export function runFrameNow(): Promise<boolean> {
     const release = registerFramePreparationAbort(preparation.abort);
     try {
       const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
+      preparation.signal.throwIfAborted();
       if (preview !== null) return await dispatchTracedFrame(context, preview, preparation);
-      const bundle = exactFrameBundle(context, await preparation.program);
-      return bundle === null ? false : await dispatchPreparedFrame(bundle);
+      const prepared = await preparation.program;
+      preparation.signal.throwIfAborted();
+      const bundle = exactFrameBundle(context, prepared);
+      return bundle === null
+        ? false
+        : await dispatchPreparedFrame(bundle, { signal: preparation.signal });
     } catch (error) {
       return operatorCancelledPreparation(error);
     } finally {
@@ -99,7 +109,11 @@ export function runFrameNow(): Promise<boolean> {
 // The operator's Cancel ends the Frame quietly; any other failure propagates.
 function operatorCancelledPreparation(error: unknown): false {
   if (!isOutputPreparationAbort(error) || !framePreparationCancelled()) throw error;
-  useToastStore.getState().pushToast('Frame preparation cancelled. Nothing was sent.', 'info');
+  const message =
+    useFramePreparationStore.getState().stage === 'finishing'
+      ? 'Frame preparation cancelled after tracing. No Start permit was issued.'
+      : 'Frame preparation cancelled. Nothing was sent.';
+  useToastStore.getState().pushToast(message, 'info');
   return false;
 }
 
@@ -234,6 +248,7 @@ function exactFrameBundle(
 }
 
 type PreparedFrameDispatchOptions = {
+  readonly signal?: AbortSignal;
   readonly review?: FramedRunReviewEvidence;
   readonly authorizationContext?: FramedRunCandidate['authorizationContext'];
   readonly outputScope?: OutputScope;
@@ -256,7 +271,8 @@ async function dispatchPreparedFrame(
   bundle: ReviewedStartBundle,
   options: PreparedFrameDispatchOptions = {},
 ): Promise<boolean> {
-  if (!(await requireFrameControllerQueue())) return false;
+  if (!(await requireFrameControllerQueue(options.signal))) return false;
+  assertFramePreparationActive(options.signal);
   const currentLaser = useLaserStore.getState();
   if (!reviewedFrameIsCurrent(bundle, currentLaser, options.authorizationContext)) {
     reportFrameRefusal([FRAME_SETUP_CHANGED_BEFORE_DISPATCH_MESSAGE]);
@@ -297,6 +313,7 @@ async function dispatchPreparedFrame(
       : { frameWcsNormalizationWarning: bundle.frameWcsNormalizationWarning }),
   };
 
+  publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);
   try {
     await currentLaser.frame(motionBounds, bundle.project.device.framingFeedMmPerMin, candidate);

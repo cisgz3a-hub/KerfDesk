@@ -30,6 +30,7 @@ import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './prep
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
+import { prepareFaintLineMask } from './faint-line-mask';
 import { shouldTraceAlphaMask } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
 import { coloredPathsToSvg } from './paths-to-svg';
@@ -148,7 +149,7 @@ export function prepareTraceForContour(
     return { prepared: cleanBinaryMask(prepared, options), crackField: null };
   }
   const adjusted = applyImageAdjustments(image, options);
-  if (shouldUseSketchTrace(image, options)) {
+  if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
     const radiusPx = SKETCH_RADIUS_PX * effectivePixelScale(options);
     if (options.sketchTrace !== true) {
       const recovered = prepareAutomaticDetailMask(
@@ -173,12 +174,20 @@ export function prepareTraceForContour(
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
   const thresholded = applyThresholdWithIso(prepared, options);
+  const field =
+    thresholded.thresholdLuma === null ? null : lumaCrackField(prepared, thresholded.thresholdLuma);
+  if (options.faintLineRecovery === true) {
+    const recovered = prepareFaintLineMask(
+      thresholded.prepared,
+      field,
+      sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
+      effectivePixelScale(options),
+    );
+    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
+  }
   return {
     prepared: cleanBinaryMask(thresholded.prepared, options),
-    crackField:
-      thresholded.thresholdLuma === null
-        ? null
-        : lumaCrackField(prepared, thresholded.thresholdLuma),
+    crackField: field,
   };
 }
 

@@ -141,34 +141,7 @@ describe('runFrameNow split Frame (ADR-353)', () => {
     expect(lastToast()).toMatchObject({ variant: 'success' });
   });
 
-  it('refuses to mint when the machine moves between the trace and the exact program', async () => {
-    installCompletingTraceFrame(events);
-    const releaseProgram = gateExactProgram(outputWorkerMocks.prepareStart);
-
-    const outcome = runFrameNow();
-    await vi.waitFor(() => expect(useLaserStore.getState().frameTrace).not.toBeNull());
-    expect(useFramePreparationStore.getState().stage).toBe('finishing');
-    // A fresh Idle report at a different position: the machine moved. The
-    // trace expires at once. The head's position has belonged to the trace
-    // since it was dispatched, so the compile finishes, and the expired trace
-    // is what refuses the permit.
-    useLaserStore.setState((state) => ({
-      statusSequence: state.statusSequence + 1,
-      statusReport: { ...idleControllerStatusForFrameTest(), mPos: { x: 99, y: 42, z: 0 } },
-    }));
-    expect(useLaserStore.getState().frameTrace).toBeNull();
-    releaseProgram();
-
-    await expect(outcome).resolves.toBe(false);
-    expect(useLaserStore.getState().framedRun).toBeNull();
-    expect(useLaserStore.getState().frameVerification).toBeNull();
-    expect(lastToast()).toMatchObject({
-      variant: 'warning',
-      message: FRAME_COMPLETED_BUT_CHANGED_MESSAGE,
-    });
-  });
-
-  it('still cancels the exact program when the setup changes while the outline is traced', async () => {
+  it('issues no permit when the setup really changes while the outline is traced', async () => {
     const releaseProgram = gateExactProgram(outputWorkerMocks.prepareStart);
     useLaserStore.setState({
       traceFrame: vi.fn(
@@ -188,9 +161,31 @@ describe('runFrameNow split Frame (ADR-353)', () => {
 
     await expect(outcome).resolves.toBe(false);
     expect(useLaserStore.getState().framedRun).toBeNull();
+  });
+
+  it('refuses to mint when the machine moves between the trace and the exact program', async () => {
+    installCompletingTraceFrame(events);
+    const releaseProgram = gateExactProgram(outputWorkerMocks.prepareStart);
+
+    const outcome = runFrameNow();
+    await vi.waitFor(() => expect(useLaserStore.getState().frameTrace).not.toBeNull());
+    expect(useFramePreparationStore.getState().stage).toBe('finishing');
+    // A fresh Idle report at a different position: the machine moved. The
+    // trace expires at once, and the preparation owner cancels the compile it
+    // was guarding for the same reason. Report changed context, not a compiler failure.
+    useLaserStore.setState((state) => ({
+      statusSequence: state.statusSequence + 1,
+      statusReport: { ...idleControllerStatusForFrameTest(), mPos: { x: 99, y: 42, z: 0 } },
+    }));
+    expect(useLaserStore.getState().frameTrace).toBeNull();
+    releaseProgram();
+
+    await expect(outcome).resolves.toBe(false);
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(lastToast()).toMatchObject({
-      variant: 'error',
-      message: FRAME_TRACE_PROGRAM_REFUSED_MESSAGE,
+      variant: 'warning',
+      message: FRAME_COMPLETED_BUT_CHANGED_MESSAGE,
     });
   });
 

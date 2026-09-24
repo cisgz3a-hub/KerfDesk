@@ -1,3 +1,4 @@
+import { coherentThinMask, hasCoherentThinDetail } from './coherent-thin-mask';
 import {
   isValidRawImageData,
   prepareTraceForContour,
@@ -8,18 +9,7 @@ import { edgeTraceInputMatches, prepareEdgeTraceInput, type EdgeTraceInput } fro
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 
 const INK_LUMA_CUTOFF = 128;
-const MAX_THIN_RUN_PX = 3;
-const MIN_THIN_CLUSTER_PIXELS = 12;
-const MIN_THIN_CLUSTER_SPAN_PX = 8;
 const RGBA_CHANNELS = 4;
-
-type ThinCluster = {
-  readonly pixelCount: number;
-  readonly minX: number;
-  readonly maxX: number;
-  readonly minY: number;
-  readonly maxY: number;
-};
 
 export type ContourDetailProfile = {
   readonly hasThinDetail: boolean;
@@ -63,9 +53,8 @@ export function contourDetailProfile(
 }
 
 function profileInk(ink: Uint8Array, width: number, height: number): ContourDetailProfile {
-  const thin = thinRunMask(ink, width, height);
   return {
-    hasThinDetail: hasCoherentThinCluster(thin, width, height),
+    hasThinDetail: hasCoherentThinDetail(ink, width, height),
     transitionDensity: maskTransitionDensity(ink, width, height),
   };
 }
@@ -74,19 +63,7 @@ function profileInk(ink: Uint8Array, width: number, height: number): ContourDeta
  * enlargement can erase them. Specks and isolated AA boundary cells are not
  * sufficient to qualify a source region for support restoration. */
 export function coherentContourDetailMask(prepared: RawImageData): Uint8Array {
-  const { width, height } = prepared;
-  const thin = thinRunMask(inkMask(prepared), width, height);
-  const visited = new Uint8Array(thin.length);
-  const coherent = new Uint8Array(thin.length);
-  for (let index = 0; index < thin.length; index += 1) {
-    if (thin[index] === 0 || visited[index] === 1) continue;
-    const pixels: number[] = [];
-    const cluster = consumeThinCluster(thin, visited, index, width, height, pixels);
-    if (isCoherentThinCluster(cluster)) {
-      for (const pixel of pixels) coherent[pixel] = 1;
-    }
-  }
-  return coherent;
+  return coherentThinMask(inkMask(prepared), prepared.width, prepared.height);
 }
 
 function inkMask(image: RawImageData): Uint8Array {
@@ -95,13 +72,6 @@ function inkMask(image: RawImageData): Uint8Array {
     ink[pixel] = (image.data[pixel * RGBA_CHANNELS] ?? 255) < INK_LUMA_CUTOFF ? 1 : 0;
   }
   return ink;
-}
-
-function thinRunMask(ink: Uint8Array, width: number, height: number): Uint8Array {
-  const thin = new Uint8Array(ink.length);
-  markShortHorizontalRuns(ink, thin, width, height);
-  markShortVerticalRuns(ink, thin, width, height);
-  return thin;
 }
 
 function maskTransitionDensity(ink: Uint8Array, width: number, height: number): number {
@@ -116,119 +86,4 @@ function maskTransitionDensity(ink: Uint8Array, width: number, height: number): 
     }
   }
   return transitions / possibleTransitions;
-}
-
-function markShortHorizontalRuns(
-  ink: Uint8Array,
-  thin: Uint8Array,
-  width: number,
-  height: number,
-): void {
-  for (let y = 0; y < height; y += 1) {
-    let x = 0;
-    while (x < width) {
-      if (ink[y * width + x] === 0) {
-        x += 1;
-        continue;
-      }
-      const start = x;
-      while (x < width && ink[y * width + x] === 1) x += 1;
-      if (x - start <= MAX_THIN_RUN_PX) {
-        for (let runX = start; runX < x; runX += 1) thin[y * width + runX] = 1;
-      }
-    }
-  }
-}
-
-function markShortVerticalRuns(
-  ink: Uint8Array,
-  thin: Uint8Array,
-  width: number,
-  height: number,
-): void {
-  for (let x = 0; x < width; x += 1) {
-    let y = 0;
-    while (y < height) {
-      if (ink[y * width + x] === 0) {
-        y += 1;
-        continue;
-      }
-      const start = y;
-      while (y < height && ink[y * width + x] === 1) y += 1;
-      if (y - start <= MAX_THIN_RUN_PX) {
-        for (let runY = start; runY < y; runY += 1) thin[runY * width + x] = 1;
-      }
-    }
-  }
-}
-
-function hasCoherentThinCluster(thin: Uint8Array, width: number, height: number): boolean {
-  const visited = new Uint8Array(thin.length);
-  for (let index = 0; index < thin.length; index += 1) {
-    if (thin[index] === 0 || visited[index] === 1) continue;
-    const cluster = consumeThinCluster(thin, visited, index, width, height);
-    if (isCoherentThinCluster(cluster)) return true;
-  }
-  return false;
-}
-
-function isCoherentThinCluster(cluster: ThinCluster): boolean {
-  const span = Math.max(cluster.maxX - cluster.minX + 1, cluster.maxY - cluster.minY + 1);
-  return cluster.pixelCount >= MIN_THIN_CLUSTER_PIXELS && span >= MIN_THIN_CLUSTER_SPAN_PX;
-}
-
-function consumeThinCluster(
-  thin: Uint8Array,
-  visited: Uint8Array,
-  start: number,
-  width: number,
-  height: number,
-  pixels?: number[],
-): ThinCluster {
-  const stack = [start];
-  visited[start] = 1;
-  let pixelCount = 0;
-  let minX = width;
-  let maxX = 0;
-  let minY = height;
-  let maxY = 0;
-
-  while (stack.length > 0) {
-    const index = stack.pop();
-    if (index === undefined) break;
-    const x = index % width;
-    const y = Math.floor(index / width);
-    pixelCount += 1;
-    pixels?.push(index);
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-    pushThinNeighbours(thin, visited, stack, x, y, width, height);
-  }
-
-  return { pixelCount, minX, maxX, minY, maxY };
-}
-
-function pushThinNeighbours(
-  thin: Uint8Array,
-  visited: Uint8Array,
-  stack: number[],
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): void {
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      if (dx === 0 && dy === 0) continue;
-      const nextX = x + dx;
-      const nextY = y + dy;
-      if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) continue;
-      const next = nextY * width + nextX;
-      if (thin[next] === 0 || visited[next] === 1) continue;
-      visited[next] = 1;
-      stack.push(next);
-    }
-  }
 }
