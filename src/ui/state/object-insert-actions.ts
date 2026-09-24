@@ -22,10 +22,9 @@ import { createRegistrationBox, createRegistrationCircle } from '../../core/shap
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
+import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
-import { sourceColorForOperation } from './operation-source-color';
 import {
   applyFreshImport,
   applyReimport,
@@ -247,10 +246,7 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
   let changed = false;
   const layers = result.project.scene.layers.map((layer) => {
     if (existing.has(layer.id)) return layer;
-    const settings = defaultSettingsForColor(
-      defaults,
-      sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color,
-    );
+    const settings = defaultSettingsForOperation(defaults, result.project.scene.objects, layer);
     const withDefaults =
       Object.keys(settings).length === 0 ? layer : applyLayerDefaultSettings(layer, settings);
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op

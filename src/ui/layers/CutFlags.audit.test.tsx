@@ -96,11 +96,13 @@ describe('artwork control audit: cut settings', () => {
     const host = await mount(<CutsLayersPanel />);
     await click(button(host, 'Advanced cut settings'));
     await openDisclosure(host, 'Saved defaults');
-    await click(button(host, 'Make Default'));
-    expect(useStore.getState().layerDefaults.byColor[layer(1).color]).toMatchObject({
+    // The operation shows a palette color; the default belongs to its blue artwork.
+    await click(button(host, 'Make Default for #0000ff'));
+    expect(useStore.getState().layerDefaults.byColor['#0000ff']).toMatchObject({
       power: 63,
       speed: 888,
     });
+    expect(useStore.getState().layerDefaults.byColor).not.toHaveProperty(layer(1).color);
     await click(button(host, 'Make Default for All'));
     expect(useStore.getState().layerDefaults.allColors).toMatchObject({ power: 63, speed: 888 });
     await act(async () => useStore.getState().setLayerParam(id, { power: 12, speed: 222 }));

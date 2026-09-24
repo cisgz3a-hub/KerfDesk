@@ -4,6 +4,9 @@ export type CutSettingsDefaultHandlers = {
   readonly onMakeDefault: () => void;
   readonly onMakeDefaultForAll: () => void;
   readonly onResetToDefault: () => void;
+  // The color Make Default saves under. It is usually the artwork's own color
+  // rather than the operation's palette color, so the button names it.
+  readonly makeDefaultColor: string;
 };
 
 export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JSX.Element {
@@ -20,9 +23,9 @@ export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JS
           <Button
             type="button"
             onClick={props.onMakeDefault}
-            title="Remember this layer's settings as the default for this color."
+            title={`Remember this layer's settings as the default for new artwork colored ${props.makeDefaultColor}.`}
           >
-            Make Default
+            Make Default for {props.makeDefaultColor}
           </Button>
           <Button
             type="button"

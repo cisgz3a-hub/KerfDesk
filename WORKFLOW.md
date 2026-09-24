@@ -398,6 +398,12 @@ Identical to the format-specific import flows except:
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
+- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+  the operation's applied settings for the colour it names: the colour of the artwork the operation
+  was created for, or the operation's own colour when it has no artwork. New operations and **Reset
+  to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
+  automatic operation colour is never matched for artwork, so a default saved for black artwork
+  does not reach other artwork whose operation happens to be black.
 - CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
   sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
   machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
