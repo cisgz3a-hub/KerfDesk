@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs, isCoverageRun } from '../../__fixtures__/ci-budget';
 import {
   collectLayerContours,
   layerPolylinesFromContours,
@@ -40,8 +41,12 @@ import { computeDesignSceneSourceFromPrepared } from './design-scene-source';
 const CONNECTED_TEXT = 'Wedding';
 const TEXT_SIZE_MM = 40;
 const TEXT_COLOR = '#c026d3';
+// Per-font tripwire for the pathological flat-core detour scan that #641
+// replaced. Ordinary CI runs the whole two-font check in 9-16 s, so only a
+// return to multiples-slower preparation reaches it.
 const READY_BOUND_MS = 45_000;
-const TEST_TIMEOUT_MS = 120_000;
+// Unchanged for the ordinary lanes; doubled for the report-only coverage run.
+const TEST_TIMEOUT_MS = ciBudgetMs(120_000, 120_000);
 
 const VBIT: CncTool = {
   id: 'connected-script-v90',
@@ -223,7 +228,7 @@ function pointInFilledContours(
 
 describe('G-code 3D readiness for connected script TextObjects', () => {
   it(
-    'finishes Dancing Script and Pacifico production preparation within a bounded time',
+    'completes Dancing Script and Pacifico production preparation for the G-code 3D pane',
     async () => {
       for (const font of FONTS) {
         const ready = await readyFixture(font);
@@ -241,6 +246,21 @@ describe('G-code 3D readiness for connected script TextObjects', () => {
           ),
         ).toBe(true);
         expect(ready.source.grid.depth.some((depth) => depth < 0)).toBe(true);
+      }
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  // The ordinary local and CI lanes own this bound. In the report-only coverage
+  // run, V8 instrumentation sets the clock instead: Pacifico took 73 s on the
+  // Linux coverage runner and 195 s in a local Windows run, against the 90 s
+  // that ciBudgetMs would allow. The preparation and its checks still run there
+  // in the test above.
+  it.skipIf(isCoverageRun())(
+    'finishes Dancing Script and Pacifico production preparation within a bounded time',
+    async () => {
+      for (const font of FONTS) {
+        const ready = await readyFixture(font);
         expect(
           ready.elapsedMs,
           `${font.key} G-code 3D preparation took ${ready.elapsedMs.toFixed(1)} ms`,

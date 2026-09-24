@@ -82,11 +82,11 @@ function machine(p: Project) {
 }
 
 describe('native negative runtime placement', () => {
-  it('exports Absolute through known custom G54 while keeping the ordinary Start origin rule', () => {
+  it('resolves both live and exported Absolute through known custom G54', () => {
     const p = project();
     const m = { ...machine(p), workOriginActive: true, wcoCache: { x: -300, y: -100, z: 0 } };
     const settings = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
-    expect(resolveJobPlacement(settings, m).ok).toBe(false);
+    expect(resolveJobPlacement(settings, m)).toEqual(resolveExportJobPlacement(settings, m));
     const placement = resolveExportJobPlacement(settings, m);
     if (!placement.ok) throw new Error('export fixture');
     const options = runtimeCoordinatePreparationOptions(p.device, placement, m);

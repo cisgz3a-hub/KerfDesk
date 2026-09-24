@@ -77,12 +77,13 @@ hobby CNC and laser boards does **not** and must be installed by hand.
 If KerfDesk connects but position never updates or commands do nothing:
 
 - **The machine is in an alarm state.** Many controllers start locked after
-  power-on. Open the **GRBL console** and send **`$$`** to read settings; if the
-  machine reports **Alarm**, home it (**`$H`**) if it has homing switches, or
-  send **`$X`** to unlock — *only after confirming the head is in a safe spot.*
+  power-on. Open **Console** in the Machine panel and send **`$$`** to read
+  settings; if the machine reports **Alarm**, home it (**`$H`**) if it has
+  homing switches, or send **`$X`** to unlock — *only after confirming the head
+  is in a safe spot.*
 - **Another program is holding the port.** Only one application can use a serial
-  port at a time. Close **LightBurn**, the **Arduino IDE**, or any other machine
-  software, then reconnect.
+  port at a time. Close any other laser or CNC software, serial terminal, or the
+  **Arduino IDE**, then reconnect.
 - **Wrong baud rate.** Most GRBL machines use **115200**. If yours uses a
   different rate, set it in the device profile before connecting.
 
@@ -97,12 +98,21 @@ If KerfDesk connects but position never updates or commands do nothing:
 
 ---
 
-## Still stuck? Send us a diagnostic
+## Still stuck? Save what the controller reported
 
-KerfDesk can export a diagnostic file that captures your machine profile, the
-controller's reported settings, and the recent serial log:
+Once KerfDesk can open the port, it has two ways to record what your controller
+said:
 
-- **Read / Backup Controller Settings → Export machine diagnostic**
+- **The communication log.** In the Machine panel, open **Console** and click
+  **Super console**. It shows the last 500 lines since you connected, with
+  filters and search. **Copy visible** copies the lines shown, with timestamps,
+  to the clipboard. The docked console also has a **Copy visible** button,
+  without timestamps. Connecting again starts a new log, so copy it first.
+- **The controller's settings.** The Super console also has **Read / Backup
+  Controller Settings**. While the controller is connected and idle (or in
+  alarm), click **Read ($$)** if no settings are listed yet, then **Export
+  backup** to save them as a `.lfgrbl-settings.json` file.
 
-Attach that file to your support request so we can see exactly what your
-controller reported.
+Paste the copied log into a text file and keep it with the backup file.
+Together they show what your controller reported, which helps anyone you ask
+for help.

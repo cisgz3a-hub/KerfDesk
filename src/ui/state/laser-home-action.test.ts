@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { createProject } from '../../core/scene';
+import { resolveCameraSafeFramePlacement } from '../laser/camera-frame-placement';
 import { useLaserStore } from './laser-store';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 
@@ -91,6 +93,74 @@ afterEach(async () => {
 });
 
 describe('home command timeout', () => {
+  it.each([
+    { source: 'g54-persistent', name: 'zero G54', wco: '0.000,0.000,7.000', active: false },
+    { source: 'g54-persistent', name: 'retained G54', wco: '200.398,170.323,7.000', active: true },
+    { source: 'g92', name: 'zero G92', wco: '0.000,0.000,7.000', active: false },
+    { source: 'g92', name: 'retained G92', wco: '200.398,170.323,7.000', active: true },
+  ] as const)(
+    'reconciles the $name XY offset only after fresh post-Home WCO',
+    async ({ source, wco, active }) => {
+      const writes: string[] = [];
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+      });
+      await connectWith(connection);
+      useLaserStore.setState({ workOriginActive: true, workOriginSource: source });
+      writes.length = 0;
+
+      const home = useLaserStore.getState().home();
+      await flush();
+      connection.emitLine('ok');
+      await flush();
+      connection.emitLine('ok');
+      await flush();
+      connection.emitLine(`<Idle|MPos:-399.000,-399.000,0.000|WCO:${wco}|FS:0,0>`);
+      await home;
+      expect(useLaserStore.getState().homingState).toBe('confirmed');
+      expect(useLaserStore.getState().workOriginSource).toBe('unknown');
+      expect(useLaserStore.getState().wcoCache).toBeNull();
+      expect(useLaserStore.getState().statusReport).toMatchObject({
+        state: 'Idle',
+        mPos: null,
+        wPos: null,
+        wco: null,
+      });
+
+      for (const position of ['MPos:-399.000,-399.000,0.000', 'WPos:0.000,0.000,0.000']) {
+        connection.emitLine(`<Idle|${position}|FS:0,0>`);
+        await flush();
+        const snapshot = useLaserStore.getState();
+        expect(
+          resolveCameraSafeFramePlacement(
+            createProject(),
+            { startFrom: 'absolute', anchor: 'front-left' },
+            { ...snapshot, trustedPositionEpoch: snapshot.trustedPositionEpoch },
+          ).ok,
+        ).toBe(false);
+      }
+
+      connection.emitLine(`<Idle|MPos:-399.000,-399.000,0.000|WCO:${wco}|FS:0,0>`);
+      await flush();
+      const state = useLaserStore.getState();
+      expect(state.workOriginActive).toBe(active);
+      expect(state.workOriginSource).toBe(active ? 'unknown' : 'none');
+      expect(state.wcoCache?.z).toBe(7);
+      expect(state.wcoCache?.x).toBe(active ? 200.398 : 0);
+      expect(state.wcoCache?.y).toBe(active ? 170.323 : 0);
+      expect(writes.some((line) => /\b(?:G92|G10)/.test(line))).toBe(false);
+      if (!active) {
+        expect(
+          resolveCameraSafeFramePlacement(
+            createProject(),
+            { startFrom: 'absolute', anchor: 'front-left' },
+            { ...state, trustedPositionEpoch: state.trustedPositionEpoch },
+          ).ok,
+        ).toBe(true);
+      }
+    },
+  );
+
   it.each(['Run', 'Hold', 'Jog'] as const)(
     'writes no Home command while the controller is known %s',
     async (controllerState) => {

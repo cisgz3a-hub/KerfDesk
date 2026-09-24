@@ -1,11 +1,9 @@
-// PlannerAdvanced — hidden-by-default editor for local estimates using the
-// recorded GRBL acceleration and junction deviation. Extracted
-// from DeviceSettings.tsx so the parent stays under the 400-line
-// hard cap (F-1 audit finding).
+// PlannerFields — local estimate references: the recorded GRBL acceleration
+// and junction deviation plus the cut/travel time scales. Machine Setup's
+// Options step renders them.
 //
 // Match the controller references before calibrating systematic ETA error.
 // Acceleration also informs separately reviewed CNC recovery runways.
-// <details> gives us native expand / collapse with no React state.
 
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { MAX_ESTIMATE_TIME_SCALE, MIN_ESTIMATE_TIME_SCALE } from '../../core/devices';
@@ -25,23 +23,9 @@ type PlannerFieldsProps = {
   readonly onTravelTimeScaleChange: (next: number) => void;
 };
 
-export function PlannerAdvanced(props: PlannerFieldsProps): JSX.Element {
-  return (
-    <details style={advancedDetailsStyle}>
-      <summary
-        style={advancedSummaryStyle}
-        title="Open or close advanced acceleration and junction-deviation estimator settings."
-      >
-        Advanced: estimator tuning
-      </summary>
-      <PlannerFields {...props} />
-    </details>
-  );
-}
-
 // The bare estimator fields, without a collapsible wrapper. Machine Setup's
 // Options step renders these flat so no field hides two collapse levels deep
-// (ADR-240); PlannerAdvanced keeps the legacy <details> shell.
+// (ADR-240).
 export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
   return (
     <>
@@ -110,17 +94,6 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
   );
 }
 
-const advancedDetailsStyle: React.CSSProperties = {
-  marginTop: 4,
-  borderTop: '1px solid var(--lf-border)',
-  paddingTop: 4,
-};
-const advancedSummaryStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  cursor: 'pointer',
-  userSelect: 'none',
-};
 const advancedBodyStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

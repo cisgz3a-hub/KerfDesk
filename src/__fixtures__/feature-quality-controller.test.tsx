@@ -291,7 +291,6 @@ describe('feature controller and workspace regressions', () => {
       machineKind: 'laser',
       laser: {},
       completedReceipt: null,
-      checkpointToReplace: null,
       repository: {},
       reviewedAtIso: new Date().toISOString(),
       reviewModel: {},

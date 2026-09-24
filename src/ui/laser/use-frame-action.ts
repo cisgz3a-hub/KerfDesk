@@ -22,7 +22,11 @@ import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveCameraSafeFramePlacement } from './camera-frame-placement';
 import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
-import { waitForFreshIdleFramePosition } from './frame-position-readiness';
+import {
+  waitForAbsoluteFrameOffset,
+  waitForFreshIdleFramePosition,
+} from './frame-position-readiness';
+import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
@@ -172,6 +176,13 @@ async function prepareFrameContext(): Promise<FrameContext | null> {
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
+    return null;
+  }
+  if (!(await waitForAbsoluteFrameOffset(useStore.getState().jobPlacement))) {
+    reportFramePreparationRefusal(
+      [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
+      wcsNormalization.warning,
+    );
     return null;
   }
   const app = useStore.getState();

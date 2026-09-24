@@ -157,7 +157,9 @@ describe('Frame source-of-truth contract', () => {
       installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
       const frame = completingFrame();
       const customOrigin = startFrom !== 'absolute';
-      const offsetField = customOrigin ? '|WCO:100.000,50.000,0.000,0.000' : '';
+      const offsetField = customOrigin
+        ? '|WCO:100.000,50.000,0.000,0.000'
+        : '|WCO:0.000,0.000,0.000,0.000';
       const report = parseStatusReport(
         `<Idle|MPos:191.500,106.500,-21.100,0.000|Bf:512,65535|FS:0,0${offsetField}>`,
       );
@@ -273,7 +275,10 @@ describe('Frame source-of-truth contract', () => {
     useStore.setState({ project: { ...project, device } });
     // A physical Clamp intersection needs a verified native-to-bed reference;
     // the other Frame cases intentionally also cover unknown mappings.
-    useLaserStore.setState(stockNativeEvidence(device, true));
+    useLaserStore.setState({
+      ...stockNativeEvidence(device, true),
+      wcoCache: { x: 0, y: 0, z: 0 },
+    });
     const bounds = currentMotionBounds();
     setNoGoZone({
       x: (bounds.minX + bounds.maxX) / 2 - 1,
