@@ -158,13 +158,6 @@ async function streamFramedRun(
   });
 }
 
-export async function runConfirmedCheckpointReplacementStart(
-  checkpoint: JobCheckpoint,
-  repository: RecoveryRepository = recoveryRepository,
-): Promise<void> {
-  await runStartJobFlowWithCheckpoint(checkpoint, null, repository);
-}
-
 /** Exact-job replay after a fully settled completion. This still performs the
  * complete current Start flow and creates a new run identity at line one. */
 export async function runCompletedJobAgainFlow(
