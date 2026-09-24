@@ -8,19 +8,24 @@ const portrait = readFileSync(
   fileURLToPath(new URL('../src/__fixtures__/perceptual/assets/astronaut.png', import.meta.url)),
 ).toString('base64');
 
-type PhotoRequest = {
+interface PhotoRequest {
   worker: number;
   id: number;
   detail: number;
   events: string[];
   errors: string[];
-};
-type PhotoSnapshot = {
+}
+interface PhotoSnapshot {
   completed: PhotoRequest[];
   dispatches: Pick<PhotoRequest, 'worker' | 'id' | 'detail'>[];
-};
-type PointBounds = { left: number; top: number; right: number; bottom: number };
-type PointSnapshot = {
+}
+interface PointBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+interface PointSnapshot {
   paints: number;
   width: number;
   height: number;
@@ -29,7 +34,7 @@ type PointSnapshot = {
   bounds: PointBounds;
   viewport: PointBounds;
   artwork: PointBounds;
-};
+}
 
 declare global {
   interface Window {
@@ -60,8 +65,11 @@ test('cached preset switching and dense point inspection work in the actual trac
   const observations = await inspectPointViews(page, dialog);
   await dialog.screenshot({ path: testInfo.outputPath('dense-points.png') });
   await inspectCachedPhoto(page, dialog, before, photoStatus, photoSvg);
+  await dialog.getByRole('button', { name: 'Show Points', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Show trace result', exact: true }).click();
   await dialog.getByText('Photo output tips', { exact: true }).click();
-  await expect(dialog.getByText(/Source size:/)).toBeVisible();
+  await dialog.getByText(/Source size:/).scrollIntoViewIfNeeded();
+  await expect(dialog.getByText(/Source size:/)).toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Trace', exact: true })).toBeInViewport();
   await dialog.screenshot({ path: testInfo.outputPath('photo-output-controls.png') });

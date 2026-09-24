@@ -75,7 +75,7 @@ will also qualify later caching and progress changes against these contracts.
 
 ## Batch 3: responsive previews
 
-Status: implemented; focused cache/overlay checks pass, integrated gates pending.
+Status: implemented; focused cache/overlay and complete-dialog browser checks pass.
 
 - Reuse prepared input and recent preset results with a bounded cache keyed by
   source, resolved settings and boundary.
@@ -219,9 +219,18 @@ to measured work, bytes and qualified browser behavior. The existing deepest
 nesting pair work, shortest Centerline projections and physical output remain
 explicit boundaries rather than claims of universal correctness or speed.
 
-The integrated release gate and complete-dialog production-browser checks are
-required before merge. Their exact-head status is recorded on the upgrade PRs;
-this ledger records implementation and independent acceptance evidence.
+Four distinct production-browser checks pass on the integrated tracer bundle
+`da948701`: full Photo raster output at Detail 60 and 100, dense point inspection
+with cached preset switching, and hashed-bundle startup through the outline
+worker. The dialog check verifies the Photo request's own phase/completion
+sequence, unchanged SVG and no new Photo dispatch on cache return, actual
+repainting after pan/zoom/Fit/resize, and visible output guidance with Cancel and
+Trace reachable at 1180 by 720. No page errors are captured. Browser-test types,
+focused lint and repository formatting pass after correcting test-only typing,
+style and rendered-text assertions. Later main updates are integrated; the full
+release and Chrome gates for each exact PR head remain the merge requirement.
+Their final status is recorded on the upgrade PRs rather than inferred from
+these focused checks.
 
 ## Verification and release boundaries
 
