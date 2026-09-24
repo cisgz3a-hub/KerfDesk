@@ -2027,11 +2027,10 @@ their archive before transmission.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; CNC **Startup Setup** links open the same flow. Old `MachineSetupDialog`
-callers and deep links from read-only Artwork references resolve to the same global flow rather than
-a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
-current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
-undoable project change.
+Setup** button; CNC **Startup Setup** links open the same flow. Deep links from read-only Artwork
+references resolve to the same global flow rather than a competing live-edit dialog. Every edit
+remains in one `DeviceProfile` + `MachineConfig` + current-job CNC draft until **Save machine
+setup**, which commits the complete configuration as one undoable project change.
 
 Machine output-kind metadata describes the researched configuration and supplies advisory warnings:
 
