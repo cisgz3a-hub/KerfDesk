@@ -956,6 +956,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
 5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   its Select dialog, so an identical second adapter (a laser controller and an Arduino that
+   both use a CH340, for example) no longer stops background streaming. A pick lasts until
+   Forget Controller or an app restart; picking both identical adapters in one run is still
+   ambiguous and uses the window port (ADR-366).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -1963,8 +1968,12 @@ their archive before transmission.
    the newest capsule with zero diagnostic acknowledgements and an explicit
    acceptance-unknown reason. It may be a conservative false positive when the
    app died before the first program byte, but the older source is never offered
-   after a newer Start may have changed machine state. A short owner lease lets a
-   still-live tab commit or cancel without another tab misclassifying it as a crash.
+   after a newer Start may have changed machine state. A still-live tab renews a
+   five-second owner lease every second until its handoff closes, including while
+   it stores the execution archive after the controller has accepted the program.
+   Another tab reconciles the Start only after that lease has gone unrenewed for a
+   whole lease on its own clock, which a live tab avoids unless it is frozen for
+   several seconds (ADR-369).
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires

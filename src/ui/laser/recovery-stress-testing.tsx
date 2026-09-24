@@ -62,7 +62,8 @@ export interface StressHarness {
   /** The in-memory store behind `repository`; a new repository over it models an app restart. */
   readonly backend: MemoryRecoveryStorageBackend;
   readonly generationStore: MemoryRecoveryGenerationStore;
-  /** Stop checkpoint tracking without a terminal write, as a crashed tab would. */
+  /** Stop checkpoint tracking without a terminal write, and stop renewing the
+   * Start lease, as a crashed tab would. */
   readonly stopTracking: () => void;
   /** Every run the tracker published as a clean completion, in order. */
   readonly offered: string[];
@@ -246,6 +247,8 @@ export async function harness(
     stopTracking: () => {
       uninstallTracking();
       uninstallTracking = (): void => undefined;
+      // A dead tab cannot renew its Start lease either.
+      repository.abandonStartLease();
     },
     offered,
     reportFailure,
