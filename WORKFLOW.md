@@ -242,6 +242,17 @@ Identical to the format-specific import flows except:
 #### All — Cmd/Ctrl+A
 1. Selects every object in the scene.
 
+#### Pick order (ADR-377)
+1. The selection remembers the order objects were picked in, separately from stacking order.
+2. A click, Select All, selecting an operation's artwork and a plain marquee start a new order,
+   bottom-most object first. Shift+click and Shift+marquee keep the earlier picks and add the new
+   objects after them. Shift+clicking a selected object drops it from the order.
+3. A group is one pick: clicking any member picks the whole group.
+4. **Align** keeps the last-picked object (or its whole group) in place and lines the rest up to it.
+   **Subtract** keeps the first-picked shape or group and cuts the later picks out of it (F-CNC22).
+5. Pick order changes no stacking order, run order or machine output. It is not saved with the
+   project.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -374,6 +385,38 @@ Identical to the format-specific import flows except:
    tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
 4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
    unchanged on invalid or empty results. They do not operate a machine.
+
+### F-A6c. Delete Duplicates (ADR-377)
+
+1. Choose **Edit → Delete Duplicates** or press `Alt+D`. With artwork selected it checks the
+   selection; with nothing selected it checks the whole design.
+2. A path is a duplicate when another path lies on it within 0.01 mm, from any start point and in
+   either direction, and both would run under the same operations with the same power scale,
+   override and stroke width. Repeats inside one object count too.
+3. The first copy in stacking order stays. An image's mask and a path text's guide always stay
+   unchanged. Imported vector artwork loses only its repeated paths; text and shapes are removed
+   only when every path repeats. An object left with no paths is removed and leaves its group.
+4. The change is one undo step and a toast reports how many paths were deleted.
+
+#### Empty — nothing repeats
+1. An info toast says no duplicates were found. The project, history and dirty state are unchanged.
+
+#### Edge — objects that are never touched
+1. Images, traced images and reliefs, locked objects and objects on hidden operations are skipped.
+   The command is disabled when the selection, or the design, holds no unlocked vector artwork.
+2. Survivors keep their stacking and run order, so machine order changes only by the removed paths.
+
+### F-A6d. Rubber-band outline (ADR-377)
+
+1. Select artwork and choose **Tools → Rubber-band outline**.
+2. A closed shape wraps the selection as tightly as a stretched rubber band: the convex outline of
+   every vector point and every image's placed corners, including rotation.
+3. The outline goes on a new **Line** operation with the next free colour and runs after the
+   existing operations. It is selected, and the change is one undo step.
+
+#### Error — nothing to wrap
+1. A selection with no area, such as one straight line, shows a warning and changes nothing.
+   With nothing selected the command is disabled.
 
 ### F-A7. Artwork Operations panel
 
@@ -922,6 +965,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
 - `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
+- `Alt+D` — Delete Duplicates in the selection, or the whole design when nothing is selected
 - `Cmd/Ctrl+A` — Select all
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
@@ -4326,21 +4370,26 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Tools → Subtract / Intersect / Exclude (next to Weld) combine two or
-   more selected closed vector shapes: the BOTTOM-MOST selected object
-   is the subject, the rest are cutters. Subtract cuts the upper shapes
-   out of it; Intersect keeps only the shared area; Exclude keeps
-   everything but the overlap. The result replaces the selection as one
-   path object (subject's color), selected, in one undo step.
-2. With closed shapes selected, the layers panel shows an "Offset" row:
+   more selected closed vector shapes or groups: the FIRST-PICKED shape
+   or group is the subject, the later picks are cutters (ADR-377, F-A5
+   pick order). Subtract cuts the later picks out of it; Intersect keeps
+   only the shared area; Exclude keeps everything but the overlap. The
+   result replaces the selection as one path object (subject's color),
+   selected, in one undo step.
+2. A group is one operand. A member inside another member is a hole in
+   it, so a grouped ring intersected with a star keeps only the star's
+   part inside the ring. Weld and Union silhouette treat groups the same
+   way.
+3. With closed shapes selected, the layers panel shows an "Offset" row:
    distance + Outward / Inward adds a NEW offset path object (round
    joins) and leaves the sources in place — kerf compensation on a
    laser, clearing outlines and inlay gaps on a router.
-3. Both work in laser AND CNC modes (geometry is machine-agnostic).
+4. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
 1. Booleans are disabled with a reason when fewer than two closed
-   vector objects are selected — the menu never runs the op, so there
-   is nothing to surface.
+   vector shapes or groups are selected — the menu never runs the op,
+   so there is nothing to surface.
 2. Open contours are rejected — the scene is unchanged and a warning
    toast names the reason (same rule as Weld).
 3. An inward offset large enough to collapse the shape changes nothing
@@ -4354,11 +4403,13 @@ and lifts the command's CNC-only gate.)*
    scene untouched (empty results never replace the sources), and shows
    a warning toast explaining the result was empty.
 
-#### Edge — transforms and z-order
+#### Edge — transforms and pick order
 1. Object transforms are baked to world space before combining, so a
    moved/scaled/rotated shape combines where it VISIBLY sits.
-2. Changing which shape is bottom-most (Arrange z-order) changes what
-   Subtract keeps — by design; the flow documents the convention.
+2. Pick order, not stacking order, decides what Subtract keeps. A plain
+   marquee picks bottom-most first, so its subject is the bottom-most
+   shape. There are no z-order commands: stacking order is vector
+   output order (ADR-377).
 
 ### F-CNC23. View the simulated cut in 3D — Phase H.11 (ADR-103 G4)
 
