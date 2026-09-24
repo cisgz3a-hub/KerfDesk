@@ -132,7 +132,6 @@ describe('recovery source and first-write authority', () => {
         firstBurnLine(prepared),
         prepared.canvasPlan,
         captureLaserModeStartSnapshot(laser),
-        checkpoint,
         laser,
       ),
     ).toBe(false);

@@ -42,15 +42,8 @@ export function sameCheckpoint(a: JobCheckpoint, b: JobCheckpoint): boolean {
   );
 }
 
-export function markOwnedResumeCheckpoint(
-  gcode: string,
-  expected: JobCheckpoint | undefined,
-  nowIso: string,
-): 'changed' | 'marked' | 'not-owned' {
+export function markOwnedResumeCheckpoint(gcode: string, nowIso: string): 'marked' | 'not-owned' {
   const current = readJobCheckpoint();
-  if (expected !== undefined && (current === null || !sameCheckpoint(current, expected))) {
-    return 'changed';
-  }
   if (current === null || !fingerprintsEqual(fingerprintGcode(gcode), current.fingerprint)) {
     return 'not-owned';
   }

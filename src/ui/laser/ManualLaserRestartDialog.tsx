@@ -42,7 +42,6 @@ export function ManualLaserRestartDialog(props: {
         fromLine,
         prepared.canvasPlan,
         prepared.laserModeStartSnapshot,
-        undefined,
         prepared.controllerSnapshot,
         placementNote,
       );
