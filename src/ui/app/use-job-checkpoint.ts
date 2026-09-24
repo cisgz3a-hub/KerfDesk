@@ -10,6 +10,7 @@ import { recoveryRepository, type RecoveryRepository, type RunId } from '../stat
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { currentJobStopRequest } from '../state/job-stop-request';
+import { settledCleanly } from '../state/post-job-clean-settle';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
 import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
@@ -406,21 +407,6 @@ function onceTrackingFailureReporter(
 function cachedAck(repository: RecoveryRepository, runId: RunId): number {
   const active = repository.getSnapshot().activeRun;
   return active?.runId === runId ? active.ackedLines : 0;
-}
-
-function settledCleanly(
-  state: LaserState,
-  priorState: LaserState | undefined,
-  previousStatus: StreamerStatus,
-): boolean {
-  return (
-    previousStatus === 'done' &&
-    priorState?.streamer?.status === 'done' &&
-    priorState.controllerOperation?.kind === 'post-job-settle' &&
-    priorState.controllerOperation.phase === 'awaiting-idle' &&
-    state.connection.kind === 'connected' &&
-    state.statusReport?.state === 'Idle'
-  );
 }
 
 function disappearedStreamInterruption(

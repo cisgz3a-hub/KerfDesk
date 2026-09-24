@@ -4,6 +4,7 @@ import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import {
+  cancelOwnedFramePreparation,
   useFramePreparationStore,
   type FramePreparationStage,
 } from '../state/frame-preparation-store';
@@ -36,6 +37,16 @@ export function JobActionControls(props: Props): JSX.Element {
       title={model.framedRunIssue ?? undefined}
     >
       {model.statusText}
+      {model.cancellablePreparation && (
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={cancelOwnedFramePreparation}
+          title="Stop preparing this Frame. Nothing has been sent to the machine."
+        >
+          Cancel
+        </button>
+      )}
     </span>
   );
   const estimate = <LiveJobTimeBadge estimate={model.estimate} />;
@@ -76,6 +87,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const framePending = useFramePreparationStore((state) => state.pending);
   const progress = useFramePreparationStore((state) => state.progress);
   const stage = useFramePreparationStore((state) => state.stage);
+  const cancellable = useFramePreparationStore((state) => state.cancellable);
   const frameActive = laser.motionOperation?.kind === 'frame';
   const preparingFrame = framePending && !frameActive;
   const busy = props.disabled || props.streaming || framePending;
@@ -86,6 +98,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     framedRunIssue,
     framedReady,
     preparingFrame,
+    cancellablePreparation: preparingFrame && cancellable,
     frameControl: frameControlProps(busy, laser.statusReport?.state),
     startLabel: framedReady ? 'Start framed job' : 'Set up & Frame',
     frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',

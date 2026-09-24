@@ -4,8 +4,13 @@ import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 
 const FRAME_QUEUE_SETTLE_TIMEOUT_MS = 1_500;
 const FRAME_QUEUE_POLL_MS = 25;
+// A reply that never comes (a line the controller dropped, or a write that
+// failed part-way) keeps this fence closed for the whole session, so the
+// message names the one step that always clears it (controller audit
+// gap-start-5).
 const FRAME_QUEUE_BUSY_MESSAGE =
-  'The controller is still finishing a previous command. Wait for its acknowledgement, then Frame again.';
+  'The controller is still finishing a previous command. Wait for its acknowledgement, then ' +
+  'Frame again. If no acknowledgement arrives, disconnect and reconnect the controller to clear it.';
 
 export type FrameWcsNormalization =
   | { readonly ok: true; readonly warning?: string }

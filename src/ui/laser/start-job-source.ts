@@ -96,20 +96,30 @@ export async function prepareCurrentStartJob(
       ...(signal === undefined ? {} : { signal }),
     });
   }
-  return prepareStartJobSnapshot(
-    project,
-    laser.controllerSettings,
-    machine,
-    jobPlacement,
-    outputScope,
-    {
+  return refusalOnThrow(() =>
+    prepareStartJobSnapshot(project, laser.controllerSettings, machine, jobPlacement, outputScope, {
       clock: () => new Date(),
       renderVariableText,
       ...(registration === undefined ? {} : { registration }),
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
       requireFrame,
-    },
+    }),
   );
+}
+
+// The worker path turns a compile exception into a named refusal; the
+// main-thread path let it escape as a bare "Unhandled rejection" toast, with
+// no Start or Frame blocker set (controller audit gap-start-10).
+async function refusalOnThrow(
+  prepare: () => Promise<StartJobPreparation>,
+): Promise<StartJobPreparation> {
+  try {
+    return await prepare();
+  } catch (error) {
+    if (isOutputPreparationAbort(error)) throw error;
+    console.warn('Start preparation failed.', error);
+    return { ok: false, messages: [outputPreparationFailure(error).message] };
+  }
 }
 
 async function prepareCurrentStartInBackground(args: {

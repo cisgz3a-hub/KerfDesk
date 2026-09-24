@@ -252,13 +252,16 @@ describe('untracked-ack start guard', () => {
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
 
-    await useLaserStore.getState().unlockAlarm();
+    // Unlock owns its exchange and finishes on the controller's ok.
+    const unlocking = useLaserStore.getState().unlockAlarm();
+    await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     rejectOldWrite(new Error('old status-era write failed late'));
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
     connection.emitLine('ok');
+    await unlocking;
     await expect(oldCommand).resolves.toBeInstanceOf(Error);
   });
 });

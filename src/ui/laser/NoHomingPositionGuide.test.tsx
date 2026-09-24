@@ -258,3 +258,82 @@ describe('NoHomingPositionGuide', () => {
     }
   });
 });
+
+// Controller audit gap-start-11: an unlock the controller refuses, or one it
+// acknowledges while staying in Alarm, used to leave the card waiting for Idle
+// with no way back. Both now return to the Unlock step with the reason.
+describe('NoHomingPositionGuide unlock that does not reach Idle', () => {
+  async function reachAlarmed(host: HTMLElement, unlockAlarm: () => Promise<void>) {
+    let failWake: ((cause: Error) => void) | null = null;
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: status('Idle'),
+      capabilities: { ...originalLaser.capabilities, sleep: true, unlock: true },
+      releaseMotors: vi.fn(async () => undefined),
+      wakeController: vi.fn(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            failWake = reject;
+          }),
+      ),
+      unlockAlarm,
+      setOriginHere: vi.fn(async () => undefined),
+    });
+    const root = await renderGuide(host);
+    await act(async () => {
+      button(host, 'Release motors to move by hand').click();
+      await Promise.resolve();
+    });
+    await act(async () => useLaserStore.setState({ statusReport: status('Sleep') }));
+    await act(async () => button(host, 'Use this position').click());
+    await act(async () => {
+      useLaserStore.setState({ statusReport: status('Alarm') });
+      if (failWake === null) throw new Error('Wake rejector was not captured');
+      failWake(new Error('Controller entered Alarm.'));
+      await Promise.resolve();
+    });
+    return root;
+  }
+
+  it('offers Unlock again with the reason when the controller refuses it', async () => {
+    const host = document.createElement('div');
+    const root = await reachAlarmed(
+      host,
+      vi.fn(async () => {
+        throw new Error('error:9');
+      }),
+    );
+    try {
+      await act(async () => {
+        button(host, 'Unlock and continue').click();
+        await Promise.resolve();
+      });
+      expect(host.textContent).toContain('Unlock failed: error:9');
+      expect(button(host, 'Unlock and continue').disabled).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('stops waiting when the controller stays in Alarm after Unlock', async () => {
+    vi.useFakeTimers();
+    const host = document.createElement('div');
+    const root = await reachAlarmed(
+      host,
+      vi.fn(async () => undefined),
+    );
+    try {
+      await act(async () => button(host, 'Unlock and continue').click());
+      expect(host.textContent).toContain('Waiting for the controller to report Idle');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(host.textContent).toContain('did not report Idle after Unlock; it reports Alarm');
+      expect(button(host, 'Unlock and continue').disabled).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+      vi.useRealTimers();
+    }
+  });
+});

@@ -214,7 +214,11 @@ function airSetupSummaryText(summary: AirAssistDefaultSyncSummary): string {
   if (summary.disabledObjectOverrideCount > 0) {
     changes.push(`clear ${summary.disabledObjectOverrideCount} stale object air override(s)`);
   }
-  return changes.length === 0 ? '' : `This will ${changes.join(', ')}, then turn manual air on.`;
+  // Those are job settings: a completed Frame no longer matches afterwards, so
+  // the next Start frames the job again (controller audit gap-start-9).
+  return changes.length === 0
+    ? ''
+    : `This will ${changes.join(', ')}, then turn manual air on. The job changes, so Start frames it again first.`;
 }
 
 function airAssistButtonStyle(
