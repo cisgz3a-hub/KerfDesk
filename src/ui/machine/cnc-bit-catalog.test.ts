@@ -123,7 +123,7 @@ describe('CNC bit catalog', () => {
     );
   });
 
-  it('pins the two exact Amana O-flute ball-nose products without inventing flute count', () => {
+  it('pins the two exact Amana O-flute ball-nose products and their single flute', () => {
     const oneEighth = MODELED_CNC_BIT_CATALOG.find(
       (entry) => entry.id === 'o-ball-0125-amana-51814',
     );
@@ -149,8 +149,10 @@ describe('CNC bit catalog', () => {
         family: 'o-flute-ball-nose',
       },
     });
-    expect(oneEighth?.tool).not.toHaveProperty('fluteCount');
-    expect(oneQuarter?.tool).not.toHaveProperty('fluteCount');
+    // Single O-flute bits: an unset count would fall back to 2 flutes and
+    // double the chip load used for auto feeds.
+    expect(oneEighth?.tool.fluteCount).toBe(1);
+    expect(oneQuarter?.tool.fluteCount).toBe(1);
   });
 
   it('keeps specialty geometry visible but reference-only', () => {
