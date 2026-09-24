@@ -8,6 +8,8 @@ export type TraceOptions = {
   // Photo shading traces continuous tones as black filled ribbons. Presence
   // selects the photo backend; 0..100 controls the bounded detail grid. Shades
   // live in covered area, so ordinary fill and bitmap output retain them.
+  // Photo tone is read in linear light, and its invert swaps light and dark
+  // there rather than in bytes (photo-tone.ts, ADR-390).
   readonly photoDetail?: number;
   // Filled contours preserve source silhouettes for fill engraving.
   // Centerline traces skeletonize dark strokes into open line paths
