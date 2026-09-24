@@ -26,10 +26,10 @@ import {
   type CrackSubPixelField,
 } from './contour-boundary';
 import { fairChainSegments } from './fair-chain';
-import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
+import { fitCubicsThroughPoints } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
-import { withCanonicalTraceCurves } from './trace-curves';
+import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
 import { contourFeatureAnchors } from './contour-feature-anchors';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
@@ -379,7 +379,8 @@ function finishLegacyLoop(
 }
 
 // The measured-loop output tail: G1 cubic fit segmented at the sharpener's
-// evidence-backed corners, resampled to the polyline contract.
+// evidence-backed corners, resampled to the polyline contract. The cubics
+// stay the ring's canonical curve (trace-curves.ts, ADR-391).
 function fitLoopTail(
   chain: ReadonlyArray<Polyline['points'][number]>,
   corners: ReadonlySet<Polyline['points'][number]>,
@@ -387,14 +388,13 @@ function fitLoopTail(
   tolerancePx: number,
 ): ContourRefinement | null {
   const refine = (amount: number): Polyline['points'] =>
-    sampleCubics(
+    fittedTraceRing(
       fitCubicsThroughPoints(
         chain,
         true,
         corners,
         tolerancePx * finish.pixelScale * finish.fitToleranceScale * amount,
       ),
-      true,
     );
   const candidate = contourRefinement(chain, refine);
   return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
