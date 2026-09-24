@@ -39,14 +39,24 @@ export function laserStartOverrideReset(
   state: Pick<LaserState, 'capabilities' | 'ovCache'>,
 ): {
   readonly bytes: string;
-  readonly send: (firstWindow: string, write: (payload: string) => Promise<void>) => Promise<void>;
+  readonly send: (
+    firstWindow: string,
+    safeWrite: (payload: string, action: 'start') => Promise<void>,
+    stillOwned: () => boolean,
+  ) => Promise<void>;
   readonly accepted: (current: LaserState, patch: Partial<LaserState>) => Partial<LaserState>;
 } {
   const before = state.ovCache;
   const bytes = laserStartOverrideResetPrefix(machineKind, state.capabilities.overrides, before);
   return {
     bytes,
-    send: (firstWindow, write) => sendResetThenFirstWindow(bytes, firstWindow, write),
+    send: (firstWindow, safeWrite, stillOwned) =>
+      sendResetThenFirstWindow(
+        bytes,
+        firstWindow,
+        (payload) => safeWrite(payload, 'start'),
+        stillOwned,
+      ),
     accepted: (current, patch) =>
       bytes === ''
         ? patch
@@ -59,13 +69,21 @@ export const LASER_START_OVERRIDE_RESET = RT_FEED_OV_RESET + RT_RAPID_OV_FULL + 
 /** The reset, when there is one, as its own realtime-only write (no newline,
  * so it owes no acknowledgement), then the first program window. A window the
  * wire cannot carry is refused by `write` before a byte leaves the host, so
- * the reset is held back from it too. */
+ * the reset is held back from it too. The reset's write is an await the Start
+ * did not have before: an Abort, disconnect or controller reset that lands in
+ * it owns the wire from then on, so the window is written only while the Start
+ * still owns it. After Abort's soft reset a controller without a homing lock
+ * boots Idle and would run that window. */
 export async function sendResetThenFirstWindow(
   bytes: string,
   firstWindow: string,
   write: (payload: string) => Promise<void>,
+  stillOwned: () => boolean,
 ): Promise<void> {
-  if (bytes !== '' && wireEncodingError(firstWindow) === null) await write(bytes);
+  if (bytes !== '' && wireEncodingError(firstWindow) === null) {
+    await write(bytes);
+    if (!stillOwned()) return;
+  }
   await write(firstWindow);
 }
 

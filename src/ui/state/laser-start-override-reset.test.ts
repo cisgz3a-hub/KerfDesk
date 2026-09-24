@@ -171,6 +171,38 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
     expect(writes.join('')).not.toContain('G21');
   });
 
+  it('writes no program window after an Abort that lands while the reset is on the wire', async () => {
+    const writes: string[] = [];
+    const resetWrite: { release?: () => void } = {};
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data !== LASER_START_OVERRIDE_RESET) return;
+      await new Promise<void>((resolve) => {
+        resetWrite.release = resolve;
+      });
+    });
+    await connectReporting(connection, '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>');
+    writes.length = 0;
+
+    const start = startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
+    start.catch(() => undefined);
+    for (let i = 0; i < 500 && resetWrite.release === undefined; i += 1) await Promise.resolve();
+    expect(resetWrite.release).toBeDefined();
+    // The operator aborts while the three reset bytes are still being written.
+    useLaserStore
+      .getState()
+      .stopJob()
+      .catch(() => undefined);
+    await flush();
+    resetWrite.release?.();
+    for (let i = 0; i < 5; i += 1) await flush();
+
+    // Abort's soft reset is the last word: a controller without a homing lock
+    // boots Idle and would run a program window written after it.
+    expect(writes.slice(0, 2)).toEqual([LASER_START_OVERRIDE_RESET, String.fromCharCode(0x18)]);
+    expect(writes.join('')).not.toContain('G21');
+  });
+
   it('holds the reset back when the first program window cannot go on the wire', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

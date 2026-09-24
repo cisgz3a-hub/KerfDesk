@@ -183,7 +183,7 @@ async function runStartJob(
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
     try {
-      await overrideReset.send(stepped.toSend, (payload) => safeWrite(payload, 'start'));
+      await overrideReset.send(stepped.toSend, safeWrite, completion.ownsCurrent);
       if (!completion.ownsCurrent()) return;
       set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
       // The first window is on the wire and accounted for, so the transport
