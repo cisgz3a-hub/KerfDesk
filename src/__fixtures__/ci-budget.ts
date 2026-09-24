@@ -22,7 +22,12 @@ function isCi(): boolean {
   return flag != null && flag !== '';
 }
 
-function isCoverage(): boolean {
+/**
+ * True inside the report-only coverage run: scripts/run-vitest-coverage.mjs sets
+ * KERFDESK_COVERAGE=1. A wall-clock bound whose instrumented cost outgrows the
+ * `ciBudgetMs` allowance can skip itself here; the ordinary lanes still assert it.
+ */
+export function isCoverageRun(): boolean {
   return process.env.KERFDESK_COVERAGE === '1';
 }
 
@@ -35,6 +40,6 @@ export function ciBudgetMs(localMs: number, ciMs: number): number {
   // V8 instrumentation makes the geometry, trace, and camera reference suites
   // substantially slower than either an ordinary local or shared-CI run. The
   // assertions still verify the result; only their wall-clock ceilings expand.
-  if (isCoverage()) return ciMs * 2;
+  if (isCoverageRun()) return ciMs * 2;
   return isCi() ? ciMs : localMs;
 }
