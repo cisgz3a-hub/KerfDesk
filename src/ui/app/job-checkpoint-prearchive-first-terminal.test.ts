@@ -33,7 +33,7 @@ const REJECTION = controllerErrorNotice(1, 'job', 'error:1', REJECTED);
 const CABLE_LOSS = disconnectDuringJobNotice();
 const ABORT = { jobStopRequest: { reason: 'operator', streamerEpoch: 0 } } as const;
 // The last status report before the terminal: two planner blocks behind ack 3.
-const PLANNER_SNAPSHOT = { streamerEpoch: 0, ackedLines: 3, queuedBlocks: 2 };
+const PLANNER_SNAPSHOT = { streamerEpoch: 0, sessionEpoch: 0, ackedLines: 3, queuedBlocks: 2 };
 const PLANNER_BACKLOG = { ackedAtStatus: 3, queuedBlocks: 2 };
 
 type Case = {
@@ -112,7 +112,14 @@ const CASES: ReadonlyArray<Case> = [
     atTerminal: { safetyNotice: REJECTION, streamPlannerSnapshot: PLANNER_SNAPSHOT },
     whileWaiting: [
       'trailing ok',
-      { streamPlannerSnapshot: { streamerEpoch: 0, ackedLines: 4, queuedBlocks: 0 } },
+      {
+        streamPlannerSnapshot: {
+          streamerEpoch: 0,
+          sessionEpoch: 0,
+          ackedLines: 4,
+          queuedBlocks: 0,
+        },
+      },
     ],
     recorded: { ...REJECTED_INTERRUPTION, plannerBacklog: PLANNER_BACKLOG },
   },

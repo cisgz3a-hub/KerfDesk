@@ -1,53 +1,14 @@
 import {
-  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   profileSupportsCapability,
   type DeviceProfile,
   type ProfileCapability,
 } from '../../core/devices';
-import {
-  fillRunwayPolicyForDevice,
-  shouldAdvise4040FillPolicySelection,
-} from '../../core/job/fill-runway-policy';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
   readonly update: (patch: Partial<DeviceProfile>) => void;
 };
-
-export function ProfileRows(props: DeviceRowsProps): JSX.Element {
-  const { device, update } = props;
-  const active = fillRunwayPolicyForDevice(device) !== undefined;
-  const needsReview = shouldAdvise4040FillPolicySelection(device);
-  const laserLabel = device.laserSubProfile?.model ?? 'Generic GRBL diode';
-  return (
-    <>
-      <Row label="Profile">
-        <button
-          type="button"
-          onClick={() => {
-            if (!jobAwareConfirm(neotronicsProfileConfirmation())) return;
-            update(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
-          }}
-          title="Apply the researched Neotronics 4040 Max / LT-4LDS-V2 20W diode defaults. Confirm live $$ settings after connecting."
-        >
-          Use Neotronics 4040 Max
-        </button>
-      </Row>
-      <Row label="Laser">
-        <span style={profileTextStyle}>
-          {active
-            ? 'Neotronics-qualified 4040 fill policy active'
-            : needsReview
-              ? 'Generic Scan Line runways active; Neotronics-qualified policy not selected'
-              : 'Generic Scan Line feed-matched runways active'}{' '}
-          — {laserLabel}
-        </span>
-      </Row>
-    </>
-  );
-}
 
 export function ZRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
@@ -146,15 +107,6 @@ function isPositive(value: number | undefined): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
-function neotronicsProfileConfirmation(): string {
-  return [
-    'Apply the Neotronics 4040 Max / LT-4LDS-V2 20W laser profile?',
-    '',
-    'This updates the local KerfDesk profile only. After connecting, read $$, export a backup, and confirm Z travel, homing, and air-assist wiring before changing GRBL settings.',
-  ].join('\n');
-}
-
-const profileTextStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
 const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',

@@ -21,7 +21,6 @@ vi.mock('./job-review', () => ({
 
 type ReviewGateArgs = {
   readonly initial: ReviewedStartBundle;
-  readonly checkpointToReplace: null;
   readonly completedReceipt: null;
   readonly purpose?: 'start' | 'frame';
 };
@@ -249,6 +248,8 @@ describe('Frame WCS disclosure and completion reporting', () => {
       selectPrimaryWcsForFrame,
       frame: successfulFrame(),
     });
+    // The operator declines the Set origin offer, so the placement refusal stands.
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     await expect(runFrameNow()).resolves.toBe(false);
 

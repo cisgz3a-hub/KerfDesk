@@ -17,22 +17,11 @@ export const definitionGridStyle: React.CSSProperties = {
   gap: '4px 10px',
   margin: 0,
 };
-export const catalogGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 10,
-};
 export const cardStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 6,
   padding: 10,
   background: 'var(--lf-bg)',
-};
-export const cardHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 8,
-  alignItems: 'center',
 };
 export const badgeStyle: React.CSSProperties = {
   fontSize: 11,
@@ -48,12 +37,6 @@ export const errorStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)' };
 export const zoneGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(120px, 1fr) repeat(4, 72px) auto auto',
-  gap: 8,
-  alignItems: 'end',
-};
-export const firmwareGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto auto',
   gap: 8,
   alignItems: 'end',
 };

@@ -76,7 +76,7 @@ describe('buildCncRecoveryPreviewModel', () => {
     );
   });
 
-  it('keeps current-project compilation behind the named legacy-only fallback', () => {
+  it('keeps current-project compilation behind the named fingerprint-only fallback', () => {
     const original = cncProject(20);
     const checkpoint = matchingCheckpoint(original);
     const capsule = legacyCapsule(checkpoint);
@@ -84,7 +84,7 @@ describe('buildCncRecoveryPreviewModel', () => {
     const sealedApi = buildCncRecoveryPreviewModel(capsule, SELECTED_EVENT);
     expect(sealedApi).toMatchObject({
       canExecute: false,
-      unavailableReason: expect.stringContaining('explicit legacy current-project fallback'),
+      unavailableReason: expect.stringContaining('explicit current-project fallback'),
     });
 
     const matching = buildLegacyFingerprintOnlyCncRecoveryPreviewModel(

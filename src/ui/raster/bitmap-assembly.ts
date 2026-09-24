@@ -34,6 +34,11 @@ import type { BitmapFields } from './luma-bitmap';
 import { bitmapFillGroups, type BitmapFillObject } from './bitmap-fill-groups';
 import { estimateBitmapGeometryResources } from './bitmap-conversion-resources';
 import type { BitmapLayerSetting } from './bitmap-operation-settings';
+import {
+  rasterizePhotoCoverage,
+  type PackedPhotoPolylines,
+} from '../../core/raster/rasterize-photo-coverage';
+import { packedPhotoBitmapResources } from './packed-photo-bitmap';
 
 export type { BitmapLayerSetting } from './bitmap-operation-settings';
 
@@ -44,6 +49,9 @@ const CURVE_TOLERANCE_PIXELS = 0.25;
 export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
 export type BitmapConversionOptions = {
+  // Internal photo handoff: vectors carry metadata only, coordinates are owned
+  // transferable buffers. Never stored in the project or used for other art.
+  readonly photoRibbons?: PackedPhotoPolylines;
   readonly preserveCoverage?: boolean;
   readonly coverageAxis?: 'x' | 'y';
   readonly dpi?: number;
@@ -67,11 +75,18 @@ export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
 // Bitmap merges a multi-selection into ONE bitmap (ADR-029 amendment ii).
 export function bitmapConversionTarget(
   objects: ReadonlyArray<ConvertibleVector>,
+  photoRibbons?: PackedPhotoPolylines,
 ): BitmapConversionTarget {
+  if (photoRibbons !== undefined && (objects.length !== 1 || objects[0]?.paths.length !== 0)) {
+    throw new Error('Packed photo conversion requires one metadata-only source.');
+  }
   return {
     bounds: combinedConvertibleBounds(objects),
     transform: IDENTITY_TRANSFORM,
-    geometryStats: estimateBitmapGeometryResources(objects),
+    geometryStats:
+      photoRibbons === undefined
+        ? estimateBitmapGeometryResources(objects)
+        : packedPhotoBitmapResources(photoRibbons),
   };
 }
 
@@ -113,9 +128,26 @@ function rasterizeConvertibles(
   readonly plan: BitmapConversionPlan;
   readonly raster: VectorRaster;
 } {
-  const plan = estimateBitmapConversion(bitmapConversionTarget(objects), options.dpi);
+  const plan = estimateBitmapConversion(
+    bitmapConversionTarget(objects, options.photoRibbons),
+    options.dpi,
+  );
   assertBitmapConversionFits(plan);
   const bounds = plan.bounds;
+  if (options.photoRibbons !== undefined) {
+    if (options.renderType !== 'fill-all' || options.preserveCoverage !== true) {
+      throw new Error('Packed photo conversion requires filled coverage sampling.');
+    }
+    const raster = rasterizePhotoCoverage({
+      geometry: options.photoRibbons,
+      bounds,
+      width: plan.pixelWidth,
+      height: plan.pixelHeight,
+      ink: inkLumaForBrightnessPercent(options.brightnessPercent ?? 50),
+      coverageAxis: options.coverageAxis ?? 'x',
+    });
+    return { bounds, plan, raster };
+  }
   // Resolve canonical geometry at the actual rounded pixel pitch, in scene mm.
   // The flattener accounts for each object's largest axis scale before baking.
   const toleranceMm =

@@ -8,6 +8,8 @@ import {
   type DeviceProfile,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
+import { usePlatformOptional } from '../../app/platform-context';
+import { backgroundStreamingPreferenceTitle } from '../../state/laser-background-streaming-notice';
 import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
 import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
@@ -224,23 +226,23 @@ function RxWindowRow(props: {
   );
 }
 
-// ADR-334. Off by default and labelled as untested on purpose: the worker
-// transport has no runtime coverage in this repository and no hardware
-// evidence, so an operator turning it on is choosing to try it.
+// Native worker ownership keeps the window out of the serial round trip.
+// The operator can retain the ordinary transport when needed for compatibility.
 function HostedStreamingRow(props: {
   readonly state: DeviceSetupStepProps['state'];
   readonly update: (patch: Partial<DeviceProfile>) => void;
 }): JSX.Element {
+  const platform = usePlatformOptional();
   return (
-    <Row label="Stream in worker">
+    <Row label="Background streaming">
       <input
         type="checkbox"
-        checked={props.state.draft.workerHostedStreaming === true}
+        checked={props.state.draft.workerHostedStreaming !== false}
         aria-label="Read the serial port and refill the job stream in a worker"
-        title="Experimental, untested on hardware. Reads the port and writes job refills off the main thread, so a busy interface cannot delay the controller. A browser that cannot hand the port to a worker keeps the normal transport."
+        title={backgroundStreamingPreferenceTitle(platform?.id)}
         onChange={(event) => props.update({ workerHostedStreaming: event.target.checked })}
       />
-      <span style={mutedInlineStyle}>experimental, untested on hardware</span>
+      <span style={mutedInlineStyle}>reconnect to apply</span>
     </Row>
   );
 }

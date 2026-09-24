@@ -16,6 +16,59 @@ import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('trace controls describe the options the engine actually receives', () => {
+  it('recovers grayscale strokes, persists the choice across styles, and restores defaults on reset', async () => {
+    const image = paper();
+    fill(image, 5, 5, 20, 20, [0, 0, 0]);
+    fill(image, 25, 45, 40, 1, [180, 180, 180]);
+    await withControls('Line Art', async (controls) => {
+      expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
+      expect(controls.host.textContent).toContain('Faint lines (keep solid areas)');
+      await controls.detect('faint-lines');
+      expect(controls.host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
+      expect(ink(preprocessForTrace(image, controls.options()))).toBe(440);
+      await controls.check('Fill tiny holes', false);
+      await controls.selectPreset('Sharp');
+      expect(controls.options().faintLineRecovery).toBe(true);
+      expect(ink(preprocessForTrace(image, controls.options()))).toBe(440);
+      await controls.selectPreset('Photo shading');
+      expect(controls.options().faintLineRecovery).toBeUndefined();
+      expect(controls.options().fillPinholeCracks).toBeUndefined();
+      await controls.selectPreset('Line Art');
+      expect(controls.options().faintLineRecovery).toBe(true);
+      expect(controls.options().fillPinholeCracks).toBe(false);
+      await controls.detect('manual');
+      expect(controls.options().faintLineRecovery).not.toBe(true);
+      expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
+      await controls.reset();
+      expect(controls.options()).toEqual(TRACE_PRESETS['Line Art']);
+    });
+  });
+
+  it.each(['Line Art', 'Smooth', 'Sharp'])(
+    '%s tiny-hole checkbox controls enclosed slits while leaving open gaps open',
+    async (name) => {
+      await withControls(name, async (controls) => {
+        for (const [width, height] of [
+          [1, 20],
+          [2, 20],
+          [2, 2],
+        ]) {
+          const image = paper();
+          fill(image, 10, 10, 40, 35, [0, 0, 0]);
+          fill(image, 25, 15, width!, height!, [255, 255, 255]);
+          await controls.check('Fill tiny holes', false);
+          expect(ink(preprocessForTrace(image, controls.options()))).toBe(1400 - width! * height!);
+          await controls.check('Fill tiny holes', true);
+          expect(ink(preprocessForTrace(image, controls.options()))).toBe(1400);
+        }
+        const open = paper();
+        fill(open, 10, 10, 40, 35, [0, 0, 0]);
+        fill(open, 25, 10, 1, 35, [255, 255, 255]);
+        expect(ink(preprocessForTrace(open, controls.options()))).toBe(1365);
+      });
+    },
+  );
+
   it('makes Otsu-to-manual and back deliberate while retaining preset output', async () => {
     const image = paper(240);
     fill(image, 20, 15, 30, 30, [170, 170, 170]);
@@ -110,7 +163,7 @@ describe('trace controls describe the options the engine actually receives', () 
       async (controls) => {
         const toggleAlpha = async (): Promise<void> => {
           await act(async () => {
-            const checkbox = controls.host.querySelector('input[type="checkbox"]');
+            const checkbox = controls.host.querySelector('[aria-label="Trace alpha mask"]');
             if (!(checkbox instanceof HTMLInputElement)) throw new Error('Missing alpha checkbox');
             checkbox.click();
           });
@@ -180,6 +233,7 @@ type Controls = {
   readonly number: (label: string) => HTMLInputElement;
   readonly change: (label: string, value: number) => Promise<void>;
   readonly detect: (mode: string) => Promise<void>;
+  readonly check: (label: string, checked: boolean) => Promise<void>;
   readonly selectPreset: (name: string) => Promise<void>;
   readonly reset: () => Promise<void>;
 };
@@ -219,6 +273,11 @@ async function withControls(
       host,
       options: () => mergeLightBurnTraceSettings(preset, settings),
       number,
+      check: async (label, checked) => {
+        const input = host.querySelector(`[aria-label="${label}"]`);
+        if (!(input instanceof HTMLInputElement)) throw new Error(`Missing checkbox ${label}`);
+        if (input.checked !== checked) await act(async () => input.click());
+      },
       selectPreset: async (nextName) => {
         const next = TRACE_PRESETS[nextName];
         if (next === undefined) throw new Error(`Missing preset ${nextName}`);

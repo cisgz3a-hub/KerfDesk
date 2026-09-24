@@ -57,7 +57,6 @@ export async function reviewFramedRunForStart(
         ? {}
         : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),
     },
-    checkpointToReplace: null,
     completedReceipt: null,
     shouldAbandon,
     ...(candidate.authorizationContext === 'laser-second-pass'

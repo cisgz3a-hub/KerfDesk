@@ -55,6 +55,18 @@ afterEach(async () => {
 });
 
 describe('TracePreview visible feedback', () => {
+  it('keeps a visible loading layer while a ready trace is converted to raster output', async () => {
+    await render({ state: ready, isRasterizing: true });
+    expect(host.querySelector('[role="progressbar"]')?.textContent).toContain(
+      'Preparing raster output',
+    );
+    expect(host.querySelector('[aria-label="Preview viewport"]')?.getAttribute('aria-busy')).toBe(
+      'true',
+    );
+    expect(host.querySelector('#line')).not.toBeNull();
+    await render({ state: ready, isRasterizing: false });
+    expect(host.querySelector('[role="progressbar"]')).toBeNull();
+  });
   it.each([
     ['decoding', 'Preparing image for tracing', 'Decoding image...'],
     ['tracing', 'Tracing image', 'Tracing...'],
@@ -115,7 +127,7 @@ describe('TracePreview visible feedback', () => {
     await click('Show Points');
     const hole = host.querySelector('#hole') as SVGPathElement;
     const line = host.querySelector('#line') as SVGPathElement;
-    const marker = host.querySelector('[aria-label="Trace points"] circle') as SVGCircleElement;
+    const marker = host.querySelector('[aria-label="Trace points"]') as HTMLCanvasElement;
     const geometry = [hole.outerHTML, line.outerHTML, marker.outerHTML];
     expect(getComputedStyle(hole).fill).toBe('var(--lf-accent)');
     expect(getComputedStyle(line).stroke).toBe('var(--lf-accent)');

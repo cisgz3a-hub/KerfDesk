@@ -81,6 +81,15 @@ export type ConsoleQuickCommand = {
   readonly command: string;
   readonly hint: string;
 };
+/** One numeric `$N=` setting a vendor documents for console use, accepted as
+ *  a whole number in [min, max] (ADR-370). */
+export type ConsoleSettingWrite = {
+  readonly id: number;
+  readonly min: number;
+  readonly max: number;
+  /** What the setting controls, for the out-of-range message. */
+  readonly meaning: string;
+};
 
 export type ControllerDriver = {
   readonly kind: ControllerKind;
@@ -95,6 +104,9 @@ export type ControllerDriver = {
   /** Validate + normalize one console input line for this firmware. */
   readonly prepareConsoleCommand: (input: string) => ConsoleCommandResult;
   readonly consoleQuickCommands: ReadonlyArray<ConsoleQuickCommand>;
+  /** Numeric `$N=` writes the Console still sends when `capabilities.settings`
+   *  is not 'grbl-dollar'. Absent means none. */
+  readonly consoleSettingWrites?: ReadonlyArray<ConsoleSettingWrite>;
   /** True when a write payload contains setup-only lines that must be blocked
    *  while a job is active (GRBL: any `$` line). */
   readonly isSetupOnlyPayload: (payload: string) => boolean;

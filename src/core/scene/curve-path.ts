@@ -74,17 +74,21 @@ export function flattenColoredPathCurves(
   path: ColoredPath,
   options: FlattenCurveOptions,
 ): FlattenColoredPathResult {
+  const budget = Math.max(1, Math.floor(options.segmentBudget ?? MAX_FLATTENED_CURVE_SEGMENTS));
   if (path.curves === undefined) {
+    let segmentCount = 0;
+    for (const polyline of path.polylines) {
+      segmentCount += Math.max(0, polyline.points.length - 1);
+      if (segmentCount > budget) {
+        return { kind: 'segment-budget-exceeded', segmentBudget: budget };
+      }
+    }
     return {
       kind: 'ok',
       polylines: path.polylines,
-      segmentCount: path.polylines.reduce(
-        (count, polyline) => count + Math.max(0, polyline.points.length - 1),
-        0,
-      ),
+      segmentCount,
     };
   }
-  const budget = Math.max(1, Math.floor(options.segmentBudget ?? MAX_FLATTENED_CURVE_SEGMENTS));
   const polylines: Polyline[] = [];
   let segmentCount = 0;
   for (const curve of path.curves) {
@@ -92,7 +96,9 @@ export function flattenColoredPathCurves(
       ...options,
       segmentBudget: budget - segmentCount,
     });
-    if (result.kind !== 'ok') return { kind: 'segment-budget-exceeded', segmentBudget: budget };
+    if (result.kind !== 'ok' || segmentCount + result.segmentCount > budget) {
+      return { kind: 'segment-budget-exceeded', segmentBudget: budget };
+    }
     polylines.push(result.polyline);
     segmentCount += result.segmentCount;
   }

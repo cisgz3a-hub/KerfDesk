@@ -39,6 +39,7 @@ export type BitmapConversionPlan = {
   readonly linesPerMm: number;
   readonly dpi: number;
   readonly verdict: RasterBudgetVerdict;
+  readonly geometryExceedsBudget: boolean;
 };
 
 export function estimateBitmapConversion(
@@ -65,13 +66,17 @@ export function estimateBitmapConversion(
     linesPerMm,
     dpi: normalizedDpi,
     verdict: resources.verdict,
+    geometryExceedsBudget: resources.geometryExceedsBudget,
   };
 }
 
 export function assertBitmapConversionFits(plan: BitmapConversionPlan): void {
   if (plan.verdict.kind === 'ok') return;
+  const advice = plan.geometryExceedsBudget
+    ? 'Simplify the artwork or use a lower trace Detail. Lower DPI or a smaller image will not resolve this geometry limit.'
+    : 'Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.';
   throw new Error(
-    `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.`,
+    `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). ${advice}`,
   );
 }
 

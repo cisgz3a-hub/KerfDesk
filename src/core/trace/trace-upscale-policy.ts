@@ -10,6 +10,8 @@ import { isBinaryContourPreset } from './contour-trace';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 import type { EdgeTraceInput } from './edge-input';
+import type { ContourTraceInput } from './contour-input';
+import { shouldTraceAlphaMask } from './trace-alpha';
 
 const DENSE_COLOR_TRANSITION_DENSITY = 0.025;
 const DENSE_COLOR_DOWNSCALE_TRIGGER_PIXELS = 1_500_000;
@@ -47,12 +49,13 @@ export function traceScalePlan(
   image: RawImageData,
   options: TraceOptions,
   edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
 ): TraceScalePlan {
   const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
   const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
   const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
-  const profile = contourQualityProfile(image, options, edgeInput);
+  const profile = contourQualityProfile(image, options, edgeInput, contourInput);
   const denseColor = isDenseColorProfile(image, options, profile);
   if (denseColor) {
     const downscale = denseColorDownscalePlan(image);
@@ -71,10 +74,11 @@ function contourQualityProfile(
   image: RawImageData,
   options: TraceOptions,
   edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
 ): ContourDetailProfile | null {
   if (options.supersampleContour !== true) return null;
   if (!isBinaryContourPreset(options) && options.traceMode !== 'edge') return null;
-  return contourDetailProfile(image, options, edgeInput);
+  return contourDetailProfile(image, options, edgeInput, contourInput);
 }
 
 function shouldUseContourQualityScale(
@@ -97,7 +101,10 @@ function isDenseColorProfile(
     profile !== null &&
     profile.transitionDensity >= DENSE_COLOR_TRANSITION_DENSITY &&
     isBinaryContourPreset(options) &&
-    shouldUseSketchTrace(image, options)
+    // Preserve the existing color/sketch workload policy. Only the newly added
+    // faint-detail trigger is inactive when the source is owned by alpha.
+    (shouldUseSketchTrace(image, options) ||
+      (options.faintLineRecovery === true && !shouldTraceAlphaMask(image, options)))
   );
 }
 

@@ -15,6 +15,7 @@ import { pushUndo } from './scene-mutations';
 import { boundsForPaths } from './path-node-edit-geometry';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { planCurveNodeJoin } from './path-node-curve-join-plan';
+import { curveCommandPath } from './path-node-command-geometry';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { useToastStore } from './toast-store';
 
@@ -105,8 +106,10 @@ function mutateObjectCurve(
   let changed = false;
   const objects = state.project.scene.objects.map((object) => {
     if (object.id !== ref.objectId || !isCurveCommandObject(object)) return object;
-    const path = object.paths[ref.pathIndex];
-    if (path?.curves === undefined) return object;
+    const source = object.paths[ref.pathIndex];
+    if (source === undefined) return object;
+    const path = curveCommandPath(source, [ref]);
+    if (path === null) return object;
     const curves = mutate(path.curves);
     if (curves === null) return object;
     const nextPath = materializeCurves(path, curves);
@@ -148,8 +151,8 @@ function materializeCurves(
   return { ...path, curves, polylines };
 }
 
-function isAnchorRef(ref: PathNodeRef | null): ref is PathNodeRef & { geometry: 'curve' } {
-  return ref?.geometry === 'curve' && ref.handle === undefined;
+function isAnchorRef(ref: PathNodeRef | null): ref is PathNodeRef {
+  return ref !== null && ref.handle === undefined;
 }
 
 function isCurveCommandObject(

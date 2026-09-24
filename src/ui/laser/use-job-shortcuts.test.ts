@@ -145,6 +145,7 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
   });
 
   it('Ctrl+Enter claims the event when connected and idle', async () => {
+    vi.useFakeTimers();
     patchLaserStore({
       streamer: null,
       connection: { kind: 'connected' },
@@ -152,22 +153,25 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
       controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
     });
     const uninstall = installJobShortcuts(window);
+    try {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(event);
 
-    const event = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    window.dispatchEvent(event);
-
-    // The flow runs and (with an empty scene / unknown status) records the
-    // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
-    expect(event.defaultPrevented).toBe(true);
-    await vi.waitFor(() =>
-      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0),
-    );
-    uninstall();
+      // The flow runs and (with an empty scene / unknown status) records the
+      // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
+      // With no status yet, the Frame first asks the controller for one.
+      expect(event.defaultPrevented).toBe(true);
+      await vi.advanceTimersByTimeAsync(3_500);
+      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0);
+    } finally {
+      uninstall();
+      vi.useRealTimers();
+    }
   });
 
   it.each([

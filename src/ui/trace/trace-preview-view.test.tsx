@@ -60,7 +60,7 @@ describe('TracePreview comparison and inspection', () => {
     await click('Show Points');
     const trace = host.querySelector('#preview-line');
     const points = host.querySelector('[aria-label="Trace points"]');
-    const firstPoint = points?.querySelector('circle');
+    expect(points).toBeInstanceOf(HTMLCanvasElement);
     const image = source();
 
     await click('Original');
@@ -76,7 +76,7 @@ describe('TracePreview comparison and inspection', () => {
     await click('Overlay');
     expect(image.hidden).toBe(false);
     expect(host.querySelector('#preview-line')).toBe(trace);
-    expect(host.querySelector('[aria-label="Trace points"] circle')).toBe(firstPoint);
+    expect(host.querySelector('[aria-label="Trace points"]')).toBe(points);
   });
 
   it('starts with a faded comparison and remembers its preference without fading Original', async () => {

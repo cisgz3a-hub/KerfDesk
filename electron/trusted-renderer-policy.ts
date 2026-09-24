@@ -28,11 +28,6 @@ export interface PermissionRequestPolicyInput {
   readonly currentUrl: string;
 }
 
-export interface DevicePermissionPolicyInput {
-  readonly deviceType: string;
-  readonly origin: string;
-}
-
 export function makeTrustedRendererOrigins(devUrl?: string): ReadonlySet<string> {
   const origins = new Set<string>([PACKAGED_RENDERER_ORIGIN]);
   if (devUrl !== undefined && devUrl.length > 0) {
@@ -95,13 +90,6 @@ export function shouldGrantPermissionRequest(
     isTrustedRendererUrl(input.requestingUrl, trustedOrigins) &&
     isTrustedRendererUrl(input.currentUrl, trustedOrigins)
   );
-}
-
-export function shouldGrantDevicePermission(
-  input: DevicePermissionPolicyInput,
-  trustedOrigins: ReadonlySet<string>,
-): boolean {
-  return input.deviceType === 'serial' && isTrustedRendererUrl(input.origin, trustedOrigins);
 }
 
 function isAllowedPermissionCheck(input: PermissionCheckPolicyInput): boolean {

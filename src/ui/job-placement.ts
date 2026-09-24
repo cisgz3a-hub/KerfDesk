@@ -17,13 +17,13 @@ export const DEFAULT_JOB_PLACEMENT: JobPlacementSettings = {
 };
 
 // Exported so the blocked-Start fix offers can recognize these refusals
-// exactly and offer the one-click remedy (Set origin here / Reset origin).
+// exactly and offer the one-click Set origin remedy.
 export const USER_ORIGIN_REQUIRED_MESSAGE =
   'User Origin needs a custom work origin. Click "Set origin here" first.';
 export const VERIFIED_ORIGIN_REQUIRED_MESSAGE =
   'Verified Origin needs a custom work origin. Click "Set origin here" first.';
-export const ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE =
-  'Absolute Coordinates requires the custom work origin to be cleared. Reset origin first, or choose User Origin.';
+export const ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE =
+  'The controller has not reported its current work-coordinate offset yet. Wait for a fresh Idle status report, then Frame again.';
 
 export function defaultJobPlacementForDevice(
   device: Pick<DeviceProfile, 'homing'>,
@@ -111,10 +111,8 @@ export function resolveJobPlacement(
 }
 
 // Save is a file export, so missing origin state must not block it except in
-// Current Position, whose placement needs the live head. Keep a known WCO in
-// the Absolute fallback: a verified native-to-bed contract then lets the caller
-// export bed positions in the connected controller's actual work frame.
-// Without qualified runtime evidence, callers retain profile-relative output.
+// Current Position, whose placement needs the live head. Live Absolute already
+// compensates known WCO; an offline export retains its profile-relative fallback.
 export function resolveExportJobPlacement(
   settings: JobPlacementSettings,
   machine: MachinePlacementSnapshot,
@@ -140,9 +138,9 @@ export function resolveExportJobPlacement(
 // Preview and the live estimate never move the machine. User Origin and Verified
 // Origin output is work-zero relative, so both can be inspected before the
 // controller origin exists — they take the export fallback. Absolute and Current
-// Position keep the live resolution: their bytes depend on live machine state or
-// on no custom origin being active. Start still uses resolveJobPlacement and the
-// completed Frame (ADR-228); the worker cache keys on the resolved jobOrigin, so
+// Position keep the live resolution: their bytes depend on live machine state.
+// Start still uses resolveJobPlacement and the completed Frame (ADR-228);
+// the worker cache keys on the resolved jobOrigin, so
 // preview and estimate must share this exact rule (ADR-327).
 export function resolvePreviewJobPlacement(
   settings: JobPlacementSettings,
@@ -180,11 +178,22 @@ export function runtimeCoordinatePreparationOptions(
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
   evidence: NativeBedEvidence & Pick<MachinePlacementSnapshot, 'workOriginActive'>,
 ): Pick<PrepareOutputOptions, 'contourEntryBounds' | 'absoluteProgramOffset'> {
-  const offset = trustedMotionOffsetForPreflight(device, placement, evidence);
-  if (offset === undefined) return { contourEntryBounds: null };
-  const bed = machineBoundsForDevice(device);
   const absolute =
     placement.jobOrigin === undefined || placement.jobOrigin.startFrom === 'absolute';
+  const offset = trustedMotionOffsetForPreflight(device, placement, evidence);
+  if (offset === undefined) {
+    // Even without a known bed translation, a measured WCO must not move an
+    // Absolute job away from the native targets it had with zero WCO. Physical
+    // bed location remains advisory and no contour-entry envelope is invented.
+    const wco = placement.preflightMotionOffset;
+    return {
+      contourEntryBounds: null,
+      ...(absolute && wco !== undefined && (wco.x !== 0 || wco.y !== 0)
+        ? { absoluteProgramOffset: { x: -wco.x, y: -wco.y } }
+        : {}),
+    };
+  }
+  const bed = machineBoundsForDevice(device);
   return {
     contourEntryBounds: {
       minX: bed.minX - offset.x,
@@ -197,10 +206,15 @@ export function runtimeCoordinatePreparationOptions(
 }
 
 function resolveAbsolute(machine: MachinePlacementSnapshot): ResolvedJobPlacement {
+  // Home establishes machine position; it does not erase G54/G92. Compensate
+  // the observed offset in the program, so Frame and Start reach the drawn
+  // Absolute coordinates without modifying the controller's work origin.
+  const wco = knownWco(machine);
+  if (wco !== null) return { ok: true, preflightMotionOffset: xyOffset(wco) };
   if (!customOriginIsActive(machine)) return { ok: true };
   return {
     ok: false,
-    messages: [ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE],
+    messages: [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
   };
 }
 
@@ -228,6 +242,12 @@ function resolveCurrentPosition(
   };
 }
 
+// Frame asks the controller for the offset before refusing (frame-status-wait),
+// so this remains only when the offset did not arrive.
+export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
+  'The work origin is set, but the controller has not reported where it is yet. Wait a moment ' +
+  'and try again, or Reset origin and set it again where the job should start.';
+
 function resolveUserOrigin(
   settings: JobPlacementSettings,
   machine: MachinePlacementSnapshot,
@@ -240,12 +260,7 @@ function resolveUserOrigin(
     };
   }
   if (wco === null) {
-    return {
-      ok: false,
-      messages: [
-        'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.',
-      ],
-    };
+    return { ok: false, messages: [CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE] };
   }
   return {
     ok: true,

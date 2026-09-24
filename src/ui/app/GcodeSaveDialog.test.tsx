@@ -60,7 +60,7 @@ function platform(
 
 function destinationButton(host: HTMLElement): HTMLButtonElement {
   const button = [...host.querySelectorAll('button')].find((item) =>
-    item.textContent?.includes('Choose destination'),
+    item.textContent?.includes('Save as'),
   );
   if (!(button instanceof HTMLButtonElement)) throw new Error('destination button missing');
   return button;

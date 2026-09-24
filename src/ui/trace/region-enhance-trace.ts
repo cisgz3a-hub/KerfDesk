@@ -23,6 +23,7 @@ import {
 import { traceImageRegion } from './trace-region';
 import { traceImageWithFallback, type TraceResult } from './use-trace-worker-client';
 import { resolveTraceSourceOptions } from '../../core/trace/trace-alpha';
+import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export type BoundaryMode = 'crop' | 'enhance';
 
@@ -36,12 +37,13 @@ export async function traceImageWithBoundaryMode(
   boundary: TraceBoundary | null | undefined,
   mode: BoundaryMode,
   signal?: AbortSignal,
+  progress?: TraceProgress,
 ): Promise<TraceResult> {
   const options = resolveTraceSourceOptions(image, requestedOptions);
   if (mode === 'crop' || boundary === null || boundary === undefined) {
-    return traceImageRegion(image, options, boundary, signal);
+    return traceImageRegion(image, options, boundary, signal, progress);
   }
-  const full = await traceImageWithFallback(image, options, signal);
+  const full = await traceImageWithFallback(image, options, signal, progress);
   const notices = new Set(full.notices);
   const paths = await enhanceRegionPaths({
     image,
@@ -49,7 +51,7 @@ export async function traceImageWithBoundaryMode(
     fullTracePaths: full.paths,
     options,
     trace: async (img, opts) => {
-      const result = await traceImageWithFallback(img, opts, signal);
+      const result = await traceImageWithFallback(img, opts, signal, progress);
       for (const notice of result.notices ?? []) notices.add(notice);
       return result.paths;
     },

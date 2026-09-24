@@ -12,6 +12,12 @@ import type { ConnectControllerOptions } from './laser-store-action-types';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SerialOpenRequest } from '../../platform/types';
 import { isGrblFamilyDriver } from './laser-disconnect-transaction';
+import {
+  BACKGROUND_STREAMING_FALLBACK_LOG,
+  backgroundStreamingFallbackWarning,
+} from './laser-background-streaming-notice';
+import { pushLog } from './laser-store-helpers';
+import { useToastStore } from './toast-store';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -81,6 +87,7 @@ export async function runConnectAction(
       return;
     }
     attachConnection(connection, baudRate, portRef.info ?? null);
+    reportBackgroundStreaming(set, connection, adapter.id);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission().catch(() => undefined);
@@ -94,9 +101,22 @@ export async function runConnectAction(
   }
 }
 
+// Every host records the fallback; only a host whose hidden window pauses
+// sending asks the operator to keep KerfDesk visible (ADR-354 Amendment 1).
+function reportBackgroundStreaming(
+  set: SetFn,
+  connection: LiveConnection,
+  host: PlatformAdapter['id'],
+): void {
+  if (connection.backgroundStreamingUnavailable !== true) return;
+  set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_FALLBACK_LOG) }));
+  const warning = backgroundStreamingFallbackWarning(host);
+  if (warning !== null) useToastStore.getState().pushToast(warning, 'warning');
+}
+
 // Split out to keep runConnectAction under the complexity cap. The hosted
-// transport is advisory: the platform silently keeps the main-thread one when
-// it cannot hand the port to a worker (ADR-334).
+// transport is preferred for compatible drivers. Explicit false preserves an
+// operator's ordinary-transport choice; unsupported runtimes retain the picked port.
 function serialOpenRequest(
   baudRate: number,
   options: ConnectControllerOptions,
@@ -104,9 +124,9 @@ function serialOpenRequest(
 ): SerialOpenRequest {
   return {
     baudRate,
-    // The worker pump understands GRBL acknowledgements only. A saved opt-in
-    // may survive a controller change or arrive through an imported profile.
-    ...(options.hostedStreaming === true && isGrblFamilyDriver(driver)
+    // The worker pump understands GRBL acknowledgements only. An old profile
+    // may survive a controller change or arrive through an imported project.
+    ...(options.hostedStreaming !== false && isGrblFamilyDriver(driver)
       ? { hostedStreaming: true }
       : {}),
   };
