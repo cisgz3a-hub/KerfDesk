@@ -20,10 +20,13 @@ const imagePath =
 // dominate the renderer's memory. Keep stage evidence and final screenshots.
 test.use({ trace: 'off', viewport: { width: 1440, height: 1000 } });
 
-test('dense Sharp artwork traces, previews and completes one simulated Frame', async ({
+test('dense Sharp artwork traces, previews and completes one simulated Frame after Home with a work offset', async ({
   page,
+  kerfdesk,
 }, testInfo) => {
   test.setTimeout(420_000);
+  page.setDefaultTimeout(15_000);
+  page.setDefaultNavigationTimeout(120_000);
   const bytes = readFileSync(imagePath);
   const stages: unknown[] = [];
   const record = (stage: string, details: unknown = {}) => {
@@ -117,6 +120,18 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame', a
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible({ timeout: 15_000 });
+  // Home establishes machine position without erasing a retained G54/G92.
+  // This used to refuse Absolute placement before starting the compiler.
+  await kerfdesk.emitSerialLine('<Idle|MPos:0,0,0|WCO:200.398,170.323,0|FS:0,0>');
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Homing & focus$/ })
+    .click();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled({
+    timeout: 15_000,
+  });
+  record('homed-with-retained-offset');
   const frame = page.getByRole('button', { name: 'Frame job', exact: true });
   await expect(frame).toBeEnabled();
   await frame.evaluate((button) => {
@@ -127,12 +142,18 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame', a
   });
   await expect(page.getByRole('button', { name: 'Preparing Frame…', exact: true })).toBeDisabled();
   record('frame-preparing');
+  // A different status representation of the same stationary controller must
+  // not cancel the real worker while it is preparing this large trace.
+  await kerfdesk.emitSerialLine('<Idle|WPos:-200.398,-170.323,0|WCO:200.398,170.323,0|FS:0,0>');
   await expect(
     page.getByText('Ready to start — framed job unchanged', { exact: true }),
   ).toBeVisible({ timeout: 180_000 });
   record('simulated-frame-complete');
   await expect(page.getByText(/Background output preparation queue is full/)).toHaveCount(0);
   await expect(page.getByText(/job or machine setup changed during preparation/)).toHaveCount(0);
+  await expect(page.getByText(/requires the custom work origin to be cleared/)).toHaveCount(0);
+  const writes = (await kerfdesk.events()).filter((event) => event.kind === 'serial-write');
+  expect(writes.some((event) => /G92|G10/.test(String(event['text'])))).toBe(false);
   expect(crashes).toBe(0);
   expect(errors).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('sharp-frame-complete.png') });

@@ -124,5 +124,8 @@ describe('Frame-authorized laser Start on Marlin', () => {
     expect(fence).toBeGreaterThanOrEqual(0);
     expect(query).toBeGreaterThan(fence);
     expect(writes.slice(query + 1).join('')).toContain(JOB_LINE);
+    // Marlin has no realtime overrides, so the ADR-355 reset never reaches it:
+    // a 0x90-0x9D byte would land in its line buffer.
+    expect(writes.join('')).not.toMatch(/[\u0080-\u00ff]/);
   });
 });

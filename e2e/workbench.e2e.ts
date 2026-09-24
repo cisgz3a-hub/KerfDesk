@@ -679,10 +679,7 @@ async function confirmStartReview(page: Page, kerfdesk: KerfDeskFixture): Promis
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Save G-code' });
   await expect(dialog).toContainText('The complete export is ready.');
-  await dialog.getByRole('button', { name: 'Choose destination…' }).click();
-  const filenamePanel = page.getByRole('dialog', { name: 'Choose G-code filename' });
-  await expect(filenamePanel).toBeVisible();
-  await filenamePanel.getByRole('button', { name: 'Save', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save as…' }).click();
 }
 
 async function installFileSystemMocks(

@@ -47,12 +47,15 @@ export const STRESS_TIMEOUT_MS = 60_000;
 // planner is full, so acknowledgements arrive at motion pace (25 ms per
 // segment) and a yank can land at any acknowledged line.
 const SIM_OPTIONS = { plannerBlocks: 16, motionMs: 25 } as const;
-const REALTIME_BYTES = new Set([
-  '?',
-  '!',
-  '~',
-  ...[0x18, 0x84, 0x85].map((code) => String.fromCharCode(code)),
-]);
+const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
+
+/** GRBL takes these out of the stream before its line buffer: the ASCII
+ * realtime commands and every extended-ASCII byte (0x80 and up), which covers
+ * door, jog cancel, and the feed/rapid/spindle override resets a laser Start
+ * sends ahead of its first line (ADR-355). Program lines compare without them. */
+function isRealtimeByte(character: string): boolean {
+  return ASCII_REALTIME_BYTES.has(character) || character.charCodeAt(0) >= 0x80;
+}
 
 export interface StressHarness {
   readonly repository: RecoveryRepository;
@@ -286,7 +289,7 @@ export function programLines(simulator: GrblSimulator, from: number): string[] {
     .slice(from)
     .flatMap((write) =>
       [...write]
-        .filter((character) => !REALTIME_BYTES.has(character))
+        .filter((character) => !isRealtimeByte(character))
         .join('')
         .split('\n'),
     )

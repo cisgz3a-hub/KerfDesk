@@ -185,12 +185,11 @@ export type DeviceProfile = {
   readonly streamingMode: GrblStreamingMode;
   readonly rxBufferBytes: number;
   /**
-   * Opt in to reading the serial port and writing job refills inside a worker
-   * (ADR-334), so a busy renderer cannot delay the acknowledgement round trip.
-   * Off by default and unqualified: it has no runtime coverage in this
-   * repository's test environment and no hardware evidence. A runtime that
-   * cannot hand the port's streams to a worker silently keeps the main-thread
-   * transport.
+   * Prefer opening the serial port and refilling jobs inside a worker, so a
+   * busy window is outside the acknowledgement round trip. Defaults to true
+   * for GRBL-family drivers; false explicitly opts out. Unsupported runtimes
+   * retain the exact selected window port and disclose the limitation.
+   * Browser simulation does not qualify a physical controller or material job.
    */
   readonly workerHostedStreaming?: boolean;
   readonly gcodeDialect: GcodeDialectSelection;
