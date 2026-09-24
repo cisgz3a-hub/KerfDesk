@@ -5,6 +5,7 @@ import {
   type MaterialLibraryDocument,
   type MaterialPreset,
 } from '../material-library';
+import { resolveLightBurnOverscan } from './lbrn-overscan';
 
 // MAX_XML_DEPTH is an integrity bound (unbounded nesting overflows the recursive
 // walker) and stays. The former 5 MB byte ceiling and 10 000 entry ceiling were
@@ -49,7 +50,7 @@ export function importLightBurnClbDocument(
   const unknownFields = new Set<string>();
   const warnings: string[] = [];
   const entries = entryElements.flatMap((entry, index) => {
-    const parsed = parseEntry(entry, index, sourceName, unknownFields);
+    const parsed = parseEntry(entry, index, sourceName, unknownFields, warnings);
     if (parsed !== null) return [parsed];
     warnings.push(`Entry ${index + 1} was skipped because speed or power was missing.`);
     return [];
@@ -79,6 +80,7 @@ function parseEntry(
   index: number,
   sourceName: string,
   unknownFields: Set<string>,
+  warnings: string[],
 ): MaterialPreset | null {
   const setting = firstDescendant(entry, ['cutsetting', 'cutsetting_0', 'cutsettings']) ?? entry;
   collectUnknownFields(setting, unknownFields);
@@ -89,16 +91,54 @@ function parseEntry(
   const materialName = ancestorAttribute(entry, ['material'], ['name']) ?? 'Imported material';
   const thickness = numberAttribute(entry, ['thickness']);
   const description = attribute(entry, ['desc', 'description', 'title']) ?? `Entry ${index + 1}`;
+  const overscanMm =
+    mode === 'fill' ? importedOverscanMm(setting, speedMmSec, description, warnings) : 0;
   return {
     id: `${slug(materialName)}-${slug(description)}-${index + 1}`,
     materialName,
-    ...(thickness === null ? {} : { thicknessMm: thickness }),
-    title: description,
+    ...entryIdentity(entry, thickness, description),
     operation: mode === 'line' ? 'cut' : 'engrave',
     description: `${description} (imported from ${sourceName})`,
-    recipe: importedRecipe(setting, mode, speedMmSec, power),
+    recipe: importedRecipe(setting, mode, speedMmSec, power, overscanMm),
     revision: 'lightburn-clb-import-v1',
   };
+}
+
+// A saved library entry carries exactly one of a positive thickness or a title
+// (material-library-io.ts). LightBurn writes Thickness="-1" (sometimes 0) for
+// entries that apply to any thickness and labels them with NoThickTitle, so
+// those become titled entries instead of an invalid "-1 mm" preset.
+function entryIdentity(
+  entry: Element,
+  thickness: number | null,
+  description: string,
+): { readonly thicknessMm: number } | { readonly title: string } {
+  if (thickness !== null && thickness > 0) return { thicknessMm: thickness };
+  const noThicknessTitle = attribute(entry, ['nothicktitle'])?.trim();
+  return {
+    title:
+      noThicknessTitle === undefined || noThicknessTitle === ''
+        ? description
+        : `${noThicknessTitle}: ${description}`,
+  };
+}
+
+// LightBurn stores the overscan switch (`overscan`) separately from its size,
+// a percentage of the cut speed (`overscanPercent`), as the .lbrn importer does.
+function importedOverscanMm(
+  setting: Element,
+  speedMmSec: number,
+  description: string,
+  warnings: string[],
+): number {
+  const overscan = resolveLightBurnOverscan(
+    booleanField(setting, ['overscan']) ?? null,
+    numberField(setting, ['overscanpercent']),
+    speedMmSec,
+    description,
+  );
+  warnings.push(...overscan.warnings);
+  return overscan.distanceMm ?? 0;
 }
 
 function importedRecipe(
@@ -106,6 +146,7 @@ function importedRecipe(
   mode: MaterialRecipe['mode'],
   speedMmSec: number,
   power: number,
+  overscanMm: number,
 ): MaterialRecipe {
   const interval = numberField(setting, ['interval', 'lineinterval']) ?? 0.1;
   const airAssist = booleanField(setting, ['airassist', 'airassistenable']);
@@ -119,7 +160,7 @@ function importedRecipe(
     ...(airAssist === undefined ? {} : { airAssist }),
     hatchAngleDeg: numberField(setting, ['scanangle', 'angle']) ?? 0,
     hatchSpacingMm: interval,
-    fillOverscanMm: numberField(setting, ['overscanning', 'overscan']) ?? 0,
+    fillOverscanMm: overscanMm,
     fillBidirectional: booleanField(setting, ['bidirectional', 'bidir']) ?? true,
     fillCrossHatch: booleanField(setting, ['crosshatch']) ?? false,
     ditherAlgorithm: 'floyd-steinberg',
@@ -148,8 +189,8 @@ const KNOWN_SETTING_FIELDS = new Set([
   'airassistenable',
   'scanangle',
   'angle',
-  'overscanning',
   'overscan',
+  'overscanpercent',
   'bidirectional',
   'bidir',
   'crosshatch',
