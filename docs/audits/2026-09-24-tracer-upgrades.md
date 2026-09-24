@@ -112,12 +112,38 @@ reuse provides the measured switching benefit without concurrent tracing work.
 
 ## Batch 4: dense geometry and processing
 
-Status: pending.
+Status: implemented; exact-geometry, persistence and node-edit checks pass.
 
 - Optimise Sharp topology validation by reusing unchanged relations/indexes;
   retain the exact topology, contact, nesting and positive-gap guarantees.
 - Reduce duplicate photo/curve geometry in transfer and saved projects without
   changing the visible or emitted shape. Qualify project round trips and undo.
+
+Topology repair reuses immutable boundary measurements and unchanged nesting
+relations within one invocation. The pair cache is bounded to 8,192 owners and
+does not retain replaced point arrays. Additional pairs still receive the exact
+check. Source visitation, conflict order, positive-gap decisions and cancellation
+remain intact. The 62-check topology cohort passes. An independent 384-pixel
+Sharp fixture remains byte-identical (2,791 paths, 61,106 vertices) through native
+and cooperative execution. Containment queries decrease from 429,192 to 151,838.
+Elapsed timings vary under load, so this establishes reduced repeated work,
+not a general end-to-end Sharp speedup.
+
+Photo worker output now keeps one polyline representation. Saved traced images
+omit only proven exactly redundant line curves; authoritative curved or stale
+canonical geometry is retained. Ordinary SVG/shape/text promotion and schema
+migration remain unchanged. Curve, Break, Start and Join lazily materialise the
+chosen path inside the edit transaction; no-op edits do not create history,
+and Undo restores the original compact object. Explicit segment budgets apply
+equally to polyline and curve representations.
+
+The compatibility cohort passes 69 checks in 12 files, including 21 independent
+acceptance/control probes of actual SVG, fill groups, G-code, coverage rasters,
+save/autosave, migration and node editing. Eighteen node/toolbar checks pass after
+the final helper extraction. Matched representation-only measurements on the
+same Photo geometry reduce manual JSON size by 62.92% at Detail 60 and 63.95%
+at Detail 100, with every original vertex retained. These are serialized-byte
+measurements, not browser heap or machine-output qualification.
 
 ## Batch 5: detail choices and photo realism
 

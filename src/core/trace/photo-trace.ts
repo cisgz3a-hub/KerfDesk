@@ -1,13 +1,7 @@
 // A photograph's tone is represented by filled vector area, without a binary
 // threshold or a colour palette. Vertical ribbons vary in width along their
 // length; horizontal fill scanlines therefore retain even very light shades.
-import {
-  polylineToCurveSubpath,
-  type ColoredPath,
-  type CurveSubpath,
-  type Polyline,
-  type Vec2,
-} from '../scene';
+import { type ColoredPath, type Polyline, type Vec2 } from '../scene';
 import { finiteOr } from '../util';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { isValidRawImageData, type RawImageData, type TraceOptions } from './trace-image';
@@ -30,7 +24,6 @@ export function* traceImageToPhotoPathsSteps(
   const grid = photoGrid(image, options.photoDetail);
   const darkness = yield* sampleDarknessSteps(image, grid, photoToneLookup(options));
   const polylines: Polyline[] = [];
-  const curves: CurveSubpath[] = [];
   for (let x = 0; x < grid.columns; x += 1) {
     let y = 0;
     while (y < grid.rows) {
@@ -42,11 +35,10 @@ export function* traceImageToPhotoPathsSteps(
       while (y < grid.rows && (darkness[y * grid.columns + x] ?? 0) > 0) y += 1;
       const ribbon = photoRibbon(image, grid, darkness, x, start, y);
       polylines.push(ribbon);
-      curves.push(polylineToCurveSubpath(ribbon));
     }
     if (cooperate) yield;
   }
-  return polylines.length === 0 ? [] : [{ color: '#000000', polylines, curves }];
+  return polylines.length === 0 ? [] : [{ color: '#000000', polylines }];
 }
 
 function photoGrid(image: RawImageData, requestedDetail: number | undefined): PhotoGrid {

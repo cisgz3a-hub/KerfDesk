@@ -13,12 +13,12 @@ const image: RawImageData = {
 };
 
 describe('photo tracing entry points', () => {
-  it('preserves pale tones and canonical closed geometry on the application entry point', async () => {
+  it('preserves pale tones and closed geometry without duplicate line curves on the application entry point', async () => {
     const paths = await traceImageToColoredPaths(image, photo);
     expect(paths).toHaveLength(1);
     expect(paths[0]?.color).toBe('#000000');
     expect(paths[0]?.polylines.every((line) => line.closed)).toBe(true);
-    expect(paths[0]?.curves?.length).toBe(paths[0]?.polylines.length);
+    expect(paths[0]?.curves).toBeUndefined();
   });
 
   it('awaits the cooperative fallback runner and matches the synchronous worker result', async () => {
