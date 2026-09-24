@@ -97,7 +97,7 @@ function FocusButton(props: {
       disabled={props.disabled}
       style={buttonStyle}
       aria-label={props.label}
-      title={props.label}
+      title={`${props.label} (${props.glyph === 'Z+' ? 'PageUp' : 'PageDown'})`}
     >
       {props.glyph}
     </button>

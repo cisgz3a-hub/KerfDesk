@@ -84,6 +84,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
       rows: [
         { keys: 'Ctrl+Enter', action: 'start job' },
         { keys: 'Ctrl+.', action: 'abort the job or machine motion, or turn a latched Fire off' },
+        { keys: 'PageUp/PageDown', action: 'jog Z (focus) up/down one step' },
       ],
     },
   ];
