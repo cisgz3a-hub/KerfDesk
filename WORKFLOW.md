@@ -2289,16 +2289,25 @@ settings and Job Review keep their existing read-only setup references.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
 2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
-   tones as fine filled lines. Adjust **Detail**, **Brightness**, **Contrast** and **Midtones**
-   while comparing Original and Trace. Midtones starts at 1; raising it lightens middle shades
-   while preserving black and white. More detail creates narrower lines and more geometry.
+   tones as fine filled lines whose covered area follows the photo's brightness in linear
+   light, so a mid-grey (sRGB 128) area is about 78% covered. Adjust **Detail**, **Brightness**,
+   **Contrast** and **Midtones** while comparing Original and Trace. Midtones starts at 1,
+   where line coverage matches the photo's midtones; raising it lightens middle shades while
+   preserving black and white, and about 2.2 gives the lighter response of earlier versions.
+   **Invert** puts the lines where the photo is light, for a mark lighter than the material or
+   light artwork on a dark background. More detail creates narrower lines and more geometry.
+   Detail's range follows the image size: on images under 320 px the top of the slider still
+   adds lines, up to one per pixel column at 100. Line widths include no allowance for the
+   laser spot; if midtones engrave too dark, raise Midtones.
    Cell-centred reconstruction retains local tone transitions; if its fixed point budget is
    reached, one consistent area-preserving reconstruction applies across the entire image.
    **Photo output tips** explains physical size, scan direction, resolution and the original
    Image layer's grayscale/dither route. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
-   thin line coverage before applying the Image operation. Full-photo raster conversion uses
+   thin line coverage before applying the Image operation. Its bitmap stores that coverage as
+   grey for the operation to engrave, so midtones look darker on the canvas than in the photo.
+   Full-photo raster conversion uses
    compact contour buffers and checks its geometry and pixel memory before starting. A
    geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
