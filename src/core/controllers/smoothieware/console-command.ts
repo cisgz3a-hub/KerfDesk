@@ -16,6 +16,7 @@
 
 import type { ConsoleCommandResult } from '../grbl/console-command';
 import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
+import { consoleTextRefusal, normalizeConsoleSpaces } from '../console-text';
 import {
   SMOOTHIE_CMD_FIRE_OFF,
   SMOOTHIE_CMD_FIRMWARE_INFO,
@@ -55,9 +56,11 @@ const ACKLESS_DOLLAR_RE = /^\$(?:[IJS]|$)/;
 const REFERENCE_GCODE_RE = /G28(?:\.[02345])?(?=$|[^0-9.])/i;
 
 export function prepareSmoothieConsoleCommand(input: string): ConsoleCommandResult {
-  const normalized = input.trim();
+  const normalized = normalizeConsoleSpaces(input).trim();
   if (normalized === '') return { ok: false, reason: EMPTY_REASON };
   if (/[\r\n]/.test(normalized)) return { ok: false, reason: MULTILINE_REASON };
+  const textRefusal = consoleTextRefusal(normalized);
+  if (textRefusal !== null) return { ok: false, reason: textRefusal };
   const upper = normalized.toUpperCase();
   if (/^CONFIG-(SET|LOAD)\b/.test(upper)) {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };

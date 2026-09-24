@@ -352,12 +352,12 @@ describe('GRBL-family variants against the simulator', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().mpos.x).toBe(5);
     await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
-      /does not accept numeric \$ setting writes/i,
+      /does not send numeric \$ setting writes/i,
     );
     expect(sim.outbound()).not.toContain('$30=1000\n');
     await expect(
       useLaserStore.getState().sendConsoleCommand('$30=1000', { confirmed: true }),
-    ).rejects.toThrow(/does not accept numeric \$ setting writes/i);
+    ).rejects.toThrow(/does not send numeric \$ setting writes/i);
     expect(sim.outbound()).not.toContain('$30=1000\n');
   });
 

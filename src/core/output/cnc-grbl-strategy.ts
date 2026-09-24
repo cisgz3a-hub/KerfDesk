@@ -57,6 +57,7 @@ import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-hel
 import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
 import {
   appendGroupTransition,
+  appendModalState,
   appendSpindleStart,
   parkTarget,
   type EmitState,
@@ -111,18 +112,7 @@ function emitCncProgram(
 
   const lines: string[] = [];
   const head: Head = { x: null, y: null, z: null };
-  lines.push('G21');
-  lines.push('G90');
-  // G54 is KerfDesk's canonical WCS. GRBL's active G54-G59 selection is
-  // modal and may be changed by a console command or startup block, so never
-  // let a stale G55-G59 redirect an otherwise valid program.
-  lines.push('G54');
-  lines.push('G94');
-  // Helical entry and adaptive clearing emit real G2/G3 with I/J offsets, which
-  // are read in the active plane. GRBL's plane is modal and a console command or
-  // $N startup block can leave it on G18/G19, where an XY I/J pair is an invalid
-  // offset (error:33) and Z becomes the circular axis.
-  lines.push('G17');
+  appendModalState(lines);
   if (isMultiTool && firstGroup.toolName !== undefined) {
     const toolName = sanitizeGcodeCommentValue(firstGroup.toolName, 40) || 'unnamed tool';
     lines.push(`; tool: ${toolName} (load before starting)`);

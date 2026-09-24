@@ -64,6 +64,24 @@ export function writeConsoleCommand(
       },
     );
   }
+  if (command.kind === 'unlock' || command.kind === 'setting-write') {
+    // The caller acts on the controller's answer: an acknowledged `$X` clears
+    // the alarm latch, and an acknowledged `$13=` write is re-read to confirm
+    // the report units. Owning the exchange makes an `error:N` reject instead
+    // of looking like success once the bytes left the port (audit
+    // cnc-controller-1, regressions-1).
+    return startControllerCommand(
+      refs,
+      (line, action, writeSource) => write(line, action, writeSource ?? source),
+      {
+        kind: 'interactive-command',
+        label: command.kind === 'unlock' ? 'Unlock (clear alarm)' : 'Write controller setting',
+        command: command.wire,
+        action: actionForConsoleCommand(command.kind),
+        source,
+      },
+    );
+  }
   return write(command.wire, actionForConsoleCommand(command.kind), source);
 }
 

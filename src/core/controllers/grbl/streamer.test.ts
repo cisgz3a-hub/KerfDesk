@@ -230,7 +230,10 @@ describe('onAck — consuming acks', () => {
     expect(r.state.status).toBe('cancelled');
     expect(r.state.inFlight).toEqual([]);
     expect(r.state.inFlightBytes).toBe(0);
-    expect(r.state.completed).toBe(1);
+    // An alarm answers no line, so nothing counts as acknowledged (audit
+    // streaming-5): the checkpoint must not move past the last accepted line.
+    expect(r.state.completed).toBe(0);
+    expect(r.acked).toBeNull();
   });
 
   it('wipeInFlight clears in-flight accounting without changing status', () => {

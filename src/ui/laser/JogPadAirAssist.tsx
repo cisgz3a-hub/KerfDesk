@@ -5,7 +5,7 @@ import {
   projectAirAssistDefaultSyncSummary,
   type AirAssistDefaultSyncSummary,
 } from '../state/air-assist-default-actions';
-import { useLaserStore } from '../state/laser-store';
+import { manualAirBlockMessage, useLaserStore } from '../state/laser-store';
 import { openMachineSetup } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
@@ -82,14 +82,19 @@ function AirAssistControl(props: {
   readonly readiness: AirAssistReadiness;
   readonly onToggle: (enabled: boolean) => void;
 }): JSX.Element {
+  // The store's own refusal for this click, if any. A 'no-output' or
+  // 'defaults' button stays clickable: its click opens the setup notice.
+  const blocked = useLaserStore((s) => manualAirBlockMessage(s, !s.airAssistOn));
+  const disabled = blocked !== null && props.readiness === 'ready';
   const label = props.enabled
     ? 'Turn manual air assist off (M9)'
     : `Turn manual air assist on (${controlSuffix(props.readiness, props.command)})`;
-  const title = controlTitle(props.readiness, label);
+  const title = disabled ? blocked : controlTitle(props.readiness, label);
   return (
     <button
       type="button"
       onClick={() => props.onToggle(!props.enabled)}
+      disabled={disabled}
       aria-label={label}
       aria-pressed={props.enabled}
       className="lf-manual-air"

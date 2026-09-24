@@ -212,7 +212,7 @@ async function writeGrblSettingAction(
     return blockWrite(
       set,
       get,
-      `${refs.driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`,
+      `KerfDesk does not send numeric $ setting writes on the ${refs.driver.label} profile. Configure the controller with its own tools.`,
     );
   }
   const blocked = machineSettingsWriteBlockReason(

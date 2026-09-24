@@ -7,6 +7,8 @@ import { useCallback } from 'react';
 import { currentWorkZMm } from '../state/infer-machine-position';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { zeroZOverwriteWarning } from './zero-z-guard';
 
 export function useZeroZAction(): () => void {
@@ -25,6 +27,15 @@ export function useZeroZAction(): () => void {
       ),
     });
     if (warning !== null && !jobAwareConfirm(warning)) return;
-    void state.zeroZHere();
+    // Both outcomes are visible: the DRO does not show work Z, and a refusal
+    // used to become an unhandled rejection with no message (audit ui-panel-5).
+    void state
+      .zeroZHere()
+      .then(() =>
+        useToastStore
+          .getState()
+          .pushToast('Work Z0 set at the current bit height (G92 Z0).', 'success'),
+      )
+      .catch(controllerActionFailureHandler('Zero Z'));
   }, []);
 }

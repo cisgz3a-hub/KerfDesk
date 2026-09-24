@@ -2,6 +2,7 @@ import { idleCollector } from '../../core/controllers/grbl';
 import type { SerialConnection } from '../../platform/types';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelScheduledControllerQualification } from './laser-controller-qualification';
+import { forgetAlarmBeforeBanner } from './laser-reset-alarm';
 import { cancelResetCleanup } from './laser-reset-cleanup';
 import type { LiveRefs } from './laser-store';
 import { clearTranscriptBuffer } from './laser-transcript-buffer';
@@ -175,6 +176,7 @@ function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean)
   cancelRawControllerLineWait(refs);
   cancelControllerLifecycleRefs(refs);
   cancelResetCleanup(refs);
+  forgetAlarmBeforeBanner(refs);
   cancelScheduledControllerQualification(refs);
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();

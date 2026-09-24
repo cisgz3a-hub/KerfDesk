@@ -12,6 +12,7 @@ import { useJogControlPreferences } from './jog-control-preferences';
 import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
+import { sleepUnavailableReason } from '../state/controller-sleep';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -83,14 +84,19 @@ function ReleaseMotorsButton(props: {
   readonly busy: boolean;
   readonly onRelease: () => void;
 }): JSX.Element | null {
+  // A grblHAL build with `$62=0` refuses `$SLP` (controller-sleep.ts).
+  const blockedReason = useLaserStore(sleepUnavailableReason);
   if (!props.show) return null;
   return (
     <button
       type="button"
       className="lf-btn"
       onClick={props.onRelease}
-      disabled={props.busy}
-      title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
+      disabled={props.busy || blockedReason !== null}
+      title={
+        blockedReason ??
+        'Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward.'
+      }
     >
       Release motors
     </button>

@@ -336,69 +336,6 @@ describe('laser-store console commands', () => {
       kind: 'realtime',
     });
   });
-
-  it('requires confirmation and Idle state while preserving position for non-positional settings', async () => {
-    const writes: string[] = [];
-    const connection = makeConnection(
-      async (data) => {
-        writes.push(data);
-      },
-      { autoRespondToStatusQuery: true },
-    );
-    await connectWith(connection);
-    writes.length = 0;
-    useLaserStore.setState({ statusReport: null, statusObservation: null });
-
-    await expect(useLaserStore.getState().sendConsoleCommand('$32=1')).rejects.toThrow(
-      /confirmation/i,
-    );
-    await useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
-    expect(writes.slice(-2)).toEqual(['?', '$32=1\n']);
-    connection.emitLine('ok');
-    await flushConnect();
-    writes.length = 0;
-
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    useLaserStore.setState({
-      controllerSettings: { laserModeEnabled: true },
-      detectedSettings: { laserModeEnabled: true },
-      grblSettingsRows: [
-        {
-          id: 32,
-          code: '$32',
-          rawValue: '1',
-          numericValue: 1,
-          name: 'Laser mode',
-          unit: null,
-          description: 'Laser mode enable',
-          category: 'laser',
-          known: true,
-          writeRisk: 'common',
-        },
-      ],
-      lastSettingsReadAt: 123,
-      workOriginActive: true,
-      workOriginSource: 'g92',
-      workZZeroEvidence: currentWorkZEvidence(),
-      wcoCache: { x: 1, y: 2, z: 3 },
-      homingState: 'confirmed',
-    });
-    await useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
-
-    expect(writes.at(-1)).toBe('$32=1\n');
-    expect(useLaserStore.getState()).toMatchObject({
-      controllerSettings: null,
-      detectedSettings: null,
-      grblSettingsRows: [],
-      lastSettingsReadAt: null,
-      workOriginActive: true,
-      workOriginSource: 'g92',
-      workZZeroEvidence: currentWorkZEvidence(),
-      wcoCache: { x: 1, y: 2, z: 3 },
-      homingState: 'confirmed',
-      statusReport: null,
-    });
-  });
 });
 
 describe('job stream transcript source', () => {

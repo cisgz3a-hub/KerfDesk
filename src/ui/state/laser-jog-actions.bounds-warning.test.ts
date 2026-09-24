@@ -100,6 +100,25 @@ describe('jog configured-machine-bounds warning', () => {
     expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
     expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
+
+  // Audit jog-home-origin-3: after $H, stock GRBL reports machine space in
+  // negative numbers (gnea/grbl config.h). Without a verified native frame that
+  // MPos has no known relation to the 0..bed bounds, so comparing them warned
+  // "outside the configured machine bounds" on every jog of a homed router.
+  it('does not compare a homed controller position with the bed without a verified frame', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => void writes.push(data));
+    configureDevice('rear-left');
+    await connectIdleAt(connection, -200, -150);
+    useLaserStore.setState({ homingState: 'confirmed' });
+    dismissAllToasts();
+    writes.length = 0;
+
+    await useLaserStore.getState().jog({ dx: 1, feed: 1000 });
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual(['$J=G91 G21 X1.000 F1000\n']);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
 });
 
 function dismissAllToasts(): void {

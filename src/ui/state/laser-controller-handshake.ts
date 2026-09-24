@@ -11,15 +11,16 @@ import {
   failedControllerQualificationPatch,
   qualifiedController,
   qualifyingController,
+  resumeQualificationInSession,
 } from './laser-controller-qualification';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import { reportSilentController } from './laser-controller-silence';
 import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
 } from './laser-controller-build-info';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { appendSystemNotice } from './laser-system-notice';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -34,6 +35,7 @@ type SafeWriteFn = (
 
 const PASSIVE_STARTUP_WAIT_MS = 250;
 const ACTIVE_HANDSHAKE_WAIT_MS = 1_750;
+const HANDSHAKE_WINDOW_MS = PASSIVE_STARTUP_WAIT_MS + ACTIVE_HANDSHAKE_WAIT_MS;
 const LATE_BANNER_SETTLE_MS = 300;
 
 type HandshakeEpochGuard = {
@@ -78,17 +80,27 @@ export async function runControllerHandshake(
   const connection = refs.connection;
   if (connection === null) return;
   const guard = createHandshakeEpochGuard(get, refs, connection, onQualificationEpoch);
+  // An in-session Alarm/Sleep, not a reboot, ends the await (audit connect-2).
+  const resume = (): void =>
+    resumeQualificationInSession(set, get, refs, connection, guard.expectedSessionEpoch);
   const response = await awaitControllerResponse(refs, safeWrite, guard);
-  if (response === 'stale') return;
+  if (response === 'stale') return resume();
   if (response === 'timeout') {
-    reportMissingControllerResponse(set, get, refs, baudRate, guard.expectedSessionEpoch);
-    return;
+    const epoch = guard.expectedSessionEpoch;
+    return reportSilentController(
+      set,
+      get,
+      refs,
+      connection,
+      { baudRate, epoch },
+      HANDSHAKE_WINDOW_MS,
+    );
   }
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
-  if (!guard.acceptControllerLineEpoch()) return;
+  if (!guard.acceptControllerLineEpoch()) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await waitForHandshakeIdle(get, refs, safeWrite);
-  if (!guard.acceptControllerLineEpoch()) return;
+  if (!guard.acceptControllerLineEpoch()) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await qualifyConnectedController(set, get, refs, safeWrite, connection, guard);
 }
@@ -146,30 +158,6 @@ async function awaitControllerResponse(
   return gotLine ? 'line' : 'timeout';
 }
 
-function reportMissingControllerResponse(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  baudRate: number,
-  expectedEpoch: number,
-): void {
-  const driver = refs.driver;
-  set(
-    appendSystemNotice(
-      get(),
-      refs,
-      `[lf2] No controller response within 2 s. Check baud rate (${baudRate}) and that the device is ${driver.label}.`,
-    ),
-  );
-  set((state) =>
-    failedControllerQualificationPatch(
-      state,
-      expectedEpoch,
-      `No controller response was received at ${baudRate} baud. Check the cable and controller profile, then retry.`,
-    ),
-  );
-}
-
 async function qualifyConnectedController(
   set: SetFn,
   get: GetFn,
@@ -200,12 +188,7 @@ async function qualifyConnectedController(
   });
   beginSettingsCollection(refs, qualificationEpoch);
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
-  await startControllerCommand(refs, safeWrite, {
-    kind: 'connection-handshake',
-    label: 'controller settings query',
-    command: `${settingsQuery}\n`,
-    source: 'system',
-  });
+  await queryHandshakeSettings(refs, safeWrite, settingsQuery, connection, guard);
   if (!handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch)) return;
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   if (!qualificationCompleted(get(), qualificationEpoch)) {
@@ -240,6 +223,38 @@ async function qualifyConnectedController(
     'connection-handshake',
   );
   parkHandshakeForMpg(set, get, refs, connection, guard);
+}
+
+async function queryHandshakeSettings(
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  settingsQuery: string,
+  connection: NonNullable<LiveRefs['connection']>,
+  guard: HandshakeEpochGuard,
+): Promise<void> {
+  const qualificationEpoch = guard.expectedSessionEpoch;
+  try {
+    await startControllerCommand(refs, safeWrite, {
+      kind: 'connection-handshake',
+      label: 'controller settings query',
+      command: `${settingsQuery}\n`,
+      source: 'system',
+    });
+  } catch (error) {
+    // An error reply or a timeout ends the owned $$ without a dump. A collector
+    // left collecting refused every later settings read, the Retry button's
+    // included, as "already being read" (audit settings-console-4). An ALARM
+    // that moved the write epoch keeps it: grblHAL still delivers the dump
+    // after a critical alarm, and that collector finishes qualification.
+    if (
+      handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch) &&
+      refs.settingsCollectorSessionEpoch === qualificationEpoch
+    ) {
+      refs.settingsCollector = idleCollector();
+      refs.settingsCollectorSessionEpoch = null;
+    }
+    throw error;
+  }
 }
 
 async function refreshHandshakeBuildInfo(

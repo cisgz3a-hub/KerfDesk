@@ -14,8 +14,10 @@ export function DesktopCloseNotice(): JSX.Element | null {
       <span>{notice.message}</span>
       <div style={actionsStyle}>
         <Button onClick={desktopCloseController.keepOpen}>Keep app open</Button>
-        {notice.kind === 'failed' ? (
-          <Button onClick={desktopCloseController.retryStop}>Retry Abort</Button>
+        {notice.retry === true ? (
+          <Button onClick={desktopCloseController.retryStop}>
+            {notice.kind === 'failed' ? 'Retry Abort' : 'Retry turning Fire off'}
+          </Button>
         ) : null}
         {notice.kind === 'unconfirmed' ? (
           <Button onClick={() => desktopCloseController.acknowledgeWarning(notice)}>
