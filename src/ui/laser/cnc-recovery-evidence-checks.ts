@@ -75,7 +75,7 @@ export function legacyEvidenceChecks(
       'semantic-line-map',
       'Archived prepared job and recovery manifest',
       'missing',
-      'This legacy fingerprint-only record predates the sealed semantic artifact.',
+      'This fingerprint-only record has no archived prepared job or recovery manifest.',
     ),
     executionFenceCheck,
     evidence(
@@ -91,11 +91,11 @@ export function legacyEvidenceChecks(
 export function legacyProgramIdentityCheck(matches: boolean): CncRecoveryEvidenceCheck {
   return evidence(
     'program-identity',
-    'Legacy interrupted program identity',
+    'Interrupted program identity',
     matches ? 'matched' : 'mismatch',
     matches
-      ? 'The current project recompiles to the legacy G-code fingerprint.'
-      : 'The current project produces different G-code from the legacy record.',
+      ? 'The current project recompiles to the saved G-code fingerprint.'
+      : 'The current project produces G-code that does not match the saved fingerprint.',
   );
 }
 

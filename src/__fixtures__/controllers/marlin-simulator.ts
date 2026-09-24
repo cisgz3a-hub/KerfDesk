@@ -3,9 +3,11 @@
 // long operations run, `Error:<text>` rejections, M114 position lines, M115
 // firmware identity, G28 homing that acks on completion, M400 that acks when
 // buffered motion drains, and M112 which halts the firmware until reconnect.
+// Beam power, fan power and burns come from marlin-laser-power-model.ts.
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { parseMotionWords, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import { executeMarlinLine, powerUpMarlin, type MarlinBurn } from './marlin-laser-power-model';
 import type { PlatformAdapter } from '../../platform/types';
 
 export type MarlinSimRejectRule = {
@@ -19,6 +21,9 @@ export type CreateMarlinSimulatorOptions = {
   readonly homingMs?: number;
   readonly rejectLines?: ReadonlyArray<MarlinSimRejectRule>;
   readonly emitBannerOnOpen?: boolean;
+  /** Lines the board ran before this connection. A board that does not reset
+   * when the port opens keeps the beam state they left. */
+  readonly initialPowerLines?: ReadonlyArray<string>;
 };
 
 export type MarlinSimState = {
@@ -30,6 +35,10 @@ export type MarlinSimState = {
   readonly fanPower: number;
   readonly laserMode: 'standard' | 'continuous' | 'dynamic';
   readonly inlineBurnPowers: ReadonlyArray<number>;
+  /** Every move made with the beam on, in the order Marlin planned them. */
+  readonly burns: ReadonlyArray<MarlinBurn>;
+  /** Lines the power model does not cover (see marlin-laser-power-model.ts). */
+  readonly modelErrors: ReadonlyArray<string>;
 };
 
 export type MarlinSimulator = {
@@ -53,10 +62,10 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
   let pendingMotions = 0;
   let isHalted = false;
   let isHomed = false;
-  let fanPower = 0;
-  let laserMode: MarlinSimState['laserMode'] = 'standard';
-  let laserPower = 0;
-  const inlineBurnPowers: number[] = [];
+  const power = powerUpMarlin();
+  for (const line of options.initialPowerLines ?? []) executeMarlinLine(power, line);
+  power.burns.splice(0);
+  const modelErrors: string[] = [];
   const pendingSettles: Array<() => void> = [];
   let rxBuffer = '';
 
@@ -71,26 +80,17 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
     if (pendingMotions === 0) pendingSettles.splice(0).forEach((complete) => complete());
   };
 
-  const handleLaserPower = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
-    // Model the modern native mode distinction, not GRBL's M3/M4 equivalence.
-    if (/^M[34]\b/i.test(line)) {
-      if (/\bI\b/i.test(line)) laserMode = /^M3\b/i.test(line) ? 'continuous' : 'dynamic';
-      if (words.spindle !== null) laserPower = words.spindle;
-    }
-    if (/^M5\b/i.test(line)) {
-      laserPower = 0;
-      if (/\bI\b/i.test(line)) laserMode = 'standard';
-    }
-    if (/^G0\b/i.test(line)) laserPower = 0;
-    if (/^G1\b/i.test(line) && laserMode === 'continuous') {
-      if (words.spindle !== null) laserPower = words.spindle;
-      if (laserPower > 0) inlineBurnPowers.push(laserPower);
+  const handleLaserPower = (line: string): void => {
+    try {
+      executeMarlinLine(power, line);
+    } catch (error) {
+      modelErrors.push(error instanceof Error ? `${line}: ${error.message}` : line);
     }
   };
 
   const handleMotion = (line: string): void => {
     const words = parseMotionWords(line);
-    handleLaserPower(line, words);
+    handleLaserPower(line);
     if (words.setsAbsolute !== null) isAbsolute = words.setsAbsolute;
     if (words.hasMotion) {
       pos = {
@@ -101,8 +101,6 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       pendingMotions += 1;
       setTimeout(finishMotion, motionMs);
     }
-    if (/^M106\b/i.test(line)) fanPower = Math.round(parseMotionWords(line).spindle ?? 255);
-    if (/^M107\b/i.test(line)) fanPower = 0;
     emit('ok');
   };
 
@@ -126,6 +124,8 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       pendingMotions = 0;
       setTimeout(() => {
         pos = { x: 0, y: 0, z: pos.z };
+        power.x = 0;
+        power.y = 0;
         isHomed = true;
         port.emitLine('ok');
       }, homingMs);
@@ -182,9 +182,13 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       pendingMotions,
       isHalted,
       isHomed,
-      fanPower,
-      laserMode,
-      inlineBurnPowers: [...inlineBurnPowers],
+      fanPower: power.fan,
+      laserMode: power.mode,
+      inlineBurnPowers: power.burns
+        .filter((burn) => burn.source === 'continuous')
+        .map((burn) => burn.power),
+      burns: [...power.burns],
+      modelErrors: [...modelErrors],
     }),
     outbound: () => port.outbound(),
   };

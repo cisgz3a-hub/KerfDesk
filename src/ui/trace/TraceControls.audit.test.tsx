@@ -33,7 +33,7 @@ it.each(['Sharp', 'Edge Detection'])(
       await clickElement(summary);
       expect(summary.parentElement?.hasAttribute('open')).toBe(true);
     }
-    const alpha = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const alpha = host.querySelector<HTMLInputElement>('[aria-label="Trace alpha mask"]');
     if (preset === 'Sharp') {
       await clickElement(alpha);
       expect(current.traceTransparency).toBe(true);

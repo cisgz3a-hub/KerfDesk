@@ -46,7 +46,11 @@ import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { ResetAlarmRefs } from './laser-reset-alarm';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
-import type { RxCapacityEvidence, StreamPlannerSnapshot } from './laser-rx-capacity-evidence';
+import type {
+  PlannerCapacityEvidence,
+  RxCapacityEvidence,
+  StreamPlannerSnapshot,
+} from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
 import type { JobStopRequest } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
@@ -217,6 +221,10 @@ export type LaserState = LaserStoreActions &
      * proof that bounds the buffered streaming window at Start (ADR-331).
      * Session-scoped; null/undefined means the controller never reported it. */
     readonly rxCapacityEvidence?: RxCapacityEvidence | null;
+    /** Planner capacity proved by Idle with no unsettled host ACKs. Separate
+     * from RX capacity: acknowledged motion can still occupy planner blocks.
+     * Session-scoped; null/undefined leaves the planner backlog unknown. */
+    readonly plannerCapacityEvidence?: PlannerCapacityEvidence | null;
     /** Planner blocks still waiting at the latest status report of the active
      * run, for the recovery restart after a stop that discards them
      * (planner-backlog-restart.ts). */

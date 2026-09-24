@@ -8,6 +8,7 @@ import { useToastStore } from '../state/toast-store';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
+import { UNLOCKED_NEXT_STEP_MESSAGE } from './start-blocked-alarm-offers';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import { runFrameNow } from './use-frame-action';
 
@@ -97,18 +98,21 @@ describe('offerFixForBlockedStart', () => {
 });
 
 describe('alarm recovery offer', () => {
-  it('unlocks a no-homing machine and retries once the controller settles', async () => {
+  it('unlocks a no-homing machine and hands the operator the Set origin step', async () => {
     useLaserStore.setState({ capabilities: { ...original.capabilities, unlock: true } });
-    await expect(offerFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('retry');
+    // Unlock voids the reported position until Set origin or Home, so the
+    // Start cannot simply retry: the toast names the step that can.
+    await expect(offerFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('handled');
     expect(vi.mocked(useLaserStore.getState().unlockAlarm)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(useLaserStore.getState().home)).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 
   it('recognizes the two-message alarm refusal (alarm code + not Idle)', async () => {
     useLaserStore.setState({ capabilities: { ...original.capabilities, unlock: true } });
     await expect(
       offerFixForBlockedStart([ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage('Alarm')]),
-    ).resolves.toBe('retry');
+    ).resolves.toBe('handled');
     expect(vi.mocked(useLaserStore.getState().unlockAlarm)).toHaveBeenCalledTimes(1);
   });
 

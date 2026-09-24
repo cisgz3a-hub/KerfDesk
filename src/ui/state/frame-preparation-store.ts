@@ -74,7 +74,7 @@ export function registerFramePreparationAbort(abort: () => void): () => void {
  *  stopped with Abort, not here. */
 export function cancelOwnedFramePreparation(): void {
   const abort = activeAbort;
-  if (abort === null) return;
+  if (abort === null || !useFramePreparationStore.getState().cancellable) return;
   cancelRequested = true;
   abort();
 }

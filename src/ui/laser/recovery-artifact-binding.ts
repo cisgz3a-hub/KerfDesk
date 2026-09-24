@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../../core/devices';
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import { emitPreparedGcode } from '../../io/gcode';
 import { hydratePreparedExecutionOutput } from '../../io/gcode/prepared-output-persistence';
@@ -22,11 +23,12 @@ export function recoveryArtifactPreparedOutput(
       ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
       sourceGeometryChecks: 'compiled-evidence-only',
     }).gcode;
+    const device = prepared.project.device;
     for (const stage of artifact.laserSecondPassChain ?? []) {
-      gcode = applySecondPassStage(gcode, stage, prepared.project.device.maxPowerS);
+      gcode = applySecondPassStage(gcode, stage, device);
       if (gcode === null) return null;
     }
-    gcode = applyResumeChain(gcode, artifact.laserResumeChain ?? []);
+    gcode = applyResumeChain(gcode, artifact.laserResumeChain ?? [], device);
     return gcode === artifact.gcode &&
       fingerprintsEqual(fingerprintGcode(gcode), artifact.fingerprint)
       ? prepared
@@ -41,10 +43,10 @@ export function recoveryArtifactPreparedOutput(
 function applySecondPassStage(
   gcode: string,
   stage: NonNullable<ExecutionArtifactV1['laserSecondPassChain']>[number],
-  maxPowerS: number,
+  device: DeviceProfile,
 ): string | null {
-  if (stage.selection.maxPowerS !== maxPowerS) return null;
-  const source = applyResumeChain(gcode, stage.resumeChainBefore);
+  if (stage.selection.maxPowerS !== device.maxPowerS) return null;
+  const source = applyResumeChain(gcode, stage.resumeChainBefore, device);
   if (!fingerprintsEqual(fingerprintGcode(source), stage.sourceFingerprint)) return null;
   // A stage saved before writers were versioned was written by writer 1.
   const secondPass = buildLaserSecondPassProgram(source, stage.selection, {
@@ -53,13 +55,16 @@ function applySecondPassStage(
   return secondPass.kind === 'error' ? null : secondPass.gcode;
 }
 
+/** `device` is the profile the archive emitted its program with; transforms 1
+ * and 2 ignore it, because they wrote GRBL power commands for every program. */
 function applyResumeChain(
   gcode: string,
   chain: NonNullable<ExecutionArtifactV1['laserResumeChain']>,
+  device: DeviceProfile,
 ): string {
   for (const step of chain) {
     // A step saved before transforms were versioned was built by transform 1.
-    const resumed = buildLaserResumeProgram(gcode, step.fromLine, step.version ?? 1);
+    const resumed = buildLaserResumeProgram(gcode, step.fromLine, device, step.version ?? 1);
     if (resumed.kind === 'error') throw new Error(resumed.reason);
     gcode = resumed.lines.join('\n');
   }

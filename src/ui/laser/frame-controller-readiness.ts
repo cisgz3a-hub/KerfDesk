@@ -21,15 +21,22 @@ export type FrameWcsNormalization =
     };
 
 /** Wait until no earlier owned or untracked write can cross Frame preparation. */
-export async function frameControllerQueueIssue(): Promise<string | null> {
+export async function frameControllerQueueIssue(signal?: AbortSignal): Promise<string | null> {
   const deadline = Date.now() + FRAME_QUEUE_SETTLE_TIMEOUT_MS;
   while (hasPendingControllerWrite(useLaserStore.getState())) {
+    signal?.throwIfAborted();
     if (Date.now() > deadline) return FRAME_QUEUE_BUSY_MESSAGE;
     await new Promise<void>((resolve) => {
       setTimeout(resolve, FRAME_QUEUE_POLL_MS);
     });
   }
+  signal?.throwIfAborted();
   return null;
+}
+
+/** Recheck after an asynchronous queue fence, immediately before dispatch. */
+export function assertFramePreparationActive(signal?: AbortSignal): void {
+  signal?.throwIfAborted();
 }
 
 /** Select the emitted G54 frame and retain disclosure of any named WCS change. */

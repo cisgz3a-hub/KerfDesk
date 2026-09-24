@@ -13,6 +13,7 @@ import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
+import { curveCommandNode } from '../state/path-node-command-geometry';
 import './tool-strip.css';
 
 type Tool = {
@@ -105,16 +106,13 @@ function NodeCommandBar(props: {
   const setStart = useStore((state) => state.setSelectedCurveStart);
   const breakCurve = useStore((state) => state.breakSelectedCurve);
   const join = useStore((state) => state.joinSelectedCurveNodes);
-  if (selected?.geometry !== 'curve' || selected.handle !== undefined) return null;
+  if (selected === null || selected.handle !== undefined) return null;
   const object = project.scene.objects.find((candidate) => candidate.id === selected.objectId);
   const path =
     object !== undefined && 'paths' in object ? object.paths[selected.pathIndex] : undefined;
-  const curve = path?.curves?.[selected.polylineIndex];
-  if (curve === undefined) return null;
-  const outgoing = curve.segments[selected.pointIndex];
-  const canJoin =
-    selectedNodes.filter((ref) => ref.geometry === 'curve' && ref.handle === undefined).length ===
-    2;
+  const node = curveCommandNode(path, selected);
+  if (node === null) return null;
+  const canJoin = selectedNodes.filter((ref) => ref.handle === undefined).length === 2;
   return (
     <div role="toolbar" aria-label="Curve node actions" className="lf-toolstrip__node-actions">
       <NodeAction
@@ -126,25 +124,25 @@ function NodeCommandBar(props: {
       <NodeAction
         label="Curve"
         title="Convert the outgoing segment to a cubic curve"
-        disabled={outgoing === undefined || outgoing.kind === 'cubic'}
+        disabled={node.outgoingKind === null || node.outgoingKind === 'cubic'}
         onClick={() => convert('cubic')}
       />
       <NodeAction
         label="Line"
         title="Convert the outgoing segment to a straight line"
-        disabled={outgoing === undefined || outgoing.kind === 'line'}
+        disabled={node.outgoingKind === null || node.outgoingKind === 'line'}
         onClick={() => convert('line')}
       />
       <NodeAction
         label="Start"
         title="Use this node as the closed path start point"
-        disabled={!curve.closed || selected.pointIndex === 0}
+        disabled={!node.closed || selected.pointIndex === 0}
         onClick={setStart}
       />
       <NodeAction
         label="Break"
         title="Break the closed path open at this node"
-        disabled={!curve.closed}
+        disabled={!node.closed}
         onClick={breakCurve}
       />
       <NodeAction

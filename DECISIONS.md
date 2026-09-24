@@ -7864,6 +7864,15 @@ segment budgets. Curve edits regenerate compatibility polylines; a legacy polyli
 the stale curve field. Serialization promotes remaining polyline-only paths to line curves, and the
 v1→v2 migrator performs the same one-way promotion for old projects.
 
+**Amendment (2026-09-24):** Traced-image paths may remain polyline-only at the
+Photo worker and save boundaries. Serialization omits present line curves only
+when their finite coordinates, subpath order, closure and segment sequence are
+exactly redundant with the polylines; nonlinear or nonmatching curves remain
+authoritative. Imported SVG, shape and text promotion, schema v2 and v1 migration
+are unchanged. Curve-node commands materialize the selected path lazily inside
+the edit transaction so undo restores its compact source. Explicit flattening
+budgets apply to both representations, including the total across subpaths.
+
 ### Consequences
 
 Preview, hit testing, save, laser compile, and CNC compile cannot silently choose conflicting copies

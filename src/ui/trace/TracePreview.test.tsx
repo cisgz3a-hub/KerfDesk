@@ -76,7 +76,8 @@ describe('TracePreview source overlay controls', () => {
       });
       const points = host.querySelector('[aria-label="Trace points"]');
       expect(points).not.toBeNull();
-      expect(points?.querySelectorAll('circle')).toHaveLength(2);
+      expect(points).toBeInstanceOf(HTMLCanvasElement);
+      expect(points?.children).toHaveLength(0);
       expect(host.querySelector('#trace-path')).not.toBeNull();
     } finally {
       await cleanup(root, host);

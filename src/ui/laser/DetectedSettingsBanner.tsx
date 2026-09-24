@@ -1,6 +1,8 @@
-// F-7: surface auto-detected machine settings from the `$$` dump.
-// Safe numeric profile values can be applied from the banner. Hardware
-// capability hints stay review-only until the operator confirms the machine.
+// F-7: describe auto-detected machine settings from the `$$` dump for the
+// connection toast (DetectedSettingsToast) and Machine Setup's automatic lane
+// (DeviceSetupAutoDetect). Safe numeric profile values are listed as updates;
+// hardware capability hints stay review-only until the operator confirms the
+// machine.
 
 import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/controllers/grbl';
 import {
@@ -9,126 +11,7 @@ import {
   type ProfileCapability,
 } from '../../core/devices';
 import { numbersClose } from '../../core/util';
-import { controlHelp, helpProps, type HelpTopicId } from '../help/help-topics';
-import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
-
-export function DetectedSettingsBanner(): JSX.Element | null {
-  const detected = useLaserStore((s) => s.detectedSettings);
-  const apply = useLaserStore((s) => s.applyDetectedSettings);
-  const dismiss = useLaserStore((s) => s.dismissDetectedSettings);
-  const controllerSettings = useLaserStore((s) => s.controllerSettings);
-  const settingsRows = useLaserStore((s) => s.grblSettingsRows);
-  const current = useStore((s) => s.project.device);
-  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
-  if (detected === null) return null;
-  const rows = describePatch(detected, current);
-  const review = describeReviewItems(detected, current, controllerSettings ?? {}, settingsRows);
-  if (rows.length === 0 && review.needsReview.length === 0 && review.ignored.length === 0) {
-    return null;
-  }
-  return (
-    <div
-      style={panelStyle}
-      role="region"
-      aria-label="Detected machine settings"
-      {...helpProps('control:laser.detected-settings.review')}
-    >
-      <strong style={titleStyle}>Detected machine settings review</strong>
-      <p style={hintStyle}>
-        Your laser reported these values via <code>$$</code>. Safe profile values can be applied;
-        hardware capabilities stay review-only until you confirm the machine.
-      </p>
-      {rows.length > 0 ? <PatchRows rows={rows} /> : null}
-      <ReviewSection
-        title="Needs review"
-        items={review.needsReview}
-        onApplyAction={(patch) => updateDeviceProfile(patch)}
-      />
-      <ReviewSection title="Ignored" items={review.ignored} />
-      <div style={actionsStyle}>
-        <button
-          type="button"
-          onClick={dismiss}
-          title={controlHelp('control:laser.detected-settings.dismiss')}
-          data-help-id="control:laser.detected-settings.dismiss"
-        >
-          Dismiss
-        </button>
-        {rows.length > 0 ? (
-          <button
-            type="button"
-            onClick={apply}
-            style={primaryButtonStyle}
-            title={controlHelp('control:laser.detected-settings.apply-safe')}
-            data-help-id="control:laser.detected-settings.apply-safe"
-          >
-            Apply safe settings
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function PatchRows({ rows }: { readonly rows: ReadonlyArray<Row> }): JSX.Element {
-  return (
-    <section>
-      <strong style={sectionTitleStyle}>Safe profile updates</strong>
-      <ul style={listStyle}>
-        {rows.map((r) => (
-          <li key={r.label} style={rowStyle}>
-            <span style={rowLabelStyle}>{r.label}</span>
-            <span style={rowValueStyle}>
-              <span style={oldStyle}>{r.oldText}</span>
-              <span aria-hidden style={arrowStyle}>
-                -&gt;
-              </span>
-              <span style={newStyle}>{r.newText}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function ReviewSection(props: {
-  readonly title: string;
-  readonly items: ReadonlyArray<ReviewItem>;
-  readonly onApplyAction?: (patch: Partial<DeviceProfile>) => void;
-}): JSX.Element | null {
-  if (props.items.length === 0) return null;
-  return (
-    <section>
-      <strong style={sectionTitleStyle}>{props.title}</strong>
-      <ul style={listStyle}>
-        {props.items.map((item) => {
-          const action = item.action;
-          return (
-            <li key={item.label} style={reviewRowStyle}>
-              <span style={rowLabelStyle}>{item.label}</span>
-              <span style={reviewDetailStyle}>
-                <span>{item.detail}</span>
-                {action === undefined || props.onApplyAction === undefined ? null : (
-                  <button
-                    type="button"
-                    style={reviewActionButtonStyle}
-                    title={action.title}
-                    data-help-id={action.helpId}
-                    onClick={() => props.onApplyAction?.(action.patch)}
-                  >
-                    {action.label}
-                  </button>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
+import type { HelpTopicId } from '../help/help-topics';
 
 type Row = {
   readonly label: string;
@@ -343,69 +226,3 @@ function formatAccel(n: number): string {
 function formatLaserMode(enabled: boolean): string {
   return enabled ? 'Enabled' : 'Disabled';
 }
-
-const panelStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-accent)',
-  background: 'var(--lf-tint-info)',
-  padding: 8,
-  borderRadius: 4,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-};
-const titleStyle: React.CSSProperties = { fontSize: 13, color: 'var(--lf-accent-fg)' };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text)' };
-const hintStyle: React.CSSProperties = {
-  margin: '2px 0 4px 0',
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-};
-const listStyle: React.CSSProperties = { margin: 0, padding: 0, listStyle: 'none', fontSize: 12 };
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: 6,
-  padding: '2px 0',
-};
-const reviewRowStyle: React.CSSProperties = {
-  ...rowStyle,
-  alignItems: 'flex-start',
-};
-const rowLabelStyle: React.CSSProperties = { width: 130, color: 'var(--lf-text-muted)' };
-const rowValueStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  gap: 4,
-  alignItems: 'baseline',
-};
-const oldStyle: React.CSSProperties = {
-  color: 'var(--lf-text-faint)',
-  textDecoration: 'line-through',
-};
-const arrowStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
-const newStyle: React.CSSProperties = { color: 'var(--lf-text)', fontWeight: 600 };
-const reviewDetailStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'flex-start',
-  gap: 4,
-  color: 'var(--lf-text-muted)',
-  lineHeight: 1.3,
-};
-const reviewActionButtonStyle: React.CSSProperties = {
-  padding: '3px 7px',
-  borderRadius: 3,
-};
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 6,
-  marginTop: 4,
-};
-const primaryButtonStyle: React.CSSProperties = {
-  background: 'var(--lf-accent)',
-  color: 'var(--lf-on-fill)',
-  border: 'none',
-  padding: '4px 10px',
-  borderRadius: 3,
-  cursor: 'pointer',
-};

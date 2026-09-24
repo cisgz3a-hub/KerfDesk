@@ -19,6 +19,13 @@ function dirtySessionState(): LaserState {
     lastError: 24,
     activeWcs: 'G55',
     ovCache: { feed: 120, rapid: 100, spindle: 100 },
+    rxCapacityEvidence: {
+      rxBytesFree: 128,
+      plannerBlocksFree: 14,
+      sessionEpoch: 0,
+      observedAt: 1,
+    },
+    plannerCapacityEvidence: { plannerBlocksFree: 15, sessionEpoch: 0, observedAt: 2 },
     activeJobMachineKind: 'cnc',
     pauseResumeTransition: { token: PENDING_TRANSITION_TOKEN, action: 'resume' },
     toolChangeIdleSeen: true,
@@ -45,6 +52,12 @@ describe.each(teardownPaths)('$name clears session-scoped controller state', ({ 
     const after = { ...dirtySessionState(), ...patch(dirtySessionState()) };
     expect(after.activeWcs).toBeNull();
     expect(after.ovCache).toBeNull();
+  });
+
+  it('requires fresh RX and Idle planner capacity evidence in the next session', () => {
+    const after = { ...dirtySessionState(), ...patch(dirtySessionState()) };
+    expect(after.rxCapacityEvidence).toBeNull();
+    expect(after.plannerCapacityEvidence).toBeNull();
   });
 
   it('drops the finished job identity and its tool-change queue', () => {

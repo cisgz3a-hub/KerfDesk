@@ -183,7 +183,7 @@ describe('full-source alpha through real cooperative region tracing', () => {
         preparedTrace,
       });
       expect(prepared).toBe(result);
-      expect(recomputed).toEqual(prepared);
+      expect(recomputed).toEqual({ ...prepared, sourceHasTransparency: true });
       expect(alphaForegroundAt(recomputed.paths, 32, 32)).toBe(true);
       expect(request.options).toBe(sharpAlpha);
       expect(request.options).toEqual({ ...TRACE_PRESETS['Sharp'], traceTransparency: true });

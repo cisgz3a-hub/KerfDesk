@@ -7,6 +7,7 @@
 // byte-deterministic given a byte-deterministic Project.
 
 import { polylineToCurveSubpath, type Project, type SceneObject } from '../../core/scene';
+import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
 import { stringifyProjectJson } from './stringify-project-json';
 
 export function serializeProject(
@@ -42,6 +43,9 @@ function withCurveGeometry(project: Project): Project {
 
 function withSerializableObject(object: SceneObject): SceneObject {
   if (!('paths' in object)) return object;
+  if (object.kind === 'traced-image') {
+    return { ...object, paths: object.paths.map(compactLineGeometry) };
+  }
   return {
     ...object,
     paths: object.paths.map((path) => ({

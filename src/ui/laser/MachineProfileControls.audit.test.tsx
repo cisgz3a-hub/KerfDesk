@@ -6,8 +6,7 @@ import { resetStore } from '../state/test-helpers';
 import { ControlledLaserOffTravelRow } from './ControlledLaserOffTravelRow';
 import { AirRestartRow, LaserPowerRows } from './DeviceProfilePowerFields';
 import { ZRows } from './DeviceProfileRows';
-import { SafetyZonesPanel as SetupSafetyZonesPanel } from './MachineSetupSafetyZones';
-import { SafetyZonesPanel } from './SafetyZonesPanel';
+import { SafetyZonesPanel } from './MachineSetupSafetyZones';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -99,26 +98,18 @@ describe('Machine profile control audit', () => {
     expect(update).toHaveBeenCalledExactlyOnceWith({ zProbePresent: true });
   });
 
-  it.each([
-    ['legacy', SafetyZonesPanel, 'Delete'],
-    ['setup', SetupSafetyZonesPanel, 'Remove'],
-  ] as const)(
-    '%s safety zones add, disable and remove the selected persisted zone',
-    (_name, Panel, remove) => {
-      act(() => root.render(<Panel />));
-      click('Add zone');
-      const added = useStore.getState().project.device.noGoZones;
-      expect(added).toHaveLength(1);
-      expect(added[0]?.enabled).toBe(true);
-      const toggle = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      expect(toggle).not.toBeNull();
-      act(() => toggle!.click());
-      expect(useStore.getState().project.device.noGoZones).toEqual([
-        { ...added[0], enabled: false },
-      ]);
-      click(remove);
-      expect(useStore.getState().project.device.noGoZones).toEqual([]);
-      expect(host.querySelector('input[type="checkbox"]')).toBeNull();
-    },
-  );
+  it('setup safety zones add, disable and remove the selected persisted zone', () => {
+    act(() => root.render(<SafetyZonesPanel />));
+    click('Add zone');
+    const added = useStore.getState().project.device.noGoZones;
+    expect(added).toHaveLength(1);
+    expect(added[0]?.enabled).toBe(true);
+    const toggle = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(toggle).not.toBeNull();
+    act(() => toggle!.click());
+    expect(useStore.getState().project.device.noGoZones).toEqual([{ ...added[0], enabled: false }]);
+    click('Remove');
+    expect(useStore.getState().project.device.noGoZones).toEqual([]);
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+  });
 });

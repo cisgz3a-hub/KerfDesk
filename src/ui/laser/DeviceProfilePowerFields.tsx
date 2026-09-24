@@ -12,6 +12,7 @@ import {
 } from '../../core/devices';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row } from './device-settings-shared';
+import { PresetAirAssistOffer } from './PresetAirAssistOffer';
 
 const MAX_POWER_S = 100000;
 
@@ -89,24 +90,28 @@ function powerRowLabels(grbl: boolean, plain: boolean): { max: string; min: stri
 }
 
 // Air-assist coolant command (M7/M8/none) wired to the controller output.
-// Operator-supplied: $$ cannot report which pin (if any) is wired.
+// Operator-supplied: $$ cannot report which pin (if any) is wired. A saved
+// preset whose air predates the preset's is offered the preset's settings.
 export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
-    <Row label="Air output">
-      <select
-        value={device.airAssistCommand}
-        onChange={(e) =>
-          update({ airAssistCommand: e.target.value as DeviceProfile['airAssistCommand'] })
-        }
-        aria-label="Air output command"
-        title="Choose the GRBL coolant output wired to air assist for Job Air and Manual Air. Leave Disabled unless you have tested the output."
-      >
-        <option value="none">Disabled</option>
-        <option value="M8">M8 flood coolant</option>
-        <option value="M7">M7 mist coolant</option>
-      </select>
-    </Row>
+    <>
+      <Row label="Air output">
+        <select
+          value={device.airAssistCommand}
+          onChange={(e) =>
+            update({ airAssistCommand: e.target.value as DeviceProfile['airAssistCommand'] })
+          }
+          aria-label="Air output command"
+          title="Choose the GRBL coolant output wired to air assist for Job Air and Manual Air. Leave Disabled unless you have tested the output."
+        >
+          <option value="none">Disabled</option>
+          <option value="M8">M8 flood coolant</option>
+          <option value="M7">M7 mist coolant</option>
+        </select>
+      </Row>
+      <PresetAirAssistOffer device={device} update={update} />
+    </>
   );
 }
 
@@ -114,9 +119,9 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
 // running job, so the emitter holds air on across an Air-off operation that
 // sits between two Air-on ones. Clearing this restores plain per-operation
 // air, which is what an operator wants once `$152=100` (no standby: the pump
-// and laser module stay powered) is set on the controller, or an air test shows
-// the installed firmware restarting the pump (A1 and A1 Pro firmware are
-// numbered separately). Hidden while air output is disabled, where it would
+// and laser module stay powered) is sent from the Console (ADR-370), or an air
+// test shows the installed firmware restarting the pump (A1 and A1 Pro firmware
+// are numbered separately). Hidden while air output is disabled, where it would
 // mean nothing.
 export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element | null {
   if (device.airAssistCommand === 'none') return null;
@@ -126,7 +131,7 @@ export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element 
         type="checkbox"
         checked={device.airAssistRestartUnreliable === true}
         aria-label="Controller cannot restart air assist mid-job"
-        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and Job Review says so. Untick once $152=100 (no standby) is set on the controller, or after an air test shows your firmware restarting the pump."
+        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and Job Review says so. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
         onChange={(event) => update({ airAssistRestartUnreliable: event.target.checked })}
       />
       <span style={{ opacity: 0.7 }}>cannot switch air off and on mid-job</span>

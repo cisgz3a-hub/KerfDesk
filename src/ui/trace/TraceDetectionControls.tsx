@@ -39,9 +39,10 @@ export function TraceDetectionControls(props: {
               detectionMode: parseDetectionMode(event.target.value),
             })
           }
-          title="Choose automatic detection, a manual brightness band, or local-contrast sketch tracing."
+          title="Choose automatic detection, faint-line recovery, a manual brightness band, or sketch tracing."
         >
           <option value="preset">{presetDetectionLabel(props.preset)}</option>
+          <option value="faint-lines">Faint lines (keep solid areas)</option>
           <option value="manual">Manual brightness band</option>
           <option value="sketch">Sketch (local contrast)</option>
         </select>
@@ -57,6 +58,8 @@ function presetDetectionLabel(preset: TraceOptions): string {
 }
 
 function detectionNote(mode: TraceDetectionMode, preset: TraceOptions): string {
+  if (mode === 'faint-lines')
+    return 'Adds continuous pale strokes while keeping solid ink. Small isolated pale specks are ignored.';
   if (mode === 'sketch')
     return 'Local contrast detects the artwork; a brightness band is not used.';
   if (preset.autoSketchTrace === true) {
@@ -66,7 +69,7 @@ function detectionNote(mode: TraceDetectionMode, preset: TraceOptions): string {
 }
 
 function parseDetectionMode(value: string): TraceDetectionMode {
-  return value === 'manual' || value === 'sketch' ? value : 'preset';
+  return value === 'manual' || value === 'sketch' || value === 'faint-lines' ? value : 'preset';
 }
 
 const noteStyle: React.CSSProperties = {
