@@ -131,7 +131,11 @@ describe('laser controller lifecycle operations', () => {
     expect(writes).toEqual(['$H\n']);
     expect(controllerOperation()).toMatchObject({ kind: 'home' });
     expect(useLaserStore.getState().homingState).toBe('homing');
-    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    // ADR-343 Amendment 1: Home proves machine position, not that G92/G54
+    // became zero, so the prior origin stays active but unresolved until a
+    // fresh WCO report. Its cached offset and every frame proof still go.
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workOriginSource).toBe('unknown');
     expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
 

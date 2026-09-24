@@ -2535,6 +2535,15 @@ Position placement remain relative to their selected work/head reference. When t
 mapping is unknown, the canvas uses the artwork frame and Job Review explains the limitation;
 the completed Frame remains the ordinary Start gate.
 
+Absolute Coordinates compensates a reported G54/G92 work offset instead of requiring Reset
+origin after Home. The program, Preview and Frame use the same offset; no offset-clearing command
+is sent. Home invalidates old coordinate observations and waits for the controller to establish
+its machine reference. Frame allows the fresh Idle/work-offset report to arrive before compiling
+an unresolved Absolute placement. A missing report is described as missing coordinate data,
+not as a requirement to erase the work origin. Equivalent MPos/WPos reports and the first zero
+WCO report do not cancel unchanged preparation; actual movement, changed offsets, report units,
+controller sessions and output edits still invalidate it.
+
 Contour entry moves use the prepared program's explicit physical envelope, including centred
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
 omitted. Preview, timing, Frame bounds and output use the same prepared result. Earlier archived

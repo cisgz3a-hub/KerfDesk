@@ -1,6 +1,7 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { LaserState } from './laser-store';
-import { hasCustomXyOrigin } from './origin-actions';
+import { hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
 
 export function statusPositionPatch(
   state: LaserState,
@@ -54,10 +55,10 @@ export function statusPositionPatch(
   // no-homing machine the operator sets the origin right after Release/Wake, when
   // GRBL sits at machine 0,0, so the resulting G92 offset is exactly zero. That
   // is a deliberate origin, not the absence of one — a routine zero-WCO frame
-  // must NOT demote it. An actual reset/alarm/clear drops workOriginSource to
-  // 'none' first (originUnknownAfterControllerReset / clearedOriginPatch), so
-  // keying on the source here cannot revive a stale origin.
-  const active = hasCustomXyOrigin(report.wco) || state.workOriginSource !== 'none';
+  // must NOT demote it. Only an explicit app-set origin carries that intent;
+  // 'unknown' after Home/reset is reconciled by this fresh WCO, not latched
+  // forever. Classify in mm while retaining the original report-unit cache.
+  const active = hasActiveXyOrigin(state, report.wco);
   return {
     statusReport: report,
     ...ovPatch,
@@ -67,6 +68,16 @@ export function statusPositionPatch(
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
   };
+}
+
+function hasActiveXyOrigin(state: LaserState, wco: WorkCoordinateOffset): boolean {
+  const [x, y, z] = normalizeReportedMPosToMm(
+    [wco.x, wco.y, wco.z],
+    state.controllerSettings?.reportInches === true,
+  );
+  const deliberateOrigin =
+    state.workOriginSource === 'g92' || state.workOriginSource === 'g54-persistent';
+  return hasCustomXyOrigin({ x, y, z }) || deliberateOrigin;
 }
 
 // The caches keep their identity while the controller repeats the same values.

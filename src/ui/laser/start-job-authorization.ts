@@ -101,18 +101,21 @@ export function controllerStartPreparationStillCurrent(
     readonly ignoreAdvisoryControllerEvidence?: boolean;
   } = {},
 ): boolean {
+  const offset = preparationOffset(preparedAgainst);
   return (
     sameControllerEvidence(
       preparedAgainst,
       current,
       options.ignoreAdvisoryControllerEvidence === true,
     ) &&
+    sameAxes(preparationOffset(current), offset) &&
     sameStartStatus(
       current.statusReport,
       preparedAgainst.statusReport,
       options.ignoreStatusState === true,
+      offset,
+      current.controllerSettings?.reportInches === true,
     ) &&
-    sameAxes(current.wcoCache, preparedAgainst.wcoCache) &&
     current.workOriginActive === preparedAgainst.workOriginActive &&
     current.workOriginSource === preparedAgainst.workOriginSource &&
     current.trustedPositionEpoch === preparedAgainst.trustedPositionEpoch &&
@@ -127,6 +130,13 @@ function sameControllerEvidence(
   ignoreAdvisoryEvidence: boolean,
 ): boolean {
   if (current.controllerSessionEpoch !== preparedAgainst.controllerSessionEpoch) return false;
+  // Report units interpret raw position/WCO numbers, even at zero. They are
+  // coordinate identity rather than advisory settings/build metadata.
+  if (
+    (current.controllerSettings?.reportInches === true) !==
+    (preparedAgainst.controllerSettings?.reportInches === true)
+  )
+    return false;
   if (ignoreAdvisoryEvidence) return true;
   return (
     current.controllerSettings === preparedAgainst.controllerSettings &&
@@ -136,10 +146,25 @@ function sameControllerEvidence(
   );
 }
 
+type Axes = NonNullable<FramedRunControllerSnapshot['wcoCache']>;
+
+function preparationOffset(
+  snapshot: Pick<FramedRunControllerSnapshot, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>,
+): Axes | null {
+  if (snapshot.wcoCache !== null) return snapshot.wcoCache;
+  // Placement already treats an absent offset as zero only without a custom
+  // origin. Its first explicit zero report does not change the compiled job.
+  return !snapshot.workOriginActive && snapshot.workOriginSource === 'none'
+    ? { x: 0, y: 0, z: 0 }
+    : null;
+}
+
 function sameStartStatus(
   current: ReturnType<typeof useLaserStore.getState>['statusReport'],
   preparedAgainst: ReturnType<typeof useLaserStore.getState>['statusReport'],
   ignoreState: boolean,
+  offset: Axes | null,
+  reportInches: boolean,
 ): boolean {
   if (current === null || preparedAgainst === null) return current === preparedAgainst;
   // WCO is an intermittent GRBL status field. The stable wcoCache is compared
@@ -148,9 +173,53 @@ function sameStartStatus(
   return (
     (ignoreState ||
       (current.state === preparedAgainst.state && current.subState === preparedAgainst.subState)) &&
-    sameAxes(current.mPos, preparedAgainst.mPos) &&
-    sameAxes(current.wPos, preparedAgainst.wPos)
+    samePositionField(current, preparedAgainst, 'mPos', offset, reportInches) &&
+    samePositionField(current, preparedAgainst, 'wPos', offset, reportInches)
   );
+}
+
+function samePositionField(
+  current: NonNullable<FramedRunControllerSnapshot['statusReport']>,
+  preparedAgainst: NonNullable<FramedRunControllerSnapshot['statusReport']>,
+  field: 'mPos' | 'wPos',
+  offset: Axes | null,
+  reportInches: boolean,
+): boolean {
+  const left = current[field];
+  const right = preparedAgainst[field];
+  // Keep observed movement strict when both samples use the same field. A
+  // second reported field must also agree; it cannot hide behind a stable one.
+  if ((left === null) === (right === null)) return sameAxes(left, right);
+  if (offset === null) return false;
+  const other = field === 'mPos' ? 'wPos' : 'mPos';
+  const sign = field === 'mPos' ? 1 : -1;
+  const resolvedLeft = left ?? translatedPosition(current[other], offset, sign);
+  const resolvedRight = right ?? translatedPosition(preparedAgainst[other], offset, sign);
+  if (resolvedLeft === null || resolvedRight === null) return false;
+  // GRBL reports coordinates at 0.001 mm / 0.0001 inch (0.00254 mm).
+  // Subtracting separately rounded MPos and WCO may differ from rounded WPos
+  // by one reporting tick. Allow that only for this representation conversion,
+  // never for changed offsets or two direct observations of the same field.
+  // https://github.com/gnea/grbl/blob/master/grbl/config.h
+  const tick = reportInches ? 0.0001 : 0.001;
+  return (['x', 'y', 'z'] as const).every((axis) => {
+    const a = resolvedLeft[axis];
+    const b = resolvedRight[axis];
+    if (offset[axis] === 0) return a === b;
+    const arithmeticError =
+      Number.EPSILON * Math.max(1, Math.abs(a), Math.abs(b), Math.abs(offset[axis])) * 4;
+    return Math.abs(a - b) <= tick + arithmeticError;
+  });
+}
+
+function translatedPosition(position: Axes | null, offset: Axes, sign: number): Axes | null {
+  return position === null
+    ? null
+    : {
+        x: position.x + sign * offset.x,
+        y: position.y + sign * offset.y,
+        z: position.z + sign * offset.z,
+      };
 }
 
 function sameAxes(
