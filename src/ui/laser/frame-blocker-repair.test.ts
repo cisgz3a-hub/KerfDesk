@@ -14,6 +14,8 @@ import {
   UNLOCKED_NEXT_STEP_MESSAGE,
 } from './start-blocked-alarm-offers';
 import { SET_ORIGIN_OFFER_PROMPT } from './start-blocked-setup-offers';
+import { useStartBlockerStore } from './start-blocker-store';
+import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareConfirm: vi.fn(() => true),
@@ -69,6 +71,7 @@ beforeEach(() => {
     }),
   });
   useToastStore.setState({ toasts: [] });
+  useStartBlockerStore.getState().clear();
 });
 
 afterEach(() => {
@@ -99,10 +102,48 @@ describe('offerFrameBlockerFixes — alarm', () => {
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 
-  it('leaves a declined alarm to the ordinary Frame refusal', async () => {
+  it('refuses with the alarm itself when the operator declines the fix', async () => {
     vi.mocked(jobAwareConfirm).mockReturnValue(false);
-    await expect(offerFrameBlockerFixes()).resolves.toBe(true);
+    await expect(offerFrameBlockerFixes()).resolves.toBe(false);
     expect(useLaserStore.getState().unlockAlarm).not.toHaveBeenCalled();
+    expect(useStartBlockerStore.getState()).toMatchObject({
+      attempt: 'frame',
+      messages: [ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage('Alarm')],
+    });
+  });
+
+  it('offers neither Home nor Unlock while a grblHAL E-stop is asserted', async () => {
+    installProject(true);
+    useLaserStore.setState({ alarmCode: 10, detectedControllerKind: 'grblhal' });
+    await expect(offerFrameBlockerFixes()).resolves.toBe(false);
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(useStartBlockerStore.getState().messages).toContain(ALARM_ACTIVE_START_MESSAGE);
+  });
+
+  it('still offers Home for alarm 10 on stock GRBL, a failed dual-motor homing', async () => {
+    installProject(true);
+    useLaserStore.setState({ alarmCode: 10 });
+    const repaired = offerFrameBlockerFixes();
+    await vi.advanceTimersByTimeAsync(200);
+    await expect(repaired).resolves.toBe(true);
+    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_PROMPT);
+  });
+
+  it('reports an alarm standing beside another blocker without offering a fix', async () => {
+    useLaserStore.setState({ autofocusBusy: true });
+    await expect(offerFrameBlockerFixes()).resolves.toBe(false);
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(useStartBlockerStore.getState().messages).toContain(ALARM_ACTIVE_START_MESSAGE);
+  });
+
+  it('reports the alarm when the accepted Home fails', async () => {
+    installProject(true);
+    useLaserStore.setState({ home: vi.fn(async () => Promise.reject(new Error('ALARM:9'))) });
+    await expect(offerFrameBlockerFixes()).resolves.toBe(false);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      'Homing failed: ALARM:9',
+    );
+    expect(useStartBlockerStore.getState().messages).toContain(ALARM_ACTIVE_START_MESSAGE);
   });
 
   it('stops the Frame quietly while an accepted Home has not settled', async () => {
@@ -216,5 +257,6 @@ describe('offerFrameBlockerFixes — placement and status', () => {
     useLaserStore.setState({ statusReport: status('Hold', { x: 0, y: 0, z: 0 }) });
     await expect(offerFrameBlockerFixes()).resolves.toBe(true);
     expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(useStartBlockerStore.getState().messages).toEqual([]);
   });
 });

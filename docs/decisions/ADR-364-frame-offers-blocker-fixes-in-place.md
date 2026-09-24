@@ -47,13 +47,20 @@ dead ends on the same path:
    banner is cleared and before `prepareFrameContext`. When the machine
    issues are all alarm messages it offers Home on a machine with homing
    enabled and Unlock otherwise (start-blocked-alarm-offers, shared with the
-   checkpoint dispatcher). Otherwise, when the live placement's sole refusal
+   checkpoint dispatcher). Neither is offered for grblHAL's E-stop alarm
+   (ALARM:10), which the controller keeps until the E-stop is released and it
+   is reset; stock GRBL 1.1h uses 10 for a failed dual-motor homing, where
+   Home is still offered. Otherwise, when the live placement's sole refusal
    has a compile-input remedy, it offers Set origin
    (start-blocked-setup-offers). One offer per press, as the checkpoint Start
    allows: after Home the head sits at the switches, so a missing origin is
-   then reported, not set. Everything else continues to the ordinary gates
-   and refuses exactly as before. Start with no permit reaches the same
-   offers through the Frame.
+   then reported, not set. An alarm left standing (the offer declined,
+   unavailable or failed, or another machine blocker beside it) is reported
+   at once with the machine messages the Start preparation uses, before the
+   G54 selection or CNC Zero Z step reaches a controller that rejects
+   commands in Alarm. Everything else continues to the ordinary gates and
+   refuses exactly as before. Start with no permit reaches the same offers
+   through the Frame.
 2. **Unlock hands over to Set origin.** Accepting Unlock clears the alarm and
    stops the Frame with one next step: jog to the job start, click Set origin
    here, and Frame again. The prompt says so before the operator accepts.

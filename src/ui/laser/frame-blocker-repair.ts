@@ -4,24 +4,25 @@
 // reachable only from the checkpoint Start flow, so a plain Frame or Start
 // answered an alarm or a missing origin with a red refusal and nothing else.
 //
-// Nothing here refuses. Each step either clears a condition the Frame would
-// refuse for, or leaves it for prepareFrameContext to refuse exactly as it
-// always has, so every factual gate still runs after the repair.
+// Nothing here adds a refusal. Each step either clears a condition the Frame
+// would refuse for, or leaves it to be refused with the Frame's own messages,
+// so every factual gate still runs after the repair.
 
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { resolveLiveFramePlacement } from './camera-frame-placement';
+import { reportFrameRefusal } from './frame-dispatch-support';
 import { hasFreshIdleFramePosition } from './frame-position-readiness';
 import { waitForControllerStatus } from './frame-status-wait';
-import { offerAlarmFixForBlockedStart } from './start-blocked-alarm-offers';
+import { isAlarmRefusalMessage, offerAlarmFixForBlockedStart } from './start-blocked-alarm-offers';
 import { offerSetupFixForBlockedStart } from './start-blocked-setup-offers';
 import { findMachineStartIssues } from './start-job-input';
 import { machineSnapshot } from './start-machine-snapshot';
 
-/** Resolves false when an accepted repair leaves the next step to the
- * operator (its toast says which); true lets the Frame proceed to its
- * ordinary gates. */
+/** Resolves false when the Frame stops here: an accepted repair left the next
+ * step to the operator (its toast says which), or an alarm still stands and
+ * has been reported. True lets the Frame proceed to its ordinary gates. */
 export async function offerFrameBlockerFixes(): Promise<boolean> {
   await waitForControllerStatus((laser) => laser.statusReport !== null);
   const machineIssues = currentMachineIssues();
@@ -29,7 +30,8 @@ export async function offerFrameBlockerFixes(): Promise<boolean> {
     // Alarm is the one machine block with an in-place fix. Motion still
     // running, a hold, or autofocus is reported by the ordinary refusal.
     const repair = await offerAlarmFixForBlockedStart(machineIssues);
-    if (repair !== 'retry') return repair !== 'handled';
+    if (repair === 'handled') return false;
+    if (repair === 'unrepaired') return !reportedStandingAlarm();
     // One offer per press, as the checkpoint Start allows: after Home the head
     // sits at the switches, so a missing origin is reported for the operator
     // to position and set, never set here.
@@ -42,6 +44,18 @@ export async function offerFrameBlockerFixes(): Promise<boolean> {
   const repair = await offerSetupFixForBlockedStart(refusal);
   if (repair === 'retry') await waitForPostRepairPosition();
   return repair !== 'handled';
+}
+
+// An alarm left standing (the fix declined, unavailable or failed, or offered
+// none because another machine blocker stands beside it) is refused now with
+// the machine messages the Start preparation reports, before the G54
+// selection or CNC Zero Z step reaches a controller that rejects commands in
+// Alarm.
+function reportedStandingAlarm(): boolean {
+  const machineIssues = currentMachineIssues();
+  if (!machineIssues.some(isAlarmRefusalMessage)) return false;
+  reportFrameRefusal(machineIssues);
+  return true;
 }
 
 function currentMachineIssues(): ReadonlyArray<string> {

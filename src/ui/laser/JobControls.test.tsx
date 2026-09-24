@@ -192,16 +192,13 @@ describe('JobControls Frame action', () => {
     }
   });
 
-  it('asks for the offset, then blocks Frame when a custom origin is active but WCO never arrives', async () => {
+  it('blocks Frame when a custom origin is active but WCO is unknown', async () => {
     vi.useFakeTimers();
     installProject();
     const originalFrame = useLaserStore.getState().frame;
-    const originalRequestStatus = useLaserStore.getState().requestControllerStatus;
     const frame = vi.fn(async () => undefined);
-    const requestControllerStatus = vi.fn(async () => undefined);
     useLaserStore.setState({
       frame,
-      requestControllerStatus,
       connection: { kind: 'connected' },
       workOriginActive: true,
       wcoCache: null,
@@ -226,22 +223,14 @@ describe('JobControls Frame action', () => {
         root = createRoot(host);
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
-      const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame job',
-      );
-      if (frameButton === undefined) throw new Error('Frame job button not rendered');
+      const frameButton = buttonByText(host, 'Frame job');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-      // Frame first asks the controller for the offset; only after the bounded
-      // wait does the refusal stand.
-      expect(useToastStore.getState().toasts).toEqual([]);
-      await act(async () => {
+        // Past the bounded status-query wait for the offset (ADR-364).
         await vi.advanceTimersByTimeAsync(3_500);
       });
 
-      expect(requestControllerStatus).toHaveBeenCalled();
       expect(frame).not.toHaveBeenCalled();
       expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
         message: CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE,
@@ -251,10 +240,7 @@ describe('JobControls Frame action', () => {
       if (root !== null) {
         await act(async () => root?.unmount());
       }
-      useLaserStore.setState({
-        frame: originalFrame,
-        requestControllerStatus: originalRequestStatus,
-      });
+      useLaserStore.setState({ frame: originalFrame });
       host.remove();
       vi.useRealTimers();
     }

@@ -187,7 +187,7 @@ function framedRunStatusText(args: {
   return `Frame expired — ${args.framedRunIssue}`;
 }
 
-// Alarm stays pressable: Frame offers Home or Unlock in place and then traces
+// Alarm stays pressable: Frame offers Home or Unlock in place
 // (frame-blocker-repair). Every other non-Idle state has no in-place fix, so
 // the button waits for the controller instead of refusing after a click.
 function frameControlProps(busy: boolean, state: string | undefined) {
@@ -198,7 +198,7 @@ function frameControlProps(busy: boolean, state: string | undefined) {
       state === 'Idle'
         ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
         : state === 'Alarm'
-          ? 'The controller is in Alarm. Frame offers Home or Unlock first, then traces the job with the tool off.'
+          ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
           : frameBlockedTitle(state),
   };
 }

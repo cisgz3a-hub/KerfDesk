@@ -10,7 +10,7 @@
 
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore } from '../state/laser-store';
+import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { repairFailed, settleThenRetry, type BlockedStartRepair } from './start-blocked-repair';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-input';
@@ -35,25 +35,38 @@ export const HOME_OFFER_PROMPT =
   'OK: home now and continue when the cycle finishes.\n' +
   'Cancel: leave it blocked.';
 
+// grblHAL raises ALARM:10 while its E-stop input is asserted and refuses both
+// Home and Unlock until the E-stop is released and the controller reset, so
+// neither is offered and the alarm's own instructions stand. Stock GRBL 1.1h
+// uses 10 for a failed dual-motor homing, which Home does address.
+const GRBLHAL_ESTOP_ALARM_CODE = 10;
+
 /** Offers Home or Unlock when every refusal message is an alarm message; an
  * alarm legitimately refuses with two at once (alarm state + not Idle). Any
- * other refusal returns 'unrepaired' without asking. */
+ * other refusal, or a grblHAL E-stop, returns 'unrepaired' without asking. */
 export async function offerAlarmFixForBlockedStart(
   messages: ReadonlyArray<string>,
 ): Promise<BlockedStartRepair> {
-  if (!isAlarmOnlyRefusal(messages)) return 'unrepaired';
+  if (messages.length === 0 || !messages.every(isAlarmRefusalMessage)) return 'unrepaired';
+  if (isGrblHalEStopAlarm(useLaserStore.getState())) return 'unrepaired';
   const homingEnabled = useStore.getState().project.device.homing.enabled;
   return homingEnabled ? offerHomeCycle() : offerUnlock();
 }
 
-function isAlarmOnlyRefusal(messages: ReadonlyArray<string>): boolean {
-  if (messages.length === 0) return false;
-  const alarmMessages: ReadonlyArray<string> = [
-    ALARM_ACTIVE_START_MESSAGE,
-    STATUS_ALARM_START_MESSAGE,
-    machineNotIdleStartMessage('Alarm'),
-  ];
-  return messages.every((message) => alarmMessages.includes(message));
+/** True for each of the refusal messages an alarm raises. */
+export function isAlarmRefusalMessage(message: string): boolean {
+  return (
+    message === ALARM_ACTIVE_START_MESSAGE ||
+    message === STATUS_ALARM_START_MESSAGE ||
+    message === machineNotIdleStartMessage('Alarm')
+  );
+}
+
+function isGrblHalEStopAlarm(laser: LaserState): boolean {
+  return (
+    laser.alarmCode === GRBLHAL_ESTOP_ALARM_CODE &&
+    (laser.activeControllerKind === 'grblhal' || laser.detectedControllerKind === 'grblhal')
+  );
 }
 
 // Unlock voids the reported position until Home or Set origin re-establishes

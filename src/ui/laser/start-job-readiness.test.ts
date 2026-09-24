@@ -16,6 +16,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { CNC_REQUIRES_GRBL_MESSAGE, prepareStartJob } from './start-job-readiness';
 import { CNC_NO_WORK_ZERO_START_MESSAGE } from './cnc-start-advisories';
+import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 
@@ -350,9 +351,7 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages).toContain(
-        'Machine must be Idle first (currently Run). Wait for it to finish and report Idle, then try again.',
-      );
+      expect(result.messages).toContain(machineNotIdleStartMessage('Run'));
     }
   });
 
@@ -386,9 +385,7 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages).toContain(
-        'Controller is in Alarm. Home it if the machine has homing switches, or Unlock it once the head is safe, then try again.',
-      );
+      expect(result.messages).toContain(ALARM_ACTIVE_START_MESSAGE);
     }
   });
 
