@@ -52,6 +52,8 @@ showed rotary state only inside the dialog, Machine Setup and Job Review.
    return turn. Stop, closing the dialog or a cancel from any surface stops motion (jog cancel, or
    ABORT MOTION without it) and suppresses the return turn; a rejected turn, alarm or disconnect
    ends the test with its reason.
+   Cancel and Abort advance a store-owned intent epoch even between turns; the
+   return turn is suppressed if that epoch or the controller session changes during the pause.
 6. **Rotary switch.** Once a profile has a rotary setup, a laser project's Job actions dock shows a
    **Rotary** toggle above Frame and Start with the attachment and size. It edits the same
    `device.rotary.enabled` Rotary Setup edits, as one undoable profile edit, is disabled while a

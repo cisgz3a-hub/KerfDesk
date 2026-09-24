@@ -12,7 +12,8 @@ export type OpenProjectOptions = {
    * system handed over), so the picker is skipped. */
   readonly file?: OpenProjectFile;
   /** Asked once the unsaved-changes guard has answered, which can take as long
-   * as the operator leaves its dialog open; false leaves the project alone. */
+   * as the operator leaves its dialog open, and immediately before committing
+   * the asynchronously parsed file; false leaves the project alone. */
   readonly stillAllowed?: () => boolean;
 };
 
@@ -34,6 +35,7 @@ export async function openProjectCommand(
       claimProjectOpenRequest: state.claimProjectOpenRequest,
       getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
       getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      ...(options.stillAllowed === undefined ? {} : { stillAllowed: options.stillAllowed }),
     },
     options.file,
   );

@@ -79,7 +79,10 @@ Three constraints shape the design:
    unsaved-changes question), does not replace the project. It waits in a nonmodal banner whose
    **Open project** button is available whenever no job runs; a newer file replaces a waiting
    one and **Dismiss** drops it. The job check runs again after the unsaved-changes dialog,
-   which can stay open while a job is started. This is not a Start guard: nothing the operator
+   which can stay open while a job is started, and immediately before the parsed file replaces
+   the document. A job that starts while either a native or LightBurn file is being read keeps
+   that file in the banner; the banner's Open project action repeats the same check.
+   This is not a Start guard: nothing the operator
    asks for inside the app is blocked. It only stops an event from outside the app from
    replacing the document unasked.
 9. **Installed web app.** The PWA manifest registers `.lf2` in `file_handlers` with

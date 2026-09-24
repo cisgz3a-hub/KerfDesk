@@ -59,8 +59,8 @@ export async function handleExternalProjectOpen(
     hold();
     return;
   }
-  // Asked again once the unsaved-changes question is answered: a job can be
-  // started while it is open.
+  // Rechecked after the unsaved-changes question and after reading/parsing:
+  // a job can start while either asynchronous step waits.
   const stillAllowed = (): boolean => {
     if (!deps.jobActive()) return true;
     hold();

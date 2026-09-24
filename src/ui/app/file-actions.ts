@@ -19,7 +19,6 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
@@ -319,6 +318,8 @@ export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly claimProjectOpenRequest: () => number;
   readonly getProjectOpenRequestEpoch: () => number;
   readonly getProjectDocumentEpoch: () => number;
+  /** Rechecked after asynchronous reading/parsing, immediately before replacing the document. */
+  readonly stillAllowed?: () => boolean;
 };
 
 /** Open a project from the picker, or `chosenFile` when the operator already
@@ -363,16 +364,9 @@ export async function handleOpenProject(
   );
   if (sizeAdvisory !== null) ownedCtx.pushToast(sizeAdvisory, 'warning');
   const controls = createImportWorkerControls(file.name, ownedCtx.pushToast);
-  let result: ReturnType<typeof deserializeProject>;
+  let parsed: Awaited<ReturnType<typeof parseOpenedProjectFile>>;
   try {
-    const parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
-    if (!owner.isCurrent()) return;
-    if (parsed.kind === 'lightburn') {
-      const opened = completeLightBurnProjectOpen(ownedCtx, file.name, parsed.result);
-      rememberOpenedProject(ctx.platform, file, opened);
-      return;
-    }
-    result = parsed.result;
+    parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
   } catch (err) {
     ownedCtx.pushToast(
       isImportCancellation(err)
@@ -384,7 +378,18 @@ export async function handleOpenProject(
   } finally {
     controls.dispose();
   }
-  if (!owner.isCurrent()) return;
-  const opened = completeNativeProjectOpen(ownedCtx, file.name, result);
+  if (!owner.isCurrent() || ctx.stillAllowed?.() === false) return;
+  completeOpenedFile(ownedCtx, file, parsed);
+}
+
+function completeOpenedFile(
+  ctx: OpenProjectCtx,
+  file: OpenProjectFile,
+  parsed: Awaited<ReturnType<typeof parseOpenedProjectFile>>,
+): void {
+  const opened =
+    parsed.kind === 'lightburn'
+      ? completeLightBurnProjectOpen(ctx, file.name, parsed.result)
+      : completeNativeProjectOpen(ctx, file.name, parsed.result);
   rememberOpenedProject(ctx.platform, file, opened);
 }

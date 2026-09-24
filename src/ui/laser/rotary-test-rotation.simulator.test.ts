@@ -117,4 +117,35 @@ describe('rotary test rotation on the GRBL simulator', () => {
     expect(written.filter((line) => LASER_ON_WORD.test(line))).toEqual([]);
     expect(sim.state().mpos.y).toBe(0);
   });
+
+  it.each(['cancelJog', 'stopJob'] as const)(
+    'suppresses the return after %s from another surface during the pause',
+    async (action) => {
+      const sim = await connectIdle();
+      const before = sim.outbound().length;
+      let phase = '';
+      const running = runRotaryTestRotation({
+        plan: rollerTurnPlan(),
+        signal: new AbortController().signal,
+        onPhase: (next) => {
+          phase = next;
+        },
+      });
+      for (let tick = 0; tick < 400 && phase !== 'pausing'; tick += 1) {
+        await vi.advanceTimersByTimeAsync(5);
+      }
+      expect(phase).toBe('pausing');
+      expect(useLaserStore.getState().motionOperation).toBeNull();
+      const stopping = useLaserStore.getState()[action]();
+      await vi.advanceTimersByTimeAsync(3000);
+      await stopping;
+      await expect(running).resolves.toEqual({ kind: 'stopped' });
+      expect(
+        sim
+          .outbound()
+          .slice(before)
+          .filter((line) => line.startsWith('$J=')),
+      ).toEqual(['$J=G91 G21 Y40.000 F240\n']);
+    },
+  );
 });

@@ -131,6 +131,8 @@ export type LaserState = LaserStoreActions &
     // ADR-103 G2 - a touch-plate probe cycle is mid-flight.
     readonly probeBusy: boolean;
     readonly motionOperation: LaserMotionOperation | null;
+    /** Cancel/Abort intent survives the idle gap between a multi-leg manual move. */
+    readonly manualMotionCancelEpoch: number;
     readonly controllerOperation: LaserControllerOperation | null;
     readonly streamer: StreamerState | null;
     /** Monotonic owner for async stream writes within a controller session. */

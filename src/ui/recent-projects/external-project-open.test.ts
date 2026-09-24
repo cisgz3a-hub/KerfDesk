@@ -146,6 +146,45 @@ describe('a project file handed over by the operating system', () => {
   });
 
   it.each([
+    ['native.lf2', () => serializeProject(projectWithLine())],
+    [
+      'lightburn.lbrn2',
+      () =>
+        '<LightBurnProject><Shape Type="Rect" CutIndex="0" W="10" H="10"><XForm>1 0 0 1 20 20</XForm></Shape></LightBurnProject>',
+    ],
+  ])('holds %s when a job starts while the file is being read', async (name, contents) => {
+    const before = useStore.getState().project;
+    let running = false;
+    let release: (text: string) => void = () => undefined;
+    let started: () => void = () => undefined;
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const bytes = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const file: FileHandle = {
+      name,
+      text: () => {
+        started();
+        return bytes;
+      },
+    };
+    const pending = handleExternalProjectOpen(
+      { kind: 'file', file },
+      deps(() => running),
+    );
+    await reading;
+    running = true;
+    release(contents());
+    await pending;
+
+    expect(useStore.getState().project).toBe(before);
+    expect(usePendingProjectOpenStore.getState().file).toBe(file);
+    expect(useStore.getState().savedName).toBeNull();
+  });
+
+  it.each([
     ['missing', 'Could not open gone.lf2: the file is no longer there.'],
     ['invalid', 'Could not open gone.lf2: it is not a KerfDesk or LightBurn project file.'],
     ['unreadable', 'Could not open gone.lf2: KerfDesk could not read it.'],

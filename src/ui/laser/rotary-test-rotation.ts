@@ -109,13 +109,22 @@ export async function runRotaryTestRotation(args: {
   readonly pauseMs?: number;
 }): Promise<RotaryTestOutcome> {
   const store = args.store ?? useLaserStore;
+  const { manualMotionCancelEpoch, controllerSessionEpoch } = store.getState();
   const [out, back] = args.plan.legs;
   args.onPhase?.('turning');
   const first = await runTurn(store, out, args.signal);
   if (first.kind !== 'done') return first;
   args.onPhase?.('pausing');
   await pause(args.pauseMs ?? ROTARY_TEST_PAUSE_MS, args.signal);
-  if (args.signal.aborted) return STOPPED;
+  const current = store.getState();
+  // A global Cancel/Abort can arrive while neither leg owns motion. The
+  // return is part of this same intent, not a new jog requested after Cancel.
+  if (
+    args.signal.aborted ||
+    current.manualMotionCancelEpoch !== manualMotionCancelEpoch ||
+    current.controllerSessionEpoch !== controllerSessionEpoch
+  )
+    return STOPPED;
   args.onPhase?.('returning');
   return runTurn(store, back, args.signal);
 }

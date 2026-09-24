@@ -18,7 +18,14 @@ export function PendingProjectOpenBanner(props: {
     const waiting = usePendingProjectOpenStore.getState().take();
     if (waiting === null) return;
     const pushToast = useToastStore.getState().pushToast;
-    void openProjectCommand(props.platform, pushToast, { file: waiting });
+    void openProjectCommand(props.platform, pushToast, {
+      file: waiting,
+      stillAllowed: () => {
+        if (!isActiveJobStatus(useLaserStore.getState().streamer?.status ?? null)) return true;
+        usePendingProjectOpenStore.getState().hold(waiting);
+        return false;
+      },
+    });
   };
   return (
     <section role="status" aria-label="Project waiting to open" style={bannerStyle}>

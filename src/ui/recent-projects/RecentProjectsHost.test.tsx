@@ -135,6 +135,36 @@ describe('Recent Projects host', () => {
     expect(usePendingProjectOpenStore.getState().file).toBeNull();
   });
 
+  it('keeps a banner file queued if a job starts while Open project reads it', async () => {
+    const before = useStore.getState().project;
+    let release: (text: string) => void = () => undefined;
+    let started: () => void = () => undefined;
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const bytes = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const file = {
+      name: 'delayed.lf2',
+      text: () => {
+        started();
+        return bytes;
+      },
+    };
+    await act(async () => usePendingProjectOpenStore.getState().hold(file));
+    await act(async () => button('Open project').click());
+    await reading;
+    await act(async () => {
+      startJob();
+      release(serializeProject(projectWithLine()));
+    });
+    await vi.waitFor(() => expect(banner()).not.toBeNull());
+    expect(useStore.getState().project).toBe(before);
+    expect(usePendingProjectOpenStore.getState().file).toBe(file);
+    expect(button('Open project').disabled).toBe(true);
+  });
+
   it('shows the Recent Projects manager when File > Recent Projects asks for it', async () => {
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     await act(async () => useRecentProjectsStore.getState().openDialog());
