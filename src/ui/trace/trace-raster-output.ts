@@ -10,6 +10,7 @@ import {
   type TracedImage,
 } from '../../core/scene';
 import { buildBitmapFromVectors } from '../raster/vector-to-bitmap';
+import { packPhotoBitmapGeometry } from '../raster/packed-photo-bitmap';
 import { positionTraceOverRasterSource } from '../state/scene-mutations';
 
 export type RasterTraceOperationInput = {
@@ -86,10 +87,14 @@ export async function buildRasterTraceOutput(
   const renderType = traced.traceMode === 'filled-contours' ? 'fill-all' : 'outlines';
   const conversionSource =
     renderType === 'outlines' ? padTraceForOutlineRaster(positioned, linesPerMm) : positioned;
-  const raster = await buildBitmapFromVectors([conversionSource], {
+  const photoRibbons = preserveCoverage ? packPhotoBitmapGeometry(conversionSource) : undefined;
+  const workerSource =
+    photoRibbons === undefined ? conversionSource : { ...conversionSource, paths: [] };
+  const raster = await buildBitmapFromVectors([workerSource], {
     dpi: linesPerMmToDpi(linesPerMm),
     renderType,
     brightnessPercent: 0,
+    ...(photoRibbons === undefined ? {} : { photoRibbons }),
     ...(preserveCoverage
       ? {
           preserveCoverage: true,
