@@ -11,13 +11,13 @@ export const REFERENCE_CNC_BIT_SHAPE_CATALOG: ReadonlyArray<ReferenceCncBitCatal
   ref(
     'engraving-flat-tip',
     'Flat-tip engraving cutters',
-    'Needs independent flat-tip width and included angle; the legacy engraving kernel is a full flat cylinder.',
+    'No exact product is modeled yet; add one as a custom Engraving bit with its included angle and tip flat width.',
     HARVEY_ENGRAVING,
   ),
   ref(
     'engraving-tipped-off',
     'Tipped-off engraving cutters',
-    'Needs the manufactured tip-off diameter as well as the included angle.',
+    'No exact product is modeled yet; add one as a custom Engraving bit using the tip-off diameter as the tip flat.',
     HARVEY_ENGRAVING,
   ),
   ref(
@@ -78,7 +78,7 @@ export const REFERENCE_CNC_BIT_SHAPE_CATALOG: ReadonlyArray<ReferenceCncBitCatal
   ref(
     'fishtail',
     'Fishtail cutters',
-    'The relieved center is not a flat-bottom kernel and must not clear floors or drill as one.',
+    'The notched fishtail end is close to, but not exactly, a flat end mill, so no preset is modeled; a measured End mill entry approximates its flat floor.',
     'https://www.inventables.com/products/carving-bit-super-pack',
     'representative-product',
   ),
