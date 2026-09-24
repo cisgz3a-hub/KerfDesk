@@ -1063,7 +1063,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    stock top.
 2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
    retracted, then restores a zero or positive pre-Frame Work-Z. If Frame began below Work Z0, it
-   deliberately stays at safe Z instead of plunging back into stock. Missing Work-Z, unknown return Z, or a driver
+   deliberately stays at safe Z instead of plunging back into stock. The retract only ever raises: a
+   bit already at or above safe Z (for example parked above the touch plate after a probe) traces and
+   returns at its own height with no Z move, and click/command point moves skip their safe-Z prefix
+   the same way (ADR-192 Amendment 1). Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
 3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
    positions are converted to millimetres before any G21 restore is built.
@@ -2004,7 +2007,9 @@ their archive before transmission.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream); the blocked-Start dialog offers Unlock/Home in place.
+   stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
+   Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
+   the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
@@ -2027,11 +2032,10 @@ their archive before transmission.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; CNC **Startup Setup** links open the same flow. Old `MachineSetupDialog`
-callers and deep links from read-only Artwork references resolve to the same global flow rather than
-a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
-current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
-undoable project change.
+Setup** button; CNC **Startup Setup** links open the same flow. Deep links from read-only Artwork
+references resolve to the same global flow rather than a competing live-edit dialog. Every edit
+remains in one `DeviceProfile` + `MachineConfig` + current-job CNC draft until **Save machine
+setup**, which commits the complete configuration as one undoable project change.
 
 Machine output-kind metadata describes the researched configuration and supplies advisory warnings:
 
@@ -2699,7 +2703,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
     bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
-11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
+    Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
+    saved before the preset gained `M8` (2026-09-19) still reads
+    Disabled and sends no air command at all; the Air output row then
+    offers **Use preset air settings** (ADR-370), which sets both. With
+    an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
     operator left on stays on. With the first operation's Air off, Job
@@ -2710,7 +2719,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     "Air restart" ticked the program must contain exactly one `M8` and
     one `M9`, the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=0`. Untick "Air restart" and the same job must
+    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
+    page defines `$152` as the standby wait, so `100` keeps the pump
+    powered and `0` idles it immediately; the A1 Pro page does not list
+    it). Send `$152=100` from the Console while Idle: on the Falcon
+    command set it accepts `$150`, `$151` and `$152` (whole numbers
+    0-100) and still refuses every other numeric setting write
+    (ADR-370). The write clears the Frame proof, so Frame again before
+    Start. Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.

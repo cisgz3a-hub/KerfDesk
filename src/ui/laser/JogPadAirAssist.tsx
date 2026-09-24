@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import type { DeviceProfile } from '../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import {
+  presetAirAssistUpdate,
+  type PresetAirAssistUpdate,
+} from '../../core/devices/preset-air-assist';
 import { useStore } from '../state';
 import {
   projectAirAssistDefaultSyncSummary,
@@ -53,6 +58,7 @@ export function JogPadAirAssist(): JSX.Element {
       />
       {noticeOpen && readiness === 'no-output' ? (
         <AirOutputUnsetNotice
+          preset={presetAirAssistUpdate(project.device)}
           onOpenSetup={openAirOutputSetup}
           onCancel={() => setNoticeOpen(false)}
         />
@@ -137,6 +143,7 @@ function controlTitle(readiness: AirAssistReadiness, label: string): string {
 }
 
 function AirOutputUnsetNotice(props: {
+  readonly preset: PresetAirAssistUpdate | null;
   readonly onOpenSetup: () => void;
   readonly onCancel: () => void;
 }): JSX.Element {
@@ -145,8 +152,9 @@ function AirOutputUnsetNotice(props: {
       <div style={airSetupWarningTextStyle}>
         <strong>Manual Air has no M7/M8 output to switch.</strong>
         <span>
-          Set the air output in Machine Setup only after a hardware test, or run the external air
-          pump by hand.
+          {props.preset === null
+            ? 'Set the air output in Machine Setup only after a hardware test, or run the external air pump by hand.'
+            : `The ${props.preset.presetName} preset uses ${props.preset.patch.airAssistCommand}; Machine Setup offers to apply it.`}
         </span>
       </div>
       <div style={airSetupWarningActionStyle}>

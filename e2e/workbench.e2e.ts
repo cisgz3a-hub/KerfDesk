@@ -648,7 +648,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
   await page.getByRole('tab', { name: 'Machine' }).click();
   const savedRecovery = page.getByText('Interrupted job saved', { exact: true });
   await expect(savedRecovery).toBeVisible();
-  await expect(page.getByText('Last Start attempt blocked', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/^Last (Start|Frame) attempt blocked$/)).toHaveCount(0);
   await savedRecovery.click();
   await expect(
     page.getByText('It is isolated from the current canvas', { exact: false }),
