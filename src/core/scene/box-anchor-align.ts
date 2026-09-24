@@ -6,9 +6,11 @@
 
 import type { BoardAnchor } from './board-capture';
 import { transformedBBox, type AABB } from './hit-test';
+import type { SceneGroup } from './scene';
 import type { SceneObject, Transform } from './scene-object';
 import { alignDelta, type SelectionAlignKind } from './selection-align';
 import type { SelectionTransform } from './selection-transform';
+import { selectionUnits, type SelectionUnit } from './selection-units';
 
 export type BoxAnchorAlignError = 'empty-selection' | 'missing-reference';
 
@@ -30,38 +32,42 @@ const ANCHOR_KINDS: Readonly<
 };
 
 /**
- * Build the transforms that move every non-reference object in `objects` so its
- * bounding box lands on `anchor` of the reference box (identified by
- * `referenceId`). Objects already at the anchor are omitted (zero-delta), so an
- * empty `transforms` list means "nothing to move".
+ * Build the transforms that move every non-reference unit of `objects` (see
+ * selectionUnits; a selected group moves whole) so its bounding box lands on
+ * `anchor` of the reference box (identified by `referenceId`). Units already at
+ * the anchor are omitted (zero-delta), so an empty `transforms` list means
+ * "nothing to move".
  */
 export function buildBoxAnchorAlign(
   objects: ReadonlyArray<SceneObject>,
   referenceId: string,
   anchor: BoardAnchor,
+  groups: ReadonlyArray<SceneGroup> = [],
 ): BoxAnchorAlignResult {
   if (objects.length === 0) return { kind: 'error', reason: 'empty-selection' };
   const reference = objects.find((object) => object.id === referenceId);
   if (reference === undefined) return { kind: 'error', reason: 'missing-reference' };
   const referenceBox = transformedBBox(reference);
   const kinds = ANCHOR_KINDS[anchor];
-  const transforms = objects
-    .filter((object) => object.id !== reference.id)
-    .map((object) => alignObjectToAnchor(object, referenceBox, kinds))
-    .filter((item): item is SelectionTransform => item !== null);
+  const transforms = selectionUnits(
+    objects.filter((object) => object.id !== reference.id),
+    groups,
+  ).flatMap((unit) => alignUnitToAnchor(unit, referenceBox, kinds));
   return { kind: 'ok', transforms };
 }
 
-function alignObjectToAnchor(
-  object: SceneObject,
+function alignUnitToAnchor(
+  unit: SelectionUnit,
   referenceBox: AABB,
   kinds: { readonly x: SelectionAlignKind; readonly y: SelectionAlignKind },
-): SelectionTransform | null {
-  const objectBox = transformedBBox(object);
-  const dx = alignDelta(objectBox, referenceBox, kinds.x).x;
-  const dy = alignDelta(objectBox, referenceBox, kinds.y).y;
-  if (dx === 0 && dy === 0) return null;
-  return { id: object.id, transform: translateTransform(object.transform, dx, dy) };
+): ReadonlyArray<SelectionTransform> {
+  const dx = alignDelta(unit.box, referenceBox, kinds.x).x;
+  const dy = alignDelta(unit.box, referenceBox, kinds.y).y;
+  if (dx === 0 && dy === 0) return [];
+  return unit.objects.map((object) => ({
+    id: object.id,
+    transform: translateTransform(object.transform, dx, dy),
+  }));
 }
 
 function translateTransform(transform: Transform, dx: number, dy: number): Transform {

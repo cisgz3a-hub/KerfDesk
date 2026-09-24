@@ -1,4 +1,5 @@
 import { pathUsesOperation, type Layer, type Project, type Scene } from '../../core/scene';
+import { selectionUnits } from '../../core/scene/selection-units';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
@@ -22,6 +23,16 @@ export function selectionTouchesGroup(
   return (project.scene.groups ?? []).some((group) =>
     group.objectIds.some((objectId) => selected.has(objectId)),
   );
+}
+
+// Align and Distribute move a selected group as one object, so their "enough
+// selected" checks count groups once rather than per member.
+export function selectionUnitCount(project: Project, selectedIds: ReadonlyArray<string>): number {
+  const selected = new Set(selectedIds);
+  return selectionUnits(
+    project.scene.objects.filter((object) => selected.has(object.id)),
+    project.scene.groups ?? [],
+  ).length;
 }
 
 export function selectionHasUnlockedObject(

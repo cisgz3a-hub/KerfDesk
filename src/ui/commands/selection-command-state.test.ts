@@ -11,6 +11,7 @@ import {
   selectionCanBreakApart,
   selectionCanCombine,
   selectionCanWeld,
+  selectionUnitCount,
   unionSilhouetteOperations,
 } from './selection-command-state';
 
@@ -147,6 +148,21 @@ describe('selection command state', () => {
       'vec-a',
       'vec-b',
     ]);
+  });
+
+  it('counts a selected group once for Align and Distribute', () => {
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: ['a', 'b', 'c'].map((id) => importedSvg(id, squarePath('#000000', 0, 0, 10))),
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [{ id: 'group', name: 'Group 1', objectIds: ['a', 'b'] }],
+      },
+    };
+
+    expect(selectionUnitCount(project, ['a', 'b'])).toBe(1);
+    expect(selectionUnitCount(project, ['a', 'b', 'c'])).toBe(2);
+    expect(selectionUnitCount(project, ['c', 'missing'])).toBe(1);
   });
 });
 
