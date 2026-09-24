@@ -1,4 +1,4 @@
-import type { ControllerDriver, FrameBounds } from './controller-driver';
+import type { ConsoleSettingWrite, ControllerDriver, FrameBounds } from './controller-driver';
 import { buildJogCommand, CMD_SPINDLE_OFF, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
@@ -43,8 +43,19 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
         : prepared;
     },
     consoleQuickCommands: driver.consoleQuickCommands.filter(({ command }) => command !== '$$'),
+    consoleSettingWrites: FALCON_AIR_SETTING_WRITES,
   };
 }
+
+/** Creality's Falcon A1 parameter page documents these air-assist settings,
+ *  each 0-100, as set from a software console. Every other numeric write stays
+ *  out of host software on this contract (ADR-370). Source:
+ *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters */
+const FALCON_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
+  { id: 150, min: 0, max: 100, meaning: 'engraving airflow level' },
+  { id: 151, min: 0, max: 100, meaning: 'cutting airflow level' },
+  { id: 152, min: 0, max: 100, meaning: 'air pump standby wait in seconds, 100 = never' },
+];
 
 function buildFalconJog(params: JogParams): string {
   // Reuse GRBL's finite-axis, finite-feed and nonempty-motion validation.

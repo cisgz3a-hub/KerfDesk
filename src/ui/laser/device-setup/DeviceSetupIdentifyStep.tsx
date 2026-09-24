@@ -8,6 +8,8 @@ import {
   type DeviceProfile,
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
+import { usePlatformOptional } from '../../app/platform-context';
+import { backgroundStreamingPreferenceTitle } from '../../state/laser-background-streaming-notice';
 import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
 import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
@@ -230,13 +232,14 @@ function HostedStreamingRow(props: {
   readonly state: DeviceSetupStepProps['state'];
   readonly update: (patch: Partial<DeviceProfile>) => void;
 }): JSX.Element {
+  const platform = usePlatformOptional();
   return (
     <Row label="Background streaming">
       <input
         type="checkbox"
         checked={props.state.draft.workerHostedStreaming !== false}
         aria-label="Read the serial port and refill the job stream in a worker"
-        title="Keeps G-code sending independent of a busy window when supported. If unavailable, keep KerfDesk visible during transfer. Reconnect after changing this setting."
+        title={backgroundStreamingPreferenceTitle(platform?.id)}
         onChange={(event) => props.update({ workerHostedStreaming: event.target.checked })}
       />
       <span style={mutedInlineStyle}>reconnect to apply</span>

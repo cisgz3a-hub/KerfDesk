@@ -114,7 +114,7 @@ describe('runFrameNow split Frame (ADR-353)', () => {
     expect(useFramePreparationStore.getState().stage).toBe('finishing');
     // A fresh Idle report at a different position: the machine moved. The
     // trace expires at once, and the preparation owner cancels the compile it
-    // was guarding for the same reason.
+    // was guarding for the same reason. Report changed context, not a compiler failure.
     useLaserStore.setState((state) => ({
       statusSequence: state.statusSequence + 1,
       statusReport: { ...idleControllerStatusForFrameTest(), mPos: { x: 99, y: 42, z: 0 } },
@@ -126,8 +126,8 @@ describe('runFrameNow split Frame (ADR-353)', () => {
     expect(useLaserStore.getState().framedRun).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(lastToast()).toMatchObject({
-      variant: 'error',
-      message: FRAME_TRACE_PROGRAM_REFUSED_MESSAGE,
+      variant: 'warning',
+      message: FRAME_COMPLETED_BUT_CHANGED_MESSAGE,
     });
   });
 

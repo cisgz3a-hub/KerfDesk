@@ -23,7 +23,10 @@ import {
   type RecoveryRepository,
 } from '../state/recovery';
 import { cncPassRecoveryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
-import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
+import {
+  cncPassRecoveryDefaultPoint,
+  FINGERPRINT_ONLY_PASS_RECOVERY_REASON,
+} from './cnc-pass-recovery-model';
 import {
   cncPassRecoveryReviewIssue,
   isLaterThanDefault,
@@ -85,10 +88,7 @@ function sealedCncArtifact(capsule: RecoveryCapsule): ExecutionArtifactV1 | null
     return null;
   }
   if (capsule.artifact.kind !== 'exact-execution') {
-    jobAwareAlert(
-      'Cannot start pass recovery:\n\nThis migrated fingerprint-only record has no sealed ' +
-        'prepared job. Use the legacy recovery review instead.',
-    );
+    jobAwareAlert(`Cannot start pass recovery:\n\n${FINGERPRINT_ONLY_PASS_RECOVERY_REASON}`);
     return null;
   }
   return capsule.artifact;

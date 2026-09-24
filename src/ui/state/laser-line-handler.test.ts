@@ -267,6 +267,45 @@ describe('handleLine streamer writes', () => {
 });
 
 describe('handleLine controller reset boundary', () => {
+  it('forgets capacities on reboot and retains the interrupted stream snapshot for recovery', () => {
+    const { refs, set, get } = makeHarness();
+    const sessionEpoch = get().controllerSessionEpoch;
+    const streamer = step(
+      onAck(step(createStreamer('G1 X1\nG1 X2\n', { streamingMode: 'ping-pong' })).state, 'ok')
+        .state,
+    ).state;
+    const snapshot = { streamerEpoch: 7, sessionEpoch, ackedLines: 1, queuedBlocks: 1 };
+    set({
+      streamer,
+      streamerEpoch: 7,
+      streamPlannerSnapshot: snapshot,
+      rxCapacityEvidence: {
+        rxBytesFree: 128,
+        plannerBlocksFree: 14,
+        sessionEpoch,
+        observedAt: 1,
+      },
+      plannerCapacityEvidence: { plannerBlocksFree: 15, sessionEpoch, observedAt: 2 },
+    });
+
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+
+    expect(get().controllerSessionEpoch).toBe(sessionEpoch + 1);
+    expect(get().rxCapacityEvidence).toBeNull();
+    expect(get().plannerCapacityEvidence).toBeNull();
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().streamPlannerSnapshot).toBe(snapshot);
+
+    for (let report = 0; report < 2; report += 1) {
+      handleLine(set, get, refs, async () => undefined, '<Idle|MPos:0,0,0|Bf:8,128|FS:0,0>');
+      expect(get().plannerCapacityEvidence).toMatchObject({
+        plannerBlocksFree: 8,
+        sessionEpoch: sessionEpoch + 1,
+      });
+      expect(get().streamPlannerSnapshot).toBe(snapshot);
+    }
+  });
+
   it('clears the cached active WCS on a reset banner (C6)', () => {
     const { refs, set, get } = makeHarness();
     set({ activeWcs: 'G55' });

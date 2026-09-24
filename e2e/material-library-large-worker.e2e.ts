@@ -70,11 +70,15 @@ test(`imports a ${FIXTURE_MIB} MiB native material library through the productio
   await expect(page.getByText('Loaded material library: Large streamed library')).toBeVisible({
     timeout: 120_000,
   });
-  const heartbeatAtLoad = await page.evaluate(
-    () =>
-      (window as Window & { __materialHeartbeatAtLoad?: number }).__materialHeartbeatAtLoad ?? 0,
-  );
-  expect(heartbeatAtLoad).toBeGreaterThanOrEqual(3);
+  // The heartbeat records this count on its first 25 ms tick after the text renders, so a read
+  // right after the visibility check can come too early. The count never changes once recorded.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __materialHeartbeatAtLoad?: number }).__materialHeartbeatAtLoad,
+      ),
+    )
+    .toBeGreaterThanOrEqual(3);
 
   const fixtureBytes = await page.evaluate(
     () => (window as Window & { __materialFixtureBytes?: number }).__materialFixtureBytes ?? 0,

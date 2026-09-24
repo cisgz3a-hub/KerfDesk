@@ -12,6 +12,7 @@ const BOUNDARY_MODE_HINT =
 
 export function BoundaryModePicker(props: {
   readonly allowEnhance?: boolean;
+  readonly disabled?: boolean;
   readonly value: BoundaryMode;
   readonly onChange: (next: BoundaryMode) => void;
 }): JSX.Element {
@@ -21,6 +22,7 @@ export function BoundaryModePicker(props: {
       <span style={fieldControlStyle}>
         <select
           value={props.value}
+          disabled={props.disabled}
           onChange={(e) => props.onChange(parseBoundaryMode(e.target.value))}
           className="lf-select"
           style={selectStyle}

@@ -31,6 +31,7 @@ import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { contourFeatureAnchors } from './contour-feature-anchors';
+import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
   closeContour,
   contourRefinement,
@@ -134,9 +135,13 @@ export function traceImageToContourColoredPaths(
 export function* traceImageToContourColoredPathsSteps(
   image: RawImageData,
   options: TraceOptions,
+  preparedInput?: ContourTraceInput,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const { prepared, crackField } = prepareTraceForContour(image, options);
+  const { prepared, crackField } =
+    preparedInput !== undefined && contourTraceInputMatches(preparedInput, image, options)
+      ? preparedInput
+      : prepareTraceForContour(image, options);
   if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   // Sub-pixel crack interpolation: vertex POSITIONS come from the

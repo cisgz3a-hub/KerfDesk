@@ -2,6 +2,7 @@ import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
+import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
 import { machineKindOf } from '../../core/scene';
 import * as detectedSettings from './detected-settings-action';
 import {
@@ -256,14 +257,11 @@ function consoleSettingWriteBlockReason(
     machineKindOf(useStore.getState().project.machine),
     command.normalized,
   );
-  if (machineKindIssue !== null) return machineKindIssue;
-  if (command.kind !== 'setting-write' || driver.capabilities.settings === 'grbl-dollar') {
-    return null;
-  }
   // A profile policy, not a claim about the firmware: the Falcon A1 Pro's
   // grblHAL answers `$N=` writes, but its vendor configuration keeps settings
-  // out of host software (audit settings-console-10).
-  return `KerfDesk does not send numeric $ setting writes on the ${driver.label} profile. Configure the controller with its own tools.`;
+  // out of host software apart from the air settings Creality documents for
+  // console use (audit settings-console-10, ADR-370).
+  return machineKindIssue ?? consoleSettingWriteIssue(driver, command);
 }
 
 async function confirmFreshConsoleIdle(

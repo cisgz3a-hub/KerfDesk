@@ -1,6 +1,7 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
 import type { LaserSecondPassWriterVersion } from '../../../core/laser-second-pass/types';
 import type { LaserResumeTransformVersion } from '../../../core/controllers/grbl/resume-program';
+import { isLaserResumeTransformVersion } from '../../../core/controllers/grbl/laser-resume-reentry';
 import { fingerprintsEqual, type GcodeFingerprint } from '../../../core/recovery';
 
 /** One recorded laser resume. `version` names the resume transform that built
@@ -34,7 +35,7 @@ export function isLaserResumeStep(value: unknown): value is LaserResumeStep {
   return (
     Number.isSafeInteger(value['fromLine']) &&
     Number(value['fromLine']) > 0 &&
-    (version === undefined || version === 1 || version === 2)
+    (version === undefined || isLaserResumeTransformVersion(version))
   );
 }
 

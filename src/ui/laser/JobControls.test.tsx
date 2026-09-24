@@ -193,6 +193,7 @@ describe('JobControls Frame action', () => {
   });
 
   it('blocks Frame when a custom origin is active but WCO is unknown', async () => {
+    vi.useFakeTimers();
     installProject();
     const originalFrame = useLaserStore.getState().frame;
     const frame = vi.fn(async () => undefined);
@@ -222,13 +223,12 @@ describe('JobControls Frame action', () => {
         root = createRoot(host);
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
-      const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame job',
-      );
-      if (frameButton === undefined) throw new Error('Frame job button not rendered');
+      const frameButton = buttonByText(host, 'Frame job');
 
       await act(async () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        // Past the bounded status-query wait for the offset (ADR-367).
+        await vi.advanceTimersByTimeAsync(3_500);
       });
 
       expect(frame).not.toHaveBeenCalled();
@@ -242,6 +242,7 @@ describe('JobControls Frame action', () => {
       }
       useLaserStore.setState({ frame: originalFrame });
       host.remove();
+      vi.useRealTimers();
     }
   });
 

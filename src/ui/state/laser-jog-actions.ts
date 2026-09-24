@@ -5,7 +5,8 @@
 // active driver), and the connection-bound safe write. Type-only LaserState /
 // LiveRefs import — no runtime cycle.
 
-import { inferCurrentMachinePosition } from './infer-machine-position';
+import { isAtOrAboveSafeZ } from './cnc-frame-lines';
+import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
 import {
@@ -106,7 +107,7 @@ async function runJogToMachinePosition(
   // before the XY traverse so the bit does not drag across stock or clamps.
   // Laser projects have no Z retract seam and keep the flat move (F105).
   try {
-    const retracted = await retractToCncSafeZ(refs, safeWrite, feed);
+    const retracted = await retractToCncSafeZ(get, refs, safeWrite, feed);
     if (retracted) {
       await settleOwnedMotionPhase(
         get,
@@ -306,8 +307,11 @@ function resetOwnedMotionPhase(set: SetFn, operationId: LaserMotionOperationId):
 // Emit the driver's Z-safe retract for a CNC project before an XY traverse, so a
 // return-to-zero (or any point move) lifts the bit clear of stock/clamps. Mirrors
 // the retract prefix frame() uses; laser projects and drivers without a jog-based
-// Z retract return undefined and skip it (F105).
+// Z retract return undefined and skip it (F105). A bit already at or above safe
+// Z stays there: the absolute jog would lower it, into a probe plate still under
+// it after a probe park (ADR-192 Amendment 1). An unknown height keeps the retract.
 async function retractToCncSafeZ(
+  get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
   feed: number,
@@ -315,6 +319,13 @@ async function retractToCncSafeZ(
   const machine = useStore.getState().project.machine;
   const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
   if (safeZMm === undefined) return false;
+  const state = get();
+  const workZMm = currentWorkZMm(
+    state.statusReport,
+    state.wcoCache,
+    state.controllerSettings?.reportInches === true,
+  );
+  if (workZMm !== null && isAtOrAboveSafeZ(workZMm, safeZMm)) return false;
   const retractLine = refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
   if (retractLine === undefined) return false;
   await safeWrite(retractLine, 'jog');

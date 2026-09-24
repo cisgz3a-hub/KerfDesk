@@ -9,10 +9,17 @@
 // Robot.cpp's seek/feed split is modelled too: F on a G0 line sets the seek
 // rate every later bare G0 inherits, and M120/M121 push/pop that state.
 // https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/robot/Robot.cpp
+// Beam power and burns come from smoothie-laser-power-model.ts.
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { hasGWord, parseMotionWords, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
 import { smoothieReferenceEffect, smoothieShellReply } from './smoothie-sim-shell';
+import {
+  executeSmoothieLine,
+  haltSmoothie,
+  powerUpSmoothie,
+  type SmoothieBurn,
+} from './smoothie-laser-power-model';
 import type { PlatformAdapter } from '../../platform/types';
 
 export type SmoothieSimRejectRule = {
@@ -27,6 +34,10 @@ export type CreateSmoothieSimulatorOptions = {
   readonly rejectLines?: ReadonlyArray<SmoothieSimRejectRule>;
   readonly emitBannerOnOpen?: boolean;
   readonly initialManualFire?: boolean;
+  /** laser_module_maximum_s_value (1 by default). */
+  readonly maximumS?: number;
+  /** Lines the board ran before this connection, which keep the beam state they left. */
+  readonly initialPowerLines?: ReadonlyArray<string>;
   /** Kernel grbl_mode. False (the default) models the stock non-CNC build. */
   readonly grblMode?: boolean;
   /** Robot default_seek_rate in mm/min (the config-sample value by default). */
@@ -43,6 +54,10 @@ export type SmoothieSimState = {
   readonly laserScale: number;
   readonly proportionalPower: boolean;
   readonly burnPowers: ReadonlyArray<number>;
+  /** Every move made with the beam on, in the order they were planned. */
+  readonly burns: ReadonlyArray<SmoothieBurn>;
+  /** Lines the power model does not cover (see smoothie-laser-power-model.ts). */
+  readonly modelErrors: ReadonlyArray<string>;
   /** Endstop homing cycles actually run. */
   readonly homingCycles: number;
   /** Endstops::handle_park rapids to the saved park point. */
@@ -86,11 +101,14 @@ export function createSmoothieSimulator(
   let isHomed = false;
   let pendingMotions = 0;
   let pendingSettles = 0;
-  let manualFire = options.initialManualFire ?? false;
-  let laserScale = 1;
-  let proportionalPower = true;
-  let motionPower = 0;
-  const burnPowers: number[] = [];
+  const power = powerUpSmoothie(
+    options.maximumS === undefined ? {} : { maximumS: options.maximumS },
+  );
+  for (const line of options.initialPowerLines ?? []) executeSmoothieLine(power, line);
+  // An operator's `fire 10` test left the beam in manual mode.
+  if (options.initialManualFire === true) executeSmoothieLine(power, 'fire 10');
+  power.burns.splice(0);
+  const modelErrors: string[] = [];
   let homingCycles = 0;
   let parkMoves = 0;
   let parkPosition = { x: 0, y: 0 }; // Endstops saved_position{0}
@@ -137,7 +155,7 @@ export function createSmoothieSimulator(
       return;
     }
     if (byte === '\x18') {
-      manualFire = false; // Laser::on_halt clears manual fire and output.
+      haltSmoothie(power); // Laser::on_halt clears manual fire and output.
       // Ctrl-X abort: flush motion; Smoothie halts if it was moving.
       if (machine === 'Run' || machine === 'Hold' || pendingMotions > 0) isHalted = true;
       pendingMotions = 0;
@@ -168,6 +186,8 @@ export function createSmoothieSimulator(
     pendingMotions = 0;
     setTimeout(() => {
       pos = SIM_ZERO_VEC3;
+      power.x = 0;
+      power.y = 0;
       isHomed = true;
       homingCycles += 1;
       machine = 'Idle';
@@ -181,6 +201,8 @@ export function createSmoothieSimulator(
     seekMoveRates.push(seekRate);
     setTimeout(() => {
       pos = { ...pos, x: parkPosition.x, y: parkPosition.y };
+      power.x = parkPosition.x;
+      power.y = parkPosition.y;
       parkMoves += 1;
       machine = 'Idle';
       port.emitLine('ok');
@@ -198,14 +220,12 @@ export function createSmoothieSimulator(
     return true;
   };
 
-  const handleLaserPower = (line: string, words: ReturnType<typeof parseMotionWords>): void => {
-    if (/^M221\b/.test(line)) {
-      if (words.spindle !== null) laserScale = words.spindle / 100;
-      const proportional = /\bP(\d+)/.exec(line)?.[1];
-      if (proportional !== undefined) proportionalPower = Number(proportional) === 0;
+  const handleLaserPower = (line: string): void => {
+    try {
+      executeSmoothieLine(power, line);
+    } catch (error) {
+      modelErrors.push(error instanceof Error ? `${line}: ${error.message}` : line);
     }
-    if (/^G[01]\b/.test(line) && words.spindle !== null) motionPower = words.spindle;
-    if (/^G1\b/.test(line) && motionPower > 0) burnPowers.push(motionPower * laserScale);
   };
 
   // Robot::process_move: `if (motion_mode == SEEK) seek_rate = F else feed_rate = F`.
@@ -234,7 +254,7 @@ export function createSmoothieSimulator(
 
   const handleMotion = (line: string): void => {
     const words = parseMotionWords(line);
-    handleLaserPower(line, words);
+    handleLaserPower(line);
     if (words.setsAbsolute !== null) isAbsolute = words.setsAbsolute;
     applyRates(line, words);
     if (words.hasMotion) {
@@ -285,7 +305,7 @@ export function createSmoothieSimulator(
       return true;
     }
     if (line === 'fire off' || line === 'fire 0') {
-      manualFire = false;
+      handleLaserPower(line);
       emit('turning laser off and returning to auto mode'); // native completion, no ok
       return true;
     }
@@ -342,10 +362,12 @@ export function createSmoothieSimulator(
       isHalted,
       isHomed,
       pendingMotions,
-      manualFire,
-      laserScale,
-      proportionalPower,
-      burnPowers: [...burnPowers],
+      manualFire: power.manualFire > 0,
+      laserScale: power.scale,
+      proportionalPower: power.proportional,
+      burnPowers: power.burns.filter((burn) => burn.mode !== 'manual').map((burn) => burn.power),
+      burns: [...power.burns],
+      modelErrors: [...modelErrors],
       homingCycles,
       parkMoves,
       seekRate,

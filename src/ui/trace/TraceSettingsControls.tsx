@@ -10,6 +10,7 @@ import {
   type LightBurnTraceSettingOverrides,
 } from './trace-options';
 import { TraceDetectionControls } from './TraceDetectionControls';
+import { TraceCheckboxRow } from './TraceCheckboxRow';
 import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
 
 type TraceSettingsControlsProps = {
@@ -115,7 +116,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
         <summary tabIndex={0} title="Trace an image's transparency instead of its brightness.">
           Transparency
         </summary>
-        <CheckboxRow
+        <TraceCheckboxRow
           label="Trace alpha mask"
           checked={alphaMask}
           disabled={alphaMaskDisabled}
@@ -186,6 +187,11 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
           onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
         />
       ) : null}
+      <TraceCheckboxRow
+        label="Fill tiny holes"
+        checked={props.overrides.fillPinholeCracks ?? props.preset.fillPinholeCracks ?? false}
+        onChange={(fillPinholeCracks) => set({ fillPinholeCracks })}
+      />
     </>
   );
 }
@@ -334,26 +340,6 @@ function NumberRow(props: {
   );
 }
 
-function CheckboxRow(props: {
-  readonly label: string;
-  readonly checked: boolean;
-  readonly disabled?: boolean;
-  readonly onChange: (next: boolean) => void;
-}): JSX.Element {
-  return (
-    <label style={checkboxRowStyle}>
-      <input
-        type="checkbox"
-        checked={props.checked}
-        disabled={props.disabled === true}
-        title={traceCheckboxTitle(props.label)}
-        onChange={(e) => props.onChange(e.target.checked)}
-      />
-      <span>{props.label}</span>
-    </label>
-  );
-}
-
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
@@ -384,23 +370,6 @@ function traceNumberTitle(label: string): string {
   }
 }
 
-function traceCheckboxTitle(label: string): string {
-  switch (label) {
-    case 'Trace alpha mask':
-      return 'Only changes images with transparent pixels; opaque images trace the same.';
-    default:
-      return `Toggle ${label.toLowerCase()} for tracing.`;
-  }
-}
-
-const checkboxRowStyle: React.CSSProperties = {
-  gridColumn: '1 / -1',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-};
 const edgeTraceNoteStyle: React.CSSProperties = {
   gridColumn: '1 / -1',
   margin: 0,

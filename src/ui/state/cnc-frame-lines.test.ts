@@ -47,9 +47,33 @@ describe('buildCncFrameMotion', () => {
     expect(lines).toHaveLength(PERIMETER.length + 2);
   });
 
-  it('restores to a parked height above the stock (post-probe park)', () => {
-    const lines = motion({ preFrameWorkZMm: 20, hasCurrentWorkZEvidence: true });
-    expect(lines[lines.length - 1]).toBe('$J=G90 G21 Z20.000 F1000\n');
+  // ADR-192 Amendment 1: after a probe the bit parks 5 mm above the plate
+  // (work Z 20 on a 15 mm plate). An absolute retract to safe Z from there
+  // would drive it down into the plate still under it.
+  it('traces a bit parked above safe Z at its own height instead of lowering it', () => {
+    expect(motion({ preFrameWorkZMm: 20, hasCurrentWorkZEvidence: true })).toEqual(PERIMETER);
+  });
+
+  it('keeps the XY return when a bit above safe Z traces at its own height', () => {
+    const returnLine = '$J=G90 G21 X5.000 Y5.000 F1000\n';
+    expect(
+      buildCncFrameMotion({
+        perimeter: PERIMETER,
+        returnLine,
+        safeZMm: SAFE_Z,
+        preFrameWorkZMm: 20,
+        hasCurrentWorkZEvidence: true,
+        buildRetract: buildGrblFrameRetract,
+        zFeed: FEED,
+      }),
+    ).toEqual({ kind: 'ready', lines: [...PERIMETER, returnLine] });
+  });
+
+  it('still blocks a bit above safe Z without current work-Z evidence', () => {
+    expect(plan({ preFrameWorkZMm: 20, hasCurrentWorkZEvidence: false })).toEqual({
+      kind: 'blocked',
+      message: CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
+    });
   });
 
   it('uses the separate Z feed without changing the XY perimeter feed', () => {
@@ -93,9 +117,7 @@ describe('buildCncFrameMotion', () => {
     });
   });
 
-  it('omits a redundant restore when the bit is already at safe Z', () => {
-    const lines = motion({ preFrameWorkZMm: SAFE_Z, hasCurrentWorkZEvidence: true });
-    expect(lines).toHaveLength(PERIMETER.length + 1);
-    expect(lines[0]).toBe('$J=G90 G21 Z3.810 F1000\n');
+  it('adds neither a retract nor a restore when the bit is already at safe Z', () => {
+    expect(motion({ preFrameWorkZMm: SAFE_Z, hasCurrentWorkZEvidence: true })).toEqual(PERIMETER);
   });
 });

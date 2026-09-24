@@ -1,11 +1,13 @@
 // Wiring for RecoveryStartHandoff, lifted out of the repository constructor
 // when ADR-337 gave the handoff a second collaborator (the intent stand-in
 // writer) and the class reached its line budget. Behaviour-free: every field
-// forwards to something the repository already owns.
+// forwards to something the repository already owns, or commits one slot
+// mutation through the backend it already holds.
 
 import type { JobCheckpoint } from '../../../core/recovery';
 import type { RecoveryArtifactV1, RunId } from './execution-artifact';
 import { putStartIntentStandIn } from './recovery-legacy-insert';
+import { commitRecoverySlotMutation } from './recovery-mutation-commit';
 import { RecoveryStartHandoff } from './recovery-start-handoff';
 import type { RecoveryStorageBackend } from './recovery-backend';
 import type {
@@ -41,6 +43,16 @@ export function createStartHandoff(deps: StartHandoffHostDeps): RecoveryStartHan
     getSnapshot: deps.getSnapshot,
     exactArtifactRecord: (runId: RunId) => deps.artifactStore.exact(runId),
     mutate: deps.mutate,
+    // A renewal is a liveness write, like progress: committed alone, with no
+    // local reload and no announcement making every other window reload.
+    renewLease: async (mutate) => {
+      const committed = await commitRecoverySlotMutation({
+        backend: deps.backend,
+        minimumGeneration: deps.currentGeneration(),
+        mutate,
+      });
+      return committed.artifactExists && committed.value;
+    },
     refresh: deps.refresh,
     materializeIntentArtifact: (
       runId: RunId,

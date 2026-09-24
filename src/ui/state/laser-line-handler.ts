@@ -363,8 +363,9 @@ function handleWelcomeLine(
     pendingTransportWrites: 0,
     accessoryCache: null,
     mpgActive: null,
-    // The rebooted firmware may expose a different receive ring; re-prove it.
+    // Re-prove the rebooted firmware's RX and planner capacities.
     rxCapacityEvidence: null,
+    plannerCapacityEvidence: null,
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
     ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),

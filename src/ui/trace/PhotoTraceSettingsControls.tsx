@@ -37,6 +37,15 @@ export function PhotoTraceSettingsControls(props: PhotoTraceSettingsControlsProp
           hint="Raise this to separate light and dark tones; lower it for softer shading."
           onChange={(photoContrast) => set({ photoContrast })}
         />
+        <PhotoNumberRow
+          label="Midtones"
+          min={0.1}
+          max={5}
+          step={0.1}
+          value={props.overrides.photoGamma ?? props.preset.gamma ?? 1}
+          hint="1 keeps the original midtones. Raise to lighten them or lower to darken them; black and white stay fixed."
+          onChange={(photoGamma) => set({ photoGamma })}
+        />
       </div>
       <p className="lf-trace-hint">
         Light and shadow are made from fine filled lines. More detail creates more paths.
@@ -59,6 +68,8 @@ export function PhotoTraceSettingsControls(props: PhotoTraceSettingsControlsProp
 function PhotoNumberRow(props: {
   readonly label: string;
   readonly min: number;
+  readonly max?: number;
+  readonly step?: number;
   readonly value: number;
   readonly hint: string;
   readonly onChange: (next: number) => void;
@@ -67,7 +78,11 @@ function PhotoNumberRow(props: {
   const hintId = useId();
   const change = (value: string): void => {
     const numeric = Number(value);
-    props.onChange(Number.isFinite(numeric) ? Math.max(props.min, Math.min(100, numeric)) : 0);
+    props.onChange(
+      Number.isFinite(numeric)
+        ? Math.max(props.min, Math.min(props.max ?? 100, numeric))
+        : props.min,
+    );
   };
   return (
     <div className="lf-trace-number">
@@ -79,8 +94,8 @@ function PhotoNumberRow(props: {
             className="lf-input"
             type="number"
             min={props.min}
-            max={100}
-            step={1}
+            max={props.max ?? 100}
+            step={props.step ?? 1}
             value={props.value}
             onChange={(event) => change(event.target.value)}
             aria-label={`Trace ${props.label}`}
@@ -92,8 +107,8 @@ function PhotoNumberRow(props: {
       <input
         type="range"
         min={props.min}
-        max={100}
-        step={1}
+        max={props.max ?? 100}
+        step={props.step ?? 1}
         value={props.value}
         onChange={(event) => change(event.target.value)}
         aria-label={`Trace ${props.label} slider`}

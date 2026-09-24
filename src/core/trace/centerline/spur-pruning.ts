@@ -12,22 +12,28 @@ import type { Vec2 } from '../../scene';
 import type { StrokeGraph, StrokeNode } from './stroke-graph';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { PruningWorklist, type MutablePruneChain as MutableChain } from './pruning-worklist';
+import { hasShortBranchSupport } from './short-branch-support';
 
 export type SpurPruneOptions = {
   /** Multiplier on the junction's local stroke radius. */
   readonly radiusFactor: number;
-  /** Absolute floor: spurs shorter than this always go. */
+  /** Working-grid artifact floor, unless the tip has drawn-branch support. */
   readonly minSpurPx: number;
   /** A leaf only counts as an artifact when its TIP pinches out — its local
    *  radius is at most this. Real branches keep their own stroke radius. */
   readonly maxSpurTipRadiusPx: number;
+  /** Working pixels per source pixel, for confirming a small drawn branch. */
+  readonly pixelScale?: number;
 };
 
 // Discriminating artifact spurs from real branches by LENGTH alone is
 // impossible: the diagonal corner spur of a 16-px-radius band is 16·√2 ≈ 23px
 // — the same length as a genuine short branch. The reliable signal is the
 // TIP: corner/jaggy wedges pinch to ~1px of ink at their end, while a real
-// branch ends in its own full-radius cap. Prune only pinched tips.
+// branch ends in its own full-radius cap. Prune only pinched tips. These
+// cutoffs describe skeleton artifacts on the working grid: a corner still
+// ends in a one-pixel wedge after enlargement. Source-scale branch support
+// below handles genuine caps too narrow for that absolute discriminator.
 export const DEFAULT_SPUR_OPTIONS: SpurPruneOptions = {
   radiusFactor: 1.6,
   minSpurPx: 2,
@@ -154,7 +160,7 @@ function* pruneOneSpurSteps(
     if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
     const group = component.get(chain);
     if (group === undefined || group.size <= 1) continue; // last chain guard
-    if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
+    if (!isArtifactSpur(chain, state, distSq, width, options)) continue;
     chain.alive = false;
     worklist.detach(chain);
     adjustDegree(degree, chain, -1);
@@ -225,23 +231,36 @@ function adjustDegree(degree: Map<number, number>, chain: MutableChain, change: 
 // from a real branch — and a real branch ends in its own full-radius cap.
 function isArtifactSpur(
   chain: MutableChain,
-  degree: Map<number, number>,
+  state: PruneState,
   distSq: Float64Array,
   width: number,
   options: SpurPruneOptions,
 ): boolean {
+  const { degree } = state;
   const junctionEnd = leafJunctionEnd(chain, degree);
   if (junctionEnd === null) return false;
   const length = arcLength(chain.points);
-  if (length < options.minSpurPx) return true;
-  const tipRadius = radiusNearPoint(leafTipPos(chain, degree), distSq, width);
-  if (tipRadius > options.maxSpurTipRadiusPx) return false; // real branch cap
+  const tip = leafTipPos(chain, degree);
+  const tipRadius = radiusNearPoint(tip, distSq, width);
+  if (length >= options.minSpurPx && tipRadius > options.maxSpurTipRadiusPx) return false;
   const junctionRadius = radiusNearPoint(junctionEnd.pos, distSq, width);
   const budget = Math.min(
     MAX_SPUR_BUDGET_PX,
     Math.max(options.minSpurPx, options.radiusFactor * junctionRadius),
   );
-  return length - junctionRadius < budget;
+  if (length >= options.minSpurPx && length - junctionRadius >= budget) return false;
+  const junction = (degree.get(chain.a) ?? 0) === 1 ? chain.b : chain.a;
+  // Only a T junction can use this narrow exception. Keep candidate lookup
+  // bounded instead of sorting a large hub's incident arms for every spur.
+  if (degree.get(junction) !== 3) return true;
+  return !hasShortBranchSupport(
+    chain,
+    state.worklist.at(junction),
+    junction,
+    distSq,
+    width,
+    options.pixelScale ?? 1,
+  );
 }
 
 function isPrunableLeaf(

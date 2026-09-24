@@ -67,10 +67,15 @@ test(`opens a ${FIXTURE_MIB} MiB native project through the production worker wh
   await expect(page).toHaveTitle(/large-streamed\.lf2/, { timeout: 120_000 });
   await expect(page.getByText('Objects: 1', { exact: true })).toBeVisible();
 
-  const heartbeatAtOpen = await page.evaluate(
-    () => (window as Window & { __projectHeartbeatAtOpen?: number }).__projectHeartbeatAtOpen ?? 0,
-  );
-  expect(heartbeatAtOpen).toBeGreaterThanOrEqual(3);
+  // The heartbeat records this count on its first 25 ms tick after the title changes, so a read
+  // right after the checks above can come too early. The count never changes once recorded.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __projectHeartbeatAtOpen?: number }).__projectHeartbeatAtOpen,
+      ),
+    )
+    .toBeGreaterThanOrEqual(3);
 
   const fixtureBytes = await page.evaluate(
     () => (window as Window & { __projectFixtureBytes?: number }).__projectFixtureBytes ?? 0,

@@ -92,9 +92,7 @@ describe('TracePreview original image space', () => {
     const trace = host.querySelector('#rounded-grid')?.closest('svg');
     expect(trace?.getAttribute('viewBox')).toBe('0 0 2048 683');
     expect(trace?.getAttribute('preserveAspectRatio')).toBe('none');
-    expect(
-      host.querySelector('[aria-label="Trace points"]')?.getAttribute('preserveAspectRatio'),
-    ).toBe('none');
+    expect(host.querySelector('[aria-label="Trace points"]')).toBeInstanceOf(HTMLCanvasElement);
     expect(host.querySelector('[aria-label="Trace boundary"]')?.parentElement).toBe(rectangle);
 
     // Select visible source coordinates after panning the enlarged original rectangle.

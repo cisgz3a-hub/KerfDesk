@@ -38,6 +38,7 @@ import {
 } from './start-preparation-owner';
 import { publishFramePreparationProgress } from '../state/frame-preparation-store';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
+import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import { machineSnapshot } from './start-machine-snapshot';
 
 /** Optional observers of one Start preparation. */
@@ -46,6 +47,7 @@ export type StartPreparationHooks = {
    * compiled, before the exact program exists (ADR-353). A main-thread
    * preparation finishes in one turn, so it never reports them early. */
   readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
+  readonly frameMotionOwner?: FramePreparationMotionOwner;
 };
 
 export type PreparedRecoverySource = {
@@ -136,10 +138,18 @@ async function prepareCurrentStartInBackground(args: {
   readonly signal?: AbortSignal;
   readonly hooks: StartPreparationHooks;
 }): Promise<StartJobPreparation> {
-  const owner = ownCurrentStartPreparation(args.app, args.laser, args.signal, {
-    jobPlacement: args.jobPlacement,
-    ...(args.resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin: args.resolvedJobOrigin }),
-  });
+  const owner = ownCurrentStartPreparation(
+    args.app,
+    args.laser,
+    args.signal,
+    {
+      jobPlacement: args.jobPlacement,
+      ...(args.resolvedJobOrigin === undefined
+        ? {}
+        : { resolvedJobOrigin: args.resolvedJobOrigin }),
+    },
+    args.hooks.frameMotionOwner,
+  );
   try {
     const background = prepareStartOutputOffThread(
       {

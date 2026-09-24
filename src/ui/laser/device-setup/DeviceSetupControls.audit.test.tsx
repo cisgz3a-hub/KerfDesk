@@ -204,6 +204,25 @@ describe('Setup control audit', () => {
     expect(useStore.getState().project.device.workerHostedStreaming).toBeUndefined();
   });
 
+  it('Background streaming hint asks only a browser operator to keep KerfDesk visible', () => {
+    const state = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null);
+    const hint = (id: 'web' | 'electron'): string => {
+      act(() =>
+        root.render(
+          <PlatformProvider adapter={{ ...platform, id }}>
+            <DeviceSetupIdentifyStep state={state} dispatch={vi.fn()} />
+          </PlatformProvider>,
+        ),
+      );
+      return host.querySelector<HTMLInputElement>(
+        'input[aria-label="Read the serial port and refill the job stream in a worker"]',
+      )!.title;
+    };
+    expect(hint('web')).toContain('keep KerfDesk visible');
+    expect(hint('electron')).not.toContain('visible');
+    expect(hint('electron')).toContain('Reconnect after changing this setting.');
+  });
+
   it('each Options disclosure opens and closes without editing the draft', () => {
     const dispatch = vi.fn();
     render(

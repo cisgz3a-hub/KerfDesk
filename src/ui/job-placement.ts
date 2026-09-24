@@ -242,6 +242,12 @@ function resolveCurrentPosition(
   };
 }
 
+// Frame asks the controller for the offset before refusing (frame-status-wait),
+// so this remains only when the offset did not arrive.
+export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
+  'The work origin is set, but the controller has not reported where it is yet. Wait a moment ' +
+  'and try again, or Reset origin and set it again where the job should start.';
+
 function resolveUserOrigin(
   settings: JobPlacementSettings,
   machine: MachinePlacementSnapshot,
@@ -254,12 +260,7 @@ function resolveUserOrigin(
     };
   }
   if (wco === null) {
-    return {
-      ok: false,
-      messages: [
-        'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.',
-      ],
-    };
+    return { ok: false, messages: [CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE] };
   }
   return {
     ok: true,

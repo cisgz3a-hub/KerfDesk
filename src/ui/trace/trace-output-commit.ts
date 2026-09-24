@@ -1,6 +1,8 @@
 import type { Project, RasterImage, TracedImage } from '../../core/scene';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
 import { projectWithCameraTraceSource } from '../state/camera-trace-import';
+import { useStore } from '../state/store';
+import { checkTraceSignal } from './trace-cancellation';
 import type { TraceOutput } from './dialog-parts';
 import type { TraceCommitClaim } from './trace-commit-ownership';
 import { traceNoticeMessage, type TraceNotice } from './trace-notices';
@@ -20,6 +22,7 @@ export type TraceOutputCommitArgs = {
 };
 
 export type TraceOutputCommitContext = {
+  readonly signal?: AbortSignal;
   readonly traceExistingImage: (
     sourceId: string,
     traced: TracedImage,
@@ -82,11 +85,12 @@ async function commitRasterTraceOutput(
     }
     return false;
   }
-  const raster = await buildRasterTraceOutput(
-    inputs.source,
+  const raster = await buildOwnedRaster(
+    args,
+    ctx,
     traced,
-    inputs.operations.map(({ operation }) => operation),
-    args.photoShading === true,
+    inputs,
+    traceOptions.cameraSource !== undefined,
   );
   const currentOwner = ctx.claimOwner();
   if (currentOwner === null) return false;
@@ -104,6 +108,43 @@ async function commitRasterTraceOutput(
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
   ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true), 'success');
   return true;
+}
+
+async function buildOwnedRaster(
+  args: TraceOutputCommitArgs,
+  ctx: TraceOutputCommitContext,
+  traced: TracedImage,
+  inputs: NonNullable<ReturnType<typeof rasterTraceInputs>>,
+  camera: boolean,
+): Promise<RasterImage> {
+  checkTraceSignal(ctx.signal);
+  // Keep the final publication recheck; this subscription also stops obsolete CPU work.
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  const validate = (): void => {
+    const owner = ctx.claimOwner();
+    if (
+      owner === null ||
+      owner.project.machine?.kind === 'cnc' ||
+      (!camera && !sameRasterTraceInputs(owner.project, inputs))
+    )
+      abort();
+  };
+  const unsubscribe = useStore.subscribe(validate);
+  ctx.signal?.addEventListener('abort', abort, { once: true });
+  try {
+    validate();
+    return await buildRasterTraceOutput(
+      inputs.source,
+      traced,
+      inputs.operations.map(({ operation }) => operation),
+      args.photoShading === true,
+      controller.signal,
+    );
+  } finally {
+    unsubscribe();
+    ctx.signal?.removeEventListener('abort', abort);
+  }
 }
 
 function traceSuccessMessage(

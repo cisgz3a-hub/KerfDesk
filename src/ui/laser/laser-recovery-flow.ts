@@ -24,7 +24,7 @@ import {
 } from './start-job-source';
 import { resumeConfirmation } from './resume-confirmation';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
-import { buildLaserResumeProgram, laserResumeDialectRefusal } from './laser-resume-program';
+import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
@@ -80,11 +80,12 @@ async function planLaserRecovery(
   const fromLine =
     requestedFromLine ??
     automaticRestart(source.gcode, capsule.ackedLines, capsule.interruption).line;
-  const dialectRefusal = laserResumeDialectRefusal(source.project.device.controllerKind);
-  const resume =
-    dialectRefusal === null
-      ? buildLaserResumeProgram(source.gcode, fromLine, LASER_RESUME_TRANSFORM_VERSION)
-      : ({ kind: 'error', reason: dialectRefusal } as const);
+  const resume = buildLaserResumeProgram(
+    source.gcode,
+    fromLine,
+    source.project.device,
+    LASER_RESUME_TRANSFORM_VERSION,
+  );
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
@@ -314,7 +315,7 @@ async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecover
   if (source === null) return null;
   if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
     jobAwareAlert(
-      'Cannot start legacy laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
+      'Cannot start laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
     );
     return null;
   }

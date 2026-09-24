@@ -178,6 +178,28 @@ describe('jogToMachinePosition', () => {
     ]);
   });
 
+  it('keeps a bit parked above the CNC safe height there instead of lowering it', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useStore.getState().setMachineKind('cnc');
+    const state = useLaserStore.getState();
+    useLaserStore.setState({
+      workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', state.workZReferenceEpoch),
+    });
+    // Parked 5 mm above a 15 mm probe plate (ADR-192 Amendment 1).
+    connection.emitLine('<Idle|MPos:50.000,30.000,20.000|FS:0,0|WCO:0.000,0.000,0.000>');
+    writes.length = 0;
+
+    await useLaserStore.getState().jogToMachinePosition(120, 80, 1000);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G91 G21 X70.000 Y50.000 F1000\n',
+    ]);
+  });
+
   it('writes nothing when a CNC point move lacks current Work-Z evidence', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
