@@ -21,7 +21,7 @@ const FAMILY_LABELS = new Map<string, string>([
   ['o-flute-ball-nose', 'O-flute ball-nose bits'],
   ['core-box', 'Core-box / round-nose bits'],
   ['v-groove', 'V-groove bits (point-cone model)'],
-  ['engraving', 'Legacy engraving tools'],
+  ['engraving', 'Engraving bits (angle + tip flat)'],
 ]);
 
 const FAMILY_ORDER = [...FAMILY_LABELS.keys()];
