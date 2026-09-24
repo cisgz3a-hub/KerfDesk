@@ -37,6 +37,9 @@ const BASE_RECIPE: MaterialRecipe = {
 };
 
 const REVISION = 'neotronics-lt4lds-v2-20w-research-2026-06-16';
+// Presets whose values changed in the 2026-09-24 settings audit carry their own
+// revision, so a layer linked to the earlier values reads as stale in Job Review.
+const AUDIT_REVISION = 'neotronics-lt4lds-v2-20w-audit-2026-09-24';
 
 export const NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS: ReadonlyArray<StarterMaterialPreset> = [
   preset({
@@ -67,10 +70,17 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS: ReadonlyArray<StarterMateria
     id: 'neotronics-lt4lds-mdf-3mm-cut',
     materialName: 'MDF',
     thicknessMm: 3,
+    revision: AUDIT_REVISION,
+    // xTool's 20 W MDF guide (xtool.com/blogs/xtool-academy/laser-cut-mdf) cuts
+    // 3 mm MDF at 100%, 480 mm/min in 2 passes. MDF's resin makes it slower than
+    // plywood: Sculpfun's S30 table cuts MDF at 300 mm/min against 780 for plywood.
     description:
-      'Starting point for 3 mm MDF cutting. MDF varies heavily; expect smoke and verify with extraction.',
-    warnings: ['MDF is smoky. Confirm air assist and extraction before cutting.'],
-    recipe: { ...BASE_RECIPE, power: 100, speed: 500, airAssist: true },
+      'Starting point for 3 mm MDF cutting, from published 20 W settings. MDF varies heavily; expect smoke and verify with extraction.',
+    warnings: [
+      'MDF is smoky. Confirm air assist and extraction before cutting.',
+      'Cut a test piece first: MDF density and glue vary between boards.',
+    ],
+    recipe: { ...BASE_RECIPE, power: 100, speed: 480, passes: 2, airAssist: true },
   }),
   preset({
     id: 'neotronics-lt4lds-black-acrylic-3mm-cut',
@@ -88,10 +98,18 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS: ReadonlyArray<StarterMateria
     id: 'neotronics-lt4lds-paper-card-felt-thin-cut',
     materialName: 'Paper / cardboard / thin felt',
     title: 'Thin stock cut',
+    revision: AUDIT_REVISION,
+    // Dynamic power (M4) scales the beam with the actual speed. In constant power
+    // (M3) a 90° corner slows to about 208 mm/min while the beam stays at 90%,
+    // about 19 times the energy per mm, which chars or lights thin stock. The
+    // values follow Creality's Falcon material table, which runs in M4.
     description:
-      'Starting point for thin stock only. Use a watched test grid first because these materials can ignite.',
-    warnings: ['Thin stock can ignite. Stay present.'],
-    recipe: { ...BASE_RECIPE, power: 90, speed: 4000, airAssist: true },
+      'Starting point for paper, card and thin felt only, not corrugated cardboard. Use a watched test grid first because these materials can ignite.',
+    warnings: [
+      'Thin stock can ignite. Stay present.',
+      'Not for corrugated cardboard: test it separately.',
+    ],
+    recipe: { ...BASE_RECIPE, powerMode: 'dynamic', power: 90, speed: 4000, airAssist: true },
   }),
   preset({
     id: 'neotronics-lt4lds-clear-acrylic-unsupported',
@@ -115,6 +133,8 @@ export function isUnsupportedPreset(preset: StarterMaterialPreset): boolean {
   return preset.unsupported === true;
 }
 
-function preset(input: Omit<StarterMaterialPreset, 'revision'>): StarterMaterialPreset {
+function preset(
+  input: Omit<StarterMaterialPreset, 'revision'> & { readonly revision?: string },
+): StarterMaterialPreset {
   return { revision: REVISION, ...input };
 }
