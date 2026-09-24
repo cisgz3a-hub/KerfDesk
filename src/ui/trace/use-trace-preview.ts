@@ -1,32 +1,5 @@
-// useTracePreview — hook that produces a live SVG preview of how a
-// raster image will trace under the current options. Used by
-// ImportImageDialog so the user can flip between presets and see the
-// result instead of guessing-then-committing.
-//
-// Preview and commit now share the SAME trace function
-// (traceImageWithFallback from use-trace-worker-client), so what the
-// user sees in the preview is what they get on Trace — including the
-// H3 retry-with-relaxed-preset semantics. The only difference is
-// rendering: preview stringifies the ColoredPath[] to SVG for the
-// browser to display; commit feeds the same paths to importSvgObject.
-//
-// Phases (all guarded by the latest-call-wins token so a slow trace
-// followed by a fast trace can't show stale output):
-//   1. file changes → decode at the preview-size cap once
-//   2. options change → re-run traceImageWithFallback on the decoded
-//      pixels, debounced 300ms so dragging a slider doesn't thrash
-//   3. ColoredPath[] → SVG string via coloredPathsToSvg before the
-//      renderer sees it
-
-import {
-  type Dispatch,
-  type SetStateAction,
-  type MutableRefObject,
-  type Ref,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+// Preview and Submit share one preparation, including decode and debounce.
+import { type Ref, useEffect, useRef, useState } from 'react';
 import type { ColoredPath } from '../../core/scene';
 import {
   type RawImageData,
@@ -34,9 +7,7 @@ import {
   type TraceOptions,
   coloredPathsToSvg,
 } from '../../core/trace';
-import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
 import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
-import { rawImageHasTransparency } from './raw-image-transparency';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
@@ -45,6 +16,12 @@ import {
   useTracePreviewSettlement,
   type TracePreviewCommitControl,
 } from './use-trace-preview-settlement';
+import type { TracePreparation } from './trace-preparation';
+import {
+  beginTracePreview,
+  decodeTraceSource,
+  type DecodedSource,
+} from './trace-preview-preparation';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -62,20 +39,6 @@ export type TracePreviewState =
     }
   | { readonly kind: 'error'; readonly message: string };
 
-// Debounce interval for option changes. 300ms is long enough that
-// rapidly cycling presets doesn't queue 5 traces, and short enough
-// that a normal click feels instant.
-const DEBOUNCE_MS = 300;
-
-// A decoded preview raster paired with its alpha-scan verdict. The verdict is
-// computed once per decode: transparency is invariant per image, and
-// re-scanning every pixel (~4M at the preview cap) synchronously on each
-// options change — ahead of the trace debounce — stalled slider dragging.
-type DecodedPreviewImage = {
-  readonly img: RawImageData;
-  readonly hasTransparency: boolean;
-};
-
 export function useTracePreview(
   file: File | null,
   options: TraceOptions,
@@ -85,207 +48,65 @@ export function useTracePreview(
   commitControl?: Ref<TracePreviewCommitControl>,
 ): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
-  const decodedRef = useRef<DecodedPreviewImage | null>(null);
-  const cancellationRef = useRef<AbortController | null>(null);
-  // Monotonic token. Each effect run captures its token; on completion
-  // it bails if the latest token has advanced — stops slow traces
-  // from clobbering a newer "ready" result.
+  const decodedRef = useRef<DecodedSource | null>(null);
+  const preparationRef = useRef<TracePreparation>();
   const tokenRef = useRef(0);
-  // Latest-options ref. The file-effect below depends only on `file`
-  // (re-decoding on every options change would be wasteful), but the
-  // first runTrace after a decode used to capture `options` from
-  // closure — i.e. whatever value was current when the file-effect
-  // FIRST fired. A user who picks a file before changing the preset
-  // saw a trace at the original preset. R-H1 audit finding.
-  const optionsRef = useLatest(options);
-  const boundaryRef = useLatest<TraceBoundary | null>(boundary ?? null);
-  const boundaryModeRef = useLatest<BoundaryMode>(boundaryMode);
-  const sourceGridRef = useLatest<TraceGrid | null>(sourceGrid ?? null);
+  const sourceWidth = sourceGrid?.width,
+    sourceHeight = sourceGrid?.height;
+  const request: TracePreparationRequest | null =
+    file === null
+      ? null
+      : {
+          file,
+          options,
+          boundary: boundary ?? null,
+          boundaryMode,
+          ...(sourceGrid === undefined ? {} : { sourceGrid }),
+        };
   const settledToken = useTracePreviewSettlement(commitControl, {
-    request: file === null ? null : { file, options, boundary: boundary ?? null, boundaryMode },
+    request,
     sourceGrid: sourceGrid ?? null,
     token: tokenRef,
     setState,
-    sourceHasTransparency: () => decodedRef.current?.hasTransparency,
+    sourceHasTransparency: () => decodedRef.current?.decoded?.hasTransparency,
+    preparation: () =>
+      preparationRef.current?.failed === true ? undefined : preparationRef.current,
+    settlePreparation: (outcome) => preparationRef.current?.settle(outcome),
   });
-
   useEffect(() => {
-    const myToken = beginPreviewDecode(file, decodedRef, tokenRef, setState);
-    if (file === null || myToken === null) return undefined;
-    void decodePreviewFile({
-      file,
-      myToken,
-      decodedRef,
-      tokenRef,
-      settledToken,
-      optionsRef,
-      boundaryRef,
-      boundaryModeRef,
-      sourceGridRef,
-      setState,
-      cancellationRef,
-    });
+    if (file === null) {
+      decodedRef.current = null;
+      return undefined;
+    }
+    const source = decodeTraceSource(file);
+    decodedRef.current = source;
     return () => {
-      tokenRef.current += 1;
-      cancelPendingPreview(cancellationRef);
+      source.controller.abort();
     };
-    // Read request settings through stable refs. A preset switch is handled
-    // below without decoding the same file again.
-  }, [file, optionsRef, boundaryRef, boundaryModeRef, sourceGridRef, settledToken]);
-
+  }, [file]);
   useEffect(() => {
-    const decoded = decodedRef.current;
-    if (decoded === null || file === null) return undefined;
-    tokenRef.current += 1;
-    const myToken = tokenRef.current;
-    // Decode-time verdict — never re-scan the pixels on an options nudge.
-    const sourceHasTransparency = decoded.hasTransparency;
-    setState({ kind: 'tracing', sourceHasTransparency });
-    return schedulePreviewTrace(() => {
-      if (tokenRef.current !== myToken) return;
-      if (settledToken.current === myToken) return;
-      startPreviewTrace({
-        img: decoded.img,
-        file,
-        options,
-        boundary: boundary ?? null,
-        boundaryMode,
-        sourceGrid: sourceGridRef.current,
-        sourceHasTransparency,
-        isCurrent: () => tokenRef.current === myToken && settledToken.current !== myToken,
-        setState,
-        cancellationRef,
-      });
-    }, cancellationRef);
-  }, [
-    file,
-    options,
-    boundary,
-    boundaryMode,
-    sourceGrid?.width,
-    sourceGrid?.height,
-    sourceGridRef,
-    settledToken,
-  ]);
-
+    const currentRequest: TracePreparationRequest | null =
+      file === null
+        ? null
+        : {
+            file,
+            options,
+            boundary: boundary ?? null,
+            boundaryMode,
+            ...(sourceWidth === undefined || sourceHeight === undefined
+              ? {}
+              : { sourceGrid: { width: sourceWidth, height: sourceHeight } }),
+          };
+    return beginTracePreview(currentRequest, {
+      decoded: decodedRef,
+      preparation: preparationRef,
+      token: tokenRef,
+      settled: settledToken,
+      setState,
+    });
+  }, [file, options, boundary, boundaryMode, sourceWidth, sourceHeight, settledToken]);
   return state;
 }
-
-function useLatest<T>(value: T): MutableRefObject<T> {
-  const ref = useRef(value);
-  ref.current = value;
-  return ref;
-}
-
-function schedulePreviewTrace(
-  start: () => void,
-  cancellationRef: MutableRefObject<AbortController | null>,
-): () => void {
-  const timer = window.setTimeout(start, DEBOUNCE_MS);
-  return () => {
-    window.clearTimeout(timer);
-    cancelPendingPreview(cancellationRef);
-  };
-}
-
-function cancelPendingPreview(cancellationRef: MutableRefObject<AbortController | null>): void {
-  // Decode and debounce may replace the request after the effect was mounted.
-  // Cleanup cancels the latest request owned by this hook, not a captured one.
-  cancellationRef.current?.abort();
-}
-
-function beginPreviewDecode(
-  file: File | null,
-  decodedRef: MutableRefObject<DecodedPreviewImage | null>,
-  tokenRef: MutableRefObject<number>,
-  setState: (state: TracePreviewState) => void,
-): number | null {
-  decodedRef.current = null;
-  if (file === null) {
-    setState({ kind: 'idle' });
-    return null;
-  }
-  tokenRef.current += 1;
-  setState({ kind: 'decoding' });
-  return tokenRef.current;
-}
-
-async function decodePreviewFile(args: {
-  readonly file: File;
-  readonly myToken: number;
-  readonly decodedRef: MutableRefObject<DecodedPreviewImage | null>;
-  readonly tokenRef: MutableRefObject<number>;
-  readonly settledToken: MutableRefObject<number | null>;
-  readonly optionsRef: MutableRefObject<TraceOptions>;
-  readonly boundaryRef: MutableRefObject<TraceBoundary | null>;
-  readonly boundaryModeRef: MutableRefObject<BoundaryMode>;
-  readonly sourceGridRef: MutableRefObject<TraceGrid | null>;
-  readonly setState: Dispatch<SetStateAction<TracePreviewState>>;
-  readonly cancellationRef: MutableRefObject<AbortController | null>;
-}): Promise<void> {
-  const { file, myToken, decodedRef, tokenRef, settledToken, setState } = args;
-  const isCurrent = (): boolean => tokenRef.current === myToken && settledToken.current !== myToken;
-  try {
-    const img = await loadImageAsRawData(file, PREVIEW_MAX_EDGE_PX);
-    if (tokenRef.current !== myToken) return;
-    const sourceHasTransparency = rawImageHasTransparency(img);
-    decodedRef.current = { img, hasTransparency: sourceHasTransparency };
-    // A commit may finish first. Keep its terminal state while retaining
-    // decoded pixels and the alpha verdict for subsequent option edits.
-    if (settledToken.current === myToken) {
-      setState((current) =>
-        current.kind === 'ready' ? { ...current, sourceHasTransparency } : current,
-      );
-      return;
-    }
-    setState({ kind: 'tracing', sourceHasTransparency });
-    startPreviewTrace({
-      img,
-      file,
-      options: args.optionsRef.current,
-      boundary: args.boundaryRef.current,
-      boundaryMode: args.boundaryModeRef.current,
-      sourceGrid: args.sourceGridRef.current,
-      sourceHasTransparency,
-      isCurrent,
-      setState,
-      cancellationRef: args.cancellationRef,
-    });
-  } catch (err) {
-    if (!isCurrent()) return;
-    setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
-  }
-}
-
-function startPreviewTrace(args: {
-  readonly img: RawImageData;
-  readonly file: File;
-  readonly options: TraceOptions;
-  readonly boundary: TraceBoundary | null;
-  readonly boundaryMode: BoundaryMode;
-  readonly sourceGrid: TraceGrid | null;
-  readonly sourceHasTransparency: boolean;
-  readonly isCurrent: () => boolean;
-  readonly setState: (next: TracePreviewState) => void;
-  readonly cancellationRef: MutableRefObject<AbortController | null>;
-}): void {
-  cancelPendingPreview(args.cancellationRef);
-  const cancellation = new AbortController();
-  args.cancellationRef.current = cancellation;
-  void runTrace({
-    ...args,
-    signal: cancellation.signal,
-    request: {
-      file: args.file,
-      options: args.options,
-      boundary: args.boundary,
-      boundaryMode: args.boundaryMode,
-    },
-  }).finally(() => {
-    if (args.cancellationRef.current === cancellation) args.cancellationRef.current = null;
-  });
-}
-
 export function runTrace(args: {
   readonly img: RawImageData;
   readonly options: TraceOptions;

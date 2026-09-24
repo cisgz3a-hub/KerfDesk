@@ -1,15 +1,21 @@
 import { useImperativeHandle, useRef, type MutableRefObject, type Ref } from 'react';
 import { coloredPathsToSvg } from '../../core/trace';
-import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
+import type {
+  PendingPreparedTrace,
+  PreparedTrace,
+  TracePreparationRequest,
+} from './prepared-trace';
 import type { TraceGrid } from './trace-boundary-grid';
 import type { TracePreviewState } from './use-trace-preview';
 import { isTraceRequestSuperseded, type TraceResult } from './use-trace-worker-client';
+import { isTraceAbort } from './trace-cancellation';
 
 export type TracePreviewSettlement =
   | { readonly kind: 'ready'; readonly result: TraceResult }
   | { readonly kind: 'error'; readonly error: unknown };
 export type TracePreviewCommitControl = {
   readonly capture: () => (outcome: TracePreviewSettlement) => void;
+  readonly preparation?: () => PendingPreparedTrace | undefined;
 };
 type PreviewOwner = {
   readonly request: TracePreparationRequest | null;
@@ -17,6 +23,8 @@ type PreviewOwner = {
   readonly token: MutableRefObject<number>;
   readonly sourceHasTransparency: () => boolean | undefined;
   readonly setState: (state: TracePreviewState) => void;
+  readonly preparation?: () => PendingPreparedTrace | undefined;
+  readonly settlePreparation?: (outcome: TracePreviewSettlement) => void;
 };
 
 export function preparedTraceEntry(preview: TracePreviewState): {
@@ -40,6 +48,7 @@ export function useTracePreviewSettlement(
   useImperativeHandle(
     control,
     () => ({
+      preparation: () => latest.current.preparation?.(),
       capture: () => {
         const captured = latest.current,
           token = captured.token.current,
@@ -60,6 +69,7 @@ export function useTracePreviewSettlement(
           if (captured.request === null) return;
           completed = true;
           settled.current = token;
+          captured.settlePreparation?.(outcome);
           captured.setState(
             outcome.kind === 'ready'
               ? readyTracePreview(
@@ -67,11 +77,7 @@ export function useTracePreviewSettlement(
                   outcome.result,
                   captured.sourceHasTransparency(),
                 )
-              : {
-                  kind: 'error',
-                  message:
-                    outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
-                },
+              : failedTracePreview(outcome.error),
           );
         };
       },
@@ -79,6 +85,12 @@ export function useTracePreviewSettlement(
     [],
   );
   return settled;
+}
+
+function failedTracePreview(error: unknown): TracePreviewState {
+  return isTraceAbort(error)
+    ? { kind: 'idle' }
+    : { kind: 'error', message: error instanceof Error ? error.message : String(error) };
 }
 
 function sameOwner(a: PreviewOwner, b: PreviewOwner): boolean {
@@ -96,7 +108,7 @@ function sameOwner(a: PreviewOwner, b: PreviewOwner): boolean {
   );
 }
 
-function readyTracePreview(
+export function readyTracePreview(
   request: TracePreparationRequest,
   result: TraceResult,
   sourceHasTransparency: boolean | undefined,

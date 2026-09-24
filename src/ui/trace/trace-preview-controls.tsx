@@ -10,6 +10,7 @@ type Props = {
   readonly isSourceFaded: boolean;
   readonly shouldShowPoints: boolean;
   readonly hasBoundary: boolean;
+  readonly boundaryDisabled?: boolean;
   readonly onViewChange: (view: TracePreviewView) => void;
   readonly onZoomChange: (zoom: number) => void;
   readonly onToggleFade: () => void;
@@ -53,6 +54,7 @@ export function TracePreviewControls(props: Props): JSX.Element {
           <button
             type="button"
             onClick={props.onBoundaryClear}
+            disabled={props.boundaryDisabled}
             className="lf-btn lf-trace-preview__clear"
             title="Clear the selected trace boundary and trace the full image again."
           >

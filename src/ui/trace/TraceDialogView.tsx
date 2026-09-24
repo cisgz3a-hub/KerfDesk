@@ -44,24 +44,28 @@ export function TraceDialogView(props: {
           {props.preview}
         </section>
         <aside className="lf-trace-dialog-controls" aria-label="Trace controls">
-          <PresetPicker
-            machineKind={props.output.machineKind}
-            value={props.presetName}
-            onChange={props.onPresetChange}
-            hasOverrides={Object.keys(props.settings.overrides).length > 0}
-          />
-          <TraceSettingsControls {...props.settings} />
-          <section className="lf-trace-output" aria-label="Trace output options">
-            <h3>Output</h3>
-            <TraceOutputFields {...props.output} />
-          </section>
+          <fieldset disabled={props.busy} className="lf-trace-commit-fields">
+            <PresetPicker
+              machineKind={props.output.machineKind}
+              value={props.presetName}
+              onChange={props.onPresetChange}
+              hasOverrides={Object.keys(props.settings.overrides).length > 0}
+            />
+            <TraceSettingsControls {...props.settings} />
+            <section className="lf-trace-output" aria-label="Trace output options">
+              <h3>Output</h3>
+              <TraceOutputFields {...props.output} />
+            </section>
+          </fieldset>
         </aside>
       </div>
       <footer className="lf-trace-dialog-footer">
-        <DeleteImageAfterTraceToggle
-          checked={props.deleteSource}
-          onChange={props.onDeleteSourceChange}
-        />
+        <fieldset disabled={props.busy} className="lf-trace-commit-fields">
+          <DeleteImageAfterTraceToggle
+            checked={props.deleteSource}
+            onChange={props.onDeleteSourceChange}
+          />
+        </fieldset>
         <DialogActions canSubmit={props.canSubmit} busy={props.busy} onCancel={props.onClose} />
       </footer>
     </Dialog>
