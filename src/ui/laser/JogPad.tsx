@@ -6,11 +6,17 @@
 // object and no longer jog the machine (F104); Z-focus keys stay on the pad.
 
 import { useCallback, useMemo, useState } from 'react';
-import { jogAxisSignsForOrigin, machineBoundsForDevice } from '../../core/devices';
+import {
+  jogAxisSignsForOrigin,
+  machineBoundsForDevice,
+  type MachineBounds,
+} from '../../core/devices';
+import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import { useLaserStore } from '../state/laser-store';
+import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { FocusJogControls, focusJogReady } from './FocusJogControls';
 import { JogArrowGrid } from './JogArrowGrid';
 import { JogPadAirAssist } from './JogPadAirAssist';
@@ -108,12 +114,30 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 // another motion owns the machine) cannot start one, so it does not follow the
 // status report either; before, the whole jog panel re-rendered on every poll
 // of a running job (ADR-352).
+//
+// A hold jog runs to the travel edge, so it needs the controller's own travel
+// envelope. MPos is in native machine coordinates, which match the profile bed
+// only through a verified native frame: homed stock GRBL puts machine space
+// into negative numbers, and a machine without homing starts at MPos 0,0
+// wherever the head was at power-up. Clamping raw MPos against 0..bed made a
+// held arrow do nothing toward the origin and overshoot the other way (audit
+// jog-home-origin-3). Without a verified frame the hold asks for full travel
+// and relies on release plus the jog-cancel byte, as it does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
-  const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
-  return <JogArrowGrid {...props} position={position} />;
+  const nativeEvidence = useLaserStore(selectNativeBedEvidence);
+  const device = useStore((s) => s.project.device);
+  const nativeFrame = resolveNativeBedFrame(device, nativeEvidence);
+  const position =
+    nativeFrame === null ? null : inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
+  const bounds = nativeFrame === null ? props.bounds : nativeTravel(nativeFrame.nativeBounds);
+  return <JogArrowGrid {...props} bounds={bounds} position={position} />;
+}
+
+function nativeTravel(bounds: NativeXyBounds): MachineBounds {
+  return { ...bounds, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
 }
 
 function useJogPadShortcuts(
