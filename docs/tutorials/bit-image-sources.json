@@ -89,5 +89,11 @@
     "source": "https://www.harveytool.com/products-en-ca/specialty-profiles/engraving-cutters/tipped-off",
     "prompt": "Use case: scientific-educational. Square CNC cutter identification photo for a bit picker. One generic polished carbide cutter, vertical shank up/tip down, slight three-quarter view revealing side profile and cutting end, whole tool occupying 80% height on pale grey studio background. Crisp industrial product photography. No text, numbers, arrows, logo, colored coating, ruler, holder, bearing, packaging, workpiece or extra tool. Manufacturer-informed geometry: Slender conical tipped-off ENGRAVING cutter. Slim taper cut from cylindrical carbide shank with one split/relieved flat cutting face. Cone terminates in a clearly visible SMALL FLAT LAND perpendicular to axis, about 1/6 of shank width. Close enough to distinguish flat land from sharp point. Not a ball, pyramid or full-width flat end mill.",
     "path": "C:/Users/Asus/.codex/generated_images/01a0b94a-ca80-72d2-9225-51add3eb8b5b/exec-d72a8b52-338e-450a-a3b5-49eee9518b57.png"
+  },
+  {
+    "id": "bit-tapered-ball-nose",
+    "source": "https://www.amanatool.com/46282-u-cnc-2d-and-3d-carving-5-4-deg-tapered-angle-ball-tip-1-16-dia-x-1-32-radius-x-1-x-1-4-shank-x-3-inch-long-x-4-flute-solid-carbide-up-cut-spiral-router-bit.html",
+    "prompt": "Rendered, not generated (ADR-368). three.js scene of the modeled tapered ball-nose law: a ball tip tangent to a straight taper with Amana 46282 geometry, 1.5875 mm (1/16 in) ball tip, 5.4 degrees per side, 25.4 mm (1 in) flutes, 6.35 mm (1/4 in) shank. Illustrative only: three right-hand (upcut) helical flutes, the 30 mm shank length, polished-metal materials, studio environment lighting and the pale grey background. Vertical shank up/tip down, slight three-quarter view. 1280 px square Chromium screenshot, then encoded like the other bit pictures.",
+    "path": "docs/tutorials/bit-renders/bit-tapered-ball-nose.html"
   }
 ]

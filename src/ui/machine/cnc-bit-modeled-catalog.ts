@@ -1,5 +1,6 @@
 import type { CncToolKind } from '../../core/scene';
 import type { ModeledCncBitCatalogEntry } from './cnc-bit-catalog-types';
+import { TAPERED_BALL_CATALOG } from './cnc-bit-tapered-ball-catalog';
 
 type SizeSpec = {
   readonly key: string;
@@ -278,4 +279,5 @@ export const MODELED_CNC_BIT_CATALOG: ReadonlyArray<ModeledCncBitCatalogEntry> =
   ...MODELED_SERIES,
   ...EXACT_BALL_BITS,
   ...POINT_V_BITS,
+  ...TAPERED_BALL_CATALOG,
 ];

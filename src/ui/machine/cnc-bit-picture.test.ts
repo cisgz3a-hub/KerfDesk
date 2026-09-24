@@ -13,8 +13,9 @@ describe('CNC bit picture mapping', () => {
       expect(BIT_PHOTO_ASSETS[picture.key], entry.id).toBeDefined();
       families.add(picture.key);
     }
-    expect(families.size).toBe(13);
+    expect(families.size).toBe(14);
     expect(families).toContain('bit-o-flute-ball-nose');
+    expect(families).toContain('bit-tapered-ball-nose');
     const oBall = MODELED_CNC_BIT_CATALOG.find((entry) => entry.family === 'o-flute-ball-nose');
     expect(oBall).toBeDefined();
     if (oBall === undefined) throw new Error('O-flute ball-nose catalog fixture missing');
@@ -33,6 +34,9 @@ describe('CNC bit picture mapping', () => {
       geometryOnly: true,
     });
     expect(cncBitPicture({ kind: 'v-bit', family: 'ball-nose' }).key).toBe('bit-v-groove');
+    expect(cncBitPicture({ kind: 'tapered-ball-nose', family: 'ball-nose' }).key).toBe(
+      'bit-tapered-ball-nose',
+    );
     expect(cncBitPicture({ kind: 'end-mill' }).geometryOnly).toBe(true);
   });
 
