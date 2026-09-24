@@ -36,6 +36,9 @@ export type CutSegment = {
   // closed segment, the last point equals the first by construction.
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  /** ADR-385: the operator placed this closed cut's start (Set Start Point);
+   * automatic start and direction choices leave it exactly as compiled. */
+  readonly startLocked?: true;
   /** Estimator-only 3D edge geometry for a two-point CNC segment. */
   readonly plannerMotion?: {
     readonly distanceMm: number;
@@ -71,6 +74,9 @@ export type CutGroup = {
   // carried by Follow Shape (offset) FillGroups via the Omit below; scanline
   // and island fill use fillRunwayPolicy sweep plans instead and never set it.
   readonly entryRunwayMm?: number;
+  // ADR-385 Line Overcut: on the final pass each closed segment keeps cutting
+  // this far along itself past its start (line-overcut.ts). Absent = none.
+  readonly overcutMm?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 

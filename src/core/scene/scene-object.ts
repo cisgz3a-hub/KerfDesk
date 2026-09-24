@@ -6,7 +6,7 @@
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
-import type { LayerPowerMode } from './layer';
+import type { LayerLineCutOptions, LayerPowerMode } from './layer';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -131,7 +131,7 @@ export type ObjectOperationSettingsOverride = {
   readonly negativeImage?: boolean;
   readonly passThrough?: boolean;
   readonly dotWidthCorrectionMm?: number;
-};
+} & LayerLineCutOptions;
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
   // Schema v5: an operation-owned entry replaces the legacy artwork-wide
@@ -154,6 +154,17 @@ export type ObjectPowerScale = {
   // Manual CNC holding-tab locations. The normalized contour position keeps
   // each tab attached when its object is moved, rotated, mirrored, or scaled.
   readonly cncTabAnchors?: ReadonlyArray<CncTabAnchor>;
+  // ADR-385 Set Start Point: where closed Line cuts on this artwork begin,
+  // at most one per closed contour. Absent means the automatic start.
+  readonly cutStartPoints?: ReadonlyArray<CutStartPoint>;
+};
+
+/** One operator-set closed-cut start: a contour and a fraction of its local
+ * perimeter, measured the way CncTabAnchor.pathT is. */
+export type CutStartPoint = {
+  readonly pathIndex: number;
+  readonly polylineIndex: number;
+  readonly pathT: number;
 };
 
 export type CncTabAnchor = {

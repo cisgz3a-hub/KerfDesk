@@ -39,6 +39,7 @@ import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 import { normalizeControllerPatch } from './project-controller-normalization';
+import { withClosedCutOptions } from './normalize-closed-cut-options';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -108,7 +109,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const normalized: Record<string, unknown> = {
     ...raw,
     device: normalizeDevice(dev),
-    optimization: normalizeOptimization(raw['optimization']),
+    optimization: withClosedCutOptions(normalizeOptimization(raw['optimization']), raw),
     jobSetup: normalizeProjectJobSetup(raw['jobSetup']),
     notes: typeof raw['notes'] === 'string' ? raw['notes'] : '',
     scene: {

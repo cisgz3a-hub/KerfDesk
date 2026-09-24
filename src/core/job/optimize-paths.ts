@@ -35,7 +35,8 @@
 // reversed traversal — whichever has its start closer to the cursor
 // wins. Closed polylines have identical start/end by construction
 // (per job.ts CutSegment docs), so reversal is semantically a no-op
-// and we skip it.
+// and we skip it. Opt-in closed-cut start and direction choices for Line
+// cuts live in closed-cut-start.ts (ADR-385).
 //
 // Determinism: tie-broken by original segment index. Same input → same
 // output across runs and platforms. Required by PROJECT.md
@@ -45,6 +46,8 @@
 
 import type { ScanOffsetPoint } from '../devices';
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import { closedCutStartPolicy, type ClosedCutStartSettings } from './closed-cut-start';
+import { sourceOrderWithClosedCutStarts } from './closed-cut-source-order';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Group, Job } from './job';
@@ -57,7 +60,8 @@ type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
 > &
-  Partial<Pick<ProjectOptimizationSettings, 'removeOverlappingLines'>>;
+  Partial<Pick<ProjectOptimizationSettings, 'removeOverlappingLines'>> &
+  ClosedCutStartSettings;
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
@@ -74,7 +78,7 @@ export function optimizePaths(
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   const ordered =
     settings.travelPolicy === 'source-order'
-      ? prioritized
+      ? sourceOrderWithClosedCutStarts(prioritized, settings)
       : optimizeGroups(prioritized, settings, scanningOffsets);
   return {
     ...job,
@@ -167,7 +171,7 @@ function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): Cut
   // former 2,000 cap silently returned them unoptimized.
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
-  const ordered = configuredSegmentOrder(group.segments, settings);
+  const ordered = configuredSegmentOrder(group.segments, settings, closedCutStartPolicy(settings));
   return { ...group, segments: ordered };
 }
 

@@ -16,6 +16,7 @@ import type { Vec2 } from '../scene';
 import type { FillGroup, Group, Job } from './job';
 import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
+import { finalPassSegment } from './line-overcut';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import { offsetForEmittedFeed } from './scan-offset';
 import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
@@ -75,6 +76,7 @@ function appendGroupSteps(
         group.color,
         group.passes,
         contourEntryOptions(group.entryRunwayMm, options),
+        group.overcutMm,
       );
     case 'cnc':
       // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
@@ -134,14 +136,18 @@ function contourEntryOptions(
 function appendContourGroupSteps(
   steps: ToolpathStep[],
   initialPrevEnd: Vec2 | null,
-  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
+  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2>; readonly closed: boolean }>,
   color: string,
   passes: number,
   entryOptions: ContourEntryOptions | null,
+  overcutMm?: number,
 ): Vec2 | null {
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
-    for (const seg of segments) {
+    // ADR-385: the final pass carries the Line overcut, as the emitter does.
+    const passOvercutMm = pass === passes - 1 ? overcutMm : undefined;
+    for (const cutSegment of segments) {
+      const seg = finalPassSegment(cutSegment, passOvercutMm);
       const first = seg.polyline[0];
       if (first === undefined) continue;
       // ADR-239: preview the tangential entry the emitter produces — a rapid

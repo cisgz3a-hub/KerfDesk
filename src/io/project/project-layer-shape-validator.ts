@@ -18,6 +18,7 @@ import {
   requireString,
 } from './project-shape-primitives';
 import { validateLayerOperationSettings, validateLayerSubLayers } from './project-layer-validator';
+import { validateLineCutOptions } from './project-closed-cut-validator';
 
 export function validateProjectLayer(layer: unknown, path: string): string | null {
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
@@ -54,6 +55,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     optionalBoolean(layer, `${path}.negativeImage`),
     optionalBoolean(layer, `${path}.passThrough`),
     optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
+    validateLineCutOptions(layer, path),
     validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
     validateMaterialBinding(layer['materialBinding'], `${path}.materialBinding`),
   ]);

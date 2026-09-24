@@ -1,6 +1,7 @@
 import type { Polyline, Vec2 } from '../scene';
+import { tabCountRule, type TabCountSettings } from './tab-spacing';
 
-export type AutomaticTabsSettings = {
+export type AutomaticTabsSettings = TabCountSettings & {
   readonly tabsEnabled: boolean;
   readonly tabSizeMm: number;
   readonly tabsPerShape: number;
@@ -26,7 +27,8 @@ export function applyAutomaticTabsToPolylines(
   settings: AutomaticTabsSettings,
 ): ReadonlyArray<Polyline> {
   if (!settings.tabsEnabled) return polylines;
-  const count = Math.max(1, Math.floor(settings.tabsPerShape));
+  // ADR-385: per shape (default) or sized from each shape's perimeter.
+  const countFor = tabCountRule(settings);
   const sizeMm = Number.isFinite(settings.tabSizeMm) ? Math.max(0, settings.tabSizeMm) : 0;
   if (sizeMm <= 0) return polylines;
 
@@ -38,7 +40,7 @@ export function applyAutomaticTabsToPolylines(
       out.push(polyline);
       continue;
     }
-    out.push(...splitClosedPolylineForTabs(polyline, count, sizeMm));
+    out.push(...splitClosedPolylineForTabs(polyline, countFor, sizeMm));
   }
   return out;
 }
@@ -110,11 +112,12 @@ function isTabEligible(
 
 function splitClosedPolylineForTabs(
   polyline: Polyline,
-  count: number,
+  countFor: (perimeterMm: number) => number,
   sizeMm: number,
 ): ReadonlyArray<Polyline> {
   const context = splitContext(polyline);
   if (context === null) return [polyline];
+  const count = countFor(context.perimeter);
   if (sizeMm >= context.perimeter) return [];
   const skips = tabSkipIntervals(context.perimeter, count, sizeMm);
   if (skips.length === 0) return [polyline];

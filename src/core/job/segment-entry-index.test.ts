@@ -99,6 +99,34 @@ describe('createNearestEntryQuery', () => {
     expect(pick?.reverse).toBe(false);
   });
 
+  it('matches the exhaustive scan when closed cuts offer one entry per vertex (ADR-385)', () => {
+    // Rings of vertices on a coarse lattice, so many candidates tie exactly;
+    // the scan keeps the first it meets, which is the lowest vertex index.
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const random = seededRandom(seed * 7919);
+      const entries: SegmentEntry[] = [];
+      for (let segmentIndex = 0; segmentIndex < 40; segmentIndex += 1) {
+        const vertices = 3 + Math.floor(random() * 6);
+        for (let vertexIndex = 0; vertexIndex < vertices; vertexIndex += 1) {
+          const point = { x: Math.round(random() * 12), y: Math.round(random() * 12) };
+          entries.push({ point, segmentIndex, reverse: false, vertexIndex });
+        }
+      }
+      const query = createNearestEntryQuery(entries);
+      const taken = new Set<number>();
+      const isAvailable = (segmentIndex: number): boolean => !taken.has(segmentIndex);
+      let cursor = { x: 6, y: 6 };
+      for (let step = 0; step < 40; step += 1) {
+        const actual = query(cursor, isAvailable);
+        const expected = referenceNearest(entries, cursor, isAvailable);
+        expect(actual, `seed ${seed} step ${step}`).toBe(expected);
+        if (actual === null) break;
+        taken.add(actual.segmentIndex);
+        cursor = actual.point;
+      }
+    }
+  });
+
   it('skips unavailable segments entirely', () => {
     const entries: SegmentEntry[] = [
       { point: { x: 1, y: 0 }, segmentIndex: 0, reverse: false },

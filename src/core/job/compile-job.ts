@@ -44,6 +44,8 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutSegment, Group, Job, JobDiagnostic } from './job';
+import { cutStartTargetsForPath, seatCutStart, seatKerfCutStart } from './cut-start-seating';
+import { lineOvercutMm } from './line-overcut';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
@@ -243,12 +245,14 @@ function vectorGroupsForLayer(
   if (line.segments.length === 0) return { groups: [], diagnostics };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
+  const overcutMm = lineOvercutMm(layer);
   return {
     groups: [
       {
         ...common,
         kind: 'cut' as const,
         ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+        ...(overcutMm === undefined ? {} : { overcutMm }),
         segments: line.segments,
       },
     ],
@@ -379,21 +383,31 @@ function appendPathSegments(
   out: CutSegment[],
 ): boolean {
   let kerfOffsetFailed = false;
-  for (const path of object.paths) {
+  for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, layer)) continue;
+    // ADR-385 Set Start Point targets; empty unless the operator placed one.
+    const starts = cutStartTargetsForPath(object, pathIndex, device);
     const closedForKerf: Polyline[] = [];
-    for (const polyline of compilationPolylines(path, object.transform)) {
+    const kerfStarts: Vec2[] = [];
+    const polylines = compilationPolylines(path, object.transform);
+    for (const [polylineIndex, polyline] of polylines.entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
+      const start = starts.get(polylineIndex);
       if (shouldApplyKerf(polyline, layer)) {
         closedForKerf.push({ points, closed: true });
+        if (start !== undefined) kerfStarts.push(start);
       } else {
         // Enforce the CutSegment invariant "a closed segment's last point
         // equals its first" so the emitter (which walks points and ignores the
         // `closed` flag) draws the closing edge. DXF entities drop the seam
         // vertex, which otherwise left the final edge uncut.
-        out.push({ polyline: withClosingPoint(points, polyline.closed), closed: polyline.closed });
+        const segment = {
+          polyline: withClosingPoint(points, polyline.closed),
+          closed: polyline.closed,
+        };
+        out.push(seatCutStart(segment, start));
       }
     }
     // Checked: the unchecked variant flattens a clipper2 failure to an empty
@@ -405,7 +419,13 @@ function appendPathSegments(
       continue;
     }
     for (const polyline of offset.value) {
-      out.push({ polyline: polyline.points, closed: true });
+      out.push(
+        seatKerfCutStart(
+          { polyline: polyline.points, closed: true },
+          kerfStarts,
+          layer.kerfOffsetMm,
+        ),
+      );
     }
   }
   return kerfOffsetFailed;

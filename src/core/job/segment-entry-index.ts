@@ -17,6 +17,9 @@
 // the reversed one. That is exactly a lexicographic minimum over
 // (distanceSquared, segmentIndex, reverse). This module reproduces that
 // comparator, so ties resolve identically and G-code stays byte-identical.
+// ADR-385 closed-cut starts add one entry per candidate vertex of a segment;
+// their fourth key, vertexIndex, is absent (read as 0) on every legacy entry,
+// so it can only break ties the old comparator never saw.
 
 import type { Vec2 } from '../scene';
 
@@ -24,6 +27,8 @@ export type SegmentEntry = {
   readonly point: Vec2;
   readonly segmentIndex: number;
   readonly reverse: boolean;
+  /** Ring vertex a closed segment would be entered at; absent means its first point. */
+  readonly vertexIndex?: number;
 };
 
 export type NearestEntryQuery = (
@@ -115,7 +120,8 @@ function linearQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
 
 // The comparator the linear scan implied. Strictly-smaller distance wins;
 // on an exact tie the lower segment index wins, and within one segment the
-// forward entry wins - the order the old scan visited them in.
+// forward entry wins - the order the old scan visited them in - then the lower
+// candidate vertex.
 function isBetter(
   distSq: number,
   candidate: SegmentEntry,
@@ -133,7 +139,8 @@ function isBetter(
   if (candidate.segmentIndex !== best.segmentIndex) {
     return candidate.segmentIndex < best.segmentIndex;
   }
-  return !candidate.reverse && best.reverse;
+  if (candidate.reverse !== best.reverse) return !candidate.reverse;
+  return (candidate.vertexIndex ?? 0) < (best.vertexIndex ?? 0);
 }
 
 function gridNearest(

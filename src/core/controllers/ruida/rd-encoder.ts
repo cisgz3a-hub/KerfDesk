@@ -13,6 +13,7 @@
 
 import type { DeviceProfile } from '../../devices';
 import type { Job } from '../../job';
+import { finalPassSegment } from '../../job/line-overcut';
 import {
   blockEnd,
   cutAbsolute,
@@ -95,8 +96,12 @@ export function encodeRdJob(job: Job, device: DeviceProfile): RdEncodeResult {
   });
   cutGroups.forEach((group, layerIndex) => {
     push(selectLayer(layerIndex));
-    for (let pass = 0; pass < Math.max(1, group.passes); pass += 1) {
-      for (const segment of group.segments) {
+    const passes = Math.max(1, group.passes);
+    for (let pass = 0; pass < passes; pass += 1) {
+      // ADR-385: Overcut extends closed cuts on the final pass only.
+      const overcutMm = pass === passes - 1 ? group.overcutMm : undefined;
+      for (const cutSegment of group.segments) {
+        const segment = finalPassSegment(cutSegment, overcutMm);
         pushSegment(push, segment.polyline, segment.closed);
       }
     }

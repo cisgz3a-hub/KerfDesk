@@ -2,6 +2,12 @@
 // module separate lets optimize-paths own group orchestration only.
 
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import {
+  closedSegmentEntries,
+  enterClosedSegment,
+  hasMovableStart,
+  type ClosedCutStartPolicy,
+} from './closed-cut-start';
 import { containmentDepths } from './containment-depth';
 import type { CutSegment } from './job';
 import { polylineBounds } from './segment-bounds';
@@ -14,17 +20,28 @@ export type SegmentOrderSettings = Pick<
   'insideFirst' | 'pathDirection' | 'startPoint'
 >;
 
+// `closedStart` (ADR-385) is passed for Line cut groups only; null keeps every
+// closed segment entered at its first point, exactly as before.
 export function configuredSegmentOrder<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   settings: SegmentOrderSettings,
+  closedStart: ClosedCutStartPolicy | null = null,
 ): T[] {
   const startCursor = startCursorForSegments(segments, settings.startPoint);
-  const allowsReverse = settings.pathDirection === 'allow-reverse';
+  const planner = {
+    allowsReverse: settings.pathDirection === 'allow-reverse',
+    closedStart,
+  };
   if (!settings.insideFirst) {
-    return nearestNeighborOrderFrom(segments, startCursor, allowsReverse).segments;
+    return nearestNeighborOrderFrom(segments, startCursor, planner).segments;
   }
-  return insideFirstNearestNeighborOrder(segments, startCursor, allowsReverse);
+  return insideFirstNearestNeighborOrder(segments, startCursor, planner);
 }
+
+type EntryPlanner = {
+  readonly allowsReverse: boolean;
+  readonly closedStart: ClosedCutStartPolicy | null;
+};
 
 /** Computes the selected planning seed without allocating a bounds array. */
 export function startCursorForSegments(
@@ -53,14 +70,14 @@ export function startCursorForSegments(
 function insideFirstNearestNeighborOrder<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   startCursor: Vec2,
-  allowsReverse: boolean,
+  planner: EntryPlanner,
 ): T[] {
   const buckets = bucketSegmentsByContainmentDepth(segments, containmentDepths(segments));
 
   const out: T[] = [];
   let cursor = startCursor;
   for (const [, bucket] of [...buckets.entries()].sort(([left], [right]) => right - left)) {
-    const ordered = nearestNeighborOrderFrom(bucket, cursor, allowsReverse);
+    const ordered = nearestNeighborOrderFrom(bucket, cursor, planner);
     for (const segment of ordered.segments) out.push(segment);
     cursor = ordered.cursor;
   }
@@ -87,9 +104,9 @@ export function bucketSegmentsByContainmentDepth<T>(
 function nearestNeighborOrderFrom<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   startCursor: Vec2,
-  allowsReverse: boolean,
+  planner: EntryPlanner,
 ): { readonly segments: T[]; readonly cursor: Vec2 } {
-  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, allowsReverse));
+  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, planner));
   const placed = new Set<number>();
   const isAvailable = (index: number): boolean => !placed.has(index);
   const out: T[] = [];
@@ -100,7 +117,7 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
     placed.add(pick.segmentIndex);
     const segment = segments[pick.segmentIndex];
     if (segment === undefined) continue;
-    const next = pick.reverse ? reverseSegment(segment) : segment;
+    const next = placeSegment(segment, pick, cursor, planner.closedStart);
     out.push(next);
     const last = next.polyline[next.polyline.length - 1];
     if (last !== undefined) cursor = last;
@@ -108,14 +125,29 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
   return { segments: out, cursor };
 }
 
+function placeSegment<T extends CutSegment>(
+  segment: T,
+  pick: SegmentEntry,
+  cursor: Vec2,
+  closedStart: ClosedCutStartPolicy | null,
+): T {
+  if (pick.reverse) return reverseSegment(segment);
+  if (closedStart === null) return segment;
+  return enterClosedSegment(segment, pick.vertexIndex ?? 0, cursor, closedStart);
+}
+
 function collectSegmentEntries(
   segments: ReadonlyArray<CutSegment>,
-  allowsReverse: boolean,
+  { allowsReverse, closedStart }: EntryPlanner,
 ): SegmentEntry[] {
   const entries: SegmentEntry[] = [];
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
     if (segment === undefined) continue;
+    if (closedStart !== null && hasMovableStart(segment)) {
+      for (const entry of closedSegmentEntries(segment, index, closedStart)) entries.push(entry);
+      continue;
+    }
     const start = segment.polyline[0];
     if (start === undefined) continue;
     entries.push({ point: start, segmentIndex: index, reverse: false });

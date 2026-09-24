@@ -16,6 +16,7 @@
 import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import { contourEntryPoint, type ContourEntryBounds } from '../job/contour-entry';
 import { expandFillHatchWithRunways } from '../job/fill-runway';
+import { finalPassSegment } from '../job/line-overcut';
 import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
 import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
@@ -193,8 +194,10 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
     // emitJob's modal tracker armed before the group — a dialect-default M3
     // here silently flipped later groups to constant power (audit P2-1).
     if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
+    // ADR-385: Overcut extends closed cuts on the final pass only.
+    const overcutMm = p === group.passes - 1 ? group.overcutMm : undefined;
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, {
+      const segText = emitSegment(finalPassSegment(seg, overcutMm), {
         ...context,
         s,
         feed,

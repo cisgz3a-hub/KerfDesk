@@ -33,6 +33,14 @@ export type ProjectOptimizationSettings = {
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
+  // ADR-385 closed Line cut starts. Absent reads as off, so projects that
+  // never opt in keep the drawn start and direction byte for byte.
+  /** Enter each closed cut at its vertex nearest where the head already is. */
+  readonly bestStartPoint?: boolean;
+  /** Start closed cuts at a sharp corner when the shape has one. */
+  readonly preferCorners?: boolean;
+  /** Run each closed cut the way round that bends least from the approach. */
+  readonly bestDirection?: boolean;
 };
 
 export type ProjectJobSetup = {

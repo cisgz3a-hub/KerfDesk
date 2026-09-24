@@ -45,7 +45,38 @@ export type LayerOperationSettings = {
   readonly negativeImage: boolean;
   readonly passThrough: boolean;
   readonly dotWidthCorrectionMm: number;
+} & LayerLineCutOptions;
+
+// ADR-385 Line options. Every field is optional and absent reads as today's
+// behaviour, so operations saved before them compile byte for byte.
+export type LayerLineCutOptions = {
+  /** Keep cutting this far past the start of each closed cut, final pass only. */
+  readonly overcutMm?: number | undefined;
+  /** 'spacing' places about one tab every tabSpacingMm instead of tabsPerShape. */
+  readonly tabPlacement?: TabPlacement | undefined;
+  readonly tabSpacingMm?: number | undefined;
+  readonly tabMinPerShape?: number | undefined;
+  readonly tabMaxPerShape?: number | undefined;
 };
+
+export type TabPlacement = 'per-shape' | 'spacing';
+
+const LINE_CUT_OPTION_KEYS = [
+  'overcutMm',
+  'tabPlacement',
+  'tabSpacingMm',
+  'tabMinPerShape',
+  'tabMaxPerShape',
+] as const satisfies ReadonlyArray<keyof LayerLineCutOptions>;
+
+/** Only the Line options that are set, so captured settings stay minimal. */
+export function definedLineCutOptions(settings: LayerLineCutOptions): LayerLineCutOptions {
+  const out: Record<string, unknown> = {};
+  for (const key of LINE_CUT_OPTION_KEYS) {
+    if (settings[key] !== undefined) out[key] = settings[key];
+  }
+  return out as LayerLineCutOptions;
+}
 
 export type LinkedMaterialBinding = {
   readonly libraryId: string;
@@ -137,6 +168,7 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  ...LINE_CUT_OPTION_KEYS,
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -205,6 +237,7 @@ export function captureLayerOperationSettings(
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    ...definedLineCutOptions(layer),
   };
 }
 

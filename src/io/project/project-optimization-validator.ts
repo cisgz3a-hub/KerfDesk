@@ -18,5 +18,8 @@ export function validateOptimization(value: unknown): string | null {
       'job-lower-left',
       'job-center',
     ]),
+    optionalBoolean(value, 'optimization.bestStartPoint'),
+    optionalBoolean(value, 'optimization.preferCorners'),
+    optionalBoolean(value, 'optimization.bestDirection'),
   ]);
 }

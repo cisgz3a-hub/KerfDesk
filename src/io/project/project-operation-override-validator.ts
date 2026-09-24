@@ -1,6 +1,7 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
 import { objectOperationSettingKeys } from '../../core/scene/object-operation-settings';
 import { layerSubLayerOperationId } from '../../core/scene/layer';
+import { validateLineCutOptions } from './project-closed-cut-validator';
 import {
   firstError,
   isObject,
@@ -43,6 +44,7 @@ export function validateObjectOperationOverride(value: unknown, path: string): s
     optionalBoolean(value, `${path}.negativeImage`),
     optionalBoolean(value, `${path}.passThrough`),
     optionalNonNegativeNumber(value, `${path}.dotWidthCorrectionMm`),
+    validateLineCutOptions(value, path),
     validateScopedOverrides(value['byOperation'], `${path}.byOperation`),
   ]);
 }
