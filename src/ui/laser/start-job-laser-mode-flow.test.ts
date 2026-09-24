@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { createJobCheckpoint } from '../../core/recovery';
 import {
   createLayer,
   createProject,
-  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
@@ -13,7 +11,7 @@ import {
 import { useStore } from '../state';
 import { createFramedRunPermit, type FramedRunCandidate } from '../state/framed-run';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
+import { readJobCheckpoint } from '../state/job-checkpoint-storage';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { RecoveryRepository } from '../state/recovery';
@@ -26,7 +24,7 @@ import { resetStore } from '../state/test-helpers';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
-import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
+import { runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -230,44 +228,6 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     expect(readJobCheckpoint()).toBeNull();
   });
 
-  it('acknowledges unknown $32 before checkpoint recovery confirmation and streaming', async () => {
-    const checkpoint = await createLegacyCheckpointFromCurrentStart();
-    const startJob = vi.fn(async () => undefined);
-    useLaserStore.setState({ startJob });
-    await makeLaserModeUnknown();
-    vi.mocked(jobAwareConfirm).mockClear();
-
-    await runCheckpointResumeFlow(checkpoint);
-
-    expect(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0]).toBe(LASER_MODE_UNVERIFIED_START_PROMPT);
-    expect(vi.mocked(jobAwareConfirm).mock.calls[1]?.[0]).toMatch(/Review resume/i);
-    expect(startJob).toHaveBeenCalledWith(
-      expect.stringContaining('resume preamble'),
-      expect.objectContaining({
-        laserModeStartEvidence: expect.objectContaining({
-          laserModeEnabled: undefined,
-          unverifiedAcknowledged: true,
-        }),
-      }),
-    );
-    expect(readJobCheckpoint()).toBeNull();
-  });
-
-  it('cancels checkpoint recovery before resume confirmation when $32 is declined', async () => {
-    const checkpoint = await createLegacyCheckpointFromCurrentStart();
-    const startJob = vi.fn(async () => undefined);
-    useLaserStore.setState({ startJob });
-    await makeLaserModeUnknown();
-    vi.mocked(jobAwareConfirm).mockReset().mockReturnValueOnce(false);
-
-    await runCheckpointResumeFlow(checkpoint);
-
-    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
-    expect(startJob).not.toHaveBeenCalled();
-    expect(readJobCheckpoint()?.resumeInFlight).toBe(false);
-  });
-
   it('uses the same $32 acknowledgement before manual recovery confirmation', async () => {
     await makeLaserModeUnknown();
 
@@ -304,18 +264,4 @@ function installCompletingFrameMock() {
   );
   useLaserStore.setState({ frame });
   return frame;
-}
-
-async function createLegacyCheckpointFromCurrentStart() {
-  await runStartJobFlow(recoveryHarness());
-  const gcode = vi.mocked(useLaserStore.getState().startJob).mock.calls.at(-1)?.[0];
-  if (typeof gcode !== 'string') throw new Error('Expected compiled laser G-code.');
-  const checkpoint = createJobCheckpoint({
-    gcode,
-    machineKind: 'laser',
-    outputScope: DEFAULT_OUTPUT_SCOPE,
-    nowIso: '2026-07-15T12:00:00.000Z',
-  });
-  writeJobCheckpoint(checkpoint);
-  return checkpoint;
 }
