@@ -18,6 +18,9 @@ export type SerialWorkerRequest =
       readonly readable: ReadableStream<Uint8Array>;
       readonly writable: WritableStream<Uint8Array>;
     }
+  /** The port's fresh readable after a recoverable line error (`read-error`).
+   *  Transferred; the worker reads on with the writer and refill it kept. */
+  | { readonly kind: 'reattach-readable'; readonly readable: ReadableStream<Uint8Array> }
   /** A write the main thread owns (console, jog, poll, cleanup). Acknowledged
    * so `SerialConnection.write` keeps resolving after the bytes are queued,
    * which the transport ledger and the write-epoch assertions depend on. */
@@ -45,7 +48,14 @@ export type SerialWorkerResponse =
   | { readonly kind: 'write-error'; readonly id: number; readonly message: string }
   /** A refill write failed. The main thread owns the containment. */
   | { readonly kind: 'stream-write-error'; readonly message: string }
-  /** The read loop ended: the device dropped, or `close` was honoured. */
+  /** A UART line error (FramingError, ParityError, BreakError,
+   *  BufferOverrunError) ended the read stream but left the port open. Only
+   *  the main thread can reach `port.readable`; the worker waits for
+   *  `reattach-readable`, still holding the writer (audit connect-1). */
+  | { readonly kind: 'read-error'; readonly name: string }
+  /** The session is over: the device dropped, a read failed for good, or
+   *  `close` was honoured. Either way the worker has already let go of both
+   *  streams, so the port can be closed once they finish (audit transport-3). */
   | { readonly kind: 'closed' };
 
 export function isSerialWorkerResponse(value: unknown): value is SerialWorkerResponse {
@@ -60,6 +70,7 @@ export function isSerialWorkerResponse(value: unknown): value is SerialWorkerRes
     kind === 'write-ack' ||
     kind === 'write-error' ||
     kind === 'stream-write-error' ||
+    kind === 'read-error' ||
     kind === 'closed'
   );
 }

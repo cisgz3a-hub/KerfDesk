@@ -332,7 +332,10 @@ function pickFsValue(fields: ReadonlyArray<string>, index: 0 | 1): number | null
   return null;
 }
 
-function parseCanonicalStatusNumber(token: string | undefined): number | null {
+/** A decimal exactly as GRBL-family firmware prints it (no exponent, no empty
+ *  token, no stray sign or leading zeros), or null. Shared with the `$#`
+ *  work-offset readback, which prints its axis vectors the same way. */
+export function parseCanonicalStatusNumber(token: string | undefined): number | null {
   if (token === undefined || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(token)) return null;
   const value = Number(token);
   return Number.isFinite(value) ? value : null;

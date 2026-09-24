@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../core/controllers';
 import {
+  ControllerCommandRefusedError,
   startControllerCommand,
   waitForFreshIdle,
   type ControllerLifecycleRefs,
@@ -29,9 +30,13 @@ type HomeEpochs = {
   readonly write: number;
   readonly position: number;
   readonly operationId: number;
+  /** Position evidence was already suppressed (for example after an unlock or
+   * a motor release) before this Home suppressed it. */
+  readonly positionSuppressedBefore: boolean;
 };
 
 type HomeOperation = Extract<NonNullable<LaserState['controllerOperation']>, { kind: 'home' }>;
+type HomeReadiness = { readonly homeCommand: string; readonly fromAlarm: boolean };
 
 let nextHomeOperationId = 1;
 
@@ -44,7 +49,7 @@ let nextHomeOperationId = 1;
 // whole cycle.
 const HOME_COMMAND_TIMEOUT_MS = 120_000;
 
-function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): string {
+function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): HomeReadiness {
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
@@ -67,7 +72,7 @@ function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): stri
     );
   }
   const blockedMessage = setupCommandBlockMessage(get());
-  if (blockedMessage === null) return homeCommand;
+  if (blockedMessage === null) return { homeCommand, fromAlarm: alarmRecoveryKnown };
   blockHome(set, get, blockedMessage);
 }
 
@@ -86,13 +91,14 @@ export async function runHomeAction(
   safeWrite: SafeWriteFn,
   driver: ControllerDriver,
 ): Promise<void> {
-  const homeCommand = assertHomeReady(set, get, driver);
+  const { homeCommand, fromAlarm } = assertHomeReady(set, get, driver);
   const expectedSessionEpoch = get().controllerSessionEpoch;
   const expectedWriteEpoch = refs.writeEpoch ?? 0;
   const operationId = nextHomeOperationId++;
+  const positionSuppressedBefore = get().positionEvidenceSuppressed === true;
   let expectedPositionEpoch = 0;
   set((state) => ({
-    controllerOperation: homeOperation(operationId, 'command'),
+    controllerOperation: homeOperation(operationId, 'command', fromAlarm),
     homingState: 'homing',
     homingProof: null,
     positionEvidenceSuppressed: true,
@@ -120,12 +126,12 @@ export async function runHomeAction(
     write: expectedWriteEpoch,
     position: expectedPositionEpoch,
     operationId,
+    positionSuppressedBefore,
   };
   try {
     await executeHomeSequence(set, get, refs, safeWrite, driver, homeCommand, epochs);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    recordHomeFailure(set, message, epochs);
+    recordHomeFailure(set, err, epochs);
     throw err;
   }
 }
@@ -193,23 +199,55 @@ function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
   }));
 }
 
-function recordHomeFailure(set: SetFn, message: string, epochs: HomeEpochs): void {
+function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void {
+  const message = error instanceof Error ? error.message : String(error);
   set((state) => {
-    if (
-      state.controllerOperation?.kind !== 'home' ||
-      state.controllerOperation.operationId !== epochs.operationId ||
-      state.controllerSessionEpoch !== epochs.session
-    )
-      return {};
+    if (state.controllerSessionEpoch !== epochs.session) return {};
+    const operation = state.controllerOperation;
+    if (operation?.kind !== 'home' || operation.operationId !== epochs.operationId) {
+      // An ALARM line or Alarm/Sleep report already invalidated this Home and
+      // cleared its owner. Still leave a record, or the failure is silent.
+      return operation === null ? { log: pushLog(state, `[lf2] Home failed: ${message}`) } : {};
+    }
     return {
       controllerOperation: null,
       homingState: 'unknown',
       homingProof: null,
+      ...refusedHomePositionPatch(state, operation, error, epochs),
       lastWriteError: message,
       safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
       log: pushLog(state, `[lf2] Home failed: ${message}`),
     };
   });
+}
+
+// KD-HOME-03/04 hides status positions after a failed Home because the cycle
+// may have stopped anywhere. A Home line the controller refused with error:N
+// never started a cycle: GRBL-family firmware rejects $H/$HX at parse or
+// validation time (for example error:3 when HOMING_SINGLE_AXIS_COMMANDS is not
+// compiled in, error:5 with homing disabled), so the positions the controller
+// keeps reporting are its real ones. Blanking them left the DRO empty and
+// Frame unable to find a position until a reconnect, re-home or Set origin
+// (audit regressions-2). The homing proof stays void, the epoch advance keeps
+// any report from before the attempt from counting as fresh, and a suppression
+// that predates this Home (unlock, motor release) is left in place.
+function refusedHomePositionPatch(
+  state: LaserState,
+  operation: HomeOperation,
+  error: unknown,
+  epochs: HomeEpochs,
+): Partial<Pick<LaserState, 'positionEvidenceSuppressed' | 'trustedPositionEpoch'>> {
+  if (
+    !(error instanceof ControllerCommandRefusedError) ||
+    operation.phase !== 'command' ||
+    epochs.positionSuppressedBefore
+  ) {
+    return {};
+  }
+  return {
+    positionEvidenceSuppressed: false,
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+  };
 }
 
 function assertHomeCurrent(
@@ -228,6 +266,17 @@ function assertHomeCurrent(
   }
 }
 
-function homeOperation(operationId: number, phase: HomeOperation['phase']): HomeOperation {
-  return { kind: 'home', phase, idleReports: 0, operationId };
+function homeOperation(
+  operationId: number,
+  phase: HomeOperation['phase'],
+  fromAlarm = false,
+): HomeOperation {
+  return {
+    kind: 'home',
+    phase,
+    idleReports: 0,
+    operationId,
+    // Only the command phase can meet a reply generated before $H executed.
+    ...(fromAlarm ? { awaitingFirstNonAlarmReport: true } : {}),
+  };
 }

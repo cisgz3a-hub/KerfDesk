@@ -33,6 +33,12 @@ import {
   streamerCanPauseForMpg,
 } from './laser-store-helpers';
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
+import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
+import {
+  homeAlarmReplyWindowPatch,
+  isStaleHomeAlarmReply,
+  staleHomeAlarmReplyPatch,
+} from './laser-home-alarm-reply';
 
 export function handleStatusLine(
   set: SetFn,
@@ -44,7 +50,8 @@ export function handleStatusLine(
   const state = get();
   const streamer = state.streamer;
   if (isInvalidatingStatusState(report.state)) {
-    handleInvalidatingStatus(set, refs, state, report, streamer);
+    if (isStaleHomeAlarmReply(state, report)) set(staleHomeAlarmReplyPatch(state, report));
+    else handleInvalidatingStatus(set, refs, state, report, streamer);
     return;
   }
   const { operation, observation: motionObservation } = observeOwnedMotionStatus(
@@ -106,6 +113,7 @@ export function handleStatusLine(
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...autofocusRecoveryPatch,
+    ...homeAlarmReplyWindowPatch(state, report),
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
     ...liveCanvasStatusCompletionPatch(state, report, streamer, jobOverAtIdle),
@@ -124,6 +132,7 @@ export function handleStatusLine(
       queuedFrameDispatch.line,
       queuedFrameDispatch.operation.operationId,
     );
+  releaseAbandonedMotionAtIdle(set, get, refs, safeWrite, report);
 }
 
 function observeOwnedMotionStatus(

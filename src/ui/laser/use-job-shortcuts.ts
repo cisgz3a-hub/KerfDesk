@@ -15,6 +15,7 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { runStartJobFlow } from './start-job-flow';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function installJobShortcuts(target: Window): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -46,5 +47,7 @@ function handleStopShortcut(e: KeyboardEvent): void {
   const activeMotion = laser.motionOperation !== null;
   if (!activeJob && !activeMotion) return;
   e.preventDefault();
-  void (activeJob ? laser.stopJob() : laser.cancelJog()).catch(() => undefined);
+  void (activeJob ? laser.stopJob() : laser.cancelJog()).catch(
+    controllerActionFailureHandler(activeJob ? 'Abort' : 'Stop motion'),
+  );
 }

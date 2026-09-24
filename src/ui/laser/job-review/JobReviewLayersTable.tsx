@@ -38,6 +38,7 @@ import {
   sectionStyle,
 } from './job-review.styles';
 import type { JobReviewEffectiveOperation } from './job-review-effective-operations';
+import { artworkOwnerPatches, reviewRowSettings } from './job-review-operation-edit';
 import { JobReviewEffectiveOperationRow } from './JobReviewEffectiveOperationRow';
 import {
   CncRowCells,
@@ -101,6 +102,7 @@ function LaserLayersTable(props: {
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const materialLibrary = useStore((s) => s.materialLibrary);
   const setLayerParam = useStore((s) => s.setLayerParam);
+  const setArtworkOverride = useStore((s) => s.setObjectsOperationOverrideForOperation);
   const updateLayerSubLayer = useStore((s) => s.updateLayerSubLayer);
   return (
     <table style={tableStyle}>
@@ -113,9 +115,17 @@ function LaserLayersTable(props: {
               <ModeChipCell label={formatLayerMode(layer.mode)} />
               <LaserRowCells
                 ariaContext={layer.name}
-                settings={layer}
+                settings={reviewRowSettings(layer, objects)}
                 maxFeedMmPerMin={maxFeed}
-                onCommit={(patch) => setLayerParam(layer.id, patch)}
+                onCommit={(patch) => {
+                  // Artworks that own an edited field keep it over the base
+                  // (ADR-317), so the edit must reach them too (audit speed-2).
+                  const owners = artworkOwnerPatches(layer, objects, patch);
+                  setLayerParam(layer.id, patch);
+                  for (const owner of owners) {
+                    setArtworkOverride(owner.objectIds, layer.id, owner.patch);
+                  }
+                }}
               />
               <td style={tableCellStyle}>{operationArtworkCount(objects, layer)}</td>
             </tr>

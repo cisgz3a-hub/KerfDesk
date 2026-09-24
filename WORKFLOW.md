@@ -530,7 +530,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 #### Error — speed input out of range
 - < 1: snaps to 1.
-- > device.maxFeed: snaps to maxFeed, status bar warns: `Capped to device max feed 6000 mm/min`.
+- > device.maxFeed: snaps to maxFeed. The Artwork Speed field shows an inline note under the
+  essentials ("15,000 mm/min is above this machine's Output max feed, so it runs at 10,000
+  mm/min.") with a one-click **Raise Output max feed to 15,000 mm/min** that raises the ceiling
+  and applies the request; a stored speed above the ceiling shows the same note. The Job Review
+  Speed cell warns with a toast: `Capped to Output max feed 10,000 mm/min. Change it in Machine
+  Setup > Output max feed.` Advisory only (ADR-361).
 
 #### Error — passes < 1
 - Snaps to 1.

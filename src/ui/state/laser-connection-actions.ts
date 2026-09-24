@@ -61,6 +61,7 @@ import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { createLaserStatusPollWriter } from './laser-status-poll-writer';
+import { cancelAttemptOwnsStatusBoundary } from './laser-motion-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -437,11 +438,12 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     // Polling here can otherwise keep pendingTransportWrites continuously
     // non-zero or race the explicitly owned Start observation.
     if (controllerOperationOwnsPolling(s)) return;
-    // Cancel owns a causal settle-marker -> status-query boundary. A periodic
-    // query inserted into that sequence would make an unlabelled status reply
-    // ambiguous again, so polling resumes only after the cancelled owner is
-    // released or the session is reset.
-    if (s.motionOperation?.cancelRequested === true) return;
+    // A live Cancel settlement owns a causal settle-marker -> status-query
+    // boundary and queries status itself; a periodic query inserted into that
+    // sequence would make an unlabelled status reply ambiguous again. A
+    // cancelled owner with no live attempt keeps polling: its release needs
+    // the Idle reports this loop produces (audit jog-home-origin-1/status-1).
+    if (cancelAttemptOwnsStatusBoundary(s.motionOperation)) return;
     if (realtimeQuery !== null) {
       if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
       void writeStatusPoll(realtimeQuery);

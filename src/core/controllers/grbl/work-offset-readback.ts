@@ -1,3 +1,5 @@
+import { parseCanonicalStatusNumber } from './status-parser';
+
 export type ActiveWorkCoordinateSystem = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
 
 export type OwnedWorkOffsetReadback =
@@ -38,7 +40,7 @@ export function parseOwnedWorkOffsetReadback(
   }
   const offset = parseOffset(offsetBodies[0] ?? '');
   return offset === null
-    ? { ok: false, reason: `${activeWcs} must report exactly three finite coordinates.` }
+    ? { ok: false, reason: `${activeWcs} must report at least three finite coordinates.` }
     : { ok: true, activeWcs, offset };
 }
 
@@ -68,10 +70,22 @@ function activeWcsFromModal(body: string): ActiveWorkCoordinateSystem | null {
   return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 
+// `$#` prints one value per configured axis: exactly XYZ on GRBL 1.1, but
+// grblHAL and FluidNC loop over every axis (system_n_axis() / _numberAxis),
+// so a rotary build reports `[G54:x,y,z,a]`. XYZ are the first three either
+// way, as in the status parser's MPos/WPos/WCO fields. A grblHAL build with
+// ROTATION_ENABLE appends `:<degrees>` for G54-G59; that rotation is about Z,
+// so it never changes the Z offset.
+// https://github.com/grblHAL/core/blob/master/report.c (report_ngc_parameters)
+// https://github.com/bdring/FluidNC/blob/main/FluidNC/src/Report.cpp (report_ngc_coord)
 function parseOffset(
   body: string,
 ): { readonly x: number; readonly y: number; readonly z: number } | null {
-  const values = body.split(',').map(Number);
-  if (values.length !== 3 || values.some((value) => !Number.isFinite(value))) return null;
+  const [axes = '', rotation, ...extra] = body.split(':');
+  if (extra.length > 0) return null;
+  if (rotation !== undefined && parseCanonicalStatusNumber(rotation) === null) return null;
+  // Every token must be a real number: Number('') is 0, so `1,2,` must not read as z=0.
+  const values = axes.split(',').map(parseCanonicalStatusNumber);
+  if (values.length < 3 || values.includes(null)) return null;
   return { x: values[0] ?? 0, y: values[1] ?? 0, z: values[2] ?? 0 };
 }

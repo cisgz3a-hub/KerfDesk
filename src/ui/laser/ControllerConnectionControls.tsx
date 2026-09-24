@@ -8,6 +8,7 @@ import { ConnectionBar } from './ConnectionBar';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 type Props = {
   readonly machineKind: MachineKind;
@@ -57,11 +58,17 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}
         onConnect={connect}
-        onDisconnect={() => void disconnectController().catch(() => undefined)}
+        onDisconnect={() =>
+          void disconnectController().catch(controllerActionFailureHandler('Disconnect'))
+        }
         onForget={props.onForget}
         qualification={qualification}
-        onRetryQualification={() => void retryQualification().catch(() => undefined)}
-        onReconnectQualification={() => void reconnect().catch(() => undefined)}
+        onRetryQualification={() =>
+          void retryQualification().catch(controllerActionFailureHandler('Check controller'))
+        }
+        onReconnectQualification={() =>
+          void reconnect().catch(controllerActionFailureHandler('Reconnect'))
+        }
         disabled={
           !supportsSerial ||
           connectionControlsBusy(props.motionOperation, props.controllerOperation) ||

@@ -17,6 +17,7 @@ import {
   PendingPauseResumeAction,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 const TOOL_CHANGE_CONTINUE_TITLE =
@@ -79,7 +80,7 @@ export function LiveMotionBar(): JSX.Element | null {
           className="lf-btn lf-btn--danger"
           style={abortButtonStyle}
           title={SOFTWARE_ABORT_TITLE}
-          onClick={() => void abort().catch(() => undefined)}
+          onClick={() => void abort().catch(controllerActionFailureHandler('Abort'))}
         >
           {description.abortLabel}
         </button>
