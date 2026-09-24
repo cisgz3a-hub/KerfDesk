@@ -11,8 +11,9 @@
 //     beam nominally off, and a diode's turn-off lag can paint a faint line over
 //     that distance (the 2026-06-03 "moved to the second part and left a stray
 //     line" class). ADR-035 split fill gaps > 5 mm into independent sweeps.
-//     Current generic policy may use bounded S0 feed runways at each edge, but
-//     no individual blank feed exceeds this threshold; any longer one is a
+//     Generated S0 feed runways at sweep edges follow the operator's overscan
+//     and can exceed this threshold; preflight recognizes those marked
+//     runways within the configured overscan. Any other longer blank feed is a
 //     regression or a stale export that predates the fix. Report it for Job
 //     Review; it is not a compile-integrity refusal.
 //

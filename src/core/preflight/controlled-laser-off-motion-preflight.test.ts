@@ -66,6 +66,42 @@ function projectWith(layer: ReturnType<typeof createLayer>): Project {
   };
 }
 
+function scanLineSquareProject(minX: number, fillOverscanMm: number): Project {
+  const square: SceneObject = {
+    kind: 'imported-svg',
+    id: 'square',
+    source: 'square.svg',
+    bounds: { minX, minY: 20, maxX: minX + 10, maxY: 30 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x: minX, y: 20 },
+              { x: minX + 10, y: 20 },
+              { x: minX + 10, y: 30 },
+              { x: minX, y: 30 },
+            ],
+            closed: true,
+          },
+        ],
+      },
+    ],
+  };
+  const layer = {
+    ...createLayer({ id: 'fill', color: '#ff0000', mode: 'fill' }),
+    hatchSpacingMm: 2,
+    fillOverscanMm,
+  };
+  return { ...createProject(), scene: { ...EMPTY_SCENE, objects: [square], layers: [layer] } };
+}
+
+function preflightCodes(project: Project): ReadonlyArray<string> {
+  return runPreflight(project, emit(project)).issues.map((issue) => issue.code);
+}
+
 function emit(project: Project): string {
   return grblStrategy.emit(compileJob(project.scene, project.device), project.device);
 }
@@ -170,6 +206,17 @@ describe('controlled laser-off motion preflight', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.message).toContain('12.000 mm');
+  });
+
+  it('accepts full generic Scan Line runways above 5 mm but reports ones that leave the bed', () => {
+    const inside = scanLineSquareProject(20, 10);
+
+    // The burn spans X20..X30, so each 10 mm laser-off runway reaches X10 or X40.
+    expect(emit(inside)).toMatch(/^G1 X40\.000 Y\S+ F1500 S0 ; kerfdesk:laser-off-motion$/m);
+    expect(preflightCodes(inside)).not.toContain('long-blank-feed');
+    expect(preflightCodes(inside)).not.toContain('out-of-bed');
+    expect(preflightCodes(scanLineSquareProject(7, 5))).not.toContain('out-of-bed');
+    expect(preflightCodes(scanLineSquareProject(7, 10))).toContain('out-of-bed');
   });
 
   it('allows only the distance error introduced by three-decimal coordinate rounding', () => {

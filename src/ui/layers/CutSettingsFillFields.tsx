@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Layer } from '../../core/scene';
+import { useStore } from '../state';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
-import { genericRunwayFallbackText } from './fill-overscan-fallback';
+import { scanLineOverscanNote } from './fill-overscan-fallback';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
@@ -120,6 +121,8 @@ function FillOverscanField(props: {
   readonly value: number;
   readonly onChange: (value: number) => void;
 }): JSX.Element {
+  const device = useStore((state) => state.project.device);
+  const note = props.fillStyle === 'scanline' ? scanLineOverscanNote(device, props.value) : null;
   return (
     <Field label="Overscan">
       <NumberInput
@@ -131,9 +134,7 @@ function FillOverscanField(props: {
         onChange={props.onChange}
       />
       <span className="lf-field-unit">mm</span>
-      {props.fillStyle === 'scanline' && props.value <= 0 ? (
-        <span style={FALLBACK_STYLE}>{genericRunwayFallbackText(props.value)}</span>
-      ) : null}
+      {note === null ? null : <span style={FALLBACK_STYLE}>{note}</span>}
     </Field>
   );
 }

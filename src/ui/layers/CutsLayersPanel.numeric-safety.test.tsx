@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -91,6 +92,28 @@ describe('CutsLayersPanel numeric safety', () => {
       });
       expect(host.textContent).toContain('stored -2; generic effective target 5 mm');
       expect(host.textContent).not.toContain('stored 0; generic effective target 5 mm');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('shows a stored overscan above the 4040-safe Scan Line bound as capped', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const operationId = requireOperationId();
+    useStore.getState().setLayerParam(operationId, {
+      mode: 'fill',
+      fillStyle: 'scanline',
+      fillOverscanMm: 10,
+    });
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('stored 10; 4040-safe Scan Line uses up to 5 mm');
+      act(() => {
+        useStore.getState().setLayerParam(operationId, { fillOverscanMm: 0 });
+      });
+      expect(host.textContent).not.toContain('4040-safe Scan Line uses up to');
+      expect(host.textContent).not.toContain('generic effective target');
     } finally {
       await unmount();
     }

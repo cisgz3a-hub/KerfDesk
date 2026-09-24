@@ -1,6 +1,7 @@
 import type { Layer, LayerOperationSettings } from '../../core/scene';
+import { useStore } from '../state';
 import { FeedCeilingNotice, useFeedCeiling } from './feed-ceiling';
-import { genericRunwayFallbackText } from './fill-overscan-fallback';
+import { scanLineOverscanNote } from './fill-overscan-fallback';
 import { clamp, numericValue, SpeedInput, targetAriaContext } from './LayerSpeedInput';
 import { LayerImageFields } from './LayerImageFields';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
@@ -145,6 +146,12 @@ function FillFields(props: {
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
   const { layer, operationTarget } = props;
+  const device = useStore((state) => state.project.device);
+  const overscanNote =
+    !operationTarget.mixedFields?.fillOverscanMm &&
+    operationTarget.settings.fillStyle === 'scanline'
+      ? scanLineOverscanNote(device, operationTarget.settings.fillOverscanMm)
+      : null;
   return (
     <>
       <p className="lf-laser-help">Closer lines create a denser fill.</p>
@@ -163,13 +170,7 @@ function FillFields(props: {
           purpose="fill overscan"
         />
         <span style={unitStyle}>mm</span>
-        {!operationTarget.mixedFields?.fillOverscanMm &&
-        operationTarget.settings.fillStyle === 'scanline' &&
-        operationTarget.settings.fillOverscanMm <= 0 ? (
-          <span style={FALLBACK_TEXT_STYLE}>
-            {genericRunwayFallbackText(operationTarget.settings.fillOverscanMm)}
-          </span>
-        ) : null}
+        {overscanNote === null ? null : <span style={FALLBACK_TEXT_STYLE}>{overscanNote}</span>}
       </FieldRow>
     </>
   );

@@ -56,6 +56,10 @@ function requiredPlan(
   return plan;
 }
 
+function hasFullOuterRunways(plans: ReturnType<typeof planFillSweeps>, runwayMm: number): boolean {
+  return plans[0]?.leadInMm === runwayMm && plans.at(-1)?.leadOutMm === runwayMm;
+}
+
 describe('planFillSweeps', () => {
   it('gives every split sweep bounded feed-matched entry and exit motion', () => {
     const plans = planFillSweeps(
@@ -169,6 +173,44 @@ describe('planFillSweeps', () => {
     ]);
   });
 
+  it('applies a configured overscan above 5 mm in full around a lone sweep', () => {
+    const plans = planFillSweeps({ ...group([seg(10, 4, 10.47, 4)]), overscanMm: 10 });
+    const run = expandedEndpoints(requiredPlan(plans, 0));
+
+    expect(plans).toEqual([
+      expect.objectContaining({ leadInMm: 10, leadOutMm: 10, runwayMotion: 'feed-matched' }),
+    ]);
+    expect(run?.leadStart.x).toBe(0);
+    expect(run?.leadEnd.x).toBeCloseTo(20.47, 9);
+  });
+
+  it('shares only split gaps too narrow for two full 10 mm runways', () => {
+    const plans = planFillSweeps({
+      ...group([seg(0, 0, 1, 0), seg(7, 0, 8, 0), seg(32, 0, 33, 0)]),
+      overscanMm: 10,
+    });
+
+    expect(plans.map(({ leadInMm, leadOutMm }) => [leadInMm, leadOutMm])).toEqual([
+      [10, 3],
+      [3, 10],
+      [10, 10],
+    ]);
+    expect(expandedEndpoints(requiredPlan(plans, 0))?.leadEnd.x).toBe(4);
+    expect(expandedEndpoints(requiredPlan(plans, 1))?.leadStart.x).toBe(4);
+    expect(expandedEndpoints(requiredPlan(plans, 1))?.leadEnd.x).toBe(18);
+    expect(expandedEndpoints(requiredPlan(plans, 2))?.leadStart.x).toBe(22);
+  });
+
+  it('keeps the 4040-safe entry bounded to 5 mm when overscan is larger', () => {
+    const plans = planFillSweeps({
+      ...group([seg(10, 4, 10.47, 4)]),
+      fillRunwayPolicy: 'feed-matched-entry',
+      overscanMm: 10,
+    });
+
+    expect(plans).toEqual([expect.objectContaining({ leadInMm: 5, leadOutMm: 5 })]);
+  });
+
   it('uses the bounded generic default instead of allowing a zero-runway powered start', () => {
     const plans = planFillSweeps({ ...group([seg(10, 4, 10.47, 4)]), overscanMm: 0 });
 
@@ -199,13 +241,15 @@ describe('planFillSweeps', () => {
         fc.double({ min: 5.001, max: 100, noNaN: true, noDefaultInfinity: true }),
         fc.double({ min: 0.1, max: 20, noNaN: true, noDefaultInfinity: true }),
         fc.double({ min: 0.1, max: 20, noNaN: true, noDefaultInfinity: true }),
-        (gapMm, firstLengthMm, secondLengthMm) => {
-          const plans = planFillSweeps(
-            group([
+        fc.double({ min: 0.5, max: 25, noNaN: true, noDefaultInfinity: true }),
+        (gapMm, firstLengthMm, secondLengthMm, runwayMm) => {
+          const plans = planFillSweeps({
+            ...group([
               seg(0, 0, firstLengthMm, 0),
               seg(firstLengthMm + gapMm, 0, firstLengthMm + gapMm + secondLengthMm, 0),
             ]),
-          );
+            overscanMm: runwayMm,
+          });
           const first = plans[0];
           const second = plans[1];
           if (first === undefined || second === undefined) return false;
@@ -220,10 +264,11 @@ describe('planFillSweeps', () => {
             firstRun.burnEnd.x <= secondRun.leadStart.x + TEST_EPS_MM &&
             firstRun.leadEnd.x <= secondRun.leadStart.x + TEST_EPS_MM &&
             secondRun.leadStart.x <= secondRun.burnStart.x + TEST_EPS_MM &&
-            first.leadOutMm <= DEFAULT_RUNWAY_MM &&
-            second.leadInMm <= DEFAULT_RUNWAY_MM &&
+            hasFullOuterRunways(plans, runwayMm) &&
+            first.leadOutMm <= runwayMm &&
+            second.leadInMm <= runwayMm &&
             first.leadOutMm + second.leadInMm <= gapMm + TEST_EPS_MM &&
-            totalRunwayMm <= 2 * DEFAULT_RUNWAY_MM * plans.length + TEST_EPS_MM
+            totalRunwayMm <= 2 * runwayMm * plans.length + TEST_EPS_MM
           );
         },
       ),
