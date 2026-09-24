@@ -2,10 +2,12 @@
 // standby timer can stop the pump and hold the program mid-job.
 //
 // Creality's A1 firmware idles the air pump (and powers the laser module down)
-// `$152` seconds after it decides work has finished: 0..100, default 30, and
-// 100 means never (Creality wiki, "Description for GRBL configuration
-// parameters"). Its shipped 1.0.6 build has dropped the pump seconds after a
-// fresh M8 (LightBurn staff: a confirmed firmware bug, fixed in 1.0.7). On the
+// `$152` seconds after it decides work has finished: 0..100, with 100 reported
+// as never (Creality wiki, "Description for GRBL configuration parameters";
+// the default is reported as 20 or 30). LightBurn staff call the air cut-off a
+// confirmed firmware bug on both the A1 and the A1 Pro. The A1 fix was a 1.0.7
+// debug build; A1 Pro firmware is numbered separately (1.0.38 on Creality's
+// support page, 2025-08-25), so a version number alone says nothing. On the
 // maintainer's Falcon A1 Pro this showed as air that "works for a few minutes
 // and then stops" and a machine that sits Idle for about a minute mid-burn
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
@@ -19,11 +21,11 @@ import type { Job } from '../../../core/job';
 type StandbyDevice = Pick<DeviceProfile, 'airAssistCommand' | 'airAssistRestartUnreliable'>;
 
 export const AIR_STANDBY_WARNING =
-  'This controller idles its air pump and laser module on its own standby timer ($152, default ' +
-  '30 s, 100 = never) and its 1.0.6 firmware has been seen dropping the pump mid-job. If air ' +
+  'This controller idles its air pump and laser module on its own standby timer ($152, ' +
+  '100 = never) and Creality firmware has been seen dropping the pump mid-job. If air ' +
   'stops after a few minutes or the machine sits Idle mid-burn and then continues, set $152=100 ' +
-  'on the controller (or update the firmware past 1.0.6). KerfDesk names such a hold in the live ' +
-  'bar and keeps waiting; it does not reset the controller.';
+  'on the controller, or install the latest firmware and confirm with an air test. KerfDesk names ' +
+  'such a hold in the live bar and keeps waiting; it does not reset the controller.';
 
 export function detectAirAssistStandbyWarnings(
   job: Job,
