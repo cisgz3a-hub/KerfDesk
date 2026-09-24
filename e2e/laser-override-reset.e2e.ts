@@ -35,11 +35,16 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
   // Job 1, with the operator's live Feed/Power adjustment reported mid-run.
   await frameCurrentJob(page, kerfdesk);
   await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  const eventsBeforeJob1 = writeEvents(await kerfdesk.events()).length;
   await page
     .getByRole('dialog', { name: 'Review job before starting' })
     .getByRole('button', { name: 'Start job' })
     .click();
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await answerStatusUntilProgramStarts(
+    kerfdesk,
+    eventsBeforeJob1,
+    '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>',
+  );
   const abort = page.getByRole('button', { name: 'ABORT JOB', exact: true });
   await expect(abort).toBeVisible({ timeout: 30_000 });
   await kerfdesk.emitSerialLine(
@@ -70,14 +75,11 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
   await expect(review).toContainText('overrides reset to 100% at Start');
   const eventsBeforeStart = writeEvents(await kerfdesk.events()).length;
   await review.getByRole('button', { name: 'Start job' }).click();
-  await kerfdesk.emitSerialLine(
+  await answerStatusUntilProgramStarts(
+    kerfdesk,
+    eventsBeforeStart,
     '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>',
   );
-  await expect
-    .poll(async () => writeEvents(await kerfdesk.events()).slice(eventsBeforeStart).length, {
-      timeout: 30_000,
-    })
-    .toBeGreaterThan(0);
 
   // The first program write carries the reset as three single raw bytes
   // (the fixture's text view decodes them as UTF-8, so assert on bytes),
@@ -177,6 +179,30 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
     await input.press('Tab');
     await expect(input).toHaveValue(value, { timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
+}
+
+// A framed laser Start writes a realtime '?' first and sends the program only
+// after a status report newer than that query. Answer the way a controller
+// does until the program is on the wire: one report emitted right after the
+// click can land before the query, and the Start then waits for a fresh report
+// that never comes. The query alone is not the job either.
+async function answerStatusUntilProgramStarts(
+  kerfdesk: KerfDeskFixture,
+  writesBefore: number,
+  statusLine: string,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const started = writeEvents(await kerfdesk.events())
+          .slice(writesBefore)
+          .some((event) => String(event['text']).includes('G21'));
+        if (!started) await kerfdesk.emitSerialLine(statusLine);
+        return started;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
 }
 
 function writeEvents(
