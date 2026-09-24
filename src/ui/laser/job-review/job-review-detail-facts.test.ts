@@ -86,6 +86,21 @@ describe('cncOperationDetail', () => {
     );
   });
 
+  // ADR-258 amendment 1: a profile whose floor holds the part compiles without
+  // tabs, so the line says why instead of listing tabs that will not be cut.
+  it('says when a shallow profile in thick stock skips its tabs', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'profile-outside',
+      depthMm: 3,
+      tabsEnabled: true,
+    };
+    expect(cncOperationDetail(settings, 19)).toContain(
+      'tabs 4 per shape (6 × 2 mm), skipped: the 16 mm floor holds the part',
+    );
+    expect(cncOperationDetail({ ...settings, depthMm: 19 }, 19)).not.toContain('skipped');
+  });
+
   it('includes direction, entry, finish allowance, strategy, and material feeds', () => {
     const settings: CncLayerSettings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,

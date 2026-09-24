@@ -213,7 +213,7 @@ function CncLayersTable(props: {
               <OperationDetailRow
                 colSpan={CNC_COLUMNS.length}
                 chip={null}
-                text={cncOperationDetail(settings)}
+                text={cncOperationDetail(settings, machine.stock.thicknessMm)}
               />
               <JobReviewEffectiveOperationRow
                 colSpan={CNC_COLUMNS.length}
