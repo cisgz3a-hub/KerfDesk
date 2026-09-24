@@ -9,7 +9,6 @@
 // and a native dialog there would freeze the ack pump and Abort button.
 
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
-import type { JobCheckpoint } from '../../core/recovery';
 import { machineKindOf } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -23,7 +22,6 @@ import {
 import { useCameraStore } from '../state/camera-store';
 import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
-import { checkpointProgramIssue, checkpointStartIssue } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob } from './start-job-source';
 import { noteManualRestartStarted, prepareManualRestartSource } from './manual-restart-source';
@@ -40,10 +38,7 @@ import {
   currentLaserForAuthorizedStartNow,
   type CurrentStartAuthorizationArgs,
 } from './start-job-authorization';
-import {
-  reportBlockedStart,
-  reportStartAuthorizationRefusal,
-} from './start-job-authorization-reporting';
+import { reportStartAuthorizationRefusal } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import { type StartOfferPolicy } from './start-blocked-repair';
@@ -133,7 +128,6 @@ async function streamFramedRun(
 ): Promise<boolean> {
   const authorizationArgs = {
     preparedAgainst: permit.controller,
-    checkpointToReplace: null,
     completedReceipt: null,
     expectedExecutionSignature: permit.candidate.executionSignature,
     repository,
@@ -151,7 +145,6 @@ async function streamFramedRun(
     reviewModel: review.reviewModel,
     laserModeStartEvidence: review.laserModeStartEvidence,
     cncSetupAttestation: review.cncSetupAttestation,
-    checkpointToReplace: null,
     completedReceipt: null,
     repository,
     framedRunClaim: claim,
@@ -164,11 +157,10 @@ export async function runCompletedJobAgainFlow(
   receipt: LastCompletedReceipt,
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  await runStartJobFlowWithCheckpoint(null, receipt, repository);
+  await runStartJobFlowWithReceipt(receipt, repository);
 }
 
-async function runStartJobFlowWithCheckpoint(
-  checkpointToReplace: JobCheckpoint | null,
+async function runStartJobFlowWithReceipt(
   completedReceipt: LastCompletedReceipt | null,
   repository: RecoveryRepository,
   offerPolicy: StartOfferPolicy = 'offer-fixes',
@@ -176,11 +168,6 @@ async function runStartJobFlowWithCheckpoint(
   clearStartBlockers();
   const laser = useLaserStore.getState();
   const app = useStore.getState();
-  const initialCheckpointIssue = checkpointStartIssue(checkpointToReplace);
-  if (initialCheckpointIssue !== null) {
-    reportBlockedStart(initialCheckpointIssue);
-    return;
-  }
   const { project } = app;
   const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
   const camera = useCameraStore.getState();
@@ -192,22 +179,12 @@ async function runStartJobFlowWithCheckpoint(
   );
   if (!prepared.ok) {
     if ((await repairOrReportBlockedStart(prepared.messages, offerPolicy)) === 'retry') {
-      return runStartJobFlowWithCheckpoint(
-        checkpointToReplace,
-        completedReceipt,
-        repository,
-        'no-offers',
-      );
+      return runStartJobFlowWithReceipt(completedReceipt, repository, 'no-offers');
     }
     return;
   }
   if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
     await discardChangedCompletedReplay(completedReceipt, repository);
-    return;
-  }
-  const programIssue = checkpointProgramIssue(checkpointToReplace, prepared.gcode);
-  if (programIssue !== null) {
-    reportBlockedStart(programIssue);
     return;
   }
   // ADR-224: the Job Review dialog replaces the warnings toast and the two
@@ -216,7 +193,6 @@ async function runStartJobFlowWithCheckpoint(
   // the same evidence/attestation objects the confirms used to produce.
   const review = await runJobReviewGate({
     initial: { app, project, laser, prepared, laserModeStartSnapshot },
-    checkpointToReplace,
     completedReceipt,
     ...completedReplayInvalidationHandler(completedReceipt, repository),
   });
@@ -226,7 +202,6 @@ async function runStartJobFlowWithCheckpoint(
   const machineKind = machineKindOf(bundle.project.machine);
   const currentLaser = await currentLaserForAuthorizedStart({
     preparedAgainst: bundle.laser,
-    checkpointToReplace,
     completedReceipt,
     expectedExecutionSignature: bundle.prepared.canvasPlan.retentionKey,
     repository,
@@ -242,7 +217,6 @@ async function runStartJobFlowWithCheckpoint(
     reviewModel,
     laserModeStartEvidence,
     cncSetupAttestation,
-    checkpointToReplace,
     completedReceipt,
     repository,
   });
@@ -300,7 +274,6 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<boolean> {
   if (handoff.blocked) return false;
   const authorizationArgs = {
     preparedAgainst: args.laser,
-    checkpointToReplace: args.checkpointToReplace,
     completedReceipt: args.completedReceipt,
     expectedExecutionSignature: args.prepared.canvasPlan.retentionKey,
     repository: args.repository,
