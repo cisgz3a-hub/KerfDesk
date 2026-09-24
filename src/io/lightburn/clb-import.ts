@@ -11,6 +11,7 @@ import { resolveLightBurnOverscan } from './lbrn-overscan';
 // walker) and stays. The former 5 MB byte ceiling and 10 000 entry ceiling were
 // policy caps and are gone — rule 7 / ADR-228.
 const MAX_XML_DEPTH = 64;
+const DEFAULT_CLB_FILL_OVERSCAN_MM = 0;
 
 export type ClbImportReport = {
   readonly sourceName: string;
@@ -136,9 +137,10 @@ function importedOverscanMm(
     numberField(setting, ['overscanpercent']),
     speedMmSec,
     description,
+    DEFAULT_CLB_FILL_OVERSCAN_MM,
   );
   warnings.push(...overscan.warnings);
-  return overscan.distanceMm ?? 0;
+  return overscan.distanceMm ?? DEFAULT_CLB_FILL_OVERSCAN_MM;
 }
 
 function importedRecipe(

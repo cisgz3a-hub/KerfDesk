@@ -82,6 +82,24 @@ describe('LightBurn CLB import', () => {
     expect(disabled.ok && disabled.library.entries[0]?.recipe.fillOverscanMm).toBe(0);
   });
 
+  it.each([null, '-1', 'not-a-number'])(
+    'reports the actual zero runway when an enabled overscan percentage is unresolved (%s)',
+    (percent) => {
+      const percentField = percent === null ? '' : `<overscanPercent Value="${percent}"/>`;
+      const result = importLightBurnClb(
+        `<LightBurnLibrary><Material Name="Oak"><Entry Thickness="3" Desc="Fill"><CutSetting type="Scan"><speed Value="300"/><maxPower Value="20"/><overscan Value="1"/>${percentField}</CutSetting></Entry></Material></LightBurnLibrary>`,
+        'unresolved-overscan.clb',
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.library.entries[0]?.recipe.fillOverscanMm).toBe(0);
+      expect(result.report.warnings).toEqual([
+        'Fill: LightBurn Scan overscan could not be converted without a nonnegative imported percentage; review the default 0 mm runway.',
+      ]);
+    },
+  );
+
   it('reports skipped unsupported entries instead of silently inventing settings', () => {
     const result = importLightBurnClb(
       `<Library><Material Name="Mixed"><Entry Desc="Missing"><CutSetting Speed="10" /></Entry><Entry Desc="Good"><CutSetting Speed="10" MaxPower="20" /></Entry></Material></Library>`,
