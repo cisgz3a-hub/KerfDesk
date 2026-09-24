@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitCubicsThroughPoints, type CubicBezier } from './cubic-fit';
+import { fitCubicWithTangents, fitCubicsThroughPoints, type CubicBezier } from './cubic-fit';
 import type { Vec2 } from '../scene';
 
 // A CCW circle sampled as a closed, cornerless ring — the shape a traced disc /
@@ -46,3 +46,48 @@ describe('fitCubicsThroughPoints — closed cornerless seam', () => {
     }
   });
 });
+
+describe('fitCubicWithTangents', () => {
+  it('solves only the arm lengths and recovers a cubic from its own samples', () => {
+    const source: CubicBezier = {
+      p0: { x: 0, y: 0 },
+      p1: { x: 3, y: 4 },
+      p2: { x: 7, y: 5 },
+      p3: { x: 10, y: 0 },
+    };
+    const samples = Array.from({ length: 41 }, (_, i) => cubicAt(source, i / 40));
+
+    const fit = fitCubicWithTangents(
+      samples,
+      unit(source.p0, source.p1),
+      unit(source.p3, source.p2),
+    );
+
+    expect(fit?.p0).toEqual(source.p0);
+    expect(fit?.p3).toEqual(source.p3);
+    const leaving = unit(fit!.p0, fit!.p1);
+    const entering = unit(fit!.p3, fit!.p2);
+    expect(leaving.x).toBeCloseTo(0.6, 12);
+    expect(leaving.y).toBeCloseTo(0.8, 12);
+    expect(entering.x).toBeCloseTo(-3 / Math.hypot(3, 5), 12);
+    expect(entering.y).toBeCloseTo(5 / Math.hypot(3, 5), 12);
+    for (const point of samples) {
+      const nearest = Math.min(
+        ...Array.from({ length: 401 }, (_, i) => {
+          const q = cubicAt(fit!, i / 400);
+          return Math.hypot(q.x - point.x, q.y - point.y);
+        }),
+      );
+      expect(nearest).toBeLessThan(0.02);
+    }
+    expect(fitCubicWithTangents([source.p0], { x: 1, y: 0 }, { x: -1, y: 0 })).toBeNull();
+  });
+});
+
+function cubicAt(c: CubicBezier, t: number): Vec2 {
+  const m = 1 - t;
+  return {
+    x: m * m * m * c.p0.x + 3 * m * m * t * c.p1.x + 3 * m * t * t * c.p2.x + t * t * t * c.p3.x,
+    y: m * m * m * c.p0.y + 3 * m * m * t * c.p1.y + 3 * m * t * t * c.p2.y + t * t * t * c.p3.y,
+  };
+}

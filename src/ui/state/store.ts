@@ -261,7 +261,7 @@ export type AppState = ObjectPropertiesActions &
       object: SceneObject,
     ) => ImportOutcome | null;
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
-    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
+    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
     readonly traceExistingImage: (
       sourceId: string,

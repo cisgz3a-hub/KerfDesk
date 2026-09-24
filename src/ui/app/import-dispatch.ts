@@ -14,7 +14,10 @@ export const ARTWORK_IMPORT_EXTENSIONS = ['.svg', '.dxf', '.png', '.jpg', '.jpeg
 export type ImportDispatchActions = {
   readonly getProjectDocumentEpoch: () => number;
   readonly importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome;
-  readonly importRasterImage: (object: SceneObject, batchIndex?: number) => void;
+  readonly importRasterImage: (
+    object: SceneObject,
+    batchIndex?: number,
+  ) => ImportOutcome | undefined;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
@@ -160,7 +163,7 @@ export function bindImportActionsToDocument(
     },
     importRasterImage: (object, batchIndex) => {
       assertCurrent();
-      actions.importRasterImage(object, batchIndex);
+      return actions.importRasterImage(object, batchIndex);
     },
     pushToast: (message, variant) => {
       if (owner.isCurrent()) actions.pushToast(message, variant);

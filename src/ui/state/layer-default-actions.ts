@@ -1,9 +1,10 @@
-import { updateLayer, type Project } from '../../core/scene';
+import { updateLayer, type Layer, type Project, type SceneObject } from '../../core/scene';
 import {
   applyLayerDefaultSettings,
   captureLayerDefaultSettings,
   type LayerDefaultSettings,
 } from '../layers/layer-default-settings';
+import { defaultColorForOperation } from './operation-source-color';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 export type LayerDefaultsState = {
@@ -50,14 +51,15 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
   return {
     makeLayerDefault: (layerId) =>
       set((state) => {
-        const layer = state.project.scene.layers.find((candidate) => candidate.id === layerId);
+        const { scene } = state.project;
+        const layer = scene.layers.find((candidate) => candidate.id === layerId);
         if (layer === undefined) return {};
         return {
           layerDefaults: {
             ...state.layerDefaults,
             byColor: {
               ...state.layerDefaults.byColor,
-              [layer.color]: captureLayerDefaultSettings(layer),
+              [defaultColorForOperation(scene.objects, layer)]: captureLayerDefaultSettings(layer),
             },
           },
         };
@@ -77,7 +79,11 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
       set((state) => {
         const layer = state.project.scene.layers.find((candidate) => candidate.id === layerId);
         if (layer === undefined) return {};
-        const defaults = defaultSettingsForColor(state.layerDefaults, layer.color);
+        const defaults = defaultSettingsForOperation(
+          state.layerDefaults,
+          state.project.scene.objects,
+          layer,
+        );
         if (Object.keys(defaults).length === 0) return {};
         const scene = updateLayer(
           state.project.scene,
@@ -96,9 +102,19 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
   };
 }
 
-export function defaultSettingsForColor(
+// Every path that creates or resets an operation looks its defaults up here,
+// under the one key Make Default saves to. There is deliberately no fallback
+// to the operation's palette color: a saved key cannot tell an artwork color
+// from a palette color, so a default saved for black artwork would reach any
+// new operation that happened to get palette black.
+export function defaultSettingsForOperation(
   layerDefaults: LayerDefaultsState,
-  color: string,
+  objects: ReadonlyArray<SceneObject>,
+  operation: Layer,
 ): LayerDefaultSettings {
-  return layerDefaults.byColor[color] ?? layerDefaults.allColors ?? {};
+  return (
+    layerDefaults.byColor[defaultColorForOperation(objects, operation)] ??
+    layerDefaults.allColors ??
+    {}
+  );
 }

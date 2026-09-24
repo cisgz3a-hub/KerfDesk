@@ -6,7 +6,13 @@ import {
   IDENTITY_TRANSFORM,
   type ReliefObject,
 } from '../../core/scene';
-import { applyFreshImport } from './scene-mutations';
+import { applyImportBedFit } from './import-bed-fit';
+import { applyFreshImport, type StateSlice } from './scene-mutations';
+
+// The store's fresh-import placement: file size first, then the oversize fit.
+function freshImport(state: StateSlice, relief: ReliefObject, batchIndex: number) {
+  return applyImportBedFit(applyFreshImport(state, relief, batchIndex));
+}
 
 function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
   const common = {
@@ -45,7 +51,7 @@ function tallRelief(source: 'mesh' | 'depth-map'): ReliefObject {
 describe('applyFreshImport relief placement', () => {
   it('centers and offsets a fresh depth map without scaling it to the bed', () => {
     const state = { project: createProject(), undoStack: [] };
-    const result = applyFreshImport(state, tallRelief('depth-map'), 2);
+    const { state: result, outcome } = freshImport(state, tallRelief('depth-map'), 2);
     const stored = result.project.scene.objects[0];
     if (stored?.kind !== 'relief') throw new Error('depth-map relief missing');
 
@@ -54,15 +60,17 @@ describe('applyFreshImport relief placement', () => {
     const center = applyTransform({ x: 50, y: 500 }, stored.transform);
     expect(center.x).toBe(state.project.device.bedWidth / 2 + 20);
     expect(center.y).toBe(state.project.device.bedHeight / 2 + 20);
+    expect(outcome).toEqual({ kind: 'added' });
   });
 
-  it('retains ordinary scale-to-fit placement for a mesh relief', () => {
+  it('retains ordinary scale-to-fit placement for an over-bed mesh relief', () => {
     const state = { project: createProject(), undoStack: [] };
-    const result = applyFreshImport(state, tallRelief('mesh'), 0);
+    const { state: result, outcome } = freshImport(state, tallRelief('mesh'), 0);
     const stored = result.project.scene.objects[0];
     if (stored?.kind !== 'relief') throw new Error('mesh relief missing');
 
     expect(stored.transform.scaleX).toBeCloseTo(0.36);
     expect(stored.transform.scaleY).toBeCloseTo(0.36);
+    expect(outcome.kind === 'added' ? outcome.bedFit?.scale : undefined).toBeCloseTo(0.36);
   });
 });

@@ -87,4 +87,25 @@ describe('importSvgFiles', () => {
       'warning',
     );
   });
+
+  it('reports a scale-to-fit after the import toasts so it stays in view', async () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1000mm" height="500mm" viewBox="0 0 1000 500"><text>x</text><rect width="10" height="10" stroke="#f00"/></svg>';
+    const bedFit = { scale: 0.36, widthMm: 1000, heightMm: 500, bedWidthMm: 400, bedHeightMm: 400 };
+    const pushToast = vi.fn();
+
+    await importSvgFiles(
+      [{ name: 'banner.svg', text: async () => svg }],
+      vi.fn(() => ({ kind: 'added' as const, bedFit })),
+      pushToast,
+    );
+
+    const messages = pushToast.mock.calls.map(([message]) => String(message));
+    expect(messages.at(-2)).toMatch(/text element.*ignored/);
+    expect(pushToast).toHaveBeenLastCalledWith(
+      'banner.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% ' +
+        'to fit. Undo restores the original size.',
+      'warning',
+    );
+  });
 });
