@@ -14,13 +14,13 @@ import {
   resumeQualificationInSession,
 } from './laser-controller-qualification';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import { reportSilentController } from './laser-controller-silence';
 import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
 } from './laser-controller-build-info';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { appendSystemNotice } from './laser-system-notice';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -35,6 +35,7 @@ type SafeWriteFn = (
 
 const PASSIVE_STARTUP_WAIT_MS = 250;
 const ACTIVE_HANDSHAKE_WAIT_MS = 1_750;
+const HANDSHAKE_WINDOW_MS = PASSIVE_STARTUP_WAIT_MS + ACTIVE_HANDSHAKE_WAIT_MS;
 const LATE_BANNER_SETTLE_MS = 300;
 
 type HandshakeEpochGuard = {
@@ -85,8 +86,15 @@ export async function runControllerHandshake(
   const response = await awaitControllerResponse(refs, safeWrite, guard);
   if (response === 'stale') return resume();
   if (response === 'timeout') {
-    reportMissingControllerResponse(set, get, refs, baudRate, guard.expectedSessionEpoch);
-    return;
+    const epoch = guard.expectedSessionEpoch;
+    return reportSilentController(
+      set,
+      get,
+      refs,
+      connection,
+      { baudRate, epoch },
+      HANDSHAKE_WINDOW_MS,
+    );
   }
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
   if (!guard.acceptControllerLineEpoch()) return resume();
@@ -148,30 +156,6 @@ async function awaitControllerResponse(
   gotLine = await nextLine;
   if (!guard.acceptControllerLineEpoch()) return 'stale';
   return gotLine ? 'line' : 'timeout';
-}
-
-function reportMissingControllerResponse(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  baudRate: number,
-  expectedEpoch: number,
-): void {
-  const driver = refs.driver;
-  set(
-    appendSystemNotice(
-      get(),
-      refs,
-      `[lf2] No controller response within 2 s. Check baud rate (${baudRate}) and that the device is ${driver.label}.`,
-    ),
-  );
-  set((state) =>
-    failedControllerQualificationPatch(
-      state,
-      expectedEpoch,
-      `No controller response was received at ${baudRate} baud. Check the cable and controller profile, then retry.`,
-    ),
-  );
 }
 
 async function qualifyConnectedController(

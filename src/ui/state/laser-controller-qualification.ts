@@ -162,6 +162,41 @@ export function resumeQualificationInSession(
   scheduleControllerQualification(set, get, refs, epoch);
 }
 
+/** How long a queued-poll controller may stay silent after connecting. */
+export const POLLED_RESPONSE_TIMEOUT_MS = 8_000;
+
+/**
+ * A driver with no realtime status query (Marlin) sends nothing during the
+ * handshake's active window, so its silence proves nothing: a board that does
+ * not reboot on open, such as native-USB 32-bit Marlin, prints no banner, and
+ * every connect used to end in "No controller response … check the cable"
+ * while the first M114 poll moments later answered normally (controller audit
+ * connect-5). The ordinary status poll starts when the handshake returns and
+ * its first fresh Idle runs qualification. `onSilent` reports a controller
+ * that never answers a poll; a late banner re-schedules qualification itself.
+ */
+export function awaitPolledQualification(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerQualificationScheduleRefs,
+  connection: unknown,
+  epoch: number,
+  onSilent: () => void,
+): void {
+  if (refs.connection !== connection || get().controllerSessionEpoch !== epoch) return;
+  set({ controllerQualification: qualifyingController(epoch, 'controller-response') });
+  scheduleControllerQualification(set, get, refs, epoch);
+  setTimeout(() => {
+    const state = get();
+    if (refs.connection !== connection || state.controllerSessionEpoch !== epoch) return;
+    if (state.statusObservation?.sessionEpoch === epoch) return;
+    const qualification = state.controllerQualification;
+    if (qualification.kind !== 'qualifying' || qualification.epoch !== epoch) return;
+    cancelScheduledControllerQualification(refs);
+    onSilent();
+  }, POLLED_RESPONSE_TIMEOUT_MS);
+}
+
 // A fresh Alarm or Sleep report is a controller answering and waiting for the
 // operator ($X, $H or Wake), not a dead link. After a Stop mid-motion GRBL
 // reboots into ALARM:3, and the 8 s deadline used to latch "Controller
