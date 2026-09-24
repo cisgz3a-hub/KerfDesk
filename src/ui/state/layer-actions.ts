@@ -1,9 +1,7 @@
 import {
   addLayer,
-  bindSceneObjectToOperations,
   createLayer,
   layerOperationSettingsEqual,
-  operationIdsForObject,
   removeSceneObjectOperationBinding,
   sceneObjectHasVisibleLayer,
   sceneObjectUsesOperation,
@@ -21,6 +19,7 @@ import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
+import { assignmentUpdate } from './operation-assignment';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -99,21 +98,7 @@ export function layerActions(set: LayerActionSet): LayerActions {
         });
       }),
     assignSelectionToLayer: (layerId) =>
-      set((state) => {
-        const target = state.project.scene.layers.find((layer) => layer.id === layerId);
-        if (target === undefined) return {};
-        const usedBefore = usedOperationIds(state.project.scene);
-        const selectedIds = new Set(selectedObjectIds(state));
-        let scene: Scene = {
-          ...state.project.scene,
-          objects: state.project.scene.objects.map((object) =>
-            selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [target.id]) : object,
-          ),
-        };
-        scene = pruneAssignmentOrphans(scene, usedBefore);
-        if (scene === state.project.scene) return {};
-        return mutation(state, { ...state.project, scene });
-      }),
+      set((state) => assignmentUpdate(state, new Set(selectedObjectIds(state)), layerId)),
     selectObjectsOnLayer: (layerId) =>
       set((state) => {
         const operation = state.project.scene.layers.find((layer) => layer.id === layerId);
@@ -194,14 +179,6 @@ function selectedObjectIds(state: LayerActionState): ReadonlyArray<string> {
 
 function normalizeLayerColor(color: string): string | null {
   return HEX_LAYER_COLOR_RE.test(color) ? color.toLowerCase() : null;
-}
-
-function pruneAssignmentOrphans(scene: Scene, usedBefore: ReadonlySet<string>): Scene {
-  const usedAfter = usedOperationIds(scene);
-  const layers = scene.layers.filter(
-    (layer) => usedAfter.has(layer.id) || !usedBefore.has(layer.id),
-  );
-  return layers.length === scene.layers.length ? scene : { ...scene, layers };
 }
 
 function selectObjectIds(ids: ReadonlyArray<string>): LayerSelectionMutation {
@@ -375,10 +352,6 @@ function subLayersEqual(
       );
     })
   );
-}
-
-function usedOperationIds(scene: Scene): ReadonlySet<string> {
-  return new Set(scene.objects.flatMap((object) => operationIdsForObject(object, scene.layers)));
 }
 
 function mutation(state: StateSlice, project: Project): LayerActionMutation {

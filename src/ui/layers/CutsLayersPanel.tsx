@@ -11,6 +11,7 @@ import { ArtworkPanelTabs } from './ArtworkPanelTabs';
 import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
+import { OperationListActions } from './OperationListActions';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 import './cuts-layers-panel.css';
 import './artwork-inspector.css';
@@ -118,8 +119,10 @@ function OperationList({ layers }: { readonly layers: ReadonlyArray<Layer> }): J
       </summary>
       <div className="lf-artwork-disclosure__body">
         <p className="lf-artwork-hint">
-          Select a drawing colour below. Use Run order to arrange the artwork in your job.
+          Select a drawing colour below. With artwork selected, a colour or Move selection here
+          moves it onto that operation. Use Run order to arrange the artwork in your job.
         </p>
+        <OperationListActions />
         {layers.length > 4 || search !== '' ? (
           <input
             type="search"

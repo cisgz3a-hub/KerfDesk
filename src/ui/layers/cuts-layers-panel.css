@@ -132,6 +132,35 @@
   color: var(--lf-text-muted);
 }
 
+.lf-operation-card__swatch {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lf-operation-card__swatch:hover {
+  box-shadow: 0 0 0 2px var(--lf-accent);
+}
+
+.lf-operation-card__assign.lf-btn {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 0 0 26px;
+  font-size: 12px;
+}
+
+.lf-operation-card__assign-note {
+  margin: 8px 0 0 26px;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+}
+
 .lf-operation-card__management > summary {
   position: absolute;
   top: 11px;
@@ -164,6 +193,64 @@
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--lf-border);
+}
+
+.lf-operation-bulk {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.lf-operation-bulk > summary {
+  cursor: pointer;
+  color: var(--lf-text-muted);
+  font-weight: 600;
+}
+
+.lf-operation-bulk[open] > summary {
+  color: var(--lf-accent-fg);
+}
+
+.lf-operation-bulk__body {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+}
+
+.lf-operation-bulk__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.lf-operation-bulk__label {
+  flex: 1 1 100%;
+  font-weight: 600;
+}
+
+.lf-operation-bulk__label small {
+  color: var(--lf-text-muted);
+  font-weight: 400;
+}
+
+.lf-operation-bulk__row .lf-btn,
+.lf-operation-bulk__sort .lf-btn {
+  font-size: 12px;
+}
+
+.lf-operation-bulk__sort {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding-top: 6px;
+  border-top: 1px solid var(--lf-border);
+}
+
+.lf-operation-bulk__sort p {
+  margin: 0;
 }
 
 .lf-artwork-view-tab.lf-btn[aria-selected='true'] {

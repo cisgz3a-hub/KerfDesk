@@ -8,9 +8,11 @@ import {
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Icon } from '../kit';
+import { AssignSelectionButton } from './AssignSelectionButton';
 import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
+import { OperationSwatchButton } from './OperationSwatchButton';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 
 export function LayerRow(props: {
@@ -33,13 +35,16 @@ export function LayerRow(props: {
       className="lf-operation-card"
       style={rowStyle(props.layer.output, active)}
     >
-      <OperationActivation
-        layer={props.layer}
-        machineKind={machineKind}
-        artworkCount={artworkCount}
-        isActive={active}
-        onActivate={activate}
-      />
+      <div style={headerStyle}>
+        <OperationSwatchButton layer={props.layer} />
+        <OperationActivation
+          layer={props.layer}
+          machineKind={machineKind}
+          artworkCount={artworkCount}
+          isActive={active}
+          onActivate={activate}
+        />
+      </div>
       <button
         type="button"
         className="lf-btn lf-btn--ghost lf-operation-card__visibility"
@@ -50,6 +55,7 @@ export function LayerRow(props: {
       >
         <Icon name="eye" size={18} />
       </button>
+      <AssignSelectionButton layer={props.layer} />
       <OperationManagement {...props} />
     </section>
   );
@@ -122,11 +128,6 @@ function OperationActivation(props: {
       style={activationStyle}
       onClick={props.onActivate}
     >
-      <span
-        aria-hidden="true"
-        title={`Automatic operation color ${props.layer.color}`}
-        style={{ ...swatchStyle, background: props.layer.color }}
-      />
       <span style={identityStyle}>
         <strong style={nameStyle}>
           {props.layer.name}
@@ -172,13 +173,9 @@ function rowStyle(output: boolean, active: boolean): React.CSSProperties {
   };
 }
 
-const swatchStyle: React.CSSProperties = {
-  width: 14,
-  height: 14,
-  borderRadius: 3,
-  border: '1px solid var(--lf-border-strong)',
-};
-const activationStyle: React.CSSProperties = {
+// The swatch is its own button (a button cannot hold another), so the row's
+// first line is a grid of swatch and activation, clear of the eye and menu.
+const headerStyle: React.CSSProperties = {
   gridColumn: '1 / -1',
   display: 'grid',
   gridTemplateColumns: '18px minmax(0, 1fr)',
@@ -186,6 +183,12 @@ const activationStyle: React.CSSProperties = {
   gap: 8,
   minWidth: 0,
   padding: '0 60px 0 0',
+};
+const activationStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  minWidth: 0,
+  padding: 0,
   border: 0,
   background: 'transparent',
   color: 'var(--lf-text)',

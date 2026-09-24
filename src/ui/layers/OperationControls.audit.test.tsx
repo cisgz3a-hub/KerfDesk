@@ -109,7 +109,7 @@ describe('artwork control audit: operations', () => {
     ]);
   });
 
-  it('creates and assigns through the legacy standalone controls with no-selection guard', async () => {
+  it('creates an operation and moves the selection onto it, offering no move without one', async () => {
     const host = await mount(<AddLayerControls />);
     input(host, '[name="newLayerColor"]').value = '#aabbcc';
     await click(button(host, 'Add layer'));
@@ -117,9 +117,10 @@ describe('artwork control audit: operations', () => {
     expect(useUiStore.getState().activeLayerColor).toBe('#aabbcc');
     const target = layer();
     const assign = await mount(<AssignSelectionButton layer={target} />);
-    expect(button(assign, `Assign selection to ${target.color}`).disabled).toBe(true);
+    expect(assign.querySelector('button')).toBeNull();
     await act(async () => arrangeTwo());
-    await click(button(assign, `Assign selection to ${target.color}`));
+    await act(async () => useStore.getState().selectObject('Second'));
+    await click(button(assign, `Move selected artwork to ${target.name}`));
     const scene = useStore.getState().project.scene;
     expect(
       primaryOperationForObject(scene.objects.find((item) => item.id === 'Second')!, scene.layers)

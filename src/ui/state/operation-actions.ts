@@ -7,6 +7,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { cloneArtworkOperations } from './clone-artwork-operations';
+import { operationPanelActions, type OperationPanelActions } from './operation-panel-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 
 type OperationActionState = StateSlice & {
@@ -25,7 +26,7 @@ type OperationSet = (
   fn: (state: OperationActionState) => OperationMutation | Record<string, never>,
 ) => void;
 
-export type OperationActions = {
+export type OperationActions = OperationPanelActions & {
   readonly useOperationForSelection: (operationId: string) => void;
   readonly useOperationForObjects: (objectIds: ReadonlyArray<string>, operationId: string) => void;
   readonly makeSelectedOperationUnique: (operationId: string) => void;
@@ -52,6 +53,7 @@ export function cncFixedDepthRole(operation: Layer): CncFixedDepthRole | null {
 
 export function operationActions(set: OperationSet): OperationActions {
   return {
+    ...operationPanelActions(set),
     useOperationForSelection: (operationId) =>
       set((state) => rebindObjects(state, selectedIdSet(state), operationId)),
     useOperationForObjects: (objectIds, operationId) =>

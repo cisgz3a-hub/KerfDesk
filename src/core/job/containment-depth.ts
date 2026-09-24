@@ -57,6 +57,18 @@ export function containmentDepths(segments: ReadonlyArray<ContainmentSegment>): 
   });
 }
 
+/** The same candidate filter for callers that must know WHICH closed shapes
+ * surround a target, not just how many (the cut-order checks). Returns the
+ * indices of every container that can enclose a target whose bounds centre is
+ * `probe`; callers still apply the exact bounds and point-in-polygon tests. */
+export function containerCandidateQuery(
+  containerBounds: ReadonlyArray<SegmentBounds | null>,
+): (probe: Vec2) => ReadonlyArray<number> {
+  const containers = containerBounds.flatMap((box, index) => (box == null ? [] : [index]));
+  const grid = containers.length === 0 ? null : buildContainerGrid(containers, containerBounds);
+  return (probe) => (grid === null ? containers : candidatesFor(grid, probe));
+}
+
 function collectContainers(
   segments: ReadonlyArray<ContainmentSegment>,
   bounds: ReadonlyArray<SegmentBounds | null>,

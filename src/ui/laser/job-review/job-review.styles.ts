@@ -140,6 +140,8 @@ export const warnListStyle: CSSProperties = {
   color: 'var(--lf-text)',
 };
 
+export const warnFixStyle: CSSProperties = { display: 'block', margin: '4px 0 2px' };
+
 export const bannerStyle: CSSProperties = { marginTop: 12 };
 
 export const bannerListStyle: CSSProperties = {

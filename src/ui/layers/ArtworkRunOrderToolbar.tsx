@@ -1,3 +1,5 @@
+import { SortCutsLastButton } from './SortCutsLastButton';
+
 type ArtworkRunOrderToolbarProps = {
   readonly search: string;
   readonly total: number;
@@ -94,6 +96,7 @@ function RunOrderTools(
         >
           Number on canvas
         </button>
+        <SortCutsLastButton />
       </div>
       <label className="lf-run-order-search">
         <span>Find artwork</span>

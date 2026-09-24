@@ -15,6 +15,7 @@ import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
+import { MoveToOperationControl } from './MoveToOperationControl';
 import {
   OperationContextActions,
   OperationNameInput,
@@ -145,6 +146,7 @@ function SelectedOperationEditor(props: {
         }
         onAdd={() => inspectCreatedOperation(() => addOperation(objectIds), props.onSelect)}
       />
+      <MoveToOperationControl objects={props.objects} />
       <CompatibilityNote
         objects={props.objects}
         operation={effectiveOperation}

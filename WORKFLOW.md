@@ -420,6 +420,11 @@ Identical to the format-specific import flows except:
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence. Jobs with more than
   four operations also offer a name filter; filtering never changes operation order.
+- While movable artwork is selected, every row it is not already on offers **Move selection here**,
+  and choosing that row's colour does the same (LightBurn's palette). With nothing to move, the
+  colour picks the drawing operation. **Actions for every operation**, at the top of the list,
+  switches every Output or Show switch on, off or inverted and, on a laser, offers **Sort cuts
+  last** (ADR-379).
 - The sibling **Run order** view is the canonical top-level sequence manager. It uses direct
   one-based numbers rather than First/Earlier/Later/Last controls and supports search,
   jump-to-number, and a virtualized list for large jobs. This order is independent of canvas
@@ -494,6 +499,33 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 2. The row moves one position in the Cuts/Layers list.
 3. Generated output processes operations in that order inside each artwork run.
 4. Undo restores the previous layer order.
+
+#### Success - move artwork onto an existing operation
+1. Select artwork, then choose **Move selection here** or the colour on the target operation's row.
+   The inspector's **Move to operation** does the same for the artwork it shows.
+2. The artwork now runs on that operation alone. Its artwork-wide settings keep applying; an
+   operation left without artwork is removed, with every artwork's settings for it.
+3. One undo step restores it. Locked artwork and the registration box never move, and nothing moves
+   onto the registration operation. Artwork moved onto a hidden operation leaves the selection.
+
+#### Success - switch every operation
+1. Open **All operations > Actions for every operation**.
+2. **Enable all**, **Disable all** and **Invert** set every Output switch; **Show all**, **Hide all**
+   and **Invert** set every Show switch. Each press is one undo step, and a press that changes
+   nothing records none. Artwork that becomes hidden leaves the selection.
+
+#### Success - sort cuts last (laser)
+1. Click **Sort cuts last** in Run order, in **Actions for every operation**, or beside the Job
+   Review cut-order warning.
+2. A Line operation is a cut when one of its closed shapes surrounds work from another output
+   operation; scores and line engraving that surround nothing keep their place. Other operations
+   keep their order ahead of the cuts, which run innermost first. Runs without a cut keep their
+   order ahead of runs with one.
+3. The G-code runs each cut after the work inside it. One undo step restores both orders. A toast
+   says how many cut operations now run last, or that nothing needed to move.
+4. When a closed cut runs before work inside it, Job Review warns `Cut order: ...` (never a block)
+   and offers **Sort cuts last** beside the warning. Sorting during the Start review changes the
+   job, so it must be framed again.
 
 #### Success - choose which artwork runs first
 1. Open **Run order** in the docked Artwork / Operations rail.

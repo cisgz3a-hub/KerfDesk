@@ -19,6 +19,7 @@ import {
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
+import { detectCutOrderWarnings } from './cut-order-warnings';
 import { rasterEnergyWarnings } from './raster-energy-warnings';
 import { rasterThresholdWarnings } from './raster-threshold-warnings';
 import { stackedCopyWarnings } from './stacked-copy-warnings';
@@ -45,6 +46,7 @@ export function detectJobIntentWarnings(
     ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
     ...compileDiagnosticWarnings(job),
+    ...detectCutOrderWarnings(job, project.scene.layers),
   ];
   append4040FillPolicyWarning(project, job, warnings);
   appendScanOffsetCoverageWarnings(project, job, warnings);
