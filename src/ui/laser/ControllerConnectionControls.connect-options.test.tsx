@@ -32,7 +32,9 @@ afterEach(() => {
 });
 
 async function clickConnect(): Promise<unknown> {
-  const connect = vi.fn(async () => undefined);
+  const connect = vi.fn<ReturnType<typeof useLaserStore.getState>['connect']>(
+    async () => undefined,
+  );
   useLaserStore.setState({ connect });
   const host = document.createElement('div');
   document.body.appendChild(host);

@@ -134,8 +134,13 @@ describe('latched grblHAL MPG machine-command ownership', () => {
     ['GRBL unlock', '$X', '$X\n'],
     ['spindle/coolant fail-off', 'M5 M9', 'M5 M9\n'],
   ] as const)('keeps %s Console traffic available', async (_label, command, wire) => {
-    await useLaserStore.getState().sendConsoleCommand(command);
+    const sent = useLaserStore.getState().sendConsoleCommand(command);
+    await flush();
     expect(writes).toEqual([wire]);
+    // A Console `$X` is an owned exchange that finishes on its ok (controller
+    // audit console group).
+    if (command === '$X') connection.emitLine('ok');
+    await sent;
   });
 
   it.each(['Run', 'Jog'] as const)(

@@ -152,20 +152,26 @@ describe('2026-09-21 independent origin/coordinate audit', () => {
   it.each(['$13=1', '$013=1'])(
     'recovers confirmed console %s through a terminal settings read',
     async (command) => {
-      const connection = makeConnection(async () => undefined);
+      const writes: string[] = [];
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+      });
       await connectWith(connection);
       useLaserStore.setState({ controllerSettings: { reportInches: false } });
       connection.emitLine('<Idle|MPos:10.000,20.000,0.000|WCO:5.000,10.000,0.000|FS:0,0>');
-      await useLaserStore.getState().sendConsoleCommand(command, { confirmed: true });
+      // The write finishes on its ok, then the Console reads `$$` itself to
+      // confirm the new units (controller audit console group).
+      const sent = useLaserStore.getState().sendConsoleCommand(command, { confirmed: true });
+      await flushConnect();
       connection.emitLine('ok');
+      await flushConnect();
       connection.emitLine('<Idle|MPos:0.3937,0.7874,0.0000|WCO:0.1969,0.3937,0.0000|FS:0,0>');
       expect(useLaserStore.getState().reportUnitsUnconfirmed).toBe(true);
       expect(useLaserStore.getState().statusReport?.mPos).toBeNull();
-      const read = useLaserStore.getState().sendConsoleCommand('$$');
-      await flushConnect();
+      expect(writes.at(-1)).toBe('$$\n');
       connection.emitLine('$13=1');
       connection.emitLine('ok');
-      await read;
+      await sent;
       expect(useLaserStore.getState().reportUnitsUnconfirmed).toBe(false);
       expect(useLaserStore.getState().statusReport).toBeNull();
       connection.emitLine('<Idle|MPos:0.3937,0.7874,0.0000|WCO:0.1969,0.3937,0.0000|FS:0,0>');
