@@ -2,7 +2,7 @@
 
 exports[`multi-artwork connected-script compilation > stays byte-exact and measurable 1`] = `
 {
-  "codeUnitCount": 1083328,
+  "codeUnitCount": 1083336,
   "head": [
     "G21",
     "G90",
@@ -15,7 +15,7 @@ exports[`multi-artwork connected-script compilation > stays byte-exact and measu
     "; cnc layer-id: connected-script-0",
     "; cnc operation: v-carve; passes: 8",
     "; cnc tool-id: vb-60",
-    "; cnc tool-name: 60° V-bit — 6.35 mm (1/4") cut",
+    "; cnc tool-name: 60deg V-bit - 6.35 mm (1/4") cut",
     "; cnc tool: v-bit; diameter-mm: 6.350; angle-deg: 60.000",
     "; cnc depth: per-pass-mm: 1.500",
     "; cnc v-resolution-mm: auto",
@@ -90,6 +90,6 @@ exports[`multi-artwork connected-script compilation > stays byte-exact and measu
     "G0 X0.000 Y0.000",
     "",
   ],
-  "utf8ByteCount": 1083340,
+  "utf8ByteCount": 1083336,
 }
 `;

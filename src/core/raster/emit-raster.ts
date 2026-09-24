@@ -389,7 +389,8 @@ function headerComment(input: EmitRasterInput): string {
   const power = input.powerPercent ?? '?';
   return [
     `; image layer ${layer} color ${color} power ${power}%`,
-    `; ${input.width} × ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} × ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
+    // ASCII only: GRBL runs any byte above 0x7F as a realtime command.
+    `; ${input.width} x ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} x ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
     `; feed ${formatGcodeFeedMmPerMin(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
     ...(input.effectiveOperationComment === undefined
       ? []

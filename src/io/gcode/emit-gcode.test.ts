@@ -12,6 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { collectG1FValues, collectG1SValues } from '../../core/invariants';
+import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
 import { emitGcode, materializeProgram } from './emit-gcode';
 
 // The ADR-243 raster case below compiles a 6.25M-pixel error-diffusion sweep.
@@ -87,7 +88,9 @@ describe('emitGcode', () => {
     // Header present and first; the motion body is unchanged after it.
     expect(withMeta.gcode.startsWith('; KerfDesk')).toBe(true);
     expect(withMeta.gcode).toContain('; commit: deadbee');
-    expect(withMeta.gcode).toContain(`; profile-name: ${project.device.name}`);
+    expect(withMeta.gcode).toContain(
+      `; profile-name: ${sanitizeGcodeCommentValue(project.device.name)}`,
+    );
     expect(withMeta.gcode).toContain(`; profile-id: ${project.device.profileId}`);
     expect(withMeta.gcode.endsWith(withoutMeta.gcode)).toBe(true);
     // No metadata => no header => deterministic body only.
