@@ -36,4 +36,9 @@ describe('vcarveIncludedAngleDeg', () => {
   ])('applies the shared included-angle contract to engraving tools: %s', (angle, expected) => {
     expect(vcarveIncludedAngleDeg(tool('engraving', angle))).toBe(expected);
   });
+
+  it('keeps the wrong-kind fallback for a tapered ball nose rather than its few-degree taper', () => {
+    const taperedBall = { ...tool('tapered-ball-nose', 10.8), tipDiameterMm: 1.5 };
+    expect(vcarveIncludedAngleDeg(taperedBall)).toBe(60);
+  });
 });

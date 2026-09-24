@@ -50,6 +50,26 @@ describe('CNC library tip-diameter persistence', () => {
     expect(restoreCncLibrary(storage)).toEqual(library);
   });
 
+  it('restores a tapered ball nose with its ball tip', () => {
+    const taperedBall: CncTool = {
+      id: 'tbn',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    };
+    const storage = memoryStorage();
+    const library: CncLibrary = {
+      customTools: [taperedBall],
+      feedPresets: [],
+      machineProfiles: [],
+    };
+
+    expect(persistCncLibrary(storage, library)).toBe(true);
+    expect(restoreCncLibrary(storage)).toEqual(library);
+  });
+
   it('keeps explicit engraving tips visible but drops wrong-kind metadata', () => {
     const parsed = parseCncLibrary(
       JSON.stringify({

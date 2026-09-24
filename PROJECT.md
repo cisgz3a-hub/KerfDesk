@@ -194,7 +194,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine | Built |
 | H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
 | H.7 | Tool + feeds/speeds libraries, including persisted engraving tip-flat geometry; multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
-| H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
+| H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover; tapered ball-nose carving bits with a modeled flank and tip-ball stepover (ADR-368) | Built |
 | H.9 | Motion polish: contour ramp entry for constant-depth operations; V-carve follows its certified variable-depth medial profile and reports any stored ramp request as advisory provenance; climb/conventional, entry-point rotation, parking parity (helical entry deferred; arc/line profile leads shipped — ADR-250) | Built; hardware CLAIMED |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |

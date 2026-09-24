@@ -20,6 +20,7 @@ const FAMILY_LABELS = new Map<string, string>([
   ['ball-nose', 'Ball-nose end mills'],
   ['o-flute-ball-nose', 'O-flute ball-nose bits'],
   ['core-box', 'Core-box / round-nose bits'],
+  ['tapered-ball-nose', 'Tapered ball-nose carving bits'],
   ['v-groove', 'V-groove bits (point-cone model)'],
   ['engraving', 'Engraving bits (angle + tip flat)'],
 ]);
@@ -77,5 +78,7 @@ function toolFamilyKey(tool: CncTool): string {
       return 'v-groove';
     case 'engraving':
       return 'engraving';
+    case 'tapered-ball-nose':
+      return 'tapered-ball-nose';
   }
 }

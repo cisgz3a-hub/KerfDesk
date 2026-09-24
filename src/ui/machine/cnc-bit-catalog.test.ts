@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { taperedBallCuttingLengthMm, taperedBallEnvelope } from '../../core/cnc-tapered-ball';
 import {
   CNC_BIT_CATALOG,
   MODELED_CNC_BIT_CATALOG,
   REFERENCE_CNC_BIT_CATALOG,
 } from './cnc-bit-catalog';
+import { TAPERED_BALL_LISTINGS } from './cnc-bit-tapered-ball-catalog';
 
 describe('CNC bit catalog', () => {
   it('keeps every catalog id unique and every research source scoped and HTTPS', () => {
     const ids = CNC_BIT_CATALOG.map((entry) => entry.id);
-    expect(CNC_BIT_CATALOG).toHaveLength(160);
+    expect(CNC_BIT_CATALOG).toHaveLength(167);
     expect(new Set(ids).size).toBe(ids.length);
     expect(CNC_BIT_CATALOG.every((entry) => entry.sourceUrl.startsWith('https://'))).toBe(true);
     expect(
@@ -22,6 +24,14 @@ describe('CNC bit catalog', () => {
     expect(idsWithSourceScope('exact-product')).toEqual([
       'o-ball-0125-amana-51814',
       'o-ball-025-amana-51818',
+      'tbn-amana-46280',
+      'tbn-amana-46282',
+      'tbn-amana-46284',
+      'tbn-amana-46286',
+      'tbn-spetool-w01001',
+      'tbn-spetool-w01004',
+      'tbn-spetool-w01006',
+      'tbn-spetool-w01010',
       'v120-075',
       'v60-hobby-0125',
       'v60-hobby-025',
@@ -69,7 +79,7 @@ describe('CNC bit catalog', () => {
   });
 
   it('offers a broad modeled catalog without pretending unsupported shapes are end mills', () => {
-    expect(MODELED_CNC_BIT_CATALOG).toHaveLength(88);
+    expect(MODELED_CNC_BIT_CATALOG).toHaveLength(96);
     expect(new Set(MODELED_CNC_BIT_CATALOG.map((entry) => entry.family))).toEqual(
       new Set([
         'straight',
@@ -85,6 +95,7 @@ describe('CNC bit catalog', () => {
         'core-box',
         'o-flute-ball-nose',
         'v-groove',
+        'tapered-ball-nose',
       ]),
     );
     expect(MODELED_CNC_BIT_CATALOG.some((entry) => entry.tool.kind === 'engraving')).toBe(false);
@@ -155,12 +166,42 @@ describe('CNC bit catalog', () => {
     expect(oneQuarter?.tool.fluteCount).toBe(1);
   });
 
+  it('models each exact tapered ball nose from its listed tip, per-side taper and flute length', () => {
+    expect(TAPERED_BALL_LISTINGS).toHaveLength(8);
+    for (const listing of TAPERED_BALL_LISTINGS) {
+      const entry = MODELED_CNC_BIT_CATALOG.find((candidate) => candidate.id === listing.id);
+      expect(entry, listing.id).toMatchObject({
+        sourceScope: 'exact-product',
+        sourceUrl: listing.sourceUrl,
+        family: 'tapered-ball-nose',
+        tool: {
+          kind: 'tapered-ball-nose',
+          tipDiameterMm: listing.tipDiameterMm,
+          // Sellers list the per-side taper; KerfDesk stores the included angle.
+          tipAngleDeg: listing.sideAngleDeg * 2,
+          shankDiameterMm: listing.shankDiameterMm,
+        },
+      });
+      if (entry === undefined) throw new Error(`Missing catalog entry ${listing.id}`);
+      expect(entry.tool).not.toHaveProperty('fluteCount');
+      expect(entry.tool.diameterMm, listing.id).toBeLessThanOrEqual(listing.shankDiameterMm);
+      const envelope = taperedBallEnvelope({ ...entry.tool, id: listing.id });
+      if (envelope === null) throw new Error(`${listing.id} has no modeled envelope`);
+      // The stored diameter is where the taper ends at the listed flute length;
+      // rounding it to 0.01 mm moves that end by well under 1%.
+      const lengthMm = taperedBallCuttingLengthMm(envelope);
+      expect(Math.abs(lengthMm - listing.cuttingLengthMm) / listing.cuttingLengthMm).toBeLessThan(
+        0.01,
+      );
+    }
+  });
+
   it('keeps specialty geometry visible but reference-only', () => {
-    expect(REFERENCE_CNC_BIT_CATALOG).toHaveLength(72);
+    expect(REFERENCE_CNC_BIT_CATALOG).toHaveLength(71);
     const labels = REFERENCE_CNC_BIT_CATALOG.map((entry) => entry.familyLabel).join(' ');
     expect(labels).toMatch(/Dovetail/);
     expect(labels).toMatch(/T-slot/);
-    expect(labels).toMatch(/Tapered ball-nose/);
+    expect(labels).not.toMatch(/Tapered ball-nose/);
     expect(labels).toMatch(/Diamond-drag/);
     expect(labels).toMatch(/drill/i);
     expect(labels).toMatch(/Thread mills/);

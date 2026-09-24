@@ -360,6 +360,8 @@ export type CncReliefPlanningEvidence = {
   readonly cellSizeMm: number;
   readonly toolDiameterMm: number;
   readonly toolKind: CncToolKind;
+  // Tapered ball nose only: the tip ball whose radius bounds the scallop.
+  readonly toolTipDiameterMm?: number;
   readonly rowSpacingMm?: number;
   readonly scallopMm?: number;
 };

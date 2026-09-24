@@ -257,6 +257,38 @@ describe('CNC relief planning warnings', () => {
     ]);
   });
 
+  it('bounds a tapered ball-nose scallop by its tip ball, not its cut diameter', () => {
+    const project = pocketProject(40);
+    const plan = {
+      layerId: 'pocket',
+      source: 'portrait.png',
+      stage: 'finishing' as const,
+      widthCells: 2,
+      heightCells: 2,
+      cellSizeMm: 0.1,
+      toolDiameterMm: 6.35,
+      toolKind: 'tapered-ball-nose' as const,
+      toolTipDiameterMm: 1,
+      rowSpacingMm: 1,
+    };
+    const warningsFor = (scallopMm: number, toolTipDiameterMm?: number) => {
+      const { toolTipDiameterMm: _tip, ...withoutTip } = plan;
+      const evidence =
+        toolTipDiameterMm === undefined ? withoutTip : { ...plan, toolTipDiameterMm };
+      const job: Job = {
+        groups: [],
+        cncCompilation: { vcarveOperations: [], reliefPlans: [{ ...evidence, scallopMm }] },
+      };
+      return detectCncReliefPlanningWarnings(project, job, 'compiled-evidence-only').join(' ');
+    };
+
+    expect(warningsFor(0.75, 1)).toContain('above the 0.5 mm tip radius');
+    expect(warningsFor(0.75, 1)).toContain('limits the cusp calculation to the tip radius');
+    expect(warningsFor(0.5, 1)).not.toContain('cusp domain');
+    // Without a valid tip the plan used the flat fallback, which has no cusp law.
+    expect(warningsFor(0.75)).not.toContain('cusp domain');
+  });
+
   it('does not derive source-only advisories in compiled-evidence-only mode', () => {
     expect(
       detectCncReliefPlanningWarnings(pocketProject(200), { groups: [] }, 'compiled-evidence-only'),

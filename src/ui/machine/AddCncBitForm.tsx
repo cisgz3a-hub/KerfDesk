@@ -1,20 +1,27 @@
 import { useState } from 'react';
-import {
-  MAX_CNC_TIP_ANGLE_DEG,
-  MIN_CNC_TIP_ANGLE_DEG,
-  isValidCncTipAngleDeg,
-} from '../../core/cnc-tip-angle';
-import { isValidCncTipDiameterMm } from '../../core/cnc-tip-diameter';
+import { MAX_CNC_TIP_ANGLE_DEG, MIN_CNC_TIP_ANGLE_DEG } from '../../core/cnc-tip-angle';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import type { CncTool, CncToolKind } from '../../core/scene';
 import { useStore } from '../state';
 import { CncToolPicture } from './CncToolPicture';
+import {
+  MAX_TAPER_SIDE_ANGLE_DEG,
+  MAX_TOOL_DIAMETER_MM,
+  MIN_TAPER_SIDE_ANGLE_DEG,
+  MIN_TOOL_DIAMETER_MM,
+  bitFormError,
+  bitFormGeometry,
+  bitFromForm,
+  taperedBallFormHint,
+  type BitFormGeometry,
+} from './add-cnc-bit-form-model';
 
 const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly label: string }> = [
   { value: 'end-mill', label: 'End mill' },
   { value: 'ball-nose', label: 'Ball nose' },
   { value: 'v-bit', label: 'V-bit' },
   { value: 'engraving', label: 'Engraving' },
+  { value: 'tapered-ball-nose', label: 'Tapered ball nose' },
 ];
 
 // The diameter is the cutting diameter, never the shank: V-carve depth is
@@ -23,8 +30,6 @@ const CONE_DIAMETER_TITLE =
   'Widest cutting diameter of the cone in millimeters, not the shank. V-carve depth is limited by this width, so a fine engraving bit on a 1/8-inch shank needs its small cone diameter here.';
 const CUTTER_DIAMETER_TITLE =
   "Enter the cutter's actual cutting diameter in millimeters, not the shank.";
-const MAX_TOOL_DIAMETER_MM = 50;
-const MIN_TOOL_DIAMETER_MM = 0.1;
 
 export function AddCncBitForm(
   props: {
@@ -40,35 +45,14 @@ export function AddCncBitForm(
   const [tipDiameter, setTipDiameter] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [pictureRequested, setPictureRequested] = useState(false);
-  const needsAngle = kind === 'v-bit' || kind === 'engraving';
-  // Only an engraving bit has a flat land at the tip; a v-bit comes to a point
-  // by definition, which is the physical difference between the two kinds.
-  const needsTipDiameter = kind === 'engraving';
-  const error = bitFormError({
-    name,
-    diameter,
-    flutes,
-    tipAngle,
-    tipDiameter,
-    needsAngle,
-    needsTipDiameter,
-  });
+  const input = { name, kind, diameter, flutes, tipAngle, tipDiameter };
+  const geometry = bitFormGeometry(kind);
+  const error = bitFormError(input);
 
   const handleAdd = (): void => {
     setHasSubmitted(true);
     if (error !== null) return;
-    (props.onAdd ?? addCustomCncTool)({
-      name: name.trim(),
-      kind,
-      diameterMm: Number(diameter),
-      fluteCount: Number(flutes),
-      ...(needsAngle ? { tipAngleDeg: Number(tipAngle) } : {}),
-      // Blank stays absent: the simulator reads that as a true point, matching
-      // how every tool behaved before the field existed.
-      ...(needsTipDiameter && tipDiameter.trim() !== ''
-        ? { tipDiameterMm: Number(tipDiameter) }
-        : {}),
-    });
+    (props.onAdd ?? addCustomCncTool)(bitFromForm(input));
     setName('');
     setDiameter('');
     setFlutes(String(DEFAULT_ASSUMED_FLUTE_COUNT));
@@ -84,10 +68,6 @@ export function AddCncBitForm(
         kind={kind}
         diameter={diameter}
         flutes={flutes}
-        tipAngle={tipAngle}
-        tipDiameter={tipDiameter}
-        needsAngle={needsAngle}
-        needsTipDiameter={needsTipDiameter}
         onNameChange={setName}
         onKindChange={(value) => {
           setKind(value);
@@ -96,6 +76,12 @@ export function AddCncBitForm(
         }}
         onDiameterChange={setDiameter}
         onFlutesChange={setFlutes}
+      />
+      <GeometryFields
+        geometry={geometry}
+        diameter={diameter}
+        tipAngle={tipAngle}
+        tipDiameter={tipDiameter}
         onTipAngleChange={setTipAngle}
         onTipDiameterChange={setTipDiameter}
       />
@@ -108,6 +94,7 @@ export function AddCncBitForm(
         initiallyOpen={pictureRequested}
         label="New bit shape"
       />
+      <BitHint message={taperedBallFormHint(input)} />
       <BitError message={hasSubmitted ? error : null} />
     </div>
   );
@@ -121,24 +108,33 @@ function BitError(props: { readonly message: string | null }): JSX.Element | nul
   );
 }
 
+function BitHint(props: { readonly message: string | null }): JSX.Element | null {
+  return props.message === null ? null : (
+    <span role="status" style={hintStyle}>
+      {props.message}
+    </span>
+  );
+}
+
 type BitFieldsProps = {
   readonly name: string;
   readonly kind: CncToolKind;
   readonly diameter: string;
   readonly flutes: string;
-  readonly tipAngle: string;
-  readonly tipDiameter: string;
-  readonly needsAngle: boolean;
-  readonly needsTipDiameter: boolean;
   readonly onNameChange: (value: string) => void;
   readonly onKindChange: (value: CncToolKind) => void;
   readonly onDiameterChange: (value: string) => void;
   readonly onFlutesChange: (value: string) => void;
-  readonly onTipAngleChange: (value: string) => void;
-  readonly onTipDiameterChange: (value: string) => void;
 };
 
 function BitFields(props: BitFieldsProps): JSX.Element {
+  // A tapered bit's stored diameter is where its flutes END, not its tip; the
+  // field says so because sellers often call the tip the cutting diameter.
+  const tapered = props.kind === 'tapered-ball-nose';
+  const cutDiameterTitle =
+    props.kind === 'v-bit' || props.kind === 'engraving'
+      ? CONE_DIAMETER_TITLE
+      : CUTTER_DIAMETER_TITLE;
   return (
     <>
       <input
@@ -154,7 +150,7 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         value={props.kind}
         onChange={(event) => props.onKindChange(event.target.value as CncToolKind)}
         aria-label="New bit kind"
-        title="Bit geometry: end mill, ball nose, v-bit, or engraving."
+        title="Bit geometry: end mill, ball nose, v-bit, engraving, or tapered ball nose."
         style={kindSelectStyle}
       >
         {TOOL_KIND_OPTIONS.map((option) => (
@@ -170,9 +166,15 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         min={MIN_TOOL_DIAMETER_MM}
         max={MAX_TOOL_DIAMETER_MM}
         step={0.1}
-        placeholder="Cutting Ø mm"
-        aria-label="New bit diameter (mm)"
-        title={props.needsAngle ? CONE_DIAMETER_TITLE : CUTTER_DIAMETER_TITLE}
+        placeholder={tapered ? 'Top dia mm' : 'Cutting Ø mm'}
+        aria-label={
+          tapered ? 'New bit cut diameter at the top of the flutes (mm)' : 'New bit diameter (mm)'
+        }
+        title={
+          tapered
+            ? 'Diameter where the tapered flutes end. For most carving bits this equals the shank diameter; it is not the tip size.'
+            : cutDiameterTitle
+        }
         style={numberInputStyle}
       />
       <input
@@ -186,81 +188,91 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         title="Enter the cutter's actual number of cutting flutes."
         style={numberInputStyle}
       />
-      {props.needsAngle ? (
-        <input
-          type="number"
-          value={props.tipAngle}
-          onChange={(event) => props.onTipAngleChange(event.target.value)}
-          min={MIN_CNC_TIP_ANGLE_DEG}
-          max={MAX_CNC_TIP_ANGLE_DEG}
-          step={1}
-          placeholder="Angle deg"
-          aria-label="New bit included angle (deg)"
-          title="Enter the cutter's actual included angle."
-          style={numberInputStyle}
-        />
+    </>
+  );
+}
+
+type GeometryFieldsProps = {
+  readonly geometry: BitFormGeometry;
+  readonly diameter: string;
+  readonly tipAngle: string;
+  readonly tipDiameter: string;
+  readonly onTipAngleChange: (value: string) => void;
+  readonly onTipDiameterChange: (value: string) => void;
+};
+
+function GeometryFields(props: GeometryFieldsProps): JSX.Element {
+  return (
+    <>
+      {props.geometry.needsAngle ? (
+        props.geometry.anglePerSide ? (
+          <input
+            type="number"
+            value={props.tipAngle}
+            onChange={(event) => props.onTipAngleChange(event.target.value)}
+            min={MIN_TAPER_SIDE_ANGLE_DEG}
+            max={MAX_TAPER_SIDE_ANGLE_DEG}
+            step={0.01}
+            placeholder="Deg/side"
+            aria-label="New bit taper angle per side (deg)"
+            title="Taper angle per side as sellers list it, for example 5.4. KerfDesk stores the included angle, twice this value."
+            style={numberInputStyle}
+          />
+        ) : (
+          <input
+            type="number"
+            value={props.tipAngle}
+            onChange={(event) => props.onTipAngleChange(event.target.value)}
+            min={MIN_CNC_TIP_ANGLE_DEG}
+            max={MAX_CNC_TIP_ANGLE_DEG}
+            step={1}
+            placeholder="Angle deg"
+            aria-label="New bit included angle (deg)"
+            title="Enter the cutter's actual included angle."
+            style={numberInputStyle}
+          />
+        )
       ) : null}
-      {props.needsTipDiameter ? (
-        <input
-          type="number"
+      {props.geometry.needsTipDiameter ? (
+        <TipDiameterField
+          required={props.geometry.tipRequired}
+          diameter={props.diameter}
           value={props.tipDiameter}
-          onChange={(event) => props.onTipDiameterChange(event.target.value)}
-          min={0}
-          max={props.diameter === '' ? undefined : Number(props.diameter)}
-          step={0.05}
-          placeholder="Tip flat mm"
-          aria-label="New bit tip flat diameter (mm)"
-          title="Width of the flat land at the very tip. Leave blank for a bit that comes to a point."
-          style={numberInputStyle}
+          onChange={props.onTipDiameterChange}
         />
       ) : null}
     </>
   );
 }
 
-function bitFormError(input: {
-  readonly name: string;
+function TipDiameterField(props: {
+  readonly required: boolean;
   readonly diameter: string;
-  readonly flutes: string;
-  readonly tipAngle: string;
-  readonly tipDiameter: string;
-  readonly needsAngle: boolean;
-  readonly needsTipDiameter: boolean;
-}): string | null {
-  if (input.name.trim() === '') return 'Enter a bit name.';
-  const diameterMm = Number(input.diameter);
-  if (
-    input.diameter.trim() === '' ||
-    !Number.isFinite(diameterMm) ||
-    diameterMm < MIN_TOOL_DIAMETER_MM ||
-    diameterMm > MAX_TOOL_DIAMETER_MM
-  ) {
-    return `Enter the actual cutting diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
-  }
-  const fluteCount = Number(input.flutes);
-  if (isInvalidFluteCount(input.flutes, fluteCount)) {
-    return 'Enter the actual flute count as a positive whole number.';
-  }
-  const tipAngleDeg = Number(input.tipAngle);
-  if (input.needsAngle && (input.tipAngle.trim() === '' || !isValidCncTipAngleDeg(tipAngleDeg))) {
-    return `Enter the actual included angle from ${MIN_CNC_TIP_ANGLE_DEG} to ${MAX_CNC_TIP_ANGLE_DEG} degrees.`;
-  }
-  return input.needsTipDiameter ? tipDiameterError(input.tipDiameter, diameterMm) : null;
-}
-
-function isInvalidFluteCount(rawValue: string, fluteCount: number): boolean {
-  return rawValue.trim() === '' || !Number.isInteger(fluteCount) || fluteCount < 1;
-}
-
-// Blank is valid — it means the bit comes to a point. A land at or past the
-// cutter diameter is not a cone at all, so the cone law would have no flank.
-function tipDiameterError(tipDiameter: string, diameterMm: number): string | null {
-  if (tipDiameter.trim() === '') return null;
-  const tipDiameterMm = Number(tipDiameter);
-  if (!isValidCncTipDiameterMm(tipDiameterMm, diameterMm)) {
-    return `Enter a tip flat from 0 to under the ${diameterMm} mm cutter diameter, or leave it blank for a pointed bit.`;
-  }
-  return null;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}): JSX.Element {
+  // Engraving: an optional flat land at the tip. Tapered ball nose: the
+  // required ball that the taper blends into.
+  return (
+    <input
+      type="number"
+      value={props.value}
+      onChange={(event) => props.onChange(event.target.value)}
+      min={0}
+      max={props.diameter === '' ? undefined : Number(props.diameter)}
+      step={props.required ? 0.01 : 0.05}
+      placeholder={props.required ? 'Tip dia mm' : 'Tip flat mm'}
+      aria-label={
+        props.required ? 'New bit ball tip diameter (mm)' : 'New bit tip flat diameter (mm)'
+      }
+      title={
+        props.required
+          ? 'Diameter of the rounded tip: twice the listed tip radius. Some sellers call it the cutting diameter.'
+          : 'Width of the flat land at the very tip. Leave blank for a bit that comes to a point.'
+      }
+      style={numberInputStyle}
+    />
+  );
 }
 
 const addFormStyle: React.CSSProperties = {
@@ -273,6 +285,11 @@ const addFormStyle: React.CSSProperties = {
 const nameInputStyle: React.CSSProperties = { flex: 1, minWidth: 90, padding: '2px 6px' };
 const kindSelectStyle: React.CSSProperties = { fontSize: 12, padding: '2px 4px' };
 const numberInputStyle: React.CSSProperties = { width: 76, padding: '2px 6px' };
+const hintStyle: React.CSSProperties = {
+  flexBasis: '100%',
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
+};
 const errorStyle: React.CSSProperties = {
   flexBasis: '100%',
   color: 'var(--lf-danger-fg)',

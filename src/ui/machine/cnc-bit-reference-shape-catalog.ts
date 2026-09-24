@@ -23,7 +23,7 @@ export const REFERENCE_CNC_BIT_SHAPE_CATALOG: ReadonlyArray<ReferenceCncBitCatal
   ref(
     'engraving-tip-radius',
     'Tip-radius engraving cutters',
-    'Needs a tip radius and tapered-side geometry that no current kernel stores.',
+    'Enter one as a custom tapered ball nose only after confirming its tip radius is tangent to its flanks: tip diameter twice the radius, taper half the included angle.',
     HARVEY_ENGRAVING,
   ),
   ref(
@@ -48,12 +48,6 @@ export const REFERENCE_CNC_BIT_SHAPE_CATALOG: ReadonlyArray<ReferenceCncBitCatal
     'tapered-square',
     'Tapered square end mills',
     'Needs taper angle, tip diameter, and cutting length independently.',
-    HARVEY_TAPERED,
-  ),
-  ref(
-    'tapered-ball',
-    'Tapered ball-nose cutters',
-    'Needs independent ball radius, tip diameter, taper angle, and cutting length.',
     HARVEY_TAPERED,
   ),
   ref(

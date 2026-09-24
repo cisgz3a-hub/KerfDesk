@@ -117,7 +117,13 @@ function arrayOf<T>(raw: unknown, parse: (item: unknown) => T | null): ReadonlyA
   return out;
 }
 
-const TOOL_KINDS: ReadonlyArray<CncToolKind> = ['end-mill', 'ball-nose', 'v-bit', 'engraving'];
+const TOOL_KINDS: ReadonlyArray<CncToolKind> = [
+  'end-mill',
+  'ball-nose',
+  'v-bit',
+  'engraving',
+  'tapered-ball-nose',
+];
 const MAX_TOOL_METADATA_LENGTH = 120;
 
 function parseTool(raw: unknown): CncTool | null {
@@ -159,7 +165,7 @@ function parseToolMetadata(record: Record<string, unknown>): Partial<CncTool> {
   // Preserve explicit finite malformed data so restore cannot reinterpret the
   // cutter as a supported point. Entry UI still prevents creating such tools.
   if (
-    record['kind'] === 'engraving' &&
+    (record['kind'] === 'engraving' || record['kind'] === 'tapered-ball-nose') &&
     typeof record['tipDiameterMm'] === 'number' &&
     Number.isFinite(record['tipDiameterMm'])
   ) {

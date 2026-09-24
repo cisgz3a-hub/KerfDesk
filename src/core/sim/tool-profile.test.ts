@@ -9,6 +9,14 @@ const TOOL_CASES: readonly CncTool[] = [
   { id: 't', name: 'v-bit', kind: 'v-bit', diameterMm: 6, tipAngleDeg: 60 },
   { id: 't', name: 'v-bit', kind: 'v-bit', diameterMm: 4, tipAngleDeg: 30 },
   { id: 't', name: 'engraving', kind: 'engraving', diameterMm: 3 },
+  {
+    id: 't',
+    name: 'tapered-ball-nose',
+    kind: 'tapered-ball-nose',
+    diameterMm: 6.25,
+    tipAngleDeg: 10.8,
+    tipDiameterMm: 1.5875,
+  },
 ];
 
 function tool(kind: CncTool['kind'], diameterMm: number, tipAngleDeg?: number): CncTool {
@@ -70,6 +78,21 @@ describe('toolProfile', () => {
     const profile = toolProfile(tool('v-bit', 6, 90));
     // 90° included -> 45° half-angle -> height equals radius at the edge.
     expect(profile.at(-2)?.heightMm).toBeCloseTo(3, 10);
+  });
+
+  it('samples a tapered ball nose around its tip ball, then to the end of its flank', () => {
+    const tapered = TOOL_CASES.find((candidate) => candidate.kind === 'tapered-ball-nose');
+    if (tapered === undefined) throw new Error('tapered ball-nose case missing');
+    const cutting = toolProfile(tapered).slice(0, -1);
+    const ballRadius = 1.5875 / 2;
+    const tangentRadius = ballRadius * Math.cos((5.4 * Math.PI) / 180);
+
+    // The curvature lives in the 0.79 mm ball, so most samples sit on it; the
+    // straight flank beyond needs only its outer end, 25.4 mm up.
+    expect(cutting.filter((point) => point.radiusMm <= tangentRadius + 1e-9)).toHaveLength(21);
+    expect(cutting.at(-2)?.radiusMm).toBeCloseTo(tangentRadius, 12);
+    expect(cutting.at(-1)?.radiusMm).toBe(3.125);
+    expect(cutting.at(-1)?.heightMm).toBeCloseTo(25.4, 1);
   });
 
   it('falls back to a usable v-bit angle when none is configured', () => {

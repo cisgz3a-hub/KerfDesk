@@ -16,6 +16,7 @@
 // PURE: plain numbers in, plain numbers out.
 
 import type { CncTool } from '../scene';
+import { taperedBallEnvelope, type TaperedBallEnvelope } from '../cnc-tapered-ball';
 import { cuttingSurfaceDz } from './tool-kernels';
 
 export type ToolProfilePoint = {
@@ -45,6 +46,29 @@ function sampleRadiusMm(radiusMm: number, sample: number, sampleCount: number): 
   return radiusMm * Math.sin((Math.PI / 2) * (sample / sampleCount));
 }
 
+// A tapered ball nose's curvature lives entirely in its small tip ball, which
+// sin-spaced radii across the full cut diameter would cross in two or three
+// samples. Its samples are uniform in angle around the ball up to the tangent
+// point instead; the straight flank beyond needs only its outer end.
+function cuttingSurfaceRadiiMm(tool: CncTool, radiusMm: number): ReadonlyArray<number> {
+  const envelope = taperedBallEnvelope(tool);
+  if (envelope === null) {
+    return Array.from({ length: CUTTING_SURFACE_SAMPLES + 1 }, (_, sample) =>
+      sampleRadiusMm(radiusMm, sample, CUTTING_SURFACE_SAMPLES),
+    );
+  }
+  return [...taperedBallCapRadiiMm(envelope), radiusMm];
+}
+
+function taperedBallCapRadiiMm(envelope: TaperedBallEnvelope): ReadonlyArray<number> {
+  const tangentAngle = Math.asin(Math.min(1, envelope.tangentRadiusMm / envelope.ballRadiusMm));
+  return Array.from(
+    { length: CUTTING_SURFACE_SAMPLES + 1 },
+    (_, sample) =>
+      envelope.ballRadiusMm * Math.sin(tangentAngle * (sample / CUTTING_SURFACE_SAMPLES)),
+  );
+}
+
 // How far the shank rises above the cutting surface, as a multiple of tool
 // diameter. Long enough to read as a tool rather than a floating stub.
 const SHANK_LENGTH_DIAMETERS = 3;
@@ -61,8 +85,7 @@ export function toolProfile(tool: CncTool): ReadonlyArray<ToolProfilePoint> {
   const radiusMm = Math.max(MIN_RADIUS_MM, tool.diameterMm / 2);
   const points: ToolProfilePoint[] = [];
 
-  for (let sample = 0; sample <= CUTTING_SURFACE_SAMPLES; sample += 1) {
-    const dMm = sampleRadiusMm(radiusMm, sample, CUTTING_SURFACE_SAMPLES);
+  for (const dMm of cuttingSurfaceRadiiMm(tool, radiusMm)) {
     points.push({ radiusMm: dMm, heightMm: cuttingSurfaceDz(tool, dMm, radiusMm) });
   }
 

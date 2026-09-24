@@ -19,6 +19,7 @@ import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm }
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
+import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -49,8 +50,12 @@ const ROUGHING_CELL_TOOL_FRACTION = 8;
 // Finishing samples finer than roughing: quality lives in the skim.
 const FINISHING_CELL_TOOL_FRACTION = 10;
 
-function finishingCellSizeMm(rowSpacingMm: number, toolDiameterMm: number): number {
-  return Math.min(rowSpacingMm, toolDiameterMm / FINISHING_CELL_TOOL_FRACTION);
+function finishingCellSizeMm(rowSpacingMm: number, tool: CncTool): number {
+  // A tapered ball nose finishes with its tip ball, so the grid resolves that
+  // ball exactly as it would a ball nose of the same diameter (ADR-368).
+  const ballRadiusMm = reliefScallopBallRadiusMm(tool);
+  const contactDiameterMm = ballRadiusMm === null ? tool.diameterMm : 2 * ballRadiusMm;
+  return Math.min(rowSpacingMm, contactDiameterMm / FINISHING_CELL_TOOL_FRACTION);
 }
 
 // Roughing group (H.5) plus — when the layer names a finishing bit — the
@@ -188,7 +193,7 @@ function reliefFinishingGroup(
       reliefDepthMm: relief.reliefDepthMm,
       targetScaleX: machineSpace.targetScaleX,
       targetScaleY: machineSpace.targetScaleY,
-      mmPerCell: finishingCellSizeMm(rowSpacingMm, finishTool.diameterMm),
+      mmPerCell: finishingCellSizeMm(rowSpacingMm, finishTool),
     });
     if (heightmap.kind === 'error') {
       return reliefMaterializationFailure(relief.source, heightmap.reason);
@@ -202,6 +207,7 @@ function reliefFinishingGroup(
       cellSizeMm: heightmap.heightmap.mmPerCell,
       toolDiameterMm: finishTool.diameterMm,
       toolKind: finishTool.kind,
+      ...finishingTipEvidence(finishTool),
       rowSpacingMm,
       scallopMm,
     });
@@ -236,6 +242,14 @@ function reliefFinishingGroup(
       layerCncTool(config, settings),
     ),
   };
+}
+
+// Only a tapered ball nose's cusp depends on a tip smaller than its stored
+// diameter; Job Review needs that tip to explain a clamped scallop request.
+function finishingTipEvidence(tool: CncTool): { readonly toolTipDiameterMm?: number } {
+  if (tool.kind !== 'tapered-ball-nose') return {};
+  const ballRadiusMm = reliefScallopBallRadiusMm(tool);
+  return ballRadiusMm === null ? {} : { toolTipDiameterMm: 2 * ballRadiusMm };
 }
 
 function reliefObjectsForLayer(

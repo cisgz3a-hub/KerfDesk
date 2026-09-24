@@ -210,4 +210,18 @@ export const BIT_PHOTO_ASSETS = {
       bytes: 3722,
     },
   },
+  'bit-tapered-ball-nose': {
+    small: {
+      file: 'bit-tapered-ball-nose-320-4dad58190d.webp',
+      width: 320,
+      height: 320,
+      bytes: 1232,
+    },
+    large: {
+      file: 'bit-tapered-ball-nose-640-66176d0c7e.webp',
+      width: 640,
+      height: 640,
+      bytes: 3046,
+    },
+  },
 } as const;

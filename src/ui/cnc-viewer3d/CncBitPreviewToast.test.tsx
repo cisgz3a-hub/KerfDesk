@@ -215,6 +215,47 @@ describe('CncBitPreviewToast', () => {
     expect(container.querySelector('canvas')?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  // ADR-368: a tapered ball nose's taper fixes where it reaches its stored
+  // diameter, so its cutting length is stated rather than disclaimed.
+  it('states where a tapered ball nose reaches its cut diameter', async () => {
+    const createScene = vi.fn(async () => ({ kind: 'ok', handle: { dispose: vi.fn() } }) as const);
+    const taperedBall: CncTool = {
+      id: 'tbn',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+      shankDiameterMm: 6.35,
+    };
+    const container = await renderToast({ tool: taperedBall, onDismiss: vi.fn(), createScene });
+
+    expect(createScene).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain(
+      'the taper reaches 6.25 mm about 25.4 mm above the tip',
+    );
+    expect(container.textContent).toContain('Flutes and coating are not modeled');
+  });
+
+  it('does not draw a tapered ball nose without its ball tip', async () => {
+    const createScene = vi.fn(async () => ({ kind: 'ok', handle: { dispose: vi.fn() } }) as const);
+    const container = await renderToast({
+      tool: {
+        id: 'tbn-no-tip',
+        name: 'Tapered ball nose without a tip',
+        kind: 'tapered-ball-nose',
+        diameterMm: 6.25,
+        tipAngleDeg: 10.8,
+      },
+      onDismiss: vi.fn(),
+      createScene,
+    });
+
+    expect(createScene).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('no tapered ball nose was modeled');
+    expect(container.textContent).toContain("Enter the cutter's ball tip diameter and taper");
+  });
+
   it('switches to a readable fallback when a running scene reports failure', async () => {
     let reportFailure: ((reason: string) => void) | undefined;
     const dispose = vi.fn();
