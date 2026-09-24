@@ -120,7 +120,6 @@ describe('R1: Job Review owns cancellation during asynchronous preparation', () 
       const delayed = delayedWorker();
       const review = runJobReviewGate({
         initial,
-        checkpointToReplace: null,
         completedReceipt: null,
         purpose: 'frame',
       });
@@ -144,7 +143,6 @@ describe('R1: Job Review owns cancellation during asynchronous preparation', () 
     const delayed = delayedWorker();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });

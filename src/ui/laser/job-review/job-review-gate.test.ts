@@ -205,7 +205,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     useLaserStore.setState({ detectedControllerKind: 'marlin' });
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -227,7 +226,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     const capture = captureJobReviewModels();
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });
@@ -256,7 +254,6 @@ describe('runJobReviewGate through runStartJobFlow', () => {
 
     const review = runJobReviewGate({
       initial,
-      checkpointToReplace: null,
       completedReceipt: null,
       purpose: 'frame',
     });

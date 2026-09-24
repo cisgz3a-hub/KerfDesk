@@ -1,9 +1,7 @@
-import type { JobCheckpoint } from '../../core/recovery';
 import type { FramedRunControllerSnapshot } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery';
 import { laserSecondPassExecutionSignature } from '../state/recovery/laser-second-pass-lineage';
-import { checkpointStartIssue } from './start-job-checkpoint-policy';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { framedRunStartClaimIsCurrent, type FramedRunStartClaim } from './framed-run-start-claim';
 
@@ -18,7 +16,6 @@ export type StartAuthorization =
 
 export type CurrentStartAuthorizationArgs = {
   readonly preparedAgainst: ReturnType<typeof useLaserStore.getState> | FramedRunControllerSnapshot;
-  readonly checkpointToReplace: JobCheckpoint | null;
   readonly completedReceipt: LastCompletedReceipt | null;
   readonly expectedExecutionSignature: string;
   readonly repository: RecoveryRepository;
@@ -42,10 +39,6 @@ export function currentLaserForAuthorizedStartNow(
       ok: false,
       refusal: { kind: 'blocked', message: FRAMED_RUN_START_CLAIM_CHANGED_MESSAGE },
     };
-  }
-  const checkpointIssue = checkpointStartIssue(args.checkpointToReplace);
-  if (checkpointIssue !== null) {
-    return { ok: false, refusal: { kind: 'blocked', message: checkpointIssue } };
   }
   if (
     args.completedReceipt !== null &&
