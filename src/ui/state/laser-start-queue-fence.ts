@@ -30,6 +30,7 @@ export function startPendingControllerMessage(state: LaserState): string {
   const detail = blockers.length > 0 ? blockers.join('; ') : 'the controller queue is not settled';
   return (
     `Controller queue is not settled: ${detail}. Start was blocked so a late completion or response ` +
-    'cannot corrupt the job stream — check the connection and try again.'
+    'cannot corrupt the job stream. Check the connection and try again; if no acknowledgement ' +
+    'arrives, disconnect and reconnect the controller to clear it.'
   );
 }
