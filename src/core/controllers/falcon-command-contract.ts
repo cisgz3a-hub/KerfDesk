@@ -49,7 +49,7 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
 
 /** Creality's Falcon A1 parameter page documents these air-assist settings,
  *  each 0-100, as set from a software console. Every other numeric write stays
- *  out of host software on this contract (ADR-366). Source:
+ *  out of host software on this contract (ADR-370). Source:
  *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters */
 const FALCON_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
   { id: 150, min: 0, max: 100, meaning: 'engraving airflow level' },

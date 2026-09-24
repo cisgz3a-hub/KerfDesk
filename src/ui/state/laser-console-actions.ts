@@ -260,7 +260,7 @@ function consoleSettingWriteBlockReason(
   // A profile policy, not a claim about the firmware: the Falcon A1 Pro's
   // grblHAL answers `$N=` writes, but its vendor configuration keeps settings
   // out of host software apart from the air settings Creality documents for
-  // console use (audit settings-console-10, ADR-366).
+  // console use (audit settings-console-10, ADR-370).
   return machineKindIssue ?? consoleSettingWriteIssue(driver, command);
 }
 

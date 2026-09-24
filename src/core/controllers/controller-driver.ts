@@ -82,7 +82,7 @@ export type ConsoleQuickCommand = {
   readonly hint: string;
 };
 /** One numeric `$N=` setting a vendor documents for console use, accepted as
- *  a whole number in [min, max] (ADR-366). */
+ *  a whole number in [min, max] (ADR-370). */
 export type ConsoleSettingWrite = {
   readonly id: number;
   readonly min: number;

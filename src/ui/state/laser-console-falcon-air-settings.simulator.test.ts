@@ -1,4 +1,4 @@
-// The Falcon A1 Pro Console against the scripted GRBL simulator (ADR-366). The
+// The Falcon A1 Pro Console against the scripted GRBL simulator (ADR-370). The
 // vendor contract keeps numeric `$N=` writes out of host software except the
 // air-assist settings Creality documents for console use, $150-$152, so the
 // `$152=100` that Job Review recommends can be sent from KerfDesk itself.

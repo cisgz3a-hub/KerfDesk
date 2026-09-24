@@ -138,7 +138,7 @@ fill overscan worth flagging in cross-reference.
 device's `M7` or `M8` before each operation whose Air setting (or artwork override) is on, `M9`
 before an Air-off operation, and a final `M9` before the closing `M5` and park. A device whose Air
 output is Disabled gets no air command at all; Job Review's manual-air advisory says so, and a
-saved preset in that state is offered the preset's air settings in Machine Setup (ADR-366). On a
+saved preset in that state is offered the preset's air settings in Machine Setup (ADR-370). On a
 profile flagged `airAssistRestartUnreliable` (the Falcon A1 Pro), `bridgedAirGapIndices` holds the
 air through an Air-off operation that sits between two Air-on ones (ADR-335). The resume
 preamble replays the emitted program and re-issues the active `M7`/`M8` before its re-entry move.

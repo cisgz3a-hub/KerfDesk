@@ -10,7 +10,7 @@ function savedWithAirDisabled(profileId?: string) {
     : { profileId, airAssistCommand: 'none' as const };
 }
 
-describe('preset air settings for a saved preset (ADR-366)', () => {
+describe('preset air settings for a saved preset (ADR-370)', () => {
   it('offers M8 with Air restart to a Falcon A1 Pro profile saved with air Disabled', () => {
     expect(
       presetAirAssistUpdate(savedWithAirDisabled(FALCON_A1_PRO_GRBLHAL_PROFILE.profileId)),

@@ -14,7 +14,7 @@ export function detectManualAirAssistWarnings(
 ): ReadonlyArray<string> {
   if (device.airAssistCommand !== 'none') return [];
   if (!job.groups.some((group) => group.kind !== 'cnc' && group.airAssist)) return [];
-  // A saved preset whose air predates the preset's own (ADR-366).
+  // A saved preset whose air predates the preset's own (ADR-370).
   const preset = presetAirAssistUpdate(device);
   return preset === null
     ? [MANUAL_AIR_WARNING]

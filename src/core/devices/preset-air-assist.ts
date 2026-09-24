@@ -6,7 +6,7 @@
 // profile saved before then still reads Air output Disabled and sends no air
 // command at all, while the Air restart row stays hidden. This names the
 // preset's air settings so Machine Setup can offer them in one click, and Job
-// Review and Manual Air can point there (ADR-366).
+// Review and Manual Air can point there (ADR-370).
 //
 // Only that clearly stale state is detected: a saved preset with Air output
 // Disabled whose preset now defines a command. An operator who chose another

@@ -1,6 +1,6 @@
 // PresetAirAssistOffer — shown under Air output when a saved copy of a
 // built-in preset still has air Disabled while the preset now defines an air
-// command (ADR-366). One click applies the preset's air settings through the
+// command (ADR-370). One click applies the preset's air settings through the
 // same update path as the rows beside it; nothing is applied on its own, so an
 // operator who disabled air on purpose can ignore it.
 import type { DeviceProfile } from '../../core/devices';

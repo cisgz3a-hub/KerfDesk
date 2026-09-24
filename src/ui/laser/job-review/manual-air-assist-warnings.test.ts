@@ -29,7 +29,7 @@ describe('manual air-assist Job Review warning', () => {
     expect(warnings[0]).toContain('manual');
   });
 
-  it('names the preset air output when a saved preset still has air Disabled (ADR-366)', () => {
+  it('names the preset air output when a saved preset still has air Disabled (ADR-370)', () => {
     const [warning] = detectManualAirAssistWarnings(AIR_JOB, {
       ...FALCON_A1_PRO_GRBLHAL_PROFILE,
       airAssistCommand: 'none',

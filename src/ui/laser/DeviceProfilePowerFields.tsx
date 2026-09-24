@@ -119,7 +119,7 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
 // running job, so the emitter holds air on across an Air-off operation that
 // sits between two Air-on ones. Clearing this restores plain per-operation
 // air, which is what an operator wants once `$152=100` (no standby: the pump
-// and laser module stay powered) is sent from the Console (ADR-366) or the
+// and laser module stay powered) is sent from the Console (ADR-370) or the
 // firmware is updated past 1.0.6. Hidden while air output is disabled, where
 // it would mean nothing.
 export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element | null {

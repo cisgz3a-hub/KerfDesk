@@ -10,7 +10,7 @@
 // and then stops" and a machine that sits Idle for about a minute mid-burn
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
 // vendor contract forbids `$$`), so the remedy is named rather than checked;
-// the Console can write it (ADR-366).
+// the Console can write it (ADR-370).
 //
 // Advisory only (rule 7 / ADR-228, ADR-345): it never refuses a Start.
 

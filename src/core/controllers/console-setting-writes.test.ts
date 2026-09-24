@@ -13,7 +13,7 @@ function issue(driver: ControllerDriver, input: string): string | null {
   return consoleSettingWriteIssue(driver, prepared.command);
 }
 
-describe('Console numeric setting writes (ADR-366)', () => {
+describe('Console numeric setting writes (ADR-370)', () => {
   it('leaves a GRBL-settings driver free to send any numeric write', () => {
     expect(issue(grblHal, '$110=6000')).toBeNull();
   });

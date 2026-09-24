@@ -32,7 +32,7 @@ function renderRow(device: DeviceProfile, update: (patch: Partial<DeviceProfile>
   act(() => root.render(<AirAssistRow device={device} update={update} />));
 }
 
-describe('Air output preset offer (ADR-366)', () => {
+describe('Air output preset offer (ADR-370)', () => {
   it("offers a saved Falcon A1 Pro with air Disabled the preset's M8 and Air restart", () => {
     const update = vi.fn();
     renderRow(SAVED_WITHOUT_AIR, update);

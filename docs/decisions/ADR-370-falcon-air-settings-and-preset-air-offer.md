@@ -1,4 +1,4 @@
-## ADR-366 - The Falcon Console sends Creality's air settings, and Machine Setup offers a preset's air to an outdated saved profile (2026-09-24)
+## ADR-370 - The Falcon Console sends Creality's air settings, and Machine Setup offers a preset's air to an outdated saved profile (2026-09-24)
 
 **Status:** Accepted. | **Date:** 2026-09-24
 

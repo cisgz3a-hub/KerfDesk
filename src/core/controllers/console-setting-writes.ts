@@ -9,7 +9,7 @@
 // gives. Creality's Falcon A1 parameter page says to set the air-assist
 // parameters $150-$152 from a software console, and Job Review's advice for
 // the A1 air pump is `$152=100`, so the Falcon contract lists those three
-// (ADR-366).
+// (ADR-370).
 import type { ConsoleSettingWrite, ControllerDriver } from './controller-driver';
 
 type ConsoleSettingCommand = { readonly kind: string; readonly normalized: string };
