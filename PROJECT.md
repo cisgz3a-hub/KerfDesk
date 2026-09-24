@@ -663,7 +663,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
   staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
   print-and-cut → v4 capture-to-trace) — no longer out of scope.
-- ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160/315**; hardware remains CLAIMED. Rotary G-code output is independent of workstation-local Labs state, while exact active-rotary raster jobs disclose the still-unqualified physical factors in Job Review.
+- ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160/315/373**; hardware remains CLAIMED. Rotary G-code output is independent of workstation-local Labs state, while exact active-rotary raster jobs disclose the still-unqualified physical factors in Job Review. A roller may scale Y from its measured roller diameter, Rotary Setup can turn the part one revolution with the laser off to check the setup, and a Rotary switch beside Frame and Start shows and toggles the active mapping (ADR-373).
 - Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
   safe-Z retracts) — ADR-098.

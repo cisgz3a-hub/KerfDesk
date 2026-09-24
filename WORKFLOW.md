@@ -2023,6 +2023,61 @@ their archive before transmission.
 5. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
    uncertain, the physical-safety warning remains instead of claiming a clean stop.
 
+### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373)
+
+#### Success — set up the attachment
+1. **Tools → Rotary Setup**, or **Setup…** beside the Rotary switch. The dialog edits a draft;
+   nothing reaches the profile until **Apply**.
+2. **Object diameter** and **Circumference** are one linked measurement: editing either updates
+   the other, and a typed circumference is stored as its exact diameter. **Measure with a strip**
+   takes the flat length of a strip wrapped once round the part where the artwork goes and the
+   strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
+   fills the field.
+3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either leaves Y
+   unscaled (**Scale Y from the roller diameter** off: the controller already moves the surface
+   in millimetres; every pre-ADR-373 roller setup, byte-identical output) or scales it by Motion
+   per turn / (π × **Roller diameter**), independent of the part's size. Motion per turn is
+   disabled while it has no effect. A chuck never stores a roller diameter.
+4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
+   limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
+
+#### Success — test rotation
+1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and
+   momentary Fire off, the Test rotation buttons test the values on screen, before Apply:
+   **Turn chuck once**; **Turn roller once** and **Turn object once** for a scaled roller; **Turn
+   object once** for an unscaled roller. CNC projects cannot run it.
+2. The part turns one revolution at about ten seconds per revolution (100-1500 mm/min, never
+   above the profile's maximum feed), pauses one second, and turns back by the same distance.
+   Both turns are ordinary jogs through the store's jog action and its readiness gate:
+   `$J=G91 G21 Y<travel> F<feed>` on GRBL, grblHAL and FluidNC, `G21` / `G91` / `G0 Y… F…` /
+   `G90` on Marlin (Smoothieware wraps the same move in its tool-off lines and `M120`/`M121`),
+   `M5` / `G21 G91` / `G1 Y… F… S0` / `G90` on the Falcon contract. No turn carries M3/M4 or a
+   power word. Ruida has no jog command, so the test is unavailable there.
+3. The operator checks that a mark on the part returns to the same place, adjusts the
+   measurements, tests again, then applies.
+
+#### Edge — stop, close, refusal
+1. **Stop rotation**, closing the dialog, or Esc sends jog cancel (`0x85`) where the firmware
+   has it; otherwise ABORT MOTION while a turn moves. The return turn is never sent after a stop,
+   and a cancel from another surface also ends the test as stopped.
+2. A turn the controller rejects (for example `error:15` beyond soft limits), an alarm or a
+   disconnect ends the test with a message and no return turn.
+3. **Apply** and **Generate test pattern** are disabled while a test turns.
+4. A test turn is a jog: it expires a completed Frame, and Start frames again.
+
+#### Success — the Rotary switch
+1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
+   toggle above Frame and Start with the attachment and size, for example
+   "Roller, Ø60 mm (rollers Ø25 mm)" or "Off · Chuck, Ø80 mm". Its tooltip gives the Y scale and
+   the machine travel for one revolution.
+2. It toggles `device.rotary.enabled`, the setup Rotary Setup edits, as one undoable profile
+   edit. It is disabled while a job, motion or controller operation owns the machine. A setup
+   whose measurements cannot map Y opens Rotary Setup instead of switching on.
+3. Switching changes the job's Y mapping, so a completed Frame expires. Job Review's Rotary fact
+   names the mapping, for example "Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one
+   revolution = 96 machine mm". Rotary stays a warning-only Job Review fact; Frame remains the
+   only ordinary Start gate.
+
 ---
 
 ## Phase C flows — STUB
