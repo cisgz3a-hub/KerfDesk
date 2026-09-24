@@ -2,7 +2,7 @@ import type { JobBounds } from '../../core/job';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import type { FrameMotionCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
-import type { LaserMotionOperation } from '../state/laser-motion-operation';
+import type { LaserMotionOperation, LaserMotionOperationId } from '../state/laser-motion-operation';
 import { useToastStore } from '../state/toast-store';
 import { frameControllerQueueIssue } from './frame-controller-readiness';
 import { reportStartBlockers } from './start-blocker-invalidation';
@@ -35,6 +35,7 @@ export type FrameOutcome = {
 export function waitForFrameOutcome(candidate: FrameMotionCandidate): FrameOutcome {
   let settled = false;
   let sawOwnedFrame = false;
+  let operationId: LaserMotionOperationId | null = null;
   let finish: (value: boolean) => void = () => undefined;
   const result = new Promise<boolean>((resolve) => {
     finish = resolve;
@@ -48,6 +49,11 @@ export function waitForFrameOutcome(candidate: FrameMotionCandidate): FrameOutco
   const unsubscribe = useLaserStore.subscribe((state, previous) => {
     const ownedOperation = candidateFrameOperation(state.motionOperation, candidate);
     if (ownedOperation !== null) {
+      if (operationId !== null && ownedOperation.operationId !== operationId) {
+        complete(false);
+        return;
+      }
+      operationId = ownedOperation.operationId;
       sawOwnedFrame = true;
       if (ownedOperation.cancelRequested === true) {
         complete(false);
@@ -61,7 +67,7 @@ export function waitForFrameOutcome(candidate: FrameMotionCandidate): FrameOutco
     if (
       sawOwnedFrame &&
       candidateFrameOperation(previous.motionOperation, candidate) !== null &&
-      state.motionOperation === null
+      ownedOperation === null
     ) {
       complete(false);
     }
@@ -73,7 +79,10 @@ export function waitForFrameOutcome(candidate: FrameMotionCandidate): FrameOutco
       return true;
     }
     const operation = candidateFrameOperation(state.motionOperation, candidate);
-    const dispatched = operation !== null && operation.cancelRequested !== true;
+    const dispatched =
+      operation !== null &&
+      operation.cancelRequested !== true &&
+      (operationId === null || operation.operationId === operationId);
     if (!dispatched) complete(false);
     return dispatched;
   };
