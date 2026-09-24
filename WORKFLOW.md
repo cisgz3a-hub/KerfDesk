@@ -1716,9 +1716,15 @@ authorization, Frame proof, controller command, or safety boundary.
   controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
   line also steps back over the moves the last status report showed still waiting in the
   planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
-- Resume, saved or manual, is refused for Smoothieware and Marlin programs with that reason:
-  the resume builder cannot yet restore their power commands (M221 scaling, `M3 I`, M106), so
-  the rest of the job would run with the laser off. Nothing is sent (ADR-362).
+- Resume, saved or manual, re-arms the beam with the power commands of the controller the job
+  was written for (ADR-364).
+  - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
+    proportional mode after the beam-off re-entry.
+  - A Marlin inline job resumes with `M5 I`, re-arms with `M3 I S0` after the re-entry, and sets
+    its feed with `G1 F` (Marlin ignores a bare `F`).
+  - A Marlin fan job turns the fan output off with `M107` before the re-entry. It turns the fan
+    back on with the job's own `M106 S` just before the next move.
+  - GRBL, grblHAL and FluidNC jobs resume as before.
 - The resumed program re-issues the air assist (M7/M8) the job had switched on before its
   beam-off re-entry, and names the program's motion mode on the first resumed line that relies
   on it: the re-entry is a rapid, and a raster row resumed mid-row used to continue as dark
