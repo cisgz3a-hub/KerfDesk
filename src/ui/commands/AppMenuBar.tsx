@@ -205,6 +205,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.rotary-setup',
         'tools.print-and-cut',
         'tools.box-generator',
+        'tools.barcode',
       ],
     },
     {

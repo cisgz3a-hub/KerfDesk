@@ -311,6 +311,13 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       ctx.boxGenerator,
     ),
     enabled(
+      'tools.barcode',
+      'tools',
+      'Barcode...',
+      'Insert a QR Code, Data Matrix or 1D barcode as engravable outlines.',
+      ctx.barcodeGenerator,
+    ),
+    enabled(
       'tools.box-fit-test',
       'tools',
       'Box Fit Test...',

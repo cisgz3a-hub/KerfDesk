@@ -51,6 +51,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.place-board': { callback: 'toggleBoardCapturePanel' },
   'tools.camera': { callback: 'toggleCameraPanel' },
   'tools.box-generator': { callback: 'boxGenerator' },
+  'tools.barcode': { callback: 'barcodeGenerator' },
   'tools.box-fit-test': { callback: 'boxFitTest' },
   'tools.material-test': { callback: 'materialTest', guard: 'create a material test' },
   'tools.interval-test': { callback: 'intervalTest', guard: 'create an interval test' },

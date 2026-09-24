@@ -7,6 +7,8 @@ export function VariableTextFields(props: {
   readonly enabled: boolean;
   readonly onEnabledChange: (enabled: boolean) => void;
   readonly onInsert: (source: string) => void;
+  /** Barcodes reuse these controls for their variable data (ADR-372). */
+  readonly label?: string;
 }): JSX.Element {
   const variables = useStore((state) => state.project.variables) ?? DEFAULT_PROJECT_VARIABLE_DATA;
   const setCsv = useStore((state) => state.setVariableCsv);
@@ -17,7 +19,7 @@ export function VariableTextFields(props: {
   const pushToast = useToastStore((state) => state.pushToast);
   const firstColumn = variables.csv?.headers[0];
   return (
-    <section aria-label="Variable text" style={sectionStyle}>
+    <section aria-label={props.label ?? 'Variable text'} style={sectionStyle}>
       <label style={toggleStyle}>
         <input
           type="checkbox"
@@ -25,7 +27,7 @@ export function VariableTextFields(props: {
           title="Evaluate typed fields when previewing, framing, exporting, or starting this job."
           onChange={(event) => props.onEnabledChange(event.currentTarget.checked)}
         />
-        Variable text
+        {props.label ?? 'Variable text'}
       </label>
       {props.enabled ? (
         <VariableTextControls

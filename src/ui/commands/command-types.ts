@@ -53,6 +53,7 @@ export type CommandId =
   | 'tools.place-board'
   | 'tools.camera'
   | 'tools.box-generator'
+  | 'tools.barcode'
   | 'tools.box-fit-test'
   | 'tools.material-test'
   | 'tools.interval-test'
@@ -208,6 +209,7 @@ export type AppCommandContext = {
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
   readonly boxGenerator: () => void;
+  readonly barcodeGenerator: () => void;
   readonly boxFitTest: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;

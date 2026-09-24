@@ -59,31 +59,3 @@ export function defaultBarcodeSpec(symbology: BarcodeSymbology = 'qr'): BarcodeS
     showText: true,
   };
 }
-
-/**
- * Switching symbology keeps the operator's data and options; untouched sample
- * data follows the new symbology, and the quiet zone resets to its standard.
- */
-export function withSymbology(spec: BarcodeShape, symbology: BarcodeSymbology): BarcodeShape {
-  if (spec.symbology === symbology) return spec;
-  const defaults = defaultBarcodeSpec(symbology);
-  const sameFamily = isMatrixSymbology(symbology) === isMatrixSymbology(spec.symbology);
-  return {
-    ...spec,
-    symbology,
-    data: spec.data === SAMPLE_DATA[spec.symbology] ? defaults.data : spec.data,
-    quietZoneModules: defaults.quietZoneModules,
-    moduleMm: sameFamily ? spec.moduleMm : defaults.moduleMm,
-  };
-}
-
-/** Null when a number is missing, non-finite or outside its range. */
-export function sanitizeBarcodeSpec(spec: BarcodeShape): BarcodeShape | null {
-  const inRange = (value: number, range: { readonly min: number; readonly max: number }): boolean =>
-    Number.isFinite(value) && value >= range.min && value <= range.max;
-  if (!inRange(spec.moduleMm, BARCODE_LIMITS.moduleMm)) return null;
-  if (!inRange(spec.widthMm, BARCODE_LIMITS.widthMm)) return null;
-  if (!inRange(spec.barHeightMm, BARCODE_LIMITS.barHeightMm)) return null;
-  if (!inRange(spec.quietZoneModules, BARCODE_LIMITS.quietZoneModules)) return null;
-  return { ...spec, quietZoneModules: Math.round(spec.quietZoneModules) };
-}

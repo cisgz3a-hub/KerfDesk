@@ -188,6 +188,7 @@ function callbacks(): CommandShellCallbacks {
     requestAdjustImage: doNothing,
     requestGcodeInspector: doNothing,
     requestBoxGenerator: doNothing,
+    requestBarcodeGenerator: doNothing,
     requestBoxFitTest: doNothing,
     requestMaterialTest: doNothing,
     requestIntervalTest: doNothing,

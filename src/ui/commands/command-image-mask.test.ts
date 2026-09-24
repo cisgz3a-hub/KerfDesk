@@ -84,6 +84,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     cameraPanelOpen: false,
     toggleCameraPanel: vi.fn(),
     boxGenerator: vi.fn(),
+    barcodeGenerator: vi.fn(),
     boxFitTest: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),

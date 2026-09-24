@@ -10,8 +10,6 @@ export {
   MIN_QUIET_ZONE,
   defaultBarcodeSpec,
   isMatrixSymbology,
-  sanitizeBarcodeSpec,
-  withSymbology,
 } from './barcode-spec';
 export { BARCODE_SYMBOLOGY_LABELS } from './barcode-symbol';
 export { layoutBarcode, layoutPolylines, type BarcodeLayout } from './barcode-layout';
