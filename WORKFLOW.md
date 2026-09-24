@@ -55,7 +55,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 #### Success — returning run (had a project last session)
 1. App opens to empty workspace.
 2. **Phase A does not auto-reopen the last project.** Autosave + recovery is a Phase C feature.
-3. User opens via `File → Open Recent` (Phase C) or `File → Open` (Phase A).
+3. User reopens it from the recent projects at the foot of the File menu, from
+   `File → Recent Projects...`, or with `File → Open` (F-A12).
 
 #### Empty — no display capability (web only)
 1. If `<canvas>` is unsupported, show full-page error: "KerfDesk requires a modern browser. Try Chrome, Edge, or Brave."
@@ -811,6 +812,38 @@ the completed physical Frame is the spatial source of truth.
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
 - _Not yet implemented:_ a status-bar warning that the embedded profile is unknown to this machine (`Project's device profile … is not configured locally`). It needs an app-level device-profile registry to compare against, which does not exist yet (see the machine-profile lifecycle / app-level device-list work). Until then the embedded profile is simply used with no such warning.
+
+#### Success — reopen a recent project (ADR-378)
+1. The foot of the File menu lists recent projects, pinned first, then the most recently opened
+   or saved. One click reopens one. `File → Recent Projects...` opens the manager.
+2. The file is read first (a browser may ask once more for permission to read it), then the
+   unsaved-changes question of F-A13 runs, then the project loads as above.
+3. Opening or saving a project puts it at the top of the list; the same file is never listed
+   twice. The list stays on this computer and is never saved in a project.
+
+#### Manage recent projects
+- The manager shows each project's name, its folder (desktop, for files opened from Explorer or
+  Finder; a browser never reveals one) and when it was last opened or saved.
+- **Pin** keeps a project on top; up to 24 pinned projects never fall off the list. **Unpin**,
+  **Remove** (one entry), **Clear unpinned** and **Clear all** change only the list, never the
+  files.
+- **Keep N recent projects**: 10 by default, 1 to 24, with pinned projects kept as well.
+- Available during a job, like `File → Open`.
+
+#### Edge — a recent project's file is gone, or reading it is refused
+1. A file found missing is marked **Missing** in the menu and the manager and stays listed until
+   the operator removes it.
+2. Reopening it opens the manager with the reason (`<name> is no longer in <folder>. …`) and
+   **Choose file...**, which opens the picker. A refused permission shows
+   `KerfDesk isn't allowed to read <name>. Choose the file again to give permission.`
+3. A browser that cannot keep file handles remembers names only. Reopening one shows
+   `<name> can't be reopened directly in this browser. Choose it in the file picker.` and opens
+   the picker.
+
+#### Success — open from the operating system
+- Desktop: F-DESK4. Installed web app on a Chromium desktop browser: opening a `.lf2` with
+  KerfDesk from the file manager focuses the open window and opens the file there, with the same
+  unsaved-changes question and the same job rule as F-DESK4.
 
 ---
 
@@ -6555,6 +6588,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 - [ ] **Files (each desktop architecture):** a `.lf2` project round-trips through
       the existing File System Access pickers and G-code export saves to the
       chosen path.
+- [ ] **Open from the operating system (each desktop architecture):** double-clicking
+      a `.lf2` starts KerfDesk with it; with KerfDesk running it opens in the same
+      window after the unsaved-changes question; during a streamed job it waits in
+      the banner until the job ends; a `.lbrn2` named on the command line opens;
+      the file reopens from Recent Projects after a restart (F-DESK4).
 - [ ] **Camera:** a USB webcam previews through `getUserMedia` on every desktop
       architecture, and private-network JPEG capture works on both Mac
       architectures. Windows RTSP/IP previews when the optional `ffmpeg` binary
@@ -6614,6 +6652,33 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 
 Until every applicable box is checked on the named real OS and hardware, that
 desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance item 7.
+
+### F-DESK4. Open a project from Explorer, Finder or the command line (ADR-378)
+
+1. The installer associates `.lf2` with KerfDesk, so double-clicking one starts KerfDesk with it.
+   `.lbrn` and `.lbrn2` stay LightBurn's; open them with `File → Open`, Open With, or
+   `KerfDesk.exe path\to\file.lbrn2`.
+2. With KerfDesk already running, a double-click or a second launch with a project path brings the
+   running window forward and opens the file there. No second copy starts.
+3. The unsaved-changes question (F-A13) comes first; **Cancel** keeps the current project.
+4. The file joins Recent Projects with its folder and reopens from there after a restart.
+
+#### Edge — a job is running, or a dialog is open
+1. The project is never replaced during a job. A banner names the file:
+   `<name> is waiting to open. KerfDesk won't replace the project while a job is running.`
+2. **Open project** becomes available when the job has finished; **Dismiss** drops the file. A
+   newer file replaces a waiting one.
+3. If a job starts while the unsaved-changes question is open, answering it does not open the
+   file; the file waits in the banner.
+4. A file that arrives while a dialog is open (Job Review, Machine Setup, an unsaved-changes
+   question) waits in the same banner as `<name> is waiting to open.`; close the dialog, then
+   choose **Open project**.
+
+#### Error — the file cannot be opened
+- Gone: `Could not open <name>: the file is no longer there.`
+- Not a project, such as a folder named `x.lf2`:
+  `Could not open <name>: it is not a KerfDesk or LightBurn project file.`
+- Unreadable: `Could not open <name>: KerfDesk could not read it.`
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 
