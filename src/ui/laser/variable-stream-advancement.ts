@@ -2,6 +2,7 @@ import type { StreamerState } from '../../core/controllers/grbl';
 import { DEFAULT_PROJECT_VARIABLE_DATA, type OutputScope, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore, type LaserState } from '../state/laser-store';
+import { settledCleanly } from '../state/post-job-clean-settle';
 import type { RunId } from '../state/recovery';
 
 let cancelObserver: (() => void) | null = null;
@@ -21,6 +22,7 @@ export function armVariableStreamAdvancement(
   }
   const initial = useLaserStore.getState();
   let previous: StreamerState | null = null;
+  let priorState: LaserState | undefined;
   let epoch: number | null = null;
   let accepted = false;
   let completed = false;
@@ -65,8 +67,11 @@ export function armVariableStreamAdvancement(
       if (state.activeRunId !== runId || current === null) return;
       epoch = state.streamerEpoch;
     }
+    const prior = priorState;
+    priorState = state;
     if (current === previous) return;
-    const outcome = variableStreamOutcome(previous, current);
+    const cleanRelease = previous !== null && settledCleanly(state, prior, previous.status);
+    const outcome = variableStreamOutcome(previous, current, cleanRelease);
     previous = current;
     if (outcome === 'pending') return;
     if (outcome === 'failed') {
@@ -103,12 +108,15 @@ export function cancelVariableStreamAdvancement(): void {
   cancelObserver = null;
 }
 
+/** `cleanRelease`: the stream was released by a settle that saw Idle, the
+ *  evidence the recovery ledger records a completed run on (post-job-clean-settle). */
 export function variableStreamOutcome(
   previous: StreamerState | null,
   current: StreamerState | null,
+  cleanRelease: boolean,
 ): 'pending' | 'successful' | 'failed' {
   if (current !== null && current.status === 'errored') return 'failed';
   if (current !== null) return 'pending';
-  if (previous?.status === 'done') return 'successful';
+  if (previous?.status === 'done' && cleanRelease) return 'successful';
   return 'failed';
 }

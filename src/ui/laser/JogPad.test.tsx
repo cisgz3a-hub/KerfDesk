@@ -264,6 +264,8 @@ describe('JogPad accessible labels', () => {
     });
     expect(host.textContent).toContain('Manual Air will update project air-assist settings.');
     expect(host.textContent).toContain('enable Job Air on 1 output layer(s)');
+    // The layer change voids a completed Frame (audit gap-start-9).
+    expect(host.textContent).toContain('The job changes, so Start frames it again first.');
     expect(setAirAssistEnabled).not.toHaveBeenCalled();
 
     const proceed = buttonByLabel(host, 'Proceed with air assist setup');

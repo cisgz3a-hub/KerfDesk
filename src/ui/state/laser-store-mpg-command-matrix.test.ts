@@ -172,8 +172,12 @@ describe('latched grblHAL MPG machine-command ownership', () => {
 
     connection.emitLine('ok');
     writes.length = 0;
-    await useLaserStore.getState().unlockAlarm();
+    // Unlock owns its exchange and finishes on the controller's ok.
+    const unlocking = useLaserStore.getState().unlockAlarm();
+    await flush();
     expect(writes).toEqual(['$X\n']);
+    connection.emitLine('ok');
+    await unlocking;
   });
 
   it('keeps the dedicated soft-reset recovery path available', async () => {

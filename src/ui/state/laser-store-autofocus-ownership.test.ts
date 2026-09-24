@@ -157,6 +157,26 @@ describe('store autofocus shared response ownership', () => {
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
   });
 
+  // Controller audit gap-start-8: the cycle moves and re-references Z, so a
+  // Z zero taken before it no longer holds.
+  it('voids Z-zero evidence once the focus cycle completes', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectWith(connection);
+    const zEpoch = useLaserStore.getState().workZReferenceEpoch;
+    useLaserStore.setState({
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: zEpoch, toolId: 'laser' },
+    });
+
+    const { pending } = await beginAutofocus(connection, writes);
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+
+    expect((await pending).kind).toBe('ok');
+    expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
+    expect(useLaserStore.getState().workZReferenceEpoch).toBe(zEpoch + 1);
+  });
+
   it('consumes an autofocus error without routing it into stream-error handling', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);

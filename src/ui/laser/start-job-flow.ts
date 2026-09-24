@@ -62,6 +62,7 @@ import {
   reviewFramedRunForStart,
 } from './framed-run-start-review';
 import { runFrameNow } from './use-frame-action';
+import { frameExpiryRestartMessage, takeFrameExpiryReason } from './frame-expiry-note';
 import {
   claimCurrentFramedRunStart,
   releaseFramedRunStartClaim,
@@ -81,10 +82,13 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
   clearStartBlockers();
   const permit = useLaserStore.getState().framedRun;
   const issue = framedRunReadinessIssue(permit);
+  const expiredBecause = takeFrameExpiryReason();
   if (issue !== null) {
     if (permit !== null) {
       useLaserStore.setState({ framedRun: null, frameVerification: null });
       useToastStore.getState().pushToast(issue, 'warning');
+    } else if (expiredBecause !== null) {
+      useToastStore.getState().pushToast(frameExpiryRestartMessage(expiredBecause), 'warning');
     }
     // Start is the primary action: with no current permit it launches the same
     // dialog-free prepare/Frame flow as the Frame button. A successful trace

@@ -6,7 +6,8 @@ import { useExperimentalLaserFeatures } from '../state/experimental-laser-featur
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { isStampedStartRun } from '../state/framed-run-interruption';
 import type { FrameTrace } from '../state/framed-run';
-import { framedRunReadinessIssue } from './framed-run-readiness';
+import { framedRunDriftReason, framedRunReadinessIssue } from './framed-run-readiness';
+import { noteFrameExpired } from './frame-expiry-note';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
 
@@ -40,17 +41,16 @@ function expireStalePermit(laser: ReturnType<typeof useLaserStore.getState>): vo
   const permit = laser.framedRun;
   if (permit === null) return;
   const expectedStartRun = isStampedStartRun(laser, laser.statusReport);
-  if (
-    !transientMachineActivity(laser, expectedStartRun) &&
-    framedRunReadinessIssue(permit, undefined, laser, {
-      ignoreControllerStatusState: expectedStartRun,
-    }) === null
-  ) {
-    return;
-  }
+  const drift = framedRunDriftReason(permit, undefined, laser, {
+    ignoreControllerStatusState: expectedStartRun,
+  });
+  if (!transientMachineActivity(laser, expectedStartRun) && drift === null) return;
   useLaserStore.setState((current) =>
     current.framedRun === permit ? { framedRun: null, frameVerification: null } : {},
   );
+  // Start says why it frames again (frame-expiry-note.ts). Activity such as a
+  // jog or the job itself is visible to the operator and needs no note.
+  if (drift !== null) noteFrameExpired(drift);
 }
 
 /** A trace awaiting its exact program expires exactly as a permit would: any

@@ -11,7 +11,12 @@ import { useCameraStore } from '../state/camera-store';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { runOwnedFrame } from '../state/frame-preparation-store';
+import {
+  framePreparationCancelled,
+  registerFramePreparationAbort,
+  runOwnedFrame,
+} from '../state/frame-preparation-store';
+import { isOutputPreparationAbort } from './output-preparation-errors';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
@@ -69,11 +74,25 @@ export function runFrameNow(): Promise<boolean> {
     const context = await prepareFrameContext();
     if (context === null) return false;
     const preparation = startExactFramePreparation(context);
-    const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
-    if (preview !== null) return dispatchTracedFrame(context, preview, preparation);
-    const bundle = exactFrameBundle(context, await preparation.program);
-    return bundle === null ? false : dispatchPreparedFrame(bundle);
+    const release = registerFramePreparationAbort(preparation.abort);
+    try {
+      const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
+      if (preview !== null) return await dispatchTracedFrame(context, preview, preparation);
+      const bundle = exactFrameBundle(context, await preparation.program);
+      return bundle === null ? false : await dispatchPreparedFrame(bundle);
+    } catch (error) {
+      return operatorCancelledPreparation(error);
+    } finally {
+      release();
+    }
   });
+}
+
+// The operator's Cancel ends the Frame quietly; any other failure propagates.
+function operatorCancelledPreparation(error: unknown): false {
+  if (!isOutputPreparationAbort(error) || !framePreparationCancelled()) throw error;
+  useToastStore.getState().pushToast('Frame preparation cancelled. Nothing was sent.', 'info');
+  return false;
 }
 
 export type TransientFrameControllerPreparation = {
