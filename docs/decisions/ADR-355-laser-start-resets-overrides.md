@@ -46,7 +46,10 @@ The operator chose the behaviour: every new laser job starts at 100%.
    acknowledgement, are not charged to the streamer's in-flight accounting, and
    cannot reorder behind a queued line. The decision is made after every
    refusal point, and the reset is held back when the window itself cannot go
-   on the wire, so **a refused Start sends nothing at all**.
+   on the wire, so **a refused Start sends nothing at all**. The window follows
+   the reset only while the Start still owns the stream: an Abort, disconnect
+   or controller reset that lands during the reset's write keeps the window off
+   the wire, so Abort's soft reset stays the last byte the controller acts on.
 3. **Only Start resets.** Pause/Resume never pass through Start, so
    adjustments made during a job stay in effect for that job. Every laser
    stream that does pass through Start resets: ordinary framed runs, recovery
