@@ -48,7 +48,7 @@ export function nativeLaserResume(
   return { preamble, tail: [...tail.slice(0, at), restore, ...tail.slice(at)] };
 }
 
-// The GRBL preamble's order: hard-off first, then air, the beam-off re-entry,
+// The GRBL preamble's order: modal state, hard-off, air, the beam-off re-entry,
 // the re-arm at zero power and the feed. Every line is one the dialect's own
 // strategy writes.
 function nativePreamble(state: LaserResumeModalState, beam: NativeLaserBeam): string[] {
@@ -142,6 +142,7 @@ function replayNativeLine(replay: NativeReplay, rawLine: string): string {
     burnPower !== null &&
     burnPower.value > 0 &&
     nativeBeamArmed(replay.beam) &&
+    // Transform 3 keeps transform 2's rule for which lines move.
     movesInBurnMotion(replay.intended, words, 3)
   ) {
     const restatesPower = effect.power === null && replay.physicalPower !== burnPower.value;

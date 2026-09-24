@@ -51,25 +51,27 @@ No hardware was available.
    device profile the program was emitted with. `select-output-strategy.ts` makes the same choice,
    and for a saved recovery the profile is the archived one. The dialects are the GRBL family,
    Smoothieware, Marlin inline and Marlin fan. A GRBL-family program resumes exactly as under
-   transform 2. The preamble keeps GRBL's order: hard-off, air, beam-off re-entry, re-arm at zero,
-   feed.
-2. **Smoothieware.** The preamble sends `fire off` when the program had, because manual fire
-   ignores motion. It then sends units, `G90`, the work system and `G94`. When the program had set
-   the scale, a hard-off `M400` + `M221 S0` follows. Then come air, `G0 X Y S0` and a re-arm
-   `M400` + `M221 S<percent> P<mode>` with the scale and mode the program held (Laser.cpp applies
-   `M221` at once, so `M400` waits for the re-entry first). The feed is a bare `F`, which
+   transform 2. The preamble keeps GRBL's order: modal state, hard-off, air, beam-off re-entry,
+   re-arm at zero power, feed.
+2. **Smoothieware.** The preamble sends `fire off` when the program had sent one, because manual
+   fire ignores motion. It then sends units, `G90`, the work system and `G94`. When the program
+   had set the scale, a hard-off `M400` + `M221 S0` follows. Then come air, `G0 X Y S0` and a
+   re-arm `M400` + `M221 S<percent> P<mode>` with the scale and mode the program held (Laser.cpp
+   applies `M221` at once, so `M400` waits for the re-entry first). The feed is a bare `F`, which
    GcodeDispatch runs as `G1 F`. In the replay, S on a G0-G3 line is power and an `M221 S` is a
-   percent that passes unchanged. The first burn move that relies on the modal S gets the program's
-   own S text.
-3. **Marlin inline.** The preamble sends `M5 I`, air, `G0 X Y S0`, a re-arm `M3 I S0` (or
-   `M4 I S0`) when the inline output was enabled, and `G1 F<feed>`. It writes no work system unless
-   the program selected one, and never `G94`. The replay follows Marlin: the S of G1-G3 and of M3/M4
-   is power, G0 and M5 zero it, and arm lines are replayed at `S0`.
-4. **Marlin fan.** The preamble sends `M107` before the re-entry, `G0 X Y` without S, and
-   `G1 F<feed>`. The fan power the program held comes back with its own `M106 S` immediately before
-   the first move of the rest of the job. It does not come back when the program sets the fan
-   first. Marlin captures a move's fan speed when the move is planned (planner.cpp), so the fan
-   starts with that move.
+   percent that passes unchanged. The first burn move that relies on the modal S gets the
+   program's own S text.
+3. **Marlin inline.** After units and `G90`, the preamble sends `M5 I`, air, `G0 X Y S0`, a
+   re-arm `M3 I S0` (or `M4 I S0`) when the inline output was enabled, and `G1 F<feed>`, because
+   Marlin answers a bare `F` as an unknown command unless the build enables `GCODE_MOTION_MODES`.
+   It writes no work system unless the program selected one, and never `G94`. The replay follows
+   Marlin: the S of G1-G3 and of M3/M4 is power, G0 and M5 zero it, and arm lines are replayed at
+   `S0`.
+4. **Marlin fan.** After units and `G90`, the preamble sends `M107` before the re-entry, then
+   `G0 X Y` without S and `G1 F<feed>`. The fan power the program held comes back with its own
+   `M106 S` immediately before the first move of the rest of the job. It does not come back when
+   the program sets the fan first. Marlin captures a move's fan speed when the move is planned
+   (planner.cpp), so the fan starts with that move.
 5. **Versioning (ADR-341 Amendment 3).** New archived steps record transform 3, and the archive
    validator accepts transforms 1-3. A step recorded as 1 or 2 rebuilds GRBL bytes whatever its
    controller. A Smoothieware or Marlin recovery saved before ADR-362's refusal therefore still
