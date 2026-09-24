@@ -76,8 +76,9 @@ describe('topology work during repeated repairs', () => {
         expect(result[index + 1]).toBe(contour.polyline);
         expect(contour.refine).not.toHaveBeenCalled();
       });
-      expect(refinements).toEqual(Array.from({ length: 12 }, (_, index) => 0.5 ** (index + 1)));
-      // These budgets isolate the thirteen warm repair rounds, after initial preparation.
+      // ADR-371 stops the halving after four steps (1/16 of the tolerance).
+      expect(refinements).toEqual(Array.from({ length: 4 }, (_, index) => 0.5 ** (index + 1)));
+      // These budgets isolate the five warm repair rounds, after initial preparation.
       const vertices = fixed.reduce((sum, contour) => sum + contour.polyline.points.length, 0);
       expect(coordinateReads).toBeLessThanOrEqual(vertices);
       expect(contains.mock.calls.length).toBeLessThanOrEqual(fixed.length * 4);
