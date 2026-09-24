@@ -414,7 +414,11 @@ describe('laser-store machine settings', () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     }));
-    await useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true });
+    // A confirmed setting write settles on the controller's ok (owned exchange).
+    const cncWrite = useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true });
+    await vi.waitFor(() => expect(writes).toEqual(['$32=0\n']));
+    connection.emitLine('ok');
+    await cncWrite;
     expect(writes).toEqual(['$32=0\n']);
   });
 

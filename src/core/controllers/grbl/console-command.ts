@@ -46,10 +46,12 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   const lineRefusal = consoleLineRefusal(trimmed);
   if (lineRefusal !== null) return { ok: false, reason: lineRefusal };
   // GRBL discards horizontal whitespace while parsing `$` system commands.
-  // Classify and emit that same compact form so spaces cannot disguise a
-  // persistent write/reset as ordinary G-code and bypass its safety policy.
+  // Classify the fully compact form so spaces cannot disguise a persistent
+  // write/reset as ordinary G-code and bypass its safety policy; send the
+  // canonical form, which keeps a value's interior spaces.
   const normalized = normalizeConsoleInput(trimmed);
-  const upper = normalized.toUpperCase();
+  const compact = trimmed.startsWith('$') ? normalized.replaceAll(/[ \t]/g, '') : normalized;
+  const upper = compact.toUpperCase();
   if (isBlockedPersistentCommand(upper)) {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };
   }
@@ -67,7 +69,7 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   if (upper === CMD_UNLOCK) {
     return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
   }
-  if (SETTING_WRITE_RE.test(normalized)) {
+  if (SETTING_WRITE_RE.test(compact)) {
     return ok(
       'setting-write',
       normalized,
@@ -75,12 +77,12 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
       true,
       true,
       true,
-      settingWriteStateEffect(normalized),
+      settingWriteStateEffect(compact),
     );
   }
-  const stateEffect = /^\$H(?:[XYZABC])?$/i.test(normalized)
+  const stateEffect = /^\$H(?:[XYZABC])?$/i.test(compact)
     ? 'reference'
-    : commonConsoleStateEffect(normalized);
+    : commonConsoleStateEffect(compact);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
 }
 
@@ -90,8 +92,19 @@ function consoleLineRefusal(trimmed: string): string | null {
   return consoleTextRefusal(trimmed);
 }
 
+// The canonical `$` line: the command and key up to the first '=' compacted the
+// way GRBL-family firmware parses them, whitespace right after '=' dropped, and
+// the value kept as typed. Stripping every space corrupted string values:
+// grblHAL and FluidNC store interior spaces (`$Sta/SSID=My Home WiFi` became
+// `MyHomeWiFi`, `$LocalFS/Run=my job.nc` ran another file), while stock GRBL
+// discards them itself (audit settings-console-9).
 function normalizeConsoleInput(trimmed: string): string {
-  return trimmed.startsWith('$') ? trimmed.replaceAll(/[ \t]/g, '') : trimmed;
+  if (!trimmed.startsWith('$')) return trimmed;
+  const equals = trimmed.indexOf('=');
+  if (equals < 0) return trimmed.replaceAll(/[ \t]/g, '');
+  const key = trimmed.slice(0, equals).replaceAll(/[ \t]/g, '');
+  const value = trimmed.slice(equals + 1).replace(/^[ \t]+/, '');
+  return `${key}=${value}`;
 }
 
 function settingWriteStateEffect(normalized: string): ConsoleStateEffect {
@@ -124,12 +137,10 @@ function ok(
   };
 }
 
+// Every `$RST=` form: GRBL's `*`, `$` and `#` restores, and grblHAL's `&`
+// (driver and plugin defaults, which on the Falcon covers the vendor's extended
+// settings), which grblHAL dispatches on the first character after '=' so
+// trailing text does not make it harmless (audit settings-console-8).
 function isBlockedPersistentCommand(upper: string): boolean {
-  return (
-    upper === '$RST=*' ||
-    upper === '$RST=$' ||
-    upper === '$RST=#' ||
-    STARTUP_WRITE_RE.test(upper) ||
-    BUILD_INFO_WRITE_RE.test(upper)
-  );
+  return /^\$RST=/.test(upper) || STARTUP_WRITE_RE.test(upper) || BUILD_INFO_WRITE_RE.test(upper);
 }

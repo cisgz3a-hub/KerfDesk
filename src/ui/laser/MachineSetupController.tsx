@@ -47,8 +47,8 @@ export function FirmwareWritesPanel(): JSX.Element {
         <section style={sectionStyle}>
           <h3 style={sectionHeadingStyle}>Guarded Writes</h3>
           <p style={mutedStyle}>
-            This controller does not accept numeric $ setting writes from the app. Configure the
-            firmware with its own tools.
+            KerfDesk does not send numeric $ setting writes on this controller profile. Configure
+            the firmware with its own tools.
           </p>
         </section>
       </div>
