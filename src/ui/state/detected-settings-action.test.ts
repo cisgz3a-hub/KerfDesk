@@ -24,11 +24,11 @@ describe('CNC live controller-cap lifecycle', () => {
       laserModeEnabled: false,
     });
 
+    // $30 is an S scale, not an RPM ceiling (audit cnc-controller-3).
     expect(useStore.getState().cncLiveCaps).toEqual({
       xMaxFeedMmPerMin: 500,
       yMaxFeedMmPerMin: 450,
       zMaxFeedMmPerMin: 80,
-      spindleMaxRpm: 10_000,
     });
   });
 
