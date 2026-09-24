@@ -105,3 +105,22 @@ describe('user macro template expansion', () => {
     });
   });
 });
+
+// A macro is sent as a Console line. GRBL-family firmware runs any byte above
+// 0x7F as a realtime command before parsing the line (audit transport-2), so a
+// "°" in a macro comment is refused when saved; a pasted non-breaking space is
+// normalized to a plain space when the Console sends it.
+describe('user macro text', () => {
+  it('refuses a character that would reach the controller as a realtime command', () => {
+    const parsed = parseUserMacroTemplate('G0 X{{x}} (45° corner)');
+    expect(parsed).toMatchObject({ kind: 'control-character', index: 13 });
+    expect(parsed.kind === 'ok' ? '' : parsed.message).toContain('"°" at column 14');
+  });
+
+  it('accepts a pasted non-breaking space', () => {
+    expect(parseUserMacroTemplate('G0\u00A0X{{x}}')).toMatchObject({
+      kind: 'ok',
+      variables: ['x'],
+    });
+  });
+});

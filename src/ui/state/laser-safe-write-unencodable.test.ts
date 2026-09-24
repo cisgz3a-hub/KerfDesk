@@ -10,6 +10,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeWireBytes } from '../../platform/web/serial-wire';
+import { grblDriver } from '../../core/controllers';
+import { createSafeWrite, type SafeWriteRefs } from './laser-safe-write';
 import { useLaserStore } from './laser-store';
 import {
   connectWith,
@@ -61,7 +63,9 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('safeWrite: a line the wire cannot carry (audit transport-1)', () => {
+// The Console now refuses such a line even earlier, in the driver's preparer
+// (audit transport-2); the ledger guarantees below are the same either way.
+describe('a line the wire cannot carry (audit transport-1)', () => {
   it('refuses it with nothing sent, nothing owed, and no E-stop notice', async () => {
     const { wire } = await connectedIdle();
     const sentBefore = wire.length;
@@ -69,7 +73,7 @@ describe('safeWrite: a line the wire cannot carry (audit transport-1)', () => {
 
     await expect(
       useLaserStore.getState().sendConsoleCommand('G4 P0 (dwell — none)'),
-    ).rejects.toThrow(/not sent.*"—".*U\+2014/i);
+    ).rejects.toThrow(/plain ASCII.*"—".*U\+2014/i);
     await flushConnect();
 
     expect(wire.slice(sentBefore)).toEqual([]);
@@ -81,7 +85,7 @@ describe('safeWrite: a line the wire cannot carry (audit transport-1)', () => {
     const { connection, wire } = await connectedIdle();
     await expect(
       useLaserStore.getState().sendConsoleCommand('G0 X1 (nudge → right)'),
-    ).rejects.toThrow(/not sent/i);
+    ).rejects.toThrow(/plain ASCII/i);
 
     await useLaserStore.getState().sendConsoleCommand('G4 P0');
     await flushConnect();
@@ -97,7 +101,7 @@ describe('safeWrite: a line the wire cannot carry (audit transport-1)', () => {
     const { connection, wire } = await connectedIdle();
     await expect(
       useLaserStore.getState().sendConsoleCommand('G4 P0 (wait — none)'),
-    ).rejects.toThrow(/not sent/i);
+    ).rejects.toThrow(/plain ASCII/i);
 
     await expect(useLaserStore.getState().jog({ dx: 1, feed: 500 })).resolves.toBeUndefined();
 
@@ -105,5 +109,40 @@ describe('safeWrite: a line the wire cannot carry (audit transport-1)', () => {
     connection.emitLine('ok');
     await flushConnect();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+});
+
+// Every writer, not only the Console, goes through safeWrite, so it refuses an
+// unsendable line itself before it owes anything: a character with no single
+// byte (transport-1) or a byte above 0x7F inside a queued line, which GRBL
+// would run as a realtime command (transport-2).
+describe('safeWrite backstop for writers that skip the Console', () => {
+  it.each([
+    ['a character with no single byte', 'G4 P0 (dwell \u2014 none)\n', 0x2014],
+    ['a realtime byte inside a queued line', 'G0\xA0X1\n', 0xa0],
+  ])('refuses %s with nothing written and nothing owed', async (_name, line, codePoint) => {
+    const written: string[] = [];
+    const refs: SafeWriteRefs = {
+      connection: {
+        write: async (data) => {
+          written.push(data);
+        },
+        onLine: () => () => undefined,
+        onClose: () => () => undefined,
+        close: async () => undefined,
+      },
+      driver: grblDriver,
+      nextTranscriptId: 1,
+      writeEpoch: 0,
+    };
+    useLaserStore.setState({ pendingTransportWrites: 0, pendingUntrackedAcks: 0 });
+    const write = createSafeWrite(useLaserStore.setState, useLaserStore.getState, refs);
+
+    await expect(write(line)).rejects.toMatchObject({ name: 'WireEncodingError', codePoint });
+
+    expect(written).toEqual([]);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().pendingTransportWrites ?? 0).toBe(0);
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
   });
 });

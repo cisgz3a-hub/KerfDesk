@@ -1,5 +1,6 @@
 import { CMD_BUILD_INFO, CMD_SETTINGS, CMD_UNLOCK, RT_STATUS } from './commands';
 import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
+import { consoleTextRefusal, normalizeConsoleSpaces } from '../console-text';
 
 export const CMD_OFFSETS = '$#';
 export const CMD_MODAL_STATE = '$G';
@@ -41,9 +42,9 @@ const POSITION_AFFECTING_SETTING_IDS: ReadonlyArray<number> = [
 ];
 
 export function prepareConsoleCommand(input: string): ConsoleCommandResult {
-  const trimmed = input.trim();
-  if (trimmed === '') return { ok: false, reason: EMPTY_REASON };
-  if (/[\r\n]/.test(trimmed)) return { ok: false, reason: MULTILINE_REASON };
+  const trimmed = normalizeConsoleSpaces(input).trim();
+  const lineRefusal = consoleLineRefusal(trimmed);
+  if (lineRefusal !== null) return { ok: false, reason: lineRefusal };
   // GRBL discards horizontal whitespace while parsing `$` system commands.
   // Classify and emit that same compact form so spaces cannot disguise a
   // persistent write/reset as ordinary G-code and bypass its safety policy.
@@ -81,6 +82,12 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
     ? 'reference'
     : commonConsoleStateEffect(normalized);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
+}
+
+function consoleLineRefusal(trimmed: string): string | null {
+  if (trimmed === '') return EMPTY_REASON;
+  if (/[\r\n]/.test(trimmed)) return MULTILINE_REASON;
+  return consoleTextRefusal(trimmed);
 }
 
 function normalizeConsoleInput(trimmed: string): string {

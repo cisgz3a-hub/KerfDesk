@@ -3,7 +3,7 @@
 // (ADR-334). Extracted so the two can never disagree about how bytes are
 // encoded or how a line is recognized.
 
-import { MAX_WIRE_CODE_UNIT, unencodableAt } from '../../core/controllers/serial-wire-encoding';
+import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 
 // One byte per character, NOT UTF-8 (M12, AUDIT-2026-06-10). GRBL's wire
 // protocol is ASCII lines plus single raw realtime bytes above 0x7F
@@ -12,16 +12,15 @@ import { MAX_WIRE_CODE_UNIT, unencodableAt } from '../../core/controllers/serial
 // bytes, so jog-cancel silently did nothing, and firmwares that buffer them
 // would corrupt the following line. Byte-per-char is identical to UTF-8 for
 // every ASCII string we emit and exact for the realtime bytes. A character
-// with no single byte throws the shared WireEncodingError before anything is
-// written; safeWrite refuses the same lines earlier, before it reserves an
-// acknowledgement (audit transport-1).
+// with no single byte, or a byte above 0x7F inside a queued line (GRBL would
+// run it as a realtime command), throws the shared WireEncodingError before
+// anything is written; safeWrite refuses the same lines earlier, before it
+// reserves an acknowledgement (audit transport-1, transport-2).
 export function encodeWireBytes(data: string): Uint8Array {
+  const refusal = wireEncodingError(data);
+  if (refusal !== null) throw refusal;
   const out = new Uint8Array(data.length);
-  for (let i = 0; i < data.length; i += 1) {
-    const code = data.charCodeAt(i);
-    if (code > MAX_WIRE_CODE_UNIT) throw unencodableAt(data, i);
-    out[i] = code;
-  }
+  for (let i = 0; i < data.length; i += 1) out[i] = data.charCodeAt(i);
   return out;
 }
 
