@@ -12,6 +12,11 @@ import type { ConnectControllerOptions } from './laser-store-action-types';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SerialOpenRequest } from '../../platform/types';
 import { isGrblFamilyDriver } from './laser-disconnect-transaction';
+import {
+  BACKGROUND_STREAMING_FALLBACK_LOG,
+  backgroundStreamingFallbackWarning,
+} from './laser-background-streaming-notice';
+import { pushLog } from './laser-store-helpers';
 import { useToastStore } from './toast-store';
 
 type SetFn = (
@@ -82,7 +87,7 @@ export async function runConnectAction(
       return;
     }
     attachConnection(connection, baudRate, portRef.info ?? null);
-    reportBackgroundStreaming(connection);
+    reportBackgroundStreaming(set, connection, adapter.id);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission().catch(() => undefined);
@@ -96,14 +101,17 @@ export async function runConnectAction(
   }
 }
 
-function reportBackgroundStreaming(connection: LiveConnection): void {
+// Every host records the fallback; only a host whose hidden window pauses
+// sending asks the operator to keep KerfDesk visible (ADR-354 Amendment 1).
+function reportBackgroundStreaming(
+  set: SetFn,
+  connection: LiveConnection,
+  host: PlatformAdapter['id'],
+): void {
   if (connection.backgroundStreamingUnavailable !== true) return;
-  useToastStore
-    .getState()
-    .pushToast(
-      'Background streaming is unavailable for this connection. Keep KerfDesk visible while sending the job.',
-      'warning',
-    );
+  set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_FALLBACK_LOG) }));
+  const warning = backgroundStreamingFallbackWarning(host);
+  if (warning !== null) useToastStore.getState().pushToast(warning, 'warning');
 }
 
 // Split out to keep runConnectAction under the complexity cap. The hosted
