@@ -101,8 +101,10 @@ function isDenseColorProfile(
     profile !== null &&
     profile.transitionDensity >= DENSE_COLOR_TRANSITION_DENSITY &&
     isBinaryContourPreset(options) &&
-    (options.faintLineRecovery === true || shouldUseSketchTrace(image, options)) &&
-    !shouldTraceAlphaMask(image, options)
+    // Preserve the existing color/sketch workload policy. Only the newly added
+    // faint-detail trigger is inactive when the source is owned by alpha.
+    (shouldUseSketchTrace(image, options) ||
+      (options.faintLineRecovery === true && !shouldTraceAlphaMask(image, options)))
   );
 }
 

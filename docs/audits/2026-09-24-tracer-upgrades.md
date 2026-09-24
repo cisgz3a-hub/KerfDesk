@@ -214,6 +214,18 @@ point rendering, Faint mask/vector/scale behavior, and compact save/edit/display
 semantics. Confirmed follow-up defects received reproductions and repairs before
 acceptance: failed decoder retry, Photo budget seams, alpha scaling, mixed-tone
 connectors, repeated closing-node movement, and empty-Submit transparency recovery.
+The combined 263-file regression run then caught a default scale-policy regression:
+the alpha guard also disabled the established dense-color downscale route. The
+guard now applies only to the new faint-detail trigger, and Faint retains the
+preset's automatic color workload policy. The original seven downscale assertions
+remain intact; additional dialog-option checks cover colored alpha, tiny targets,
+manual/sketch choices and full-source alpha ownership through opaque crops. Two
+Photo option expectations also needed the new explicit neutral gamma value;
+their existing switch and clamp checks now include Midtones. The focused Photo
+follow-up passes 39 checks in four files. All 40 existing narrow scale checks
+and five new dialog/parity checks pass, and nine scale plans match the batch-one
+implementation exactly. Targeted typed lint and formatting pass. The final combined regression result
+and exact-head release verdict are recorded on the integration PR.
 Performance claims remain limited
 to measured work, bytes and qualified browser behavior. The existing deepest
 nesting pair work, shortest Centerline projections and physical output remain
@@ -228,7 +240,7 @@ repainting after pan/zoom/Fit/resize, and visible output guidance with Cancel an
 Trace reachable at 1180 by 720. No page errors are captured. Browser-test types,
 focused lint and repository formatting pass after correcting test-only typing,
 style and rendered-text assertions. Later main updates are integrated; the full
-release and Chrome gates for each exact PR head remain the merge requirement.
+release and Chrome gates for the final PR's exact head remain the merge requirement.
 Their final status is recorded on the upgrade PRs rather than inferred from
 these focused checks.
 
@@ -239,7 +251,7 @@ narrow affected checks. Broader type, lint, formatting, build and browser checks
 follow integration. Performance comparisons use matching inputs and geometry;
 machine contention is recorded rather than reported as a product speed claim.
 
-The final audit will review the integrated result against these requirements,
+The final audit reviews the integrated result against these requirements,
 including negative cases, cancellation, saved output and representative browser
 flows. Software and rendered evidence do not qualify material or machine output.
 Frame, Start and controller contracts are outside this change. The primary dirty

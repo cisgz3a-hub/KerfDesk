@@ -105,7 +105,8 @@ function applyDetectionSettings(
     if (preset.traceMode === 'edge') return;
     out['faintLineRecovery'] = true;
     out['sketchTrace'] = false;
-    out['autoSketchTrace'] = false;
+    // The faint flag already takes precedence over automatic sketch masking.
+    // Retain the preset's color workload policy if alpha owns detection.
     return;
   }
   if (settings.detectionMode === 'sketch') {

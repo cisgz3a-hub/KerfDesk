@@ -14,6 +14,7 @@ describe('faint-line and tiny-hole settings', () => {
       });
       expect(faint.faintLineRecovery).toBe(true);
       expect(faint.sketchTrace).toBe(false);
+      expect(faint.autoSketchTrace).toBe(preset.autoSketchTrace);
       expect(faint.cutoffLuma).toBe(preset.cutoffLuma);
       expect(faint.thresholdLuma).toBe(preset.thresholdLuma);
       expect(faint.useOtsuThreshold).toBe(preset.useOtsuThreshold);
