@@ -2352,7 +2352,38 @@ settings and Job Review keep their existing read-only setup references.
 - Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
   advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
 - Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
-  embedded record. This feature adds no live data source or barcode/QR generator.
+  embedded record. This feature adds no live data source. Barcodes whose data uses variable
+  fields take their own copy offset the same way (F-D7).
+
+### F-D7. Insert or edit a barcode or QR Code (ADR-372)
+
+**Success:**
+
+1. Choose **Tools → Barcode...** (also under the toolbar's **More**). Pick the type: QR Code,
+   Data Matrix, Code 128, Code 39, EAN-13, UPC-A or EAN-8. Type the data; EAN and UPC add the
+   check digit when it is left off.
+2. Set the error correction (QR Code only), the size by module or by overall width (quiet zones
+   included), the bar height and text (1D only), the quiet zone in modules, and **Invert** for
+   stock that marks lighter than its surface, such as anodised aluminium or slate.
+3. The preview re-encodes on every change, black on white, with the type, version or module
+   count and the finished size underneath; it can be scanned from the screen. Quiet zones below
+   the standard and modules under 0.2 mm show a warning.
+4. For serials or CSV data, tick **Variable data** and insert fields as for variable text. The
+   preview encodes the value the next output would use; each array copy and each output
+   re-encodes its own value.
+5. **Insert** places the code centred on the bed on its own Fill operation, selected, as one undo
+   step. Double-click a barcode, or use **Edit barcode...** in the artwork panel, to change it;
+   **Apply** re-encodes it in place and keeps its position, rotation and operation.
+6. Frame and Start work as for any artwork; a completed Frame remains the sole ordinary Start
+   policy gate.
+
+**Errors:**
+
+- Data the type cannot carry (a letter in EAN-13, a wrong check digit, lowercase in Code 39, too
+  much data) shows the reason under the preview and disables **Insert** or **Apply**.
+- A variable value that cannot be encoded fails Save G-code, Start or SVG export with the barcode
+  and the value named; nothing is engraved in its place.
+- If the text under a 1D code cannot be drawn, the dialog stays open with the reason.
 
 ## Phase E flows
 
