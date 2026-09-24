@@ -78,6 +78,10 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS: ReadonlyArray<StarterMateria
     thicknessMm: 3,
     description:
       'Starting point for opaque black acrylic on a blue diode. Do not transfer this to clear acrylic.',
+    // xTool support article 555: a blue diode cannot cut clear, white or blue acrylic.
+    warnings: [
+      'Black opaque sheet only: a 450/455 nm diode cannot cut clear, white or blue acrylic, and other colours need their own test.',
+    ],
     recipe: { ...BASE_RECIPE, power: 100, speed: 360, airAssist: true },
   }),
   preset({
@@ -93,10 +97,12 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS: ReadonlyArray<StarterMateria
     id: 'neotronics-lt4lds-clear-acrylic-unsupported',
     materialName: 'Clear acrylic',
     title: 'Unsupported',
+    // xTool support article 555: clear acrylic is transparent to the blue diode
+    // wavelength, so it can be neither cut nor engraved directly.
     description:
-      'Clear acrylic is not recommended for a 450/455 nm diode laser. Use opaque acrylic or another laser type.',
+      'A 450/455 nm diode laser cannot cut or engrave clear acrylic because the beam passes through it. Use opaque acrylic or a CO2 laser.',
     unsupported: true,
-    warnings: ['Clear acrylic is not recommended for a 450/455 nm diode laser.'],
+    warnings: ['A 450/455 nm diode laser cannot cut or engrave clear acrylic.'],
     recipe: { ...BASE_RECIPE, power: 0, speed: 1000, airAssist: false },
   }),
 ];
