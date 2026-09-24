@@ -214,7 +214,7 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
     // U+00B0 in a queued line is a realtime byte to GRBL, so the window is
     // refused before a byte leaves the host, and the reset with it.
     await expect(
-      startTestLaserJob('G21 X1°\nG90\n', { streamingMode: 'ping-pong' }),
+      startTestLaserJob('G21 X1\u00b0\nG90\n', { streamingMode: 'ping-pong' }),
     ).rejects.toThrow(/realtime command/);
 
     // Neither the reset nor any program byte left the host. (The failed Start
