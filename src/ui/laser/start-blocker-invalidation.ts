@@ -9,7 +9,7 @@
 
 import { createStore } from 'zustand/vanilla';
 import { useStore } from '../state/store';
-import { useStartBlockerStore } from './start-blocker-store';
+import { useStartBlockerStore, type BlockedAction } from './start-blocker-store';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
 
@@ -22,9 +22,12 @@ const invalidationLifecycle = createStore<InvalidationLifecycle>(() => ({ owner:
  * the next project edit retires it. Prefer this over calling the store's
  * `report` directly — a refusal reported without expiry outlives its cause.
  */
-export function reportStartBlockers(messages: ReadonlyArray<string>): void {
+export function reportStartBlockers(
+  messages: ReadonlyArray<string>,
+  action: BlockedAction = 'start',
+): void {
   ensureStartBlockerInvalidationSubscription();
-  useStartBlockerStore.getState().report(messages);
+  useStartBlockerStore.getState().report(messages, action);
 }
 
 /** Retire the retained refusal because a fresh Start or Frame is under way. */

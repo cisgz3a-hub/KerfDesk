@@ -8,8 +8,8 @@ import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { JobControls } from './JobControls';
-import { runStartJobFlow } from './start-job-flow';
 import { useStartBlockerStore } from './start-blocker-store';
+import { runFrameNow } from './use-frame-action';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -64,8 +64,8 @@ afterEach(async () => {
 });
 
 describe('Start blocker surface', () => {
-  it('keeps the exact failed Start preparation messages beside the Start button', async () => {
-    await runStartJobFlow();
+  it('keeps the exact failed Frame preparation messages beside the job actions', async () => {
+    await runFrameNow();
     await act(async () => {
       root = createRoot(host);
       root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
@@ -74,7 +74,9 @@ describe('Start blocker surface', () => {
     expect(useStartBlockerStore.getState().messages).toContain(
       'No output layers. Enable Output on at least one layer.',
     );
-    expect(host.textContent).toContain('Last Start attempt blocked');
+    // Frame job was the button pressed, so the notice names Frame, not Start.
+    expect(host.textContent).toContain('Last Frame attempt blocked');
+    expect(host.textContent).not.toContain('Last Start attempt blocked');
     expect(host.textContent).toContain('No output layers. Enable Output on at least one layer.');
   });
 });
