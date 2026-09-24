@@ -161,6 +161,8 @@ export const FRAME_START_SESSION_CHANGED_MESSAGE =
   'The controller session changed after Frame. Frame the exact job again before starting.';
 export const FRAME_START_ORIGIN_CHANGED_MESSAGE =
   'The work origin changed after Frame. Frame the exact job again before starting.';
+export const FRAME_START_REPORT_UNITS_CHANGED_MESSAGE =
+  'The controller position report units changed after Frame. Frame the exact job again before starting.';
 export const FRAME_START_POSITION_CHANGED_MESSAGE =
   'The machine moved after Frame. Return to the framed work position or Frame the exact job again before starting.';
 
@@ -253,6 +255,11 @@ export function framedRunStartHandoffIssue(
   if (current.controllerSessionEpoch !== permit.controller.controllerSessionEpoch) {
     return FRAME_START_SESSION_CHANGED_MESSAGE;
   }
+  if (
+    (current.controllerSettings?.reportInches === true) !==
+    (permit.controller.controllerSettings?.reportInches === true)
+  )
+    return FRAME_START_REPORT_UNITS_CHANGED_MESSAGE;
   if (!sameStartOrigin(permit.controller, current)) return FRAME_START_ORIGIN_CHANGED_MESSAGE;
   if (!sameReportedWorkPosition(permit.controller, current)) {
     return FRAME_START_POSITION_CHANGED_MESSAGE;
@@ -298,7 +305,38 @@ function sameReportedWorkPosition(
 ): boolean {
   const left = reportedWorkPosition(before);
   const right = reportedWorkPosition(completed);
-  return left !== null && right !== null && sameAxesWithinTolerance(left, right);
+  if (left === null || right === null) return false;
+  if ((before.statusReport?.wPos === null) === (completed.statusReport?.wPos === null)) {
+    return sameAxesWithinTolerance(left, right);
+  }
+  // An added WPos field must not hide movement in a directly shared MPos.
+  if (!sameCommonMachinePosition(before, completed)) return false;
+  const scale = before.controllerSettings?.reportInches === true ? 25.4 : 1;
+  const tick = scale === 1 ? 0.001 : 0.0001 * scale;
+  const offset = before.wcoCache;
+  return (['x', 'y', 'z'] as const).every((axis) => {
+    // Keep the existing direct-position tolerance on zero-offset axes. Only
+    // subtracting separately rounded MPos/WCO can add a full reporting tick.
+    if (offset === null || offset[axis] === 0) {
+      return Math.abs(left[axis] - right[axis]) <= 1e-3;
+    }
+    const arithmeticError =
+      Number.EPSILON *
+      Math.max(1, Math.abs(left[axis]), Math.abs(right[axis]), Math.abs(offset[axis] * scale)) *
+      4;
+    return Math.abs(left[axis] - right[axis]) <= tick + arithmeticError;
+  });
+}
+
+function sameCommonMachinePosition(
+  before: FramedRunControllerSnapshot,
+  completed: FramedRunControllerSnapshot,
+): boolean {
+  const left = before.statusReport?.mPos;
+  const right = completed.statusReport?.mPos;
+  if (left == null || right == null) return true;
+  const scale = before.controllerSettings?.reportInches === true ? 25.4 : 1;
+  return sameAxesWithinTolerance(scaledAxes(left, scale), scaledAxes(right, scale));
 }
 
 function reportedWorkPosition(

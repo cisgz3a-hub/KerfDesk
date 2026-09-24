@@ -37,7 +37,7 @@ export async function reportStartAuthorizationRefusal(
   }
 }
 
-export function reportBlockedStart(message: string): void {
+function reportBlockedStart(message: string): void {
   reportStartBlockers([message]);
   jobAwareAlert(`Cannot start job:\n\n${message}`);
 }

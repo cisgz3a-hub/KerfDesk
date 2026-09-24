@@ -71,8 +71,10 @@ import {
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
+import { laserStartOverrideReset } from './laser-start-override-reset';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
+import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 
@@ -108,10 +110,7 @@ export const TOOL_CHANGE_PLAN_MISMATCH_MESSAGE =
 export function jobActions(
   set: SetFn,
   get: GetFn,
-  refs: ResetCleanupRefs &
-    ControllerLifecycleRefs & {
-      readonly driver: ControllerDriver;
-    },
+  refs: JobActionContext['refs'],
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
@@ -120,7 +119,7 @@ export function jobActions(
   // already names the cause for recovery.
   const failDarkStop = (): Promise<void> => runStopJob(context);
   return {
-    continueToolChange: () => runContinueToolChange(set, get, refs, safeWrite),
+    continueToolChange: () => runContinueToolChange(context),
     startJob: (gcode, options = {}) => runStartJob(context, gcode, options),
     pauseJob: () => runConfirmedPauseJob({ ...context, failDarkStop }),
     resumeJob: () => runConfirmedResumeJob({ ...context, failDarkStop }),
@@ -136,7 +135,7 @@ async function runStartJob(
   const { set, get, safeWrite } = context;
   assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
-  const setupEpoch = captureStartSetupEpoch(get());
+  const setupEpoch: StartSetupEpoch = cncControllerEpochOf(get());
   const completion = createStartArmingCompletion(context);
   set({
     controllerOperation: { kind: 'start-arming', phase: 'queue-fence' },
@@ -151,6 +150,7 @@ async function runStartJob(
     options.assertFinalStartAuthorized?.();
     completion.assertCurrent();
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
+    const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-355
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
@@ -181,9 +181,9 @@ async function runStartJob(
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
     try {
-      await safeWrite(stepped.toSend, 'start');
+      await overrideReset.send(stepped.toSend, safeWrite, completion.ownsCurrent);
       if (!completion.ownsCurrent()) return;
-      set((state) => liveCanvasExecutionAcceptedPatch(state));
+      set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
       // The first window is on the wire and accounted for, so the transport
       // may take the refill from here (ADR-334). A transport that cannot host
       // it, or a stream that is no longer simply streaming, is a no-op.
@@ -403,10 +403,6 @@ function assertStartAllowed(set: SetFn, get: GetFn, allowStartArming = false): v
   }
 }
 
-function captureStartSetupEpoch(state: LaserState): StartSetupEpoch {
-  return cncControllerEpochOf(state);
-}
-
 function assertStartReservation(get: GetFn, expected: StartSetupEpoch): void {
   const state = get();
   const unchanged =
@@ -434,13 +430,17 @@ async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
 // controller was never held (the M0 was never sent); it is idling at the park
 // position and simply needs the next lines fed. Functional set for the same
 // at-write-time snapshot reason as runResumeJob.
-async function runContinueToolChange(
-  set: SetFn,
-  get: GetFn,
-  refs: ResetCleanupRefs & ControllerLifecycleRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  if (get().streamer?.status !== 'tool-change') return;
+async function runContinueToolChange(context: JobActionContext): Promise<void> {
+  const { set, get, refs, safeWrite } = context;
+  const heldStream = get().streamer;
+  if (heldStream?.status !== 'tool-change') return;
+  const writeOwner = streamWriteOwner(get());
+  const readOwnedStreamer = captureHostedRefillStream(context);
+  // The hold's ACK path may still be releasing the old hosted refill. Finish
+  // that handback before consuming M0, and do not consume a replacement hold
+  // or the same hold twice if another Continue won this await.
+  await releaseHostedRefill(refs);
+  if (readOwnedStreamer() !== heldStream) return;
   // Fresh Idle proves the pre-M0 retract/park completed; fresh work-Z evidence
   // proves the replacement bit was touched off. Both are required before the
   // stream may issue its spindle-off safe-Z lift and later M3/G4.
@@ -462,15 +462,16 @@ async function runContinueToolChange(
     return steppedStreamerPatch(s, continued, stepped.state);
   });
   if (toSend.length > 0) {
-    const writeOwner = streamWriteOwner(get());
     try {
       await safeWrite(toSend, 'resume');
+      if (readOwnedStreamer() === null) return;
       const mpgBlock = mpgCommandBlockMessage(get());
       if (mpgBlock !== null) {
         set({ lastWriteError: mpgBlock });
         return;
       }
       set((state) => liveCanvasExecutionAcceptedPatch(state));
+      await armHostedRefill(refs, readOwnedStreamer);
     } catch (err) {
       containActiveStreamWriteFailure(set, refs, safeWrite, 'resume', writeOwner);
       throw err;

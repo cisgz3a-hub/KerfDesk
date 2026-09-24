@@ -35,7 +35,6 @@ vi.mock('../state/job-aware-dialogs', () => ({
 
 type ReviewGateArgs = {
   readonly initial: ReviewedStartBundle;
-  readonly checkpointToReplace: null;
   readonly completedReceipt: null;
   readonly purpose?: 'start' | 'frame';
 };
@@ -152,7 +151,6 @@ describe('reviewFramedRunForStart', () => {
     expect(args.initial.prepared).toBe(permit.candidate.preparedStart);
     expect(args.initial.project).toBe(permit.candidate.project);
     expect(args.initial.frameWcsNormalizationWarning).toBe(disclosure);
-    expect(args.checkpointToReplace).toBeNull();
     expect(args.completedReceipt).toBeNull();
     // Omitted purpose defaults to 'start' inside the gate.
     expect(args.purpose).toBeUndefined();

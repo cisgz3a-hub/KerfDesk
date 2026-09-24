@@ -1,10 +1,8 @@
 // DeviceProfileFields — reusable per-field editors for a DeviceProfile's
-// identity and geometry (name, bed, origin, feed) plus homing. Granular so the
-// Machine Setup can place identity and geometry on its coordinates step while
-// BasicRows recomposes the same fields for legacy inline editors; BasicRows
-// recomposes them in the original order for the inline Device Profile panel, so
-// that panel renders identical controls. Pure presentational components: each
-// takes a `device` plus an `update` callback and owns no store wiring.
+// identity and geometry (name, bed, origin, feed) plus the recorded homing
+// corner. Granular so Machine Setup's coordinates step can place each field
+// where it belongs. Pure presentational components: each takes a value plus a
+// change callback and owns no store wiring.
 // Power/air-assist fields live in DeviceProfilePowerFields.tsx.
 
 import type { DeviceProfile, Origin } from '../../core/devices';
@@ -66,38 +64,6 @@ export function HomingCornerSelect(props: {
         title="Record where this machine homes. The controller's firmware determines the actual homing direction; changing this record does not change firmware."
       />
     </label>
-  );
-}
-
-export function HomingEditor(props: {
-  readonly enabled: boolean;
-  readonly direction: Origin;
-  readonly onChange: (next: { enabled: boolean; direction: Origin }) => void;
-}): JSX.Element {
-  return (
-    <>
-      <label
-        style={inlineLabelStyle}
-        title="If enabled, the Home button runs this controller's homing command and waits for completion."
-      >
-        <input
-          type="checkbox"
-          checked={props.enabled}
-          onChange={(e) =>
-            props.onChange({ enabled: e.target.checked, direction: props.direction })
-          }
-          aria-label="Homing enabled"
-          title="Enable this only when the controller and machine support homing."
-        />
-        <span>Home enabled</span>
-      </label>
-      {props.enabled && (
-        <HomingCornerSelect
-          value={props.direction}
-          onChange={(direction) => props.onChange({ enabled: props.enabled, direction })}
-        />
-      )}
-    </>
   );
 }
 
@@ -189,23 +155,6 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
         />
         <span style={unitStyle}>mm/min</span>
       </Row>
-    </>
-  );
-}
-
-// The inline Device Profile panel's machine-agnostic fields in one block,
-// composed from the granular rows so the wizard can reuse them piecemeal.
-// The laser-only power/air-assist rows moved to DeviceSettings, which gates
-// them on the machine kind (ADR-101 §6) — the wizard steps already mount
-// LaserPowerRows / AirAssistRow directly.
-export function BasicRows(props: DeviceRowsProps): JSX.Element {
-  const { device, update } = props;
-  return (
-    <>
-      <NameRow device={device} update={update} />
-      <BedRows device={device} update={update} />
-      <OriginCornerRow device={device} update={update} />
-      <FeedRows device={device} update={update} />
     </>
   );
 }

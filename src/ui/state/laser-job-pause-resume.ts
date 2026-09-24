@@ -21,6 +21,7 @@ import {
   completePauseResumeTransition,
   failDarkWasAlreadyRequested,
   hasCurrentPauseResumeTransportFence,
+  ownsPauseResumeTransition,
   isPauseResumeDeadlineError,
   type PauseResumeTransitionAction,
   type PauseResumeTransitionToken,
@@ -39,7 +40,8 @@ import {
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { SerialConnection } from '../../platform/types';
-import { releaseHostedRefill } from './laser-hosted-refill';
+import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
+import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -74,11 +76,11 @@ const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
   // Pause is about to change the stream's status, so this side takes the
-  // refill back first and keeps it for the rest of the job (ADR-334). Unlike
-  // Abort's reset, the door byte does not retire the worker's refill, so the
-  // host must freeze at the line where the worker stopped. The handshake runs
-  // before the transition owner starts, so it cannot eat the confirmation
-  // deadline and turn a slow handover into a fail-dark reset.
+  // refill back first; a confirmed Resume can hand it over again (ADR-354).
+  // Unlike Abort's reset, the door byte does not retire the worker's refill,
+  // so the host must freeze at the line where the worker stopped. The
+  // handshake runs before the transition owner starts, so it cannot eat the
+  // confirmation deadline and turn a slow handover into a fail-dark reset.
   await releaseHostedRefill(context.refs);
   const activeDriver = context.driver();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
@@ -145,6 +147,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
+  const readOwnedStreamer = captureHostedRefillStream(context);
   const resumeByte = activeDriver.realtime.resume;
   const timeoutMessage = laserJob
     ? RESUME_CONFIRMATION_TIMEOUT_MESSAGE
@@ -183,6 +186,12 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
       token,
       liveness: !laserJob && confirmedDoorResume ? 'cnc-door' : 'none',
     });
+    // The resumed window is accepted before the same ready barrier used by
+    // Start takes a fresh ledger snapshot. Never lend a cancelled transition
+    // or a replacement run/connection to the worker when ready arrives late.
+    await armHostedRefill(context.refs, () =>
+      ownsPauseResumeTransition(context.refs, token) ? readOwnedStreamer() : null,
+    );
   };
   await runOwnedPauseResumeTransition(
     context,

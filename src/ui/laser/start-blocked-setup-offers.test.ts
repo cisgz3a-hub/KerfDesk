@@ -3,14 +3,13 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
-  ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE,
+  ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE,
   USER_ORIGIN_REQUIRED_MESSAGE,
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import {
   offerSetupFixForBlockedStart,
-  RESET_ORIGIN_OFFER_PROMPT,
   SET_ORIGIN_OFFER_PROMPT,
   VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT,
 } from './start-blocked-setup-offers';
@@ -74,22 +73,12 @@ describe('set-origin offer', () => {
   });
 });
 
-describe('reset-origin offer', () => {
-  it('clears the custom origin and retries', async () => {
-    await expect(offerSetupFixForBlockedStart(ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE)).resolves.toBe(
-      'retry',
-    );
-    expect(jobAwareConfirm).toHaveBeenCalledWith(RESET_ORIGIN_OFFER_PROMPT);
-    expect(RESET_ORIGIN_OFFER_PROMPT).toContain('then Frame before starting');
-    expect(vi.mocked(useLaserStore.getState().resetOrigin)).toHaveBeenCalledTimes(1);
-    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'success' });
-  });
-
-  it('keeps the block when the operator declines', async () => {
-    vi.mocked(jobAwareConfirm).mockReturnValue(false);
-    await expect(offerSetupFixForBlockedStart(ABSOLUTE_CUSTOM_ORIGIN_ACTIVE_MESSAGE)).resolves.toBe(
+describe('unknown Absolute offset', () => {
+  it('does not offer to erase an origin while waiting for controller coordinates', async () => {
+    await expect(offerSetupFixForBlockedStart(ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE)).resolves.toBe(
       'unrepaired',
     );
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
     expect(vi.mocked(useLaserStore.getState().resetOrigin)).not.toHaveBeenCalled();
   });
 });

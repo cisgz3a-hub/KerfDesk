@@ -130,7 +130,11 @@ describe('exact laser recovery activation', () => {
     const started = await runLaserRecoveryCapsuleFlow(capsule, repository);
 
     expect(started).toBe(true);
-    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    // $32 is acknowledged immediately before the resume review, never after it.
+    const prompts = vi.mocked(jobAwareConfirm).mock.calls.map(([message]) => message);
+    const laserModePrompt = prompts.indexOf(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(laserModePrompt).toBeGreaterThanOrEqual(0);
+    expect(prompts[laserModePrompt + 1]).toMatch(/Review resume/i);
     expect(recoveryStart).toHaveBeenCalledWith(
       expect.stringContaining('resume preamble'),
       expect.objectContaining({
@@ -169,6 +173,9 @@ describe('exact laser recovery activation', () => {
 
     expect(started).toBe(false);
     expect(recoveryStart).not.toHaveBeenCalled();
+    // Declining $32 ends the flow before the resume review is shown.
+    expect(jobAwareConfirm).toHaveBeenCalledWith(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(jobAwareConfirm).not.toHaveBeenCalledWith(expect.stringMatching(/Review resume/i));
     const retained = repository.getSnapshot().recoveryCapsule;
     expect(retained).toMatchObject({
       runId: capsule.runId,

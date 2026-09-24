@@ -137,7 +137,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Save the intended output',
         instruction:
-          'Return to the project and check machine profile, placement and Output scope. Choose Save G-code, wait for preparation, then Choose destination. Read any export messages before using the file.',
+          'Return to the project and check machine profile, placement and Output scope. Choose Save G-code, wait for preparation, then Save as. Choose a filename and folder, such as Downloads or Desktop. Read any export messages before using the file.',
         focus: 'Save G-code',
         result: 'The saved file contains the prepared export for the chosen setup.',
       },

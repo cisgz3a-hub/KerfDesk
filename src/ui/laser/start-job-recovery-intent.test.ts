@@ -26,7 +26,8 @@ import {
 import { resetStore } from '../state/test-helpers';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
-import { runCheckpointResumeFlow, runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
+import { forgetManualRestartsForTests } from './manual-restart-source';
+import { runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -180,6 +181,7 @@ afterEach(() => {
   useJobReviewStore.getState().close();
   localStorage.clear();
   useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
+  forgetManualRestartsForTests();
   vi.restoreAllMocks();
 });
 
@@ -274,52 +276,8 @@ describe('interrupted laser job intent separation', () => {
     expect(jobAwareAlert).not.toHaveBeenCalledWith(expect.stringContaining('Start is blocked'));
   });
 
-  it('refuses a stale legacy checkpoint object after the stored record advances', async () => {
-    const gcode = await compileCurrentLaserJob();
-    const stale = createJobCheckpoint({
-      gcode,
-      machineKind: 'laser',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-07T02:00:00.000Z',
-    });
-    writeJobCheckpoint(stale);
-    writeJobCheckpoint(advanceJobCheckpoint(stale, 2, '2026-07-07T02:01:00.000Z'));
-    useLaserStore.setState({ startJob: vi.fn(async () => undefined) });
-
-    await runCheckpointResumeFlow(stale);
-
-    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
-    expect(jobAwareAlert).toHaveBeenCalledWith(expect.stringContaining('record changed'));
-  });
-
-  it('keeps the explicit legacy fallback on the exact tail of matching G-code', async () => {
-    const gcode = await compileCurrentLaserJob();
-    const initial = createJobCheckpoint({
-      gcode,
-      machineKind: 'laser',
-      outputScope: DEFAULT_OUTPUT_SCOPE,
-      nowIso: '2026-07-07T03:00:00.000Z',
-    });
-    const interrupted = advanceJobCheckpoint(initial, 2, '2026-07-07T03:01:00.000Z');
-    writeJobCheckpoint(interrupted);
-    const resumedStart = vi.fn<(gcode: string, options?: object) => Promise<void>>(
-      async () => undefined,
-    );
-    useLaserStore.setState({ startJob: resumedStart });
-
-    await runCheckpointResumeFlow(interrupted);
-
-    const resumeProgram = resumedStart.mock.calls[0]?.[0] ?? '';
-    const fromLine = rawResumeLine(gcode, interrupted.ackedLines);
-    const exactTail = gcode
-      .split('\n')
-      .slice(fromLine - 1)
-      .join('\n');
-    expect(resumeProgram.endsWith(exactTail)).toBe(true);
-  });
-
   it.each([false, true])(
-    'keeps rejected recovery retryable without overwriting a replacement checkpoint (%s)',
+    'keeps a rejected manual restart retryable without overwriting a replacement checkpoint (%s)',
     async (replaceCheckpoint) => {
       const gcode = await compileCurrentLaserJob();
       const checkpoint = createJobCheckpoint({
@@ -330,8 +288,10 @@ describe('interrupted laser job intent separation', () => {
       });
       writeJobCheckpoint(checkpoint);
       const replacement = advanceJobCheckpoint(checkpoint, 2, '2026-09-21T00:01:00.000Z');
+      const markedDuringAttempt: Array<boolean | undefined> = [];
       const programWrites: string[] = [];
       const rejected = vi.fn(async (program: string, options?: StartJobOptions) => {
+        markedDuringAttempt.push(readJobCheckpoint()?.resumeInFlight);
         useLaserStore.setState({
           trustedPositionEpoch: (useLaserStore.getState().trustedPositionEpoch ?? 0) + 1,
         });
@@ -340,8 +300,10 @@ describe('interrupted laser job intent separation', () => {
         programWrites.push(program);
       });
       useLaserStore.setState({ startJob: rejected });
-      await runCheckpointResumeFlow(checkpoint);
+      await runStartFromLineFlow(rawResumeLine(gcode, checkpoint.ackedLines));
       expect(rejected).toHaveBeenCalledOnce();
+      // The restart owned the matching record, so what follows is a real restore.
+      expect(markedDuringAttempt).toEqual([true]);
       expect(programWrites).toEqual([]);
       const retryable = replaceCheckpoint ? replacement : checkpoint;
       expect(readJobCheckpoint()).toEqual(retryable);
@@ -351,12 +313,12 @@ describe('interrupted laser job intent separation', () => {
           programWrites.push(program);
         }),
       });
-      await runCheckpointResumeFlow(retryable);
+      await runStartFromLineFlow(rawResumeLine(gcode, retryable.ackedLines));
       expect(programWrites).toHaveLength(1);
     },
   );
 
-  it('keeps a resume marker after authorization when transport acceptance is uncertain', async () => {
+  it('keeps a manual restart resume marker after authorization when transport acceptance is uncertain', async () => {
     const gcode = await compileCurrentLaserJob();
     const checkpoint = createJobCheckpoint({
       gcode,
@@ -371,7 +333,7 @@ describe('interrupted laser job intent separation', () => {
         throw new Error('Transport failed after the first write could have been accepted.');
       }),
     });
-    await runCheckpointResumeFlow(checkpoint);
+    await runStartFromLineFlow(rawResumeLine(gcode, checkpoint.ackedLines));
     expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
   });
 
