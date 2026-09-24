@@ -143,14 +143,16 @@ function hashOnSimulatedClock(): void {
 /** Hold every host SHA-256 until the returned release runs, so an accepted
  * Start's execution archive cannot activate (ADR-337's pre-activation window).
  * A hold its test never releases stays pending: those flows stop for good
- * rather than resume into the next test, whose beforeEach starts unheld. */
+ * rather than resume into the next test, whose beforeEach starts unheld. A
+ * late release from a timed-out test leaves a newer test's hold in place. */
 export function holdHostDigests(): () => void {
   let release = (): void => undefined;
-  heldDigests = new Promise<void>((resolve) => {
+  const hold = new Promise<void>((resolve) => {
     release = resolve;
   });
+  heldDigests = hold;
   return () => {
-    heldDigests = null;
+    if (heldDigests === hold) heldDigests = null;
     release();
   };
 }
