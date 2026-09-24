@@ -2366,8 +2366,14 @@ settings and Job Review keep their existing read-only setup references.
    successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
    In a CNC project, smoothing retains established stroke junctions at the
-   source image's current physical size. Selection bounds follow the conditioned
-   geometry while the trace remains registered over its full source image.
+   source image's current physical size. In a laser project, outlines keep the
+   tracer's fitted curves and store the chords the job burns within 0.025 mm;
+   straight-segment outlines and Centerline strokes are reduced at the source
+   image's current physical size to the fewest straight moves within 0.025 mm.
+   Drawn corners and stroke ends keep their exact positions, and Photo shading
+   and Raster scan output keep the traced geometry. Selection bounds follow the
+   conditioned geometry while the trace remains registered over its full source
+   image.
 
 **Error — worker stalls or crashes**:
 - A worker request has a bounded execution timeout. The failed worker is
