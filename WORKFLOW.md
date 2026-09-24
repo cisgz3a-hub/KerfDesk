@@ -976,7 +976,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B4. Frame
 
 #### Success
-1. User clicks **Frame job** while connected and the controller is Idle.
+1. User clicks **Frame job** while connected and the controller is Idle. While the exact job
+   is still being prepared, before any motion, a **Cancel** beside the status abandons the
+   preparation with nothing sent. A Start that has to frame again because the job or the
+   controller changed after the last Frame says so (ADR-362 Amendment 1).
 2. Frame preparation compares the live controller output contract with the selected process.
    Known, unknown, stale, or unavailable `$30`/`$32` values and stock-GRBL option `M` observations
    for an exact program containing `M7` remain explicit Start-time Job Review advisories; they do
@@ -2668,6 +2671,9 @@ on the rail, below the job actions, as the hand-placement fallback):
 
 Errors remain recoverable in place. A rejected Release, Wake, Unlock, or Set
 origin displays its controller-derived reason and does not advance the guide.
+Unlock waits for the controller's answer: a refused `$X`, or no Idle within 5 s
+of an accepted one, returns the card to **Unlock and continue** with the reason
+(ADR-362 Amendment 1).
 Disconnect cancels the local guide state. An alarm, reset, disconnect, origin
 change, or job change invalidates any candidate or one-use permit. Current
 Position may omit Set origin; Current Position, User Origin, and Absolute
@@ -5450,6 +5456,9 @@ and lifts the command's CNC-only gate.)*
    controller-specific reset/de-energize path; it is not a physical E-stop. The
    host stops sending and requests `M5 I` + `M107` cleanup.
 4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+   Its final status check sends an owned `M400`, then an owned `M114`, because Marlin has no
+   realtime status query; the fresh Idle-shaped report must match the Frame (ADR-362
+   Amendment 1).
 5. Inline export targets modern Marlin `LASER_FEATURE` with PWM, researched against 2.1.2.6:
    `M5 I` settles and disables power before inline entry or re-entry with `M3 I S0`, each move
    carries its requested S power, and `M5 I` exits the mode. This explicit boundary applies with
