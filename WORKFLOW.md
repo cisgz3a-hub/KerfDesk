@@ -1948,8 +1948,12 @@ clone/hash runs after the first controller bytes are accepted.
    the newest capsule with zero diagnostic acknowledgements and an explicit
    acceptance-unknown reason. It may be a conservative false positive when the
    app died before the first program byte, but the older source is never offered
-   after a newer Start may have changed machine state. A short owner lease lets a
-   still-live tab commit or cancel without another tab misclassifying it as a crash.
+   after a newer Start may have changed machine state. A still-live tab renews a
+   five-second owner lease every second until its handoff closes, including while
+   it stores the execution archive after the controller has accepted the program.
+   Another tab reconciles the Start only after that lease has gone unrenewed for a
+   whole lease on its own clock, which a live tab avoids unless it is frozen for
+   several seconds (ADR-369).
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires

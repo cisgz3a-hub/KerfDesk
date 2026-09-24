@@ -11,7 +11,9 @@ import { DEFAULT_OUTPUT_SCOPE } from '../../../core/scene';
 import { createStartIntent, START_INTENT_INTERRUPTION_MESSAGE } from './start-intent';
 import {
   armFreshStartIntentMutation,
+  cancelPendingStartMutation,
   reconcilePendingStartMutation,
+  renewPendingStartLeaseMutation,
 } from './recovery-start-handoff-mutations';
 import { emptyRecoverySlots, type PendingStartRecord } from './recovery-model';
 import { parseRecoverySlots } from './recovery-model';
@@ -146,6 +148,75 @@ describe('start intent handoff', () => {
     tampered.pendingStart.intent.fingerprint = { fnv1a: 'not-a-number', chars: 1, lines: 1 };
 
     expect(parseRecoverySlots(tampered, 0).accepted).toBe(false);
+  });
+
+  it('renews only the lease its own arming wrote', () => {
+    const armed = armFreshStartIntentMutation(emptyRecoverySlots(0), 'run-a', intent(), NOW);
+    const owned = { runId: 'run-a', armedAtIso: NOW };
+
+    const renewed = renewPendingStartLeaseMutation(armed.slots, owned, LATER);
+    expect(renewed.value).toBe(true);
+    expect(renewed.slots.revision).toBe(armed.slots.revision + 1);
+    expect(renewed.slots.pendingStart).toEqual({
+      ...armed.slots.pendingStart,
+      leaseRenewedAtIso: LATER,
+    });
+
+    // Another run, the same run armed at another moment, or a closed handoff
+    // is never revived by a renewal.
+    for (const other of [
+      { runId: 'run-b', armedAtIso: NOW },
+      { runId: 'run-a', armedAtIso: LATER },
+    ]) {
+      expect(renewPendingStartLeaseMutation(armed.slots, other, LATER)).toEqual({
+        slots: armed.slots,
+        value: false,
+      });
+    }
+    const cancelled = cancelPendingStartMutation(armed.slots, 'run-a').slots;
+    expect(renewPendingStartLeaseMutation(cancelled, owned, LATER).value).toBe(false);
+  });
+
+  it('does not reconcile a lease renewed after the reconciler observed it', () => {
+    const armed = armFreshStartIntentMutation(emptyRecoverySlots(0), 'run-a', intent(), NOW);
+    const observed = armed.slots.pendingStart;
+    if (observed === null) throw new Error('Expected an armed Start.');
+    const renewed = renewPendingStartLeaseMutation(
+      armed.slots,
+      { runId: 'run-a', armedAtIso: NOW },
+      LATER,
+    ).slots;
+
+    const reconciled = reconcilePendingStartMutation(renewed, LATER, {
+      ...observed,
+      artifactKind: 'legacy-fingerprint-only',
+    });
+
+    expect(reconciled.value).toBe(false);
+    expect(reconciled.slots).toBe(renewed);
+  });
+
+  it('keeps a renewed lease through the slot parser and drops an unreadable one', () => {
+    const armed = armFreshStartIntentMutation(emptyRecoverySlots(0), 'run-a', intent(), NOW);
+    const renewed = renewPendingStartLeaseMutation(
+      armed.slots,
+      { runId: 'run-a', armedAtIso: NOW },
+      LATER,
+    ).slots;
+
+    const parsed = parseRecoverySlots(JSON.parse(JSON.stringify(renewed)), 0);
+    expect(parsed.accepted).toBe(true);
+    expect(parsed.slots.pendingStart?.leaseRenewedAtIso).toBe(LATER);
+
+    // A liveness hint is not operator-facing data: an unreadable one measures
+    // the lease from arming again instead of rejecting the whole record.
+    const tampered = JSON.parse(JSON.stringify(renewed)) as {
+      pendingStart: { leaseRenewedAtIso: unknown };
+    };
+    tampered.pendingStart.leaseRenewedAtIso = 42;
+    const dropped = parseRecoverySlots(tampered, 0);
+    expect(dropped.accepted).toBe(true);
+    expect(dropped.slots.pendingStart).toEqual(armed.slots.pendingStart);
   });
 
   it('rejects an intent attached to a supervised recovery handoff', () => {

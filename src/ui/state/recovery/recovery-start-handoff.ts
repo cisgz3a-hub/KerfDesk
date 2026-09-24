@@ -1,5 +1,6 @@
 import type { ExecutionArtifactV1, RecoveryArtifactV1, RunId } from './execution-artifact';
 import type {
+  PendingStartRecord,
   PersistedRecoverySlots,
   RecoveryRepositoryResult,
   RecoveryRepositorySnapshot,
@@ -12,10 +13,19 @@ import {
   armFreshStartMutation,
   cancelPendingStartMutation,
   reconcilePendingStartMutation,
+  renewPendingStartLeaseMutation,
+  sameStartLease,
 } from './recovery-start-handoff-mutations';
 import { recoveryOk as ok } from './recovery-result';
 
 const PENDING_START_OWNER_LEASE_MS = 5_000;
+/** The owner renews well inside the lease, so a busy but live window keeps it. */
+const PENDING_START_LEASE_RENEWAL_MS = 1_000;
+
+type SlotMutation<T> = (slots: PersistedRecoverySlots) => {
+  readonly slots: PersistedRecoverySlots;
+  readonly value: T;
+};
 
 type HandoffHost = {
   readonly nowIso: () => string;
@@ -25,12 +35,12 @@ type HandoffHost = {
   ) => Promise<RecoveryRepositoryResult<StoredRecoveryArtifact>>;
   readonly mutate: <T>(
     operation: string,
-    mutate: (slots: PersistedRecoverySlots) => {
-      readonly slots: PersistedRecoverySlots;
-      readonly value: T;
-    },
+    mutate: SlotMutation<T>,
     requiredArtifactRunId?: RunId,
   ) => Promise<RecoveryRepositoryResult<T>>;
+  /** Commit one lease renewal; true only when it renewed this window's own
+   * handoff. Rejects when storage fails. */
+  readonly renewLease: (mutate: SlotMutation<boolean>) => Promise<boolean>;
   readonly refresh: () => Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>>;
   /** Materialize the fingerprint-only artifact an intent-armed handoff stands
    * for, so the capsule reconciliation writes has something to point at.
@@ -43,8 +53,17 @@ type HandoffHost = {
 
 export class RecoveryStartHandoff {
   private reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+  private renewalTimer: ReturnType<typeof setInterval> | null = null;
+  private abandoned = false;
 
   constructor(private readonly host: HandoffHost) {}
+
+  /** This window is going away: it never renews or watches a lease again, and
+   * leaves every record for the next window to reconcile. */
+  abandon(): void {
+    this.abandoned = true;
+    this.clearTimer();
+  }
 
   async armFreshStart(
     runId: RunId,
@@ -67,15 +86,19 @@ export class RecoveryStartHandoff {
 
   /** ADR-337: arm before the archive exists. The intent alone is enough to
    * tell the operator, after a crash, which program was handed over and how
-   * long it was — which is the whole job of this record. */
-  armFreshStartIntent(
+   * long it was — which is the whole job of this record. The archive is built
+   * after acceptance, for as long as the job's geometry takes, so this window
+   * renews its lease until the handoff closes. */
+  async armFreshStartIntent(
     runId: RunId,
     intent: JobCheckpoint,
     armedAtIso = this.host.nowIso(),
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.host.mutate('arm durable job Start intent', (slots) =>
+    const armed = await this.host.mutate('arm durable job Start intent', (slots) =>
       armFreshStartIntentMutation(slots, runId, intent, armedAtIso),
     );
+    if (armed.ok && armed.value) this.renewLeaseWhileOwned({ runId, armedAtIso });
+    return armed;
   }
 
   async armClaimedRecoveryStart(args: {
@@ -112,30 +135,76 @@ export class RecoveryStartHandoff {
     const pending = this.host.getSnapshot().pendingStart;
     if (pending === null) return ok(false);
     const remainingLeaseMs =
-      Date.parse(pending.armedAtIso) +
+      Date.parse(pending.leaseRenewedAtIso ?? pending.armedAtIso) +
       PENDING_START_OWNER_LEASE_MS -
       Date.parse(this.host.nowIso());
     if (Number.isFinite(remainingLeaseMs) && remainingLeaseMs > 0) {
-      this.scheduleReconciliation(Math.min(remainingLeaseMs, PENDING_START_OWNER_LEASE_MS));
+      this.scheduleReconciliation(
+        pending,
+        Math.min(remainingLeaseMs, PENDING_START_OWNER_LEASE_MS),
+      );
       return ok(false);
     }
     return this.reconcileNow();
   }
 
+  /** Stop renewing this window's lease and watching another window's: the
+   * handoff closed, or its record was purged. */
   clearTimer(): void {
+    this.stopRenewing();
     if (this.reconcileTimer === null) return;
     clearTimeout(this.reconcileTimer);
     this.reconcileTimer = null;
   }
 
-  private scheduleReconciliation(delayMs: number): void {
-    if (this.reconcileTimer !== null) return;
+  /** Reconcile only a record left exactly as it was observed for a whole
+   * local lease. A renewal — or a newer Start in its place — is watched
+   * afresh, measured on this window's clock rather than the owner's. */
+  private scheduleReconciliation(observed: PendingStartRecord, delayMs: number): void {
+    if (this.abandoned || this.reconcileTimer !== null) return;
     this.reconcileTimer = setTimeout(() => {
       this.reconcileTimer = null;
       void this.host.refresh().then((refreshed) => {
-        if (refreshed.ok) void this.reconcileNow();
+        const pending = this.host.getSnapshot().pendingStart;
+        if (!refreshed.ok || pending === null) return;
+        if (sameStartLease(pending, observed)) void this.reconcileNow();
+        else this.scheduleReconciliation(pending, PENDING_START_OWNER_LEASE_MS);
       });
     }, delayMs);
+  }
+
+  /** The window that armed an intent keeps its handoff alive while it builds
+   * the archive. Every stop condition is local: a closed or purged handoff
+   * clears the timer, and a renewal that finds the record no longer this
+   * window's ends it. A failed write is simply retried on the next beat. */
+  private renewLeaseWhileOwned(owned: {
+    readonly runId: RunId;
+    readonly armedAtIso: string;
+  }): void {
+    if (this.abandoned) return;
+    this.clearTimer();
+    let renewing = false;
+    const timer = setInterval(() => {
+      if (renewing) return;
+      renewing = true;
+      void this.host
+        .renewLease((slots) => renewPendingStartLeaseMutation(slots, owned, this.host.nowIso()))
+        .then(
+          (renewed) => {
+            if (!renewed && this.renewalTimer === timer) this.stopRenewing();
+          },
+          () => undefined,
+        )
+        .finally(() => {
+          renewing = false;
+        });
+    }, PENDING_START_LEASE_RENEWAL_MS);
+    this.renewalTimer = timer;
+  }
+
+  private stopRenewing(): void {
+    if (this.renewalTimer !== null) clearInterval(this.renewalTimer);
+    this.renewalTimer = null;
   }
 
   private async reconcileNow(): Promise<RecoveryRepositoryResult<boolean>> {
