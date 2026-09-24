@@ -17,6 +17,12 @@ const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly l
   { value: 'engraving', label: 'Engraving' },
 ];
 
+// The diameter is the cutting diameter, never the shank: V-carve depth is
+// limited by it, so a shank size on a fine engraving bit carves far too deep.
+const CONE_DIAMETER_TITLE =
+  'Widest cutting diameter of the cone in millimeters, not the shank. V-carve depth is limited by this width, so a fine engraving bit on a 1/8-inch shank needs its small cone diameter here.';
+const CUTTER_DIAMETER_TITLE =
+  "Enter the cutter's actual cutting diameter in millimeters, not the shank.";
 const MAX_TOOL_DIAMETER_MM = 50;
 const MIN_TOOL_DIAMETER_MM = 0.1;
 
@@ -164,9 +170,9 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         min={MIN_TOOL_DIAMETER_MM}
         max={MAX_TOOL_DIAMETER_MM}
         step={0.1}
-        placeholder="Diameter mm"
+        placeholder="Cutting Ø mm"
         aria-label="New bit diameter (mm)"
-        title="Enter the cutter's actual diameter in millimeters."
+        title={props.needsAngle ? CONE_DIAMETER_TITLE : CUTTER_DIAMETER_TITLE}
         style={numberInputStyle}
       />
       <input
@@ -229,7 +235,7 @@ function bitFormError(input: {
     diameterMm < MIN_TOOL_DIAMETER_MM ||
     diameterMm > MAX_TOOL_DIAMETER_MM
   ) {
-    return `Enter the actual cutter diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
+    return `Enter the actual cutting diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
   }
   const fluteCount = Number(input.flutes);
   if (isInvalidFluteCount(input.flutes, fluteCount)) {
