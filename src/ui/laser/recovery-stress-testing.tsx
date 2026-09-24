@@ -3,8 +3,10 @@
 // simulator (planner back-pressure on, so acknowledgements track motion like
 // real firmware), the real checkpoint tracker, the real recovery repository
 // over an in-memory backend, the real recovery flow and the real completion
-// prompt. Suites importing this module must mock '../state/job-aware-dialogs'.
+// prompt. Host SHA-256 runs on the simulated clock (`hashOnSimulatedClock`).
+// Suites importing this module must mock '../state/job-aware-dialogs'.
 
+import { createHash } from 'node:crypto';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
@@ -78,6 +80,7 @@ let uninstallReview = (): void => undefined;
 let uninstallTracking = (): void => undefined;
 let host: HTMLDivElement;
 let root: Root;
+let heldDigests: Promise<void> | null = null;
 
 /** Register the fake-timer, store, prompt-host and mock lifecycle for a suite. */
 export function installRecoveryStressHooks(): void {
@@ -86,6 +89,8 @@ export function installRecoveryStressHooks(): void {
   ).IS_REACT_ACT_ENVIRONMENT = true;
   beforeEach(() => {
     vi.useFakeTimers();
+    heldDigests = null;
+    hashOnSimulatedClock();
     resetStore();
     useJobReviewStore.getState().close();
     useLaserStore.setState(initialLaserState());
@@ -119,6 +124,51 @@ export function installRecoveryStressHooks(): void {
     resetStore();
     vi.restoreAllMocks();
   });
+}
+
+/** WebCrypto resolves `crypto.subtle.digest` on a real event-loop turn, and
+ * advancing fake time grants the real loop one turn per fired timer. A Start's
+ * archive hashes in three sequential rounds before it activates, so on a
+ * loaded runner the simulated machine would stream on while it hashed, and a
+ * seeded restart could land before activation and find only the pending Start
+ * (ADR-337). The same SHA-256 bytes, resolved on the microtask queue, finish
+ * before the next simulated acknowledgement, as hashing a job this size does
+ * on real hardware. */
+function hashOnSimulatedClock(): void {
+  const subtle = globalThis.crypto.subtle;
+  const webCryptoDigest = subtle.digest.bind(subtle);
+  vi.spyOn(subtle, 'digest').mockImplementation(async (algorithm, data) => {
+    if (!isSha256(algorithm)) return webCryptoDigest(algorithm, data);
+    if (heldDigests !== null) await heldDigests;
+    return sha256(data);
+  });
+}
+
+/** Hold every host SHA-256 until the returned release runs, so an accepted
+ * Start's execution archive cannot activate (ADR-337's pre-activation window).
+ * A hold its test never releases stays pending: those flows stop for good
+ * rather than resume into the next test, whose beforeEach starts unheld. */
+export function holdHostDigests(): () => void {
+  let release = (): void => undefined;
+  heldDigests = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return () => {
+    heldDigests = null;
+    release();
+  };
+}
+
+function isSha256(algorithm: AlgorithmIdentifier): boolean {
+  const name = typeof algorithm === 'string' ? algorithm : algorithm.name;
+  return name.toUpperCase() === 'SHA-256';
+}
+
+function sha256(data: BufferSource): ArrayBuffer {
+  const bytes = ArrayBuffer.isView(data)
+    ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+    : new Uint8Array(data);
+  return new Uint8Array(createHash('sha256').update(bytes).digest()).buffer;
 }
 
 /** Twenty separate strokes so the program has dozens of acknowledgeable lines. */

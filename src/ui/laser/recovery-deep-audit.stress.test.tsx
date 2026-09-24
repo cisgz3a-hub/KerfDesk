@@ -31,6 +31,7 @@ import {
   drive,
   expectCapsuleFor,
   harness,
+  holdHostDigests,
   installRecoveryStressHooks,
   mulberry32,
   programLines,
@@ -277,9 +278,12 @@ describe('evidence bounds the recovery point can rely on', () => {
     async (seed) => {
       const random = mulberry32(seed);
       const h = await harness();
-      const { running } = await startFramedJob(h.repository);
+      const { runId, running } = await startFramedJob(h.repository);
       await tick(80 + Math.floor(random() * 1_400));
       const acknowledged = useLaserStore.getState().streamer?.completed ?? -1;
+      // Progress checkpoints exist only once the Start archive has activated
+      // (ADR-337); the case below covers a tab that dies before that.
+      expect(h.repository.getSnapshot().activeRun?.runId).toBe(runId);
       h.stopTracking(); // the tab dies: no terminal record is written
       const restarted = new RecoveryRepository({
         backend: h.backend,
@@ -291,6 +295,43 @@ describe('evidence bounds the recovery point can rely on', () => {
       expect(capsule?.interruption.kind).toBe('unknown');
       expect(capsule?.ackedLines).toBeLessThanOrEqual(acknowledged);
       expect(acknowledged - (capsule?.ackedLines ?? 0)).toBeLessThan(CHECKPOINT_ACK_INTERVAL_LINES);
+      await drive(running);
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it(
+    'app restart before the Start archive activates: the Start intent recovers from line 0 once its lease lapses',
+    async () => {
+      const h = await harness();
+      const releaseDigests = holdHostDigests();
+      const { runId, running } = await startFramedJob(h.repository);
+      await tick(400);
+      const acknowledged = useLaserStore.getState().streamer?.completed ?? -1;
+      // The pending Start intent still owns the run, so no checkpoint was saved.
+      expect(h.repository.getSnapshot().pendingStart?.runId).toBe(runId);
+      expect(h.repository.getSnapshot().activeRun).toBeNull();
+      expect(acknowledged).toBeGreaterThanOrEqual(CHECKPOINT_ACK_INTERVAL_LINES);
+      h.stopTracking();
+      const restarted = new RecoveryRepository({
+        backend: h.backend,
+        generationStore: h.generationStore,
+        legacyStorage: { read: () => null, clear: () => undefined },
+      });
+      await drive(restarted.initialize());
+      // Inside the owner lease the window that armed the Start may still be alive.
+      expect(restarted.getSnapshot().recoveryCapsule).toBeNull();
+      expect(restarted.getSnapshot().pendingStart?.runId).toBe(runId);
+      await tick(5_000);
+      // Line 0 re-burns what already ran rather than skipping anything.
+      const capsule = restarted.getSnapshot().recoveryCapsule;
+      expect(capsule?.runId).toBe(runId);
+      expect(capsule?.interruption.kind).toBe('unknown');
+      expect(capsule?.ackedLines).toBe(0);
+      expect(capsule?.artifact.kind).toBe('legacy-fingerprint-only');
+      expect(restarted.getSnapshot().pendingStart).toBeNull();
+      // Only now may the dead tab's Start flow finish, so it cannot race the reconcile.
+      releaseDigests();
       await drive(running);
     },
     STRESS_TIMEOUT_MS,
