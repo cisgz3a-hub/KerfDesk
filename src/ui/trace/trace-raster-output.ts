@@ -12,6 +12,7 @@ import {
 import { buildBitmapFromVectors } from '../raster/vector-to-bitmap';
 import { packPhotoBitmapGeometry } from '../raster/packed-photo-bitmap';
 import { positionTraceOverRasterSource } from '../state/scene-mutations';
+import { checkTraceSignal } from './trace-cancellation';
 
 export type RasterTraceOperationInput = {
   readonly operation: Layer;
@@ -81,7 +82,9 @@ export async function buildRasterTraceOutput(
   traced: TracedImage,
   operations: ReadonlyArray<Layer>,
   preserveCoverage = false,
+  signal?: AbortSignal,
 ): Promise<RasterImage> {
+  checkTraceSignal(signal);
   const positioned = positionTraceOverRasterSource(source, traced);
   const linesPerMm = rasterTraceLinesPerMm(source, traced, operations);
   const renderType = traced.traceMode === 'filled-contours' ? 'fill-all' : 'outlines';
@@ -90,18 +93,22 @@ export async function buildRasterTraceOutput(
   const photoRibbons = preserveCoverage ? packPhotoBitmapGeometry(conversionSource) : undefined;
   const workerSource =
     photoRibbons === undefined ? conversionSource : { ...conversionSource, paths: [] };
-  const raster = await buildBitmapFromVectors([workerSource], {
-    dpi: linesPerMmToDpi(linesPerMm),
-    renderType,
-    brightnessPercent: 0,
-    ...(photoRibbons === undefined ? {} : { photoRibbons }),
-    ...(preserveCoverage
-      ? {
-          preserveCoverage: true,
-          coverageAxis: photoCoverageAxis(positioned.transform.rotationDeg),
-        }
-      : {}),
-  });
+  const raster = await buildBitmapFromVectors(
+    [workerSource],
+    {
+      dpi: linesPerMmToDpi(linesPerMm),
+      renderType,
+      brightnessPercent: 0,
+      ...(photoRibbons === undefined ? {} : { photoRibbons }),
+      ...(preserveCoverage
+        ? {
+            preserveCoverage: true,
+            coverageAxis: photoCoverageAxis(positioned.transform.rotationDeg),
+          }
+        : {}),
+    },
+    signal,
+  );
   return { ...raster, id: traced.id };
 }
 
