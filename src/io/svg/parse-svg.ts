@@ -338,12 +338,13 @@ function boundsForPolylines(polylines: readonly Polyline[]): ImportedSvg['bounds
 
 function appendVectorEntry(context: WalkContext, path: ColoredPath, filled: boolean): void {
   const mode = filled ? 'fill' : 'line';
+  const entryPath = filled ? svgFillPath(path) : path;
   const bounds = boundsForPolylines(path.polylines);
   const previous = context.entries.at(-1);
   if (previous?.kind === 'imported-svg' && previous.operationOverride?.mode === mode) {
     context.entries[context.entries.length - 1] = {
       ...previous,
-      paths: [...previous.paths, path],
+      paths: [...previous.paths, entryPath],
       bounds: {
         minX: Math.min(previous.bounds.minX, bounds.minX),
         minY: Math.min(previous.bounds.minY, bounds.minY),
@@ -360,6 +361,20 @@ function appendVectorEntry(context: WalkContext, path: ColoredPath, filled: bool
     bounds,
     transform: IDENTITY_TRANSFORM,
     operationOverride: { mode },
-    paths: [path],
+    paths: [entryPath],
   });
+}
+
+function svgFillPath(path: ColoredPath): ColoredPath {
+  // SVG fills implicitly close every subpath and default to nonzero winding.
+  // Materialize both meanings only in the new Fill fragment, keeping stroke
+  // geometry and the legacy aggregate (including its saved-project defaults).
+  return {
+    ...path,
+    fillRule: path.fillRule ?? 'nonzero',
+    polylines: path.polylines.map((line) => ({ ...line, closed: true })),
+    ...(path.curves === undefined
+      ? {}
+      : { curves: path.curves.map((curve) => ({ ...curve, closed: true })) }),
+  };
 }
