@@ -31,24 +31,11 @@ export async function streamResumeFromRawLine(
   laserModeStartSnapshot: LaserModeStartSnapshot,
   checkpointToResume?: JobCheckpoint,
   preparedController = useLaserStore.getState(),
+  placementNote?: string,
 ): Promise<boolean> {
-  const resume = buildProjectResume(project, gcode, fromLine);
-  if (resume.kind === 'error') {
-    jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
-    return false;
-  }
-  const resumeGcode = resume.lines.join('\n');
-  const laserModeStartEvidence = confirmLaserModeStartEvidence(
-    project,
-    laserModeStartSnapshot,
-    jobAwareConfirm,
-    resumeGcode,
-  );
-  if (laserModeStartEvidence === null) return false;
-  const proceed = jobAwareConfirm(
-    resumeConfirmation(machineKindOf(project.machine), fromLine, resume.fromLine),
-  );
-  if (!proceed) return false;
+  const reviewed = reviewResume(project, gcode, fromLine, laserModeStartSnapshot, placementNote);
+  if (reviewed === null) return false;
+  const { resumeGcode, laserModeStartEvidence } = reviewed;
   const checkpointBeforeStart = readJobCheckpoint();
   const checkpointMarkedAtIso = new Date().toISOString();
   const checkpointUpdate = markOwnedResumeCheckpoint(
@@ -153,6 +140,42 @@ function restoreUnacceptedResumeCheckpoint(
 }
 
 const RESUME_PLUNGE_MM_PER_MIN = 300;
+
+// Builds the resume and takes the operator's two confirmations, or null when
+// it cannot be built or the operator declines.
+function reviewResume(
+  project: Project,
+  gcode: string,
+  fromLine: number,
+  laserModeStartSnapshot: LaserModeStartSnapshot,
+  placementNote: string | undefined,
+): {
+  readonly resumeGcode: string;
+  readonly laserModeStartEvidence: Exclude<ReturnType<typeof confirmLaserModeStartEvidence>, null>;
+} | null {
+  const resume = buildProjectResume(project, gcode, fromLine);
+  if (resume.kind === 'error') {
+    jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
+    return null;
+  }
+  const resumeGcode = resume.lines.join('\n');
+  const laserModeStartEvidence = confirmLaserModeStartEvidence(
+    project,
+    laserModeStartSnapshot,
+    jobAwareConfirm,
+    resumeGcode,
+  );
+  if (laserModeStartEvidence === null) return null;
+  const machineKind = machineKindOf(project.machine);
+  const question = resumeConfirmation(
+    machineKind,
+    fromLine,
+    resume.fromLine,
+    'manual',
+    placementNote,
+  );
+  return jobAwareConfirm(question) ? { resumeGcode, laserModeStartEvidence } : null;
+}
 
 // A laser program in a dialect the builder cannot restore power for is
 // refused before anything is built (laserResumeDialectRefusal).

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Dialog, DialogActions } from '../kit';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
 import { recoveryRouteFromCanvasPlan } from './laser-recovery-preview-route';
-import type { PreparedRecoverySource } from './start-job-source';
+import { noteManualRestartStarted, type ManualRestartSource } from './manual-restart-source';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 
 const RESTART_HINT =
@@ -12,15 +12,16 @@ const RESTART_HINT =
 
 /** Inspect a frozen preparation without changing the document or moving the machine. */
 export function ManualLaserRestartDialog(props: {
-  readonly source: PreparedRecoverySource;
+  readonly restart: ManualRestartSource;
   readonly initialLine: number;
   readonly onClose: () => void;
 }): JSX.Element {
-  const maximumLine = props.source.canvasPlan.fingerprint.lines;
+  const { source: prepared, placementNote } = props.restart;
+  const maximumLine = prepared.canvasPlan.fingerprint.lines;
   // The preparation already parsed this program; packing it is a linear copy.
   const route = useMemo(
-    () => recoveryRouteFromCanvasPlan(props.source.canvasPlan),
-    [props.source.canvasPlan],
+    () => recoveryRouteFromCanvasPlan(prepared.canvasPlan),
+    [prepared.canvasPlan],
   );
   const [fromLine, setFromLine] = useState(Math.min(props.initialLine, maximumLine));
   const [starting, setStarting] = useState(false);
@@ -35,18 +36,20 @@ export function ManualLaserRestartDialog(props: {
     setStarting(true);
     setFailure('');
     try {
-      const source = props.source;
       const started = await streamResumeFromRawLine(
-        source.project,
-        source.gcode,
+        prepared.project,
+        prepared.gcode,
         fromLine,
-        source.canvasPlan,
-        source.laserModeStartSnapshot,
+        prepared.canvasPlan,
+        prepared.laserModeStartSnapshot,
         undefined,
-        source.controllerSnapshot,
+        prepared.controllerSnapshot,
+        placementNote,
       );
-      if (started) props.onClose();
-      else setFailure('Recovery was not started. Check the selected movement and machine setup.');
+      if (started) {
+        noteManualRestartStarted(props.restart);
+        props.onClose();
+      } else setFailure('Recovery was not started. Check the selected movement and machine setup.');
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error));
     } finally {
@@ -70,6 +73,7 @@ export function ManualLaserRestartDialog(props: {
         disabled={starting}
         onChange={setFromLine}
       />
+      <p>{placementNote}</p>
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}
       <ManualRestartActions starting={starting} onCancel={close} onStart={() => void start()} />

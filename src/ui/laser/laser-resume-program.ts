@@ -40,8 +40,11 @@ const DIALECT_POWER_COMMANDS: Partial<Record<ControllerKind, string>> = {
 
 /** Why KerfDesk cannot build a correct resumed program for this controller's
  *  programs, or null when it can. */
-export function laserResumeDialectRefusal(controllerKind: ControllerKind): string | null {
-  const commands = DIALECT_POWER_COMMANDS[controllerKind];
+export function laserResumeDialectRefusal(
+  controllerKind: ControllerKind | undefined,
+): string | null {
+  const commands =
+    controllerKind === undefined ? undefined : DIALECT_POWER_COMMANDS[controllerKind];
   if (commands === undefined) return null;
   return (
     `KerfDesk cannot build a correct resumed program for this controller yet: ${commands}, ` +
