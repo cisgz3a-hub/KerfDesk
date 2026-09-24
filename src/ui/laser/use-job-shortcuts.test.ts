@@ -16,6 +16,7 @@ function streamingState(): LaserState['streamer'] {
 
 const realStopJob = useLaserStore.getState().stopJob;
 const realCancelJog = useLaserStore.getState().cancelJog;
+const realSetFireActive = useLaserStore.getState().setFireActive;
 
 function press(key: string, init: KeyboardEventInit = {}): void {
   window.dispatchEvent(
@@ -39,6 +40,9 @@ afterEach(() => {
     stopJob: realStopJob,
     cancelJog: realCancelJog,
     motionOperation: null,
+    controllerOperation: null,
+    fireActive: false,
+    setFireActive: realSetFireActive,
     connection: { kind: 'disconnected' },
   });
   useUiStore.setState({ textDialog: null });
@@ -198,5 +202,44 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     expect(alert).not.toHaveBeenCalled();
     uninstall();
     target.remove();
+  });
+});
+
+// Ctrl+. is the keyboard fallback for the Live Motion bar's ABORT MOTION and
+// LASER OFF (ADR-207). It used to act only on a streaming job or a jog/Frame,
+// so Home, Probe, Auto-focus and a latched Fire ignored it (audit
+// job-lifecycle-6 / ui-panel-4).
+describe('Ctrl+. follows the Live Motion bar', () => {
+  it.each([
+    ['homing', { kind: 'home', phase: 'command', idleReports: 0, operationId: 1 }],
+    ['probing', { kind: 'probe' }],
+  ])('aborts through the controller while %s', (_name, controllerOperation) => {
+    const stopJob = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    patchLaserStore({
+      stopJob,
+      cancelJog,
+      controllerOperation: controllerOperation as LaserState['controllerOperation'],
+    });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(stopJob).toHaveBeenCalledTimes(1);
+    expect(cancelJog).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  it('turns a latched momentary Fire off', () => {
+    const setFireActive = vi.fn(async () => undefined);
+    const stopJob = vi.fn(async () => undefined);
+    patchLaserStore({ fireActive: true, setFireActive, stopJob });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(setFireActive).toHaveBeenCalledWith(false);
+    expect(stopJob).not.toHaveBeenCalled();
+    uninstall();
   });
 });
