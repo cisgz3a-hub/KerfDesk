@@ -222,12 +222,32 @@ function cutSettingValue(
   }
 }
 
+// Operators read an engraved date or time as the computer's wall clock, as in
+// LightBurn, so every field comes from the Date's local-time view. The full
+// form adds that zone's UTC offset so the text still names one instant.
 function formatDateTime(
   value: Date,
   format: Extract<VariableTemplateToken, { readonly kind: 'date-time' }>['format'],
 ): string {
-  const iso = value.toISOString();
-  if (format === 'date-iso') return iso.slice(0, 10);
-  if (format === 'time-24h') return iso.slice(11, 19);
-  return iso;
+  const date = [
+    String(value.getFullYear()).padStart(4, '0'),
+    twoDigits(value.getMonth() + 1),
+    twoDigits(value.getDate()),
+  ].join('-');
+  const time = [value.getHours(), value.getMinutes(), value.getSeconds()].map(twoDigits).join(':');
+  if (format === 'date-iso') return date;
+  if (format === 'time-24h') return time;
+  return `${date}T${time}${utcOffset(value.getTimezoneOffset())}`;
+}
+
+// getTimezoneOffset() counts minutes from local time back to UTC, so a zone
+// behind UTC reports a positive value and prints a negative offset.
+function utcOffset(minutesToUtc: number): string {
+  const minutes = Math.abs(minutesToUtc);
+  const sign = minutesToUtc > 0 ? '-' : '+';
+  return `${sign}${twoDigits(Math.floor(minutes / 60))}:${twoDigits(minutes % 60)}`;
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, '0');
 }

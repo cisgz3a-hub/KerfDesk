@@ -128,7 +128,7 @@ describe('evaluateVariableTemplate', () => {
 
     expect(
       evaluateVariableTemplate(template, text, variableProject(), {
-        now: new globalThis.Date('2026-07-12T05:06:07.000Z'),
+        now: new globalThis.Date(2026, 6, 12, 5, 6, 7),
         recordIndex: 1,
       }),
     ).toEqual({ ok: true, value: 'ID:A-0007 Grace 2026-07-12 P=42' });
