@@ -7,7 +7,7 @@
 // LightBurn (ADR-029 amendment ii).
 
 import type { RasterImage } from '../../core/scene';
-import { estimateBitmapConversion } from './bitmap-conversion-plan';
+import { assertBitmapConversionFits, estimateBitmapConversion } from './bitmap-conversion-plan';
 import {
   assembleBitmap,
   assembleBitmapAsync,
@@ -51,12 +51,11 @@ export async function buildBitmapFromVectors(
 ): Promise<RasterImage> {
   if (signal?.aborted === true) throw new DOMException('Bitmap conversion cancelled', 'AbortError');
   const id = crypto.randomUUID();
-  const plan = estimateBitmapConversion(bitmapConversionTarget(objects), options.dpi);
-  if (plan.verdict.kind !== 'ok') {
-    throw new Error(
-      `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI, scale the artwork down, or simplify its geometry before converting to bitmap.`,
-    );
-  }
+  const plan = estimateBitmapConversion(
+    bitmapConversionTarget(objects, options.photoRibbons),
+    options.dpi,
+  );
+  assertBitmapConversionFits(plan);
   const workerResult = convertBitmapInWorker(objects, options, id, signal);
   if (workerResult === null) {
     throw new Error(

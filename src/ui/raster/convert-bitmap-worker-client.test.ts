@@ -15,12 +15,14 @@ class FakeWorker {
   onerror: (() => void) | null = null;
   onmessageerror: (() => void) | null = null;
   request: ConvertBitmapWorkerRequest | undefined;
+  transfer: Transferable[] | undefined;
   terminate = vi.fn();
   constructor() {
     FakeWorker.instances.push(this);
   }
-  postMessage(request: ConvertBitmapWorkerRequest): void {
+  postMessage(request: ConvertBitmapWorkerRequest, transfer?: Transferable[]): void {
     this.request = request;
+    this.transfer = transfer;
   }
   succeed(): void {
     if (this.request === undefined) throw new Error('missing request');
@@ -60,6 +62,27 @@ afterEach(() => {
 });
 
 describe('conversion request ownership', () => {
+  it('transfers photo coordinates and still retires only the cancelled request', async () => {
+    const controller = new AbortController();
+    const photoRibbons = {
+      points: new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]),
+      offsets: new Uint32Array([0, 4]),
+    };
+    const result = convertBitmapInWorker([], { photoRibbons }, 'photo', controller.signal);
+    if (result === null) throw new Error('worker unavailable');
+    const worker = latestWorker();
+    expect(worker.transfer).toEqual([photoRibbons.points.buffer, photoRibbons.offsets.buffer]);
+    const rejected = expect(result).rejects.toThrow(/cancelled/);
+    controller.abort();
+    await rejected;
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    const next = start();
+    const replacement = latestWorker();
+    worker.succeed();
+    expect(replacement.terminate).not.toHaveBeenCalled();
+    replacement.succeed();
+    await expect(next).resolves.toEqual({ id: 'raster' });
+  });
   it('terminates successful workers, clears timers, and keeps the signal out of the payload', async () => {
     const controller = new AbortController();
     const result = start(controller.signal);

@@ -26,13 +26,15 @@ import {
   effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
+import { downscaleTracedPaths } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
 import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
+import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
+import { prepareUpscaledTraceInput } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner } from './trace-steps';
 import { resolveTraceSourceOptions } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
@@ -161,8 +163,15 @@ export async function traceImageToColoredPaths(
   // SOURCE-pixel semantics on the supersampled raster.
   const edgeInput =
     options.traceMode === 'edge' ? prepareEdgeTraceInput(image, options) : undefined;
-  const scalePlan = traceScalePlan(image, options, edgeInput);
+  let contourInput =
+    options.supersampleContour === true && isBinaryContourPreset(options)
+      ? prepareContourTraceInput(image, options)
+      : undefined;
+  const scalePlan = traceScalePlan(image, options, edgeInput, contourInput);
   if (scalePlan.kind === 'downscale') {
+    // The native mask was only needed for the resolution decision. Release
+    // its scalar buffers before allocating and tracing the bounded raster.
+    contourInput = undefined;
     const workingImage = resampleBuffer(image, scalePlan.width, scalePlan.height);
     // Convert the two source-area controls once, using both actual raster
     // dimensions. Keep fractional working thresholds; UI integer rounding
@@ -204,25 +213,26 @@ export async function traceImageToColoredPaths(
   }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;
   if (factor > 1) {
-    // AUTO repairs source-grid impulses once. An explicit forced median keeps
-    // its existing working-grid order, after enlargement. Both paths measure
-    // a fresh local mask and threshold field at the enlarged resolution.
-    const reuseCleanedEdge = edgeInput !== undefined && options.edgeMedianFilter !== true;
-    const scaledOptions: TraceOptions = {
-      ...options,
-      pixelScale: factor,
-      ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
-    };
-    const upscaled = withCanonicalTraceCurves(
-      await dispatchTrace(
-        upscaleBy(reuseCleanedEdge ? edgeInput.source : image, factor),
-        scaledOptions,
-        run,
-      ),
-    );
-    return downscaleTracedPaths(upscaled, factor);
+    return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
-  return withCanonicalTraceCurves(await dispatchTrace(image, options, run, edgeInput));
+  return withCanonicalTraceCurves(
+    await dispatchTrace(image, options, run, edgeInput, contourInput),
+  );
+}
+
+async function traceUpscaledImage(
+  image: RawImageData,
+  options: TraceOptions,
+  factor: number,
+  run: TraceStepRunner,
+  edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
+): Promise<ColoredPath[]> {
+  const enlarged = prepareUpscaledTraceInput(image, options, factor, edgeInput, contourInput);
+  const upscaled = withCanonicalTraceCurves(
+    await dispatchTrace(enlarged.image, enlarged.options, run, undefined, enlarged.contourInput),
+  );
+  return downscaleTracedPaths(upscaled, factor);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.
@@ -233,6 +243,7 @@ async function dispatchTrace(
   options: TraceOptions,
   run: TraceStepRunner,
   edgeInput?: EdgeTraceInput,
+  contourInput?: ContourTraceInput,
 ): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline')
     return run(traceCenterlineStrokePathsSteps(image, options));
@@ -242,7 +253,7 @@ async function dispatchTrace(
   // the in-house contour backend (ADR-123). imagetracerjs remains only for
   // the multi-colour, no-fixed-palette path below.
   if (isBinaryContourPreset(options))
-    return run(traceImageToContourColoredPathsSteps(image, options));
+    return run(traceImageToContourColoredPathsSteps(image, options, contourInput));
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));

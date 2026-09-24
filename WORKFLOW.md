@@ -2281,7 +2281,9 @@ settings and Job Review keep their existing read-only setup references.
    Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
-   thin line coverage before applying the Image operation. CNC keeps the editable shapes;
+   thin line coverage before applying the Image operation. Full-photo raster conversion uses
+   compact contour buffers and checks its geometry and pixel memory before starting. A
+   geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
