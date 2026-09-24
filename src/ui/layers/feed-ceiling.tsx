@@ -89,6 +89,7 @@ export function FeedCeilingNotice(props: {
         <button
           type="button"
           className="lf-feed-ceiling-note__raise"
+          title={`Set this machine's Output max feed to ${formatFeed(target)} mm/min so this speed runs as entered. Only raise it as far as the machine can really move.`}
           onClick={() => {
             updateDeviceProfile({ maxFeed: target });
             props.onRaise(target);
