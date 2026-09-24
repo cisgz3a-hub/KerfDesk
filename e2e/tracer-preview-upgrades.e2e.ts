@@ -85,23 +85,24 @@ async function installWorkerProbe(page: Page): Promise<void> {
         if (!String(args[0]).includes('trace-worker')) return worker;
         const owner = ++workerId;
         const requests = new Map<number, PhotoRequest>();
-        const post = worker.postMessage.bind(worker);
-        worker.postMessage = (...parameters: Parameters<Worker['postMessage']>) => {
-          const request = parameters[0] as Partial<TraceWorkerRequest>;
-          const detail = request.options?.photoDetail;
-          if (typeof detail === 'number' && typeof request.id === 'number') {
-            const record: PhotoRequest = {
-              worker: owner,
-              id: request.id,
-              detail,
-              events: [],
-              errors: [],
-            };
-            requests.set(request.id, record);
-            window.__tracerUpgradeProbe.photoRequests.push(record);
-          }
-          Reflect.apply(post, worker, parameters);
-        };
+        worker.postMessage = new Proxy(worker.postMessage, {
+          apply(post, _receiver, parameters: unknown[]) {
+            const request = parameters[0] as Partial<TraceWorkerRequest>;
+            const detail = request.options?.photoDetail;
+            if (typeof detail === 'number' && typeof request.id === 'number') {
+              const record: PhotoRequest = {
+                worker: owner,
+                id: request.id,
+                detail,
+                events: [],
+                errors: [],
+              };
+              requests.set(request.id, record);
+              window.__tracerUpgradeProbe.photoRequests.push(record);
+            }
+            Reflect.apply(post, worker, parameters);
+          },
+        });
         worker.addEventListener('message', (event: MessageEvent<TraceWorkerResponse>) => {
           const response = event.data;
           const record = requests.get(response.id);
@@ -231,7 +232,9 @@ async function inspectCachedPhoto(
   await expect(dialog.getByRole('spinbutton', { name: 'Trace Detail', exact: true })).toHaveValue(
     '30',
   );
-  await expect(dialog.locator('.lf-trace-preview__status')).toHaveText(photoStatus);
+  await expect(dialog.locator('.lf-trace-preview__status')).toHaveText(photoStatus, {
+    useInnerText: true,
+  });
   expect(await completedPhotoRequest(page)).toEqual(before);
   expect(await previewFingerprint(dialog)).toBe(photoSvg);
   await expect(dialog.getByRole('spinbutton', { name: 'Trace Midtones', exact: true })).toHaveValue(
