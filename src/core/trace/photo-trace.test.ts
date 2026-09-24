@@ -75,7 +75,7 @@ describe('photo shading vectors', () => {
         expect(paths).toHaveLength(1);
         expect(paths[0]!.color).toBe('#000000');
         expect(paths[0]!.polylines.every((line) => line.closed)).toBe(true);
-        expect(paths[0]!.curves?.every((curve) => curve.closed)).toBe(true);
+        expect(paths[0]!.curves).toBeUndefined();
       }
     },
   );

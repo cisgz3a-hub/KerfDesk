@@ -11,10 +11,13 @@ import {
   type LaserResumeMotion,
   type LaserResumeTransformVersion,
 } from './laser-resume-reentry';
+import type { LaserResumeDialect } from './laser-resume-dialect';
+import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resume-beam';
+import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
 
 export type { LaserResumeTransformVersion };
 /** The transform new resumes use; archived resume steps record their own. */
-export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 2;
+export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 3;
 
 export type ResumeProgram = {
   readonly kind: 'ok';
@@ -48,6 +51,10 @@ export type ResumeOptions = {
   readonly plungeMmPerMin: number;
   /** Laser transform to reproduce; the current one unless replaying an archive. */
   readonly laserTransform?: LaserResumeTransformVersion;
+  /** The power commands of the controller the program was written for
+   * (laserResumeDialectForDevice). Transform 3 rebuilds the beam in them;
+   * transforms 1 and 2 always wrote GRBL's, and so replay their archives. */
+  readonly laserDialect?: LaserResumeDialect;
 };
 
 type GcodeWord = { readonly letter: string; readonly value: number };
@@ -80,21 +87,59 @@ export function buildResumeProgram(
     mist: false,
     flood: false,
   };
-  for (let i = 0; i < fromLine - 1; i += 1) {
-    const issue = applyLine(state, lines[i] ?? '');
-    if (issue !== null) return { kind: 'error', reason: `Line ${i + 1}: ${issue}` };
-  }
+  const beam = nativeBeamFor(transform, options.laserDialect);
+  const issue = scanToResumeLine(lines, fromLine, state, beam);
+  if (issue !== null) return { kind: 'error', reason: issue };
   const originalTail = lines.slice(fromLine - 1);
   if (originalTail.every((line) => stripComments(line).trim() === '')) {
     return { kind: 'error', reason: 'Nothing left to run from that line.' };
   }
-  const preamble = buildPreamble(state, transform);
-  const tail = rewriteLaserResumeTail(state, originalTail, transform);
+  const { preamble, tail } = resumeBody(state, beam, originalTail, transform);
   return {
     kind: 'ok',
     lines: [...preamble, ...tail],
     fromLine,
     preambleCount: preamble.length,
+  };
+}
+
+// Smoothieware and Marlin programs get their own power commands from
+// transform 3 on (ADR-364). Earlier transforms wrote GRBL's for every program,
+// and their archived steps must still rebuild those exact bytes.
+function nativeBeamFor(
+  transform: LaserResumeTransformVersion,
+  dialect: LaserResumeDialect | undefined,
+): NativeLaserBeam | null {
+  if (transform < 3 || dialect === undefined || dialect === 'grbl') return null;
+  return createNativeLaserBeam(dialect);
+}
+
+/** Follows the program up to the resume line, or says why the replay cannot. */
+function scanToResumeLine(
+  lines: ReadonlyArray<string>,
+  fromLine: number,
+  state: LaserResumeModalState,
+  beam: NativeLaserBeam | null,
+): string | null {
+  for (let i = 0; i < fromLine - 1; i += 1) {
+    const line = lines[i] ?? '';
+    const issue = applyLine(state, line);
+    if (issue !== null) return `Line ${i + 1}: ${issue}`;
+    if (beam !== null) scanNativeBeamLine(beam, line);
+  }
+  return null;
+}
+
+function resumeBody(
+  state: LaserResumeModalState,
+  beam: NativeLaserBeam | null,
+  originalTail: ReadonlyArray<string>,
+  transform: LaserResumeTransformVersion,
+): { readonly preamble: ReadonlyArray<string>; readonly tail: ReadonlyArray<string> } {
+  if (beam !== null) return nativeLaserResume(state, beam, originalTail);
+  return {
+    preamble: buildPreamble(state, transform),
+    tail: rewriteLaserResumeTail(state, originalTail, transform),
   };
 }
 

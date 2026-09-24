@@ -16,6 +16,7 @@ const FLATTENED_SEGMENT_BYTES = 128;
 export type BitmapGeometryResources = {
   readonly sourceBytes: number;
   readonly minimumFlattenedSegments: number;
+  readonly scanlineBytesPerPixel?: number;
 };
 
 export function estimateBitmapGeometryResources(
@@ -45,14 +46,21 @@ export function bitmapConversionResources(
   pixelWidth: number,
   pixelHeight: number,
   geometry: BitmapGeometryResources = { sourceBytes: 0, minimumFlattenedSegments: 0 },
-): { readonly verdict: RasterBudgetVerdict; readonly maxFlattenedSegments: number } {
+): {
+  readonly verdict: RasterBudgetVerdict;
+  readonly maxFlattenedSegments: number;
+  readonly geometryExceedsBudget: boolean;
+} {
   const valid =
     Number.isSafeInteger(pixelWidth) &&
     Number.isSafeInteger(pixelHeight) &&
     pixelWidth > 0 &&
     pixelHeight > 0;
   const pixelCount = valid ? pixelWidth * pixelHeight : 0;
-  const baseBytes = pixelCount * ENCODING_BYTES_PER_PIXEL + geometry.sourceBytes;
+  const scanlineBytes = valid
+    ? (geometry.scanlineBytesPerPixel ?? 0) * Math.max(pixelWidth, pixelHeight)
+    : 0;
+  const baseBytes = pixelCount * ENCODING_BYTES_PER_PIXEL + geometry.sourceBytes + scanlineBytes;
   const estimatedWorkingBytes =
     baseBytes + geometry.minimumFlattenedSegments * FLATTENED_SEGMENT_BYTES;
   const budget = {
@@ -72,6 +80,9 @@ export function bitmapConversionResources(
     : `bitmap encoding and geometry need about ${Math.ceil(estimatedWorkingBytes / 1048576)} MB, above the ${MAX_RASTER_WORKING_BYTES / 1048576} MB conversion budget`;
   return {
     maxFlattenedSegments,
+    geometryExceedsBudget:
+      geometry.sourceBytes + geometry.minimumFlattenedSegments * FLATTENED_SEGMENT_BYTES >
+      MAX_RASTER_WORKING_BYTES,
     verdict:
       valid &&
       Number.isFinite(estimatedWorkingBytes) &&

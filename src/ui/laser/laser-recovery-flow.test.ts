@@ -236,7 +236,11 @@ describe('exact laser recovery activation', () => {
     );
     if (movement === undefined) throw new Error('Expected a burn movement.');
     const fromLine = movement.rawLineIndex + 1;
-    const expected = buildLaserResumeProgram(capsule.artifact.gcode, fromLine);
+    const expected = buildLaserResumeProgram(
+      capsule.artifact.gcode,
+      fromLine,
+      DEFAULT_DEVICE_PROFILE,
+    );
     if (expected.kind !== 'ok') throw new Error(expected.reason);
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob, frameVerification: null, framedRun: null });
@@ -246,7 +250,7 @@ describe('exact laser recovery activation', () => {
     expect(startJob).toHaveBeenCalledWith(expected.lines.join('\n'), expect.anything());
     const firstRun = repository.getSnapshot().activeRun;
     if (firstRun === null) throw new Error('Expected tracked recovery.');
-    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine, version: 2 }]);
+    expect(firstRun.artifact.laserResumeChain).toEqual([{ fromLine, version: 3 }]);
     expect(firstRun.artifact.provenance).toMatchObject({
       workflow: { requestedFromLine: fromLine, effectiveFromLine: fromLine },
     });

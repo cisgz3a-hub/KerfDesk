@@ -172,6 +172,6 @@ export function describeStreamHold(hold: StreamHold, falconAirTimerHint: boolean
     `${hold.unacknowledgedLines} sent lines for ${streamHoldSeconds(hold)} s. ` +
     'KerfDesk is connected and waiting; nothing was reset';
   return falconAirTimerHint
-    ? `${base}. On a Creality A1 this is usually the firmware's own standby timer — set $152=100 on the controller`
+    ? `${base}. On a Creality A1 this is usually the firmware's own standby timer — send $152=100 from the Console after the job`
     : base;
 }

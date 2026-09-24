@@ -17,6 +17,12 @@ import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-
 export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
 
+// Frame first asks the controller for a report (frame-status-wait), so this
+// remains only when none arrived.
+export const CONTROLLER_STATUS_UNKNOWN_START_MESSAGE =
+  'The controller has not reported its status. Check that it is powered and connected, then ' +
+  'try again. If it still does not report, disconnect and reconnect.';
+
 export type PrepareStartInput =
   | { readonly ok: false; readonly result: StartJobPreparation }
   | {
@@ -69,9 +75,7 @@ export function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyA
   }
   if (machine.alarmCode !== null) issues.push(ALARM_ACTIVE_START_MESSAGE);
   if (machine.statusReport === null) {
-    issues.push(
-      'Controller status is not known yet. Wait for an Idle status report before starting.',
-    );
+    issues.push(CONTROLLER_STATUS_UNKNOWN_START_MESSAGE);
   } else if (machine.statusReport.state === 'Alarm' && machine.alarmCode === null) {
     issues.push(STATUS_ALARM_START_MESSAGE);
   } else if (machine.statusReport.state !== 'Idle') {

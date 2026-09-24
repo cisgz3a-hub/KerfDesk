@@ -147,6 +147,7 @@ describe('Trace Image raster output', () => {
     expect(buildBitmapFromVectors).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({ renderType: 'fill-all', preserveCoverage: true }),
+      expect.any(AbortSignal),
     );
     expect(ctx.commitRasterizedTrace).toHaveBeenCalledTimes(1);
   });
@@ -174,6 +175,7 @@ describe('Trace Image raster output', () => {
           renderType: expectedRenderType,
           brightnessPercent: 0,
         },
+        expect.any(AbortSignal),
       );
       expect(ctx.traceExistingImage).not.toHaveBeenCalled();
       expect(ctx.commitRasterizedTrace).toHaveBeenCalledWith(
@@ -196,6 +198,7 @@ describe('Trace Image raster output', () => {
     expect(buildBitmapFromVectors).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({ dpi: 508 }),
+      expect.any(AbortSignal),
     );
   });
 
@@ -215,6 +218,7 @@ describe('Trace Image raster output', () => {
     expect(buildBitmapFromVectors).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({ dpi: 508 }),
+      expect.any(AbortSignal),
     );
   });
 
@@ -289,6 +293,7 @@ describe('Trace Image raster output', () => {
     expect(buildBitmapFromVectors).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({ dpi: expect.closeTo(355.6, 8) }),
+      expect.any(AbortSignal),
     );
     expect(ctx.commitRasterizedTrace).toHaveBeenCalledTimes(1);
   });

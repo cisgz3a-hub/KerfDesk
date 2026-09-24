@@ -131,7 +131,7 @@ describe('planner backlog on the recorded cause', () => {
   });
 
   it('reads only the current run snapshot with a backlog', () => {
-    const snapshot = { streamerEpoch: 7, ackedLines: 400, queuedBlocks: 380 };
+    const snapshot = { streamerEpoch: 7, sessionEpoch: 3, ackedLines: 400, queuedBlocks: 380 };
     expect(currentRunPlannerBacklog({ streamerEpoch: 7, streamPlannerSnapshot: snapshot })).toEqual(
       backlog,
     );

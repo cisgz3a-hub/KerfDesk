@@ -1063,7 +1063,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    stock top.
 2. Frame writes tool/spindle/coolant off, retracts to `<safeZ>`, traces and returns in XY while
    retracted, then restores a zero or positive pre-Frame Work-Z. If Frame began below Work Z0, it
-   deliberately stays at safe Z instead of plunging back into stock. Missing Work-Z, unknown return Z, or a driver
+   deliberately stays at safe Z instead of plunging back into stock. The retract only ever raises: a
+   bit already at or above safe Z (for example parked above the touch plate after a probe) traces and
+   returns at its own height with no Z move, and click/command point moves skip their safe-Z prefix
+   the same way (ADR-192 Amendment 1). Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
 3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
    positions are converted to millimetres before any G21 restore is built.
@@ -1713,9 +1716,15 @@ authorization, Frame proof, controller command, or safety boundary.
   controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
   line also steps back over the moves the last status report showed still waiting in the
   planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
-- Resume, saved or manual, is refused for Smoothieware and Marlin programs with that reason:
-  the resume builder cannot yet restore their power commands (M221 scaling, `M3 I`, M106), so
-  the rest of the job would run with the laser off. Nothing is sent (ADR-362).
+- Resume, saved or manual, re-arms the beam with the power commands of the controller the job
+  was written for (ADR-364).
+  - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
+    proportional mode after the beam-off re-entry.
+  - A Marlin inline job resumes with `M5 I`, re-arms with `M3 I S0` after the re-entry, and sets
+    its feed with `G1 F` (Marlin ignores a bare `F`).
+  - A Marlin fan job turns the fan output off with `M107` before the re-entry. It turns the fan
+    back on with the job's own `M106 S` just before the next move.
+  - GRBL, grblHAL and FluidNC jobs resume as before.
 - The resumed program re-issues the air assist (M7/M8) the job had switched on before its
   beam-off re-entry, and names the program's motion mode on the first resumed line that relies
   on it: the re-entry is a rapid, and a raster row resumed mid-row used to continue as dark
@@ -2004,7 +2013,9 @@ their archive before transmission.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream); the blocked-Start dialog offers Unlock/Home in place.
+   stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
+   Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
+   the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
@@ -2027,11 +2038,10 @@ their archive before transmission.
 ### F-C7. Unified Machine Setup
 
 The single beginner-facing machine configuration surface. The Laser/CNC rail exposes one **Machine
-Setup** button; CNC **Startup Setup** links open the same flow. Old `MachineSetupDialog`
-callers and deep links from read-only Artwork references resolve to the same global flow rather than
-a competing live-edit dialog. Every edit remains in one `DeviceProfile` + `MachineConfig` +
-current-job CNC draft until **Save machine setup**, which commits the complete configuration as one
-undoable project change.
+Setup** button; CNC **Startup Setup** links open the same flow. Deep links from read-only Artwork
+references resolve to the same global flow rather than a competing live-edit dialog. Every edit
+remains in one `DeviceProfile` + `MachineConfig` + current-job CNC draft until **Save machine
+setup**, which commits the complete configuration as one undoable project change.
 
 Machine output-kind metadata describes the researched configuration and supplies advisory warnings:
 
@@ -2268,24 +2278,35 @@ settings and Job Review keep their existing read-only setup references.
    or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
    Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
    source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
-   only to Overlay. A centred loading indicator distinguishes image preparation from tracing,
-   remains visible while zoomed or panned, and disappears on completion or error.
+   only to Overlay. A centred loading indicator names image preparation, tracing and geometry
+   refinement as those stages run, and shows elapsed time. It remains visible while zoomed or
+   panned, continues through raster conversion, and disappears on completion or error.
    Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
-   **Show Points** displays vector vertices. These viewing controls do not
+   **Show Points** displays vector vertices in a bounded viewport canvas. Overlapping markers
+   combine at the current zoom; zoom in to separate them. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share
    the original image's aspect ratio even when their working grids round to different sizes.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
 2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
-   tones as fine filled lines. Adjust **Detail**, **Brightness** and **Contrast** while comparing
-   Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
+   tones as fine filled lines. Adjust **Detail**, **Brightness**, **Contrast** and **Midtones**
+   while comparing Original and Trace. Midtones starts at 1; raising it lightens middle shades
+   while preserving black and white. More detail creates narrower lines and more geometry.
+   Cell-centred reconstruction retains local tone transitions; if its fixed point budget is
+   reached, one consistent area-preserving reconstruction applies across the entire image.
+   **Photo output tips** explains physical size, scan direction, resolution and the original
+   Image layer's grayscale/dither route. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
-   thin line coverage before applying the Image operation. CNC keeps the editable shapes;
+   thin line coverage before applying the Image operation. Full-photo raster conversion uses
+   compact contour buffers and checks its geometry and pixel memory before starting. A
+   geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
-   or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
+   **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
+   pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
+   local contrast alone and can remove dark shadow backgrounds. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
@@ -2293,11 +2314,11 @@ settings and Job Review keep their existing read-only setup references.
    converted using the actual width and height ratios, without rounding the internal values.
    The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
-   for alpha-mask tracing. Sliders and numeric fields stay in sync. Manual adjustments persist
+   for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
+   it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
    when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
    restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
-   Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
    Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
@@ -2325,9 +2346,13 @@ settings and Job Review keep their existing read-only setup references.
    Straightening retains deep notches and narrow turns where the outline doubles
    back along an otherwise straight edge. Increasing Smoothness still removes
    edge waviness without increasing how far such a turn may be shortened.
-4. Click **Trace** after the preview is ready. When the file, options, and
-   boundary still match, the ready preview geometry is reused instead of traced
-   a second time. The result is imported as a Scene object.
+4. Click **Trace** when the settings are chosen. Matching pending preview work is adopted;
+   a matching ready result is reused. Commit-affecting controls and boundary editing freeze
+   during submission while comparison, zoom and Cancel remain available. Cancel stops owned
+   preparation, trace and raster workers. The result is imported as a Scene object.
+   Photo paths and saved traces retain compact polylines when their line curves would only
+   duplicate the same vertices. Explicit curve/node commands materialise their editable
+   geometry inside the edit transaction; Undo restores the previous representation.
    **Delete Image After trace** starts selected and removes the source bitmap only after a
    successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
@@ -2343,11 +2368,17 @@ settings and Job Review keep their existing read-only setup references.
 **Edge — rapid preset changes**:
 - At most one trace job is live. Starting the newest job rejects the older job
   as superseded; supersession is not shown as a user-facing error.
+- Revisiting recent settings can reuse a completed result. The dialog retains at most three
+  results within a conservative 32 MiB geometry/SVG accounting budget. Keys include all resolved
+  settings, the source file, boundary mode/coordinates and source grid; oversized results are
+  not retained. Closing the dialog or replacing the source file clears the cache. There is no
+  additional speculative worker competing with the selected trace.
 
 **Edge — source changes before commit**:
-- Reuse is allowed only when file identity, options, boundary, and boundary mode
-  match the ready preview. Otherwise commit decodes and traces the current
-  source normally. Existing source-revalidation checks still apply.
+- Reuse is allowed only when file identity, options, boundary, boundary mode and source grid
+  match the pending or ready preparation. Otherwise commit prepares the current source.
+  Replacing the document or captured source during submission cancels the owned work and
+  restores the dialog's controls. A retired submission cannot unfreeze a newer retry.
 
 **Edge — an opaque region of a transparent image**:
 - **Trace alpha mask** keeps using the full source's transparency when a Crop or Enhance region
@@ -2678,7 +2709,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
     bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
-11. **Air pump at Start (ADR-323).** With an operation's Air on, Frame
+11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
+    Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
+    saved before the preset gained `M8` (2026-09-19) still reads
+    Disabled and sends no air command at all; the Air output row then
+    offers **Use preset air settings** (ADR-370), which sets both. With
+    an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
     operator left on stays on. With the first operation's Air off, Job
@@ -2689,7 +2725,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     "Air restart" ticked the program must contain exactly one `M8` and
     one `M9`, the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=0`. Untick "Air restart" and the same job must
+    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
+    page defines `$152` as the standby wait, so `100` keeps the pump
+    powered and `0` idles it immediately; the A1 Pro page does not list
+    it). Send `$152=100` from the Console while Idle: on the Falcon
+    command set it accepts `$150`, `$151` and `$152` (whole numbers
+    0-100) and still refuses every other numeric setting write
+    (ADR-370). The write clears the Frame proof, so Frame again before
+    Start. Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.

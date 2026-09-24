@@ -13,8 +13,9 @@ describe('photo shading trace controls', () => {
     expect(controls.number('Detail').value).toBe('60');
     expect(controls.number('Brightness').value).toBe('0');
     expect(controls.number('Contrast').value).toBe('0');
-    expect(controls.host.querySelectorAll('input[type="range"]')).toHaveLength(3);
-    expect(controls.host.querySelectorAll('input[type="number"]')).toHaveLength(3);
+    expect(controls.number('Midtones').value).toBe('1');
+    expect(controls.host.querySelectorAll('input[type="range"]')).toHaveLength(4);
+    expect(controls.host.querySelectorAll('input[type="number"]')).toHaveLength(4);
     expect(controls.host.querySelector('select, details, input[type="checkbox"]')).toBeNull();
     expect(controls.host.textContent).toContain(
       'Light and shadow are made from fine filled lines.',
@@ -35,15 +36,18 @@ describe('photo shading trace controls', () => {
     await controls.change('Detail slider', 82);
     await controls.change('Brightness', -14);
     await controls.change('Contrast', 25);
+    await controls.change('Midtones slider', 1.8);
     expect(controls.settings()).toEqual({
       thresholdLuma: 90,
       photoDetail: 82,
       photoBrightness: -14,
       photoContrast: 25,
+      photoGamma: 1.8,
     });
     expect(controls.number('Detail').value).toBe('82');
     expect(controls.number('Brightness slider').value).toBe('-14');
     expect(controls.number('Contrast slider').value).toBe('25');
+    expect(controls.number('Midtones').value).toBe('1.8');
     expect(controls.host.textContent).not.toContain('Threshold');
   });
 
