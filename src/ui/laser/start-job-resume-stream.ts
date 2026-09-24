@@ -1,4 +1,4 @@
-import { buildResumeProgram } from '../../core/controllers/grbl';
+import { buildResumeProgram, type ResumeProgramResult } from '../../core/controllers/grbl';
 import { streamingModeForController } from '../../core/devices';
 import { markResumeInFlight, type JobCheckpoint } from '../../core/recovery';
 import { machineKindOf, type Project } from '../../core/scene';
@@ -14,6 +14,7 @@ import { useLaserStore } from '../state/laser-store';
 import { recoveryRepository } from '../state/recovery';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
+import { laserResumeDialectRefusal } from './laser-resume-program';
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
@@ -31,7 +32,7 @@ export async function streamResumeFromRawLine(
   checkpointToResume?: JobCheckpoint,
   preparedController = useLaserStore.getState(),
 ): Promise<boolean> {
-  const resume = buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
+  const resume = buildProjectResume(project, gcode, fromLine);
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return false;
@@ -152,6 +153,21 @@ function restoreUnacceptedResumeCheckpoint(
 }
 
 const RESUME_PLUNGE_MM_PER_MIN = 300;
+
+// A laser program in a dialect the builder cannot restore power for is
+// refused before anything is built (laserResumeDialectRefusal).
+function buildProjectResume(
+  project: Project,
+  gcode: string,
+  fromLine: number,
+): ResumeProgramResult {
+  const dialectRefusal =
+    machineKindOf(project.machine) === 'laser'
+      ? laserResumeDialectRefusal(project.device.controllerKind)
+      : null;
+  if (dialectRefusal !== null) return { kind: 'error', reason: dialectRefusal };
+  return buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
+}
 
 function resumeBuildOptions(project: Project) {
   const machine = project.machine;
