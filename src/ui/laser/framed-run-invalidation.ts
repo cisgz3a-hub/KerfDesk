@@ -5,6 +5,7 @@ import { useStore } from '../state/store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { isStampedStartRun } from '../state/framed-run-interruption';
+import type { FrameTrace } from '../state/framed-run';
 import { framedRunReadinessIssue } from './framed-run-readiness';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
@@ -31,6 +32,11 @@ export function ensureFramedRunInvalidationSubscriptions(): void {
 function expireCurrentPermitIfNeeded(owner: symbol): void {
   if (invalidationLifecycle.getState().owner !== owner) return;
   const laser = useLaserStore.getState();
+  expireStalePermit(laser);
+  expireStaleTrace(laser);
+}
+
+function expireStalePermit(laser: ReturnType<typeof useLaserStore.getState>): void {
   const permit = laser.framedRun;
   if (permit === null) return;
   const expectedStartRun = isStampedStartRun(laser, laser.statusReport);
@@ -47,7 +53,32 @@ function expireCurrentPermitIfNeeded(owner: symbol): void {
   );
 }
 
-function transientMachineActivity(
+/** A trace awaiting its exact program expires exactly as a permit would: any
+ * transient activity or drift since its clean completion ends it, so the
+ * program can never be bound to an outline the machine no longer stands on
+ * (ADR-353). */
+function expireStaleTrace(laser: ReturnType<typeof useLaserStore.getState>): void {
+  const trace = laser.frameTrace ?? null;
+  if (trace === null) return;
+  if (!transientMachineActivity(laser, false) && frameTraceReadinessIssue(trace, laser) === null) {
+    return;
+  }
+  useLaserStore.setState((current) => (current.frameTrace === trace ? { frameTrace: null } : {}));
+}
+
+/** Readiness of a trace for binding its exact program: the permit rule, with
+ * no Start-run exemption because no Start can own a trace. */
+export function frameTraceReadinessIssue(
+  trace: FrameTrace,
+  laser: ReturnType<typeof useLaserStore.getState> = useLaserStore.getState(),
+): string | null {
+  return framedRunReadinessIssue(trace, undefined, laser);
+}
+
+/** True while the machine is doing, or reporting, anything other than a
+ * settled Idle. Exported so the Frame flow can refuse to mint a permit in the
+ * same conditions that would have expired it a moment later. */
+export function transientMachineActivity(
   laser: ReturnType<typeof useLaserStore.getState>,
   expectedStartRun: boolean,
 ): boolean {

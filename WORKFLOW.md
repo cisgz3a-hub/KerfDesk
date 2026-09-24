@@ -530,7 +530,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 #### Error — speed input out of range
 - < 1: snaps to 1.
-- > device.maxFeed: snaps to maxFeed, status bar warns: `Capped to device max feed 6000 mm/min`.
+- > device.maxFeed: snaps to maxFeed. The Artwork Speed field shows an inline note under the
+  essentials ("15,000 mm/min is above this machine's Output max feed, so it runs at 10,000
+  mm/min.") with a one-click **Raise Output max feed to 15,000 mm/min** that raises the ceiling
+  and applies the request; a stored speed above the ceiling shows the same note. The Job Review
+  Speed cell warns with a toast: `Capped to Output max feed 10,000 mm/min. Change it in Machine
+  Setup > Output max feed.` Advisory only (ADR-361).
 
 #### Error — passes < 1
 - Snaps to 1.
@@ -900,7 +905,11 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### Phase B+ shortcuts
 - `Cmd/Ctrl+Return` — Start job (Phase B)
-- `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B)
+- `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
+  it aborts a running Home, Probe or Auto-focus the same way, and turns a latched Fire off
+  (ADR-362).
+- `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
+  the keys scroll it instead (ADR-362).
 
 ---
 
@@ -1134,6 +1143,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    visibility changes, released when the job ends). If the platform
    refuses the lock, one LaserLog line warns the operator to disable
    system sleep before long burns — the job itself always proceeds.
+   The desktop app keeps its page visible while the window is minimized, so
+   the lock keeps holding. A browser tab cannot: minimizing the browser
+   releases the lock by W3C design (ADR-362).
 12. During a CNC job the canvas motion overlay's head label and status badge
      add the running depth pass and the passes remaining (`Pass k of N •
      m remaining`), derived from the ADR-215 pass spans of the exact started
@@ -1672,6 +1684,13 @@ authorization, Frame proof, controller command, or safety boundary.
   which the stream counts as acknowledged although the controller discarded the line, the
   automatic line is the rejected line itself, so that burn is not skipped; the picker says
   that lines the controller ran after it before stopping may burn again (ADR-341 Amendment 3).
+  An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
+  controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
+  line also steps back over the moves the last status report showed still waiting in the
+  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
+- Resume, saved or manual, is refused for Smoothieware and Marlin programs with that reason:
+  the resume builder cannot yet restore their power commands (M221 scaling, `M3 I`, M106), so
+  the rest of the job would run with the laser off. Nothing is sent (ADR-362).
 - The resumed program re-issues the air assist (M7/M8) the job had switched on before its
   beam-off re-entry, and names the program's motion mode on the first resumed line that relies
   on it: the re-entry is a rapid, and a raster row resumed mid-row used to continue as dark
@@ -1689,6 +1708,10 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
+  It uses the placement of the newest run the project reproduces exactly (the interrupted run,
+  the last completed run, or the previous manual restart), so a Current Position job is not
+  re-anchored where the head stopped; the dialog and confirmation name that placement. With no
+  such run, the confirmation says the restart is anchored at the head as it is now (ADR-362).
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,
@@ -2671,6 +2694,9 @@ through the "Machine finishing" window while the postamble park rapid is still
 running. `$SLP` clears the work origin and invalidates any Verified Frame; the
 top-level **Controller is asleep** banner offers Wake (Ctrl-X), and on a
 no-homing profile the Position job card returns to guide the re-set.
+grblHAL refuses `$SLP` unless its `$62` Sleep enable is on: when a `$$` read reported
+`$62=0`, Release motors is disabled with that reason, and a controller that refuses `$SLP`
+leaves the origin as it was (ADR-362).
 
 ---
 
@@ -4560,9 +4586,10 @@ and lifts the command's CNC-only gate.)*
 2. A selected project material outranks the machine starter. An operator-saved
    per-color or all-color layer default outranks both and is copied exactly.
 3. A completed `$$` observation can lower only automatic settings: the slower
-   `$110/$111` limits feed, `$112` limits plunge, and `$30` limits RPM only with
-   `$32=0`. Starting a replacement read, reset, or disconnect discards those
-   transient limits until a complete new dump arrives.
+   `$110/$111` limits feed and `$112` limits plunge. `$30` is the S value for full output, not a
+   measured RPM, so it no longer caps automatic spindle speeds; the explicit S-to-RPM choice in
+   Machine Setup sets the spindle maximum (ADR-362). Starting a replacement read, reset, or
+   disconnect discards those transient limits until a complete new dump arrives.
 
 #### Empty
 1. An unidentified machine with no catalog starter keeps the existing behavior;
@@ -7039,7 +7066,11 @@ the edge it sits on, and a midpoint over the same edge.
    **Startup Setup > Tool Plan**.
 3. The job pipeline is unchanged: operations with different bits become contiguous
    per-bit tool sections (profile sections last), and each boundary emits the
-   labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue.
+   labelled M0 tool-change hold — jog, swap the bit, re-zero Z, Continue. The block after each
+   M0 restates `G21 G90 G54 G94 G17`. A touch-off probe that misses (ALARM:4/5) during a
+   drained hold keeps the job: unlock with the Alarm banner, re-zero the new bit, then Continue.
+   Every other alarm still cancels the job. A CNC recovery never defaults to a pass before a tool
+   change the job had already continued past (ADR-362).
 
 #### Edge — same bit on every layer
 

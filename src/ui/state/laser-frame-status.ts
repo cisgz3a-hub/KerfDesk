@@ -1,6 +1,13 @@
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
 import { frameStatusFailureMessage } from './frame-status-failure';
-import { createFramedRunPermit, framedRunCompletionIssue } from './framed-run';
+import {
+  createFramedRunPermit,
+  createFrameTrace,
+  framedRunCompletionIssue,
+  isFramedRunCandidate,
+  type FrameMotionCandidate,
+  type FramedRunControllerSource,
+} from './framed-run';
 import {
   applyMotionTerminalAckFence,
   observeMotionStatus,
@@ -53,7 +60,9 @@ export function frameCompletionPatch(args: {
     Pick<LaserState, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>
   >;
   readonly frameFailureMessage: string | null;
-}): Partial<Pick<LaserState, 'framedRun' | 'frameVerification' | 'lastWriteError' | 'log'>> {
+}): Partial<
+  Pick<LaserState, 'framedRun' | 'frameTrace' | 'frameVerification' | 'lastWriteError' | 'log'>
+> {
   if (args.positionInvalidated || args.frameFailureMessage !== null) return {};
   const completedFrame = cleanCompletedFrameOperation(
     args.operation,
@@ -91,13 +100,29 @@ export function frameCompletionPatch(args: {
   if (issue !== null) {
     return {
       framedRun: null,
+      frameTrace: null,
       frameVerification: null,
       lastWriteError: issue,
       log: pushLog(args.state, `[lf2] ${issue}`),
     };
   }
+  return completedFrameEvidencePatch(candidate, source);
+}
+
+function completedFrameEvidencePatch(
+  candidate: FrameMotionCandidate,
+  source: FramedRunControllerSource,
+): Partial<Pick<LaserState, 'framedRun' | 'frameTrace' | 'frameVerification'>> {
+  if (!isFramedRunCandidate(candidate)) {
+    // A split Frame traced the bounds before its exact program existed. The
+    // clean completion is recorded with the same controller evidence a permit
+    // would carry; the Frame flow mints the permit only when the exact program
+    // arrives with these same bounds (ADR-353). No authorization exists yet.
+    return { frameTrace: createFrameTrace(candidate, source) };
+  }
   return {
     framedRun: createFramedRunPermit(candidate, source),
+    frameTrace: null,
     frameVerification: candidate.frameVerification,
   };
 }

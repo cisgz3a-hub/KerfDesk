@@ -47,6 +47,7 @@ import type { SaveOutputEmission } from './save-output-emission';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type { EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
+import type { FrameBoundsPreview } from './frame-bounds-preview';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import {
   BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE,
@@ -70,8 +71,12 @@ export function prepareStartOutputOffThread(
   request: StartOutputPreparationRequest,
   onProgress?: (progress: OutputCompilationProgress) => void,
   signal?: AbortSignal,
+  /** Called once, with the Frame rectangles, as soon as the worker has
+   * compiled the job — seconds before the exact program for a dense job. The
+   * program resolved afterwards was built from that same compile (ADR-353). */
+  onFrameBounds?: (preview: FrameBoundsPreview) => void,
 ): Promise<StartJobPreparation> | null {
-  const pending = runWorker(request, onProgress, signal);
+  const pending = runWorker(request, onProgress, signal, onFrameBounds);
   if (pending === null) return null;
   return pending.then((response) => {
     if (response.kind !== 'start') throw new Error('Background Start preparation returned no job.');
@@ -172,6 +177,7 @@ type PendingRequest = {
   readonly resolve: (response: PreparedResponse) => void;
   readonly reject: (error: Error) => void;
   readonly onProgress?: (progress: OutputCompilationProgress) => void;
+  readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   readonly detachAbort: (() => void) | null;
 };
 
@@ -189,6 +195,7 @@ function runWorker(
   request: OutputPreparationRequest,
   onProgress?: (progress: OutputCompilationProgress) => void,
   signal?: AbortSignal,
+  onFrameBounds?: (preview: FrameBoundsPreview) => void,
 ): Promise<PreparedResponse> | null {
   if (signal?.aborted === true) return Promise.reject(outputPreparationAbortError());
   const worker = ensureWorker();
@@ -203,6 +210,7 @@ function runWorker(
       resolve,
       reject,
       ...(onProgress === undefined ? {} : { onProgress }),
+      ...(onFrameBounds === undefined ? {} : { onFrameBounds }),
       detachAbort: signal === undefined ? null : () => signal.removeEventListener('abort', abort),
     });
     signal?.addEventListener('abort', abort, { once: true });
@@ -286,6 +294,14 @@ function handleWorkerMessage(event: MessageEvent<OutputPreparationResult>): void
       pending.onProgress?.(event.data.progress);
     } catch {
       // Progress is observational and cannot settle output preparation.
+    }
+    return;
+  }
+  if ('frameBounds' in event.data) {
+    try {
+      pending.onFrameBounds?.(event.data.frameBounds);
+    } catch {
+      // A failing listener must not settle, or lose, the exact program.
     }
     return;
   }

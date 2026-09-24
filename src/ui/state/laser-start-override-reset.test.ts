@@ -104,7 +104,7 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
     vi.restoreAllMocks();
   });
 
-  it('puts the reset in front of the first program window when an override survived', async () => {
+  it('sends the reset alone, just ahead of the first program window, when an override survived', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -115,7 +115,9 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
 
     await startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
 
-    expect(writes[0]).toBe(`${LASER_START_OVERRIDE_RESET}G21\n`);
+    // A queued line may not carry a byte above 0x7F (ADR-361), so the realtime
+    // reset travels as its own write and the window follows it unchanged.
+    expect(writes.slice(0, 2)).toEqual([LASER_START_OVERRIDE_RESET, 'G21\n']);
     // Realtime bytes never enter GRBL's receive buffer, so the streamer must
     // not charge them against it.
     expect(useLaserStore.getState().streamer?.inFlight).toEqual([{ line: 'G21\n', bytes: 4 }]);
@@ -150,5 +152,42 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
     );
 
     expect(writes).toEqual([]);
+  });
+
+  it('fails the Start without writing the program when the reset write is rejected', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === LASER_START_OVERRIDE_RESET) throw new Error('Transport rejected the write.');
+    });
+    await connectReporting(connection, '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>');
+    writes.length = 0;
+
+    await expect(
+      startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' }),
+    ).rejects.toThrow(/Transport rejected/);
+
+    expect(writes[0]).toBe(LASER_START_OVERRIDE_RESET);
+    expect(writes.join('')).not.toContain('G21');
+  });
+
+  it('holds the reset back when the first program window cannot go on the wire', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectReporting(connection, '<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>');
+    writes.length = 0;
+
+    // U+00B0 in a queued line is a realtime byte to GRBL, so the window is
+    // refused before a byte leaves the host, and the reset with it.
+    await expect(
+      startTestLaserJob('G21 X1°\nG90\n', { streamingMode: 'ping-pong' }),
+    ).rejects.toThrow(/realtime command/);
+
+    // Neither the reset nor any program byte left the host. (The failed Start
+    // still runs its usual write-failure containment.)
+    expect(writes).not.toContain(LASER_START_OVERRIDE_RESET);
+    expect(writes.join('')).not.toContain('G21');
   });
 });

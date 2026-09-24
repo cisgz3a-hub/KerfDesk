@@ -3,6 +3,7 @@ import { useStore } from '../state';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { gridFullRowStyle } from './JobControls.styles';
+import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 type Props = {
   readonly disabled: boolean;
@@ -24,7 +25,7 @@ export function JobSetupControls(props: Props): JSX.Element {
   return (
     <>
       <HomeButton
-        onHome={() => void home().catch(() => undefined)}
+        onHome={() => void home().catch(controllerActionFailureHandler('Home'))}
         onConfigureHoming={props.onConfigureHoming}
         busy={busy}
         streaming={props.streaming}

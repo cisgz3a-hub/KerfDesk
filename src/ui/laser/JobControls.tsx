@@ -129,6 +129,10 @@ export function JobControls(props: Props): JSX.Element {
           isStreaming={isStreaming}
           isPaused={isPaused}
           isToolChange={isToolChange}
+          isFinishingTail={
+            status === 'done' &&
+            (controllerState === 'Run' || controllerState === 'Hold' || controllerState === 'Door')
+          }
         />
       )}
       <PlacementSection streaming={controlsBusy} collapsed={props.dockedJobActions === true} />

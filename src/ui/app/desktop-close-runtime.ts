@@ -8,24 +8,41 @@ import { DesktopCloseController, type DesktopCloseReply } from './desktop-close-
 // hashing on close. Open/New epochs and true-to-true dirty edits change it.
 const documentSnapshot = createAutosaveProjectSnapshot();
 
-export const desktopCloseController = new DesktopCloseController(
-  () => {
-    const laser = useLaserStore.getState();
-    return {
-      active: isActiveJob(laser.streamer),
-      epoch: laser.streamerEpoch,
-      dirty: useStore.getState().dirty,
-      document: documentSnapshot(useStore.getState()),
-      warning:
-        laser.safetyNotice?.kind === 'disconnect-stop-unconfirmed' ||
-        (laser.safetyNotice?.kind === 'write-failed' && laser.safetyNotice.action === 'stop')
-          ? laser.safetyNotice.message
-          : null,
-    };
-  },
+export const FIRE_NOT_CONFIRMED_OFF_WARNING =
+  'KerfDesk could not confirm that Fire is off, so the laser beam may still be on. Release the ' +
+  'Fire control, and use the physical E-stop or power cutoff if the beam may still be on.';
+
+export const desktopCloseController = new DesktopCloseController(() => {
+  const laser = useLaserStore.getState();
+  return {
+    active: isActiveJob(laser.streamer),
+    fireLatched: laser.fireActive,
+    epoch: laser.streamerEpoch,
+    dirty: useStore.getState().dirty,
+    document: documentSnapshot(useStore.getState()),
+    warning: closeWarning(laser),
+  };
+}, stopBeforeClose);
+
+// A latched Fire is turned off before a running job is aborted. Web pages
+// cannot await a write while they unload, so the desktop handoff is the one
+// place that M5 is sure to be written (controller audit electron-native-3).
+async function stopBeforeClose(): Promise<void> {
+  if (useLaserStore.getState().fireActive) await useLaserStore.getState().setFireActive(false);
   // Recovery records this stop as the app closing, not as an operator Abort.
-  () => useLaserStore.getState().stopJob('app-closing'),
-);
+  if (isActiveJob(useLaserStore.getState().streamer)) {
+    await useLaserStore.getState().stopJob('app-closing');
+  }
+}
+
+function closeWarning(laser: ReturnType<typeof useLaserStore.getState>): string | null {
+  const notice = laser.safetyNotice;
+  if (notice?.kind === 'disconnect-stop-unconfirmed') return notice.message;
+  if (notice?.kind === 'write-failed' && (notice.action === 'stop' || notice.action === 'fire')) {
+    return notice.message;
+  }
+  return laser.fireActive ? FIRE_NOT_CONFIRMED_OFF_WARNING : null;
+}
 
 interface CloseRequest {
   readonly operation: 'prepare' | 'approve' | 'cancel';

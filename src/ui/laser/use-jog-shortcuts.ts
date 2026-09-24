@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isEditableShortcutTarget, isScrollRegionTarget } from '../common/keyboard-targets';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 
 // Bare arrow keys are reserved for nudging the selected canvas object. They used
@@ -22,6 +22,9 @@ export function installJogShortcuts(
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
     if (isModalOpen(useUiStore.getState()) || isEditableShortcutTarget(event.target)) return;
+    // A focused scroll region keeps its native PageUp/PageDown scrolling, and
+    // a key a closer handler already consumed is not also a machine move.
+    if (event.defaultPrevented || isScrollRegionTarget(event.target)) return;
     const direction = FOCUS_JOG_KEYS[event.key];
     if (direction === undefined) return;
     if (args.focusDisabled()) return;

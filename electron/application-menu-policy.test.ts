@@ -45,6 +45,8 @@ describe('Electron application menu ownership', () => {
   });
 
   it('uses an explicit packaged DevTools policy when creating the main window', () => {
-    expect(mainProcessSource()).toContain('devTools: shouldEnableDesktopDevTools(app.isPackaged)');
+    expect(mainProcessSource()).toContain(
+      'webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(app.isPackaged))',
+    );
   });
 });

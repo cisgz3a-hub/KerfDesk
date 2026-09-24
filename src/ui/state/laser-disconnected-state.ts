@@ -32,6 +32,7 @@ export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     motionOperation: null,
     controllerOperation: null,
     probeBusy: false,

@@ -62,6 +62,12 @@ import {
   type SerialDiagnosticPolicy,
 } from './serial-port-diagnostics.js';
 import {
+  waitForSerialPorts,
+  type NoPortsPrompt,
+  type SerialPortEventSource,
+} from './serial-port-wait.js';
+import { mainWindowWebPreferences } from './desktop-window-options.js';
+import {
   resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
@@ -238,13 +244,7 @@ function createMainWindow(): BrowserWindow {
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
     title: DESKTOP_PRODUCT_NAME,
-    webPreferences: {
-      contextIsolation: true,
-      devTools: shouldEnableDesktopDevTools(app.isPackaged),
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
+    webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(app.isPackaged)),
   });
 }
 
@@ -261,14 +261,25 @@ function installContentSecurityPolicy(ses: Session): void {
 
 async function chooseSerialPortId(
   webContents: WebContents,
-  portList: ReadonlyArray<ElectronSerialPort>,
+  portList: ReadonlyArray<ElectronSerialPortSummary>,
 ): Promise<string> {
-  if (portList.length === 0) {
+  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
+  const showMessageBox: NoPortsPrompt = (options) =>
+    owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options);
+  // An empty list waits with the operator for a port (serial-port-wait.ts).
+  const ports =
+    portList.length > 0
+      ? portList
+      : await waitForSerialPorts(
+          webContents.session as unknown as SerialPortEventSource,
+          webContents,
+          showMessageBox,
+        );
+  if (ports.length === 0) {
     console.log('[serial] No ports - is the laser plugged in and powered on?');
     return '';
   }
-  const buttons = serialPortDialogButtons(portList);
-  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
+  const buttons = serialPortDialogButtons(ports);
   const options = {
     type: 'question' as const,
     buttons: [...buttons],
@@ -276,13 +287,10 @@ async function chooseSerialPortId(
     defaultId: 0,
     noLink: true,
     message: 'Select laser serial port',
-    detail: portList.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
+    detail: ports.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
   };
-  const result =
-    owner === undefined
-      ? await dialog.showMessageBox(options)
-      : await dialog.showMessageBox(owner, options);
-  return serialPortIdForDialogResponse(portList, result.response);
+  const result = await showMessageBox(options);
+  return serialPortIdForDialogResponse(ports, result.response);
 }
 
 function logSerialPorts(portList: ReadonlyArray<ElectronSerialPort>): void {

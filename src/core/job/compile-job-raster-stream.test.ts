@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
-import { applyImageMaskToLuma, dither, resampleLumaNearest } from '../raster';
+import { applyImageMaskToLuma, dither, resampleLuma } from '../raster';
+import { burnGridKernel } from '../raster/luma-resample';
 import type { DitherAlgorithm } from '../raster/dither';
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
@@ -9,6 +10,10 @@ import { rotatedMaskedRasterLuma } from './raster-rotated-sample';
 
 const SOURCE_W = 12;
 const SOURCE_H = 9;
+// A source denser than the burn grid at a non-integer ratio, so the streamed
+// rows are pinned to the materialized area-average resample too (ADR-359).
+const DENSE_SOURCE_W = 37;
+const DENSE_SOURCE_H = 29;
 const TARGET_W = 20;
 const TARGET_H = 15;
 const S_MAX = 800;
@@ -21,21 +26,21 @@ const ALGORITHMS: ReadonlyArray<DitherAlgorithm> = [
 ];
 const ORIGINS: ReadonlyArray<DeviceProfile['origin']> = ['rear-left', 'front-right'];
 
-function sourceLuma(): Uint8Array {
-  const luma = new Uint8Array(SOURCE_W * SOURCE_H);
+function sourceLuma(width = SOURCE_W, height = SOURCE_H): Uint8Array {
+  const luma = new Uint8Array(width * height);
   for (let i = 0; i < luma.length; i += 1) luma[i] = (i * 53 + 11) % 256;
   return luma;
 }
 
-function image(hasMask: boolean): RasterImage {
+function image(hasMask: boolean, width = SOURCE_W, height = SOURCE_H): RasterImage {
   return {
     kind: 'raster-image',
     id: 'img',
     color: '#808080',
     source: 'img.png',
     dataUrl: 'data:image/png;base64,unused',
-    pixelWidth: SOURCE_W,
-    pixelHeight: SOURCE_H,
+    pixelWidth: width,
+    pixelHeight: height,
     dither: 'floyd-steinberg',
     linesPerMm: 10,
     bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
@@ -89,10 +94,15 @@ function materializedReference(
   device: DeviceProfile,
   algorithm: DitherAlgorithm,
 ): Float64Array {
-  const resampled = resampleLumaNearest(
-    { luma: sourceLuma(), width: SOURCE_W, height: SOURCE_H },
+  const resampled = resampleLuma(
+    {
+      luma: sourceLuma(obj.pixelWidth, obj.pixelHeight),
+      width: obj.pixelWidth,
+      height: obj.pixelHeight,
+    },
     TARGET_W,
     TARGET_H,
+    burnGridKernel(algorithm),
   );
   const masked = applyImageMaskToLuma({
     image: obj,
@@ -155,34 +165,39 @@ describe('streamedRasterRowProvider', () => {
       }
     });
   }
-  for (const algorithm of ALGORITHMS) {
-    for (const origin of ORIGINS) {
-      for (const hasMask of [false, true]) {
-        it(`matches the materialized pipeline (${algorithm}, ${origin}, mask=${hasMask})`, () => {
-          const device = { ...DEFAULT_DEVICE_PROFILE, origin };
-          const obj = image(hasMask);
-          const mask = hasMask ? maskObject() : null;
-          const rowAt = streamedRasterRowProvider({
-            sourceLuma: sourceLuma(),
-            sourceWidth: SOURCE_W,
-            sourceHeight: SOURCE_H,
-            pixelWidth: TARGET_W,
-            pixelHeight: TARGET_H,
-            obj,
-            maskObject: mask,
-            device,
-            bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
-            algorithm,
-            sMax: S_MAX,
-            sMin: 0,
+  for (const [width, height] of [
+    [SOURCE_W, SOURCE_H],
+    [DENSE_SOURCE_W, DENSE_SOURCE_H],
+  ] as const) {
+    for (const algorithm of ALGORITHMS) {
+      for (const origin of ORIGINS) {
+        for (const hasMask of [false, true]) {
+          it(`matches the materialized pipeline (${width}x${height}, ${algorithm}, ${origin}, mask=${hasMask})`, () => {
+            const device = { ...DEFAULT_DEVICE_PROFILE, origin };
+            const obj = image(hasMask, width, height);
+            const mask = hasMask ? maskObject() : null;
+            const rowAt = streamedRasterRowProvider({
+              sourceLuma: sourceLuma(width, height),
+              sourceWidth: width,
+              sourceHeight: height,
+              pixelWidth: TARGET_W,
+              pixelHeight: TARGET_H,
+              obj,
+              maskObject: mask,
+              device,
+              bounds: { minX: 0, minY: 0, maxX: 40, maxY: 30 },
+              algorithm,
+              sMax: S_MAX,
+              sMin: 0,
+            });
+            const reference = materializedReference(obj, mask, device, algorithm);
+            for (let y = 0; y < TARGET_H; y += 1) {
+              expect(rowAt(y), `row ${y}`).toEqual(
+                reference.subarray(y * TARGET_W, (y + 1) * TARGET_W),
+              );
+            }
           });
-          const reference = materializedReference(obj, mask, device, algorithm);
-          for (let y = 0; y < TARGET_H; y += 1) {
-            expect(rowAt(y), `row ${y}`).toEqual(
-              reference.subarray(y * TARGET_W, (y + 1) * TARGET_W),
-            );
-          }
-        });
+        }
       }
     }
   }

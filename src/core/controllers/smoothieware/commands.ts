@@ -2,17 +2,29 @@
 // !/~ require additional transport/configuration evidence. Halt recovery is M999.
 
 import { buildAbsoluteFrameLines, buildRelativeJogCommand } from '../relative-jog-commands';
+import type { FrameBounds } from '../controller-driver';
 import type { JogParams } from '../grbl/commands';
 
-/** Home all configured axes (Smoothie's homing cycle). */
-export const SMOOTHIE_CMD_HOME = 'G28.2';
+/**
+ * Home all configured axes. `$H`, not G28.2: G28.2 homes only in grbl mode
+ * and merely rapids to the saved park point (machine 0,0 by default) in the
+ * Reprap dialect, which is the default on the non-CNC firmware.bin build
+ * (Endstops.cpp on_gcode_received case 2; Kernel.cpp grbl_mode default).
+ * SimpleShell maps `$H` to G28.2 in grbl mode and G28 otherwise, and prints
+ * `ok` only after the blocking homing cycle, so it homes in both dialects.
+ * https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/utils/simpleshell/SimpleShell.cpp
+ * https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/tools/endstops/Endstops.cpp
+ */
+export const SMOOTHIE_CMD_HOME = '$H';
 
 /** Clear the halted (kill/limit) state. */
 export const SMOOTHIE_CMD_UNLOCK = 'M999';
 
 export const SMOOTHIE_CMD_POSITION = 'M114';
 export const SMOOTHIE_CMD_FIRMWARE_INFO = 'M115';
+/** SimpleShell `version`: prints the build line and the axis count, never `ok`. */
 export const SMOOTHIE_CMD_VERSION = 'version';
+export const SMOOTHIE_VERSION_COMPLETE_PREFIX = 'Build version:';
 
 /** After Ctrl-X, ON_HALT has already disabled native/manual laser output.
  * M5/M9 clear optional spindle/switch accessories and are allowed while halted. */
@@ -37,9 +49,33 @@ export const SMOOTHIE_FRAME_TOOL_OFF_LINES: ReadonlyArray<string> = [
 // empty") acks only once motion has finished. NOT hardware-verified.
 export const SMOOTHIE_CMD_SETTLE = 'M400';
 
+// Robot.cpp keeps a separate seek rate for G0 and takes it from any F on a G0
+// line (`if (motion_mode == SEEK) seek_rate = F`). A jog or frame `G0 ... F`
+// would therefore become the travel speed of every later bare `G0`, including
+// a job's travel moves. M120/M121 push and pop the Robot modal state (feed and
+// seek rate, absolute and inch mode, active WCS), so each manual move leaves
+// the controller exactly as it found it. Parsed-time state, so the queued move
+// keeps its own rate. Marlin gives M120/M121 a different meaning (endstops),
+// which is why the wrapper lives here and not in the shared builders.
+// https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/robot/Robot.cpp
+export const SMOOTHIE_CMD_PUSH_STATE = 'M120';
+export const SMOOTHIE_CMD_POP_STATE = 'M121';
+
 // Smoothieware has no native jog protocol: reuse the shared relative-jog /
-// absolute-frame builders (byte-identical to the Marlin path).
+// absolute-frame builders inside a push/pop of the Robot modal state.
 export function buildSmoothieJogCommand(params: JogParams): string {
-  return [...SMOOTHIE_FRAME_TOOL_OFF_LINES, buildRelativeJogCommand(params)].join('\n');
+  return [
+    ...SMOOTHIE_FRAME_TOOL_OFF_LINES,
+    SMOOTHIE_CMD_PUSH_STATE,
+    buildRelativeJogCommand(params),
+    SMOOTHIE_CMD_POP_STATE,
+  ].join('\n');
 }
-export const buildSmoothieFrameLines = buildAbsoluteFrameLines;
+
+export function buildSmoothieFrameLines(bounds: FrameBounds, feed: number): ReadonlyArray<string> {
+  return [
+    `${SMOOTHIE_CMD_PUSH_STATE}\n`,
+    ...buildAbsoluteFrameLines(bounds, feed),
+    `${SMOOTHIE_CMD_POP_STATE}\n`,
+  ];
+}

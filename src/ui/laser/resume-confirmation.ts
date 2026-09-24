@@ -6,11 +6,13 @@ export function resumeConfirmation(
   requestedLine: number,
   recoveryLine: number,
   tracking: 'manual' | 'saved-recovery' = 'manual',
+  placementNote?: string,
 ): string {
   if (machineKind === 'cnc') {
     return `CNC recovery is disabled:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`;
   }
-  const details = `The machine will move to the recorded position with the beam off, then replay from line ${recoveryLine}.`;
+  const moves = `The machine will move to the recorded position with the beam off, then replay from line ${recoveryLine}.`;
+  const details = placementNote === undefined ? moves : `${moves}\n\n${placementNote}`;
   const archiveWarning =
     tracking === 'saved-recovery'
       ? 'This recovery is saved as a new run so another interruption can be reviewed again.'

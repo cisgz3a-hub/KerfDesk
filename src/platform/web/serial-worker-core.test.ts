@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
+import { MAX_READ_RECOVERIES_WITHOUT_DATA } from './serial-read-recovery';
 import { createSerialWorkerCore } from './serial-worker-core';
 import type { SerialWorkerResponse } from './serial-worker-protocol';
 
@@ -219,5 +220,156 @@ describe('serial worker core (ADR-334)', () => {
     expect(h.posted.at(-1)).toEqual({ kind: 'closed' });
     // A cancelled reader ends the loop rather than hanging it.
     await h.core.readLoop();
+  });
+});
+
+// A stream the test can fail, standing in for the transferred port readable.
+function failingReadable(): {
+  readonly readable: ReadableStream<Uint8Array>;
+  readonly push: (text: string) => void;
+  readonly fail: (name: string) => void;
+} {
+  let control: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const readable = new ReadableStream<Uint8Array>({
+    start(controller) {
+      control = controller;
+    },
+  });
+  return {
+    readable,
+    push: (text) => control?.enqueue(new TextEncoder().encode(text)),
+    fail: (name) => control?.error(new DOMException(`${name} (simulated)`, name)),
+  };
+}
+
+function attachedTo(readable: ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>) {
+  const posted: SerialWorkerResponse[] = [];
+  const core = createSerialWorkerCore({ post: (message) => posted.push(message) });
+  core.handle({ kind: 'attach', readable, writable });
+  return { core, posted };
+}
+
+describe('serial worker core: how the read side ends (audits connect-1, transport-3/4)', () => {
+  it('asks for a fresh readable after a UART line error, keeping the writer and the refill', async () => {
+    const first = failingReadable();
+    const written: string[] = [];
+    const writable = new WritableStream<Uint8Array>({
+      write: (chunk) => {
+        written.push(new TextDecoder().decode(chunk));
+      },
+    });
+    const w = attachedTo(first.readable, writable);
+    w.core.handle({ kind: 'prepare-arm', id: 1 });
+    w.core.handle({ kind: 'arm', id: 1, streamer: streamingJob() });
+
+    first.fail('FramingError');
+    await w.core.readLoop();
+    expect(w.posted.at(-1)).toEqual({ kind: 'read-error', name: 'FramingError' });
+    expect(w.posted).not.toContainEqual({ kind: 'closed' });
+    expect(writable.locked).toBe(true);
+
+    const second = failingReadable();
+    w.core.handle({ kind: 'reattach-readable', readable: second.readable });
+    second.push('ok\n');
+    await flush();
+
+    expect(lines(w.posted)).toEqual(['ok']);
+    expect(written).toEqual(['G1 X2.000\n']);
+    expect(w.core.armedStreamer()?.completed).toBe(1);
+  });
+
+  it('drops the record a line error cut short instead of gluing it to the next stream', async () => {
+    const first = failingReadable();
+    const w = attachedTo(first.readable, new WritableStream<Uint8Array>());
+    first.push('<Idle|MPos:1.');
+    await flush();
+    first.fail('ParityError');
+    await w.core.readLoop();
+
+    const second = failingReadable();
+    w.core.handle({ kind: 'reattach-readable', readable: second.readable });
+    second.push('9,0,0>\nok\n');
+    await flush();
+
+    // Bytes went missing at the error, so the halves joined would read as a
+    // plausible but wrong position report ('<Idle|MPos:1.9,0,0>'). The tail
+    // alone is not a status report at all.
+    expect(lines(w.posted)).toEqual(['9,0,0>', 'ok']);
+  });
+
+  it('lets go of both streams before reporting that its read side ended', async () => {
+    const source = failingReadable();
+    const writable = new WritableStream<Uint8Array>();
+    const posted: Array<{ message: SerialWorkerResponse; writableLocked: boolean }> = [];
+    const core = createSerialWorkerCore({
+      post: (message) => posted.push({ message, writableLocked: writable.locked }),
+    });
+    core.handle({ kind: 'attach', readable: source.readable, writable });
+
+    source.fail('NetworkError');
+    await core.readLoop();
+    await flush();
+
+    // A port whose writable is still locked cannot be closed, and the next
+    // Connect to it throws "The port is already open" (audit transport-3).
+    expect(posted.at(-1)).toEqual({ message: { kind: 'closed' }, writableLocked: false });
+    expect(source.readable.locked).toBe(false);
+  });
+
+  it('treats line errors as final once fresh streams keep failing without a byte', async () => {
+    let current = failingReadable();
+    const w = attachedTo(current.readable, new WritableStream<Uint8Array>());
+    let recoveries = 0;
+    for (;;) {
+      current.fail('BreakError');
+      await w.core.readLoop();
+      await flush();
+      if (w.posted.at(-1)?.kind !== 'read-error') break;
+      recoveries += 1;
+      current = failingReadable();
+      w.core.handle({ kind: 'reattach-readable', readable: current.readable });
+    }
+
+    expect(recoveries).toBe(MAX_READ_RECOVERIES_WITHOUT_DATA);
+    expect(w.posted.at(-1)).toEqual({ kind: 'closed' });
+  });
+
+  it('closes its writer on Disconnect rather than aborting it, so queued bytes still drain', async () => {
+    // Streams spec: abort() discards every chunk still queued, and Chromium's
+    // serial sink implements it as a transmit-buffer flush; close() drains.
+    const sinkCalls: string[] = [];
+    const writable = new WritableStream<Uint8Array>({
+      close: () => {
+        sinkCalls.push('close');
+      },
+      abort: () => {
+        sinkCalls.push('abort');
+      },
+    });
+    const w = attachedTo(failingReadable().readable, writable);
+
+    w.core.handle({ kind: 'close' });
+    await flush();
+
+    expect(sinkCalls).toEqual(['close']);
+    expect(w.posted.at(-1)).toEqual({ kind: 'closed' });
+  });
+
+  it('still lets go of a replacement readable that crosses with Disconnect', async () => {
+    const w = attachedTo(failingReadable().readable, new WritableStream<Uint8Array>());
+    w.core.handle({ kind: 'close' });
+    await flush();
+    let cancelled = false;
+    const late = new ReadableStream<Uint8Array>({
+      cancel: () => {
+        cancelled = true;
+      },
+    });
+
+    w.core.handle({ kind: 'reattach-readable', readable: late });
+    await flush();
+
+    expect(cancelled).toBe(true);
+    expect(w.posted.filter((message) => message.kind === 'closed')).toHaveLength(1);
   });
 });

@@ -10,6 +10,8 @@ import { inferCurrentMachinePosition } from './infer-machine-position';
 import { useStore } from './store';
 import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { sleepRefusalMessage, sleepUnavailableReason } from './controller-sleep';
+import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
   runOriginTransaction,
   unknownOriginPatch,
@@ -268,25 +270,34 @@ async function releaseMotors(
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
+  const blocked = sleepUnavailableReason(get());
+  if (blocked !== null) throw new Error(blocked);
   await assertOriginActionReady(set, get, refs, safeWrite);
-  await runOriginTransaction(
-    set,
-    get,
-    refs,
-    safeWrite,
-    'Release motors',
-    releaseMotorsAction,
-    () =>
-      get().workOriginSource === 'g54-persistent'
-        ? unknownOriginPatch()
-        : {
-            ...clearedOriginPatch(),
-            positionEvidenceSuppressed: true,
-            statusReport: null,
-            statusObservation: null,
-          },
-    { changesXyOrigin: true },
-  );
+  try {
+    await runOriginTransaction(
+      set,
+      get,
+      refs,
+      safeWrite,
+      'Release motors',
+      releaseMotorsAction,
+      () =>
+        get().workOriginSource === 'g54-persistent'
+          ? unknownOriginPatch()
+          : {
+              ...clearedOriginPatch(),
+              positionEvidenceSuppressed: true,
+              statusReport: null,
+              statusObservation: null,
+            },
+      { changesXyOrigin: true, refusalLeavesOrigin: true },
+    );
+  } catch (error) {
+    // `$SLP` refused before it ran: the motors are energized and the origin
+    // stands (controller-sleep.ts).
+    if (!(error instanceof ControllerCommandRefusedError)) throw error;
+    throw new Error(sleepRefusalMessage(get().activeControllerKind, error.message));
+  }
 }
 
 function usesPrimaryWcs(state: LaserState): boolean {
@@ -343,6 +354,7 @@ function transientXyOriginPatch(
     wcoCache: axisHonestWco,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 
@@ -360,6 +372,7 @@ function persistentOriginAfterTransientClearPatch(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }
 
@@ -372,5 +385,6 @@ function clearedOriginPatch(): Partial<LaserState> {
     wcoCache: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
   };
 }

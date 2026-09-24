@@ -11,11 +11,20 @@ import {
   createCancelContext,
   publishCancelFailure,
   type CancelContext,
+  type MotionCancelRefs,
 } from './laser-motion-cancel-context';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { cancelPendingManualMotions } from './manual-motion-intent';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
+const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state after Cancel.';
+// Disconnect and Reconnect are disabled while a motion owner exists, so the
+// guidance names what the operator can actually do: KerfDesk settles and
+// releases the owner itself on the controller's next Idle report.
+const MOTION_STOP_TIMEOUT_MESSAGE =
+  'Timed out waiting for motion to stop after Cancel. KerfDesk releases motion control when the controller next reports Idle; use ABORT MOTION to stop the machine now.';
+const AUTOMATIC_RELEASE_FAILURE_HEADING = 'Releasing the stopped motion needs attention';
 
 export async function runCancelJog(
   set: SetFn,
@@ -23,18 +32,21 @@ export async function runCancelJog(
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
+  // A jog/Frame still proving fresh Idle has no motion owner yet. Its cancel
+  // must poison it now, or it writes its (possibly boundary-length) move after
+  // this 0x85 already reached an Idle controller that ignored it.
+  cancelPendingManualMotions(refs);
   const context = createCancelContext(set, get, refs, safeWrite);
   const operationId = context.operationId;
   // Cancel intent itself expires a completed Frame permit, even when no live
   // motion owner exists (for example a key/button release after a zero-length
   // jog). Authorization never survives a realtime cancel attempt.
-  set({ frameVerification: null, framedRun: null });
+  set({ frameVerification: null, framedRun: null, frameTrace: null });
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
     const cancelError = await writeJogCancel(context);
     try {
-      await waitForCancelledMotionQueue(context, operationId);
-      await armCancelledMotionStatusFence(context, operationId);
+      await settleCancelledMotion(context, operationId);
     } catch (settlementError) {
       throw cancelError ?? settlementError;
     }
@@ -45,13 +57,51 @@ export async function runCancelJog(
   }
 }
 
+/** Settles and releases a motion owner that was cancelled without an operator
+ * Cancel: the controller rejected one of its lines (error:N), its write failed,
+ * or an earlier Cancel attempt gave up. The caller starts it only on a fresh
+ * Idle with the owner's acknowledgements drained, so no realtime jog-cancel is
+ * sent; the release uses the same causal proof as Cancel — ack-owned settle
+ * marker, then a stamped status query, then a later Idle. */
+export async function settleAbandonedMotionOperation(
+  set: SetFn,
+  get: GetFn,
+  refs: MotionCancelRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  const context = createCancelContext(set, get, refs, safeWrite, AUTOMATIC_RELEASE_FAILURE_HEADING);
+  const operationId = context.operationId;
+  if (operationId === undefined) return;
+  markMotionOperationCancelling(context, operationId, true);
+  try {
+    await settleCancelledMotion(context, operationId);
+  } catch (error) {
+    publishCancelFailure(context, error);
+  }
+}
+
+async function settleCancelledMotion(
+  context: CancelContext,
+  operationId: LaserMotionOperationId | undefined,
+): Promise<void> {
+  await waitForCancelledMotionQueue(context, operationId);
+  await armCancelledMotionStatusFence(context, operationId);
+}
+
 function markMotionOperationCancelling(
   context: CancelContext,
   operationId: LaserMotionOperationId,
+  automaticRelease = false,
 ): void {
   context.set((state) =>
     state.motionOperation?.operationId === operationId
-      ? { motionOperation: cancellingMotionOperation(state.motionOperation, context.attemptId) }
+      ? {
+          motionOperation: cancellingMotionOperation(
+            state.motionOperation,
+            context.attemptId,
+            automaticRelease,
+          ),
+        }
       : {},
   );
   // A phase barrier may currently own the singleton fresh-status waiter.
@@ -75,10 +125,18 @@ async function writeJogCancel(context: CancelContext): Promise<unknown | undefin
 function cancellingMotionOperation(
   operation: LaserMotionOperation,
   attemptId: symbol,
+  automaticRelease: boolean,
 ): LaserMotionOperation {
   const { cancelStatusQueryAfterSequence: staleFence, ...unstamped } = operation;
   void staleFence;
-  return { ...unstamped, cancelRequested: true, cancelAttemptId: attemptId };
+  return {
+    ...unstamped,
+    cancelRequested: true,
+    cancelAttemptId: attemptId,
+    ...(automaticRelease
+      ? { automaticReleaseAttempts: (operation.automaticReleaseAttempts ?? 0) + 1 }
+      : {}),
+  };
 }
 
 async function waitForCancelledMotionQueue(
@@ -113,6 +171,10 @@ async function armCancelledMotionStatusFence(
   if (operationId === undefined) return;
   assertCancelContext(context);
   await waitForCancelledMotionIdleBeforeMarker(context, operationId);
+  // A queued status query (Marlin M114) owes its own trailing `ok`, which
+  // arrives after its report. The marker's command owner would claim that ok
+  // as its own terminal acknowledgement, so the query must drain first.
+  await waitForCancelledMotionQueue(context, operationId);
   assertCancelContext(context);
   await crossCancellationSettlementMarker(context);
   assertCancelContext(context);
@@ -136,9 +198,19 @@ async function waitForCancelledMotionIdleBeforeMarker(
     );
   }
   const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
+  let controllerAnswered = false;
   while (context.get().motionOperation?.operationId === operationId) {
     await waitForCancelledMotionQueue(context, operationId);
-    const report = await queryCancellationStatus(context, statusQuery, deadline);
+    // Near the deadline the query budget shrinks to a millisecond. Once the
+    // controller has answered, that expiry means motion did not stop in time,
+    // not that the controller went silent.
+    const report = await queryCancellationStatus(
+      context,
+      statusQuery,
+      deadline,
+      controllerAnswered ? MOTION_STOP_TIMEOUT_MESSAGE : CONTROLLER_STATE_TIMEOUT_MESSAGE,
+    );
+    controllerAnswered = true;
     assertCancelContext(context);
     if (report.state === 'Idle') return;
     if (report.state === 'Jog') {
@@ -151,15 +223,14 @@ async function waitForCancelledMotionIdleBeforeMarker(
     if (Date.now() >= deadline) break;
     await sleep(CANCEL_QUEUE_POLL_MS);
   }
-  throw new Error(
-    'Timed out waiting for motion to stop after Cancel. Reconnect before sending more motion.',
-  );
+  throw new Error(MOTION_STOP_TIMEOUT_MESSAGE);
 }
 
 async function queryCancellationStatus(
   context: CancelContext,
   statusQuery: string,
   deadline: number,
+  timeoutMessage: string,
 ): Promise<Awaited<ReturnType<typeof waitForFreshControllerStatus>>> {
   assertCancelContext(context);
   const beforeQuery = context.get();
@@ -171,7 +242,7 @@ async function queryCancellationStatus(
     },
     accept: () => true,
     timeoutMs: Math.max(1, deadline - Date.now()),
-    timeoutMessage: 'Timed out waiting for controller state after Cancel.',
+    timeoutMessage,
   });
   const ownedWait = alreadyWaiting ? null : context.refs.controllerStatusWait;
   try {
@@ -206,7 +277,7 @@ async function crossCancellationSettlementMarker(context: CancelContext): Promis
   });
 }
 
-function cancellationStatusQuery(refs: LiveRefs): string | null {
+function cancellationStatusQuery(refs: MotionCancelRefs): string | null {
   return (
     refs.driver.realtime.statusQuery ??
     (refs.driver.commands.queuedStatusQuery === null

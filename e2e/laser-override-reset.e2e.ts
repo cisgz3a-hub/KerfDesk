@@ -81,14 +81,20 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
     '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>',
   );
 
-  // The first program write carries the reset as three single raw bytes
-  // (the fixture's text view decodes them as UTF-8, so assert on bytes),
-  // immediately followed by the program's first line.
+  // The reset goes out as its own write of three single raw bytes, since a
+  // queued line may not carry a byte above 0x7F (ADR-361), immediately ahead
+  // of the program's first line; only a status query may fall between them.
+  // The fixture's text view decodes raw bytes as UTF-8, so assert on bytes.
   const job2Writes = writeEvents(await kerfdesk.events()).slice(eventsBeforeStart);
-  const firstProgramWrite = job2Writes.find((event) => String(event['text']).includes('G21'));
-  const bytes = (firstProgramWrite?.['bytes'] ?? []) as number[];
-  expect(bytes.slice(0, OVERRIDE_RESET_BYTES.length)).toEqual(OVERRIDE_RESET_BYTES);
-  expect(String.fromCharCode(...bytes.slice(3, 7))).toBe('G21\n');
+  const firstProgram = job2Writes.findIndex((event) => String(event['text']).includes('G21'));
+  expect(firstProgram).toBeGreaterThan(0);
+  const programBytes = (job2Writes[firstProgram]?.['bytes'] ?? []) as number[];
+  expect(String.fromCharCode(...programBytes.slice(0, 4))).toBe('G21\n');
+  const writtenBefore = job2Writes
+    .slice(0, firstProgram)
+    .map((event) => (event['bytes'] ?? []) as number[])
+    .filter((bytes) => String.fromCharCode(...bytes) !== '?');
+  expect(writtenBefore.at(-1)).toEqual(OVERRIDE_RESET_BYTES);
 
   // And the program carries the new settings: F3000, and 70% of the profile's
   // S1000 for the darkest pixels.

@@ -54,10 +54,13 @@ async function connectAndSettle(connection: FakeConnection): Promise<void> {
   await settleTestGrblHandshake();
 }
 
+const THREE_AXIS_OFFSETS = ['[G54:0.000,0.000,0.000]', '[G55:4.000,5.000,-6.250]'];
+
 function respondToWorkZQuery(
   data: string,
   connection: FakeConnection,
   beforeReply: () => void = () => undefined,
+  offsetLines: ReadonlyArray<string> = THREE_AXIS_OFFSETS,
 ): void {
   queueMicrotask(() => {
     if (data === '$G\n') {
@@ -67,8 +70,7 @@ function respondToWorkZQuery(
     }
     if (data === '$#\n') {
       beforeReply();
-      connection.emitLine('[G54:0.000,0.000,0.000]');
-      connection.emitLine('[G55:4.000,5.000,-6.250]');
+      for (const line of offsetLines) connection.emitLine(line);
       connection.emitLine('ok');
     }
   });
@@ -119,6 +121,33 @@ describe('owned controller Work-Z recovery', () => {
       toolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
       controllerSessionEpoch: useLaserStore.getState().controllerSessionEpoch,
     });
+  });
+
+  // grblHAL and FluidNC print every configured axis in `$#` (report.c
+  // get_axis_values loops over system_n_axis()), so a rotary router answers
+  // with four values per WCS. XYZ are still the first three.
+  it('recovers Work Z from a 4-axis grblHAL/FluidNC `$#` report', async () => {
+    const connection = makeConnection((data, conn) => {
+      respondToTestGrblBuildInfo(data, conn.emitLine);
+      respondToWorkZQuery(data, conn, undefined, [
+        '[G54:0.000,0.000,0.000,0.000]',
+        '[G55:4.000,5.000,-6.250,90.000]',
+        '[G92:0.000,0.000,0.000,0.000]',
+      ]);
+    });
+    await connectAndSettle(connection);
+
+    await useLaserStore.getState().recoverWorkZFromController({
+      activeToolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
+      controllerOffsetRepresentsStockTop: true,
+    });
+
+    expect(useLaserStore.getState().workZZeroEvidence).toMatchObject({
+      source: 'controller-readback',
+      activeWcs: 'G55',
+      offsetZMm: -6.25,
+    });
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
   it('writes no recovery query while the MPG already owns the controller', async () => {

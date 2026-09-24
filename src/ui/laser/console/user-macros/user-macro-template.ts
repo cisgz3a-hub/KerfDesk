@@ -46,6 +46,18 @@ export function parseUserMacroTemplate(template: string): UserMacroTemplateResul
       message: 'A user macro template cannot contain control characters.',
     };
   }
+  // Unicode spaces are normalized when the Console sends the macro; any other
+  // character above 0x7F would reach the controller as a realtime command
+  // (audit transport-2), so refuse it when the macro is saved, not when sent.
+  const nonAsciiIndex = nonAsciiCharacterIndex(template);
+  if (nonAsciiIndex >= 0) {
+    const character = String.fromCodePoint(template.codePointAt(nonAsciiIndex) ?? 0);
+    return {
+      kind: 'control-character',
+      index: nonAsciiIndex,
+      message: `A user macro must be plain ASCII: "${character}" at column ${nonAsciiIndex + 1} would reach the controller as a realtime command, not text.`,
+    };
+  }
   if (template.trim() === '') {
     return { kind: 'empty-template', message: 'Enter one Console command for this macro.' };
   }
@@ -127,6 +139,27 @@ function ownVariableValue(
   variable: string,
 ): string | undefined {
   return Object.prototype.hasOwnProperty.call(values, variable) ? values[variable] : undefined;
+}
+
+function nonAsciiCharacterIndex(value: string): number {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit > DELETE_CODE_UNIT && !isUnicodeSpace(codeUnit)) return index;
+  }
+  return -1;
+}
+
+// The Unicode spaces core/controllers/console-text maps to ASCII spaces when
+// the Console sends a line (kept local: this module imports only its siblings).
+function isUnicodeSpace(codeUnit: number): boolean {
+  return (
+    codeUnit === 0x00a0 ||
+    codeUnit === 0x1680 ||
+    (codeUnit >= 0x2000 && codeUnit <= 0x200a) ||
+    codeUnit === 0x202f ||
+    codeUnit === 0x205f ||
+    codeUnit === 0x3000
+  );
 }
 
 function controlCharacterIndex(value: string): number {

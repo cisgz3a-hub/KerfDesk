@@ -269,11 +269,11 @@ function displayNumber(value: number, decimals: number): number {
 function numberFieldTitle(name: string, label: string): string {
   switch (name) {
     case 'lineIntervalMm':
-      return 'Distance between raster scan lines. Smaller values engrave denser images.';
+      return 'Distance between raster scan lines. Smaller values pack rows closer and burn more energy per area at the same power and speed.';
     case 'imageDpi':
       return 'Image engraving resolution in dots per inch.';
     case 'dotWidthCorrectionMm':
-      return 'Compensate for physical laser dot width when raster engraving.';
+      return 'Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan.';
     case 'minPower':
       return 'Lowest laser power used by grayscale image engraving.';
     default:

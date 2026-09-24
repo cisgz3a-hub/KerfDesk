@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { currentJobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
-import { checkpointInterruption } from './checkpoint-interruption';
+import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
 
 describe('checkpointInterruption', () => {
   it('maps a disconnect-during-fire notice to a disconnect interruption', () => {
@@ -92,5 +92,57 @@ describe('currentJobStopRequest', () => {
     expect(currentJobStopRequest({ jobStopRequest: request, streamerEpoch: 4 })).toBe(request);
     expect(currentJobStopRequest({ jobStopRequest: request, streamerEpoch: 5 })).toBeNull();
     expect(currentJobStopRequest({ streamerEpoch: 4 })).toBeNull();
+  });
+});
+
+// Controller audit recovery-6: a cause that discarded the planner records the
+// backlog, so the automatic restart steps back over the discarded moves.
+describe('planner backlog on the recorded cause', () => {
+  const backlog = { ackedAtStatus: 400, queuedBlocks: 380 };
+
+  it('records it for an Abort, a rejected line and a reboot', () => {
+    const operator = { reason: 'operator' as const, streamerEpoch: 2 };
+    expect(checkpointInterruption('errored', null, operator, backlog)?.plannerBacklog).toEqual(
+      backlog,
+    );
+    const rejected: LaserSafetyNotice = {
+      kind: 'controller-error',
+      code: 2,
+      message: 'The controller rejected a command (error:2).',
+    };
+    expect(checkpointInterruption('errored', rejected, null, backlog)?.plannerBacklog).toEqual(
+      backlog,
+    );
+    const reboot: LaserSafetyNotice = { kind: 'controller-reboot', message: 'Rebooted.' };
+    expect(checkpointInterruption('errored', reboot, null, backlog)?.plannerBacklog).toEqual(
+      backlog,
+    );
+  });
+
+  it('leaves it out where the controller kept running or the stop may not have arrived', () => {
+    const lost: LaserSafetyNotice = { kind: 'disconnect-during-job', message: 'USB dropped.' };
+    expect(checkpointInterruption('disconnected', lost, null, backlog)).not.toHaveProperty(
+      'plannerBacklog',
+    );
+    const closing = { reason: 'app-closing' as const, streamerEpoch: 2 };
+    expect(checkpointInterruption('errored', null, closing, backlog)).not.toHaveProperty(
+      'plannerBacklog',
+    );
+  });
+
+  it('reads only the current run snapshot with a backlog', () => {
+    const snapshot = { streamerEpoch: 7, ackedLines: 400, queuedBlocks: 380 };
+    expect(currentRunPlannerBacklog({ streamerEpoch: 7, streamPlannerSnapshot: snapshot })).toEqual(
+      backlog,
+    );
+    expect(
+      currentRunPlannerBacklog({ streamerEpoch: 8, streamPlannerSnapshot: snapshot }),
+    ).toBeUndefined();
+    expect(
+      currentRunPlannerBacklog({
+        streamerEpoch: 7,
+        streamPlannerSnapshot: { ...snapshot, queuedBlocks: 0 },
+      }),
+    ).toBeUndefined();
   });
 });

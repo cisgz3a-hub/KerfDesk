@@ -10,6 +10,7 @@
 
 import { isSendableGcodeLine } from '../controllers/grbl';
 import type { JobInterruption } from './job-interruption';
+import { plannerFrontierRawLine } from './planner-backlog-restart';
 
 // Answers that can follow the rejected one before the stop takes effect: the
 // controller keeps parsing its receive buffer until the reset byte arrives.
@@ -21,6 +22,9 @@ export type AutomaticRestart = {
   readonly line: number;
   /** True when the restart replays the line the controller rejected. */
   readonly replaysRejectedLine: boolean;
+  /** Planner blocks the stop discarded, when the restart steps back over them
+   *  (planner-backlog-restart.ts). */
+  readonly plannerBacklogBlocks?: number;
 };
 
 type RestartScan = {
@@ -58,7 +62,21 @@ export function automaticRestart(
     if (newline === -1) break;
     start = newline + 1;
   }
-  return restartFrom(scan, ackedSendableLines);
+  return withPlannerBacklog(gcode, restartFrom(scan, ackedSendableLines), interruption);
+}
+
+// A stop that discarded the planner also discarded moves acknowledged before
+// the restart line; step back over them when that is earlier.
+function withPlannerBacklog(
+  gcode: string,
+  restart: AutomaticRestart,
+  interruption: JobInterruption | undefined,
+): AutomaticRestart {
+  const backlog = interruption?.plannerBacklog;
+  if (backlog === undefined) return restart;
+  const frontier = plannerFrontierRawLine(gcode, backlog);
+  if (frontier === null || frontier >= restart.line) return restart;
+  return { ...restart, line: frontier, plannerBacklogBlocks: backlog.queuedBlocks };
 }
 
 function visitLine(

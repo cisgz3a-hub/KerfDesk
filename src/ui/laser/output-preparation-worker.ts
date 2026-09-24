@@ -23,6 +23,10 @@ async function prepare(envelope: OutputPreparationEnvelope): Promise<void> {
         const update: OutputPreparationResult = { requestId, progress };
         self.postMessage(update);
       },
+      onFrameBounds: (frameBounds) => {
+        const update: OutputPreparationResult = { requestId, frameBounds };
+        self.postMessage(update);
+      },
     });
   } catch (error) {
     response = {

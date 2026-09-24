@@ -164,3 +164,28 @@ describe('prepareConsoleCommand', () => {
     });
   });
 });
+
+// Controller audit 2026-09-23: settings-console-8 (every $RST= form is a
+// persistent restore) and settings-console-9 (a value's interior spaces
+// survive; grblHAL and FluidNC store them).
+describe('persistent restores and $ string values', () => {
+  it.each(['$RST=&', '$rst = &', '$RST=*1', '$RST=$$'])('blocks %s', (input) => {
+    const prepared = prepareConsoleCommand(input);
+    expect(prepared.ok).toBe(false);
+  });
+
+  it('keeps the spaces inside a $ setting value and compacts only the key', () => {
+    const prepared = prepareConsoleCommand('$ 74 = My Net');
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.command.wire).toBe('$74=My Net\n');
+    expect(prepared.command.kind).toBe('setting-write');
+  });
+
+  it('sends a FluidNC string setting as typed', () => {
+    const prepared = prepareConsoleCommand('$Sta/SSID=My Home WiFi');
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(prepared.command.wire).toBe('$Sta/SSID=My Home WiFi\n');
+  });
+});

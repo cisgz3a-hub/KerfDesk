@@ -57,6 +57,9 @@ beforeEach(() => {
     controllerSettings: { maxPowerS: 1_000, minPowerS: 0, laserModeEnabled: true },
     controllerSettingsObservation: { sessionEpoch: 9, observedAt: 1 },
     controllerQualification: { kind: 'qualified', epoch: 9, settings: 'verified' },
+    // Overrides reported at 100%, so Start sends no ADR-355 reset ahead of the
+    // program and the first write these tests reject is the program's own.
+    ovCache: { feed: 100, rapid: 100, spindle: 100 },
   });
 });
 

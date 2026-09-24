@@ -5,12 +5,18 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
+import { WRITER_CLOSE_TIMEOUT_MS } from './bounded-writer-close';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 import {
   createWorkerSerialConnection,
   WORKER_HANDSHAKE_TIMEOUT_MS,
   type SerialWorkerBridge,
 } from './worker-serial-connection';
+
+type PortStreams = {
+  readable: ReadableStream<Uint8Array> | null;
+  writable: WritableStream<Uint8Array> | null;
+};
 
 type Harness = {
   readonly connection: ReturnType<typeof createWorkerSerialConnection>;
@@ -20,6 +26,8 @@ type Harness = {
   readonly closedPort: () => number;
   readonly forgotPort: () => number;
   readonly streams: { readonly readable: ReadableStream; readonly writable: WritableStream };
+  /** What the port's `readable`/`writable` getters return from now on. */
+  readonly port: PortStreams;
 };
 
 function harness(): Harness {
@@ -28,6 +36,7 @@ function harness(): Harness {
   const counts = { terminated: 0, closed: 0, forgotten: 0 };
   const readable = new ReadableStream<Uint8Array>();
   const writable = new WritableStream<Uint8Array>();
+  const port: PortStreams = { readable, writable };
   const bridge: SerialWorkerBridge = {
     postMessage: (message, transfer) => sent.push({ message, transfer: transfer ?? [] }),
     onMessage: (handler) => {
@@ -41,8 +50,12 @@ function harness(): Harness {
   const connection = createWorkerSerialConnection({
     bridge,
     port: {
-      readable,
-      writable,
+      get readable() {
+        return port.readable;
+      },
+      get writable() {
+        return port.writable;
+      },
       close: async () => {
         counts.closed += 1;
       },
@@ -61,7 +74,12 @@ function harness(): Harness {
     closedPort: () => counts.closed,
     forgotPort: () => counts.forgotten,
     streams: { readable, writable },
+    port,
   };
+}
+
+async function settle(): Promise<void> {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
 }
 
 function armedStreamer() {
@@ -229,6 +247,25 @@ describe('worker serial connection (ADR-334)', () => {
     expect(closed).toEqual([1]);
     await expect(pending).rejects.toThrow('closed before the write completed');
     await expect(h.connection.write('?')).rejects.toThrow('not writable');
+    // The worker ended the session itself, having let go of both streams, so
+    // nothing may be left behind: not the worker, and not an open port that
+    // the next Connect would find "already open" (audit transport-3).
+    await settle();
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(1);
+  });
+
+  it('still stops the worker and closes the port once when Disconnect follows a drop', async () => {
+    const h = harness();
+    h.emit({ kind: 'closed' });
+
+    await h.connection.close();
+    await h.connection.close();
+
+    // Disconnect after a drop must not ask the departed worker to close again.
+    expect(h.sent.filter((entry) => entry.message.kind === 'close')).toEqual([]);
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(1);
   });
 
   it('revokes the pairing through Forget after letting go of the refill', async () => {
@@ -250,5 +287,96 @@ describe('worker serial connection (ADR-334)', () => {
     expect(refill.isArmed()).toBe(false);
     expect(h.closedPort()).toBe(1);
     expect(h.forgotPort()).toBe(1);
+  });
+});
+
+// A UART line error leaves the port open with a fresh `port.readable` (Web
+// Serial spec, https://serial.spec.whatwg.org/). Only this thread can reach it.
+describe('worker serial connection: line errors (audit connect-1)', () => {
+  it('hands the fresh port readable to the worker and keeps the session', () => {
+    const h = harness();
+    const closed: number[] = [];
+    h.connection.onClose(() => closed.push(1));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fresh = new ReadableStream<Uint8Array>();
+    h.port.readable = fresh;
+
+    h.emit({ kind: 'read-error', name: 'FramingError' });
+
+    expect(h.sent.at(-1)).toEqual({
+      message: { kind: 'reattach-readable', readable: fresh },
+      transfer: [fresh],
+    });
+    expect(closed).toEqual([]);
+    expect(h.terminated()).toBe(0);
+  });
+
+  it('ends the session like a dropped cable when the port has no readable to give', async () => {
+    const h = harness();
+    const closed: number[] = [];
+    h.connection.onClose(() => closed.push(1));
+    h.port.readable = null;
+
+    h.emit({ kind: 'read-error', name: 'ParityError' });
+    expect(closed).toEqual([1]);
+    // The worker still holds the writer, so it is asked to let go first.
+    expect(h.sent.at(-1)?.message).toEqual({ kind: 'close' });
+    h.emit({ kind: 'closed' });
+    await settle();
+
+    expect(h.sent.some((entry) => entry.message.kind === 'reattach-readable')).toBe(false);
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(1);
+  });
+
+  it('does not hand over a readable once Disconnect has begun', async () => {
+    const h = harness();
+    const closing = h.connection.close();
+
+    h.emit({ kind: 'read-error', name: 'BreakError' });
+    h.emit({ kind: 'closed' });
+    await closing;
+
+    expect(h.sent.some((entry) => entry.message.kind === 'reattach-readable')).toBe(false);
+    expect(h.closedPort()).toBe(1);
+  });
+});
+
+// The worker closing its transferred writer only posts the close across; the
+// port's own writable is still sending Disconnect's M5/M9 until the pipe that
+// holds it finishes (audit transport-4).
+describe('worker serial connection: port drain before close (audit transport-4)', () => {
+  it('waits for the port writable to finish before closing the port', async () => {
+    const h = harness();
+    const writable = new WritableStream<Uint8Array>();
+    const pipeHold = writable.getWriter();
+    h.port.writable = writable;
+
+    const closing = h.connection.close();
+    h.emit({ kind: 'closed' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(h.terminated()).toBe(1);
+    expect(h.closedPort()).toBe(0);
+
+    pipeHold.releaseLock();
+    await closing;
+    expect(h.closedPort()).toBe(1);
+  });
+
+  it('closes the port anyway once the drain deadline passes', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const writable = new WritableStream<Uint8Array>();
+    writable.getWriter();
+    h.port.writable = writable;
+
+    const closing = h.connection.close();
+    h.emit({ kind: 'closed' });
+    await vi.advanceTimersByTimeAsync(WRITER_CLOSE_TIMEOUT_MS - 20);
+    expect(h.closedPort()).toBe(0);
+    await vi.advanceTimersByTimeAsync(40);
+    await closing;
+
+    expect(h.closedPort()).toBe(1);
   });
 });

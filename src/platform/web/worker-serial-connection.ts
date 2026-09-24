@@ -7,9 +7,16 @@
 //
 // Handover establishes a line-delivery barrier before sampling the renderer.
 // A timed-out handover closes the transport; it never creates a second writer.
+//
+// Teardown is one path, whoever starts it: Disconnect, Forget, a failed
+// handover, or the worker reporting that its read side ended by itself. The
+// worker lets go of both streams, the worker is stopped, the port's own
+// streams finish draining through the transfer pipes, and only then is the
+// port closed (audit transport-3, transport-4).
 
 import type { SerialConnection } from '../types';
 import { createWorkerRefillHandover } from './worker-refill-handover';
+import { portStreamsReleased, settleWithin } from './worker-teardown-waits';
 import {
   isSerialWorkerResponse,
   type SerialWorkerRequest,
@@ -39,6 +46,8 @@ type PendingWrite = { readonly resolve: () => void; readonly reject: (error: Err
 
 type Session = {
   closed: boolean;
+  /** The worker reported `closed`: it has already let go of both streams. */
+  workerReleased: boolean;
   nextWriteId: number;
   handover: ReturnType<typeof createWorkerRefillHandover> | null;
   closedSignal: (() => void) | null;
@@ -48,51 +57,49 @@ type Session = {
   readonly pendingWrites: Map<number, PendingWrite>;
 };
 
+type Link = {
+  readonly bridge: SerialWorkerBridge;
+  readonly port: WorkerSerialPort;
+  readonly timeoutMs: number;
+  readonly session: Session;
+  unsubscribe: () => void;
+  terminated: boolean;
+  /** The one teardown run; every later caller awaits the same promise. */
+  ending: Promise<void> | null;
+};
+
 export function createWorkerSerialConnection(args: {
   readonly bridge: SerialWorkerBridge;
   readonly port: WorkerSerialPort;
   readonly timeoutMs?: number;
 }): SerialConnection {
-  const { bridge, port } = args;
-  const timeoutMs = args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS;
-  const session = createSession();
-  const unsubscribe = bridge.onMessage((message) => {
-    if (isSerialWorkerResponse(message)) routeResponse(session, message);
-  });
-  attachStreams(bridge, port, unsubscribe);
-  let terminated = false;
-  const terminate = (): void => {
-    if (terminated) return;
-    terminated = true;
-    unsubscribe();
-    bridge.terminate();
+  const link: Link = {
+    bridge: args.bridge,
+    port: args.port,
+    timeoutMs: args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS,
+    session: createSession(),
+    unsubscribe: () => undefined,
+    terminated: false,
+    ending: null,
   };
+  const { session } = link;
+  link.unsubscribe = link.bridge.onMessage((message) => {
+    if (isSerialWorkerResponse(message)) routeResponse(link, message);
+  });
+  attachStreams(link.bridge, link.port, link.unsubscribe);
   session.handover = createWorkerRefillHandover({
-    post: (message) => bridge.postMessage(message),
-    timeoutMs,
+    post: (message) => link.bridge.postMessage(message),
+    timeoutMs: link.timeoutMs,
     onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
     fail: () => {
       // An unanswered handover leaves ownership uncertain. Stop the worker
       // before notifying the store, so no fallback can duplicate its writes.
-      terminate();
+      terminate(link);
       fireClose(session);
-      void port.close().catch(() => undefined);
+      void endSession(link);
     },
   });
   const hostedStreaming = session.handover.refill;
-  const shutDown = async (): Promise<void> => {
-    if (!session.closed) {
-      // The worker holds the stream locks, so it must let go before the port
-      // can be closed here.
-      await settleWithin(timeoutMs, (done) => {
-        session.closedSignal = done;
-        bridge.postMessage({ kind: 'close' });
-      });
-      session.closedSignal = null;
-      fireClose(session);
-    }
-    terminate();
-  };
 
   return {
     write: async (data) => {
@@ -100,23 +107,19 @@ export function createWorkerSerialConnection(args: {
       const id = session.nextWriteId++;
       return new Promise<void>((resolve, reject) => {
         session.pendingWrites.set(id, { resolve, reject });
-        bridge.postMessage({ kind: 'write', id, data });
+        link.bridge.postMessage({ kind: 'write', id, data });
       });
     },
     onLine: (handler) => subscribe(session.lineSubs, handler),
     onClose: (handler) => subscribe(session.closeSubs, handler),
-    close: async () => {
-      if (session.closed) return;
-      await shutDown();
-      await port.close().catch((err: unknown) => {
-        console.warn('port.close() rejected:', err);
-      });
-    },
+    // Still stops the worker and closes the port after the worker ended the
+    // session itself: returning early there leaked the worker and left the
+    // port open for the next Connect (audit transport-3).
+    close: () => endSession(link),
     forget: async () => {
       await hostedStreaming.release();
-      await shutDown();
-      await port.close().catch(() => undefined);
-      await port.forget?.().catch((err: unknown) => {
+      await endSession(link);
+      await link.port.forget?.().catch((err: unknown) => {
         console.warn('port.forget() rejected:', err);
       });
     },
@@ -127,6 +130,7 @@ export function createWorkerSerialConnection(args: {
 function createSession(): Session {
   return {
     closed: false,
+    workerReleased: false,
     nextWriteId: 1,
     handover: null,
     closedSignal: null,
@@ -160,7 +164,48 @@ function attachStreams(
   }
 }
 
-function routeResponse(session: Session, message: SerialWorkerResponse): void {
+function endSession(link: Link): Promise<void> {
+  link.ending ??= runEndSession(link);
+  return link.ending;
+}
+
+async function runEndSession(link: Link): Promise<void> {
+  const { session } = link;
+  // The worker holds the stream locks, so it must let go before the port can
+  // be closed here. Skipped when it already has (its read side ended by
+  // itself) or can no longer answer (stopped after a failed handover).
+  if (!session.workerReleased && !link.terminated) {
+    await settleWithin(link.timeoutMs, (done) => {
+      session.closedSignal = done;
+      link.bridge.postMessage({ kind: 'close' });
+    });
+    session.closedSignal = null;
+  }
+  fireClose(session);
+  terminate(link);
+  // Stopping the worker does not finish the port's own streams: they stay
+  // locked by the transfer pipes until the drain the worker's close started
+  // is done, and closing the port before then fails (audit transport-4).
+  await portStreamsReleased(link.port);
+  await link.port.close().catch((err: unknown) => {
+    console.warn('port.close() rejected:', err);
+  });
+}
+
+function terminate(link: Link): void {
+  if (link.terminated) return;
+  link.terminated = true;
+  link.unsubscribe();
+  link.bridge.terminate();
+}
+
+function routeResponse(link: Link, message: SerialWorkerResponse): void {
+  const { session } = link;
+  // Routed even once the session is closed: a teardown may be waiting on it.
+  if (message.kind === 'closed') {
+    workerClosed(link);
+    return;
+  }
   if (session.closed) return;
   if (message.kind === 'line') {
     deliverLine(session, message.line);
@@ -172,9 +217,48 @@ function routeResponse(session: Session, message: SerialWorkerResponse): void {
     for (const handler of session.writeErrorSubs) handler(message.message);
     return;
   }
-  session.closedSignal?.();
+  if (message.kind === 'read-error') reattachReadable(link, message.name);
+}
+
+// The worker has let go of both streams. Either a teardown asked it to, or its
+// read side ended by itself (the cable was pulled, or a read failed for good).
+// The store learns of the second at once, as a dropped cable, and the rest of
+// the teardown follows so the next Connect finds the port closed.
+function workerClosed(link: Link): void {
+  const { session } = link;
+  session.workerReleased = true;
+  const requested = session.closedSignal;
   session.closedSignal = null;
+  if (requested !== null) {
+    requested();
+    return;
+  }
   fireClose(session);
+  void endSession(link);
+}
+
+// A UART line error ended the worker's read stream but left the port open,
+// and `port.readable` is already a fresh stream (Web Serial spec; see
+// serial-read-recovery.ts). Only this thread can reach it, so hand it over;
+// the worker kept its writer and any armed refill (audit connect-1). A port
+// with no free readable, or a runtime that refuses the transfer, ends the
+// session as a dropped cable would, never with a second reader.
+function reattachReadable(link: Link, errorName: string): void {
+  if (link.ending !== null) return;
+  const readable = link.port.readable;
+  if (readable !== null && !readable.locked) {
+    try {
+      link.bridge.postMessage({ kind: 'reattach-readable', readable }, [readable]);
+      console.warn(
+        `Serial line error (${errorName}); the port is still open, so reading continues.`,
+      );
+      return;
+    } catch (error) {
+      console.warn("The serial worker could not take the port's fresh readable:", error);
+    }
+  }
+  fireClose(link.session);
+  void endSession(link);
 }
 
 function routeWriteResult(session: Session, message: SerialWorkerResponse): boolean {
@@ -218,21 +302,4 @@ function fireClose(session: Session): void {
 function subscribe<T>(subscribers: Set<T>, handler: T): () => void {
   subscribers.add(handler);
   return () => subscribers.delete(handler);
-}
-
-/** Run `begin`, then resolve on its callback or on the deadline — whichever
- * comes first. Never rejects: a silent worker is handled by the caller's own
- * fallback, not by an unhandled rejection on a teardown path. */
-async function settleWithin(timeoutMs: number, begin: (done: () => void) => void): Promise<void> {
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const finish = (): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve();
-    };
-    const timer = setTimeout(finish, timeoutMs);
-    begin(finish);
-  });
 }

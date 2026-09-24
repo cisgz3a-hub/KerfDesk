@@ -99,34 +99,9 @@ export function toolChangeReady(state: LaserState): boolean {
   return streamer.inFlight.length === 0 && state.toolChangeIdleSeen;
 }
 
-// The state patch applied whenever a RUNNING job enters a tool-change hold: at
-// the ack-driven transition (advanceStream) and when a Continue step lands
-// directly in the next hold within one fill (F22). A new bit is going in, so
-// void the prior tool's Z0 and bump the epoch, require a FRESH Idle before the
-// setup gate / Continue unlock, and advance the pending-tool label + id to name
-// the incoming bit. Both entry sites must share this so they cannot drift.
-export function toolChangeHoldEntryPatch(
-  state: LaserState,
-): Pick<
-  LaserState,
-  | 'workZZeroEvidence'
-  | 'workZReferenceEpoch'
-  | 'toolChangeIdleSeen'
-  | 'pendingToolLabel'
-  | 'pendingToolId'
-  | 'toolChangeLabels'
-  | 'toolChangeToolIds'
-> {
-  return {
-    workZZeroEvidence: null,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    toolChangeIdleSeen: false,
-    pendingToolLabel: state.toolChangeLabels[0] ?? null,
-    pendingToolId: state.toolChangeToolIds[0] ?? null,
-    toolChangeLabels: state.toolChangeLabels.slice(1),
-    toolChangeToolIds: state.toolChangeToolIds.slice(1),
-  };
-}
+// Entering a hold voids the prior tool's Z0 and re-arms toolChangeIdleSeen;
+// every entry site applies that through steppedStreamerPatch
+// (tool-change-hold-entry.ts) so the sites cannot drift.
 
 // Continue is stronger than setup readiness. Fresh Idle only proves the old
 // tool's retract/park completed; the new tool must also have a freshly
@@ -317,6 +292,7 @@ type InitialLaserState = Pick<
   | 'pendingToolId'
   | 'frameVerification'
   | 'framedRun'
+  | 'frameTrace'
   | 'framedRunStartClaim'
 >;
 
@@ -363,6 +339,7 @@ export function initialLaserState(): InitialLaserState {
     workZZeroEvidence: null,
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     framedRunStartClaim: null,
   };
 }
@@ -406,6 +383,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
     framedRun: null,
+    frameTrace: null,
     motionOperation: null,
     controllerOperation: null,
     probeBusy: false,

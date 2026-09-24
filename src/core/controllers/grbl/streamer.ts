@@ -259,7 +259,8 @@ export function continueToolChange(state: StreamerState): StreamerState {
 }
 
 // Consume one ack from GRBL (ok / error / alarm). Decrements in-flight,
-// bumps completed. An 'alarm' ack makes the stream terminal ('cancelled')
+// bumps completed for a line reply (ok / error). An 'alarm' ack makes the
+// stream terminal ('cancelled')
 // and an 'error' ack makes it terminal ('errored') - GRBL rejected the
 // line, so no further bytes may be sent (P0-1). Terminal statuses absorb
 // later acks: buffer accounting still runs (GRBL freed the bytes), but the
@@ -282,33 +283,39 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   // later untracked ack ($X unlock, M9 cleanup) for this dead stream.
   const nextInFlight = kind === 'alarm' ? [] : state.inFlight.slice(1);
   const nextBytes = kind === 'alarm' ? 0 : state.inFlightBytes - head.bytes;
-  const completed = state.completed + 1;
-  // A paused stream never promotes to 'done': GRBL acks held-but-parsed
-  // lines during a feed hold, so pausing near the end of a job drains the
-  // queues while the machine still holds unexecuted planner motion. resume()
-  // completes a drained stream instead.
-  const nextStatus: StreamerStatus = isTerminal(state.status)
-    ? state.status
-    : kind === 'alarm'
-      ? 'cancelled'
-      : kind === 'error'
-        ? 'errored'
-        : state.status !== 'paused' &&
-            state.status !== 'tool-change' &&
-            nextInFlight.length === 0 &&
-            queuedLineCount(state) === 0
-          ? 'done'
-          : state.status;
+  // ALARM:N is reported asynchronously (protocol_exec_rt_system) and answers
+  // no line, so it acknowledges nothing: counting it made the checkpoint's
+  // ackedLines, and the recovery default built on it, one line past the last
+  // line the controller accepted (controller audit streaming-5).
+  const completed = kind === 'alarm' ? state.completed : state.completed + 1;
   return {
     state: {
       ...state,
       inFlight: nextInFlight,
       inFlightBytes: nextBytes,
       completed,
-      status: nextStatus,
+      status: statusAfterAck(state, kind, nextInFlight.length),
     },
-    acked: head.line,
+    acked: kind === 'alarm' ? null : head.line,
   };
+}
+
+// A paused stream never promotes to 'done': GRBL acks held-but-parsed
+// lines during a feed hold, so pausing near the end of a job drains the
+// queues while the machine still holds unexecuted planner motion. resume()
+// completes a drained stream instead.
+function statusAfterAck(
+  state: StreamerState,
+  kind: AckKind,
+  inFlightAfter: number,
+): StreamerStatus {
+  if (isTerminal(state.status)) return state.status;
+  if (kind === 'alarm') return 'cancelled';
+  if (kind === 'error') return 'errored';
+  const drained = inFlightAfter === 0 && queuedLineCount(state) === 0;
+  return drained && state.status !== 'paused' && state.status !== 'tool-change'
+    ? 'done'
+    : state.status;
 }
 
 function ackStatusWithoutLine(state: StreamerState, kind: AckKind): StreamerState {

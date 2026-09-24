@@ -16,6 +16,7 @@ import {
   swatchStyle,
   tableCellStyle,
 } from './job-review-table.styles';
+import { pushFeedCeilingToast } from '../../layers/feed-ceiling';
 import { ReviewNumberCell } from './ReviewNumberCell';
 
 const PERCENT_MAX = 100;
@@ -99,6 +100,7 @@ export function LaserRowCells(props: {
         min={MIN_SPEED_MM_PER_MIN}
         max={props.maxFeedMmPerMin}
         onCommit={(speed) => props.onCommit({ speed })}
+        onClamp={() => pushFeedCeilingToast(props.maxFeedMmPerMin)}
       />
       <ReviewNumberCell
         label={`Passes for ${props.ariaContext}`}

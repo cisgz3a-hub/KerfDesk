@@ -41,6 +41,7 @@ import {
   selectionHasVectorObject,
   selectionTouchesGroup,
 } from './selection-command-state';
+import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
 
@@ -276,8 +277,9 @@ function laserCommandContext(
   return {
     connectLaser: () =>
       void laser.connect(platform, connectOptionsForDevice(useStore.getState().project.device)),
-    disconnectLaser: () => void laser.disconnect().catch(() => undefined),
-    homeLaser: () => void laser.home().catch(() => undefined),
+    disconnectLaser: () =>
+      void laser.disconnect().catch(controllerActionFailureHandler('Disconnect')),
+    homeLaser: () => void laser.home().catch(controllerActionFailureHandler('Home')),
   };
 }
 

@@ -49,9 +49,11 @@ export type JobCheckpoint = {
   // is how progress updates recognize the checkpointed run.
   readonly sendableLines: number;
   // GRBL acks counted by the streamer, in SENDABLE numbering. An ack means
-  // "parsed into the RX buffer", not "executed" — the mapped resume line is
-  // exact when only the app died, and a few lines late when the controller
-  // lost power too.
+  // "parsed into the planner", not "executed": the mapped resume line is exact
+  // when only the app died, but a stop that discards the planner (Abort, a
+  // reset, a reboot) can leave it a whole planner ahead of the cut, up to 512
+  // moves on grblHAL. The automatic restart steps back by the recorded
+  // planner backlog (planner-backlog-restart.ts).
   readonly ackedLines: number;
   // True while a resume run (preamble + tail, its own numbering) streams:
   // progress updates are suspended so a coincidental total match can never

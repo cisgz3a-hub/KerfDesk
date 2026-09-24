@@ -64,14 +64,40 @@ export function writeConsoleCommand(
       },
     );
   }
+  if (command.kind === 'unlock' || command.kind === 'setting-write') {
+    // The caller acts on the controller's answer: an acknowledged `$X` clears
+    // the alarm latch, and an acknowledged `$13=` write is re-read to confirm
+    // the report units. Owning the exchange makes an `error:N` reject instead
+    // of looking like success once the bytes left the port (audit
+    // cnc-controller-1, regressions-1).
+    return startControllerCommand(
+      refs,
+      (line, action, writeSource) => write(line, action, writeSource ?? source),
+      {
+        kind: 'interactive-command',
+        label: command.kind === 'unlock' ? 'Unlock (clear alarm)' : 'Write controller setting',
+        command: command.wire,
+        action: actionForConsoleCommand(command.kind),
+        source,
+      },
+    );
+  }
   return write(command.wire, actionForConsoleCommand(command.kind), source);
 }
 
+// Marlin and Smoothieware answer M115 with a FIRMWARE_NAME line and then `ok`.
+// Owning the exchange attributes that identity line to the operator's query:
+// Marlin can also print FIRMWARE_NAME unprompted at boot, so an unowned one
+// still crosses the controller-reset boundary there.
 export function isOwnedControllerIdentityCommand(
   refs: { readonly driver: ControllerDriver },
   command: { readonly normalized: string },
 ): boolean {
-  return refs.driver.kind === 'marlin' && command.normalized.trim().toUpperCase() === 'M115';
+  const kind = refs.driver.kind;
+  return (
+    (kind === 'marlin' || kind === 'smoothieware') &&
+    command.normalized.trim().toUpperCase() === 'M115'
+  );
 }
 
 function actionForConsoleCommand(kind: string): LaserSafetyAction {

@@ -44,8 +44,9 @@ import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
+import type { ResetAlarmRefs } from './laser-reset-alarm';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
-import type { RxCapacityEvidence } from './laser-rx-capacity-evidence';
+import type { RxCapacityEvidence, StreamPlannerSnapshot } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
 import type { JobStopRequest } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
@@ -55,7 +56,7 @@ import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
-import type { FramedRunPermit, FramedRunStartClaim } from './framed-run';
+import type { FramedRunPermit, FramedRunStartClaim, FrameTrace } from './framed-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { LiveCanvasRun } from './canvas-motion-plan';
 import type {
@@ -79,8 +80,8 @@ import {
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
-  type StallProbe,
 } from './laser-store-helpers';
+import type { StallProbe } from './laser-stream-stall';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
@@ -216,6 +217,10 @@ export type LaserState = LaserStoreActions &
      * proof that bounds the buffered streaming window at Start (ADR-331).
      * Session-scoped; null/undefined means the controller never reported it. */
     readonly rxCapacityEvidence?: RxCapacityEvidence | null;
+    /** Planner blocks still waiting at the latest status report of the active
+     * run, for the recovery restart after a stop that discards them
+     * (planner-backlog-restart.ts). */
+    readonly streamPlannerSnapshot?: StreamPlannerSnapshot | null;
     /** The controller keeps answering status queries but has stopped
      * acknowledging the lines already sent to it. Named in the live bar and
      * logged once per episode; null while acknowledgements flow or no job
@@ -262,6 +267,12 @@ export type LaserState = LaserStoreActions &
      * Ordinary permits await Start-time review; transient candidates may carry
      * review evidence from birth. A pending candidate lives on motionOperation. */
     readonly framedRun: FramedRunPermit | null;
+    /** A clean Frame that traced the job's bounds before its exact program
+     * existed (ADR-353). Not a Start authorization: the Frame flow binds the
+     * exact program to it and mints `framedRun`, or it expires under the same
+     * drift rules as a permit. Optional so hand-built test states stay valid;
+     * absent reads as null. */
+    readonly frameTrace?: FrameTrace | null;
     /** Atomic owner while ordinary Start hands one exact permit to the store. */
     readonly framedRunStartClaim: FramedRunStartClaim | null;
     /**
@@ -302,6 +313,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
   stallProbe: StallProbe;
 } & TranscriptBufferRefs &
   ResetCleanupRefs &
+  ResetAlarmRefs &
   ConnectAttemptOwnershipRefs &
   ConnectionTeardownOwnershipRefs &
   ControllerQualificationScheduleRefs & {
@@ -402,20 +414,23 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
   };
 }
 
+/** Why a manual air command would be refused, or null. The rail disables the
+ *  Manual Air button with the same reason instead of letting a click fail
+ *  silently (audit ui-panel-6). Air OFF stays reachable during an MPG takeover. */
+export function manualAirBlockMessage(state: LaserState, enabling: boolean): string | null {
+  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  if (!enabling && state.mpgActive === true) return null;
+  return enabling
+    ? (mpgCommandBlockMessage(state) ??
+        airAssistCommandBlockMessage(state) ??
+        controllerOperationCommandBlockMessage(state.controllerOperation))
+    : (airAssistCommandBlockMessage(state) ??
+        controllerOperationCommandBlockMessage(state.controllerOperation));
+}
+
 function assertAirAssistReady(set: SetFn, get: GetFn, enabling: boolean): void {
   const state = get();
-  const takeoverFailOff = !enabling && state.mpgActive === true;
-  const blockedMessage =
-    state.connection.kind !== 'connected'
-      ? 'Connect to the laser first.'
-      : takeoverFailOff
-        ? null
-        : enabling
-          ? (mpgCommandBlockMessage(state) ??
-            airAssistCommandBlockMessage(state) ??
-            controllerOperationCommandBlockMessage(state.controllerOperation))
-          : (airAssistCommandBlockMessage(state) ??
-            controllerOperationCommandBlockMessage(state.controllerOperation));
+  const blockedMessage = manualAirBlockMessage(state, enabling);
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,

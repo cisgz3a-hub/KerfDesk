@@ -16,12 +16,22 @@ export function ReviewNumberCell(props: {
   readonly step?: number | 'any';
   readonly isInteger?: boolean;
   readonly onCommit: (next: number) => void;
+  /** Called on blur when the typed number was above `max` and got capped, so
+   * the owner can say why instead of snapping silently (F-A7). */
+  readonly onClamp?: (requested: number) => void;
 }): JSX.Element {
   const field = useDebouncedCommit<number>({
     value: props.value,
     commit: props.onCommit,
     parse: (input) => parseReviewNumber(input, props.value, props),
   });
+  const onBlur = (event: React.FocusEvent<HTMLInputElement>): void => {
+    const requested = parseEnglishDecimalInput(field.displayValue);
+    if (props.max !== undefined && requested !== null && requested > props.max) {
+      props.onClamp?.(requested);
+    }
+    field.onBlur(event);
+  };
   const errorId = `review-number-error-${props.label.replace(/[^a-z0-9]+/giu, '-').toLowerCase()}`;
   return (
     <td style={tableCellStyle}>
@@ -29,7 +39,7 @@ export function ReviewNumberCell(props: {
         aria-label={props.label}
         value={field.displayValue}
         onChange={field.onChange}
-        onBlur={field.onBlur}
+        onBlur={onBlur}
         min={props.min}
         {...(props.max === undefined ? {} : { max: props.max })}
         step={props.step ?? 1}

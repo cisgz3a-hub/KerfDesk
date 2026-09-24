@@ -35,6 +35,22 @@ export function parkTarget(group: CncGroup | undefined, finish: Vec2 | undefined
   };
 }
 
+// The modal state every KerfDesk CNC program runs in, stated in the preamble
+// and again after each tool-change hold, since a Console command or `$N`
+// startup block may have changed any of it.
+export function appendModalState(lines: string[]): void {
+  lines.push('G21');
+  lines.push('G90');
+  // G54 is KerfDesk's canonical WCS. GRBL's active G54-G59 selection is
+  // modal, so never let a stale G55-G59 redirect an otherwise valid program.
+  lines.push('G54');
+  lines.push('G94');
+  // Helical entry and adaptive clearing emit real G2/G3 with I/J offsets, which
+  // are read in the active plane. On G18/G19 an XY I/J pair is an invalid
+  // offset (error:33) and Z becomes the circular axis.
+  lines.push('G17');
+}
+
 // Between-group transitions: an M0 tool-change block when the bit changes
 // (multi-tool jobs only), else a spindle re-start when only the RPM does.
 export function appendGroupTransition(
@@ -74,6 +90,12 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, state: E
   lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${toolName}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
+  // The hold hands the machine to the operator: a Console command, a macro or a
+  // touch-off probe that stopped on its alarm (its closing G90 never runs) can
+  // leave G91, inches or another WCS behind, and `$X` does not reset them. The
+  // next line is an absolute G0 Z lift, so restate the preamble's modal state
+  // before it (controller audit streaming-3).
+  appendModalState(lines);
   // The operator physically moves the head during the pause: jogging XY over the
   // stock to touch off the new bit, and Z down onto the stock top. None of those
   // positions are the emitter's tracked park/height any more, so void all three.

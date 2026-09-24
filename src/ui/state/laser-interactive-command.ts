@@ -106,6 +106,17 @@ export type FreshIdleWaitOptions = {
 const DEFAULT_COMMAND_TIMEOUT_MS = 8_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 8_000;
 
+/** The controller answered the owned line with a terminal `error:N`. GRBL-family
+ * firmware returns it when the line fails to parse or validate, before running
+ * it, so the line itself caused no motion. Distinct from ALARM, timeout and
+ * cancellation, after which the machine state is uncertain. */
+export class ControllerCommandRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ControllerCommandRefusedError';
+  }
+}
+
 type ControllerCommandTimeoutMode = 'fixed' | 'non-idle-status-activity';
 export type ControllerCommandCompletion = 'terminal' | 'terminal-and-idle';
 
@@ -215,7 +226,9 @@ function rejectCommandFromTerminalResponse(
       refs,
       request,
       'reject',
-      response.raw ?? (response.code === null ? 'error' : `error:${response.code}`),
+      new ControllerCommandRefusedError(
+        response.raw ?? (response.code === null ? 'error' : `error:${response.code}`),
+      ),
     );
     return true;
   }
@@ -361,12 +374,13 @@ function finishControllerCommand(
   refs: ControllerLifecycleRefs,
   request: ControllerCommandRequest,
   mode: 'resolve' | 'reject',
-  message?: string,
+  message?: string | Error,
 ): void {
   if (refs.controllerCommand !== request) return;
   refs.controllerCommand = null;
   clearTimeout(request.timer);
   if (mode === 'resolve') request.resolve([...request.responses]);
+  else if (message instanceof Error) request.reject(message);
   else request.reject(new Error(message ?? `${request.label} failed.`));
 }
 

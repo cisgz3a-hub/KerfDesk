@@ -103,6 +103,8 @@ describe('manual laser restart preview', () => {
       source.laserModeStartSnapshot,
       undefined,
       source.controllerSnapshot,
+      // Where the restart is anchored, for its confirmation (audit recovery-4).
+      expect.stringContaining('Placement:'),
     );
     const [project, gcode, , plan, , , controller] =
       vi.mocked(streamResumeFromRawLine).mock.calls[0]!;

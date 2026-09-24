@@ -14,6 +14,7 @@ import {
   EXPECTED_HEARTBEAT_TIMEOUT_MS,
   EXPECTED_MAX_TIMEOUT_MS,
   flushPromises,
+  GRBLHAL_RESUMING_STATUS,
   jobWriteCount,
   LONG_RESTORE_PROGRESS_MS,
   makeConnectionHarness,
@@ -99,6 +100,38 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
     harness.emitStatus(RUN_STATUS);
     await flushPromises();
     expect(jobWriteCount(harness.writes)).toBe(1);
+  });
+
+  it('keeps Resume alive through the grblHAL Door:4 spindle restore and refills after Run', async () => {
+    const harness = makeConnectionHarness();
+    await connectAndStartCnc(harness);
+    await pauseAtSettledDoor(harness);
+    await releaseHeldStreamCapacity(harness);
+    harness.setResumeStatus(GRBLHAL_RESUMING_STATUS);
+    harness.writes.length = 0;
+    vi.useFakeTimers();
+
+    const resume = useLaserStore.getState().resumeJob();
+    const observed = observeOutcome(resume);
+    await flushPromises();
+    // grblHAL's stock $392 spindle-on delay is 4.0 s, reported as Door:4.
+    await advanceWithFreshStatus(
+      harness,
+      GRBLHAL_RESUMING_STATUS,
+      STOCK_SPINDLE_RESTORE_PROGRESS_MS,
+    );
+
+    expect(observed.result()).toBe('pending');
+    expect(useLaserStore.getState().statusReport).toMatchObject({ state: 'Door', subState: 4 });
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(jobWriteCount(harness.writes)).toBe(0);
+
+    harness.emitStatus(RUN_STATUS);
+    await resume;
+    expect(observed.result()).toBe('resolved');
+    expect(jobWriteCount(harness.writes)).toBe(1);
+    expect(harness.writes).not.toContain(RT_SOFT_RESET);
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
   });
 
   it('keeps a longer live Door:3 restore pending beyond the old eight-second status wait', async () => {

@@ -4,8 +4,10 @@
 // The rule the whole design rests on: exactly one side writes refills, and the
 // handover happens only through the transport's acknowledged handshake. So
 // every store action that changes the stream's status — pause, resume, tool
-// change, abort — takes the refill back FIRST, and `advanceStream` writes
-// nothing while the worker holds it.
+// change — takes the refill back FIRST, and `advanceStream` writes nothing
+// while the worker holds it. Abort posts its realtime reset first: the worker
+// retires its refill on that write, and the release follows only to bound a
+// silent worker.
 //
 // Everything else is unchanged. The worker forwards every line, so the
 // acknowledgement ledger, the safety handlers and the streamer state on this
@@ -48,7 +50,8 @@ export async function armHostedRefill(
 /**
  * Take the refill back and wait for the transport to confirm. Every caller
  * that is about to change the stream's status must await this, or the two
- * sides would briefly disagree about who writes next.
+ * sides would briefly disagree about who writes next. The one exception is a
+ * realtime reset, which the worker treats as its own release.
  */
 export async function releaseHostedRefill(refs: ConnectionRefs): Promise<void> {
   const refill = hostedRefill(refs);

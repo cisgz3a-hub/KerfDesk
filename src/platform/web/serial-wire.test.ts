@@ -1,16 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { extractSerialLines, MAX_SERIAL_LINE_LENGTH } from './serial-wire';
 
+// The framing invariants hold after EVERY read: the buffer never outgrows one
+// record plus its CR, and discard mode never buffers. They are checked with
+// plain comparisons per read and asserted once at the end. One `expect` per
+// read made the one-character partition (about 262,000 reads) take ~4.4 s on
+// its own and time out under load, for the same proof.
 function readChunks(chunks: ReadonlyArray<string>): ReadonlyArray<string> {
   let state = { buffer: '', discarding: false };
   const lines: string[] = [];
+  let largestBuffer = 0;
+  let bufferedWhileDiscarding = false;
   for (const chunk of chunks) {
     const result = extractSerialLines(state, chunk);
     state = result.state;
     lines.push(...result.lines);
-    expect(state.buffer.length).toBeLessThanOrEqual(MAX_SERIAL_LINE_LENGTH + 1);
-    if (state.discarding) expect(state.buffer).toBe('');
+    largestBuffer = Math.max(largestBuffer, state.buffer.length);
+    if (state.discarding && state.buffer !== '') bufferedWhileDiscarding = true;
   }
+  expect(largestBuffer).toBeLessThanOrEqual(MAX_SERIAL_LINE_LENGTH + 1);
+  expect(bufferedWhileDiscarding).toBe(false);
   return lines;
 }
 

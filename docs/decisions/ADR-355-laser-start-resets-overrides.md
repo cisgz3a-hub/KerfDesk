@@ -37,13 +37,16 @@ The operator chose the behaviour: every new laser job starts at 100%.
 1. **A laser Start resets feed, rapid and power overrides to 100%** when the
    controller reports anything else, or has not reported `Ov:` yet this session
    and so cannot be proved to be at 100%. Known-baseline values send nothing.
-2. **The reset rides the first program write.** The three GRBL realtime bytes
-   (`0x90` feed reset, `0x95` rapid 100%, `0x99` spindle reset) are prepended to
-   the same write as the program's first window. GRBL acts on realtime bytes on
-   arrival and never stores them in its receive buffer, so they cost no RX
-   budget, the streamer does not charge them to its in-flight accounting, and
-   they cannot reorder behind a queued line. The decision is made after every
-   refusal point, so **a refused Start sends nothing at all**.
+2. **The reset goes out just ahead of the first program window.** The three
+   GRBL realtime bytes (`0x90` feed reset, `0x95` rapid 100%, `0x99` spindle
+   reset) are their own write, with no newline, immediately before the
+   program's first window: a queued line may not carry a byte above 0x7F
+   (ADR-361, audit transport-2). GRBL acts on realtime bytes on arrival and
+   never stores them in its receive buffer, so they cost no RX budget, owe no
+   acknowledgement, are not charged to the streamer's in-flight accounting, and
+   cannot reorder behind a queued line. The decision is made after every
+   refusal point, and the reset is held back when the window itself cannot go
+   on the wire, so **a refused Start sends nothing at all**.
 3. **Only Start resets.** Pause/Resume never pass through Start, so
    adjustments made during a job stay in effect for that job. Every laser
    stream that does pass through Start resets: ordinary framed runs, recovery

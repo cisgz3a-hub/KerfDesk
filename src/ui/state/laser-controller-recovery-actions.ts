@@ -76,6 +76,7 @@ export function controllerRecoveryActions(
               : 'none',
           frameVerification: null,
           framedRun: null,
+          frameTrace: null,
           motionOperation: null,
           controllerOperation: { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 },
           homingState: 'unknown',

@@ -32,6 +32,7 @@ import {
 } from './start-job-checkpoint-policy';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
+import { noteManualRestartStarted, prepareManualRestartSource } from './manual-restart-source';
 import {
   completedReceiptIsCurrent,
   replayCompilationMatches,
@@ -348,9 +349,11 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     jobAwareAlert(`Cannot resume CNC job:\n\n${CNC_AUTOMATIC_RECOVERY_DISABLED_REASON}`);
     return;
   }
-  const prepared = await prepareRecoverySource();
-  if (prepared === null) return;
-  await streamResumeFromRawLine(
+  // The newest run's own placement, not the stopped head (audit recovery-4).
+  const restart = await prepareManualRestartSource();
+  if (restart === null) return;
+  const prepared = restart.source;
+  const started = await streamResumeFromRawLine(
     prepared.project,
     prepared.gcode,
     fromLine,
@@ -358,7 +361,9 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     prepared.laserModeStartSnapshot,
     undefined,
     prepared.controllerSnapshot,
+    restart.placementNote,
   );
+  if (started) noteManualRestartStarted(restart);
 }
 
 // Resume the checkpointed interrupted job (ADR-118): re-compile the project,

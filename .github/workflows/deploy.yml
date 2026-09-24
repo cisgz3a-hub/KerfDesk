@@ -1,5 +1,11 @@
 name: Deploy to Cloudflare Pages
 
+# A workflow_run deploy runs on the default branch, so the run list would show
+# main's tip at trigger time, not the commit CI validated; name the run after
+# the candidate so the list says what each run was deciding about (ADR-360).
+run-name: >-
+  Deploy ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
 # Runs AFTER the CI workflow succeeds on main (R-H5 audit fix —
 # previously deploy ran in parallel with CI, so a commit that broke
 # tests / lint but built cleanly would publish). Manual trigger from
@@ -30,6 +36,9 @@ concurrency:
 # from reusing the web-deploy token for R2.
 permissions:
   contents: read
+  # Read-only: the candidate phase lists successful main CI runs and manual
+  # production deploys to find a newer verified commit (ADR-360).
+  actions: read
 
 jobs:
   deploy:
@@ -38,7 +47,10 @@ jobs:
     # workflow_run fires for EVERY CI completion (success + failure).
     # Manual dispatches are production deploys, so the selected ref must
     # be main and the job still re-runs the shared release gate below.
-    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    # Only a push to main is a production candidate: `branches: [main]`
+    # matches a triggering run's head branch, which a fork PR can also name
+    # main (ADR-360).
+    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -48,8 +60,11 @@ jobs:
           # a push race (or a re-run of an old green CI) would deploy a
           # different commit than the one validated. Pin the checkout to the
           # triggering run's head SHA. Manual dispatch has no historical-ref
-          # input: it always checks out current main and re-proves it below.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'refs/heads/main' }}
+          # input: it checks out main as it was when dispatched (github.sha),
+          # so the run records the tree it builds; if main moved while it
+          # queued, the resolver no-ops it instead of building a newer tip
+          # than its own record (ADR-360).
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           # Fetch full history so the version badge's `git rev-list --count
           # HEAD` (the auto build number, see vite.config.ts appVersion) is the
           # real total, not the shallow-clone 1. `git rev-parse --short HEAD`
@@ -75,6 +90,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW_CONTROL_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
@@ -82,12 +98,57 @@ jobs:
           git merge-base --is-ancestor "${WORKFLOW_CONTROL_SHA}" refs/remotes/origin/main
           git show "${WORKFLOW_CONTROL_SHA}:scripts/resolve-web-deploy-identity.mjs" \
             > "${control_resolver}"
+          git show "${WORKFLOW_CONTROL_SHA}:scripts/list-reverted-in-candidate.mjs" \
+            > "${RUNNER_TEMP}/list-reverted-in-candidate.mjs"
+          checkout_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git rev-parse refs/remotes/origin/main)"
+          evidence="${RUNNER_TEMP}/deploy-evidence"
+          mkdir -p "${evidence}"
+          if git merge-base --is-ancestor "${checkout_sha}" "${current_main_sha}"; then
+            checkout_on_main=true
+          else
+            checkout_on_main=false
+          fi
+          # ADR-360: main's CI verifies one commit at a time, so any merge during
+          # a run leaves the verified commit behind the tip. It still builds if
+          # no newer commit on main has passed CI or been published, and main
+          # has not reverted anything it contains. The tip and a manual dispatch
+          # need no lookup; the resolver throws if a list it needs was not written.
+          if [ "${EVENT_NAME}" = workflow_run ] && [ "${checkout_sha}" != "${current_main_sha}" ] && [ "${checkout_on_main}" = true ]; then
+            git rev-list "${checkout_sha}..${current_main_sha}" > "${evidence}/newer-main-commits.txt"
+            # Newer commits whose push CI on main passed: their own runs publish them.
+            gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+              -f branch=main -f event=push -f status=success -f per_page=100 \
+              --jq '.workflow_runs[].head_sha' > "${evidence}/verified-shas.txt"
+            # Newer commits a deploy actually published: run-name "Deploy <sha>"
+            # and a successful publish step in any attempt, however the run ended
+            # and whatever triggered it.
+            gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/runs" \
+              -f status=completed -f per_page=100 \
+              --jq '.workflow_runs[] | select(.conclusion != "skipped") | "\(.id) \(.display_title)"' |
+              while read -r run_id title; do
+                published_sha="${title#Deploy }"
+                if grep -qxF "${published_sha}" "${evidence}/newer-main-commits.txt"; then
+                  published_steps="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" \
+                    -f filter=all --jq '[.jobs[].steps[]? | select(.name == "Publish to Cloudflare Pages" and .conclusion == "success")] | length')"
+                  if [ "${published_steps}" != "0" ]; then echo "${published_sha}"; fi
+                fi
+              done >> "${evidence}/verified-shas.txt"
+            # A revert adds a commit, so a reverted tree is still on main.
+            node "${RUNNER_TEMP}/list-reverted-in-candidate.mjs" \
+              --candidate="${checkout_sha}" --main="${current_main_sha}" \
+              --output="${evidence}/reverted-in-candidate.txt"
+          fi
           node "${control_resolver}" \
             --event-name="${EVENT_NAME}" \
             --phase=candidate \
-            --checkout-sha="$(git rev-parse HEAD)" \
-            --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
+            --checkout-sha="${checkout_sha}" \
+            --current-main-sha="${current_main_sha}" \
             --validated-sha="${VALIDATED_SHA}" \
+            --checkout-on-main="${checkout_on_main}" \
+            --newer-main-commits-file="${evidence}/newer-main-commits.txt" \
+            --verified-shas-file="${evidence}/verified-shas.txt" \
+            --reverted-in-candidate-file="${evidence}/reverted-in-candidate.txt" \
             --github-output="${GITHUB_OUTPUT}"
 
       - name: Record obsolete run as an intentional non-deployment
@@ -97,6 +158,8 @@ jobs:
           DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
           FRESHNESS_REASON: ${{ steps.deployment_identity.outputs.reason }}
         run: |
+          # A skipped publication still ends green; the annotation keeps it visible.
+          echo "::notice title=Production not published::${FRESHNESS_REASON}"
           {
             echo '### Production deployment skipped'
             echo
@@ -141,6 +204,11 @@ jobs:
           else
             checkout_on_main=false
           fi
+          # ADR-360: a revert merged during the gate withholds the reverted tree.
+          reverted_in_candidate="${RUNNER_TEMP}/reverted-at-publication.txt"
+          node "${RUNNER_TEMP}/list-reverted-in-candidate.mjs" \
+            --candidate="${DEPLOY_SHA}" --main=refs/remotes/origin/main \
+            --output="${reverted_in_candidate}"
           node "${RUNNER_TEMP}/resolve-web-deploy-identity.mjs" \
             --event-name="${EVENT_NAME}" \
             --phase=publication \
@@ -148,6 +216,7 @@ jobs:
             --current-main-sha="$(git rev-parse refs/remotes/origin/main)" \
             --validated-sha="${VALIDATED_SHA}" \
             --checkout-on-main="${checkout_on_main}" \
+            --reverted-in-candidate-file="${reverted_in_candidate}" \
             --github-output="${GITHUB_OUTPUT}"
 
       - name: Record a commit that left main as a non-deployment
@@ -157,6 +226,7 @@ jobs:
           DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
           FRESHNESS_REASON: ${{ steps.pre_publish_identity.outputs.reason }}
         run: |
+          echo "::notice title=Production not published::${FRESHNESS_REASON}"
           {
             echo '### Production deployment skipped after verification'
             echo
@@ -164,7 +234,7 @@ jobs:
             echo
             echo "${FRESHNESS_REASON}"
             echo
-            echo 'The verified commit is no longer on main, so no provider command was executed.'
+            echo 'The verified commit left main or main reverted it, so no provider command was executed.'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish to Cloudflare Pages

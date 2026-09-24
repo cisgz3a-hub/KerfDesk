@@ -1,5 +1,9 @@
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { framedRunControllerSnapshot, type FramedRunCandidate } from './framed-run';
+import {
+  framedRunControllerSnapshot,
+  type FramedRunCandidate,
+  type FrameTraceCandidate,
+} from './framed-run';
 import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
 
@@ -132,4 +136,12 @@ export function framedRunCandidate(): FramedRunCandidate {
     },
     controllerBeforeFrame: framedRunControllerSnapshot(useLaserStore.getState()),
   } as FramedRunCandidate;
+}
+
+/** The split-Frame counterpart: the same partial shape, marked deferred. */
+export function frameTraceCandidate(): FrameTraceCandidate {
+  const { preparedStart, review, ...rest } = framedRunCandidate();
+  void preparedStart;
+  void review;
+  return { ...rest, exactProgram: 'deferred' };
 }
