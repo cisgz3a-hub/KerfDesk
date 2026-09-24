@@ -1,6 +1,5 @@
 // AutofocusEditor — textarea + one-click presets for the user's
-// autofocus command. Extracted from DeviceSettings.tsx so the
-// parent stays under the 400-line hard cap (F-1 audit finding).
+// autofocus command, shown in Machine Setup's Options step.
 //
 // Single-click presets for the autofocus command. Each preset is one
 // controller line the runtime can execute; users on something else either
