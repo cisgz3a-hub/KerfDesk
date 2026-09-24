@@ -71,6 +71,7 @@ import {
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
+import { laserStartOverrideReset } from './laser-start-override-reset';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
@@ -136,7 +137,7 @@ async function runStartJob(
   const { set, get, safeWrite } = context;
   assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
-  const setupEpoch = captureStartSetupEpoch(get());
+  const setupEpoch: StartSetupEpoch = cncControllerEpochOf(get());
   const completion = createStartArmingCompletion(context);
   set({
     controllerOperation: { kind: 'start-arming', phase: 'queue-fence' },
@@ -151,6 +152,7 @@ async function runStartJob(
     options.assertFinalStartAuthorized?.();
     completion.assertCurrent();
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
+    const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-355
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
@@ -181,9 +183,9 @@ async function runStartJob(
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
     try {
-      await safeWrite(stepped.toSend, 'start');
+      await overrideReset.send(stepped.toSend, safeWrite, completion.ownsCurrent);
       if (!completion.ownsCurrent()) return;
-      set((state) => liveCanvasExecutionAcceptedPatch(state));
+      set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
       // The first window is on the wire and accounted for, so the transport
       // may take the refill from here (ADR-334). A transport that cannot host
       // it, or a stream that is no longer simply streaming, is a no-op.
@@ -401,10 +403,6 @@ function assertStartAllowed(set: SetFn, get: GetFn, allowStartArming = false): v
     });
     throw new Error(blockedMessage);
   }
-}
-
-function captureStartSetupEpoch(state: LaserState): StartSetupEpoch {
-  return cncControllerEpochOf(state);
 }
 
 function assertStartReservation(get: GetFn, expected: StartSetupEpoch): void {

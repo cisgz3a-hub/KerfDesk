@@ -156,7 +156,11 @@ describe.each([FALCON_COMPATIBLE_PROFILE, FALCON_A1_PRO_GRBLHAL_PROFILE])(
         await vi.advanceTimersByTimeAsync(12000);
         await starting;
         await vi.advanceTimersByTimeAsync(5000);
-        const wire = sim.outbound().slice(startWriteIndex).join('').replaceAll('?', '');
+        // GRBL drops realtime bytes before its line buffer: the '?' status
+        // polls and the 0x80+ override resets a laser Start sends first (ADR-355).
+        const wire = [...sim.outbound().slice(startWriteIndex).join('')]
+          .filter((character) => character !== '?' && character.charCodeAt(0) < 0x80)
+          .join('');
         const expectedCommands = permit.candidate.preparedStart.gcode
           .split(/\r?\n/)
           .map((line) =>
