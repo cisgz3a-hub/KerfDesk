@@ -16,10 +16,12 @@ import { applyRasterizedTraceToExisting } from './rasterized-trace-mutation';
 import {
   applyFreshImport,
   applyTraceToExisting,
+  type ImportOutcome,
   type MutationResult,
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
+import { applyImportBedFit } from './import-bed-fit';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
 import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
@@ -45,7 +47,7 @@ export function imageImportActions(
   set: ImportSet,
   get: () => ProjectSlice,
 ): {
-  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
+  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly traceExistingImage: (
     sourceId: string,
     traced: TracedImage,
@@ -60,11 +62,19 @@ export function imageImportActions(
 } {
   return {
     importRasterImage: (object, batchIdx) => {
+      let outcome: ImportOutcome = { kind: 'added' };
       // batchIdx staggers multi-image drops by 10 mm each (F-A3); a single
       // import or the toolbar picker passes nothing → 0.
-      set((s) => withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)));
+      set((s) => {
+        const fitted = applyImportBedFit(
+          withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)),
+        );
+        outcome = fitted.outcome;
+        return fitted.state;
+      });
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
+      return outcome;
     },
     traceExistingImage: (sourceId, traced, options) => {
       set((s) =>

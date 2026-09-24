@@ -33,6 +33,7 @@ import {
   type TextInsertOptions,
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
+import { applyImportBedFit } from './import-bed-fit';
 import {
   applyAddRegistrationBox,
   applyRemoveRegistrationBox,
@@ -110,17 +111,22 @@ export function objectInsertActions(
 
 function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObject'] {
   return (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
+    let outcome: ImportOutcome = { kind: 'added' };
     set((state) => {
-      return applyLayerDefaultsToFreshLayers(
-        state.project.scene.layers,
-        applyFreshImport(state, object, batchOffsetIdx),
-        state.layerDefaults,
-        state.cncLiveCaps,
+      const fitted = applyImportBedFit(
+        applyLayerDefaultsToFreshLayers(
+          state.project.scene.layers,
+          applyFreshImport(state, object, batchOffsetIdx),
+          state.layerDefaults,
+          state.cncLiveCaps,
+        ),
       );
+      outcome = fitted.outcome;
+      return fitted.state;
     });
     // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
     fitAllObjects(get);
-    return { kind: 'added' };
+    return outcome;
   };
 }
 

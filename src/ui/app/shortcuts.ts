@@ -37,7 +37,7 @@ export type FileCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
-  readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => void;
+  readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
   readonly newProject: () => void;
   readonly projectDocumentEpoch: number;

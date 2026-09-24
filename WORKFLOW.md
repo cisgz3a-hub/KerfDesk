@@ -182,10 +182,18 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 2. Toast (warning): `<filename> has no drawable content`. No state change.
 
 #### Edge — SVG is larger than the machine bed
-1. After import, the object's bounding box is checked against bed dimensions.
-2. If any part is outside bed: warning toast `Design extends beyond bed. Resize or reposition before generating G-code.`
-3. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
-4. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
+1. Art that fits the bed keeps its file size, including art exactly the bed size. Only an import
+   larger than the bed in either axis is scaled down, uniformly, to fit inside 90% of the bed,
+   centered (a staggered multi-file import keeps its 10 mm offset). The margin keeps the scaled
+   outline clear of the bed edges for overscan, kerf, and Frame.
+2. A warning toast, after the import's other toasts, reports it:
+   `design.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% to fit. Undo restores the original size.`
+   DXF, image, and STL imports follow the same rule and notice; a height-map relief keeps its
+   authored size and is only centered.
+3. The scale-to-fit is its own undo step: the first Undo returns the design to its file size,
+   centered and extending past the bed; a second Undo removes the import.
+4. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
+5. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
 
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
@@ -2494,6 +2502,7 @@ correct M4-mode raster G-code from Compile.
 2. App decodes the image, computes intrinsic mm-bounds from the
    image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
    ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
+   An image larger than the bed is scaled down to fit, with a warning (F-A3).
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)
@@ -3500,7 +3509,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at 100 mm wide (height by aspect),
    5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count. The
+   layer created automatically. Toast reports the triangle count; a relief
+   larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
 3. The canvas shows the relief as a grayscale depth map — light = stock

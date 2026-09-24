@@ -105,4 +105,24 @@ describe('hasOutOfBoundsObjects', () => {
     });
     expect(hasOutOfBoundsObjects(project)).toBe(false);
   });
+
+  it('reads float noise at the edge of bed-sized art as on the bed', () => {
+    // Centering 12.3..412.3 mm art on the 400 mm bed lands its left edge at
+    // about -4e-15 mm; a real 0.001 mm overhang still counts.
+    const bedSized = (x: number): SceneObject =>
+      rasterObject({
+        bounds: { minX: 12.3, minY: 0, maxX: 412.3, maxY: 100 },
+        transform: { ...IDENTITY_TRANSFORM, x, y: 150 },
+      } as Partial<SceneObject>);
+    const layers = [createLayer({ id: 'img', color: '#808080', mode: 'image' })];
+    const centeredX = 200 - (12.3 + 412.3) / 2;
+    expect(12.3 + centeredX).toBeLessThan(0);
+
+    expect(hasOutOfBoundsObjects(projectWith({ objects: [bedSized(centeredX)], layers }))).toBe(
+      false,
+    );
+    expect(
+      hasOutOfBoundsObjects(projectWith({ objects: [bedSized(centeredX - 0.001)], layers })),
+    ).toBe(true);
+  });
 });

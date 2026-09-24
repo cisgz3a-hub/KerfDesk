@@ -14,7 +14,7 @@ export function editImageAction(
   selected: SceneObject | null,
   getProjectDocumentEpoch: () => number,
   importSvgObject: (object: SceneObject, batchIndex?: number) => ImportOutcome,
-  importRasterImage: (object: SceneObject) => void,
+  importRasterImage: (object: SceneObject) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): () => void {
   const documentEpoch = getProjectDocumentEpoch();
