@@ -34,6 +34,7 @@ import {
 } from './laser-store-helpers';
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
+import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import {
   homeAlarmReplyWindowPatch,
   isStaleHomeAlarmReply,
@@ -113,7 +114,7 @@ export function handleStatusLine(
     ...mpgOwnershipPatch(report, state),
     ...operationPatch,
     ...autofocusRecoveryPatch,
-    ...homeAlarmReplyWindowPatch(state, report),
+    ...nonAlarmReportPatch(state, report),
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
     ...liveCanvasStatusCompletionPatch(state, report, streamer, jobOverAtIdle),
@@ -231,6 +232,19 @@ function observeStatusConsumers(
   );
 }
 
+// A report that is not Alarm or Sleep closes the Home stale-reply window, and
+// whatever raised the last ALARM:N is over, even when the unlock came from a
+// pendant or another sender (audit streaming-4).
+function nonAlarmReportPatch(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'controllerOperation' | 'alarmCode'>> {
+  return {
+    ...homeAlarmReplyWindowPatch(state, report),
+    ...(state.alarmCode === null ? {} : { alarmCode: null }),
+  };
+}
+
 function isInvalidatingStatusState(state: string): boolean {
   return state === 'Alarm' || state === 'Sleep';
 }
@@ -243,12 +257,15 @@ function handleInvalidatingStatus(
   streamer: StreamerState | null,
 ): void {
   const alarm = report.state === 'Alarm';
+  // The Alarm report that follows a missed touch-off probe keeps the held job
+  // its ALARM:4/5 kept (tool-change-probe-alarm.ts).
+  const keepToolChangeHold = alarm && isProbeAlarmedToolChangeHold(state);
   advanceWriteEpoch(refs);
   set({
     statusReport: report,
     statusSequence: state.statusSequence + 1,
     statusObservation: null,
-    ...cancelActiveStreamerPatch(streamer),
+    ...(keepToolChangeHold ? {} : cancelActiveStreamerPatch(streamer)),
     ...(alarm ? {} : { alarmCode: null }),
     wcoCache: null,
     ovCache: null,
@@ -271,7 +288,7 @@ function handleInvalidatingStatus(
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
-    ...liveCanvasLifecyclePatchForInvalidation(state, alarm),
+    ...(keepToolChangeHold ? {} : liveCanvasLifecyclePatchForInvalidation(state, alarm)),
   });
   cancelControllerLifecycleRefs(refs, `Controller entered ${alarm ? 'Alarm' : 'Sleep'}.`);
 }

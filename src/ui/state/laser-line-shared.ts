@@ -6,6 +6,7 @@ import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import type { ControllerQualificationScheduleRefs } from './laser-controller-qualification';
+import type { ResetAlarmRefs } from './laser-reset-alarm';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -15,7 +16,8 @@ import type { TranscriptSource } from './laser-transcript';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 
 export type HandlerRefs = ControllerLifecycleRefs &
-  ResetCleanupRefs & {
+  ResetCleanupRefs &
+  ResetAlarmRefs & {
     // Active firmware driver — classification and follow-up command bytes come
     // from here so this pipeline stays firmware-neutral (ADR-094).
     driver: ControllerDriver;

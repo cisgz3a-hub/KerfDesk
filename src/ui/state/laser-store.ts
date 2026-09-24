@@ -44,6 +44,7 @@ import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
+import type { ResetAlarmRefs } from './laser-reset-alarm';
 import type { ActiveStreamHeartbeatProbe } from './laser-stream-heartbeat';
 import type { RxCapacityEvidence } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
@@ -308,6 +309,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
   stallProbe: StallProbe;
 } & TranscriptBufferRefs &
   ResetCleanupRefs &
+  ResetAlarmRefs &
   ConnectAttemptOwnershipRefs &
   ConnectionTeardownOwnershipRefs &
   ControllerQualificationScheduleRefs & {
