@@ -66,31 +66,33 @@ afterEach(() => {
 });
 
 describe('Workspace job dock', () => {
-  it('routes Frame and setup-and-Frame to the existing independent handlers', () => {
+  it('routes Frame to its handler and leaves Start greyed out until a Frame completes', () => {
     connectIdle();
     render(<WorkspaceJobActions />);
 
+    expect(button('Start').disabled).toBe(true);
     act(() => button('Frame job').click());
     expect(calls.frame).toHaveBeenCalledOnce();
+    // A disabled Start never runs anything, and Start never Frames on its own.
+    act(() => button('Start').click());
     expect(calls.start).not.toHaveBeenCalled();
-
-    act(() => button('Set up & Frame').click());
-    expect(calls.start).toHaveBeenCalledOnce();
-    expect(calls.frame).toHaveBeenCalledOnce();
+    expect(host.textContent).toContain('Not framed — Frame this job to unlock Start');
   });
 
-  it('preserves disconnected and missing-Idle button states without adding a Start policy gate', () => {
+  it('keeps Start greyed out until a Frame completes, whatever the connection state', () => {
     render(<WorkspaceJobActions />);
     expect(button('Frame job').disabled).toBe(true);
-    expect(button('Set up & Frame').disabled).toBe(true);
+    expect(button('Start').disabled).toBe(true);
 
     act(() => useLaserStore.setState({ connection: { kind: 'connected' } }));
     expect(button('Frame job').disabled).toBe(true);
     expect(button('Frame job').title).toContain('Wait for an Idle');
-    expect(button('Set up & Frame').disabled).toBe(false);
+    expect(button('Start').disabled).toBe(true);
+    expect(button('Start').title).toContain('Start unlocks when a Frame of this exact job');
 
     act(() => useLaserStore.setState({ statusReport: idleControllerStatusForFrameTest() }));
     expect(button('Frame job').disabled).toBe(false);
+    expect(button('Start').disabled).toBe(true);
   });
 
   it.each(['streaming', 'paused', 'tool-change', 'errored', 'done'] as const)(
@@ -101,7 +103,7 @@ describe('Workspace job dock', () => {
       render(<WorkspaceJobActions />);
 
       expect(button('Frame job').disabled).toBe(true);
-      expect(button('Set up & Frame').disabled).toBe(true);
+      expect(button('Start').disabled).toBe(true);
       expect(labels()).not.toContain('Pause');
       expect(labels()).not.toContain('ABORT JOB');
     },
@@ -144,15 +146,15 @@ describe('Workspace job dock', () => {
     await installReviewPendingFramedRunPermitForCurrentState();
     render(<WorkspaceJobActions />);
 
-    expect(button('Start framed job').disabled).toBe(false);
+    expect(button('Start').disabled).toBe(false);
     expect(button('Frame again').disabled).toBe(false);
     expect(host.textContent).toContain('Ready to start — framed job unchanged');
-    act(() => button('Start framed job').click());
+    act(() => button('Start').click());
     expect(calls.start).toHaveBeenCalledOnce();
 
     act(() => useStore.getState().setJobPlacement({ startFrom: 'current-position' }));
-    expect(labels()).not.toContain('Start framed job');
-    expect(button('Set up & Frame').disabled).toBe(false);
+    expect(button('Start').disabled).toBe(true);
+    expect(button('Frame job').disabled).toBe(false);
     expect(host.textContent).toContain('Frame expired');
   });
 
@@ -166,7 +168,7 @@ describe('Workspace job dock', () => {
     );
 
     expect(labels().filter((label) => label === 'Frame job')).toHaveLength(1);
-    expect(labels().filter((label) => label === 'Set up & Frame')).toHaveLength(1);
+    expect(labels().filter((label) => label === 'Start')).toHaveLength(1);
     expect(calls.estimate).toHaveBeenCalledOnce();
     expect(labels()).toEqual(
       expect.arrayContaining([
@@ -195,7 +197,7 @@ describe('Workspace job dock', () => {
     render(<LaserWindow />);
 
     expect(labels()).toContain('Frame job');
-    expect(labels()).toContain('Set up & Frame');
+    expect(labels()).toContain('Start');
     expect(calls.estimate).toHaveBeenCalledOnce();
     expect(host.querySelector('[aria-label="Job actions"]')).toBeNull();
   });
@@ -261,5 +263,5 @@ function labels(): string[] {
 
 function expectActionsDisabled(): void {
   expect(button('Frame job').disabled).toBe(true);
-  expect(button('Set up & Frame').disabled).toBe(true);
+  expect(button('Start').disabled).toBe(true);
 }

@@ -25,17 +25,17 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
         title: 'Complete the physical Frame',
         examplePhase: 0,
         instruction:
-          'On the real machine, choose Frame job or Set up & Frame and watch the full generated motion envelope with the tool off. Wait for Frame to complete successfully.',
+          'On the real machine, choose Frame job and watch the full generated motion envelope with the tool off. Wait for Frame to complete successfully; Start stays greyed out until it does.',
         focus: 'Frame job',
         result:
-          'A completed Frame authorises the exact prepared job. An interrupted Frame does not.',
+          'A completed Frame authorises the exact prepared job and unlocks Start. An interrupted Frame does not.',
       },
       {
         title: 'Open Job Review at Start',
         examplePhase: 1,
         instruction:
-          'Choose Start framed job. Job Review opens with the prepared job, operation values and warnings. Read those warnings and check that the physical workpiece and clearance match your intended run.',
-        focus: 'Start framed job → Job Review',
+          'Choose Start. Job Review opens with the prepared job, operation values and warnings. Read those warnings and check that the physical workpiece and clearance match your intended run.',
+        focus: 'Start → Job Review',
         result: 'The review is shown at Start; ordinary Frame does not open this review dialog.',
         visual: 'frame',
       },

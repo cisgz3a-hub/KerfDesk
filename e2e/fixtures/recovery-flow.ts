@@ -200,7 +200,7 @@ export async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Pr
   await expect
     .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
     .toContain('$J=G90 G21');
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
 }
 
 export async function confirmJobReview(

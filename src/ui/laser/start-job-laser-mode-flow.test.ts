@@ -25,6 +25,7 @@ import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { captureJobReviewModels, installAutoJobReview, useJobReviewStore } from './job-review';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from './laser-mode-start-acknowledgement';
 import { runStartFromLineFlow, runStartJobFlow } from './start-job-flow';
+import { runFrameNow } from './use-frame-action';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -185,9 +186,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     useLaserStore.setState({ framedRun: null, frameVerification: null });
     const review = captureJobReviewModels();
 
-    // First press performs the dialog-free watched Frame. The deliberate second
-    // press opens the single review and consumes the exact completion-issued artifact.
-    await runStartJobFlow(recoveryHarness());
+    // The dialog-free watched Frame is its own step. Start then opens the
+    // single review and consumes the exact completion-issued artifact.
+    await runFrameNow();
     await runStartJobFlow(recoveryHarness());
 
     review.stop();
@@ -216,9 +217,9 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     reviewChoice = 'cancel';
     const review = captureJobReviewModels();
 
-    // ADR-237: the first press Frames dialog-free; the second opens the
-    // Start review carrying the unknown-$32 acknowledgement, then cancels.
-    await runStartJobFlow(recoveryHarness());
+    // ADR-237: Frame runs dialog-free; Start opens the review carrying the
+    // unknown-$32 acknowledgement, then cancels.
+    await runFrameNow();
     await runStartJobFlow(recoveryHarness());
 
     review.stop();

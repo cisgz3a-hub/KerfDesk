@@ -43,7 +43,7 @@ test('routine controls stay visible while setup, history, and Learn remain reach
   mkdirSync(evidence, { recursive: true });
   await page.screenshot({ path: `${evidence}/machine-after.png` });
   await page.setViewportSize({ width: 640, height: 450 });
-  const start = page.getByRole('button', { name: 'Set up & Frame', exact: true });
+  const start = page.getByRole('button', { name: 'Start', exact: true });
   await expect(start).toBeVisible();
   const bounds = await start.boundingBox();
   expect((bounds?.y ?? 450) + (bounds?.height ?? 1)).toBeLessThanOrEqual(450);
@@ -77,7 +77,7 @@ test('Done clears a simulated completed run while keeping the project and job co
   await page.screenshot({ path: `${evidence}/completed-simulated-laptop.png` });
   await page.setViewportSize({ width: 640, height: 450 });
   const done = page.getByRole('button', { name: 'Done', exact: true });
-  const start = page.getByRole('button', { name: 'Set up & Frame', exact: true });
+  const start = page.getByRole('button', { name: 'Start', exact: true });
   await expect(done).toBeVisible();
   await expect(start).toBeVisible();
   // With the import-machine banner in a very short window, the dock can scroll

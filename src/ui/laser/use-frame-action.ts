@@ -28,6 +28,7 @@ import {
 } from './frame-position-readiness';
 import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers } from './start-blocker-invalidation';
+import { clearFrameExpiryNote } from './frame-expiry-note';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { resolveFrameCandidate } from './frame-candidate';
@@ -75,6 +76,7 @@ export function runFrameNow(): Promise<boolean> {
   return runOwnedFrame(async () => {
     ensureFramedRunInvalidationSubscriptions();
     clearStartBlockers();
+    clearFrameExpiryNote();
     const context = await prepareFrameContext();
     if (context === null) return false;
     const preparation = startExactFramePreparation(context);

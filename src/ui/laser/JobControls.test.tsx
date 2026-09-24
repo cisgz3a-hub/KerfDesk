@@ -341,7 +341,7 @@ describe('JobControls running safety copy', () => {
       expect(buttonByText(host, 'Home').disabled).toBe(true);
       expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
       expect(buttonByText(host, 'Frame job').disabled).toBe(true);
-      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
+      expect(buttonByText(host, 'Start').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -383,7 +383,7 @@ describe('JobControls running safety copy', () => {
       expect(buttonByText(host, 'Home').disabled).toBe(true);
       expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
       expect(buttonByText(host, 'Frame job').disabled).toBe(true);
-      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
+      expect(buttonByText(host, 'Start').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -413,7 +413,7 @@ describe('JobControls running safety copy', () => {
       expect(buttonByText(host, 'Home').disabled).toBe(true);
       expect(buttonByText(host, 'Set origin here').disabled).toBe(true);
       expect(buttonByText(host, 'Frame job').disabled).toBe(true);
-      expect(buttonByText(host, 'Set up & Frame').disabled).toBe(true);
+      expect(buttonByText(host, 'Start').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());

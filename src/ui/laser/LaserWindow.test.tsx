@@ -149,7 +149,7 @@ describe('LaserWindow autofocus busy controls', () => {
       expect(button(host, 'Home').disabled).toBe(true);
       expect(button(host, 'Auto-focus').disabled).toBe(true);
       expect(button(host, 'Frame job').disabled).toBe(true);
-      expect(button(host, 'Set up & Frame').disabled).toBe(true);
+      expect(button(host, 'Start').disabled).toBe(true);
       expect(button(host, 'Set origin here').disabled).toBe(true);
       const stepSelect = host.querySelector<HTMLSelectElement>(
         'select[aria-label="Jog step size"]',

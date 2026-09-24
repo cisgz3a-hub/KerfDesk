@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { FRAME_JOB_FIRST_MESSAGE } from './framed-run-readiness';
 import { useStartBlockerStore } from './start-blocker-store';
 import { installJobShortcuts } from './use-job-shortcuts';
 
@@ -161,13 +163,17 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     });
     window.dispatchEvent(event);
 
-    // The flow runs and (with an empty scene / unknown status) records the
-    // Frame-preparation refusal — proving the shortcut reached runStartJobFlow.
+    // The flow runs and, with no completed Frame, says to Frame first instead
+    // of framing — proving the shortcut reached runStartJobFlow (ADR-367).
     expect(event.defaultPrevented).toBe(true);
-    await vi.waitFor(() =>
-      expect(useStartBlockerStore.getState().messages.length).toBeGreaterThan(0),
-    );
-    uninstall();
+    try {
+      await vi.waitFor(() =>
+        expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE),
+      );
+      expect(useStartBlockerStore.getState().messages).toEqual([]);
+    } finally {
+      uninstall();
+    }
   });
 
   it.each([
