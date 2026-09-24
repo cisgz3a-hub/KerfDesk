@@ -2221,17 +2221,24 @@ settings and Job Review keep their existing read-only setup references.
    or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
    Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
    source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
-   only to Overlay. A centred loading indicator distinguishes image preparation from tracing,
-   remains visible while zoomed or panned, and disappears on completion or error.
+   only to Overlay. A centred loading indicator names image preparation, tracing and geometry
+   refinement as those stages run, and shows elapsed time. It remains visible while zoomed or
+   panned, continues through raster conversion, and disappears on completion or error.
    Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
-   **Show Points** displays vector vertices. These viewing controls do not
+   **Show Points** displays vector vertices in a bounded viewport canvas. Overlapping markers
+   combine at the current zoom; zoom in to separate them. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share
    the original image's aspect ratio even when their working grids round to different sizes.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
 2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
-   tones as fine filled lines. Adjust **Detail**, **Brightness** and **Contrast** while comparing
-   Original and Trace. More detail creates narrower lines and more geometry. Editable vectors
+   tones as fine filled lines. Adjust **Detail**, **Brightness**, **Contrast** and **Midtones**
+   while comparing Original and Trace. Midtones starts at 1; raising it lightens middle shades
+   while preserving black and white. More detail creates narrower lines and more geometry.
+   Cell-centred reconstruction retains local tone transitions; if its fixed point budget is
+   reached, one consistent area-preserving reconstruction applies across the entire image.
+   **Photo output tips** explains physical size, scan direction, resolution and the original
+   Image layer's grayscale/dither route. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
    thin line coverage before applying the Image operation. Full-photo raster conversion uses
@@ -2240,7 +2247,9 @@ settings and Job Review keep their existing read-only setup references.
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
-   or **Sketch (local contrast)**. Cutoff/Threshold appear when the band is actually used, including
+   **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
+   pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
+   local contrast alone and can remove dark shadow backgrounds. Cutoff/Threshold appear when the band is actually used, including
    alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
@@ -2248,11 +2257,11 @@ settings and Job Review keep their existing read-only setup references.
    converted using the actual width and height ratios, without rounding the internal values.
    The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
-   for alpha-mask tracing. Sliders and numeric fields stay in sync. Manual adjustments persist
+   for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
+   it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
    when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
    restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
-   Explicit Sketch uses local contrast alone, including removal of dark shadow backgrounds.
    Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
@@ -2280,9 +2289,13 @@ settings and Job Review keep their existing read-only setup references.
    Straightening retains deep notches and narrow turns where the outline doubles
    back along an otherwise straight edge. Increasing Smoothness still removes
    edge waviness without increasing how far such a turn may be shortened.
-4. Click **Trace** after the preview is ready. When the file, options, and
-   boundary still match, the ready preview geometry is reused instead of traced
-   a second time. The result is imported as a Scene object.
+4. Click **Trace** when the settings are chosen. Matching pending preview work is adopted;
+   a matching ready result is reused. Commit-affecting controls and boundary editing freeze
+   during submission while comparison, zoom and Cancel remain available. Cancel stops owned
+   preparation, trace and raster workers. The result is imported as a Scene object.
+   Photo paths and saved traces retain compact polylines when their line curves would only
+   duplicate the same vertices. Explicit curve/node commands materialise their editable
+   geometry inside the edit transaction; Undo restores the previous representation.
    **Delete Image After trace** starts selected and removes the source bitmap only after a
    successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
@@ -2298,11 +2311,17 @@ settings and Job Review keep their existing read-only setup references.
 **Edge — rapid preset changes**:
 - At most one trace job is live. Starting the newest job rejects the older job
   as superseded; supersession is not shown as a user-facing error.
+- Revisiting recent settings can reuse a completed result. The dialog retains at most three
+  results within a conservative 32 MiB geometry/SVG accounting budget. Keys include all resolved
+  settings, the source file, boundary mode/coordinates and source grid; oversized results are
+  not retained. Closing the dialog or replacing the source file clears the cache. There is no
+  additional speculative worker competing with the selected trace.
 
 **Edge — source changes before commit**:
-- Reuse is allowed only when file identity, options, boundary, and boundary mode
-  match the ready preview. Otherwise commit decodes and traces the current
-  source normally. Existing source-revalidation checks still apply.
+- Reuse is allowed only when file identity, options, boundary, boundary mode and source grid
+  match the pending or ready preparation. Otherwise commit prepares the current source.
+  Replacing the document or captured source during submission cancels the owned work and
+  restores the dialog's controls. A retired submission cannot unfreeze a newer retry.
 
 **Edge — an opaque region of a transparent image**:
 - **Trace alpha mask** keeps using the full source's transparency when a Crop or Enhance region

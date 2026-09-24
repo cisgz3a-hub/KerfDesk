@@ -47,6 +47,8 @@ export type TraceResult = {
   readonly width: number;
   readonly height: number;
   readonly notices?: ReadonlyArray<TraceNotice>;
+  // Submit's fallback decoder can recover source metadata before any crop.
+  readonly sourceHasTransparency?: boolean;
 };
 
 export class TraceRequestSupersededError extends Error {

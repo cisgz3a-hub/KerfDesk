@@ -128,6 +128,6 @@ export function readyTracePreview(
     height: result.height,
     preparedTrace: { request, result },
     ...(result.notices === undefined ? {} : { notices: result.notices }),
-    sourceHasTransparency,
+    sourceHasTransparency: sourceHasTransparency ?? result.sourceHasTransparency,
   };
 }

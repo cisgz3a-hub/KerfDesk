@@ -9,6 +9,7 @@ import {
   TraceOutputFields,
 } from './dialog-parts';
 import { TraceSettingsControls } from './TraceSettingsControls';
+import { PhotoOutputGuidance } from './PhotoOutputGuidance';
 import './tracer-dialog.css';
 
 // Slots keep this layout independent of worker state and commit ownership.
@@ -55,6 +56,9 @@ export function TraceDialogView(props: {
             <section className="lf-trace-output" aria-label="Trace output options">
               <h3>Output</h3>
               <TraceOutputFields {...props.output} />
+              {props.output.photoShading ? (
+                <PhotoOutputGuidance source={props.source} machineKind={props.output.machineKind} />
+              ) : null}
             </section>
           </fieldset>
         </aside>

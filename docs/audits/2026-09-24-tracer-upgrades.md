@@ -39,12 +39,8 @@ preparation reuse, alpha handling, subpixel and glyph fidelity, and the real Arc
 House image remaining on the enlarged grid. Seven additional scale-policy checks
 pass. Targeted typed lint passes after helper extraction and test cleanup.
 
-Integration notes: the initial repository typecheck was interrupted during
-concurrent implementation and is not a pass. The next complete typecheck found a
-single exact-optional test argument; it is corrected and awaits confirmation.
-Two cold dev-browser startup probes timed out with modules still pending and no
-captured runtime errors. The production build and startup browser check now pass,
-with no captured runtime errors. Both uncropped Photo raster browser regressions
+The initial production build and startup browser check pass, with no captured
+runtime errors. Both uncropped Photo raster browser regressions
 pass at 64 mm: Detail 60 and 100 each save a 640 by 640 image with all 256 gray
 levels, a matching PNG, one committed source replacement and its Image operation.
 The first browser test assumed an import size; it was corrected to set the actual
@@ -117,6 +113,12 @@ results. Cache hits refresh recovered transparency metadata. Five retained
 regressions and four independent retry/cancellation/cache probes pass. The combined
 progress/worker cohort passes 45 checks; the decoder/cache follow-up passes 27.
 
+The retained empty-result Submit path also recovers transparency from its
+already decoded full source before cropping. Its metadata reaches the preview
+without another decode, while prepared-result identity remains unchanged. Both
+transparent and opaque failure/retry cases reproduced the missing metadata;
+the repaired five-file cohort passes 39 checks, including the real alpha control.
+
 ## Batch 4: dense geometry and processing
 
 Status: implemented; exact-geometry, persistence and node-edit checks pass.
@@ -164,7 +166,7 @@ faint preview and hit testing after the representation change.
 
 ## Batch 5: detail choices and photo realism
 
-Status: pending.
+Status: implemented; independent detail/Photo audit repairs and focused checks pass.
 
 - Offer coherent grayscale pale-detail recovery and visible small-gap cleanup
   controls with understandable defaults; qualify noise and solid-ink retention.
@@ -172,6 +174,54 @@ Status: pending.
   expose midtones, and make output size/direction/resolution effects visible.
 - Explain the existing grayscale/dither Image workflow alongside the editable
   filled-line photo treatment.
+
+Faint lines adds coherent pale strokes to the preset's actual brightness/Otsu
+mask, retaining solid ink. It is an explicit choice; preset defaults stay intact.
+Coherence includes existing dark portions of the stroke and paints only newly
+admitted pale detail. Manual bands and alpha masks retain precedence. Fill tiny
+holes exposes the existing bounded enclosed-white-component cleanup; it does
+not bridge open gaps or replace the separate area filters.
+
+The initial 131-check affected cohort and 28-check scale/UI follow-up pass.
+Independent audit then reproduced two further defects: faint mode unnecessarily
+downscaled an alpha-owned trace, and coherence considered only added pixels,
+dropping pale connectors between dark parts of one continuous stroke. Both are
+repaired. The alpha fixture is now byte-identical at 200 contours/3,400 vertices;
+4/6/8/10/12/16-pixel mixed-tone runs retain all 160 stroke pixels. The 41-check
+repair cohort and 21-check post-extraction follow-up pass. Independent scalar,
+noise, solid-area, hole and sixteen default-preparation comparisons remain green.
+
+Photo reconstruction now places sampled widths at cell centres, preserving
+more local tone contrast while keeping the exact filled-area integral and
+complete white gaps. It retains the same source sampling grid and 410,240-point
+output ceiling. If the centred trial would exceed that ceiling, the entire
+image uses the previous area-preserving profile; source sampling runs once.
+The independent audit caught and repaired an initial per-column budget policy
+that introduced false vertical seams. Identical-column, actual-polygon strip
+integration, cancellation during fallback and native/cooperative comparisons
+now pass. Eight-pixel vertical contrast retention improves from 75.49% to 84.93%
+at Detail 60, and 85.60% to 92.94% at Detail 100; horizontal sampling is unchanged.
+These are software measurements, not a universal realism or engraving guarantee.
+
+Midtones exposes the existing gamma adjustment with neutral default 1. Photo
+output tips connect final physical size, scan direction and resolution to the
+result, and distinguish traced ribbons from original Image grayscale/dithering.
+
+## Final audit findings and remaining limits
+
+Independent execution reviewed runtime ownership/cache behavior, Photo maths and
+point rendering, Faint mask/vector/scale behavior, and compact save/edit/display
+semantics. Confirmed follow-up defects received reproductions and repairs before
+acceptance: failed decoder retry, Photo budget seams, alpha scaling, mixed-tone
+connectors, repeated closing-node movement, and empty-Submit transparency recovery.
+Performance claims remain limited
+to measured work, bytes and qualified browser behavior. The existing deepest
+nesting pair work, shortest Centerline projections and physical output remain
+explicit boundaries rather than claims of universal correctness or speed.
+
+The integrated release gate and complete-dialog production-browser checks are
+required before merge. Their exact-head status is recorded on the upgrade PRs;
+this ledger records implementation and independent acceptance evidence.
 
 ## Verification and release boundaries
 

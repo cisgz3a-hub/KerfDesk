@@ -11,6 +11,7 @@ import type { RawImageData, TraceOptions } from './trace-image';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 import type { EdgeTraceInput } from './edge-input';
 import type { ContourTraceInput } from './contour-input';
+import { shouldTraceAlphaMask } from './trace-alpha';
 
 const DENSE_COLOR_TRANSITION_DENSITY = 0.025;
 const DENSE_COLOR_DOWNSCALE_TRIGGER_PIXELS = 1_500_000;
@@ -100,7 +101,8 @@ function isDenseColorProfile(
     profile !== null &&
     profile.transitionDensity >= DENSE_COLOR_TRANSITION_DENSITY &&
     isBinaryContourPreset(options) &&
-    shouldUseSketchTrace(image, options)
+    (options.faintLineRecovery === true || shouldUseSketchTrace(image, options)) &&
+    !shouldTraceAlphaMask(image, options)
   );
 }
 

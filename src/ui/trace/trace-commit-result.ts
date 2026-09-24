@@ -11,6 +11,7 @@ import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-
 import type { TraceResult } from './use-trace-worker-client';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { checkTraceSignal } from './trace-cancellation';
+import { rawImageHasTransparency } from './raw-image-transparency';
 
 export async function resolveTraceCommitResult(args: {
   readonly file: File;
@@ -41,12 +42,14 @@ export async function resolveTraceCommitResult(args: {
 
   const image = await loadImageAsRawData(args.file, undefined, args.signal);
   checkTraceSignal(args.signal);
+  const sourceHasTransparency = rawImageHasTransparency(image);
   const boundary = traceBoundaryForWorkingGrid(args.boundary, args.sourceGrid, image);
-  return traceImageWithBoundaryMode(
+  const result = await traceImageWithBoundaryMode(
     image,
     args.options,
     boundary,
     args.boundaryMode ?? 'crop',
     args.signal,
   );
+  return { ...result, sourceHasTransparency };
 }
