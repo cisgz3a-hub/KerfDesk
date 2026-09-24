@@ -200,9 +200,13 @@ describe('what a recovered job actually burns (wire bytes, independent interpret
 });
 
 describe('a line the controller rejects mid-job', () => {
-  async function rejectedRun() {
+  /** `beforeArchive` holds the Start's execution archive until after the
+   * rejection (ADR-337), optionally with the operator acknowledging the safety
+   * notice ("I made the machine safe") before it activates. */
+  async function rejectedRun(beforeArchive?: { readonly clearNotice: boolean }) {
     const rejectLines: { pattern: RegExp; errorCode: number }[] = [];
     const h = await harness({ simulator: { rejectLines } });
+    const releaseDigests = beforeArchive === undefined ? () => undefined : holdHostDigests();
     const { runId, running } = await startFramedJob(h.repository);
     const queued = (useLaserStore.getState().streamer?.queued ?? []).map((line) => line.trim());
     const target = queued.filter((line) => /^G1\b.*S[1-9]/.test(line))[11];
@@ -218,11 +222,20 @@ describe('a line the controller rejects mid-job', () => {
       await tick(5);
     }
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
+    const ackedAtRejection = useLaserStore.getState().streamer?.completed;
     await tick(3_000);
+    if (beforeArchive !== undefined) {
+      // The pending Start intent still owns the run, so the terminal waits.
+      expect(h.repository.getSnapshot().pendingStart?.runId).toBe(runId);
+      expect(h.repository.getSnapshot().activeRun).toBeNull();
+      expect(h.repository.getSnapshot().recoveryCapsule).toBeNull();
+      if (beforeArchive.clearNotice) useLaserStore.getState().clearSafetyNotice();
+    }
+    releaseDigests();
     await drive(running);
     const capsule = await expectCapsuleFor(h.repository, runId);
     if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
-    return { h, capsule, gcode: capsule.artifact.gcode, target };
+    return { h, capsule, gcode: capsule.artifact.gcode, target, ackedAtRejection };
   }
 
   it(
@@ -267,6 +280,29 @@ describe('a line the controller rejects mid-job', () => {
       const sent = programLines(h.simulator, before);
       const burned = oracleBurns(sent.join('\n'), RECONNECTED_HEAD).map(burnGeometryKey);
       expect(burned).toContain(burnGeometryKey(rejectedBurn));
+    },
+    STRESS_TIMEOUT_MS,
+  );
+
+  it.each([
+    { clearNotice: false, notice: 'still shown' },
+    { clearNotice: true, notice: 'acknowledged' },
+  ])(
+    'a rejection before the Start archive activates still restarts at the rejected line (notice $notice)',
+    async ({ clearNotice }) => {
+      const { capsule, gcode, target, ackedAtRejection } = await rejectedRun({ clearNotice });
+      // The deferred terminal records what the tracker first saw, not what the
+      // store holds once the archive activates.
+      expect(capsule.interruption).toMatchObject({
+        kind: 'controller-error',
+        rejectedLine: target,
+      });
+      expect(capsule.ackedLines).toBe(ackedAtRejection);
+      const rejectedLine = gcode.split('\n').findIndex((line) => line.trim() === target) + 1;
+      expect(automaticRestart(gcode, capsule.ackedLines, capsule.interruption)).toEqual({
+        line: rejectedLine,
+        replaysRejectedLine: true,
+      });
     },
     STRESS_TIMEOUT_MS,
   );
