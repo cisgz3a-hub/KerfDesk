@@ -25,10 +25,9 @@ import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import {
   DEFAULT_LAYER_DEFAULTS_STATE,
-  defaultSettingsForColor,
+  defaultSettingsForOperation,
   type LayerDefaultsState,
 } from './layer-default-actions';
-import { sourceColorForOperation } from './operation-source-color';
 import { applyCameraTraceImport } from './camera-trace-import';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
@@ -105,8 +104,7 @@ function withFreshCncLayers(state: ImportState, result: MutationResult): Mutatio
   const defaults = state.layerDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE;
   const layers = result.project.scene.layers.map((layer) => {
     if (existingIds.has(layer.id)) return layer;
-    const sourceColor = sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color;
-    const savedCnc = defaultSettingsForColor(defaults, sourceColor).cnc;
+    const savedCnc = defaultSettingsForOperation(defaults, result.project.scene.objects, layer).cnc;
     if (savedCnc === undefined) return layer;
     savedDefaultLayerIds.add(layer.id);
     // Image and trace mutations own structural settings such as mode and
