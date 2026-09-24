@@ -947,8 +947,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    port is opened inside a dedicated worker so its read and refill loop can continue while the
    Chrome window is minimised or busy.
 2. If the worker cannot identify the selected port uniquely or is unavailable before opening,
-   the app uses the selected window port and warns: "Background streaming is unavailable for
-   this connection. Keep KerfDesk visible while sending the job."
+   the app uses the selected window port and records that in the Laser log. In a browser it
+   also warns: "Background streaming is unavailable for this connection. Keep KerfDesk visible
+   while sending the job." The desktop app does not warn: its window keeps sending while
+   minimised (ADR-354 Amendment 1).
 3. Machine Setup's **Background streaming** preference can be turned off explicitly. Reconnect
    to apply a change. Marlin and Smoothieware keep their existing transport.
 4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
