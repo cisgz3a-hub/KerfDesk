@@ -46,6 +46,7 @@ export function TracePreview(props: Props): JSX.Element {
         onToggleFade={() => setIsSourceFaded((next) => !next)}
         onTogglePoints={() => setShouldShowPoints((next) => !next)}
         onBoundaryClear={props.onBoundaryClear}
+        boundaryDisabled={props.boundaryDisabled === true}
       />
       <div className="lf-trace-preview__surface">
         <div

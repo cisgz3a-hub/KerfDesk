@@ -160,6 +160,7 @@ describe('commit source revalidation (P2-A)', () => {
             options: commitArgs.options,
             boundary: null,
             boundaryMode: 'crop',
+            sourceGrid: { width: seed.pixelWidth, height: seed.pixelHeight },
           },
           result,
         },
@@ -189,6 +190,7 @@ describe('commit source revalidation (P2-A)', () => {
             options: { ...commitArgs.options },
             boundary: null,
             boundaryMode: 'crop',
+            sourceGrid: { width: seed.pixelWidth, height: seed.pixelHeight },
           },
           result: {
             paths: [{ color: '#ff0000', polylines: [] }],

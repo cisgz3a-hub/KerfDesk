@@ -7,7 +7,7 @@ repair sequence, checks and subsequent independent review.
 
 ## Batch 1: preserve detail and complete output
 
-Status: implemented; focused regressions pass, integration gates pending.
+Status: implemented; focused regressions, production browser checks and PR CI pass.
 
 - Preserve accepted thin gray lines through automatic contour enlargement;
   qualify angled strokes, anti-aliasing, solid regions, glyphs and holes.
@@ -48,17 +48,34 @@ with no captured runtime errors. Both uncropped Photo raster browser regressions
 pass at 64 mm: Detail 60 and 100 each save a 640 by 640 image with all 256 gray
 levels, a matching PNG, one committed source replacement and its Image operation.
 The first browser test assumed an import size; it was corrected to set the actual
-physical size explicitly. Repository gates remain required before release.
+physical size explicitly. PR #880's `ac482993a` head passes both repository CI
+(lint, types, licenses, tests and build) and Chrome UX smoke. Final integration
+gates remain required after subsequent batches and the current-main refresh.
 
 ## Batch 2: reliable submission and cancellation
 
-Status: pending.
+Status: implemented; focused cancellation and ownership regressions pass.
 
 - Freeze commit-affecting controls during submission and keep Cancel available.
 - Propagate one submission-owned cancellation signal through trace and bitmap
   workers while retaining stale-publication guards.
 - Adopt a matching unfinished preview instead of decoding and tracing again.
   Qualify cancellation, replacement requests, failure and source/document edits.
+
+Preview and Submit now share the current decode/debounce/trace preparation.
+Cancellation stops owned trace and bitmap workers and prevents a late decode
+from dispatching new work. Header FileReader work aborts, and late ImageBitmaps
+are closed. Commit controls and crop mutations freeze while comparison, zoom
+and Cancel remain available. Source content can still rebase before submission;
+after submission its captured object and document identity remain authoritative.
+
+The follow-up audit reproduced and repaired a retained-dialog cancellation bug:
+replacing the source stopped the worker but left the old dialog busy. Computation
+ownership and submission UI ownership are now separate so the old submission can
+clear its own loading state without unfreezing an immediate retry. A seven-file
+affected cohort passes 102 checks, including decoder cancellation, debounce,
+settlement, source replacement and submission controls. Final integrated gates
+will also qualify later caching and progress changes against these contracts.
 
 ## Batch 3: responsive previews
 

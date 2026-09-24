@@ -58,12 +58,12 @@ for (const camera of [false, true])
           const before = settlementSnapshot();
           expect(requests).toHaveLength(1);
           await submitSettlement(host);
-          expect(requests).toHaveLength(2);
+          expect(requests).toHaveLength(1);
           expect(host.textContent).toContain('Tracing...');
           await act(async () =>
             failure
-              ? requests[1]!.reject(new Error('controlled trace failure'))
-              : requests[1]!.resolve(emptySettlement),
+              ? requests[0]!.reject(new Error('controlled trace failure'))
+              : requests[0]!.resolve(emptySettlement),
           );
           expect(settlementSnapshot()).toEqual(before);
           expect(host.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
@@ -110,7 +110,7 @@ it('settles an empty retrace without replacing its existing target or deleting i
   await chooseSettlementOutput(mounted.host, 'vector', true);
   const before = settlementSnapshot();
   await submitSettlement(mounted.host);
-  await act(async () => requests[1]!.resolve(emptySettlement));
+  await act(async () => requests[0]!.resolve(emptySettlement));
   expect(settlementSnapshot()).toEqual(before);
   expect(settlementReady(mounted.host)).toBe(true);
 });
@@ -118,7 +118,7 @@ it('settles an empty retrace without replacing its existing target or deleting i
 it('an early successful commit retains geometry and one grouped history entry', async () => {
   mounted = await mountSettlementDialog();
   await submitSettlement(mounted.host);
-  await act(async () => requests[1]!.resolve(settlementResult));
+  await act(async () => requests[0]!.resolve(settlementResult));
   const s = useStore.getState();
   expect(useUiStore.getState().imageDialog).toBeNull();
   expect(s.undoStack).toHaveLength(1);
@@ -127,12 +127,19 @@ it('an early successful commit retains geometry and one grouped history entry', 
   expect(result?.bounds).toEqual(settlementResult.bounds);
 });
 
-it('a failed commit decode settles its superseded preview and preserves the source', async () => {
+it('a failed shared decode settles Submit and preserves the source', async () => {
+  let rejectDecode!: (error: Error) => void;
+  vi.mocked(loadImageAsRawData).mockReturnValueOnce(
+    new Promise((_, reject) => {
+      rejectDecode = reject;
+    }),
+  );
   mounted = await mountSettlementDialog();
   const before = settlementSnapshot();
-  vi.mocked(loadImageAsRawData).mockRejectedValueOnce(new Error('commit decode failure'));
   await submitSettlement(mounted.host);
-  expect(requests).toHaveLength(1);
+  await act(async () => rejectDecode(new Error('commit decode failure')));
+  expect(requests).toHaveLength(0);
+  expect(loadImageAsRawData).toHaveBeenCalledTimes(1);
   expect(settlementSnapshot()).toEqual(before);
   expect(mounted.host.textContent).toContain('Preview failed: commit decode failure');
 });
@@ -142,7 +149,7 @@ for (const replacement of ['close-reopen', 'replace-dialog', 'new-document'] as 
     it(`old ${failure ? 'error' : 'empty'} settlement cannot affect ${replacement}`, async () => {
       mounted = await mountSettlementDialog();
       await submitSettlement(mounted.host);
-      const old = requests[1]!;
+      const old = requests[0]!;
       await act(async () => {
         if (replacement === 'close-reopen') useUiStore.getState().closeImageDialog();
         if (replacement === 'new-document') useStore.getState().setProject(createProject());
@@ -179,7 +186,7 @@ for (const camera of [false, true])
     mounted = await mountSettlementDialog(camera);
     await chooseSettlementOutput(mounted.host, 'raster', true);
     await submitSettlement(mounted.host);
-    await act(async () => requests[1]!.resolve(settlementResult));
+    await act(async () => requests[0]!.resolve(settlementResult));
     expect(buildBitmapFromVectors).toHaveBeenCalledOnce();
     expect(settlementReady(mounted.host)).toBe(true);
     await act(async () => {
