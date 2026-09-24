@@ -10,6 +10,7 @@ import {
 } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { controllerUnlockedPatch } from './laser-console-completion';
+import { startControllerCommand } from './laser-interactive-command';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -28,7 +29,17 @@ export function autofocusActions(
       assertNoMotionOperation(set, get);
       const unlock = refs.driver.commands.unlock;
       if (unlock === null) throw new Error('This controller has no unlock command.');
-      await write(`${unlock}\n`, 'unlock');
+      // Owned like the Console's `$X`: the controller's answer decides, so an
+      // `error:N` (a door still open, a locked-out build) rejects with its
+      // reason instead of clearing the alarm on the bytes alone (controller
+      // audit gap-start-11).
+      await startControllerCommand(refs, write, {
+        kind: 'interactive-command',
+        label: 'Unlock (clear alarm)',
+        command: `${unlock}\n`,
+        action: 'unlock',
+        source: 'console',
+      });
       // Shared with a Console `$X`, so both unlock paths leave the same state.
       set(controllerUnlockedPatch);
     },
