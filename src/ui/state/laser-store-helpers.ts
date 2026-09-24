@@ -279,6 +279,7 @@ type InitialLaserState = Pick<
   | 'activeWcs'
   | 'ovCache'
   | 'rxCapacityEvidence'
+  | 'plannerCapacityEvidence'
   | 'accessoryCache'
   | 'mpgActive'
   | 'workOriginActive'

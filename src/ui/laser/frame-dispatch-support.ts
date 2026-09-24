@@ -125,8 +125,9 @@ export function reportFramePreparationRefusal(
   );
 }
 
-export async function requireFrameControllerQueue(): Promise<boolean> {
-  const issue = await frameControllerQueueIssue();
+export async function requireFrameControllerQueue(signal?: AbortSignal): Promise<boolean> {
+  const issue = await frameControllerQueueIssue(signal);
+  signal?.throwIfAborted();
   if (issue === null) return true;
   reportFrameRefusal([issue]);
   return false;

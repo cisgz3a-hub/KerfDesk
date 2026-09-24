@@ -1,3 +1,4 @@
+import { strictEqual } from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import type { RawImageData } from '../../core/trace';
 import { PERCEPTUAL_FIXTURES } from './shapes';
@@ -48,11 +49,11 @@ describe('PERCEPTUAL_FIXTURES', () => {
         const b = image.data[base + 2] ?? PAPER;
         const a = image.data[base + 3] ?? PAPER;
         // Pure black or pure white, fully opaque, greyscale.
-        expect(a).toBe(255);
-        expect(r === g && g === b).toBe(true);
-        expect(r === 0 || r === 255).toBe(true);
+        strictEqual(a, 255);
+        strictEqual(r === g && g === b, true);
+        strictEqual(r === 0 || r === 255, true);
         // Truth bit agrees with the rendered ink.
-        expect(truth.data[y * width + x] === 1).toBe(imageIsInk(image, x, y));
+        strictEqual(truth.data[y * width + x] === 1, imageIsInk(image, x, y));
       }
     }
   });

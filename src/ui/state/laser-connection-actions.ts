@@ -232,6 +232,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     accessoryCache: null,
     mpgActive: null,
     rxCapacityEvidence: null,
+    plannerCapacityEvidence: null,
     workOriginActive: false,
     workOriginSource: 'none',
     frameVerification: null,

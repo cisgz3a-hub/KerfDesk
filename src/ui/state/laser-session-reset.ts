@@ -22,7 +22,15 @@ type FinishedJobState = Pick<
 >;
 
 type SessionScopedState = FinishedJobState &
-  Pick<LaserState, 'alarmCode' | 'lastError' | 'activeWcs' | 'ovCache' | 'rxCapacityEvidence'>;
+  Pick<
+    LaserState,
+    | 'alarmCode'
+    | 'lastError'
+    | 'activeWcs'
+    | 'ovCache'
+    | 'rxCapacityEvidence'
+    | 'plannerCapacityEvidence'
+  >;
 
 /**
  * State owned by ONE run. Cleared when a job reaches a terminal state — a
@@ -61,8 +69,8 @@ export function frameProofReset(): Pick<
  * State owned by ONE controller session. Adds the firmware-reported values that
  * only mean something while the port is open: the latched fault codes, and the
  * modal/override readouts GRBL reports on an intermittent cadence, and the
- * receive-capacity proof latched from `Bf:` reports (a reconnect may boot
- * different firmware with a different ring). GRBL re-initializes its parser
+ * RX and planner capacities proved by `Bf:` reports (a reconnect may boot
+ * different firmware with different buffers). GRBL re-initializes its parser
  * state on reset, so none of these survive the session that produced them.
  */
 export function sessionScopedJobStateReset(): SessionScopedState {
@@ -73,5 +81,6 @@ export function sessionScopedJobStateReset(): SessionScopedState {
     activeWcs: null,
     ovCache: null,
     rxCapacityEvidence: null,
+    plannerCapacityEvidence: null,
   };
 }

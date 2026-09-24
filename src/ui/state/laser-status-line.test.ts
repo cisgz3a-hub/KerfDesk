@@ -54,6 +54,11 @@ describe('laser status-line receive-capacity evidence (ADR-331)', () => {
       plannerBlocksFree: 15,
       sessionEpoch: get().controllerSessionEpoch,
     });
+    const plannerCapacity = get().plannerCapacityEvidence;
+    expect(plannerCapacity).toMatchObject({
+      plannerBlocksFree: 15,
+      sessionEpoch: get().controllerSessionEpoch,
+    });
 
     set({ streamer: step(createStreamer('G1 X1\nG1 X2\n')).state });
     handleStatusLine(set, get, refs, async () => undefined, inFlight);
@@ -68,6 +73,7 @@ describe('laser status-line receive-capacity evidence (ADR-331)', () => {
     set({ pendingUntrackedAcks: 0 });
     handleStatusLine(set, get, refs, async () => undefined, inFlight);
     expect(get().rxCapacityEvidence?.rxBytesFree).toBe(65535);
+    expect(get().plannerCapacityEvidence).toBe(plannerCapacity);
   });
 });
 
