@@ -14,6 +14,7 @@ export type LightBurnTraceSettingOverrides = {
   readonly photoBrightness?: number;
   readonly photoContrast?: number;
   readonly photoGamma?: number;
+  readonly photoInvert?: boolean;
   readonly detectionMode?: TraceDetectionMode;
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
@@ -68,12 +69,14 @@ function mergePhotoSettings(
 ): TraceOptions {
   // Keep the operator's other style settings in UI state without allowing a
   // stale threshold, alpha mask or speckle filter to destroy photo midtones.
+  // Photo tone controls have their own keys, so they never reach line presets.
   return {
     ...preset,
     photoDetail: photoValue(settings.photoDetail, preset.photoDetail ?? 60, 0, 100),
     brightness: photoValue(settings.photoBrightness, preset.brightness ?? 0, -100, 100),
     contrast: photoValue(settings.photoContrast, preset.contrast ?? 0, -100, 100),
     gamma: photoValue(settings.photoGamma, preset.gamma ?? 1, 0.1, 5),
+    invert: settings.photoInvert ?? preset.invert ?? false,
   };
 }
 

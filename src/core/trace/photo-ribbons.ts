@@ -4,6 +4,8 @@ import type { TraceSteps } from './trace-steps';
 export type PhotoGrid = { readonly columns: number; readonly rows: number };
 // The previous grid's worst case, including all white-cell splits.
 const MAX_POINTS = 2 * 320 * (640 + 1);
+// (1e-12)²: a ribbon edge counts as straight while its turn is numerical noise.
+const STRAIGHT_SINE_SQUARED = 1e-24;
 
 export function* photoRibbonsSteps(
   image: { readonly width: number; readonly height: number },
@@ -77,8 +79,16 @@ function appendStraightened(points: Vec2[], point: Vec2): void {
   const a = points[points.length - 2];
   const b = points[points.length - 1];
   if (a !== undefined && b !== undefined) {
-    const cross = (b.x - a.x) * (point.y - b.y) - (b.y - a.y) * (point.x - b.x);
-    if (Math.abs(cross) < 1e-12) {
+    const abX = b.x - a.x;
+    const abY = b.y - a.y;
+    const bpX = point.x - b.x;
+    const bpY = point.y - b.y;
+    const cross = abX * bpY - abY * bpX;
+    // Bound the turn's sine rather than the raw cross product. Equal shades
+    // sampled from differently aligned cells can differ in their last bits,
+    // and along a long straight edge that noise alone passes a fixed bound.
+    const lengths = (abX * abX + abY * abY) * (bpX * bpX + bpY * bpY);
+    if (cross * cross <= STRAIGHT_SINE_SQUARED * lengths) {
       points[points.length - 1] = point;
       return;
     }
