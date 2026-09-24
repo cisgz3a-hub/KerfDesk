@@ -1,5 +1,9 @@
 import { type LaserControllerOperation } from './laser-controller-operation';
-import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
+import {
+  ControllerCommandRefusedError,
+  startControllerCommand,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
@@ -33,10 +37,7 @@ export async function runOriginTransaction(
   label: string,
   writeCommands: OriginCommandWriter,
   successPatch: (assertCurrent: () => void) => Partial<LaserState> | Promise<Partial<LaserState>>,
-  options: {
-    readonly changesXyOrigin?: boolean;
-    readonly reestablishesPositionEvidence?: boolean;
-  } = {},
+  options: OriginTransactionOptions = {},
 ): Promise<void> {
   const operation: LaserControllerOperation = {
     kind: 'interactive-command',
@@ -86,26 +87,59 @@ export async function runOriginTransaction(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    set((state) =>
-      ownsTransaction(state)
-        ? {
-            ...unknownOriginPatch(),
-            ...(options.changesXyOrigin === true
-              ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 }
-              : {}),
-            ...originControllerFailurePatch(state, message, pendingLine),
-            controllerOperation:
-              state.controllerOperation === operation ? null : state.controllerOperation,
-            lastWriteError: message,
-            log: pushLog(
-              state,
-              `[lf2] ${label} failed while waiting on ${pendingLine.trim() || 'the controller'}. Work-origin state is unknown: ${message}`,
-            ),
-          }
-        : state,
-    );
+    const failure = { error, message, label, pendingLine, operation, options };
+    set((state) => (ownsTransaction(state) ? failedOriginTransactionPatch(state, failure) : state));
     throw error instanceof Error ? error : new Error(message);
   }
+}
+
+type OriginTransactionOptions = {
+  readonly changesXyOrigin?: boolean;
+  readonly reestablishesPositionEvidence?: boolean;
+  /** A single-line command the controller refused (`error:N`) never ran,
+   *  so the origin it would have changed is still known. */
+  readonly refusalLeavesOrigin?: boolean;
+};
+
+type OriginTransactionFailure = {
+  readonly error: unknown;
+  readonly message: string;
+  readonly label: string;
+  readonly pendingLine: string;
+  readonly operation: LaserControllerOperation;
+  readonly options: OriginTransactionOptions;
+};
+
+function failedOriginTransactionPatch(
+  state: LaserState,
+  failure: OriginTransactionFailure,
+): Partial<LaserState> {
+  const { message, label, pendingLine, operation, options } = failure;
+  const controllerOperation =
+    state.controllerOperation === operation ? null : state.controllerOperation;
+  if (
+    options.refusalLeavesOrigin === true &&
+    failure.error instanceof ControllerCommandRefusedError
+  ) {
+    return {
+      controllerOperation,
+      lastWriteError: message,
+      log: pushLog(state, `[lf2] ${label} refused by the controller (${message}).`),
+    };
+  }
+  return {
+    ...unknownOriginPatch(),
+    ...(options.changesXyOrigin === true
+      ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 }
+      : {}),
+    ...originControllerFailurePatch(state, message, pendingLine),
+    controllerOperation,
+    lastWriteError: message,
+    log: pushLog(
+      state,
+      `[lf2] ${label} failed while waiting on ${pendingLine.trim() || 'the controller'}. Work-origin state is unknown: ${message}`,
+    ),
+  };
 }
 
 function originTransactionOwner(
