@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Project } from '../src/core/scene';
+import { polylineToCurveSubpath } from '../src/core/scene/curve-path';
 import { TRACE_PRESETS } from '../src/core/trace/trace-presets';
 import type { TraceOptions } from '../src/core/trace/trace-image';
 import type { TraceWorkerRequest, TraceWorkerResponse } from '../src/ui/trace/trace-worker';
@@ -232,7 +233,13 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     expect(traced.traceMode).toBe(preset.traceMode ?? 'filled-contours');
     expect([traced.tracePixelWidth, traced.tracePixelHeight]).toEqual([1254, 1254]);
     if (request.geometryJson === null) throw Error('Missing worker output geometry');
-    expect(traced.paths).toEqual(JSON.parse(request.geometryJson));
+    // Saving may omit an exactly redundant line representation. Restore that
+    // representation for this exact worker-to-saved-geometry comparison.
+    const restoredPaths = traced.paths.map((path) => ({
+      ...path,
+      curves: path.curves ?? path.polylines.map(polylineToCurveSubpath),
+    }));
+    expect(restoredPaths).toEqual(JSON.parse(request.geometryJson));
     const polylines = traced.paths.flatMap((path) => path.polylines);
     expect(polylines.length).toBe(request.polylines);
     expect(polylines.reduce((sum, line) => sum + line.points.length, 0)).toBe(request.vertices);
