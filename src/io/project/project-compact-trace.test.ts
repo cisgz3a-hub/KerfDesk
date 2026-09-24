@@ -63,7 +63,10 @@ function projectFor(paths: readonly ColoredPath[]): Project {
       ...base.scene,
       objects: [object],
       layers: [
-        createLayer({ id: 'photo-fill', color: '#000000', mode: 'fill', hatchSpacingMm: 0.2 }),
+        {
+          ...createLayer({ id: 'photo-fill', color: '#000000', mode: 'fill' }),
+          hatchSpacingMm: 0.2,
+        },
       ],
     },
   };

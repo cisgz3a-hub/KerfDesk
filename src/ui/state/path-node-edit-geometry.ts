@@ -39,7 +39,7 @@ export function editPathsNodesByDelta(
             (ref) =>
               ref.pathIndex === pathIndex &&
               ref.polylineIndex === polylineIndex &&
-              ref.pointIndex === pointIndex,
+              samePolylineNode(polyline, ref.pointIndex, pointIndex),
           )
         ) {
           return point;
@@ -55,6 +55,14 @@ export function editPathsNodesByDelta(
     return pathChanged ? replaceCompatibilityPolylines(path, polylines) : path;
   });
   return changed ? { paths: nextPaths } : null;
+}
+
+function samePolylineNode(polyline: Polyline, a: number, b: number): boolean {
+  const last = polyline.points.length - 1;
+  const closurePair = (a === 0 && b === last) || (a === last && b === 0);
+  // A repeated closing point is the same anchor as the start. Move either
+  // selection once at both indices without coupling coincident interior nodes.
+  return a === b || (polyline.closed && closurePair && hasDuplicateClosingPoint(polyline.points));
 }
 
 export function deletePathsNodes(

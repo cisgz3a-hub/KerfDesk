@@ -105,6 +105,85 @@ describe('compact trace node editing', () => {
     expect(useStore.getState().project.scene.objects[0]).toBe(object);
   });
 
+  it.each([[0], [4], [0, 4]])(
+    'moves closing endpoint selection %j like the canonical anchor after save, with undo',
+    (...indices) => {
+      const ring = { ...line, points: [...line.points, line.points[0]!] };
+      const source = load([ring]);
+      const canonical = {
+        ...source,
+        paths: [{ ...source.paths[0]!, curves: [polylineToCurveSubpath(ring)] }],
+      };
+      const original = useStore.getState().project;
+      const project = { ...original, scene: { ...original.scene, objects: [canonical] } };
+      useStore.setState({ project });
+      select(0, 0);
+      useStore.getState().nudgeSelectedPathNode(1, 2);
+      const expected = currentPath().polylines;
+
+      const reopened = deserializeProject(serializeProject(project));
+      if (reopened.kind !== 'ok') throw new Error('Saved ring failed to reopen');
+      resetStore();
+      useStore.setState({ project: reopened.project });
+      const compact = useStore.getState().project.scene.objects[0];
+      expect(currentPath().curves).toBeUndefined();
+      indices.forEach((pointIndex, index) =>
+        useStore
+          .getState()
+          .selectPathNode(
+            { objectId: source.id, pathIndex: 0, polylineIndex: 0, pointIndex },
+            { additive: index > 0 },
+          ),
+      );
+      useStore.getState().nudgeSelectedPathNode(1, 2);
+      expect(currentPath().polylines).toEqual(expected);
+      expect(currentPath().curves).toBeUndefined();
+      expect(useStore.getState().undoStack).toHaveLength(1);
+      useStore.getState().undo();
+      expect(useStore.getState().project.scene.objects[0]).toBe(compact);
+      useStore.getState().redo();
+      expect(currentPath().polylines).toEqual(expected);
+    },
+  );
+
+  it.each([[0], [4], [0, 4]])('deletes closure endpoint selection %j once', (...indices) => {
+    const ring = { ...line, points: [...line.points, line.points[0]!] };
+    const source = load([ring]);
+    indices.forEach((pointIndex, index) =>
+      useStore
+        .getState()
+        .selectPathNode(
+          { objectId: source.id, pathIndex: 0, polylineIndex: 0, pointIndex },
+          { additive: index > 0 },
+        ),
+    );
+    useStore.getState().deleteSelectedPathNodes();
+    expect(currentPath().polylines[0]).toEqual({
+      closed: true,
+      points: [...line.points.slice(1), line.points[1]!],
+    });
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.objects[0]).toBe(source);
+  });
+
+  it.each([false, true])('keeps coincident interior nodes independent with closed=%s', (closed) => {
+    const points = [
+      line.points[0]!,
+      line.points[1]!,
+      line.points[0]!,
+      ...line.points.slice(2),
+      line.points[0]!,
+    ];
+    load([{ closed, points }]);
+    select(0, 0);
+    useStore.getState().nudgeSelectedPathNode(1, 2);
+    const moved = currentPath().polylines[0]!.points;
+    expect(moved[0]).toEqual({ x: 1, y: 2 });
+    expect(moved[2]).toEqual({ x: 0, y: 0 });
+    expect(moved.at(-1)).toEqual(closed ? { x: 1, y: 2 } : { x: 0, y: 0 });
+  });
+
   it('breaks a compact closed path at the selected node and undoes the entire edit', () => {
     const object = load();
     select(8, 0);

@@ -110,6 +110,13 @@ percentages or UI updates. The additional speculative worker remains off:
 first-visit benefit and peak-memory cost have not been established. Recent-result
 reuse provides the measured switching benefit without concurrent tracing work.
 
+Independent lifecycle review found that a rejected shared decoder promise could
+keep a later preset retry stuck on the old error. A later cache miss now retries
+only that failed decode, retaining File-owned cancellation and valid cached
+results. Cache hits refresh recovered transparency metadata. Five retained
+regressions and four independent retry/cancellation/cache probes pass. The combined
+progress/worker cohort passes 45 checks; the decoder/cache follow-up passes 27.
+
 ## Batch 4: dense geometry and processing
 
 Status: implemented; exact-geometry, persistence and node-edit checks pass.
@@ -128,6 +135,8 @@ Sharp fixture remains byte-identical (2,791 paths, 61,106 vertices) through nati
 and cooperative execution. Containment queries decrease from 429,192 to 151,838.
 Elapsed timings vary under load, so this establishes reduced repeated work,
 not a general end-to-end Sharp speedup.
+The pre-existing overlapping-pair array can still grow quadratically for deeply
+nested artwork; the new relation-cache cap does not bound that separate work.
 
 Photo worker output now keeps one polyline representation. Saved traced images
 omit only proven exactly redundant line curves; authoritative curved or stale
@@ -144,6 +153,14 @@ the final helper extraction. Matched representation-only measurements on the
 same Photo geometry reduce manual JSON size by 62.92% at Detail 60 and 63.95%
 at Detail 100, with every original vertex retained. These are serialized-byte
 measurements, not browser heap or machine-output qualification.
+
+The final edit audit found one representation-parity defect: moving only the
+first node of a compact closed contour left its repeated closing endpoint
+behind. Exact first/last closure aliases now move together, once, without
+coupling coincident interior points or open endpoints. Thirty-three node-edit
+checks pass, including save, undo/redo and deletion controls. An independent
+Photo Detail 100 probe with 315,660 vertices keeps its design drawing, simplified
+faint preview and hit testing after the representation change.
 
 ## Batch 5: detail choices and photo realism
 
