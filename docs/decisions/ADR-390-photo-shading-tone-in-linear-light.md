@@ -153,7 +153,9 @@ Midtones.
 - Out of scope: Image mode's dither modes set dot coverage from the stored bytes directly
   (`core/raster/dither.ts`), which gives the same byte-proportional coverage this decision removes
   from Photo shading. By the same derivation its Gamma near 0.45 would approximate linear light;
-  that is not measured and not changed here.
+  that is not measured and not changed here. Photo output tips therefore no longer offer the Image
+  layer "for the original photo’s tones"; they offer it for engraving the original image instead
+  of lines.
 - The model assumes each line marks exactly its drawn width. A spot wider than the line adds the
   same width to every line, which matters most in highlights where lines are narrowest. No test
   card has measured it; Midtones is the operator's correction until one sets a spot allowance.

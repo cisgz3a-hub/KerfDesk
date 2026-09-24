@@ -24,9 +24,9 @@ export function PhotoOutputGuidance(props: {
       </p>
       {props.machineKind === 'laser' ? (
         <p className="lf-trace-hint">
-          For the original photo’s tones, cancel Trace and keep the image on an Image layer. Its
-          Dither setting offers dot patterns or Grayscale. Raster scan here engraves the traced
-          ribbon pattern.
+          To engrave the original image instead of lines, cancel Trace and keep it on an Image
+          layer. Its Dither setting offers dot patterns or Grayscale. Raster scan here engraves the
+          traced ribbon pattern.
         </p>
       ) : null}
     </details>
