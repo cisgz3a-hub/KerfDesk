@@ -13,6 +13,7 @@ import { handleMenuKeyDown } from './menu-keyboard';
 import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
 import { MenuBarHistoryControls } from './MenuBarHistoryControls';
+import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -118,6 +119,7 @@ function MenuFamily(props: {
               </div>
             </Fragment>
           ))}
+          {props.family === 'file' ? <RecentProjectMenuGroup onRun={props.onCommandRun} /> : null}
         </div>
       ) : null}
     </details>

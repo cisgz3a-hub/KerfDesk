@@ -22,6 +22,7 @@ export type CommandFamily = (typeof COMMAND_FAMILY_ORDER)[number];
 export type CommandId =
   | 'file.new'
   | 'file.open'
+  | 'file.open-recent'
   | 'file.save'
   | 'file.save-as'
   | 'file.import'
@@ -171,6 +172,8 @@ export type AppCommandContext = {
   readonly confirmDiscard: (action: string) => Promise<boolean>;
   readonly newProject: () => void;
   readonly openProject: () => void;
+  // Recent Projects manager (ADR-378); the File menu also lists entries inline.
+  readonly openRecentProjects: () => void;
   readonly saveProject: () => void;
   readonly saveProjectAs: () => void;
   readonly importArtwork: () => void;

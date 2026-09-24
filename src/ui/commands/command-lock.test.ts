@@ -50,6 +50,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     confirmDiscard: vi.fn(async () => true),
     newProject: vi.fn(),
     openProject: vi.fn(),
+    openRecentProjects: vi.fn(),
     saveProject: vi.fn(),
     saveProjectAs: vi.fn(),
     importArtwork: vi.fn(),

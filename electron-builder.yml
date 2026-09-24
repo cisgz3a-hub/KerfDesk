@@ -35,6 +35,15 @@ nsis:
   # adds no restriction and does not authorize future commercial terms.
   license: public/eula.txt
 
+# Double-clicking a KerfDesk project opens it in KerfDesk (ADR-378). Only the
+# .lf2 type is claimed: registering .lbrn/.lbrn2 here would take LightBurn's
+# own files away from LightBurn. Those still open through Open With, the
+# command line (electron/desktop-project-paths.ts) and File > Open.
+fileAssociations:
+  - ext: lf2
+    name: KerfDesk.Project
+    description: KerfDesk project
+
 # This stable Windows config keeps macOS / Linux targets absent. ADR-248 governs
 # the future Mac Preview config/workflow; Linux remains out of scope.
 # mac:

@@ -1,4 +1,5 @@
 import { fileCommandContext } from './file-command-context';
+import { recentProjectsCommandContext } from './recent-projects-command';
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
@@ -107,6 +108,7 @@ function appCommandContext(
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   return {
     ...fileCommandContext(callbacks, platform, app, pushToast),
+    ...recentProjectsCommandContext(),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
     ...arrangeCommandContext(app, callbacks),

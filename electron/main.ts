@@ -100,7 +100,7 @@ import {
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
-import { revealPrimaryWindow } from './single-instance-policy.js';
+import { installDesktopProjectOpens } from './desktop-project-open.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,16 +114,14 @@ app.setName(DESKTOP_PRODUCT_NAME);
 app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
 
-// One process owns the shared Chromium profile and the serial-capable UI.
-// A second launch only raises that primary window.
-const HAS_SINGLE_INSTANCE_LOCK = app.requestSingleInstanceLock();
+// One process owns the shared Chromium profile and the serial-capable UI. A
+// second launch raises that primary window and hands over any project file it
+// was asked to open (ADR-378).
+const DESKTOP_PROJECT_OPENS = installDesktopProjectOpens(app, {
+  isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
+});
+const HAS_SINGLE_INSTANCE_LOCK = DESKTOP_PROJECT_OPENS.hasSingleInstanceLock;
 if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
-else {
-  app.on('second-instance', () => {
-    const primary = BrowserWindow.getAllWindows()[0];
-    if (primary !== undefined) revealPrimaryWindow(primary);
-  });
-}
 
 function installApplicationMenu(): void {
   const template = desktopApplicationMenuTemplate(process.platform);
@@ -528,7 +526,7 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       // window. createWindow() will call loadURL('app://app/index.html'),
       // which fails fast if this handler isn't installed yet.
       const distRoot = path.join(__dirname, '..', 'dist', 'web');
-      protocol.handle('app', makeAppProtocolHandler(distRoot));
+      protocol.handle('app', DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)));
       // A Session survives macOS window closure; install its listeners once,
       // before the first renderer, rather than adding another picker on reopen.
       installSessionPermissions(session.defaultSession);

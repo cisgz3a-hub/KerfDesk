@@ -46,6 +46,8 @@ import {
   type ProjectOpenCompletionContext,
 } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
+import { rememberOpenedProject } from '../recent-projects/recent-project-record';
+import { chosenOrPickedProjectFiles } from './chosen-project-file';
 import {
   bindImportActionsToDocument,
   captureImportDocumentOwner,
@@ -319,7 +321,12 @@ export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly getProjectDocumentEpoch: () => number;
 };
 
-export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
+/** Open a project from the picker, or `chosenFile` when the operator already
+ * chose it (Recent Projects, or a file the operating system handed over). */
+export async function handleOpenProject(
+  ctx: OpenProjectCtx,
+  chosenFile?: OpenProjectFile,
+): Promise<void> {
   const owner = claimProjectOpenRequest(
     ctx.pushToast,
     ctx.claimProjectOpenRequest,
@@ -337,10 +344,12 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   };
   let files: ReadonlyArray<OpenProjectFile>;
   try {
-    files = await ctx.platform.pickFilesForOpen({
-      accept: ['.lf2', '.lbrn', '.lbrn2'],
-      multiple: false,
-    });
+    files = await chosenOrPickedProjectFiles(chosenFile, () =>
+      ctx.platform.pickFilesForOpen({
+        accept: ['.lf2', '.lbrn', '.lbrn2'],
+        multiple: false,
+      }),
+    );
   } catch (err) {
     ownedCtx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
     return;
@@ -359,7 +368,8 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     const parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
     if (!owner.isCurrent()) return;
     if (parsed.kind === 'lightburn') {
-      completeLightBurnProjectOpen(ownedCtx, file.name, parsed.result);
+      const opened = completeLightBurnProjectOpen(ownedCtx, file.name, parsed.result);
+      rememberOpenedProject(ctx.platform, file, opened);
       return;
     }
     result = parsed.result;
@@ -375,5 +385,6 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     controls.dispose();
   }
   if (!owner.isCurrent()) return;
-  completeNativeProjectOpen(ownedCtx, file.name, result);
+  const opened = completeNativeProjectOpen(ownedCtx, file.name, result);
+  rememberOpenedProject(ctx.platform, file, opened);
 }
