@@ -116,6 +116,20 @@ function completionPatch(
   ) {
     return {};
   }
+  if (result.kind === 'ok') {
+    // The cycle moved and re-referenced Z, so a Z zero taken before it no
+    // longer holds. A Console `$HZ1` also voids XY and homing evidence,
+    // because a typed command is classified conservatively (the Falcon
+    // contract marks it 'reference'); the button's owned cycle confirms a
+    // fresh Idle and reports the new position, and focusing moves only Z.
+    // The vendor has not documented the cycle, so this narrower button effect
+    // is deliberate (controller audit gap-start-8).
+    return {
+      ...(state.controllerOperation?.kind === 'autofocus' ? { controllerOperation: null } : {}),
+      workZZeroEvidence: null,
+      workZReferenceEpoch: state.workZReferenceEpoch + 1,
+    };
+  }
   if (result.kind !== 'timeout' && result.kind !== 'motion-uncertain') {
     return state.controllerOperation?.kind === 'autofocus' ? { controllerOperation: null } : {};
   }
