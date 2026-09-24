@@ -1,10 +1,11 @@
 // Boolean combine commands (ADR-103 G1) — Subtract / Intersect / Exclude,
 // siblings of tools.weld (union). Machine-agnostic geometry: available in
-// both laser and CNC modes. The bottom-most selected object is the subject.
+// both laser and CNC modes. The first-selected shape or group is the subject
+// and a group is one operand (ADR-377).
 
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 
-const NEEDS_SELECTION = 'Select two or more unlocked closed vector shapes first.';
+const NEEDS_SELECTION = 'Select two or more unlocked closed vector shapes or groups first.';
 
 export function vectorBooleanCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -43,7 +44,7 @@ export function vectorBooleanCommands(ctx: AppCommandContext): ReadonlyArray<App
           'tools.subtract',
           'tools',
           'Subtract',
-          'Cut the upper selected shapes out of the bottom-most one',
+          'Cut the later-selected shapes out of the first one you selected',
           ctx.subtractSelection,
         )
       : disabled('tools.subtract', 'tools', 'Subtract', NEEDS_SELECTION, ctx.subtractSelection),

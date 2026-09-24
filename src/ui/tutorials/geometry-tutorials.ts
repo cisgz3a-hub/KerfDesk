@@ -62,11 +62,11 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
     id: 'subtract',
     title: 'Subtract',
     visual: 'subtract',
-    summary: 'Cut upper shapes out of the bottom-most selected shape.',
+    summary: 'Cut later-selected shapes out of the first shape you select.',
     preparation:
-      'Create the base shape first, then create and position the cutting shape over it. The bottom-most selected object is the subject; the upper shapes are removed from it.',
-    result: 'The bottom shape remains with the overlapping area cut out.',
-    tip: 'A small circle fully inside a rectangle can make a hole. Selection click order does not choose the subject; stacking order does.',
+      'Position the cutting shape over the base shape. Click the base shape first, then Shift-click the cutting shapes. The first shape you pick is kept and the later picks are removed from it.',
+    result: 'The first-picked shape remains with the overlapping area cut out.',
+    tip: 'A group counts as one shape, so a grouped ring cuts a ring rather than a disc. A small circle fully inside a rectangle makes a hole.',
   }),
   combineLesson({
     id: 'intersect',
@@ -76,7 +76,7 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
     preparation:
       'Position two or more closed shapes so they share the area you want to keep. For practice, partly overlap two circles.',
     result: 'Only the common overlap remains as the new vector result.',
-    tip: 'If the selected shapes share no area, there is no intersection to keep.',
+    tip: "A group counts as one shape, so a grouped ring intersected with a star keeps only the star's part inside the ring. Shapes that share no area leave nothing to keep.",
   }),
   combineLesson({
     id: 'exclude',

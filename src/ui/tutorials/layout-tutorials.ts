@@ -15,9 +15,9 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose what to line up with',
         instruction:
-          'Select the objects to move. Shift-click the object you want to line up with last. This last object stays in place.',
+          'Select the objects to move. Shift-click the object you want to line up with last. This last object stays in place. A group counts as one object.',
         focus: 'Last selected = reference',
-        result: 'The last object sets the alignment position.',
+        result: 'The last object you picked sets the alignment position.',
       },
       {
         title: 'Line up an edge',
@@ -34,7 +34,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
         result: 'The smaller design sits in the centre of the larger shape.',
       },
     ],
-    tip: 'Alignment uses the box around each object. Irregular shapes may need a small adjustment by eye.',
+    tip: 'Alignment uses the box around each object. After a drag-box selection, Shift-click the reference twice (off, then on) to make it the last pick.',
     keywords: ['align', 'centre', 'center', 'left', 'right', 'top', 'bottom'],
     related: ['select', 'distribute', 'array'],
   },

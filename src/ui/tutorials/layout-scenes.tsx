@@ -143,7 +143,7 @@ export function BooleanScene({
           ? 'Two overlapping closed shapes'
           : {
               weld: 'One united outline',
-              subtract: 'Upper shape removed from lower',
+              subtract: 'Second pick removed from first',
               intersect: 'Only the shared area',
               exclude: 'Overlap removed from both',
             }[kind]}

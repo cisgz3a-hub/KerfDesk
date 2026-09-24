@@ -131,13 +131,17 @@ export function selectionCanJoinPaths(
   );
 }
 
-// ADR-103 G1: booleans need a subject AND at least one clip.
+// ADR-103 G1: booleans need a subject AND at least one clip. A selected group
+// is one operand (ADR-377), so a lone group is not enough.
 export function selectionCanCombine(project: Project, selectedIds: ReadonlyArray<string>): boolean {
   const selected = new Set(selectedIds);
   const objects = project.scene.objects.filter(
     (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
   );
-  return objects.length >= 2 && objects.every(objectHasOnlyClosedContours);
+  return (
+    objects.every(objectHasOnlyClosedContours) &&
+    selectionUnits(objects, project.scene.groups ?? []).length >= 2
+  );
 }
 
 export function selectionCanBreakApart(

@@ -47,6 +47,9 @@ type LayerActionMutation = {
 type LayerSelectionMutation = {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  // Set when the operator picks by operation, so Align and Subtract see a
+  // fresh pick order (ADR-377).
+  readonly selectionOrder?: ReadonlyArray<string>;
 };
 
 type LayerClipboardMutation = {
@@ -186,11 +189,12 @@ function selectObjectIds(ids: ReadonlyArray<string>): LayerSelectionMutation {
   return {
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),
+    selectionOrder: ids,
   };
 }
 
 function clearSelection(): LayerSelectionMutation {
-  return { selectedObjectId: null, additionalSelectedIds: new Set() };
+  return { selectedObjectId: null, additionalSelectedIds: new Set(), selectionOrder: [] };
 }
 
 function selectableObjectIdsOnLayer(scene: Scene, operation: Layer): ReadonlyArray<string> {

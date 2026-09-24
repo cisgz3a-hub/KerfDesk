@@ -20,6 +20,7 @@ import {
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
+import { orderedSelectionIds } from './selection-order';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -103,11 +104,13 @@ function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<Ap
   return applySelectionTransformsToState(state, [{ id: target.id, transform: fitted.transform }]);
 }
 
+// The reference stays put and everything else lines up to it. Like LightBurn it
+// is the last object picked (ADR-377), or that object's whole group.
 function applySelectionAlignToState(
   state: AppState,
   kind: SelectionAlignKind,
 ): AppState | Partial<AppState> {
-  const ids = selectedObjectIds(state);
+  const ids = orderedSelectionIds(state);
   const referenceId = ids[ids.length - 1];
   if (referenceId === undefined) return state;
   const scene = state.project.scene;

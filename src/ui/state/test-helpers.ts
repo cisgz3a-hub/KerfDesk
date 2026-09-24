@@ -23,6 +23,7 @@ export function resetStore(): void {
     selectedPathNode: null,
     selectedPathNodes: [],
     additionalSelectedIds: new Set(),
+    selectionOrder: [],
     previewMode: false,
     undoStack: [],
     redoStack: [],

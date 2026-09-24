@@ -9,8 +9,8 @@ import { combinedBBox, type AABB } from './hit-test';
 import type { SceneGroup } from './scene';
 import type { SceneObject } from './scene-object';
 
-export type SelectionUnit = {
-  readonly objects: ReadonlyArray<SceneObject>;
+export type SelectionUnit<T extends SceneObject = SceneObject> = {
+  readonly objects: ReadonlyArray<T>;
   readonly box: AABB;
 };
 
@@ -22,12 +22,12 @@ type GroupsByMember = ReadonlyMap<string, ReadonlyArray<SceneGroup>>;
  * missing from `objects` (a locked or hidden one) belongs to no unit and its
  * box does not count, but it still joins the groups it shares.
  */
-export function selectionUnits(
-  objects: ReadonlyArray<SceneObject>,
+export function selectionUnits<T extends SceneObject>(
+  objects: ReadonlyArray<T>,
   groups: ReadonlyArray<SceneGroup>,
-): ReadonlyArray<SelectionUnit> {
+): ReadonlyArray<SelectionUnit<T>> {
   const unitKeys = unitKeyById(objects, groups);
-  const members = new Map<string, SceneObject[]>();
+  const members = new Map<string, T[]>();
   for (const object of objects) {
     const key = unitKeys.get(object.id) ?? object.id;
     const unit = members.get(key);

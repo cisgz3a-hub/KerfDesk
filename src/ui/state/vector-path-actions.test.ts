@@ -153,7 +153,7 @@ describe('boolean + offset actions (ADR-103 G1)', () => {
     resetStore();
   });
 
-  it('subtract cuts the clip out of the bottom-most subject and replaces the selection', () => {
+  it('subtract cuts the clip out of the first selected shape and replaces the selection', () => {
     loadObjects([
       shapeObject('base', '#222222', squarePath('#222222', 0, 0, 10), IDENTITY_TRANSFORM),
       shapeObject('cutter', '#222222', squarePath('#222222', 5, 0, 10), IDENTITY_TRANSFORM),

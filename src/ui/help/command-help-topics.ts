@@ -179,7 +179,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.subtract': {
     family: 'tools',
-    tooltip: 'Cut the upper selected shapes out of the bottom-most one (boolean difference).',
+    tooltip:
+      'Cut later-selected shapes or groups out of the first one you selected (boolean difference).',
   },
   'tools.intersect': {
     family: 'tools',

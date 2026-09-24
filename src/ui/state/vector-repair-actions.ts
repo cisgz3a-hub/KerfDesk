@@ -70,6 +70,7 @@ function unionSelection(state: RepairState, operationId: string): RepairState | 
     selected,
     { id: operation.bindingOperationId ?? operation.id, color: operation.color },
     id,
+    scene.groups ?? [],
   );
   if (result.kind === 'error') {
     warn(result.error.message);

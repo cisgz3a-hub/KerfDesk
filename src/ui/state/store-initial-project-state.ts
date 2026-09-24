@@ -20,6 +20,7 @@ export function initialProjectWorkspaceState(project: Project) {
     selectedPathNode: null,
     selectedPathNodes: [],
     additionalSelectedIds: new Set(additionalSelectedIds),
+    selectionOrder: persistedIds,
     previewMode: false,
     externalGcodePreview: null,
     undoStack: [],

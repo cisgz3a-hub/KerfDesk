@@ -27,6 +27,7 @@ import {
 } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
+import { inSelectionOrder } from './selection-order';
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { planWeldSelection } from './vector-path-weld-plan';
@@ -35,7 +36,7 @@ import { vectorRepairActions, type VectorRepairActions } from './vector-repair-a
 export type VectorPathActions = VectorRepairActions & {
   readonly convertSelectionToPath: () => void;
   readonly weldSelection: () => void;
-  // ADR-103 G1 — subject = bottom-most selected object, clips = the rest.
+  // ADR-377 — subject = the first-picked shape or group, clips = the rest.
   readonly booleanSelection: (op: VectorBooleanOp) => void;
   // ADR-103 G1 — adds a NEW offset object; the sources stay.
   readonly offsetSelection: (deltaMm: number) => void;
@@ -48,6 +49,7 @@ type VectorPathState = StateSlice & {
   readonly selectedPathNode: PathNodeRef | null;
   readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly selectionOrder?: ReadonlyArray<string>;
 };
 
 type VectorPathMutation = {
@@ -219,12 +221,19 @@ function booleanSelectionMutation(
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
-  const combineResult = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
+  // Pick order decides which shape Subtract keeps, and a group is one operand.
+  const operands = inSelectionOrder(state, selected);
+  const combineResult = combineVectorObjects(
+    operands,
+    op,
+    uniqueObjectId(state.project.scene, op),
+    state.project.scene.groups ?? [],
+  );
   if (combineResult.kind === 'error') {
     useToastStore.getState().pushToast(combineResult.error.message, 'warning');
     return state;
   }
-  const prepared = prepareIndependentArtwork(state.project.scene, combineResult.value, selected[0]);
+  const prepared = prepareIndependentArtwork(state.project.scene, combineResult.value, operands[0]);
   const combined = prepared.object;
   const removeIds = new Set(selected.map((object) => object.id));
   let scene = prepared.scene;

@@ -92,7 +92,7 @@ export function planWeldSelection(
     preparedObjects.push(...prepareWeldObjectsForBucket(bucket, layer.id));
   }
 
-  const welded = weldVectorObjects(preparedObjects, resultId);
+  const welded = weldVectorObjects(preparedObjects, resultId, scene.groups);
   if (welded.kind === 'error') return welded;
   return ok({ object: welded.value, layers: insertClonedLayers(scene.layers, clonedLayers) });
 }

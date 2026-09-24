@@ -3,16 +3,21 @@
 // which owns Weld (= union) — these ops need a subject/clip split, so they
 // live apart from the color-grouped union.
 //
-// Subject convention (PROVISIONAL, ADR-103): the BOTTOM-MOST selected object
-// in z-order is the subject; every other selected object is a clip. Matches
-// the "cut the front shapes out of the back shape" reading of Subtract. The
-// result inherits the subject's color and lands as a plain path object with
-// identity transform (world-space baked), exactly like Weld.
+// Operands (ADR-377): each ungrouped object is one operand and each selected
+// group is one operand (see groupOperandRegion). The FIRST operand in the
+// given object order is the subject and every later operand is a clip, so the
+// caller's order decides what Subtract keeps; the store passes selection order,
+// matching LightBurn's "the second shape you add is subtracted from the first".
+// The result inherits the subject's color and lands as a plain path object
+// with identity transform (world-space baked), exactly like Weld.
 
 import { differenceD, FillRule, inflatePathsD, intersectD, xorD, type PathsD } from 'clipper2-ts';
 import { EndType, JoinType } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
 import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene';
+import type { SceneGroup } from '../scene/scene';
+import { selectionUnits } from '../scene/selection-units';
+import { operandRegions } from './group-operand-region';
 import {
   boundsForPaths,
   pathDToPolyline,
@@ -39,33 +44,31 @@ const FALLBACK_COLOR = '#000000';
 const MIN_OFFSET_MM = 0.001;
 
 /**
- * Combine the bottom-most object (subject) with the rest (clips). Returns an
- * error result when fewer than two objects are given, a contour is open, or the
- * result is empty (e.g. an intersection of disjoint shapes) — callers surface
- * the message as a toast.
+ * Combine the first operand (subject) with the rest (clips). A group in
+ * `groups` whose selected members are all in `objects` acts as one operand.
+ * Returns an error result when fewer than two operands are given, a contour is
+ * open, or the result is empty (e.g. an intersection of disjoint shapes) —
+ * callers surface the message as a toast.
  */
 export function combineVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   op: VectorBooleanOp,
   id: string,
+  groups: ReadonlyArray<SceneGroup> = [],
 ): Result<ImportedSvg, VectorOpError> {
-  const [subjectObject, ...clipObjects] = objects;
-  if (subjectObject === undefined || clipObjects.length === 0) {
+  const operands = selectionUnits(objects, groups).map((unit) => unit.objects);
+  const [subjectOperand, ...clipOperands] = operands;
+  const subjectObject = subjectOperand?.[0];
+  if (subjectObject === undefined || clipOperands.length === 0) {
     return err({
       kind: 'too-few-objects',
-      message: 'Boolean operations need two or more closed vector objects.',
+      message: 'Boolean operations need two or more closed vector shapes or groups.',
     });
   }
-  const subject = normalizeVectorObjectRegion(subjectObject);
-  if (subject.kind === 'error') return subject;
-  const clipRegions = clipObjects.map(normalizeVectorObjectRegion);
-  const clipError = clipRegions.find((region) => region.kind === 'error');
-  if (clipError?.kind === 'error') return clipError;
-  const combined = runBooleanOp(
-    op,
-    subject.value,
-    clipRegions.flatMap((region) => (region.kind === 'ok' ? [region.value] : [])),
-  );
+  const regions = operandRegions(operands);
+  if (regions.kind === 'error') return regions;
+  const [subject, ...clipRegions] = regions.value;
+  const combined = runBooleanOp(op, subject ?? [], clipRegions);
   if (combined.kind === 'error') return combined;
   const paths: ColoredPath[] = [
     {

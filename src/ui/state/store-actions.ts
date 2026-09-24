@@ -10,6 +10,7 @@ import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
+import { extendedSelectionOrder, freshSelectionOrder } from './selection-order';
 import type { AppState } from './store';
 import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
@@ -200,22 +201,17 @@ export function viewActions(
 > {
   return {
     selectObject: (id) =>
-      set((s) => ({
-        ...scopedSelectionProjectPatch(
+      set((s) =>
+        pickedSelectionPatch(
           s,
           id === null
             ? { selectedObjectId: null, additionalSelectedIds: new Set() }
             : selectionFromIds(s, [id], false),
+          false,
         ),
-        selectedPathNode: null,
-        selectedPathNodes: [],
-      })),
+      ),
     toggleSelectObject: (id) =>
-      set((s) => ({
-        ...scopedSelectionProjectPatch(s, toggleSelectionFromId(s, id)),
-        selectedPathNode: null,
-        selectedPathNodes: [],
-      })),
+      set((s) => pickedSelectionPatch(s, toggleSelectionFromId(s, id), true)),
     selectAllObjects: () =>
       set((s) => {
         const ids = s.project.scene.objects
@@ -223,21 +219,17 @@ export function viewActions(
           .filter((object) => sceneObjectHasVisibleLayer(s.project.scene, object))
           .map((o) => o.id);
         const [primary, ...rest] = ids;
-        return {
-          ...scopedSelectionProjectPatch(s, {
-            selectedObjectId: primary ?? null,
-            additionalSelectedIds: new Set(rest),
-          }),
-          selectedPathNode: null,
-          selectedPathNodes: [],
+        const selection = {
+          selectedObjectId: primary ?? null,
+          additionalSelectedIds: new Set(rest),
         };
+        return pickedSelectionPatch(s, selection, false);
       }),
     selectObjects: (ids, options = {}) =>
-      set((s) => ({
-        ...scopedSelectionProjectPatch(s, selectionFromIds(s, ids, options.additive === true)),
-        selectedPathNode: null,
-        selectedPathNodes: [],
-      })),
+      set((s) => {
+        const additive = options.additive === true;
+        return pickedSelectionPatch(s, selectionFromIds(s, ids, additive), additive);
+      }),
     togglePreview: () =>
       set((s) => ({
         previewMode: !s.previewMode,
@@ -310,6 +302,23 @@ export function interactionActions(
         redoStack: [],
         dirty: true,
       })),
+  };
+}
+
+// A selection the operator picked. Adding to or toggling the selection keeps
+// the earlier picks' order; any other pick starts the record afresh (ADR-377).
+function pickedSelectionPatch(
+  state: AppState,
+  selection: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
+  extendsSelection: boolean,
+) {
+  return {
+    ...scopedSelectionProjectPatch(state, selection),
+    selectionOrder: extendsSelection
+      ? extendedSelectionOrder(state, selection)
+      : freshSelectionOrder(selection),
+    selectedPathNode: null,
+    selectedPathNodes: [],
   };
 }
 

@@ -116,7 +116,7 @@ const SUBJECT = rectObject('a', 0, 0, 10, 10);
 const CLIP = rectObject('b', 5, 0, 15, 10);
 
 describe('combineVectorObjects', () => {
-  it('subtract removes the clip from the bottom-most subject', () => {
+  it('subtract removes the later clip from the first-listed subject', () => {
     const result = unwrap(combineVectorObjects([SUBJECT, CLIP], 'subtract', 'out'));
     expect(totalArea(result)).toBeCloseTo(50, 6);
     expect(result.bounds.maxX).toBeCloseTo(5, 6);

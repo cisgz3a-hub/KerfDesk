@@ -217,6 +217,10 @@ export type AppState = ObjectPropertiesActions &
     // rotate are intentionally Phase C — Phase A's transform pipeline only
     // operates on the primary selection. Move + Delete are multi-aware.
     readonly additionalSelectedIds: ReadonlySet<string>;
+    // The order the selection was picked in (ADR-377, selection-order.ts).
+    // Read it through orderedSelectionIds, which drops ids no longer selected;
+    // absent means nothing was picked yet, so stacking order applies.
+    readonly selectionOrder?: ReadonlyArray<string>;
     readonly previewMode: boolean;
     // External .nc program shown in the simulator instead of the compiled
     // job (H.6b); cleared when Preview exits. Session-only, never persisted.
