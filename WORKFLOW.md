@@ -2625,8 +2625,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
-    Disabled and sends no air command at all; re-select the preset or
-    set both by hand. With an operation's Air on, Frame
+    Disabled and sends no air command at all; the Air output row then
+    offers **Use preset air settings** (ADR-366), which sets both. With
+    an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
     operator left on stays on. With the first operation's Air off, Job
@@ -2640,9 +2641,11 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
     page defines `$152` as the standby wait, so `100` keeps the pump
     powered and `0` idles it immediately; the A1 Pro page does not list
-    it). KerfDesk does not send `$` setting writes on the
-    Falcon command set, so set `$152` with the controller's own tools.
-    Untick "Air restart" and the same job must
+    it). Send `$152=100` from the Console while Idle: on the Falcon
+    command set it accepts `$150`, `$151` and `$152` (whole numbers
+    0-100) and still refuses every other numeric setting write
+    (ADR-366). The write clears the Frame proof, so Frame again before
+    Start. Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
