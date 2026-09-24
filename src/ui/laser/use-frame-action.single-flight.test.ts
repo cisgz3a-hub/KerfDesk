@@ -263,6 +263,7 @@ describe('Frame preparation ownership', () => {
       pending: false,
       progress: null,
       stage: 'preparing',
+      cancellable: false,
     });
     // Nothing owns a Frame now, so a late report has no control to describe.
     worker.report(progress);
