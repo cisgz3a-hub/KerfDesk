@@ -56,7 +56,9 @@ export function LayerImageFields(props: {
         <span style={unitStyle}>dpi</span>
       </FieldRow>
       <p className="lf-laser-help">
-        Line interval and DPI describe the same scan density. Changing one updates the other.
+        Line interval and DPI describe the same scan density. Changing one updates the other. A
+        smaller line interval (higher DPI) burns more energy per area at the same power and speed,
+        so lower power or raise speed when you tighten it.
       </p>
       <FieldRow label="Dot width">
         <DotWidthCorrectionInput {...controlProps} />
@@ -266,7 +268,7 @@ function DotWidthCorrectionInput(props: {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Dot width correction for ${labelContext}`}
-      title="Compensate for physical laser dot width when raster engraving this layer."
+      title="Compensate for physical laser dot width when raster engraving this layer. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan."
     />
   );
 }

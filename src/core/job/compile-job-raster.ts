@@ -1,7 +1,8 @@
 import { type DeviceProfile } from '../devices';
 import { clamp } from '../math';
-import { applyImageMaskToLuma, dither, pixelExtentForMm, resampleLumaNearest } from '../raster';
+import { applyImageMaskToLuma, dither, pixelExtentForMm, resampleLuma } from '../raster';
 import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processing';
+import { burnGridKernel } from '../raster/luma-resample';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
@@ -185,6 +186,7 @@ function rasterValuesFor(
     device: input.device,
     bounds: input.bounds,
     algorithm: imageDitherAlgorithm(input.layer),
+    passThrough: input.layer.passThrough,
     sMax: input.sMax,
     sMin: input.sMin,
   });
@@ -227,6 +229,8 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         bounds: input.bounds,
         pixelWidth: input.pixelWidth,
         pixelHeight: input.pixelHeight,
+        kernel: burnGridKernel(imageDitherAlgorithm(input.layer)),
+        passThrough: input.layer.passThrough,
       },
       input.maskObject,
     );
@@ -237,7 +241,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
   }
   const luma = input.layer.passThrough
     ? input.preparedLuma
-    : resampleLumaNearest(
+    : resampleLuma(
         {
           luma: input.preparedLuma,
           width: input.obj.pixelWidth,
@@ -245,6 +249,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         },
         input.pixelWidth,
         input.pixelHeight,
+        burnGridKernel(imageDitherAlgorithm(input.layer)),
       );
   const maskedLuma = applyImageMaskToLuma({
     image: input.obj,
