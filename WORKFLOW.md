@@ -4943,8 +4943,9 @@ as the pane's design record.
 1. An incomplete physical checklist, a retained-position choice without its
    evidence, a boundary pass that does not exist in the sealed job, or a failed
    preflight refuses with the specific reason; no controller command is sent.
-2. Legacy fingerprint-only capsules cannot use pass recovery and are directed
-   to the legacy review path.
+2. Fingerprint-only capsules (a migrated legacy checkpoint or an ADR-337 Start
+   stand-in) cannot use pass recovery and are directed to the runway review
+   (F-CNC27), which uses the current-project fingerprint fallback.
 
 #### Empty
 1. Without a retained CNC capsule no recovery card is shown (unchanged).

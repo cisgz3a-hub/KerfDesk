@@ -79,7 +79,8 @@ export function buildCncRecoveryPreviewModel(
 }
 
 /**
- * Explicit compatibility boundary for migrated fingerprint-only records.
+ * Explicit compatibility boundary for fingerprint-only records: a migrated
+ * checkpoint or an ADR-337 Start stand-in.
  * This is the only preview path allowed to compile the open project.
  */
 export function buildLegacyFingerprintOnlyCncRecoveryPreviewModel(
@@ -106,7 +107,7 @@ function buildCapsulePreview(
   if (artifact.kind === 'legacy-fingerprint-only') {
     return unavailable(
       legacyEvidenceChecks(capsule),
-      'This migrated fingerprint-only record requires the explicit legacy current-project fallback.',
+      'This fingerprint-only record requires the explicit current-project fallback, which continues only if the current project compiles to the same fingerprint.',
       recoveryParametersFromAcceleration(100),
     );
   }
@@ -174,12 +175,16 @@ function buildLegacyPreview(
     return unavailable(base, 'The device acceleration setting is invalid.', parameters);
   }
   if (checkpoint.machineKind !== 'cnc' || project.machine?.kind !== 'cnc') {
-    return unavailable(base, 'Open the original CNC project for this legacy record.', parameters);
+    return unavailable(
+      base,
+      'Open the original CNC project for this fingerprint-only record.',
+      parameters,
+    );
   }
   if (costlyCanvasPreparation(project, checkpoint.outputScope)) {
     return unavailable(
       base,
-      'This legacy recovery preview requires background compilation, which is unavailable in the legacy flow.',
+      'This fingerprint-only recovery preview requires background compilation, which is unavailable in the current-project fallback.',
       parameters,
     );
   }
@@ -188,7 +193,11 @@ function buildLegacyPreview(
     ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
   if (!prepared.ok) {
-    return unavailable(base, 'The current project cannot compile this legacy record.', parameters);
+    return unavailable(
+      base,
+      'The current project cannot compile this fingerprint-only record.',
+      parameters,
+    );
   }
   const emitted = emitPreparedGcode(prepared, {
     outputScope: checkpoint.outputScope,
@@ -207,7 +216,7 @@ function buildLegacyPreview(
   if (emitSplit.blocking.length > 0) {
     return unavailable(
       [...advisories, ...base],
-      `The current project cannot emit this legacy record: ${emitSplit.blocking.join(' ')}`,
+      `The current project cannot emit this fingerprint-only record: ${emitSplit.blocking.join(' ')}`,
       parameters,
     );
   }
@@ -216,7 +225,7 @@ function buildLegacyPreview(
   if (!programMatches) {
     return unavailable(
       checks,
-      'The current project does not reproduce the legacy interrupted program.',
+      'The current project does not reproduce the saved G-code fingerprint.',
       parameters,
     );
   }

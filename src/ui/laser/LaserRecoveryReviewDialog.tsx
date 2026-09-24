@@ -211,16 +211,18 @@ function RecoveryActions(props: {
 }
 
 function ArtifactSummary({ capsule }: { readonly capsule: RecoveryCapsule }): JSX.Element {
+  // A fingerprint-only record is a migrated checkpoint or an ADR-337 Start
+  // stand-in, so this copy never calls it older, migrated or legacy.
   if (capsule.artifact.kind === 'legacy-fingerprint-only') {
     return (
       <section aria-labelledby="laser-recovery-artifact-title" style={sectionStyle}>
         <h3 id="laser-recovery-artifact-title" style={sectionTitleStyle}>
-          Legacy fingerprint-only record
+          Fingerprint-only record
         </h3>
         <p style={bodyStyle}>
-          This older record does not contain the exact emitted G-code. Explicit recovery can
-          continue only if the current project compiles to the same fingerprint. Nothing is imported
-          into the open project automatically.
+          This record holds only the program fingerprint, not the exact emitted G-code. Explicit
+          recovery can continue only if the current project compiles to the same fingerprint.
+          Nothing is imported into the open project automatically.
         </p>
       </section>
     );
