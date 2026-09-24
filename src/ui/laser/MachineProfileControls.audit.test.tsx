@@ -4,11 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { ControlledLaserOffTravelRow } from './ControlledLaserOffTravelRow';
-import { HomingEditor } from './DeviceProfileFields';
 import { AirRestartRow, LaserPowerRows } from './DeviceProfilePowerFields';
 import { ZRows } from './DeviceProfileRows';
 import { SafetyZonesPanel as SetupSafetyZonesPanel } from './MachineSetupSafetyZones';
-import { PlannerAdvanced } from './PlannerAdvanced';
 import { SafetyZonesPanel } from './SafetyZonesPanel';
 
 (
@@ -57,20 +55,10 @@ describe('Machine profile control audit', () => {
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 
-  it('homing and laser mode checkboxes produce profile patches without issuing controller commands', () => {
-    const onChange = vi.fn();
+  it('laser mode checkbox produces a profile patch without issuing controller commands', () => {
     const update = vi.fn();
     const device = { ...useStore.getState().project.device, laserModeEnabled: false };
-    act(() =>
-      root.render(
-        <>
-          <HomingEditor enabled={false} direction="rear-left" onChange={onChange} />
-          <LaserPowerRows device={device} update={update} />
-        </>,
-      ),
-    );
-    act(() => checkbox('Homing enabled').click());
-    expect(onChange).toHaveBeenCalledWith({ enabled: true, direction: 'rear-left' });
+    act(() => root.render(<LaserPowerRows device={device} update={update} />));
     act(() => checkbox('GRBL $32 laser mode enabled').click());
     expect(update).toHaveBeenCalledWith({ laserModeEnabled: true });
     expect(update).toHaveBeenCalledTimes(1);
@@ -133,30 +121,4 @@ describe('Machine profile control audit', () => {
       expect(host.querySelector('input[type="checkbox"]')).toBeNull();
     },
   );
-
-  it('advanced estimator disclosure opens and closes without mutating estimate settings', () => {
-    const onChange = vi.fn();
-    act(() =>
-      root.render(
-        <PlannerAdvanced
-          accel={1000}
-          jd={0.01}
-          cutTimeScale={1}
-          travelTimeScale={1}
-          onAccelChange={onChange}
-          onJdChange={onChange}
-          onCutTimeScaleChange={onChange}
-          onTravelTimeScaleChange={onChange}
-        />,
-      ),
-    );
-    const details = host.querySelector('details')!;
-    const summary = details.querySelector('summary')!;
-    expect(details.open).toBe(false);
-    act(() => summary.click());
-    expect(details.open).toBe(true);
-    act(() => summary.click());
-    expect(details.open).toBe(false);
-    expect(onChange).not.toHaveBeenCalled();
-  });
 });

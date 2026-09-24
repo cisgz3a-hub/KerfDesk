@@ -74,4 +74,4 @@ the same page taught two different rules for "choose one of these".
 - WORKFLOW.md F-C7 stage 1 and the `machine-setup` tutorial describe the lane.
 - The dead standalone `ProfileCatalogPanel` in `MachineSetupProfiles.tsx` keeps
   its old card shape. It is referenced only by its own test; folding or deleting
-  it remains the separate refactor ADR-240 already deferred.
+  it remains the separate refactor ADR-240 already deferred. (ADR-363 deleted it.)

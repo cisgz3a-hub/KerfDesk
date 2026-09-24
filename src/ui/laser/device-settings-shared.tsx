@@ -1,7 +1,5 @@
-// device-settings-shared — small primitives (Row + style tokens) reused
-// across the DeviceSettings sub-components. Extracted to break circular
-// imports between DeviceSettings.tsx (the parent) and its split-out
-// children (AutofocusEditor, PlannerAdvanced).
+// device-settings-shared — small primitives (Row + style tokens) shared by
+// the device profile field editors and the Machine Setup steps that mount them.
 
 export function Row({
   label,
