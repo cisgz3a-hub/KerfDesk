@@ -79,6 +79,14 @@ export const canvasTheme = {
   previewCut: '#2563eb',
   previewHeadFill: '#ff3b30',
   previewHeadStroke: '#fff',
+  // Closed-cut start marks (preview-cut-start-markers, ADR-385): automatic
+  // starts and operator-set starts must be told apart at a glance.
+  get previewCutStart() {
+    return themed('#047857', '#34d399');
+  },
+  get previewCutStartSet() {
+    return themed('#b45309', '#fbbf24');
+  },
   // Large-scene simplification notice (draw-vector-strokes)
   noticeFill: 'rgba(255, 248, 225, 0.95)',
   noticeStroke: '#d6a100',

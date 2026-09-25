@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawPreviewCutStartMarkers } from './preview-cut-start-markers';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
@@ -68,6 +69,8 @@ export type DrawOpts = {
   readonly displayPolylineCache?: DisplayPolylineCache;
   readonly previewToolpath?: Toolpath;
   readonly previewShowTravel?: boolean;
+  // ADR-385: mark where each closed Line cut starts and which way it runs.
+  readonly previewShowStartPoints?: boolean;
   readonly previewBackgroundKey?: object;
   readonly previewRouteRenderer?: (
     ctx: CanvasRenderingContext2D,
@@ -188,10 +191,22 @@ function drawPreviewModeScene(
     drawCncRemoval(ctx, opts.cncRemovalGrid, view, stockMaterialKey(project));
   }
   if (opts.previewToolpath === undefined) return;
+  drawPreviewRoute(ctx, opts.previewToolpath, view, opts);
+  if (opts.previewShowStartPoints === true) {
+    drawPreviewCutStartMarkers(ctx, opts.previewToolpath, view);
+  }
+}
+
+function drawPreviewRoute(
+  ctx: CanvasRenderingContext2D,
+  toolpath: Toolpath,
+  view: ViewTransform,
+  opts: DrawOpts,
+): void {
   if (
     opts.previewRouteRenderer?.(
       ctx,
-      opts.previewToolpath,
+      toolpath,
       view,
       opts.scrubberT ?? 1,
       opts.previewShowTravel !== false,
@@ -199,7 +214,7 @@ function drawPreviewModeScene(
     ) === true
   )
     return;
-  drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
+  drawPreview(ctx, toolpath, view, opts.scrubberT ?? 1, {
     showTravel: opts.previewShowTravel !== false,
     showFuture: true,
     showEndpoints: true,

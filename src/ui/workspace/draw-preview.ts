@@ -39,6 +39,7 @@ import {
   registerPreviewJobOriginOffset,
 } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
+import { withPreviewCutStartMarkers } from './preview-cut-start-markers';
 import { preparePreviewFrame } from './preview-route-frame';
 import { renderPreviewFrame } from './preview-route-render';
 
@@ -224,7 +225,13 @@ export function buildPreviewToolpathFromPrepared(
     : previewRouteExceedsBudget(machineToolpath)
       ? mapOwnedToolpathToPackedScene
       : mapOwnedToolpathToScene;
-  const previewToolpath = mapPreview(machineToolpath, prepared.jobOriginOffset, project.device);
+  // Start marks go on before registration: both registries key by identity.
+  const previewToolpath = withPreviewCutStartMarkers(
+    mapPreview(machineToolpath, prepared.jobOriginOffset, project.device),
+    prepared.job,
+    prepared.jobOriginOffset,
+    project.device,
+  );
   registerPreviewJobOriginOffset(previewToolpath, prepared.jobOriginOffset);
   if (planPreview) {
     registerExecutablePlanPreviewRoute({

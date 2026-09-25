@@ -5,6 +5,7 @@
 // preview (the raster sim renders separately).
 
 import type { Toolpath } from '../../core/job';
+import type { CutStartMarker } from '../../core/job/cut-start-markers';
 import type { Project } from '../../core/scene';
 import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-route';
 
@@ -30,6 +31,8 @@ export type PreviewIssue =
 export type PreviewToolpath = Toolpath &
   ExecutablePlanPreviewCarrier & {
     readonly previewIssue?: PreviewIssue;
+    /** ADR-385: closed Line cut starts in scene space, in cut order. */
+    readonly cutStartMarkers?: ReadonlyArray<CutStartMarker>;
   };
 
 export function previewIssueFor(toolpath: Toolpath): PreviewIssue | null {

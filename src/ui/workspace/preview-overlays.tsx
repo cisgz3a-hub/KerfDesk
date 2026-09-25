@@ -14,6 +14,7 @@ import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
 import { PreviewEstimateBreakdown } from './preview-estimate-breakdown';
 import { PreviewResolutionBanner } from './preview-resolution';
+import { PreviewStartPointsToggle } from './PreviewStartPointsToggle';
 import type { PreviewIssue } from './preview-status';
 import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
 import { RoutePreviewDisplayBanner } from './RoutePreviewDisplayBanner';
@@ -117,6 +118,7 @@ export function PreviewStatsPanel(props: {
         />
         Traversal moves
       </label>
+      <PreviewStartPointsToggle toolpath={props.toolpath} />
       <span>
         Estimated time <strong>{formatEstimate(props.estimate)}</strong>
       </span>

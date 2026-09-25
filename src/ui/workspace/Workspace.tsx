@@ -46,7 +46,7 @@ export function Workspace(): JSX.Element {
     useWorkspaceSelection();
   const previewMode = useStore((s) => s.previewMode);
   const routePreviewLabel = useStore(selectRoutePreviewLabel);
-  const { scrubberT, showPreviewTravel } = useWorkspacePreviewState();
+  const { scrubberT, showPreviewTravel, showPreviewStartPoints } = useWorkspacePreviewState();
   const toolMode = useUiStore((s) => s.toolMode);
   const artworkRunFocus = useUiStore((s) => s.artworkRunFocus);
   const viewState = useViewState();
@@ -71,6 +71,7 @@ export function Workspace(): JSX.Element {
     cncRemovalGrid,
     scrubberT,
     showPreviewTravel,
+    showPreviewStartPoints,
     viewState,
     canvasSize,
     previewBitmap,
@@ -161,10 +162,15 @@ function selectRoutePreviewLabel(state: ReturnType<typeof useStore.getState>): s
 function useWorkspacePreviewState(): {
   readonly scrubberT: number;
   readonly showPreviewTravel: boolean;
+  readonly showPreviewStartPoints: boolean;
 } {
   const scrubberT = useUiStore((state) => state.scrubberT);
   const showPreviewTravel = useUiStore((state) => state.showPreviewTravel);
-  return useMemo(() => ({ scrubberT, showPreviewTravel }), [scrubberT, showPreviewTravel]);
+  const showPreviewStartPoints = useUiStore((state) => state.showPreviewStartPoints);
+  return useMemo(
+    () => ({ scrubberT, showPreviewTravel, showPreviewStartPoints }),
+    [scrubberT, showPreviewTravel, showPreviewStartPoints],
+  );
 }
 
 function useDropPenDraftOnProjectReplace(project: Project): void {
@@ -214,6 +220,7 @@ type WorkspaceDrawArgs = {
   readonly cncRemovalGrid: RemovalGrid | null;
   readonly scrubberT: number;
   readonly showPreviewTravel: boolean;
+  readonly showPreviewStartPoints: boolean;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   // Not read directly — the draw effect reads canvas.width/height — but a
   // bitmap resize clears the canvas, so the effect must re-run on it.
@@ -271,6 +278,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     args.previewMode,
     args.scrubberT,
     args.showPreviewTravel,
+    args.showPreviewStartPoints,
     args.viewState,
     args.canvasSize,
     args.previewBitmap.drawRoute,
@@ -314,6 +322,7 @@ function drawWorkspaceScene(
     preview: args.previewMode,
     scrubberT: args.scrubberT,
     previewShowTravel: args.showPreviewTravel,
+    previewShowStartPoints: args.showPreviewStartPoints,
     previewRouteRenderer: args.previewBitmap.drawRoute,
     previewBackgroundKey: state.previewBackgroundKey,
     view: args.viewState,

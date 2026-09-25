@@ -110,6 +110,8 @@ export type UiState = ArtworkRunOrderUiState &
     readonly setScrubberT: (next: number) => void;
     readonly showPreviewTravel: boolean;
     readonly setShowPreviewTravel: (next: boolean) => void;
+    readonly showPreviewStartPoints: boolean;
+    readonly setShowPreviewStartPoints: (next: boolean) => void;
     readonly showCanvasStartMarkers: boolean;
     readonly setShowCanvasStartMarkers: (next: boolean) => void;
     readonly previewPlaying: boolean;
@@ -285,6 +287,8 @@ export const useUiStore = create<UiState>((set) => ({
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
   showPreviewTravel: true,
   setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
+  showPreviewStartPoints: false,
+  setShowPreviewStartPoints: (next) => set({ showPreviewStartPoints: next }),
   showCanvasStartMarkers: readCanvasStartMarkersVisible(),
   setShowCanvasStartMarkers: (next) => {
     writeCanvasStartMarkersVisible(next);

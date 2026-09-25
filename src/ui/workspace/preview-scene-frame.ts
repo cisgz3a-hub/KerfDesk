@@ -87,7 +87,7 @@ export function mapOwnedToolpathToPackedScene(
   return { steps: new PackedToolpathSteps(packed), totalLength: toolpath.totalLength };
 }
 
-function scenePointMapper(jobOriginOffset: Vec2, device: DeviceProfile): (p: Vec2) => Vec2 {
+export function scenePointMapper(jobOriginOffset: Vec2, device: DeviceProfile): (p: Vec2) => Vec2 {
   return (p) => toSceneCoords({ x: p.x - jobOriginOffset.x, y: p.y - jobOriginOffset.y }, device);
 }
 
