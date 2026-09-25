@@ -157,7 +157,9 @@ async function holdAtToolChange(device: Device): Promise<void> {
     ),
   });
   // The device acks every job line; let the pre-M0 tail drain and a fresh Idle arrive.
-  await settle(400);
+  await vi.waitFor(() => expect(useLaserStore.getState().toolChangeIdleSeen).toBe(true), {
+    timeout: 5000,
+  });
 }
 
 beforeEach(() => {
@@ -189,15 +191,17 @@ describe('ST-1: Continue during an operator jog inside a tool-change hold', () =
 
     // Touch off the new bit: Zero Z records work-Z evidence for the hold.
     await useLaserStore.getState().zeroZHere();
-    await settle();
-    expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull();
+    await vi.waitFor(() => expect(useLaserStore.getState().workZZeroEvidence).not.toBeNull());
 
     // The operator lifts Z with an ordinary jog. GRBL acks `$J=` at parse
     // time and stays in STATE_JOG while the move runs.
     await useLaserStore.getState().jog({ dz: 10, feed: 300 });
-    await settle(300);
+    // Real timers drive the status poll; wait for its Jog reply rather than a
+    // fixed time, which a loaded machine overran.
+    await vi.waitFor(() => expect(useLaserStore.getState().statusReport?.state).toBe('Jog'), {
+      timeout: 5000,
+    });
     expect(device.machine).toBe('Jog');
-    expect(useLaserStore.getState().statusReport?.state).toBe('Jog');
     expect(useLaserStore.getState().motionOperation?.kind).toBe('jog');
 
     // Evidence of the defect #1: the Continue button is enabled mid-jog.

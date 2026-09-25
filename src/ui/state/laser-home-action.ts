@@ -7,6 +7,7 @@ import {
 } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { resetRequiredBlockMessage } from './controller-reset-required';
+import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 import {
@@ -50,33 +51,36 @@ let nextHomeOperationId = 1;
 // whole cycle.
 const HOME_COMMAND_TIMEOUT_MS = 120_000;
 
+const PENDING_WRITE_HOME_MESSAGE =
+  'Home is blocked until the previous controller write and terminal acknowledgement settle.';
+
 function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): HomeReadiness {
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
   const state = get();
-  // An MPG owns the controller, or a critical event left it accepting only a
-  // soft reset (controller-reset-required.ts).
-  const ownershipBlocked = mpgCommandBlockMessage(state) ?? resetRequiredBlockMessage(state);
-  if (ownershipBlocked !== null) blockHome(set, get, ownershipBlocked);
-  if (hasPendingControllerWrite(get())) {
-    const message =
-      'Home is blocked until the previous controller write and terminal acknowledgement settle.';
-    blockHome(set, get, message);
-  }
-  const controllerState = state.statusReport?.state ?? null;
-  const alarmRecoveryKnown =
-    controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
-  if (controllerState !== 'Idle' && !alarmRecoveryKnown) {
-    blockHome(
-      set,
-      get,
-      `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`,
-    );
-  }
-  const blockedMessage = setupCommandBlockMessage(get());
-  if (blockedMessage === null) return { homeCommand, fromAlarm: alarmRecoveryKnown };
+  const fromAlarm = alarmRecoveryKnown(state);
+  const blockedMessage =
+    // An MPG owns the controller, or a critical event left it accepting only a
+    // soft reset (controller-reset-required.ts).
+    mpgCommandBlockMessage(state) ??
+    resetRequiredBlockMessage(state) ??
+    (hasPendingControllerWrite(state) ? PENDING_WRITE_HOME_MESSAGE : null) ??
+    homeStateBlockMessage(state, fromAlarm) ??
+    setupCommandBlockMessage(state);
+  if (blockedMessage === null) return { homeCommand, fromAlarm };
   blockHome(set, get, blockedMessage);
+}
+
+function alarmRecoveryKnown(state: LaserState): boolean {
+  const controllerState = state.statusReport?.state ?? null;
+  return controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
+}
+
+function homeStateBlockMessage(state: LaserState, fromAlarm: boolean): string | null {
+  const controllerState = state.statusReport?.state ?? null;
+  if (controllerState === 'Idle' || fromAlarm) return null;
+  return `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`;
 }
 
 function blockHome(set: SetFn, get: GetFn, message: string): never {
@@ -150,8 +154,10 @@ async function executeHomeSequence(
   // Vendor Home sequences can contain one command per axis. Each line must
   // earn its own terminal acknowledgement before the next line is dispatched;
   // the first axis's ok must never authorize the final settlement marker.
-  for (const command of homeCommand.split(/\r?\n/).filter((line) => line.trim() !== '')) {
+  const lines = homeCommand.split(/\r?\n/).filter((line) => line.trim() !== '');
+  for (const [index, command] of lines.entries()) {
     assertHomeCurrent(get(), refs, epochs);
+    if (index > 0) set(reopenHomeAlarmReplyWindow);
     await startControllerCommand(refs, safeWrite, {
       kind: 'home',
       label: 'home',

@@ -1,8 +1,7 @@
-// Audit HF-1 repro: the Falcon's two-line Home ($HX then $HY) on a grblHAL
-// controller with homing init lock.
+// The Falcon's two-line Home ($HX then $HY) on a grblHAL controller with its
+// homing lock (controller audit 2026-09-25 HF-1).
 //
-// Correct behaviour (upstream grblHAL core, system.c go_home, lines 494-505 at
-// d7aaee3d84b1e7010f075d395206afff038d7379):
+// grblHAL core system.c go_home, lines 494-505 at d7aaee3d:
 //
 //     if(retval == Status_OK && !sys.abort) {
 //         state_set(STATE_IDLE);
@@ -15,13 +14,12 @@
 //
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L494-L505
 //
-// With `$22` homing init lock on, after `$HX` completes and before `$HY` runs,
-// grblHAL is back in Alarm (code 11, no ALARM: line is printed) because Y is
-// not yet homed. A `?` serviced in that gap is answered `<Alarm|...>`. The
-// vendor Home is still in progress: `$HY` is already written and will home Y,
-// after which grblHAL returns to Idle. KerfDesk should not treat that
-// between-lines Alarm report as a new alarm that ends the Home; the Home should
-// finish on the settle marker and a fresh Idle.
+// With `$22` homing lock on, grblHAL is back in Alarm (code 11, no ALARM: line)
+// after `$HX` finishes, because Y is not yet homed. A `?` served before `$HY`
+// starts reads `<Alarm|...>`. The Home is still in progress: `$HY` is written
+// and homes Y, after which grblHAL reports Idle. KerfDesk re-opens the stale
+// Alarm window for each further Home line (laser-home-alarm-reply.ts), so the
+// Home finishes on the settle marker and a fresh Idle.
 //
 // Timing: with status reports while homing off by default (config.h:745-753),
 // a `?` that arrives during the $HX cycle is served at motion_control.c:960,
@@ -29,19 +27,13 @@
 // grblHAL between go_home's re-lock and the start of $HY (about one host round
 // trip). KerfDesk fast-polls every 250 ms during Home, so this is a race, not
 // every Home.
-//
-// Current KerfDesk: laser-home-alarm-reply.ts only tolerates a stale Alarm reply
-// before the FIRST non-Alarm report of the whole Home; the `<Home|...>` report
-// of the `$HX` cycle closes that window, so the between-lines `<Alarm|...>` runs
-// handleInvalidatingStatus (laser-status-line.ts), which clears the Home owner
-// and rejects the pending `$HY` command with "Controller entered Alarm.".
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeSerialPort } from '../../__fixtures__/controllers/fake-serial-port';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
-import { connectOptionsForDevice } from '../../ui/commands/connect-options';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
+import { connectOptionsForDevice } from '../commands/connect-options';
+import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 const IDLE = '<Idle|MPos:0.000,0.000,0.000|FS:0,0>';
 const ALARM = '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>';
@@ -61,9 +53,9 @@ afterEach(async () => {
 });
 
 describe('HF-1 Falcon $HX/$HY Home on grblHAL with homing init lock', () => {
-  // Control: identical wire sequence without the between-lines Alarm reply.
-  // Passes on current code, so the only difference in the failing case below
-  // is the `<Alarm|...>` report grblHAL legitimately sends between the lines.
+  // Control: identical wire sequence without the between-lines Alarm reply, so
+  // the only difference in the cases below is the `<Alarm|...>` report grblHAL
+  // legitimately sends between the lines.
   it('control: finishes the Home when no status is serviced between $HX and $HY', async () => {
     expect(await runFalconHome({ gapAlarmReport: false })).toEqual({
       outcome: 'resolved',
@@ -72,7 +64,6 @@ describe('HF-1 Falcon $HX/$HY Home on grblHAL with homing init lock', () => {
   });
 
   it('finishes the Home when grblHAL reports Alarm between $HX and $HY', async () => {
-    // Current code: { outcome: 'Controller entered Alarm.', homingState: 'unknown' }.
     expect(await runFalconHome({ gapAlarmReport: true })).toEqual({
       outcome: 'resolved',
       homingState: 'confirmed',
@@ -81,9 +72,8 @@ describe('HF-1 Falcon $HX/$HY Home on grblHAL with homing init lock', () => {
 
   // Same re-lock when Home starts from Idle after an Unlock ($X leaves the axes
   // unhomed, so limits_homing_required() is still true after $HX;
-  // machine_limits.c:668-673). Here the stale-Alarm window is never opened.
+  // machine_limits.c:668-673). No stale-Alarm window is open for the first line.
   it('finishes a Home started from Idle when grblHAL re-locks between $HX and $HY', async () => {
-    // Current code: { outcome: 'Controller entered Alarm.', homingState: 'unknown' }.
     expect(await runFalconHome({ gapAlarmReport: true, startInAlarm: false })).toEqual({
       outcome: 'resolved',
       homingState: 'confirmed',
