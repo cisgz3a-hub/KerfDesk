@@ -26,6 +26,12 @@ import {
   type CrackSubPixelField,
 } from './contour-boundary';
 import { fairChainSegments } from './fair-chain';
+import {
+  CONNECT_PAPER_AT_SADDLES,
+  createSaddleResolver,
+  normalizeTurnPolicy,
+  type TurnPolicy,
+} from './saddle-connectivity';
 import { fitCubicsThroughPoints } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
@@ -159,6 +165,7 @@ export function* traceImageToContourColoredPathsSteps(
     fitToleranceScale: toleranceScale,
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     pixelScale: scale,
+    turnPolicy: normalizeTurnPolicy(options.turnPolicy),
     ...(crackField === null ? {} : { crackField }),
   });
   return polylines.length === 0
@@ -180,6 +187,9 @@ export type ContourFinishOptions = {
   /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
    *  mid-crack vertices (binary-only callers like the edge lane). */
   readonly crackField?: CrackSubPixelField;
+  /** Saddle policy (ADR-395), matching the one the mask cleanup used.
+   *  Omitted = the historical rule (ink four-connected), as the edge lane. */
+  readonly turnPolicy?: TurnPolicy;
 };
 
 /** Finish a binary ink mask into smooth closed outlines — the shared
@@ -209,7 +219,11 @@ export function* contourPolylinesFromMaskSteps(
     crackField: options.crackField,
   };
   const contours: FinishedContour[] = [];
-  for (const loop of traceBoundaryLoops(mask)) {
+  const saddles =
+    options.turnPolicy === undefined
+      ? CONNECT_PAPER_AT_SADDLES
+      : createSaddleResolver(mask, options.turnPolicy, options.crackField);
+  for (const loop of traceBoundaryLoops(mask, saddles)) {
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.

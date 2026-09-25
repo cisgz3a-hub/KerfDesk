@@ -86,9 +86,16 @@ describe('Centerline preset connectivity', () => {
     inkRect(image, 100, 70, 1, 1);
 
     // The 12-pixel diagonal meets the area threshold; the 11-pixel diagonal
-    // and lone speck remain noise. Filled contours keep four-connectivity.
+    // and lone speck remain noise. Filled contours now judge the diagonal as
+    // their walker traces it — one hairline (ADR-395) — so they agree with
+    // Centerline; the historical four-connected rule is still available.
     expect(lowerInkPixels(preprocessForTrace(image, CENTERLINE))).toBe(12);
-    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(0);
+    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(12);
+    expect(
+      lowerInkPixels(
+        preprocessForTrace(image, { ...TRACE_PRESETS['Line Art']!, turnPolicy: 'connect-paper' }),
+      ),
+    ).toBe(0);
   });
 });
 
