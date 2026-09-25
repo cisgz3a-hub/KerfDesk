@@ -8,6 +8,7 @@ import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput } from '../gcode';
 
 export type EmitRdOptions = {
+  /** The export placement. It also picks the file's reference-point mode. */
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
 };
@@ -29,11 +30,15 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
     ...(options.jobOrigin ? { jobOrigin: options.jobOrigin } : {}),
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
   });
-  return emitPreparedRdFile(prepared);
+  return emitPreparedRdFile(prepared, options);
 }
 
-/** Encodes a previously prepared output without compiling the project again. */
-export function emitPreparedRdFile(prepared: PreparedOutput): EmitRdResult {
+/** Encodes a previously prepared output without compiling the project again.
+ *  `options` must be the ones the output was prepared with. */
+export function emitPreparedRdFile(
+  prepared: PreparedOutput,
+  options: EmitRdOptions = {},
+): EmitRdResult {
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
@@ -45,7 +50,11 @@ export function emitPreparedRdFile(prepared: PreparedOutput): EmitRdResult {
     prepared.project.device,
     prepared.project.machine,
   );
-  const encoded = encodeRdJob(machineJob, prepared.project.device);
+  const encoded = encodeRdJob(
+    machineJob,
+    prepared.project.device,
+    options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin },
+  );
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
   return { ok: true, bytes: encoded.bytes, advisories: prepared.advisories ?? [] };
 }

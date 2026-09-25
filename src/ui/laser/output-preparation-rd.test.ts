@@ -1,8 +1,9 @@
 import { deepStrictEqual } from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
+import { swizzleBytes } from '../../core/controllers/ruida';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
-import { emitRdFile } from '../../io/rd';
+import { emitRdFile, type EmitRdOptions } from '../../io/rd';
 import { outputPreparationShouldRunOffThread } from './output-preparation-worker-client';
 import { prepareOutputRequest } from './output-preparation';
 
@@ -33,9 +34,33 @@ describe('Ruida background output preparation', () => {
     },
     EQUIVALENCE_TIMEOUT_MS,
   );
+
+  // Audit RU-2: the worker encoded without the request options, so its file
+  // could name a different reference point than the direct path.
+  it('encodes with the request placement', async () => {
+    const project = heavyRuidaLineProject(1);
+    const options: EmitRdOptions = {
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    };
+    const direct = emitRdFile(project, options);
+    if (!direct.ok) throw new Error('direct fixture emission failed');
+
+    const response = await prepareOutputRequest(
+      { kind: 'rd', project, options },
+      { jobId: 'rd-placement' },
+    );
+
+    if (response.kind !== 'rd' || !response.result.ok) {
+      throw new Error('background fixture emission failed');
+    }
+    deepStrictEqual(response.result.bytes, direct.bytes);
+    expect(response.result.advisories).toEqual(direct.advisories);
+    // D8 11 "Ref Point Mode 1, Anchor Point" swizzled with magic 0x88.
+    expect([...response.result.bytes.slice(0, 2)]).toEqual([...swizzleBytes([0xd8, 0x11])]);
+  });
 });
 
-function heavyRuidaLineProject(): Project {
+function heavyRuidaLineProject(passes = HEAVY_LINE_PASSES): Project {
   const color = '#000000';
   return {
     ...createProject(),
@@ -44,7 +69,7 @@ function heavyRuidaLineProject(): Project {
       layers: [
         {
           ...createLayer({ id: color, color, mode: 'line' }),
-          passes: HEAVY_LINE_PASSES,
+          passes,
         },
       ],
       objects: [
