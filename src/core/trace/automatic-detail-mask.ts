@@ -16,7 +16,17 @@ export function prepareAutomaticDetailMask(
   const hi = Math.max(0, Math.min(255, Math.max(cutoff, threshold)));
   const { width, height } = image;
   const plane = classifyDetail(localField, width, height, lo, hi);
-  const solidIso = lightSolidIso(plane, hi);
+  const scale = options.pixelScale ?? 1;
+  const solidIso = lightSolidIso(
+    {
+      width,
+      height,
+      luma: plane.luma,
+      rgba: image.data,
+      pixelScale: Number.isFinite(scale) && scale >= 1 ? scale : 1,
+    },
+    hi,
+  );
   const data = new Uint8ClampedArray(image.data.length);
   for (let i = 0; i < plane.ink.length; i += 1) {
     const filled =

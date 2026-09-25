@@ -1,8 +1,9 @@
 // ADR-393: the automatic (Line Art) detail mask fills light solids that the
-// local-contrast test alone would hollow, without filling paper, counters or
-// outlined colour fills, and colour promotion needs spatially coherent colour.
+// local-contrast test alone would hollow, without filling paper or counters,
+// and colour promotion needs spatially coherent colour.
 import { describe, expect, it } from 'vitest';
 import { blank, components, rect } from '../../__fixtures__/auto-detail-trace';
+import { addChannelNoise, lcg, square, SQUARE, SIZE } from '../../__fixtures__/light-solid-scenes';
 import { rasterizeColoredPaths } from '../../__fixtures__/perceptual/rasterize';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareTraceForContour, type RawImageData } from './trace-image';
@@ -10,25 +11,8 @@ import { TRACE_PRESETS } from './trace-presets';
 import { traceImageToColoredPaths } from './trace-to-paths';
 
 const LINE_ART = TRACE_PRESETS['Line Art']!;
-const SIZE = 280;
-const SQUARE = { x: 40, y: 40, side: 200 };
 
 type Rgb = readonly [number, number, number];
-
-function lcg(seed: number): () => number {
-  let state = seed;
-  return () => (state = (Math.imul(state, 1103515245) + 12345) >>> 0) / 2 ** 32;
-}
-
-function square(rgb: Rgb, noise = 0, seed = 1): RawImageData {
-  const image = blank(SIZE, SIZE);
-  const rnd = lcg(seed);
-  for (let y = SQUARE.y; y < SQUARE.y + SQUARE.side; y++)
-    for (let x = SQUARE.x; x < SQUARE.x + SQUARE.side; x++)
-      for (let c = 0; c < 3; c++)
-        image.data[4 * (y * SIZE + x) + c] = rgb[c]! + Math.round(rnd() * 2 * noise - noise);
-  return image;
-}
 
 function coverageDisc(rgb: Rgb, radius: number, size: number): RawImageData {
   const image = blank(size, size);
@@ -96,20 +80,21 @@ describe('automatic detail mask fills light solids (ADR-393)', () => {
     expect((await traceSummary(image)).contours).toBe(0);
   });
 
-  it('keeps paper counters and outlined colour fills open', () => {
+  it('keeps paper counters open and fills outlined colour fills', () => {
     // A thick gold ring: its paper counter must stay a hole.
     const ring = square([212, 160, 23]);
     rect(ring, 100, 100, 80, 80, 255);
     const ringMask = prepareTraceForContour(ring, LINE_ART).prepared;
     expect(components(ringMask, [100, 100, 80, 80], true).pixels).toBe(0);
     expect(components(ringMask, [40, 40, 200, 200], true).pixels).toBe(40000 - 6400);
-    // A gold fill inside a black outline stays a hole, as under a global
-    // brightness threshold: nothing marks it as a solid on paper.
+    // A gold fill inside a black outline is a light solid too: outline and
+    // fill trace as one solid, as they would at a threshold above gold.
     const outlined = blank(SIZE, SIZE);
     rect(outlined, 40, 40, 200, 200, 0);
     rect(outlined, 46, 46, 188, 188, [212, 160, 23, 255]);
     const outlinedMask = prepareTraceForContour(outlined, LINE_ART).prepared;
-    expect(components(outlinedMask, [60, 60, 160, 160], true).pixels).toBe(0);
+    expect(components(outlinedMask, [40, 40, 200, 200], true).pixels).toBe(40000);
+    expect(components(outlinedMask, [40, 40, 200, 200], false).pixels).toBe(0);
   });
 
   it('does not fill vignetted, noisy paper enclosed by pencil lines', () => {
@@ -137,9 +122,31 @@ describe('automatic detail mask fills light solids (ADR-393)', () => {
 
 describe('automatic colour promotion needs spatially coherent colour (ADR-393)', () => {
   it('ignores per-pixel chroma noise on grey art', () => {
-    for (const grey of [60, 185, 230]) {
-      expect(shouldUseSketchTrace(square([grey, grey, grey], 8, grey), LINE_ART)).toBe(false);
+    for (const grey of [60, 185, 200, 230]) {
+      for (const noise of [8, 10, 12, 16]) {
+        const image = square([grey, grey, grey]);
+        addChannelNoise(image, noise, grey + noise);
+        expect(shouldUseSketchTrace(image, LINE_ART), `grey ${grey} ±${noise}`).toBe(false);
+      }
     }
+  });
+
+  it('reads the noise of a small grey picture inside clean margins', () => {
+    const image = blank(SIZE, SIZE);
+    rect(image, 100, 100, 80, 80, 185);
+    addChannelNoise(image, 16, 9);
+    // Re-clean the margins: only the 80 px picture carries noise.
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++)
+        if (x < 100 || x >= 180 || y < 100 || y >= 180)
+          image.data.set([255, 255, 255], 4 * (y * SIZE + x));
+    expect(shouldUseSketchTrace(image, LINE_ART)).toBe(false);
+  });
+
+  it('still promotes noisy coloured art', () => {
+    const image = square([210, 180, 140]);
+    addChannelNoise(image, 16, 5);
+    expect(shouldUseSketchTrace(image, LINE_ART)).toBe(true);
   });
 
   it('still promotes coherent colour patches, strokes and thin lines', () => {
