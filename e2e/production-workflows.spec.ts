@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   expandMachineUtilities,
   selectWorkspacePanel,
@@ -201,13 +203,21 @@ test('exports rotary raster through the configured machine-space transform', asy
   expect(Math.max(...yValues)).toBeGreaterThan(30);
 });
 
-test('gates camera bed alignment behind Labs and homing capability', async ({ page }) => {
+// ADR-387: Align to bed left Labs and waits only for a lens calibration.
+test('offers camera bed alignment once the lens is calibrated, without Labs', async ({
+  page,
+  kerfdesk,
+}) => {
   await (await toolbarCommand(page, 'Camera')).click();
   const align = page.getByRole('button', { name: 'Align to bed…' });
   await expect(align).toBeDisabled();
-  await expect(align).toHaveAttribute('title', /Tools > Labs/);
+  await expect(align).toHaveAttribute('title', /Calibrate the lens first/);
 
-  await enableLab(page, 'Camera alignment v2');
+  await kerfdesk.setOpenFiles([
+    { name: 'lens-calibrated.lf2', text: lensCalibratedProjectFixture() },
+  ]);
+  await page.getByRole('button', { name: 'Open...' }).click();
+  await expect(page).toHaveTitle(/lens-calibrated\.lf2/);
   await expect(align).toBeEnabled();
   await page.getByRole('button', { name: 'Start USB camera' }).click();
   await align.click();
@@ -1410,6 +1420,25 @@ interface SavedProject {
     };
   };
   readonly scene: { readonly objects: readonly Record<string, unknown>[] };
+}
+
+// The basic fixture with a saved lens calibration, the one thing Align to bed
+// needs before it opens. Detection still checks the calibration against the
+// live capture; this test stops before detecting.
+function lensCalibratedProjectFixture(): string {
+  const path = fileURLToPath(new URL('./fixtures/project-basic.lf2', import.meta.url));
+  const project = JSON.parse(readFileSync(path, 'utf8')) as {
+    device: Record<string, unknown>;
+  };
+  project.device['cameraCalibration'] = {
+    intrinsics: { fx: 800, fy: 800, cx: 320, cy: 240 },
+    distortion: [0, 0, 0, 0],
+    imageWidth: 640,
+    imageHeight: 480,
+    rmsPx: 0.4,
+    calibratedAt: 1,
+  };
+  return JSON.stringify(project);
 }
 
 function outlineNestProjectFixture(): string {

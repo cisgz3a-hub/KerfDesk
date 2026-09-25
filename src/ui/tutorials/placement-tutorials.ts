@@ -29,7 +29,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Align the view to the bed',
         instruction:
-          'Align to bed is available with Camera alignment v2 enabled in Labs. Follow its marker workflow and enter the Marker surface height. Keep the marker sheet fixed during detection; Burn markers is a real machine job, while Markers already burned reuses a target.',
+          'Align to bed opens once the lens is calibrated, for USB and network cameras alike. Follow its marker workflow and enter the Marker surface height. Keep the marker sheet fixed during detection; Burn markers is a real machine job, while Markers already burned reuses a target.',
         focus: 'Lens calibration + bed alignment',
         result: 'Detected bed markers relate the camera view to the machine workspace.',
       },
@@ -45,7 +45,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     ],
     tip: 'Moving the camera changes its relationship to the bed. A convincing overlay alone does not verify real-world alignment.',
     keywords: ['camera', 'USB', 'RTSP', 'lens', 'checkerboard', 'markers', 'overlay', 'alignment'],
-    related: ['labs', 'trace', 'board', 'print-cut', 'frame-start'],
+    related: ['trace', 'board', 'print-cut', 'frame-start'],
   },
   {
     id: 'registration',

@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { Button } from '../../kit';
+import { fireSetupSummary } from '../FireControlRow';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { deviceSetupSupportsMachineKind } from './device-setup-flow';
 import type { FirmwareDiff } from './device-setup-firmware-diff';
@@ -101,15 +102,11 @@ function workspaceRows(state: DeviceSetupStepProps['state']): ReviewRows {
 }
 
 function laserRows(state: DeviceSetupStepProps['state']): ReviewRows {
-  const fire = state.draft.fireControl;
   return [
     ['Power range', `${state.draft.minPowerS}–${state.draft.maxPowerS} S`],
     ['Laser mode', state.draft.laserModeEnabled ? 'Expected on' : 'Off'],
     ['Air output', state.draft.airAssistCommand],
-    [
-      'Low-power Fire',
-      fire?.enabled === true ? `Enabled, ${fire.maxPowerPercent}% cap` : 'Disabled',
-    ],
+    ['Fire button', fireSetupSummary(state.draft)],
   ];
 }
 

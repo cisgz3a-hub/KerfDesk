@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 
-export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut' | 'cameraAlignmentV2';
+// Low-power Fire and camera alignment v2 left Labs (ADR-387): Fire is the
+// machine's own "Enable Fire button" opt-in and Align to bed needs only a lens
+// calibration. Their stored keys, like the rotary keys ADR-315 retired, are
+// ignored on read and dropped on the next write rather than migrated.
+export type ExperimentalLaserFeature = 'printAndCut';
 
 export type ExperimentalLaserFeatures = Readonly<Record<ExperimentalLaserFeature, boolean>>;
 
 export const DEFAULT_EXPERIMENTAL_LASER_FEATURES: ExperimentalLaserFeatures = {
-  lowPowerFire: false,
   printAndCut: false,
-  cameraAlignmentV2: false,
 };
 
 const STORAGE_KEY = 'kerfdesk.experimental-laser-features.v1';
@@ -41,11 +43,7 @@ export function readExperimentalLaserFeatures(
     if (raw === null) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
-    return {
-      lowPowerFire: parsed['lowPowerFire'] === true,
-      printAndCut: parsed['printAndCut'] === true,
-      cameraAlignmentV2: parsed['cameraAlignmentV2'] === true,
-    };
+    return { printAndCut: parsed['printAndCut'] === true };
   } catch {
     return DEFAULT_EXPERIMENTAL_LASER_FEATURES;
   }

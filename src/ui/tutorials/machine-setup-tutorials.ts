@@ -142,9 +142,26 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
           'A click requests one fixed step; a supported hold requests continued movement until release.',
         visual: 'origin',
       },
+      {
+        title: 'Mark the spot with Fire',
+        instruction:
+          'On a diode laser, turn on Enable Fire button in Machine Setup → Essentials → Air assist and test fire. The Fire button shows its power as a percent and as the S value it sends. Hold it for a dim positioning dot; releasing, leaving the button or switching windows sends M5. When Fire cannot run, the button says why.',
+        focus: 'Hold Fire · release sends M5',
+        result: 'A dim dot shows where the head points without running a job.',
+      },
     ],
     tip: 'Jog changes the physical head position. It does not move selected artwork on the canvas or establish a new work origin by itself.',
-    keywords: ['jog', 'arrows', 'position', 'step', 'speed', 'move head', 'continuous'],
+    keywords: [
+      'jog',
+      'arrows',
+      'position',
+      'step',
+      'speed',
+      'move head',
+      'continuous',
+      'fire',
+      'test fire',
+    ],
     related: ['connection', 'origin', 'cnc-probe', 'frame-start'],
   },
   {

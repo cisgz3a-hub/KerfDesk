@@ -2,9 +2,16 @@
 // five-marker target as a real job, clear the bed, detect, and solve. The
 // capture/detect body lives in auto-align.ts; manual 4-corner alignment
 // remains available on the machine-camera preview for display-only setups.
+//
+// Available for any camera source once a lens calibration exists (ADR-387;
+// it no longer waits for a Labs switch). LightBurn orders it the same way:
+// calibrate the lens, then align.
+// https://docs.lightburnsoftware.com/2.1/Reference/Cameras/Alignment/
+// Every check on the alignment itself (calibration binding, marker detection,
+// degenerate solve) stays in runAutoAlign.
 
 import { useEffect } from 'react';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { useStore } from '../state';
 import { useCameraAlignWizardStore } from './align-wizard/camera-align-wizard-store';
 import { CameraAlignWizard } from './align-wizard/CameraAlignWizard';
 
@@ -12,8 +19,7 @@ export function AutoAlignControls(): JSX.Element {
   const open = useCameraAlignWizardStore((s) => s.open);
   const openWizard = useCameraAlignWizardStore((s) => s.openWizard);
   const closeWizard = useCameraAlignWizardStore((s) => s.closeWizard);
-  const featureEnabled = useExperimentalLaserFeatures((state) => state.features.cameraAlignmentV2);
-  const available = featureEnabled;
+  const available = useStore((s) => s.project.device.cameraCalibration !== undefined);
 
   useEffect(() => {
     if (!available && open) closeWizard();
@@ -26,7 +32,7 @@ export function AutoAlignControls(): JSX.Element {
         className="lf-btn"
         disabled={!available}
         onClick={openWizard}
-        title={alignmentButtonTitle(featureEnabled)}
+        title={alignmentButtonTitle(available)}
       >
         Align to bed…
       </button>
@@ -35,8 +41,10 @@ export function AutoAlignControls(): JSX.Element {
   );
 }
 
-function alignmentButtonTitle(featureEnabled: boolean): string {
-  if (!featureEnabled) return 'Enable Camera alignment v2 in Tools > Labs first.';
+function alignmentButtonTitle(lensCalibrated: boolean): string {
+  if (!lensCalibrated) {
+    return 'Calibrate the lens first (Calibrate lens…). Align to bed measures the bed through the lens-corrected view.';
+  }
   return 'Align the camera to the bed: burn the marker target (or reuse a burned one), then detect it.';
 }
 

@@ -169,22 +169,15 @@ describe('Machine dialog control audit', () => {
     const onClose = vi.fn();
     act(() => root.render(<LabsSettingsDialog onClose={onClose} />));
     const toggles = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-    expect(toggles).toHaveLength(3);
+    // Fire and camera alignment left Labs (ADR-387); Print and Cut remains.
+    expect(toggles).toHaveLength(1);
     for (const toggle of toggles) act(() => toggle.click());
-    expect(useExperimentalLaserFeatures.getState().features).toEqual({
-      lowPowerFire: true,
-      printAndCut: true,
-      cameraAlignmentV2: true,
-    });
+    expect(useExperimentalLaserFeatures.getState().features).toEqual({ printAndCut: true });
     expect(localStorage.getItem('kerfdesk.experimental-laser-features.v1')).toContain(
       '"printAndCut":true',
     );
     act(() => button('Reset all').click());
-    expect(useExperimentalLaserFeatures.getState().features).toEqual({
-      lowPowerFire: false,
-      printAndCut: false,
-      cameraAlignmentV2: false,
-    });
+    expect(useExperimentalLaserFeatures.getState().features).toEqual({ printAndCut: false });
     expect(toggles.every((toggle) => !toggle.checked)).toBe(true);
     act(() => button('Done').click());
     expect(onClose).toHaveBeenCalledTimes(1);

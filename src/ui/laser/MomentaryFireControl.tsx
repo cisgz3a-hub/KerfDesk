@@ -1,64 +1,135 @@
+// MomentaryFireControl — the hold-to-fire positioning beam in Position the
+// head (ADR-162, amended by ADR-387). Shown on every laser project: a machine
+// without the opt-in gets a Set up button, and a refused press names its
+// reason on the button face instead of the control vanishing. The power reads
+// as both the percent and the S word a press sends.
+
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
-import { profileSupportsCapability, type LaserFireControl } from '../../core/devices';
-import { machineKindOf, type Project } from '../../core/scene';
-import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { formatFirePercent } from '../../core/devices/fire-availability';
+import {
+  fireActivationBlock,
+  fireSetupForProject,
+  type FireSetup,
+} from '../state/laser-fire-readiness';
 import { useLaserStore, type LaserState } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
+import { openMachineSetup } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
+
+type EnabledFireSetup = Extract<FireSetup, { readonly kind: 'enabled' }>;
+type UnreadyFireSetup = Extract<FireSetup, { readonly kind: 'unavailable' | 'needs-setup' }>;
 
 export function MomentaryFireControl(): JSX.Element | null {
   const project = useStore((state) => state.project);
-  const labsEnabled = useExperimentalLaserFeatures((state) => state.features.lowPowerFire);
   // Only what this control reads, never the whole store: it is always mounted
   // in the jog pad, and a whole-store subscription re-rendered it on every
-  // acknowledged line of a running job.
-  const controllerSupportsFire = useLaserStore((state) => state.capabilities.lowPowerFire);
+  // acknowledged line of a running job. The refusal is selected as text, so a
+  // write that leaves it unchanged does not render the control.
   const fireActive = useLaserStore((state) => state.fireActive);
   const setFireActive = useLaserStore((state) => state.setFireActive);
-  const disabled = useLaserStore(fireControlDisabled);
-  const control = availableFireControl(project, labsEnabled, controllerSupportsFire);
+  const blockMessage = useLaserStore(
+    (state) => fireActivationBlock(state, project)?.message ?? null,
+  );
+  const blockCaption = useLaserStore(
+    (state) => fireActivationBlock(state, project)?.caption ?? null,
+  );
+  const setup = fireSetupForProject(project);
+  const control = setup.kind === 'enabled' ? setup.control : null;
   const { held, release } = useMomentaryRelease(setFireActive);
 
   useEffect(() => {
     if (control === null) release();
   }, [control, release]);
-  if (control === null) return null;
+  if (setup.kind === 'hidden') return null;
+  if (setup.kind !== 'enabled') return <FireSetupButton setup={setup} />;
 
   const press = (): void => {
-    if (disabled || held.current) return;
+    if (blockMessage !== null || held.current) return;
     held.current = true;
-    void setFireActive(true, control.maxPowerPercent).catch(() => {
+    void setFireActive(true, setup.control.maxPowerPercent).catch(() => {
+      // A refused press sent nothing and leaves nothing latched. A failed M3
+      // write keeps the uncertain-on latch, so release() asks for M5 now
+      // rather than at the next release signal.
       held.current = false;
+      release();
     });
   };
+  return (
+    <FireHoldButton
+      setup={setup}
+      fireActive={fireActive}
+      blockMessage={blockMessage}
+      blockCaption={blockCaption}
+      onPress={press}
+      onRelease={release}
+    />
+  );
+}
 
+function FireHoldButton(props: {
+  readonly setup: EnabledFireSetup;
+  readonly fireActive: boolean;
+  readonly blockMessage: string | null;
+  readonly blockCaption: string | null;
+  readonly onPress: () => void;
+  readonly onRelease: () => void;
+}): JSX.Element {
+  const percent = `${formatFirePercent(props.setup.percent)}%`;
+  const powerS = `S${props.setup.powerS}`;
   return (
     <button
       type="button"
-      aria-label={`Hold for low-power Fire at ${control.maxPowerPercent}%`}
-      aria-pressed={fireActive}
-      disabled={disabled}
+      aria-label={`Hold for low-power Fire at ${percent} (${powerS})`}
+      aria-pressed={props.fireActive}
+      disabled={props.blockMessage !== null}
       onPointerDown={(event) => {
         event.preventDefault();
-        press();
+        props.onPress();
       }}
-      onPointerLeave={release}
-      onBlur={release}
+      onPointerLeave={props.onRelease}
+      onBlur={props.onRelease}
       onKeyDown={(event) => {
         if (isFireKey(event.key) && !event.repeat) {
           event.preventDefault();
-          press();
+          props.onPress();
         }
       }}
       onKeyUp={(event) => {
-        if (isFireKey(event.key)) release();
+        if (isFireKey(event.key)) props.onRelease();
       }}
-      style={fireButtonStyle(fireActive)}
-      title={`Hold to turn on the positioning beam at no more than ${control.maxPowerPercent}%. Release always sends M5.`}
+      style={fireButtonStyle(props.fireActive)}
+      title={
+        props.blockMessage === null
+          ? `Hold to turn on the positioning beam at ${percent} (${powerS}). Release always sends M5.`
+          : `${props.blockMessage} Fire sends ${percent} (${powerS}) once ready.`
+      }
     >
       <span style={titleStyle}>Fire</span>
-      <span style={stateStyle}>{fireActive ? 'ON' : `HOLD ${control.maxPowerPercent}%`}</span>
+      <span style={stateStyle}>{props.fireActive ? 'ON' : (props.blockCaption ?? 'HOLD')}</span>
+      <span style={powerStyle}>{`${percent} · ${powerS}`}</span>
+    </button>
+  );
+}
+
+// No opt-in yet: the face says so and a click opens the Machine Setup row
+// that holds it. A machine that cannot offer Fire at all says why and stays
+// disabled. Neither state can send anything to the controller.
+function FireSetupButton({ setup }: { readonly setup: UnreadyFireSetup }): JSX.Element {
+  const canSetUp = setup.kind === 'needs-setup';
+  return (
+    <button
+      type="button"
+      disabled={!canSetUp}
+      onClick={() => openMachineSetup({ kind: 'step', step: 'confirm', highlight: 'fire' })}
+      aria-label={
+        canSetUp ? 'Set up the Fire button for this machine' : `Fire unavailable: ${setup.reason}`
+      }
+      title={canSetUp ? `${setup.reason} Click to open Machine Setup.` : setup.reason}
+      style={setupButtonStyle}
+    >
+      <span style={titleStyle}>Fire</span>
+      <span style={stateStyle}>{canSetUp ? 'Set up' : 'Unavailable'}</span>
     </button>
   );
 }
@@ -105,57 +176,39 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
   return { held, release };
 }
 
-function availableFireControl(
-  project: Project,
-  labsEnabled: boolean,
-  controllerSupportsFire: boolean,
-): LaserFireControl | null {
-  if (!labsEnabled || machineKindOf(project.machine) !== 'laser') return null;
-  if (!controllerSupportsFire) return null;
-  if (!profileSupportsCapability(project.device, 'low-power-fire')) return null;
-  return project.device.fireControl?.enabled === true ? project.device.fireControl : null;
-}
-
-function fireControlDisabled(laser: LaserState): boolean {
-  const positionUnknown =
-    laser.statusReport === null ||
-    (laser.statusReport.mPos === null && laser.statusReport.wPos === null);
-  return [
-    laser.connection.kind !== 'connected',
-    laser.statusReport?.state !== 'Idle',
-    positionUnknown,
-    laser.alarmCode !== null,
-    isActiveJob(laser.streamer),
-    laser.motionOperation !== null,
-    laser.controllerOperation !== null,
-    laser.autofocusBusy,
-    laser.probeBusy,
-    laser.pendingUntrackedAcks > 0,
-  ].some(Boolean);
-}
-
 function isFireKey(key: string): boolean {
   return key === ' ' || key === 'Enter';
 }
 
 function fireButtonStyle(active: boolean): React.CSSProperties {
   return {
-    gridArea: 'fire',
-    minWidth: 76,
-    height: 58,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
+    ...fireButtonBaseStyle,
     border: active ? '1px solid var(--lf-danger)' : '1px solid var(--lf-border)',
     background: active ? 'var(--lf-danger)' : 'var(--lf-bg-2)',
     color: active ? 'var(--lf-on-fill)' : 'var(--lf-text)',
-    borderRadius: 4,
-    userSelect: 'none',
-    touchAction: 'none',
   };
 }
 
+const fireButtonBaseStyle: React.CSSProperties = {
+  gridArea: 'fire',
+  minWidth: 76,
+  height: 58,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 2,
+  borderRadius: 4,
+  userSelect: 'none',
+  touchAction: 'none',
+};
+// Muted like Manual Air's not-ready face: present and explained, not armed.
+const setupButtonStyle: React.CSSProperties = {
+  ...fireButtonBaseStyle,
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-0)',
+  color: 'var(--lf-text-muted)',
+};
 const titleStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700 };
 const stateStyle: React.CSSProperties = { fontSize: 10 };
+const powerStyle: React.CSSProperties = { fontSize: 10, opacity: 0.8 };

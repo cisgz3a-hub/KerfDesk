@@ -50,7 +50,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'labs',
     title: 'Understand optional Labs features',
-    summary: 'Find the optional controls and learn which machine capabilities each one expects.',
+    summary: 'Find the optional Labs control and learn which machine capability it expects.',
     category: 'Machine & setup',
     machine: 'laser',
     minutes: 2,
@@ -62,14 +62,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a feature deliberately',
         instruction:
-          'Read the descriptions for Low-power Fire control, Print and Cut, and Camera alignment v2. These optional features are off by default and expose different machine workflows.',
-        focus: 'Three optional features',
-        result: 'You can identify the feature that serves your current task.',
+          'Read the Print and Cut description. Labs features are off by default and expose machine workflows still being hardware-validated. Fire and camera bed alignment have left Labs: Enable Fire button is in Machine Setup, and Align to bed is in the Camera panel.',
+        focus: 'Print and Cut',
+        result: 'You can tell which workflow Labs still holds and where the others went.',
       },
       {
         title: 'Check the matching machine setup',
         instruction:
-          'Low-power Fire needs an approved diode profile. Print and Cut uses a homed absolute-position profile. Camera alignment v2 enables the camera alignment workflow. Turning on a preference does not supply missing hardware or prove its calibration.',
+          'Print and Cut uses a homed absolute-position profile. Turning on a preference does not supply missing hardware or prove its calibration.',
         focus: 'Feature + supported setup',
         result: 'The preference and the actual machine configuration remain separate choices.',
       },
@@ -82,7 +82,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       },
     ],
     tip: 'Labs preferences do not change the ordinary run sequence: complete Frame for the exact job, then use Start to open Job Review.',
-    keywords: ['labs', 'experimental', 'optional', 'fire', 'print and cut', 'camera alignment'],
+    keywords: ['labs', 'experimental', 'optional', 'print and cut'],
     related: ['machine-setup', 'print-cut', 'camera', 'frame-start'],
   },
   {

@@ -30,17 +30,23 @@ describe('LabsSettingsDialog', () => {
     try {
       expect(host.textContent).not.toContain('Rotary setup');
       expect(host.textContent).not.toContain('Rotary image engraving');
-      const lowPowerFire = checkboxByLabel(host, 'Low-power Fire control');
-      expect(lowPowerFire.checked).toBe(false);
+      // ADR-387: Fire and camera alignment left Labs; the dialog says where they went.
+      expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
+      expect(host.textContent).not.toContain('Low-power Fire control');
+      expect(host.textContent).not.toContain('Camera alignment v2');
+      expect(host.textContent).toContain('Enable Fire button');
+      expect(host.textContent).toContain('Align to bed');
+      const printAndCut = checkboxByLabel(host, 'Print and Cut');
+      expect(printAndCut.checked).toBe(false);
 
       await act(async () => {
-        lowPowerFire.checked = true;
-        Simulate.change(lowPowerFire);
+        printAndCut.checked = true;
+        Simulate.change(printAndCut);
       });
 
-      expect(useExperimentalLaserFeatures.getState().features.lowPowerFire).toBe(true);
-      expect(localStorage.getItem('kerfdesk.experimental-laser-features.v1')).toContain(
-        '"lowPowerFire":true',
+      expect(useExperimentalLaserFeatures.getState().features.printAndCut).toBe(true);
+      expect(localStorage.getItem('kerfdesk.experimental-laser-features.v1')).toBe(
+        '{"printAndCut":true}',
       );
     } finally {
       await act(async () => root.unmount());

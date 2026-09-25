@@ -7,7 +7,6 @@ import {
   step,
 } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
-import { useExperimentalLaserFeatures } from './experimental-laser-features';
 import { useLaserStore } from './laser-store';
 import {
   connectWith,
@@ -37,12 +36,9 @@ beforeEach(async () => {
   useStore.setState({ project: createProject() });
   useStore.getState().updateDeviceProfile({
     airAssistCommand: 'M8',
-    capabilities: ['low-power-fire'],
     fireControl: { enabled: true, maxPowerPercent: 2 },
     maxPowerS: 1000,
   });
-  useExperimentalLaserFeatures.getState().resetFeatures();
-  useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', true);
   await connectWith(connection);
   useLaserStore.setState({
     mpgActive: true,
@@ -59,7 +55,6 @@ beforeEach(async () => {
 afterEach(async () => {
   useLaserStore.setState({ fireActive: false, airAssistOn: false });
   await useLaserStore.getState().disconnect();
-  useExperimentalLaserFeatures.getState().resetFeatures();
   useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });

@@ -3,12 +3,8 @@
 
 import { selectControllerDriver } from '../../../core/controllers';
 import type { DeviceProfile } from '../../../core/devices';
-import {
-  AirAssistRow,
-  AirRestartRow,
-  FireControlRow,
-  LaserPowerRows,
-} from '../DeviceProfilePowerFields';
+import { AirAssistRow, AirRestartRow, LaserPowerRows } from '../DeviceProfilePowerFields';
+import { FireControlRow, fireSetupSummary } from '../FireControlRow';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
@@ -54,13 +50,12 @@ function LaserMachineStep({
       />
       <details
         className="lf-setup-disclosure lf-setup-disclosure--nested"
-        open={highlight === 'air-assist'}
+        open={highlight === 'air-assist' || highlight === 'fire'}
       >
         <summary title="Configure the air-assist relay and low-power test-fire controls.">
           <span>Air assist and test fire</span>
           <small>
-            {state.draft.airAssistCommand} · Fire{' '}
-            {state.draft.fireControl?.enabled === true ? 'enabled' : 'off'}
+            {state.draft.airAssistCommand} · Fire: {fireSetupSummary(state.draft)}
           </small>
         </summary>
         <div className="lf-setup-disclosure-body">

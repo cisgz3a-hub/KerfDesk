@@ -3,7 +3,7 @@
 // jog and frame builders, and the Fire press itself); the oracle is an
 // independent port of gnea/grbl gcode.c's laser-power logic.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   executeGrblLine,
   powerUpGrbl,
@@ -18,7 +18,6 @@ import {
 } from '../../core/devices/falcon-profiles';
 import type { Job } from '../../core/job';
 import { grblStrategy } from '../../core/output/grbl-strategy';
-import { useExperimentalLaserFeatures } from './experimental-laser-features';
 import { fireActions } from './laser-fire-actions';
 import { useLaserStore, type LaserState } from './laser-store';
 import { useStore } from './store';
@@ -116,14 +115,8 @@ async function pressFire(model: GrblLaserPowerModel): Promise<LaserState> {
   return press.state;
 }
 
-beforeEach(() => {
-  useExperimentalLaserFeatures.getState().resetFeatures();
-  useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', true);
-});
-
 afterEach(() => {
   useStore.setState({ project: originalProject });
-  useExperimentalLaserFeatures.getState().resetFeatures();
 });
 
 describe('momentary Fire and the GRBL laser-mode modal state', () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { grblDriver } from '../../core/controllers';
-import { useExperimentalLaserFeatures } from './experimental-laser-features';
+import { createStreamer } from '../../core/controllers/grbl';
 import { fireActions } from './laser-fire-actions';
 import { useLaserStore, type LaserState } from './laser-store';
 import { buildPortClosePatch, disconnectStopCommands } from './laser-store-helpers';
@@ -59,27 +59,31 @@ function harness(write = vi.fn<Parameters<typeof fireActions>[2]>(async () => un
   return { get, setFireActive: fireActions(set, get, write).setFireActive, write };
 }
 
-beforeEach(() => {
+// No Labs switch and no catalog `low-power-fire` capability: the machine's own
+// opt-in is the whole consent now (ADR-387).
+function installFireControl(fireControl: { enabled: boolean; maxPowerPercent: number }): void {
   useStore.setState({
     project: {
       ...originalProject,
       machine: { kind: 'laser' },
       device: {
         ...originalProject.device,
-        capabilities: [...(originalProject.device.capabilities ?? []), 'low-power-fire'],
-        fireControl: { enabled: true, maxPowerPercent: 2 },
+        fireControl,
         maxPowerS: 1000,
         framingFeedMmPerMin: 1000,
       },
     },
   });
-  useExperimentalLaserFeatures.getState().resetFeatures();
-  useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', true);
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  installFireControl({ enabled: true, maxPowerPercent: 2 });
 });
 
 afterEach(() => {
   useStore.setState({ project: originalProject });
-  useExperimentalLaserFeatures.getState().resetFeatures();
+  localStorage.clear();
 });
 
 describe('momentary low-power Fire action', () => {
@@ -96,13 +100,53 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(false);
   });
 
-  it('fails closed when the Labs gate is off', async () => {
-    useExperimentalLaserFeatures.getState().setFeature('lowPowerFire', false);
+  it('fails closed until the machine opts in', async () => {
+    installFireControl({ enabled: false, maxPowerPercent: 2 });
     const test = harness();
 
-    await expect(test.setFireActive(true)).rejects.toThrow('Tools > Labs');
+    await expect(test.setFireActive(true)).rejects.toThrow('Enable Fire button');
     expect(test.write).not.toHaveBeenCalled();
     expect(test.get().fireActive).toBe(false);
+  });
+
+  it('ignores a retired Labs Fire switch left in storage', async () => {
+    localStorage.setItem(
+      'kerfdesk.experimental-laser-features.v1',
+      JSON.stringify({ lowPowerFire: false, printAndCut: false, cameraAlignmentV2: false }),
+    );
+    const test = harness();
+
+    await test.setFireActive(true);
+    expect(test.write).toHaveBeenCalledWith(FIRE_ON, 'fire', 'console');
+  });
+
+  it('never sends more than the absolute 5% ceiling, whatever the profile holds', async () => {
+    // A value the normalizers would reject, planted as if it bypassed them.
+    installFireControl({ enabled: true, maxPowerPercent: 50 });
+    const test = harness();
+
+    await test.setFireActive(true, 50);
+    expect(test.write).toHaveBeenCalledWith('G1 F1000 M3 S50\n', 'fire', 'console');
+  });
+
+  it('refuses every ADR-162 precondition without writing anything', async () => {
+    const refusals: ReadonlyArray<readonly [string, Partial<LaserState>]> = [
+      ['Connect to the laser first.', { connection: { kind: 'disconnected' } }],
+      ['Clear the controller alarm', { alarmCode: 1 }],
+      ['A job is active', { streamer: { ...createStreamer('G1 X1\n'), status: 'streaming' } }],
+      ['auto-focus', { autofocusBusy: true }],
+      ['probing', { probeBusy: true }],
+      ['acknowledge the previous command', { pendingUntrackedAcks: 1 }],
+    ];
+    for (const [message, patch] of refusals) {
+      const test = harness();
+      Object.assign(test.get(), patch);
+
+      await expect(test.setFireActive(true), message).rejects.toThrow(message);
+      expect(test.write, message).not.toHaveBeenCalled();
+      expect(test.get().fireActive, message).toBe(false);
+      expect(test.get().lastWriteError, message).toContain(message);
+    }
   });
 
   it('requires an Idle report with a known position', async () => {
@@ -191,6 +235,41 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(true);
     await test.setFireActive(false);
     expect(write).toHaveBeenLastCalledWith('M5\n', 'fire', 'console');
+    expect(test.get().fireActive).toBe(false);
+  });
+
+  it('keeps the on latch when a repeat press is refused', async () => {
+    const test = harness();
+    await test.setFireActive(true);
+    Object.assign(test.get(), { pendingUntrackedAcks: 1 });
+
+    await expect(test.setFireActive(true)).rejects.toThrow('acknowledge');
+    // The accepted M3 may still hold the beam on: LASER OFF and the release
+    // M5 both key on this latch.
+    expect(test.get().fireActive).toBe(true);
+
+    await test.setFireActive(false);
+    expect(test.write).toHaveBeenLastCalledWith('M5\n', 'fire', 'console');
+    expect(test.get().fireActive).toBe(false);
+  });
+
+  it('compensates with M5 when the machine opt-in is withdrawn during activation', async () => {
+    let resolveStart: (() => void) | undefined;
+    const write = vi.fn((line: string) =>
+      line === FIRE_ON
+        ? new Promise<void>((resolve) => {
+            resolveStart = resolve;
+          })
+        : Promise.resolve(),
+    );
+    const test = harness(write);
+
+    const starting = test.setFireActive(true);
+    installFireControl({ enabled: false, maxPowerPercent: 2 });
+    resolveStart?.();
+    await starting;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON, 'M5\n']);
     expect(test.get().fireActive).toBe(false);
   });
 

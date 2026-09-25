@@ -11,19 +11,9 @@ const FEATURE_ROWS: ReadonlyArray<{
   readonly detail: string;
 }> = [
   {
-    id: 'lowPowerFire',
-    label: 'Low-power Fire control',
-    detail: 'Momentary positioning beam on approved diode profiles.',
-  },
-  {
     id: 'printAndCut',
     label: 'Print and Cut',
     detail: 'Two-point registration on homed, absolute-position machines.',
-  },
-  {
-    id: 'cameraAlignmentV2',
-    label: 'Camera alignment v2',
-    detail: 'Experimental camera registration and validation workflow.',
   },
 ];
 
@@ -36,6 +26,11 @@ export function LabsSettingsDialog(props: { readonly onClose: () => void }): JSX
       <p style={noticeStyle}>
         These machine workflows are still being hardware-validated. They are off by default and
         remain subject to normal device and safety checks.
+      </p>
+      <p style={noticeStyle}>
+        Fire and camera bed alignment are no longer here: turn on Enable Fire button for a diode
+        laser in Machine Setup, and use Align to bed in the Camera panel once the lens is
+        calibrated.
       </p>
       <div style={listStyle}>
         {FEATURE_ROWS.map((row) => (

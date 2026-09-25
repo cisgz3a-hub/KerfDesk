@@ -1,10 +1,13 @@
-import { cappedFirePowerS, profileSupportsCapability } from '../../core/devices';
-import { machineKindOf } from '../../core/scene';
-import { useExperimentalLaserFeatures } from './experimental-laser-features';
+import { cappedFirePowerS } from '../../core/devices';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
+import {
+  FIRE_NOT_ENABLED_MESSAGE,
+  fireActivationBlock,
+  fireSetupForProject,
+} from './laser-fire-readiness';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { isActiveJob, mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
 
@@ -79,15 +82,17 @@ async function activateFire(
   requestedPercent: number | undefined,
 ): Promise<void> {
   const token = ++runtime.requestToken;
-  const blocked = fireActivationBlockMessage(get());
-  if (blocked !== null) rejectFireActivation(set, get, blocked);
+  const project = useStore.getState().project;
+  const blocked = fireActivationBlock(get(), project);
+  if (blocked !== null) rejectFireActivation(set, get, blocked.message);
   if (runtime.activationPending || get().fireActive) return;
 
-  const device = useStore.getState().project.device;
-  const control = device.fireControl;
-  if (control === undefined) {
-    rejectFireActivation(set, get, 'Enable low-power Fire in Device Profile first.');
-  }
+  // The block check has already refused every other setup. This narrows the
+  // type, and fails closed should that check ever stop covering it.
+  const setup = fireSetupForProject(project);
+  if (setup.kind !== 'enabled') rejectFireActivation(set, get, FIRE_NOT_ENABLED_MESSAGE);
+  const device = project.device;
+  const control = setup.control;
   const powerS = cappedFirePowerS(
     requestedPercent ?? control.maxPowerPercent,
     control,
@@ -102,7 +107,8 @@ async function activateFire(
   }));
   try {
     await safeWrite(fireOnCommand(powerS, device.framingFeedMmPerMin), 'fire', 'console');
-    if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {
+    const stillAllowed = fireActivationBlock(get(), useStore.getState().project, true) === null;
+    if (token !== runtime.requestToken || !stillAllowed) {
       // Same latch rule as deactivateFire: this compensating M5 may race a
       // failed release write, so only a successful write may clear the latch.
       const offAccepted = await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console').then(
@@ -124,60 +130,11 @@ async function activateFire(
   }
 }
 
-function fireActivationBlockMessage(state: LaserState, ignorePendingAcks = false): string | null {
-  return (
-    fireFeatureBlockMessage(state) ??
-    fireControllerStateBlockMessage(state) ??
-    fireBusyBlockMessage(state, ignorePendingAcks)
-  );
-}
-
-function fireFeatureBlockMessage(state: LaserState): string | null {
-  const project = useStore.getState().project;
-  if (!useExperimentalLaserFeatures.getState().features.lowPowerFire) {
-    return 'Enable Low-power Fire in Tools > Labs first.';
-  }
-  if (machineKindOf(project.machine) !== 'laser') return 'Fire is unavailable for CNC projects.';
-  if (!state.capabilities.lowPowerFire) return 'The connected controller does not support Fire.';
-  if (!profileSupportsCapability(project.device, 'low-power-fire')) {
-    return 'The active machine profile is not approved for low-power Fire.';
-  }
-  return project.device.fireControl?.enabled === true
-    ? null
-    : 'Enable low-power Fire in Device Profile first.';
-}
-
-function fireControllerStateBlockMessage(state: LaserState): string | null {
-  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
-  const mpgBlock = mpgCommandBlockMessage(state);
-  if (mpgBlock !== null) return mpgBlock;
-  if (state.alarmCode !== null) return 'Clear the controller alarm before using Fire.';
-  if (state.statusReport === null) {
-    return 'Controller status is not known yet. Wait for an Idle position report.';
-  }
-  if (state.statusReport.state !== 'Idle') {
-    return `Machine must be Idle before using Fire (currently ${state.statusReport.state}).`;
-  }
-  return state.statusReport.mPos === null && state.statusReport.wPos === null
-    ? 'Fire needs a trusted live position report from the controller.'
-    : null;
-}
-
-function fireBusyBlockMessage(state: LaserState, ignorePendingAcks: boolean): string | null {
-  if (isActiveJob(state.streamer)) return 'A job is active. Request ABORT before using Fire.';
-  if (state.motionOperation !== null) return 'Wait for the jog or frame operation to finish.';
-  if (state.controllerOperation !== null) return 'Wait for the controller operation to finish.';
-  if (state.autofocusBusy) return 'Wait for auto-focus to finish.';
-  if (state.probeBusy) return 'Wait for probing to finish.';
-  if (!ignorePendingAcks && state.pendingUntrackedAcks > 0) {
-    return 'Wait for the controller to acknowledge the previous command.';
-  }
-  return null;
-}
-
+// A refused press sends nothing, so it leaves the on latch alone. Clearing it
+// here let a refused repeat press hide LASER OFF, and skip M5 on release,
+// while an earlier accepted M3 could still hold the beam on.
 function rejectFireActivation(set: SetFn, get: GetFn, message: string): never {
   set({
-    fireActive: false,
     lastWriteError: message,
     log: pushLog(get(), `[lf2] Fire command blocked: ${message}`),
   });
