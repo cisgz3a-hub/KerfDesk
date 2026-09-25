@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { findNonFiniteCoords, findPlungedTravelIssues } from '../invariants';
 import type { CncPath3dPass } from '../job';
@@ -120,11 +121,21 @@ function passEndpointKey(pass: CncPath3dPass): string {
   return `${first?.x},${first?.y}:${last?.x},${last?.y}`;
 }
 
-const SAFE_COMPILATION = compileSafe();
-
 describe('recovered test11 Safe V-carve artifact regression', () => {
-  it('pins the strongest source reconstruction available from the exported artifact', async () => {
-    const compilation = await SAFE_COMPILATION;
+  let compilation: SafeCompilation;
+
+  // Compile once, under its own budget. A module-level compile could finish
+  // inside the first test and overrun its default 5 s timeout, which it did on
+  // CI (2026-09-25 audit, DEP-4). The compile alone takes 13-15 s on a Windows
+  // dev laptop, past the default 10 s hook timeout, and at least 5.5 s on CI.
+  beforeAll(
+    async () => {
+      compilation = await compileSafe();
+    },
+    ciBudgetMs(60_000, 120_000),
+  );
+
+  it('pins the strongest source reconstruction available from the exported artifact', () => {
     expect(compilation.rendered.bounds.minX).toBe(0);
     expect(compilation.rendered.bounds.minY).toBe(0);
     expect(compilation.rendered.bounds.maxX).toBeCloseTo(16.55, 12);
@@ -136,8 +147,8 @@ describe('recovered test11 Safe V-carve artifact regression', () => {
     expect(findPlungedTravelIssues(compilation.gcode, { safeZMm: 3.81 })).toEqual([]);
   });
 
-  it('finishes all four depth levels of one region before entering the next', async () => {
-    const passes = safePathPasses(await SAFE_COMPILATION);
+  it('finishes all four depth levels of one region before entering the next', () => {
+    const passes = safePathPasses(compilation);
     expect(passes).toHaveLength(EXPECTED_PASSES);
     expect(passes.every((pass) => pass.lateralFeed === 'z-rate-capped')).toBe(true);
     const regionMinimumXs: number[] = [];
@@ -155,11 +166,11 @@ describe('recovered test11 Safe V-carve artifact regression', () => {
     expect(regionMinimumXs).toEqual([...regionMinimumXs].sort((a, b) => a - b));
   });
 
-  it('keeps the regenerated program within artifact and GRBL streaming budgets', async () => {
-    const { gcode } = await SAFE_COMPILATION;
+  it('keeps the regenerated program within artifact and GRBL streaming budgets', () => {
+    const { gcode } = compilation;
     const lines = gcode.split('\n');
     const xyzBlocks = gcodeXyzFeedBlockCount(gcode);
-    const passes = safePathPasses(await SAFE_COMPILATION);
+    const passes = safePathPasses(compilation);
     const maximumDepthMm = -Math.min(
       ...passes.flatMap((pass) => pass.points.map((point) => point.z)),
     );

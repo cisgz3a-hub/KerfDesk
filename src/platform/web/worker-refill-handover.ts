@@ -1,10 +1,21 @@
+import type { StreamerState } from '../../core/controllers/grbl';
 import type { HostedStreamRefill } from '../types';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
+
+// The arm message carries the whole streamer, and its queued lines are the whole
+// job, sent lines included, so copying it to the worker takes time in proportion
+// to the program. Node's structuredClone of that shape measured about 0.4 µs a
+// line (5M lines in about 2 s), and a slow laptop is several times slower. The
+// deadline is there to catch a silent worker, not a big job, so it grows with
+// the program at about ten times that rate (audit SER-1; ADR-354 Amendment 2).
+const ARM_DEADLINE_MS_PER_QUEUED_LINE = 0.005;
 
 type Pending = {
   readonly id: number;
   readonly promise: Promise<void>;
   readonly finish: () => void;
+  /** Restarts the deadline, `ms` from now. */
+  readonly extend: (ms: number) => void;
 };
 type HandoverState = {
   phase: 'main' | 'preparing' | 'arming' | 'worker' | 'releasing' | 'closed';
@@ -78,13 +89,17 @@ function begin(state: HandoverState, deps: HandoverDeps): Pending {
   const promise = new Promise<void>((done) => {
     resolve = done;
   });
-  const timer = setTimeout(deps.fail, deps.timeoutMs);
+  let timer = setTimeout(deps.fail, deps.timeoutMs);
   state.pending = {
     id: state.nextId++,
     promise,
     finish: () => {
       clearTimeout(timer);
       resolve();
+    },
+    extend: (ms) => {
+      clearTimeout(timer);
+      timer = setTimeout(deps.fail, ms);
     },
   };
   return state.pending;
@@ -143,5 +158,13 @@ function captureSnapshot(state: HandoverState, deps: HandoverDeps, id: number): 
   }
   state.phase = 'arming';
   state.handedOver = true;
+  // Restarted before the post, which copies the snapshot synchronously, so the
+  // new deadline covers that copy, the worker's decode and its reply.
+  state.pending?.extend(deps.timeoutMs + armTransferBudgetMs(streamer));
   post(deps, { kind: 'arm', id, streamer: streamer as never });
+}
+
+function armTransferBudgetMs(streamer: unknown): number {
+  const queued = (streamer as Partial<StreamerState>).queued?.length ?? 0;
+  return Math.ceil(queued * ARM_DEADLINE_MS_PER_QUEUED_LINE);
 }

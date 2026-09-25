@@ -10,7 +10,10 @@ import { readSvgDocumentFromBlob } from './parse-svg-blob';
 const identity = { id: 'source', source: 'effects.svg' };
 const square = 'M0 0 H10 V10 H0 Z';
 const outline = `<path d="${square}" fill="none" stroke="blue"/>`;
-const clip = `<defs><clipPath id="clip" clipPathUnits="userSpaceOnUse"><path d="${square}" clip-rule="evenodd"/></clipPath></defs>`;
+// A clip over one quarter of the square: importing the artwork unclipped would
+// cut what the design hides. (A clip that hides nothing imports; see
+// parse-svg-vector-clip.test.ts.)
+const clip = `<defs><clipPath id="clip" clipPathUnits="userSpaceOnUse"><path d="M0 0 H5 V5 H0 Z" clip-rule="evenodd"/></clipPath></defs>`;
 
 function svg(content: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">${content}</svg>`;

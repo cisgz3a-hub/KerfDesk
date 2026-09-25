@@ -1,5 +1,5 @@
 import { boundedSplitRunwayLengths } from '../raster/raster-sweep-plan';
-import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
+import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-defaults';
 import { isEmittableFillSegment } from './fill-emission-resolution';
 import { effectiveFillOverscanMm } from './fill-overscan';
 import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
@@ -30,11 +30,14 @@ export function feedMatchedFillRunwayMm(configuredMm: number): number {
  * Generic Scan Line never starts powered motion directly after a rapid.
  * A stored zero predates the universal-runway contract, so use the generic
  * default instead of treating it as an opt-out. A positive value applies in
- * full: split sweeps already share their gap without overlap, and the 4040
- * bound above is that profile's decision, not a geometric limit.
+ * full up to MAX_FILL_OVERSCAN_MM, the Overscan field's own maximum: split
+ * sweeps already share their gap without overlap, and the 4040 bound above is
+ * that profile's decision, not a geometric limit.
  */
 export function genericFeedMatchedFillRunwayMm(configuredMm: number): number {
-  return Number.isFinite(configuredMm) && configuredMm > 0 ? configuredMm : DEFAULT_OVERSCAN_MM;
+  return Number.isFinite(configuredMm) && configuredMm > 0
+    ? Math.min(configuredMm, MAX_FILL_OVERSCAN_MM)
+    : DEFAULT_OVERSCAN_MM;
 }
 
 /**

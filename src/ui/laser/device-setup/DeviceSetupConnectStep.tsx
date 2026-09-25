@@ -6,6 +6,7 @@
 import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';
 import { usePlatform } from '../../app/platform-context';
+import { connectOptionsForDevice } from '../../commands/connect-options';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useLaserStore, type ConnectionState } from '../../state/laser-store';
@@ -51,14 +52,15 @@ function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
       (activeControllerCommandSet ?? null) !== (driver.commandSet ?? null) ||
       (detectedControllerKind !== null && detectedControllerKind !== controllerKind));
 
+  // The options the rail and menu Connect build from a profile, so the draft's
+  // Background streaming choice travels as they send it, an explicit opt-out
+  // included (2026-09-25 audit, SER-2). Connect treats a missing choice as on
+  // for GRBL-family drivers. Setup keeps its controller and baud fallbacks.
   const openConnection = (): Promise<void> =>
     connect(platform, {
+      ...connectOptionsForDevice(state.draft),
       controllerKind,
-      controllerCommandSet: state.draft.controllerCommandSet,
       baudRate: state.draft.baudRate ?? guide.defaultBaudRate,
-      // The draft's "Stream in worker" opt-in, as every other Connect honours it
-      // (audit connect-6).
-      ...(state.draft.workerHostedStreaming === true ? { hostedStreaming: true } : {}),
     });
   const reconnect = async (): Promise<void> => {
     await disconnect();

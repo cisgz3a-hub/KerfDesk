@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { FillGroup, FillSegment } from './job';
 import { expandFillHatchWithRunways } from './fill-runway';
-import { planFillSweeps } from './fill-sweep-plan';
+import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-defaults';
+import { genericFeedMatchedFillRunwayMm, planFillSweeps } from './fill-sweep-plan';
 
 const DEFAULT_RUNWAY_MM = 5;
 const TEST_EPS_MM = 1e-9;
@@ -273,5 +274,17 @@ describe('planFillSweeps', () => {
         },
       ),
     );
+  });
+});
+
+// 2026-09-25 PR audit LBG-5: every Scan Line runway (output, preview, Frame
+// bounds, estimate) goes through this, and a stored value applied in full.
+describe('genericFeedMatchedFillRunwayMm', () => {
+  it('applies a stored runway in full up to the Overscan maximum', () => {
+    expect(genericFeedMatchedFillRunwayMm(10)).toBe(10);
+    expect(genericFeedMatchedFillRunwayMm(MAX_FILL_OVERSCAN_MM)).toBe(MAX_FILL_OVERSCAN_MM);
+    expect(genericFeedMatchedFillRunwayMm(50)).toBe(MAX_FILL_OVERSCAN_MM);
+    expect(genericFeedMatchedFillRunwayMm(0)).toBe(DEFAULT_OVERSCAN_MM);
+    expect(genericFeedMatchedFillRunwayMm(Number.NaN)).toBe(DEFAULT_OVERSCAN_MM);
   });
 });

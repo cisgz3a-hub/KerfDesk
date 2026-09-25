@@ -165,6 +165,15 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
    and document replacement leave the complete file uninserted and release staged image assets.
 
+#### Edge — SVG with a vector clip
+1. A vector clip that hides none of the artwork imports as if it were absent, such as the frame or
+   artboard rectangle Figma and Illustrator wrap exported content in. KerfDesk accepts it when
+   the clip is one shape in user-space units (SVG's default) with a single convex outline, and
+   every point of the clipped artwork lies inside it (ADR-358 Amendment 1).
+2. Any other vector clip, and every vector mask and filter, still rejects the whole file with its
+   reason, because importing it unclipped could cut what the design hides.
+3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`, the SVG default.
+
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
 2. If not SVG: toast (error variant, red): `Not a valid SVG: <filename>`. No state change.
@@ -2664,8 +2673,11 @@ or traced image) with at least one closed polyline.
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
   The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
   Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
-  scanline's outer entry and exit), and a stored value of zero uses the bounded 5 mm generic runway
-  default rather than allowing a rapid-to-powered start; Frame includes that effective motion.
+  scanline's outer entry and exit), up to the field's 25 mm maximum, and a stored value of zero uses
+  the bounded 5 mm generic runway default rather than allowing a rapid-to-powered start; Frame
+  includes that effective motion. A larger stored value, such as a LightBurn percentage converted
+  at high speed, is applied at 25 mm; the import stores it at 25 mm and says so, and Job Review
+  notes "applied at most 25 mm" (ADR-238 Amendment 3).
 - *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
   runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
   ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.

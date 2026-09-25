@@ -12,9 +12,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Same rule as ci.yml: a new push cancels a PR branch's in-progress run, but
+# every main run finishes. Cancelling on main left many published commits
+# with only a cancelled Browser smoke run (2026-09-25 audit, DEP-1). GitHub
+# still keeps one pending run per group, so a burst of merges runs the tip.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
