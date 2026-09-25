@@ -134,17 +134,18 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
         ],
       },
     ];
-    // The region re-trace runs on the SUPERSAMPLED crop. computeRegionUpscaleFactor
-    // returns 2 for this small crop, so the injected tracer sees a 20x20 buffer
-    // and its output is downscaled by 2 then offset by the region origin (5,5):
-    // (8,8)->(4,4)->(9,9); (12,12)->(6,6)->(11,11) — landing inside the interior.
+    // The region re-trace runs on the SUPERSAMPLED crop. The box plus its
+    // context ring (ADR-410) covers the whole 20x20 image, and
+    // computeRegionUpscaleFactor returns 2, so the injected tracer sees a 40x40
+    // buffer and its output is downscaled by 2 then offset by the padded
+    // origin (0,0): (18,18)->(9,9); (22,22)->(11,11) — inside the interior.
     const enhancedCrop: ColoredPath[] = [
       {
         color: '#000000',
         polylines: [
           polyline([
-            [8, 8],
-            [12, 12],
+            [18, 18],
+            [22, 22],
           ]),
         ],
       },
@@ -184,7 +185,7 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
     );
     expect(traceImageWithFallback).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ width: 20, height: 20 }),
+      expect.objectContaining({ width: 40, height: 40 }),
       expect.objectContaining({
         ...options,
         autoUpscaleSmallSources: false,

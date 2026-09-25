@@ -9,28 +9,43 @@
 // full-image pass dropped, without paying for a 1024px 2x buffer.
 //
 // The merge must survive two traps:
-//   * Every polyline traced FROM the crop lies inside the crop by
-//     construction, so containment alone cannot tell a genuine re-traced
-//     shape from a fragment of a larger shape CLIPPED by the crop edge.
-//     Fragments hug the region border; genuine shapes sit inside it.
+//   * A polyline traced FROM the crop that reaches the crop edge may be a
+//     fragment of a larger shape CLIPPED by it.
 //   * A polyline of the ORIGINAL trace that crosses the region border (a
 //     larger outline passing through the box) must survive untouched.
-// Both are solved with one rule: only the region SHRUNK by a margin is
-// replaced. Existing polylines fully inside the shrunk region are dropped;
-// replacement polylines fully inside it are merged in (by colour); everything
-// in the margin ring or crossing the border keeps its original geometry.
+// Only the region SHRUNK by a margin is replaced: existing polylines fully
+// inside it are dropped, re-traced ones fully inside it are merged in (by
+// colour), and everything crossing it keeps its original geometry. The crop
+// is traced with a padding ring of real neighbouring pixels (ADR-410), so a
+// clipped fragment always reaches into the padding and fails that test, and
+// pixels near the box edge are filtered with the surroundings the full pass
+// saw. region-merge.ts pairs the two traces of a shape that grazes the border
+// so it is neither lost nor doubled.
+//
+// The crop also inherits the full image's Otsu cut and auto-sketch verdict
+// (trace-source-decisions.ts); re-deriving them from the crop's own pixels
+// made the patch binarise differently from its surroundings.
 //
 // Pure-core compliant: no I/O, no clock, no random — the tracer itself is
 // injected by the caller (the UI passes its worker-backed tracer; tests pass
 // a direct core tracer).
 
-import type { ColoredPath, Polyline } from '../scene';
+import type { ColoredPath } from '../scene';
 import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
+import { edgeMaskRadiusPx } from './edge-input';
+import { replacePathsInRegion } from './region-merge';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
-import type { RawImageData, TraceOptions } from './trace-image';
-import { resolveTraceSourceOptions } from './trace-alpha';
+import {
+  SKETCH_RADIUS_PX,
+  effectivePixelScale,
+  type RawImageData,
+  type TraceOptions,
+} from './trace-image';
+import { resolveFrozenTraceSourceOptions } from './trace-source-decisions';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
+
+export { replacePathsInRegion } from './region-merge';
 
 // 2x is mkbitmap's documented sweet spot ("a greyscale image contains more
 // detail than a bilevel image at the same resolution"); 3x+ invents detail.
@@ -68,26 +83,53 @@ export function computeRegionUpscaleFactor(crop: RawImageData, options: TraceOpt
 
 /** Re-trace `region` of `image` supersampled and return `fullTracePaths` with
  *  the region's interior replaced by the re-traced geometry. A degenerate or
- *  out-of-image region returns the input paths unchanged. */
+ *  out-of-image region returns the input paths unchanged.
+ *
+ *  `fullTracePaths` must come from the same frozen decisions: pass options
+ *  from resolveFrozenTraceSourceOptions(image, ...) to the full trace too. */
 export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<ColoredPath[]> {
   const region = normalizeTraceBoundary(args.region, args.image.width, args.image.height);
   if (region === null) return [...args.fullTracePaths];
-  const options = resolveTraceSourceOptions(args.image, args.options);
-  const crop = cropRawImageData(args.image, region);
+  // Otsu's cut and the auto-sketch trigger are whole-image decisions; a crop
+  // must inherit them, not re-derive them from its own pixels (ADR-410).
+  const options = resolveFrozenTraceSourceOptions(args.image, args.options);
+  // Trace the box with the neighbourhood its filters read, so pixels near the
+  // box edge see the same surroundings as in the full pass. Subpaths reaching
+  // into the padding never pass the merge's interior test.
+  const padded = padRegion(region, regionContextPx(options), args.image);
+  const crop = cropRawImageData(args.image, padded);
   const factor = computeRegionUpscaleFactor(crop, options);
   const traced = await args.trace(
     factor > 1 ? upscaleBy(crop, factor) : crop,
     optionsForRegionScale(options, factor),
   );
-  const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), region.x, region.y);
-  const interior = shrinkRegion(region, REGION_EDGE_MARGIN_PX);
-  const replacement = inSource
-    .map((path) => ({
-      ...path,
-      polylines: path.polylines.filter((pl) => polylineFullyInside(pl, interior)),
-    }))
-    .filter((path) => path.polylines.length > 0);
-  return replacePathsInRegion(args.fullTracePaths, interior, replacement);
+  const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), padded.x, padded.y);
+  return replacePathsInRegion(
+    args.fullTracePaths,
+    shrinkRegion(region, REGION_EDGE_MARGIN_PX),
+    inSource,
+  );
+}
+
+// Widest neighbourhood a luma lane reads around a pixel, in this image's
+// pixels: the sketch / auto-detail / faint-line window (which also covers the
+// 3x3 median and the auto median's two-link support), or Edge Detection's
+// local-contrast window. One more pixel covers bilinear upscaling's reach.
+function regionContextPx(options: TraceOptions): number {
+  const sketch = SKETCH_RADIUS_PX * effectivePixelScale(options);
+  const edge = options.traceMode === 'edge' ? edgeMaskRadiusPx(options) : 0;
+  return Math.ceil(Math.max(sketch, edge)) + 1;
+}
+
+function padRegion(region: TraceBoundary, pad: number, image: RawImageData): TraceBoundary {
+  const x = Math.max(0, region.x - pad);
+  const y = Math.max(0, region.y - pad);
+  return {
+    x,
+    y,
+    width: Math.min(image.width, region.x + region.width + pad) - x,
+    height: Math.min(image.height, region.y + region.height + pad) - y,
+  };
 }
 
 function optionsForRegionScale(options: TraceOptions, factor: number): TraceOptions {
@@ -105,38 +147,6 @@ function optionsForRegionScale(options: TraceOptions, factor: number): TraceOpti
   };
 }
 
-/** Merge: drop existing polylines fully inside `interior`, then add the
- *  replacement polylines, folding them into the first existing path of the
- *  same colour (no duplicate colour layers). Exported for tests. */
-export function replacePathsInRegion(
-  existing: ReadonlyArray<ColoredPath>,
-  interior: TraceBoundary,
-  replacement: ReadonlyArray<ColoredPath>,
-): ColoredPath[] {
-  const out: ColoredPath[] = [];
-  const mergedColors = new Set<string>();
-  for (const path of existing) {
-    const survivors = path.polylines.filter((pl) => !polylineFullyInside(pl, interior));
-    const additions = mergedColors.has(path.color)
-      ? []
-      : replacementPolylines(replacement, path.color);
-    mergedColors.add(path.color);
-    const polylines = [...survivors, ...additions];
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
-  }
-  for (const path of replacement) {
-    if (mergedColors.has(path.color)) continue;
-    mergedColors.add(path.color);
-    const polylines = replacementPolylines(replacement, path.color);
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
-  }
-  return out;
-}
-
-function replacementPolylines(replacement: ReadonlyArray<ColoredPath>, color: string): Polyline[] {
-  return replacement.filter((path) => path.color === color).flatMap((path) => [...path.polylines]);
-}
-
 function shrinkRegion(region: TraceBoundary, marginPx: number): TraceBoundary {
   return {
     x: region.x + marginPx,
@@ -144,13 +154,4 @@ function shrinkRegion(region: TraceBoundary, marginPx: number): TraceBoundary {
     width: Math.max(0, region.width - 2 * marginPx),
     height: Math.max(0, region.height - 2 * marginPx),
   };
-}
-
-function polylineFullyInside(polyline: Polyline, region: TraceBoundary): boolean {
-  if (polyline.points.length === 0) return false;
-  const maxX = region.x + region.width;
-  const maxY = region.y + region.height;
-  return polyline.points.every(
-    (p) => p.x >= region.x && p.x <= maxX && p.y >= region.y && p.y <= maxY,
-  );
 }

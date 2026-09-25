@@ -23,6 +23,7 @@ import {
 import { traceImageRegion } from './trace-region';
 import { traceImageWithFallback, type TraceResult } from './use-trace-worker-client';
 import { resolveTraceSourceOptions } from '../../core/trace/trace-alpha';
+import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
 import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export type BoundaryMode = 'crop' | 'enhance';
@@ -39,10 +40,19 @@ export async function traceImageWithBoundaryMode(
   signal?: AbortSignal,
   progress?: TraceProgress,
 ): Promise<TraceResult> {
-  const options = resolveTraceSourceOptions(image, requestedOptions);
   if (mode === 'crop' || boundary === null || boundary === undefined) {
-    return traceImageRegion(image, options, boundary, signal, progress);
+    return traceImageRegion(
+      image,
+      resolveTraceSourceOptions(image, requestedOptions),
+      boundary,
+      signal,
+      progress,
+    );
   }
+  // The full pass and the region re-trace share one set of whole-image
+  // binarisation decisions (Otsu cut, auto-sketch verdict), so the patch
+  // cuts exactly where its surroundings did (ADR-410).
+  const options = resolveFrozenTraceSourceOptions(image, requestedOptions);
   const full = await traceImageWithFallback(image, options, signal, progress);
   const notices = new Set(full.notices);
   const paths = await enhanceRegionPaths({

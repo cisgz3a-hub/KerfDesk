@@ -62,6 +62,10 @@ export type TraceOptions = {
   readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
+  // INTERNAL full-source auto-sketch verdict (ADR-410), carried like
+  // sourceHasTransparency so an Enhance crop binarises as the full pass did.
+  // Read only while autoSketchTrace is on; absent = decide on the image given.
+  readonly sourceAutoSketch?: boolean;
   // Explicit faint-line detection adds coherent narrow local-contrast strokes
   // to this preset's actual brightness/Otsu mask, retaining its solid areas.
   // Alpha tracing takes precedence; UI manual/sketch detection clears this flag.
@@ -77,6 +81,10 @@ export type TraceOptions = {
   // image's luma histogram (Otsu 1979) instead of a fixed value.
   // Used only when explicit cutoffLuma / thresholdLuma are absent.
   readonly useOtsuThreshold?: boolean;
+  // INTERNAL full-source Otsu cut (ADR-410), read only while useOtsuThreshold
+  // is on, so an Enhance crop cuts where the full pass cut. Dropping
+  // useOtsuThreshold (the relaxed retry) drops it with it.
+  readonly sourceOtsuThreshold?: number;
   // medianFilter: 3×3 median filter (RGBA → greyscale) applied
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
   // artefacts without rounding off real edges the way a Gaussian

@@ -248,7 +248,10 @@ function applyThresholdWithIso(
     };
   }
   if (options.useOtsuThreshold === true) {
-    const thresholdLuma = otsuThreshold(prepared);
+    // A derived region carries the whole source's cut (ADR-410).
+    const frozen = options.sourceOtsuThreshold;
+    const thresholdLuma =
+      frozen !== undefined && Number.isFinite(frozen) ? frozen : otsuThreshold(prepared);
     return {
       prepared: thresholdToMonochrome(prepared, thresholdLuma),
       thresholdLuma,
@@ -292,7 +295,7 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): 
 
 // Forced median and selective automatic cleanup have different contracts. The
 // automatic path computes and applies its result once, preserving connected ink.
-function applyMedian(
+export function applyMedian(
   image: RawImageData,
   medianFilterOption: boolean | 'auto' | undefined,
 ): RawImageData {
@@ -344,7 +347,8 @@ function shouldDespeckle(options: TraceOptions): boolean {
   );
 }
 
-const SKETCH_RADIUS_PX = 8;
+/** Local-contrast window of sketch and auto-detail masks, in SOURCE pixels. */
+export const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
 function sketchTraceToMonochrome(image: RawImageData, radiusPx = SKETCH_RADIUS_PX): RawImageData {

@@ -64,6 +64,11 @@ export function edgeTraceInputMatches(
   );
 }
 
+/** The detector's neighbourhood radius on this execution's grid, in pixels. */
+export function edgeMaskRadiusPx(options: TraceOptions): number {
+  return edgeMaskOptions(options).radiusPx;
+}
+
 function edgeMaskOptions(options: TraceOptions): LocalContrastMaskOptions {
   const low = options.edgeLowThresholdRatio ?? DEFAULT_LOW_THRESHOLD_RATIO;
   const sigma = options.edgeBlurSigma ?? DEFAULT_BLUR_SIGMA;

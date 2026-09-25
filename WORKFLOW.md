@@ -3269,7 +3269,8 @@ and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
-**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
+amended by [ADR-410](docs/decisions/ADR-410-region-enhance-seams.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3291,7 +3292,12 @@ re-runs: the full image is traced, the boxed source region is re-traced
 at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
-preview shows the full trace with the boxed feature recovered. Commit
+box is re-traced with a ring of the real neighbouring pixels around it and
+with the whole image's Otsu cut and auto-sketch choice, so the patch
+binarises exactly like its surroundings, and a shape grazing the box edge
+appears once, never twice or not at all. Fitted curves and operation
+bindings survive inside and outside the box. The preview shows the full
+trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
 
