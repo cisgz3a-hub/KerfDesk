@@ -15,6 +15,7 @@ const SCENE_MOCKS = vi.hoisted(() => ({
   recolor: vi.fn(),
   setDirectionArrows: vi.fn(),
   dispose: vi.fn(),
+  prepareToShow: vi.fn<(_signal?: AbortSignal) => Promise<void>>(),
 }));
 
 vi.mock('../viewer3d', async (importOriginal) => {
@@ -53,6 +54,7 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     setDirectionArrows: SCENE_MOCKS.setDirectionArrows,
     resize: vi.fn(),
     requestRender: vi.fn(),
+    prepareToShow: SCENE_MOCKS.prepareToShow,
     dispose: SCENE_MOCKS.dispose,
   };
 }
@@ -125,9 +127,85 @@ beforeEach(() => {
   SCENE_MOCKS.recolor.mockReset();
   SCENE_MOCKS.setDirectionArrows.mockReset();
   SCENE_MOCKS.dispose.mockClear();
+  SCENE_MOCKS.prepareToShow.mockReset().mockResolvedValue();
 });
 
 describe('useViewer3dScene', () => {
+  it('keeps preparing until the current model GPU frame is complete', async () => {
+    let finish!: () => void;
+    SCENE_MOCKS.prepareToShow.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await withMountedScene(renderModel(FIRST_PROGRAM), async ({ getBinding }) => {
+      expect(getBinding()?.state).toBe('preparing');
+      expect(SCENE_MOCKS.setPlayhead).not.toHaveBeenCalled();
+      await act(async () => finish());
+      expect(getBinding()?.state).toBe('ready');
+    });
+  });
+
+  it('aborts replaced preparation and ignores its late completion', async () => {
+    const requests: { signal: AbortSignal | undefined; finish: () => void }[] = [];
+    SCENE_MOCKS.prepareToShow.mockImplementation(
+      (signal) =>
+        new Promise<void>((finish) => {
+          requests.push({ signal, finish });
+        }),
+    );
+    await withMountedScene(
+      renderModel(FIRST_PROGRAM),
+      async ({ getBinding, rerender, unmount }) => {
+        await rerender(renderModel(SECOND_PROGRAM));
+        expect(requests).toHaveLength(2);
+        expect(requests[0]?.signal?.aborted).toBe(true);
+        await act(async () => requests[0]?.finish());
+        expect(getBinding()?.state).toBe('preparing');
+        await act(async () => requests[1]?.finish());
+        expect(getBinding()?.state).toBe('ready');
+        await rerender(renderModel(FIRST_PROGRAM));
+        await unmount();
+        expect(requests[2]?.signal?.aborted).toBe(true);
+        await act(async () => requests[2]?.finish());
+      },
+    );
+  });
+
+  it('surfaces a GPU preparation failure without publishing readiness', async () => {
+    SCENE_MOCKS.prepareToShow.mockRejectedValue(new Error('GPU context lost'));
+    await withMountedScene(renderModel(FIRST_PROGRAM), ({ getBinding }) => {
+      expect(getBinding()?.state).toBe('no-webgl');
+      expect(getBinding()?.reason).toBe('GPU context lost');
+      expect(SCENE_MOCKS.setPlayhead).not.toHaveBeenCalled();
+      expect(getBinding()?.handleRef.current).toBeNull();
+      expect(SCENE_MOCKS.dispose).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('reinstalls A when returning from pending B instead of revealing B as A', async () => {
+    const first = renderModel(FIRST_PROGRAM);
+    await withMountedScene(first, async ({ getBinding, rerender }) => {
+      const requests: (() => void)[] = [];
+      SCENE_MOCKS.prepareToShow.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            requests.push(resolve);
+          }),
+      );
+      await rerender(renderModel(SECOND_PROGRAM));
+      await rerender(first);
+      expect(getBinding()?.state).toBe('preparing');
+      expect(SCENE_MOCKS.setSegments).toHaveBeenLastCalledWith(first);
+      expect(requests).toHaveLength(2);
+      await act(async () => requests[0]?.());
+      expect(getBinding()?.state).toBe('preparing');
+      await act(async () => requests[1]?.());
+      expect(getBinding()?.state).toBe('ready');
+    });
+  });
+
   it('creates one scene and draws the program into it', async () => {
     const model = renderModel(FIRST_PROGRAM);
     await withMountedScene(model, ({ getBinding }) => {

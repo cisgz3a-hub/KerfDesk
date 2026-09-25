@@ -9,6 +9,7 @@ import {
 import { installConnectedScriptCanvasProject } from './fixtures/install-connected-script-canvas-project';
 import { showGcodeCanvas } from './fixtures/mixed-canvas-project';
 import { withViewerPhaseDiagnostics } from './fixtures/viewer-phase-diagnostics';
+import { expectVisibleViewerToolpath } from './fixtures/visible-viewer-toolpath';
 import { waitForGcodeCanvasReady } from './fixtures/wait-for-gcode-canvas-ready';
 
 const TEST_TIMEOUT_MS = 120_000;
@@ -26,12 +27,6 @@ const REQUIRED_WORKER_URL_PARTS = [
 ] as const;
 const COMPILATION_UNAVAILABLE_PATTERN = /Background compilation unavailable/i;
 const PREVIEW_WORKER_UNAVAILABLE_PATTERN = /background preview worker could not start/i;
-
-// Keep DOM and phase diagnostics while isolating filmstrip GPU readback from
-// this responsiveness measurement. Failure screenshots remain enabled.
-test.use({
-  trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true, sources: true },
-});
 
 test('real connected-script multi-operation G-code 3D reaches ready off-thread', async ({
   page,
@@ -68,6 +63,7 @@ test('real connected-script multi-operation G-code 3D reaches ready off-thread',
       workerUrls,
     });
     expectRequiredWorkers(workerUrls);
+    await expectVisibleViewerToolpath(page, testInfo);
     expect(pageErrors).toEqual([]);
     await expect(page.getByText(COMPILATION_UNAVAILABLE_PATTERN)).toHaveCount(0);
     await expect(page.getByText(PREVIEW_WORKER_UNAVAILABLE_PATTERN)).toHaveCount(0);
