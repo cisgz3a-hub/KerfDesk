@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { detectControllerFromBanner } from '../../core/controllers';
 import { DEFAULT_DEVICE_PROFILE, type Origin } from '../../core/devices';
 import {
   bedPointToNative,
@@ -91,6 +92,25 @@ describe('verified native controller to profile-bed frame', () => {
     expect(
       resolveNativeBedFrame(device, { ...evidence, detectedControllerKind: 'fluidnc' }),
     ).toBeNull();
+  });
+
+  // Audit HF-8: the vendor file labels the Falcon controller GRBL-LPC and its
+  // banner is unrecorded; grblHAL at COMPATIBILITY_LEVEL >= 1 prints the stock
+  // "Grbl 1.1f" banner too (report.c:310-314). Neither contradicts the vendor
+  // command contract.
+  it('keeps the official A1 convention on a "Grbl ..." banner', () => {
+    const device = { ...DEVICE, controllerCommandSet: 'creality-falcon-a1-pro' as const };
+    const evidence = {
+      homingState: 'confirmed',
+      activeControllerKind: 'grblhal' as const,
+      activeControllerCommandSet: 'creality-falcon-a1-pro' as const,
+    };
+    for (const banner of ["Grbl 1.1f ['$' for help]", "Grbl 1.1h ['$' for help]"]) {
+      const detectedControllerKind = detectControllerFromBanner(banner);
+      expect(
+        resolveNativeBedFrame(device, { ...evidence, detectedControllerKind })?.nativeToBedOffsetMm,
+      ).toEqual({ x: 0, y: 0 });
+    }
   });
 
   it('rejects non-finite dimensions instead of inventing a mapping', () => {

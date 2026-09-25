@@ -315,7 +315,9 @@ function handleWelcomeLine(
   safeWrite: SafeWriteFn,
   raw: string,
 ): void {
-  const detected = detectControllerFromBanner(raw);
+  // A "Grbl 1.1f" banner is also grblHAL's at COMPATIBILITY_LEVEL >= 1, so on a
+  // grblHAL driver it identifies grblHAL, not a mismatch (audit HF-8).
+  const detected = detectControllerFromBanner(raw, refs.driver.kind);
   if (detected === null) return;
   const state = get();
   const nextSessionEpoch = state.controllerSessionEpoch + 1;
