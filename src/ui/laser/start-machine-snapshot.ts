@@ -1,10 +1,12 @@
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
-import type { Project } from '../../core/scene';
+import { laserOutputRefusal } from '../../core/preflight/laser-module-readiness';
+import { machineKindOf, type Project } from '../../core/scene';
 import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
 
 /** Every controller and camera fact a Start preparation compiles against, as
  * one by-value snapshot. It is what the request carries into the preparation
@@ -14,6 +16,7 @@ export function machineSnapshot(
   laser: ReturnType<typeof useLaserStore.getState>,
   camera: ReturnType<typeof useCameraStore.getState>,
 ) {
+  const laserModuleEvidence = connectedLaserModuleEvidence(laser);
   return {
     connected: laser.connection.kind === 'connected',
     statusReport: laser.statusReport,
@@ -31,6 +34,10 @@ export function machineSnapshot(
     controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
     controllerSettings: laser.controllerSettings,
     controllerSettingsObservation: laser.controllerSettingsObservation,
+    laserModuleReport: laserModuleEvidence,
+    // A controller without its laser module cannot run a laser job at all.
+    laserOutputRefusal:
+      machineKindOf(project.machine) === 'laser' ? laserOutputRefusal(laserModuleEvidence) : null,
     wcoCache: laser.wcoCache,
     activeWcs: laser.activeWcs,
     ovCache: laser.ovCache,

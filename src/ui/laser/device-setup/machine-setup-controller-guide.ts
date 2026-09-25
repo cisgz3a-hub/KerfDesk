@@ -96,7 +96,7 @@ export function machineSetupControllerGuide(
         configurationSurface: 'Smoothieware SD-card config file',
         writePolicy: 'external-config',
         writeExplanation:
-          'Match laser_module_maximum_s_value to the profile and set laser_module_minimum_power to 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
+          'Set laser_module_maximum_s_value 1.0 (Full-power S stays 1): Smoothieware stores every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below the requested power. Set laser_module_enable true and laser_module_minimum_power 0 for dark S0 feed moves. Edit the config through the Smoothieware USB/SD workflow, then reset and reconnect.',
       };
     case 'ruida':
       return {

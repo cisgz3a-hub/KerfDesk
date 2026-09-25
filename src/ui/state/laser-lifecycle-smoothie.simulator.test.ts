@@ -15,6 +15,7 @@ import { fingerprintGcode } from '../../core/recovery';
 import { canvasJobTimingPlan } from './canvas-job-timing-plan';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { useLaserStore } from './laser-store';
+import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
@@ -277,7 +278,10 @@ describe('Smoothieware lifecycle against the simulator', () => {
     await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(20);
     await useLaserStore.getState().stopJob();
-    await pump(50);
+    // Ctrl-X halts Smoothieware without a reboot banner (USBSerial.cpp
+    // L302-L314), so the M5/M9 cleanup goes out on the reset-cleanup
+    // fallback, not on a banner.
+    await pump(RESET_CLEANUP_BANNER_TIMEOUT_MS + 50);
     expect(sim.outbound()).toContain('\x18');
     expect(sim.outbound()).toContain('M5\n');
     expect(sim.outbound()).toContain('M9\n');

@@ -17,6 +17,7 @@ import {
   backgroundStreamingFallbackWarning,
 } from './laser-background-streaming-notice';
 import { pushLog } from './laser-store-helpers';
+import { connectionScopedEvidenceReset } from './laser-module-probe';
 import { useToastStore } from './toast-store';
 
 type SetFn = (
@@ -102,7 +103,7 @@ async function connectSerialController(
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   refs.nextTranscriptId = 1;
   refs.driver = driver;
-  set((state) => connectingPatch(state, refs));
+  set((state) => ({ ...connectingPatch(state, refs), ...connectionScopedEvidenceReset() }));
   try {
     const portRef = await adapter.serial.requestPort();
     requestedPort = portRef;

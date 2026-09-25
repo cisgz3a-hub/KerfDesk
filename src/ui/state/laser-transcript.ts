@@ -140,6 +140,11 @@ function decoded(
       : { decoded: desc.detail === undefined ? desc.title : `${desc.title}: ${desc.detail}` };
   }
   if (response.kind === 'alarm') {
+    if (response.code === null) {
+      return {
+        decoded: 'Controller alarm: the controller halted and refuses motion until unlocked.',
+      };
+    }
     const desc = presentAlarm(controllerKind, response.code);
     return desc === null
       ? { decoded: `Alarm ${response.code}` }

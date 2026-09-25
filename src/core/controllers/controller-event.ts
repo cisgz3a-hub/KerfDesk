@@ -17,6 +17,9 @@ export type ControllerEvent =
       readonly halted?: true;
     }
   | { readonly kind: 'alarm'; readonly code: number }
+  // A firmware alarm announced as text instead of a number (Smoothieware
+  // `ALARM: Hard limit +X`). Like GRBL's `ALARM:N` it answers no line.
+  | { readonly kind: 'alarm'; readonly code: null; readonly raw: string }
   | { readonly kind: 'status'; readonly report: StatusReport }
   | { readonly kind: 'setting'; readonly id: number; readonly value: string }
   | { readonly kind: 'message'; readonly tag: string; readonly body: string }

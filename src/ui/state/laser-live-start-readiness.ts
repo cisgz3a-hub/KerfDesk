@@ -1,7 +1,9 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { StatusReport } from '../../core/controllers/grbl';
+import { laserOutputRefusal } from '../../core/preflight/laser-module-readiness';
 import type { MachineKind } from '../../core/scene';
 import { framedRunStartHandoffIssue, type FramedRunPermit } from './framed-run';
+import { connectedLaserModuleEvidence } from './laser-module-probe';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import {
   waitForFreshControllerStatus,
@@ -27,8 +29,10 @@ const LIVE_STATUS_TIMEOUT_MS = 3_000;
 export const LASER_LIVE_STATUS_TIMEOUT_MESSAGE =
   'Laser Start could not obtain a fresh same-session controller status report after its final status query. Check the connection and try again.';
 
-/** Ordinary Frame-authorized laser Start only. Recovery/replay paths have
- * separate resumability evidence and intentionally do not carry a permit. */
+/** Every laser Start first proves the controller can run laser output at all.
+ * The live-status proof that follows is for the ordinary Frame-authorized
+ * Start only: recovery/replay paths have separate resumability evidence and
+ * intentionally do not carry a permit. */
 export async function refreshLaserLiveStartState(args: {
   readonly set: SetFn;
   readonly get: GetFn;
@@ -38,7 +42,14 @@ export async function refreshLaserLiveStartState(args: {
   readonly machineKind: MachineKind;
   readonly permit: FramedRunPermit | undefined;
 }): Promise<void> {
-  if (args.machineKind !== 'laser' || args.permit === undefined) return;
+  if (args.machineKind !== 'laser') return;
+  // Every laser Start, recovery and replay included: a controller without its
+  // laser module factually cannot run laser output (controller audit SM-3).
+  const noLaserOutput = laserOutputRefusal(connectedLaserModuleEvidence(args.get()));
+  if (noLaserOutput !== null) {
+    rejectLaserStart(args.set, args.get, `${noLaserOutput} No program bytes were sent.`);
+  }
+  if (args.permit === undefined) return;
   const driver = args.driver();
   if (driver.realtime.statusQuery === null && driver.commands.queuedStatusQuery === null) {
     rejectLaserStart(args.set, args.get, LASER_LIVE_STATUS_TIMEOUT_MESSAGE);

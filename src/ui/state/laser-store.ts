@@ -25,6 +25,7 @@ import { statusRequestActions } from './laser-status-request';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import type { ControllerBuildInfoState } from './laser-controller-build-info';
+import type { LaserModuleObservation } from './laser-module-probe';
 import type {
   ControllerQualification,
   ControllerQualificationScheduleRefs,
@@ -190,6 +191,15 @@ export type LaserState = LaserStoreActions &
      * controllerSessionEpoch so late replies from a reset or forgotten port can
      * never make a newer session look ready. */
     readonly controllerQualification: ControllerQualification;
+    /** What the connected firmware's own laser-module report proved (the
+     * Smoothieware `M221` probe, laser-module-probe.ts). Connection-scoped:
+     * the module cannot change without a reboot, and a reboot re-runs the
+     * probe. null/undefined: not probed, or the driver has no probe. */
+    readonly laserModuleEvidence?: LaserModuleObservation | null;
+    /** Frame modal-state pushes (Smoothieware M120) written by a Frame that
+     * has not ended cleanly; restored with the driver's pop at the next free
+     * Idle (laser-frame-modal-restore.ts). Optional for hand-built states. */
+    readonly framePushesAwaitingPop?: number;
     readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
     readonly lastSettingsReadAt: number | null;
     /**

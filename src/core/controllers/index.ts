@@ -17,6 +17,8 @@ export type {
   ControllerDriver,
   ControllerRealtime,
   FrameBounds,
+  LaserModuleEvidence,
+  LaserModuleProbe,
 } from './controller-driver';
 export { selectControllerDriver } from './select-controller-driver';
 export { detectControllerFromBanner } from './detect-controller';

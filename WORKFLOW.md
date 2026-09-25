@@ -5819,11 +5819,30 @@ as the pane's design record.
    settled mode changes. A GRBL `M3` or `M4` is not a native Smoothieware power-mode selector.
    Native override changes settle the queue; completed output de-energizes the module and a
    new job explicitly re-establishes its override.
-   Match `laser_module_maximum_s_value` to the profile and set `laser_module_minimum_power`
-   to `0` for dark S0 feed moves. The pinned V1 `fire off` shell command clears manual firing
-   before output, Frame, jog and Home; its exact textual completion is the acknowledgement.
-3. Abort uses the controller's Ctrl-X halt path; a halted controller answers `!!` to normal
-   lines. Unlock sends `M999`. This is not the GRBL soft-reset lifecycle or a physical E-stop.
+   Set `laser_module_maximum_s_value 1.0` and keep Full-power S at 1: Smoothieware stores
+   every S word in 12-bit 1.11 fixed point, so any S of 2 or more wraps and fires far below
+   the requested power. Machine Setup holds Full-power S at 1; a saved profile above it keeps
+   its value and gets a Job Review warning until the operator corrects it. Set
+   `laser_module_minimum_power` to `0` for dark S0 feed moves. The pinned V1 `fire off` shell
+   command clears manual firing before output, Frame, jog and Home; its exact textual
+   completion is the acknowledgement. The tool-off lines end with `M9`, so jog, Frame and Home
+   switch air off and the Manual Air control shows it off.
+3. Qualification sends one `M221`. With no `Laser power` report the Laser module is not loaded:
+   jog, Frame and Home leave out `fire off` (nothing would answer it), the Console refuses
+   `fire`, and a laser job's Frame and Start, and Fire, are refused because the controller
+   cannot run laser output. A report without `disable auto power` is a build older than edge
+   971eb8cf (2021-06-15); Job Review warns that its constant-power layers run
+   speed-proportional.
+4. Abort uses the controller's Ctrl-X halt path; a halted controller answers `!!` to normal
+   lines (`error:Alarm lock` in grbl mode). Its `ALARM:` lines (hard limit, kill button, Abort
+   in grbl mode) stop a running job and are logged; they never name a job line as rejected.
+   Unlock sends `M999`. A Frame that ended before its own `M121` gets one `M121` once the board
+   is unhalted and Idle, so job travel keeps the configured seek rate. This is not the GRBL
+   soft-reset lifecycle or a physical E-stop.
+5. The status row shows feed and S only while the board runs: at rest Smoothieware reports the
+   requested feed, not a live one. While running, S is the modal S word and L the live laser
+   power. The Read ($$) control and the settings auto-read are not offered, because
+   Smoothieware has no settings query.
 
 ### F-H4. Export a Ruida job (.rd, EXPERIMENTAL)
 

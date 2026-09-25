@@ -80,6 +80,31 @@ export type ControllerCommands = {
    *  firmware has no jog-based Z retract omits it, and the caller skips the
    *  retract prefix. Newline-terminated to match buildFrameLines. */
   readonly buildFrameRetract?: (zMm: number, feed: number) => string;
+  /** Modal-state push and pop lines around the Frame perimeter (Smoothieware
+   *  M120/M121). A Frame that ends after its push but before its own pop is
+   *  restored with the pop once the controller is Idle. Absent: no wrapper. */
+  readonly frameModalState?: { readonly push: string; readonly pop: string };
+};
+
+/** What a firmware's own laser-module report proved (Smoothieware `M221`). */
+export type LaserModuleEvidence = {
+  /** 'absent': no laser output module answered, so the controller cannot run
+   *  laser output and prints nothing for the module's own commands. */
+  readonly module: 'loaded' | 'absent';
+  /** Whether the loaded module has a constant-power (not speed-proportional)
+   *  mode. Null when the module is absent. */
+  readonly constantPowerMode: boolean | null;
+};
+
+/** One owned query, sent once per qualification, that proves whether the
+ *  firmware's laser output module is loaded. */
+export type LaserModuleProbe = {
+  readonly command: string;
+  /** Classifies the lines the query printed before its terminal `ok`. */
+  readonly parse: (responses: ReadonlyArray<string>) => LaserModuleEvidence;
+  /** The same driver for a session with no laser module: its vocabulary minus
+   *  the module's own commands, which nothing on the board would answer. */
+  readonly withoutLaserModule: (driver: ControllerDriver) => ControllerDriver;
 };
 
 export type ConsoleQuickCommand = {
@@ -134,4 +159,6 @@ export type ControllerDriver = {
     streamLines: ReadonlyArray<string>,
     queueIndex: number,
   ) => StreamPauseBeamPlan;
+  /** Present when the firmware can run without its laser output module. */
+  readonly laserModuleProbe?: LaserModuleProbe;
 };
