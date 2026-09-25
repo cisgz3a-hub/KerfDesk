@@ -1,5 +1,6 @@
 import { useUiStore } from '../state/ui-store';
 import type { DragState } from './drag-state';
+import { useNodeEditStore } from './node-edit-store';
 import type { useWorkspaceDragDeps } from './workspace-drag-deps';
 
 export type WorkspaceDragCancellationDeps = Pick<
@@ -23,6 +24,7 @@ export function cancelWorkspaceDrag(
   deps.setDraftShape(null);
   deps.setCursorMm(null);
   deps.setSnapGuides([]);
+  useNodeEditStore.getState().setFeedback(null);
   if (drag?.kind === 'pan') {
     useUiStore.getState().setPan(drag.startPanX, drag.startPanY);
   }

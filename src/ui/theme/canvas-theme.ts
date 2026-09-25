@@ -45,6 +45,11 @@ export const canvasTheme = {
   selectionMarqueeFill: 'rgba(49, 117, 208, 0.12)',
   rotateHandleStroke: '#fff',
   snapGuide: '#00a884',
+  // Node editor (draw-node-edit-overlay, ADR-376): the node or segment under
+  // the pointer, a segment picked by clicking it, and an open end about to join.
+  pathSegmentHover: '#f59e0b',
+  pathSegmentSelected: '#3175d0',
+  pathNodeJoinCue: '#db2777',
   get measureStroke() {
     return themed('#7b1fa2', '#d6a5f5');
   },

@@ -12,7 +12,7 @@ import { IconButton, type IconName } from '../kit';
 import { useDesignStudioStore } from '../design-studio';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
-import { useStore } from '../state/store';
+import { NodeActionBar } from './NodeActionBar';
 import './tool-strip.css';
 
 type Tool = {
@@ -65,7 +65,7 @@ export function ToolStrip(): JSX.Element {
             pressed={isActive(toolMode, tool.mode)}
           />
           {tool.helpKey === 'measure' && toolMode.kind === 'node' ? (
-            <NodeCommandBar nodeToolButtonRef={nodeToolButtonRef} />
+            <NodeActionBar nodeToolButtonRef={nodeToolButtonRef} />
           ) : null}
         </Fragment>
       ))}
@@ -90,93 +90,6 @@ export function ToolStrip(): JSX.Element {
         <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: studioIcon }} />
       </button>
     </aside>
-  );
-}
-
-function NodeCommandBar(props: {
-  readonly nodeToolButtonRef: React.RefObject<HTMLButtonElement | null>;
-}): JSX.Element | null {
-  const project = useStore((state) => state.project);
-  const selected = useStore((state) => state.selectedPathNode);
-  const selectedNodes = useStore((state) => state.selectedPathNodes);
-  const smooth = useStore((state) => state.smoothSelectedCurveNode);
-  const corner = useStore((state) => state.cornerSelectedCurveNode);
-  const convert = useStore((state) => state.convertSelectedCurveSegment);
-  const setStart = useStore((state) => state.setSelectedCurveStart);
-  const breakCurve = useStore((state) => state.breakSelectedCurve);
-  const join = useStore((state) => state.joinSelectedCurveNodes);
-  if (selected?.geometry !== 'curve' || selected.handle !== undefined) return null;
-  const object = project.scene.objects.find((candidate) => candidate.id === selected.objectId);
-  const path =
-    object !== undefined && 'paths' in object ? object.paths[selected.pathIndex] : undefined;
-  const curve = path?.curves?.[selected.polylineIndex];
-  if (curve === undefined) return null;
-  const outgoing = curve.segments[selected.pointIndex];
-  const canJoin =
-    selectedNodes.filter((ref) => ref.geometry === 'curve' && ref.handle === undefined).length ===
-    2;
-  return (
-    <div role="toolbar" aria-label="Curve node actions" className="lf-toolstrip__node-actions">
-      <NodeAction
-        label="Smooth"
-        title="Align the incoming and outgoing curve handles"
-        onClick={smooth}
-      />
-      <NodeAction label="Corner" title="Align handles to the adjoining chords" onClick={corner} />
-      <NodeAction
-        label="Curve"
-        title="Convert the outgoing segment to a cubic curve"
-        disabled={outgoing === undefined || outgoing.kind === 'cubic'}
-        onClick={() => convert('cubic')}
-      />
-      <NodeAction
-        label="Line"
-        title="Convert the outgoing segment to a straight line"
-        disabled={outgoing === undefined || outgoing.kind === 'line'}
-        onClick={() => convert('line')}
-      />
-      <NodeAction
-        label="Start"
-        title="Use this node as the closed path start point"
-        disabled={!curve.closed || selected.pointIndex === 0}
-        onClick={setStart}
-      />
-      <NodeAction
-        label="Break"
-        title="Break the closed path open at this node"
-        disabled={!curve.closed}
-        onClick={breakCurve}
-      />
-      <NodeAction
-        label="Join"
-        title="Join two selected open curve endpoints"
-        disabled={!canJoin}
-        onClick={() => {
-          const outcome = join();
-          if (outcome.kind !== 'unchanged') props.nodeToolButtonRef.current?.focus();
-        }}
-      />
-    </div>
-  );
-}
-
-function NodeAction(props: {
-  readonly label: string;
-  readonly title: string;
-  readonly disabled?: boolean;
-  readonly onClick: () => void;
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      aria-label={props.label}
-      title={props.title}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className="lf-btn lf-toolstrip__node-action"
-    >
-      {props.label}
-    </button>
   );
 }
 

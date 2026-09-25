@@ -7,9 +7,6 @@ export function useWorkspaceDragDeps() {
   const selectObject = useStore((s) => s.selectObject);
   const selectObjects = useStore((s) => s.selectObjects);
   const selectPathNode = useStore((s) => s.selectPathNode);
-  const setSelectedPathNodePositionDuringInteraction = useStore(
-    (s) => s.setSelectedPathNodePositionDuringInteraction,
-  );
   const setSelectedCncTabAnchorDuringInteraction = useStore(
     (s) => s.setSelectedCncTabAnchorDuringInteraction,
   );
@@ -33,7 +30,6 @@ export function useWorkspaceDragDeps() {
     selectObject,
     selectObjects,
     selectPathNode,
-    setSelectedPathNodePositionDuringInteraction,
     setSelectedCncTabAnchorDuringInteraction,
     toggleSelectObject,
     setCursorMm,

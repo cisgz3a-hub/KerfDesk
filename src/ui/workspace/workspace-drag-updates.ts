@@ -5,21 +5,26 @@ import { draftForDrawDrag, drawModifiersFromEvent } from './draw-tool';
 import { constrainMeasureEnd, type MeasureDraft } from './measure-tool';
 import { updatePathNodeDrag } from './path-node-drag';
 import { updatePenCursor } from './pen-tool';
+import type { SnapGuide, SnapSettings } from './snapping';
+import { pxToMmForCanvas, type ViewState } from './view-transform';
 
 type CanvasMouseEvent = React.MouseEvent<HTMLCanvasElement>;
 
 type NonTransformDragUpdateArgs = {
   readonly e: CanvasMouseEvent;
+  readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly drag: DragState | null;
   readonly point: Vec2 | null;
   readonly project: Project;
+  readonly viewState: ViewState;
   readonly toolMode: ToolMode;
+  readonly snapSettings: SnapSettings;
+  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
   readonly setDraftShape: (shape: ShapeObject | null) => void;
   readonly setMeasureDraft: (draft: MeasureDraft | null) => void;
   readonly setSelectionMarquee: (
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
-  readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
   readonly setSelectedCncTabAnchorDuringInteraction: (
     anchorIndex: number,
     layerColor: string,
@@ -49,8 +54,10 @@ export function handleNonTransformDragUpdate(args: NonTransformDragUpdateArgs): 
     updatePathNodeDrag({
       drag: args.drag,
       point: args.point,
-      setSelectedPathNodePositionDuringInteraction:
-        args.setSelectedPathNodePositionDuringInteraction,
+      modifiers: args.e,
+      pxToMm: pxToMmForCanvas(args.ref.current, args.project, args.viewState),
+      snapSettings: args.snapSettings,
+      setSnapGuides: args.setSnapGuides,
     });
     return true;
   }

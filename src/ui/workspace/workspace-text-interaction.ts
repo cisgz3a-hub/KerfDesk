@@ -12,6 +12,7 @@ import type { OwnedPointerHandlers } from './workspace-pointer-owner';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { finishPen } from './pen-tool';
 import { openEditorForSelectedObject } from './open-selected-object-editor';
+import { insertNodeOnDoubleClick } from './node-edit-pointer';
 
 type TextPointerArgs = {
   readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -106,6 +107,10 @@ export function handleCanvasDoubleClick(event: React.MouseEvent<HTMLCanvasElemen
     if (ui.penDraft !== null) {
       finishPen({ closed: false, project: app.project, drawShape: app.drawShape });
     }
+    return;
+  }
+  if (ui.toolMode.kind === 'node') {
+    insertNodeOnDoubleClick(event, ui);
     return;
   }
   openCanvasObjectEditor(event, app, ui);

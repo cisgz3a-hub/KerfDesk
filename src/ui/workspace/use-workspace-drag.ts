@@ -21,7 +21,7 @@ import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
-import { beginPathNodeDrag } from './path-node-drag';
+import { beginPathNodeDrag, finishPathNodeDrag } from './path-node-drag';
 import { dispatchPositionLaser } from './position-laser-click';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { selectObjectsInMarquee } from './selection-marquee';
@@ -157,7 +157,6 @@ function runWorkspaceDragMove(args: {
     setDraftShape: deps.setDraftShape,
     setMeasureDraft: deps.setMeasureDraft,
     setSelectionMarquee: deps.setSelectionMarquee,
-    setSelectedPathNodePositionDuringInteraction: deps.setSelectedPathNodePositionDuringInteraction,
     setSelectedCncTabAnchorDuringInteraction: deps.setSelectedCncTabAnchorDuringInteraction,
     selectionAnchor: deps.selectionAnchor,
     snapSettings: deps.snapSettings,
@@ -265,13 +264,18 @@ function beginPathNodeDragForNodeTool(args: {
     return null;
   }
   const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
+  const { selectedObjectId, additionalSelectedIds, selectedPathNodes, selectObject } =
+    useStore.getState();
   return beginPathNodeDrag({
     project: args.project,
     scenePoint: point,
     pxToMm,
     additive: args.e.shiftKey,
-    selectedPathNodes: useStore.getState().selectedPathNodes,
+    selectedObjectId,
+    additionalSelectedIds,
+    selectedPathNodes,
     selectPathNode: args.selectPathNode,
+    selectObject,
   });
 }
 
@@ -288,7 +292,6 @@ function updateWorkspaceDrag(args: {
   readonly setSelectionMarquee: (
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
-  readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
   readonly setSelectedCncTabAnchorDuringInteraction: (
     anchorIndex: number,
     layerColor: string,
@@ -361,6 +364,7 @@ function finishWorkspaceDrag(args: {
     commitSelectionMarquee({ ...args, drag: args.drag });
     return;
   }
+  if (args.drag.kind === 'path-node') finishPathNodeDrag(args.drag);
   args.endInteraction();
 }
 

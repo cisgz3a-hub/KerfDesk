@@ -7,6 +7,8 @@ import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { useCanvasMotionLayer } from './use-canvas-motion-layer';
 import type { ViewState } from './view-transform';
 import { CanvasTextEditor } from '../text/CanvasTextEditor';
+import { NodeEditOverlay } from './NodeEditOverlay';
+import { clearNodeEditPointer, nodeEditPointerHandlers } from './node-edit-pointer';
 import {
   handleCanvasDoubleClick,
   workspaceTextPointerHandlers,
@@ -28,7 +30,10 @@ export function WorkspaceCanvasLayers(props: {
   readonly canvasMotionOverlay: CanvasMotionOverlay | null;
 }): JSX.Element {
   const motionRef = useRef<HTMLCanvasElement | null>(null);
-  const handlers = workspaceTextPointerHandlers({ ...props, canvasRef: props.baseRef });
+  const handlers = nodeEditPointerHandlers(
+    workspaceTextPointerHandlers({ ...props, canvasRef: props.baseRef }),
+    { ...props, canvasRef: props.baseRef },
+  );
   useCanvasMotionLayer({
     ref: motionRef,
     project: props.project,
@@ -47,6 +52,7 @@ export function WorkspaceCanvasLayers(props: {
         onPointerUp={handlers.onPointerUp}
         onPointerCancel={handlers.onPointerCancel}
         onLostPointerCapture={handlers.onLostPointerCapture}
+        onPointerLeave={clearNodeEditPointer}
         onDoubleClick={handleCanvasDoubleClick}
         onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
@@ -59,6 +65,13 @@ export function WorkspaceCanvasLayers(props: {
         style={canvasMotionLayerStyle}
         aria-hidden="true"
         data-testid="canvas-motion-layer"
+      />
+      <NodeEditOverlay
+        baseRef={props.baseRef}
+        canvasSize={props.canvasSize}
+        project={props.project}
+        previewMode={props.previewMode}
+        viewState={props.viewState}
       />
       <CanvasTextEditor
         canvasRef={props.baseRef}
