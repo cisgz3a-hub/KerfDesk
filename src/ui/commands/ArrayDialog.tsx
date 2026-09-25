@@ -126,7 +126,7 @@ function VariableArrayOption(props: {
         <input
           type="checkbox"
           checked={props.checked}
-          title="Assign each grid copy a variable record using the current range and advance settings."
+          title="Assign each array copy a variable record using the current range and advance settings."
           onChange={(event) => props.onChange(event.currentTarget.checked)}
         />{' '}
         Advance variables per copy
