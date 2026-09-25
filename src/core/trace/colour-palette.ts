@@ -339,6 +339,3 @@ export function projectOnto(
   const rb = c.b - a.b - t * db;
   return { t, residual: Math.sqrt(rL * rL + ra * ra + rb * rb), length: Math.sqrt(len2) };
 }
-
-/** Mode filter for 1-px islands: a pixel none of whose 4-neighbours shares
- *  its label takes the most common label of its 8-neighbourhood. */

@@ -4,7 +4,7 @@
 // pixel takes its nearest palette colour, the label map is cleaned of
 // anti-aliasing seams, 1-px islands and specks (colour-label-cleanup.ts), and
 // each label's final colour is the mean of its pixels. The border-dominant
-// colour is reported as the paper/background.
+// colour is reported as the paper/background when it is also paper-light.
 //
 // Pure core: deterministic, no clock, no random, no I/O.
 
@@ -60,12 +60,16 @@ export type QuantizeOptions = {
 
 // A pixel is "flat" when every 4-neighbour is within this OKLab distance.
 // ~0.05 is a clearly visible but small difference (JPEG noise and paper
-
-// A pixel is "flat" when every 4-neighbour is within this OKLab distance.
-// ~0.05 is a clearly visible but small difference (JPEG noise and paper
 // texture stay below it; any anti-aliased edge step exceeds it).
 const FLAT_DE = 0.05;
 const BACKGROUND_MIN_BORDER_SHARE = 0.5;
+// Paper is light: the border colour only counts as paper when it is within
+// this OKLab lightness of the lightest palette colour AND at least this light
+// (dark kraft, #b08850, is ~0.65; saturated red is ~0.53, navy ~0.36). A dark
+// or mid-tone field filling the border is artwork (light-on-dark art, a
+// full-bleed flag), so every colour is traced instead of silently dropping one.
+const PAPER_LIGHTNESS_MARGIN = 0.05;
+export const PAPER_MIN_LIGHTNESS = 0.65;
 const ALPHA_OPAQUE_MIN = 128;
 
 export function quantizeColours(image: RawImageData, options: QuantizeOptions): QuantizedColours {
@@ -89,7 +93,9 @@ export function quantizeColours(image: RawImageData, options: QuantizeOptions): 
     lab,
     rgba: image.data,
     palette: palette.colours,
-    backgroundIndex: hasTransparency ? null : borderBackground(palette.labels, width, height),
+    backgroundIndex: hasTransparency
+      ? null
+      : paperBackground(palette.labels, palette.colours, width, height),
     hasTransparency,
   };
 }
@@ -282,16 +288,38 @@ function uniqueHex(hex: string, used: Set<string>): string {
   return candidate;
 }
 
-/** The paper colour: the label holding at least half of the opaque border
- *  pixels. Art that fills the frame has no background. */
-function borderBackground(labels: Uint8Array, width: number, height: number): number | null {
+/** The paper colour: a label holding at least half of the opaque border
+ *  pixels that is also paper-light (see PAPER_MIN_LIGHTNESS). When two labels
+ *  each hold exactly half, the lighter one is the candidate. Art that fills
+ *  the frame, or a dark border field, has no background. */
+function paperBackground(
+  labels: Uint8Array,
+  palette: ReadonlyArray<PaletteColour>,
+  width: number,
+  height: number,
+): number | null {
+  const counts = borderCounts(labels, width, height);
+  const total = counts.reduce((sum, c) => sum + c, 0);
+  const lightest = Math.max(...palette.map((colour) => colour.lab[0]));
+  let paper = -1;
+  let paperL = Number.NEGATIVE_INFINITY;
+  for (let l = 0; l < palette.length && total > 0; l += 1) {
+    const L = (palette[l] as PaletteColour).lab[0];
+    if ((counts[l] as number) < BACKGROUND_MIN_BORDER_SHARE * total || L <= paperL) continue;
+    paper = l;
+    paperL = L;
+  }
+  if (paper < 0) return null;
+  return paperL >= PAPER_MIN_LIGHTNESS && paperL >= lightest - PAPER_LIGHTNESS_MARGIN
+    ? paper
+    : null;
+}
+
+function borderCounts(labels: Uint8Array, width: number, height: number): Int32Array {
   const counts = new Int32Array(256);
-  let total = 0;
   const visit = (i: number): void => {
     const l = labels[i] as number;
-    if (l === TRANSPARENT_LABEL) return;
-    counts[l] = (counts[l] as number) + 1;
-    total += 1;
+    if (l !== TRANSPARENT_LABEL) counts[l] = (counts[l] as number) + 1;
   };
   for (let x = 0; x < width; x += 1) {
     visit(x);
@@ -301,13 +329,5 @@ function borderBackground(labels: Uint8Array, width: number, height: number): nu
     visit(y * width);
     if (width > 1) visit(y * width + width - 1);
   }
-  let best = -1;
-  let bestCount = 0;
-  for (let l = 0; l < 255; l += 1) {
-    if ((counts[l] as number) > bestCount) {
-      bestCount = counts[l] as number;
-      best = l;
-    }
-  }
-  return best >= 0 && bestCount >= BACKGROUND_MIN_BORDER_SHARE * total ? best : null;
+  return counts;
 }

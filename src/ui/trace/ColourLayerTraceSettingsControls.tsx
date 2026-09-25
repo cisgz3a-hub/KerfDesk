@@ -9,8 +9,9 @@ import {
   MIN_COLOUR_LAYERS,
   type ColourLayerOutput,
 } from '../../core/trace/colour-layer-options';
-import { colourLayerPowers } from '../../core/trace/colour-layer-power';
+import { colourLayerSettings } from '../../core/trace/colour-layer-power';
 import { hexOkLightness } from '../../core/trace/colour-oklab';
+import { useStore } from '../state/store';
 import { mergeColourLayerSettings } from './colour-layer-settings';
 import { TraceCheckboxRow } from './TraceCheckboxRow';
 import type { LightBurnTraceSettingOverrides } from './trace-options';
@@ -34,6 +35,8 @@ export function ColourLayerTraceSettingsControls(props: Props): JSX.Element {
   const options = mergeColourLayerSettings(props.preset, props.overrides);
   const layers = options.colourLayers ?? {};
   const output: ColourLayerOutput = layers.output ?? 'cut-out';
+  // CNC operation power is not a tone: no power percentages there.
+  const laser = useStore((s) => s.project.machine?.kind !== 'cnc');
   return (
     <fieldset className="lf-trace-settings">
       <legend>Colour layers</legend>
@@ -74,7 +77,12 @@ export function ColourLayerTraceSettingsControls(props: Props): JSX.Element {
           onChange={(despeckleMinPixels) => set({ despeckleMinPixels })}
         />
       </div>
-      <ColourSwatches colours={props.previewColours} output={output} />
+      <ColourSwatches
+        colours={props.previewColours}
+        output={output}
+        paperTraced={layers.keepBackground === true}
+        laser={laser}
+      />
       <div className="lf-trace-reset-row">
         <button
           type="button"
@@ -160,14 +168,24 @@ function SpeckRow(props: {
   );
 }
 
-// Swatches in stacking order (lightest first), each with the share of the
-// operation's power its colour starts at (colour-layer-power.ts).
+// Swatches in stacking order (lightest first). On a laser each shows the
+// share of the operation's power its colour starts at, or "off" for paper
+// (colour-layer-power.ts); CNC operations keep their own settings.
 function ColourSwatches(props: {
   readonly colours: ReadonlyArray<string> | undefined;
   readonly output: ColourLayerOutput;
+  readonly paperTraced: boolean;
+  readonly laser: boolean;
 }): JSX.Element {
   const colours = props.colours ?? [];
-  const powers = colourLayerPowers(colours, 100, props.output);
+  const settings = colourLayerSettings(colours, 100, {
+    output: props.output,
+    paperTraced: props.paperTraced,
+  });
+  const label = (colour: string): string => {
+    const setting = settings.get(colour.toLowerCase());
+    return setting === undefined || setting.output ? `${setting?.power ?? 100}%` : 'off';
+  };
   const ordered = [...colours].sort((a, b) => hexOkLightness(b) - hexOkLightness(a));
   return (
     <section aria-label="Traced colours" style={swatchSectionStyle}>
@@ -177,23 +195,36 @@ function ColourSwatches(props: {
         <>
           <ul style={swatchListStyle}>
             {ordered.map((colour) => (
-              <li
-                key={colour}
-                style={swatchItemStyle}
-                title={`${colour}: ${powers.get(colour) ?? 100}% of the operation power`}
-              >
+              <li key={colour} style={swatchItemStyle} title={swatchTitle(colour, label, props)}>
                 <span aria-hidden="true" style={{ ...swatchChipStyle, background: colour }} />
-                <span>{`${powers.get(colour) ?? 100}%`}</span>
+                {props.laser ? <span>{label(colour)}</span> : null}
               </li>
             ))}
           </ul>
-          <p style={swatchNoteStyle}>
-            {`${ordered.length} layer${ordered.length === 1 ? '' : 's'}, one operation each. Darker colours start at more power; the percentages are of each new operation's power.`}
-          </p>
+          <p style={swatchNoteStyle}>{swatchNote(ordered.length, props.laser)}</p>
         </>
       )}
     </section>
   );
+}
+
+function swatchTitle(
+  colour: string,
+  label: (colour: string) => string,
+  props: { readonly laser: boolean },
+): string {
+  if (!props.laser) return colour;
+  const value = label(colour);
+  return value === 'off'
+    ? `${colour}: paper, created with output off`
+    : `${colour}: ${value} of the operation power`;
+}
+
+function swatchNote(count: number, laser: boolean): string {
+  const layers = `${count} layer${count === 1 ? '' : 's'}, one operation each.`;
+  return laser
+    ? `${layers} Darker colours start at more power; the percentages are of each new operation's power. Paper (near-white, or the traced background) starts with output off.`
+    : layers;
 }
 
 const swatchSectionStyle: React.CSSProperties = { marginTop: 14 };

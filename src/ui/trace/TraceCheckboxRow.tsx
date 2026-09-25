@@ -26,7 +26,7 @@ function traceCheckboxTitle(label: string): string {
     case 'Invert':
       return 'Trace light artwork on a dark background: light areas become the traced shapes. Transparent areas stay background.';
     case 'Trace background colour':
-      return 'Also trace the paper colour as its own layer. Off: the paper is left unburned.';
+      return 'Also trace the paper colour as its own layer. Its operation starts with output off, so the paper is still not burned until you turn it on.';
     case 'Trace alpha mask':
       return 'Only changes images with transparent pixels; opaque images trace the same.';
     default:

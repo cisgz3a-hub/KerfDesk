@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 import type { RawImageData } from './trace-image';
 import { isColourLayerTrace } from './colour-layer-trace';
 import { TRACE_PRESETS } from './trace-presets';
+import { colourLayerSettings } from './colour-layer-power';
 import {
+  canvas,
   coverageStats,
+  fillDisc,
+  fillRect,
   OPTIONS,
   render,
   rgbImage,
@@ -109,5 +113,42 @@ describe('colour-layer palette', () => {
   it('returns nothing for a blank page', () => {
     const blank = render(20, 20, () => [255, 255, 255]);
     expect(trace(blank)).toEqual([]);
+  });
+});
+
+describe('colour-layer paper detection', () => {
+  const colours = (paths: ReadonlyArray<{ readonly color: string }>): string[] =>
+    paths.map((path) => path.color).sort();
+
+  it('never takes a dark full-bleed field for paper (light-on-dark art)', () => {
+    const image = canvas(100, 100, [0, 0, 0]);
+    fillDisc(image, 50, 50, 25, [255, 255, 255]);
+    const paths = trace(image);
+    // Both colours are traced, so nothing is silently left out...
+    expect(colours(paths)).toEqual(['#000000', '#ffffff']);
+    // ...and only the black field burns: the white disc starts with output off.
+    const settings = colourLayerSettings(colours(paths), 100, { output: 'cut-out' });
+    expect(settings.get('#000000')).toEqual({ power: 100, output: true });
+    expect(settings.get('#ffffff')).toEqual({ power: 0, output: false });
+  });
+
+  it('traces both colours of a full-bleed two-colour flag, whichever holds the border', () => {
+    for (const redRows of [30, 31, 29]) {
+      const image = canvas(100, 60, [20, 40, 160]);
+      fillRect(image, 0, 0, 100, redRows, [200, 20, 20]);
+      expect(trace(image)).toHaveLength(2);
+    }
+  });
+
+  it('still leaves light paper untraced, including a kraft tone', () => {
+    for (const paper of [
+      [255, 255, 255],
+      [200, 160, 110],
+    ] as const) {
+      const image = canvas(80, 60, paper);
+      fillRect(image, 10, 10, 40, 40, [30, 20, 10]);
+      fillRect(image, 45, 10, 70, 40, [150, 30, 30]);
+      expect(trace(image)).toHaveLength(2);
+    }
   });
 });

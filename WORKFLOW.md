@@ -2498,9 +2498,11 @@ settings and Job Review keep their existing read-only setup references.
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
    edge with no gap or overlap (ADR-402). **Cut-out** burns each colour only in its own area;
    **Stacked** also fills each colour under the darker colours above it. The paper colour is left
-   untraced unless **Trace background colour** is ticked. The swatches show the traced colours,
+   untraced unless **Trace background colour** is ticked; only a light border colour counts as
+   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
    lightest first. On commit each colour gets its own operation; on a laser each starts at a power
-   set by its darkness (the darkest keeps the operation's power), which the operator can edit.
+   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
+   operator can edit. Paper (near-white, or the traced background) starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses

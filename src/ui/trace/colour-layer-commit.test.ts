@@ -89,9 +89,10 @@ describe('colour-layer commit', () => {
     const state = { project: project(), undoStack: [] };
     const plain = applyTraceToExisting(state, SOURCE_ID, traced());
     const layered = applyTraceToExisting(state, SOURCE_ID, traced(), {
-      colourLayerOutput: 'cut-out',
+      colourLayers: { output: 'cut-out' },
     });
     expect(traceOperations(layered)).toHaveLength(3);
+    expect(traceOperations(layered).every((operation) => operation.output)).toBe(true);
     const base = traceOperations(plain)[0]?.power as number;
     const powers = powerByColour(layered);
     expect(powers.get('#000000')).toBe(base);
@@ -108,9 +109,30 @@ describe('colour-layer commit', () => {
     const state = { project: project(DEFAULT_CNC_MACHINE_CONFIG), undoStack: [] };
     const plain = applyTraceToExisting(state, SOURCE_ID, traced());
     const layered = applyTraceToExisting(state, SOURCE_ID, traced(), {
-      colourLayerOutput: 'cut-out',
+      colourLayers: { output: 'cut-out' },
     });
     expect([...powerByColour(layered).values()]).toEqual([...powerByColour(plain).values()]);
+  });
+
+  it('creates the traced paper with output off', () => {
+    const state = { project: project(), undoStack: [] };
+    const layered = applyTraceToExisting(state, SOURCE_ID, traced(), {
+      colourLayers: { output: 'cut-out', paperTraced: true },
+    });
+    const outputs = new Map(
+      traceOperations(layered).map((operation) => [operation.id, operation.output]),
+    );
+    const object = layered.project.scene.objects.find((candidate) => candidate.id === TRACE_ID);
+    const byColour = new Map(
+      (object !== undefined && 'paths' in object ? object.paths : []).map((path) => [
+        path.color,
+        outputs.get(path.operationIds?.[0] ?? ''),
+      ]),
+    );
+    // #e0e0e0 is the lightest traced colour and paper-light: it is the paper.
+    expect(byColour.get('#e0e0e0')).toBe(false);
+    expect(byColour.get('#808080')).toBe(true);
+    expect(byColour.get('#000000')).toBe(true);
   });
 
   it('hands the chosen output to the store and names the layers in the toast', async () => {
@@ -133,7 +155,29 @@ describe('colour-layer commit', () => {
       live,
     );
     expect(ok).toBe(true);
-    expect(calls[0]?.colourLayerOutput).toBe('stacked');
+    expect(calls[0]?.colourLayers).toEqual({ output: 'stacked', paperTraced: false });
     expect(toasts[0]).toContain('3 colour layers, power set by darkness');
+  });
+
+  it('does not claim darkness powers on a CNC', async () => {
+    const toasts: string[] = [];
+    const live = project(DEFAULT_CNC_MACHINE_CONFIG);
+    const ok = await commitTraceOutput(
+      {
+        seed: { id: SOURCE_ID, source: 'badge.png' },
+        options: { colourLayers: { keepBackground: true } },
+      },
+      {
+        traceExistingImage: () => undefined,
+        commitRasterizedTrace: () => undefined,
+        pushToast: (message) => toasts.push(message),
+        claimOwner: () => ({ project: live, source: source() }),
+      },
+      traced(),
+      live,
+    );
+    expect(ok).toBe(true);
+    expect(toasts[0]).toContain('3 colour layers');
+    expect(toasts[0]).not.toContain('power');
   });
 });

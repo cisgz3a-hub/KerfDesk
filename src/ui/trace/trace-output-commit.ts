@@ -67,7 +67,8 @@ export async function commitTraceOutput(
   }
   if (ctx.claimOwner() === null) return false;
   ctx.traceExistingImage(args.seed.id, traced, withColourLayerOutput(traceOptions, args));
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false), 'success');
+  const cnc = liveProject.machine?.kind === 'cnc';
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false, cnc), 'success');
   return true;
 }
 
@@ -110,7 +111,7 @@ async function commitRasterTraceOutput(
     return false;
   }
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true, false), 'success');
   return true;
 }
 
@@ -152,14 +153,21 @@ async function buildOwnedRaster(
 }
 
 // A colour-layer trace gives each colour's operation a darkness-ordered power
-// (ADR-402); the store needs to know which output the powers are for.
+// (ADR-402); the store needs to know which output the powers are for and
+// whether the paper was traced (its operation starts with output off).
 function withColourLayerOutput(
   options: TraceExistingImageOptions,
   args: TraceOutputCommitArgs,
 ): TraceExistingImageOptions {
   const colourLayers = args.options?.colourLayers;
   if (colourLayers === undefined) return options;
-  return { ...options, colourLayerOutput: colourLayers.output ?? 'cut-out' };
+  return {
+    ...options,
+    colourLayers: {
+      output: colourLayers.output ?? 'cut-out',
+      paperTraced: colourLayers.keepBackground === true,
+    },
+  };
 }
 
 function traceSuccessMessage(
@@ -167,12 +175,18 @@ function traceSuccessMessage(
   traced: TracedImage,
   sourceStatus: string,
   raster: boolean,
+  cnc: boolean,
 ): string {
   const colorCount = traced.paths.length;
   const output = raster ? ' as a raster scan' : '';
+  // CNC operation power is not a tone, so a CNC commit keeps its powers
+  // (colour-layer-power.ts) and the toast must not claim otherwise.
+  const layers = `${colorCount} colour layer${colorCount === 1 ? '' : 's'}`;
   const colours =
     args.options?.colourLayers !== undefined && !raster
-      ? `${colorCount} colour layer${colorCount === 1 ? '' : 's'}, power set by darkness`
+      ? cnc
+        ? layers
+        : `${layers}, power set by darkness`
       : `${colorCount} color${colorCount === 1 ? '' : 's'}`;
   const summary = `Traced ${args.seed.source}${output} — ${colours}, ${sourceStatus}`;
   return [summary, ...(args.notices ?? []).map(traceNoticeMessage)].join('. ');

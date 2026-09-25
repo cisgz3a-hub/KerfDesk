@@ -159,23 +159,95 @@ function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): numb
 
 /** Regions (4-connected, one label) smaller than minArea join the neighbour
  *  label they share the most boundary with (ties to the lower label).
- *  Transparent regions stay. */
+ *  Transparent regions stay. The smallest regions go first, and a region that
+ *  joins another is re-measured as the merged whole (union-find), so two
+ *  touching specks are judged together and neither is left behind as an
+ *  orphaned speck when the other moves on. */
 export function absorbSmallRegions(grid: LabelGrid, minArea: number): void {
   if (!(minArea > 1)) return;
+  const regions = labelRegions(grid, minArea);
+  const { size, members } = regions;
+  const queue = members.flatMap((pixels, id) => (pixels === null ? [] : [id]));
+  queue.sort((a, b) => (size[a] as number) - (size[b] as number) || a - b);
+  const shared = new Int32Array(256);
+  // A worklist: an array iterator also visits the roots pushed below.
+  for (const queued of queue) {
+    const r = regions.find(queued);
+    const own = members[r];
+    if (own === null || own === undefined || (size[r] as number) >= minArea) continue;
+    const label = grid.labels[own[0] as number] as number;
+    if (label === TRANSPARENT_LABEL) continue;
+    const best = mostSharedNeighbour(grid, own, label, shared);
+    if (best < 0) continue;
+    for (const p of own) grid.labels[p] = best;
+    const root = unionWithNeighbours(grid, regions, r, best);
+    if ((size[root] as number) < minArea) queue.push(root);
+  }
+}
+
+// Keep the invariant "4-adjacent regions never share a label": after region r
+// took `label`, union it with every neighbouring region carrying that label.
+function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label: number): number {
+  const n = grid.labels.length;
+  let root = r;
+  for (const p of regions.members[r] ?? []) {
+    for (let d = 0; d < 4; d += 1) {
+      const q = neighbour4(p, d, grid.width, n);
+      if (q < 0 || grid.labels[q] !== label) continue;
+      const other = regions.find(regions.component[q] as number);
+      if (other !== root) root = regions.union(root, other);
+    }
+  }
+  return root;
+}
+
+type Regions = {
+  /** Region id of every pixel (4-connected, one label). */
+  readonly component: Int32Array;
+  readonly size: number[];
+  /** Pixels of a region below the speck area; null for a large region. */
+  readonly members: Array<number[] | null>;
+  readonly find: (id: number) => number;
+  /** Merge two roots; returns the surviving root. */
+  readonly union: (a: number, b: number) => number;
+};
+
+function labelRegions(grid: LabelGrid, minArea: number): Regions {
   const n = grid.labels.length;
   const component = new Int32Array(n).fill(-1);
   const stack = new Int32Array(n);
-  const shared = new Int32Array(256);
-  let id = 0;
+  const parent: number[] = [];
+  const size: number[] = [];
+  const members: Array<number[] | null> = [];
   for (let start = 0; start < n; start += 1) {
     if (component[start] !== -1) continue;
-    const label = grid.labels[start] as number;
-    const members = floodComponent(grid, start, id, component, stack);
-    id += 1;
-    if (label === TRANSPARENT_LABEL || members.length >= minArea) continue;
-    const best = mostSharedNeighbour(grid, members, label, shared);
-    if (best >= 0) for (const p of members) grid.labels[p] = best;
+    const pixels = floodComponent(grid, start, parent.length, component, stack);
+    parent.push(parent.length);
+    size.push(pixels.length);
+    members.push(pixels.length < minArea ? pixels : null);
   }
+  const find = (id: number): number => {
+    let root = id;
+    while (parent[root] !== root) root = parent[root] as number;
+    for (let c = id; c !== root; ) {
+      const next = parent[c] as number;
+      parent[c] = root;
+      c = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number): number => {
+    const keep = (size[a] as number) >= (size[b] as number) ? a : b;
+    const gone = keep === a ? b : a;
+    parent[gone] = keep;
+    size[keep] = (size[keep] as number) + (size[gone] as number);
+    const kept = members[keep] ?? null;
+    const moved = members[gone] ?? null;
+    members[keep] = kept === null || moved === null ? null : kept.concat(moved);
+    members[gone] = null;
+    return keep;
+  };
+  return { component, size, members, find, union };
 }
 
 function floodComponent(

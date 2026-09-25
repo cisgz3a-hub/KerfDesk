@@ -1,9 +1,15 @@
 import { act, useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene/machine';
+import { useStore } from '../state/store';
 import { clickControl, control, mountControl } from '../image-editor/control-audit-test-support';
 import { TraceSettingsControls } from './TraceSettingsControls';
-import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
+import {
+  hasAggressivePreprocessing,
+  mergeLightBurnTraceSettings,
+  type LightBurnTraceSettingOverrides,
+} from './trace-options';
 import { VISIBLE_TRACE_PRESET_NAMES } from './dialog-parts';
 
 const colourPreset = TRACE_PRESETS['Colour layers']!;
@@ -80,6 +86,32 @@ describe('Colour layers trace controls', () => {
     // The darkest colour keeps the operation's power; lighter ones scale down.
     expect(items.map((item) => item.textContent)).toEqual(['25%', '48.4%', '100%']);
     expect(controls.host.textContent).toContain('3 layers, one operation each');
+  });
+
+  it('shows paper as off, and no power percentages on a CNC', async () => {
+    const laser = await mountColourControls(['#000000', '#ffffff']);
+    const labels = (host: HTMLElement): Array<string | null> =>
+      [...host.querySelectorAll('[aria-label="Traced colours"] li')].map((li) => li.textContent);
+    expect(labels(laser.host)).toEqual(['off', '100%']);
+    expect(laser.host.textContent).toContain('Paper (near-white, or the traced background)');
+    const project = useStore.getState().project;
+    useStore.setState({ project: { ...project, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    try {
+      const cnc = await mountColourControls(['#000000', '#808080']);
+      expect(labels(cnc.host)).toEqual(['', '']);
+      expect(cnc.host.textContent).toContain('2 layers, one operation each.');
+      expect(cnc.host.textContent).not.toContain('power');
+    } finally {
+      useStore.setState({ project });
+    }
+  });
+
+  it('never retries a zero-path colour trace: relaxing would repeat the same trace', () => {
+    // Its 12 px speck default would make the shared predicate true, but a
+    // missing despeckle reads as the same default in the colour backend.
+    expect(colourPreset.despeckleMinPixels).toBeGreaterThan(1);
+    expect(hasAggressivePreprocessing(colourPreset)).toBe(false);
+    expect(hasAggressivePreprocessing(lineArtPreset)).toBe(true);
   });
 });
 
