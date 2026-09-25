@@ -1087,8 +1087,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Success
 1. User clicks **Frame job** while connected and the controller is Idle. While the exact job
    is still being prepared, before any motion, a **Cancel** beside the status abandons the
-   preparation with nothing sent. A Start that has to frame again because the job or the
-   controller changed after the last Frame says so (ADR-362 Amendment 1).
+   preparation with nothing sent. If the job or the controller changed after the last Frame,
+   Start stays greyed out and the status line beside it says why that Frame expired, until
+   the next Frame begins (ADR-362 Amendment 1, ADR-372).
 2. Frame preparation compares the live controller output contract with the selected process.
    Known, unknown, stale, or unavailable `$30`/`$32` values and stock-GRBL option `M` observations
    for an exact program containing `M7` remain explicit Start-time Job Review advisories; they do
@@ -2155,7 +2156,8 @@ their archive before transmission.
 2. A turn the controller rejects (for example `error:15` beyond soft limits), an alarm or a
    disconnect ends the test with a message and no return turn.
 3. **Apply** and **Generate test pattern** are disabled while a test turns.
-4. A test turn is a jog: it expires a completed Frame, and Start frames again.
+4. A test turn is a jog: it expires a completed Frame, and Start stays greyed out until the job
+   is framed again (ADR-372).
 
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
