@@ -5,8 +5,9 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
 
 ## OR-1 — M3 (constant-power) output stops the machine with the beam still lit
 
-- severity: high (typical case: tens-of-ms full-power dwell = burn dot at a cut end / pass seam; on grblHAL
-  with `$673` coolant on-delay set, the lit dwell lasts the whole 0.5-20 s delay = burn-through/fire risk)
+- severity: high (typical case: tens-of-ms full-power dwell = burn dot at a cut end / pass seam; critical
+  where a coolant on-delay is configured: grblHAL `$673` (0.5-20 s) or FluidNC `coolant/delay_ms` (0-10 s)
+  runs inside that drain with the beam lit = burn-through/fire risk)
 - verdict: CONFIRMED (repro against the repo's gcode.c port + traced in GRBL/grblHAL/FluidNC source)
 - status: new
 - failure scenario: any M3 vector group (Neotronics 4040 profile cuts by default; `grbl-compatible` dialect;
@@ -23,8 +24,9 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
   stepper.c:392-398 (`if (st.exec_block->is_pwm_rate_adjusted) { spindle_set_speed(SPINDLE_PWM_OFF_VALUE); }`
   = only M4 goes dark at an empty buffer), stepper.c:259-262 (`delay_ms(settings.stepper_idle_lock_time)`),
   defaults.h:49 (`$1` 25 ms). grblHAL d7aaee3d gcode.c:4121-4126, :4411, coolant_control.c:45-53 (`$673`
-  on-delay dwell after coolant on), settings.c:2505 ("0.5".."20" s), stepper.c:566-573. FluidNC v4.0.3
-  Stepper.cpp:234-240. Wiki Grbl-v1.1-Laser-Mode: "Constant laser power mode simply keeps the laser power as
+  on-delay dwell after coolant on), settings.c:2505 ("0.5".."20" s), nuts_bolts.c:324-340 (dwell loop touches
+  no spindle), stepper.c:566-573. FluidNC v4.0.3 Stepper.cpp:234-240, GCode.cpp:1716-1733 (sync then
+  `set_state`), CoolantControl.cpp:72-79 (`dwell_ms(_delay_ms, ...)` after coolant on), :90 (`delay_ms` 0-10000). Wiki Grbl-v1.1-Laser-Mode: "Constant laser power mode simply keeps the laser power as
   programmed, regardless if the machine is moving, accelerating, or stopped." and "When using `M3` constant
   laser power mode, try to avoid force-sync conditions during a job whenever possible."
   URLs: https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/stepper.c#L392-L398 ,
@@ -33,10 +35,9 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
   https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode
 - reproduction: `src/__audit_repro__/OR/m3-lit-planner-drain.test.ts` — 3 tests, all FAIL
   (`"M3 S0" drains with M3 S800 lit`, `"M9" drains ...`, `"M8" drains ...`).
-- fix (local): drop the redundant between-pass re-arm (mode never changes inside a group; the next pass's
-  `G0 ... S0` darkens without a sync — also removes a stop per pass in M4); emit a group's coolant change
-  after its first laser-off seek instead of right after the previous burn; order the job end as park/laser-off
-  motion before `M9`/`M5` or at least `M5` before `M9`.
+- fix (local): drop the redundant between-pass re-arm and skip a laser-off seek to the current head position
+  (see addendum); emit a group's coolant change after its first non-zero laser-off seek instead of right after
+  the previous burn; at the job end emit `M5` before `M9`.
 
 ## OR-2 — CNC pass recovery marks passes "proven complete" that may still have been queued
 
@@ -80,14 +81,61 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
 - fix (local): without a `Bf` snapshot, step back the archived `$I` planner size (stock 15) or the per-family
   reserve CNC already uses.
 
-## Low / plausible (being verified)
+## OR-4 — xTool D1 Pro profiles drive native `$J=` jog/Frame although the cited vendor file disables it
 
-- xTool D1 Pro profiles keep native `$J=` jog/Frame although the cited xTool LightBurn device file sets
-  `"EnableGrblJCommand": false` (downloaded file sha256 d03e3021...; proprietary firmware — not verifiable).
-- LightBurn `.lbdev` import reads XML tags only; xTool's official JSON `.lbdev` is rejected as "missing bed
-  width or height"; real files use `S_Scale`, `MirrorY`, not `SMax`/`Origin` (fails closed).
-- `controller-readiness.ts:121-122` comment says Start refuses `max-power-mismatch`; Start demotes it to a Job
-  Review warning (`start-job-controller-policy.ts:26-30`).
+- severity: low
+- verdict: PLAUSIBLE (xTool firmware is closed; KerfDesk side traced)
+- status: new
+- failure scenario: if the xTool firmware rejects `$J=` (as xTool's LightBurn device file assumes), every Frame
+  (built from `$J=` lines) fails, so Start never unlocks; jog buttons fail too.
+- kerfdesk evidence: `src/core/devices/brand-laser-profiles.ts:65-89` (note cites `"EnableGrblJCommand": false`
+  but no `controllerCommandSet`), `src/core/controllers/grbl/driver.ts:86` (`buildFrameLines: buildGrblFrameJogLines`);
+  the Falcon profile honours the same vendor field through `falcon-command-contract.ts:14-21`.
+- upstream evidence: xTool-D1ProV3.lbdev (https://xtool.zendesk.com/hc/article_attachments/7316804567447/xTool-D1ProV3.lbdev,
+  fetched 2026-09-25, sha256 d03e3021...): `"EnableGrblJCommand": false`, `"BaudRate": 230400`, `"S_Scale": 1000`,
+  `"MirrorY": true`, `"Width": 430`, `"Height": 400`. xTool product page returned HTTP 403.
+- reproduction: traced only.
+- fix: needs decision (give the xTool profiles a relative-G1 jog/Frame contract like the Falcon's, or keep `$J`
+  and say so in Machine Setup).
+
+## OR-5 — LightBurn `.lbdev` import cannot read real LightBurn device files
+
+- severity: low (fails closed with a wrong reason)
+- verdict: CONFIRMED (repro)
+- status: new
+- failure scenario: importing xTool's official D1 Pro `.lbdev` (JSON) in Machine Setup returns "invalid: missing
+  bed width or height"; the importer only matches invented XML tags (`<SMax>`, `<Origin>`), never `S_Scale`,
+  `MirrorY`, `Settings.BaudRate`.
+- kerfdesk evidence: `src/io/lightburn/lbdev-import.ts:66-100` (tag lists), `:226-231` (XML regex); tests use an
+  invented XML sample (`lbdev-import.test.ts:4-16`).
+- upstream evidence: the xTool file above; Falcon bundle keys recorded in
+  `docs/audits/2026-09-19-machine-compatibility-fixes/falcon-vendor-configuration.json`.
+- reproduction: `src/__audit_repro__/OR/lbdev-json-import.test.ts` — FAILS (`expected 'invalid' to be 'review'`).
+- fix (local): parse the JSON `DeviceList[]` form (Width, Height, Settings.S_Scale, Settings.BaudRate,
+  MirrorX/MirrorY -> origin, Settings.AirAssistM7), keep the review step.
+
+## OR-6 — Controller-readiness text is wrong for FluidNC and one comment is stale
+
+- severity: low
+- verdict: CONFIRMED (trace)
+- status: new
+- failure scenario: FluidNC with a PWM (non-Laser) spindle reports `$32=0`; Job Review says "Enable GRBL laser
+  mode ($32=1)", but FluidNC's `$32` is a read-only proxy of the spindle type (fix = `Laser` spindle in YAML).
+  Separately, `controller-readiness.ts:121-122` says Start refuses `max-power-mismatch`; Start demotes every
+  readiness error to a Job Review warning (`start-job-controller-policy.ts:26-30`).
+- kerfdesk evidence: `src/core/preflight/controller-readiness.ts:231-236`, `:121-122`.
+- upstream evidence: FluidNC v4.0.3 SettingsDefinitions.cpp:146 `INT_PROXY("32", "Grbl/LaserMode",
+  spindle->isRateAdjusted())`; Settings.h:229 `setStringValue(...) override { return Error::ReadOnlySetting; }`.
+- reproduction: traced only.
+- fix (local): FluidNC-specific wording; fix the comment.
+
+## OR-1 addendum
+
+GRBL also syncs on a zero-length move under M3 (motion_control.c:67-73, "Forces a buffer sync while in M3 laser
+mode only"). KerfDesk always emits each segment's laser-off seek, so pass 2 of a closed contour seeks to where
+pass 1 ended; if only the re-arm is removed, that zero-length seek becomes the lit drain. The repro now includes
+this rule, so the fix must also skip a seek to the current head position (or otherwise leave the beam dark).
+Real-pipeline sample: 2 of 572 burn moves on 3 mm script text were below one 80 steps/mm step (M3 coincident).
 
 ## Checked so far (correct)
 
@@ -103,6 +151,4 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
 
 ## Still to check
 
-- grbl-power-modes / dialect M3/M4 choices vs grblHAL/FluidNC nuances; `$32=0` path wording.
-- Resume/replay edge cases (compact words, F restore) against the oracle; native resume consistency.
-- CNC GRBL emitter items not in the 2026-09-24 CNC audit.
+- Final pass over resume edge cases; CNC GRBL emitter items not in the 2026-09-24 CNC audit (so far none new).

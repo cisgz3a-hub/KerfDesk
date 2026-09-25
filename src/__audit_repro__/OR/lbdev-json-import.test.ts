@@ -13,8 +13,8 @@
 // "BaudRate":230400,"EnableGrblJCommand":false,...},"Type":"Serial"}]}.
 // Creality's Falcon A1 Pro bundle records the same keys ("Width", "Height",
 // "S_Scale", "BaudRate"; docs/audits/2026-09-19-machine-compatibility-fixes/
-// falcon-vendor-configuration.json). lbdev-import.ts:69-100 and :224-231 only
-// match XML tags (`<Width>…</Width>`, `<SMax>`, `<Origin>`), so every such
+// falcon-vendor-configuration.json). lbdev-import.ts:66-100 and :226-231 only
+// match XML tags (`<Width>...</Width>`, `<SMax>`, `<Origin>`), so every such
 // file is rejected as "missing bed width or height".
 
 import { describe, expect, it } from 'vitest';

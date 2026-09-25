@@ -9,6 +9,9 @@
 //  - gcode.c:916-926 [4. Set spindle speed]: an S change on a line without axis
 //    motion calls spindle_sync(); gcode.c:946 [7] spindle state change and
 //    gcode.c:955 [8] coolant change (coolant_sync) sync too.
+//  - motion_control.c:67-73: in laser mode, a motion line whose target is the
+//    current position (PLAN_EMPTY_BLOCK, planner.c:381) calls spindle_sync()
+//    under M3 ("Forces a buffer sync while in M3 laser mode only").
 //  - coolant_control.c:121-126 and spindle_control.c:277-282 call
 //    protocol_buffer_synchronize() (protocol.c:169-177), which waits until the
 //    planner is empty and the cycle has stopped.
@@ -19,7 +22,9 @@
 //    and coolant_control.c:57-67 sync coolant, coolant_control.c:45-53 then
 //    dwells `$673` (settings.h:457; 0 or 0.5-20 s) after turning coolant on, and
 //    stepper.c:566-573 switches the PWM off at an empty buffer only for
-//    rate-adjusted (M4) laser blocks. FluidNC v4.0.3 Stepper.cpp:234-240 is the same.
+//    rate-adjusted (M4) laser blocks. FluidNC v4.0.3 Stepper.cpp:234-240 is the same,
+//    and GCode.cpp:1716-1733 + CoolantControl.cpp:72-79 dwell `coolant/delay_ms`
+//    (0-10000 ms, CoolantControl.cpp:90) after turning coolant on.
 //  - GRBL wiki "Grbl v1.1 Laser Mode": "Constant laser power mode simply keeps
 //    the laser power as programmed, regardless if the machine is moving,
 //    accelerating, or stopped." and, for CAM developers, "When using M3
@@ -28,7 +33,7 @@
 //
 // The oracle is the repository's independent port of gcode.c laser power
 // (src/__fixtures__/controllers/grbl-laser-power-model.ts); the sync
-// predicate below follows gcode.c [4]/[7]/[8]/[10].
+// predicate below follows gcode.c [4]/[7]/[8]/[10] and motion_control.c:67-73.
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -54,12 +59,23 @@ function words(line: string): Array<{ letter: string; value: number }> {
   }));
 }
 
+type Head = { x: number | null; y: number | null };
+
 /** True when GRBL 1.1h drains its planner while executing this line
  * (gcode.c [4] S change without axis motion, [7] spindle change,
- * [8] coolant change, [10] dwell). */
-function drainsPlanner(model: GrblLaserPowerModel, coolant: Coolant, line: string): boolean {
+ * [8] coolant change, [10] dwell; motion_control.c:67-73 coincident target). */
+function drainsPlanner(
+  model: GrblLaserPowerModel,
+  coolant: Coolant,
+  head: Head,
+  line: string,
+): boolean {
   const ws = words(line);
   const hasAxis = ws.some((w) => 'XYZ'.includes(w.letter));
+  const x = ws.find((w) => w.letter === 'X')?.value ?? head.x;
+  const y = ws.find((w) => w.letter === 'Y')?.value ?? head.y;
+  // motion_control.c:67-73: a coincident motion target under M3 syncs.
+  if (hasAxis && model.spindle === 'cw' && x === head.x && y === head.y) return true;
   const s = ws.find((w) => w.letter === 'S')?.value;
   const spindleWord = ws.find((w) => w.letter === 'M' && [3, 4, 5].includes(w.value))?.value;
   const spindle = spindleWord === 3 ? 'cw' : spindleWord === 4 ? 'ccw' : spindleWord === 5 ? 'off' : model.spindle;
@@ -100,14 +116,24 @@ function litDrains(gcode: string): string[] {
   });
   const model = powerUpGrbl(true);
   const coolant: Coolant = { mist: false, flood: false };
+  const head: Head = { x: null, y: null };
   const found: string[] = [];
   lines.forEach((line, index) => {
     const midJob = index < lastBurn;
-    if (midJob && drainsPlanner(model, coolant, line) && model.spindle === 'cw' && model.beam > 0) {
+    if (
+      midJob &&
+      drainsPlanner(model, coolant, head, line) &&
+      model.spindle === 'cw' &&
+      model.beam > 0
+    ) {
       found.push(`line ${index + 1} "${line.trim()}" drains with M3 S${model.beam} lit`);
     }
     executeGrblLine(model, line);
     applyCoolant(coolant, line);
+    for (const w of words(line)) {
+      if (w.letter === 'X') head.x = w.value;
+      if (w.letter === 'Y') head.y = w.value;
+    }
   });
   return found;
 }

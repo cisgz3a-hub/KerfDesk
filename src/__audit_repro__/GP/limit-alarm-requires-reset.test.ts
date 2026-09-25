@@ -11,7 +11,7 @@
 // `$X` that GRBL cannot answer (and which then strands an owed acknowledgement
 // that blocks Home/Jog/Frame until a reconnect).
 //
-// Upstream: https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L219-L238
+// Upstream: https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L218-L237
 //           https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/limits.c (hard limit ISR: mc_reset + EXEC_ALARM_HARD_LIMIT; limits_soft_check: mc_reset + EXEC_ALARM_SOFT_LIMIT)
 //           https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface ("[MSG:Reset to continue]")
 //

@@ -1,6 +1,6 @@
 # Track ST (GRBL-family streaming, flow control, job lifecycle) — partial findings
 
-Status: in progress (partial save). Upstream root: gnea/grbl 1.1h bfb67f0c, grblHAL core d7aaee3d,
+Status: complete (final hand-back sent; this file mirrors it). Upstream root: gnea/grbl 1.1h bfb67f0c, grblHAL core d7aaee3d,
 FluidNC v4.0.3. Repro tests live in `src/__audit_repro__/ST/` and all FAIL on current code.
 
 ## Findings (most severe first)
@@ -17,10 +17,13 @@ FluidNC v4.0.3. Repro tests live in `src/__audit_repro__/ST/` and all FAIL on cu
   (b) Continue while an operator line's `ok` is still owed (second Zero Z `G10 L20 P1 Z0`, or the
   jog owner's `G4 P0.01` settle marker dispatched at Idle): the `ok` arrives before any job line's.
   Jog-marker case: the stream claims it (`inFlight` 6→5 though GRBL answered no job line → RX budget
-  freed early, next refill can overrun GRBL's ring; with the worker transport armed the worker pumps
-  it too), the jog owner never sees its marker ack and `pendingUntrackedAcks` stays 1. Zero-Z case:
-  the owned command takes the `ok` but the ledger keeps 1 owed ack forever → after the job Start,
-  Jog, Frame, Home and origin writes are refused until reconnect.
+  freed early, next refill can overrun GRBL's ring), the jog owner never sees its marker ack and
+  `pendingUntrackedAcks` stays 1. Zero-Z case: the owned command takes the `ok` but the ledger keeps
+  1 owed ack forever → after the job Start, Jog, Frame, Home and origin writes are refused until
+  reconnect; if the worker refill was armed first, the worker pumps that `ok` as a job ack
+  (serial-worker-core.ts:161-176) while the main thread does not (traced only), so the worker runs
+  one line ahead of the main thread's copy; after a later hand-back (Pause releases the refill
+  first) the main thread re-sends the line the worker already sent (duplicate execution).
 - kerfdesk evidence:
   - `src/ui/state/laser-store-helpers.ts:110-134` `toolChangeContinueBlockMessage` checks only MPG,
     `toolChangeReady`, work-Z evidence, plate removal, tool id — no motion/controller operation, no
@@ -96,8 +99,8 @@ FluidNC v4.0.3. Repro tests live in `src/__audit_repro__/ST/` and all FAIL on cu
 - kerfdesk evidence: `src/__fixtures__/controllers/grbl-sim-machine.ts:147-156` (Hold:0/Door:1
   labels), `:166-196` realtime handling, `:366-394` G-code accepted unless locked;
   `grbl-simulator.ts:30` REALTIME_BYTES (6 bytes only), `:68-80` only `\n` ends a line,
-  `:179-184` triggerAlarm; `grbl-sim-planner.ts:265` `GRBL_PLANNER_BLOCKS = 16`;
-  `grbl-sim-rx-window.ts:157-175`.
+  `:179-184` triggerAlarm; `grbl-sim-planner.ts:31` `GRBL_PLANNER_BLOCKS = 16`;
+  `grbl-sim-rx-window.ts:10-28`.
 - upstream evidence: protocol.c:79, :93-95, :99-101, :208, :226-236, :546; gcode.c:1084-1090;
   motion_control.c:195-200; system.c:87-93; report.c:491-500; planner.c:250-254, 498-502;
   serial.c:24, :37-42, :150-196; limits.c:319-320 (all at bfb67f0c).
@@ -130,6 +133,28 @@ FluidNC v4.0.3. Repro tests live in `src/__audit_repro__/ST/` and all FAIL on cu
   do not zero owed acks for lines written after that transition; ALARM:N lines and reboot banners
   already own the ledger reset.
 
+### ST-5 — A programmed spindle spin-up dwell is announced as "CONTROLLER HOLDING PROGRAM"
+- severity: low (misleading live-bar text and log line)
+- verdict: CONFIRMED (reproduced on the pure stall/hold functions)
+- status: new
+- failure scenario: every CNC job start and tool-change Continue writes `M3 S…` then
+  `G4 P<spinup>`; GRBL reports Idle and withholds the G4 `ok` for the whole dwell. With a spin-up
+  ≥3 s (default 3 s; VFD spindles commonly 5-10 s) the bar switches to "CONTROLLER HOLDING PROGRAM
+  — The controller reports Idle and has not acknowledged the last N sent lines…" and the log records
+  "[lf2] Controller holding program … KerfDesk is connected and waiting" although the controller is
+  executing the program.
+- kerfdesk evidence: `src/ui/state/laser-stream-hold.ts:48` `STREAM_HOLD_VISIBLE_MS = 3_000`,
+  `:66-82` `streamHoldFromProbe` ignores what the head in-flight line is;
+  `src/ui/state/laser-stream-stall.ts:30-55`; `src/core/output/cnc-grbl-transitions.ts:116-129`
+  `appendSpindleStart` writes `G4 P<spinupSec>`; `src/core/scene/machine.ts:274` default 3 s.
+- upstream evidence: motion_control.c:195-200 mc_dwell (sync then delay);
+  nuts_bolts.c delay_sec serves realtime every 50 ms (state Idle).
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L195-L200
+- reproduction: `src/__audit_repro__/ST/stream-hold-during-dwell.test.ts` (fails: hold reported at 4 s
+  into a 5 s dwell).
+- fix (local): when the oldest in-flight line is `G4 P<s>` (or `M3`/`M4` sync) and less than its
+  programmed time plus a margin has elapsed, report "Dwelling (spindle spin-up)" instead of a hold.
+
 ## Checked and correct (so far)
 - RX window: GRBL ring holds 128 bytes (serial.c:24, :37-42); KerfDesk default 120, `Bf:` free − 8,
   count includes the `\n`, never sends `\r`, realtime bytes excluded, oversized lines refused at Start.
@@ -151,9 +176,18 @@ FluidNC v4.0.3. Repro tests live in `src/__audit_repro__/ST/` and all FAIL on cu
 - Jog cancel 0x85 only in STATE_JOG (serial.c:159-163); KerfDesk re-sends only after a fresh Jog report.
 - Worker refill parity: same pure onAck/step and the same classifier; divergence only via ST-1(b).
 
-## Still to check
-- FluidNC channel specifics beyond the shared classifier (window is profile-sourced).
-- grblHAL MPG takeover: console recovery lines and manual air-off are allowed while MPG owns the
-  stream, but grblHAL disables host RX in MPG mode and flushes it on exit (stream.c:818-849) —
-  owed acks may never arrive (lead for the grblHAL/MPG track).
-- Stream-hold wording during legitimate CNC spin-up dwells ≥3 s (default spin-up 3 s) — cosmetic.
+## Not covered / leads for other tracks
+- grblHAL MPG takeover (lead, PLAUSIBLE): console recovery lines and manual air-off are allowed while
+  MPG owns control, but grblHAL disables host RX in MPG mode and resets the read buffer on exit
+  (grblHAL core stream.c:818-849); their owed acks may never arrive, and a paused stream claims any
+  terminal ack while `status === 'paused'` (laser-store-helpers.ts:149). Driver-level `disable_rx`
+  semantics were not traced.
+- grblHAL sticky G-code error (lead for console/grblHAL tracks): with COMPATIBILITY_LEVEL 0
+  (config.h:97 default) a failed G-code line leaves `gc_state.last_error` set, so every later G-code
+  line is skipped and answered with the same `error:N` until a `$` command, empty line or reset
+  (protocol.c:246-286). Mid-stream this is absorbed (terminal stream + reset), but G-code-only
+  operations after a console error (Frame's M5/M9 prelude, Zero Z, air) can fail with a stale error.
+- FluidNC: 120-byte profile window is below its 256-byte UART ring and its channel queues bytes
+  while the planner is full (Channel.cpp:211-240); not exercised further.
+- Frame-first modules (framed-run*.ts, laser-frame-status.ts, laser-frame-dispatch.ts) were read for
+  stream interplay only; permit logic left to the Frame track.

@@ -34,6 +34,28 @@ Status: in progress (checkpoint 1, 2026-09-25). Repro tests live in `src/__audit
 - reproduction: traced only.
 - fix (local): correct the three comments.
 
+### TC-3 - Smoothieware Disconnect closes the port before the controller has taken its M5/M9 cleanup
+
+- severity: low
+- verdict: PLAUSIBLE (KerfDesk side reproduced; whether Smoothieware loses the lines depends on main-loop timing on hardware)
+- status: new
+- failure scenario: Smoothieware, idle, Manual Air on (`airAssistOn`). Disconnect writes `M5\n` and `M9\n` and closes the port in the same millisecond, without waiting for the `ok`s it already owes. Closing drops DTR; Smoothieware's USB serial flushes its receive buffer on the detach before dispatching any buffered line, so an unparsed `M9` is discarded and the air keeps running while KerfDesk shows Disconnected. (With an active job KerfDesk sends Ctrl-X first; Smoothieware's halt sets switches to their halt value, Switch.cpp on_halt, so only the idle Manual Air case is exposed.)
+- kerfdesk evidence: `src/ui/state/laser-connection-actions.ts:345-369` `stopBeforeDisconnect` awaits only `safeWrite(stopCommand, 'disconnect')` (transport write) for non-GRBL drivers; `:321-324` then `quarantineConnectionRefs` and `closeConnectionOnce`. `src/ui/state/laser-store-helpers.ts:207` airAssistOn -> `stopLaserLines` (`SMOOTHIE_STOP_LASER_LINES = ['M5', 'M9']`, smoothieware/commands.ts:31).
+- upstream evidence: USBCDC.cpp#L183-L189 `case CDC_SET_CONTROL_LINE_STATE: ... if (transfer.setup.wValue & CDC_CLS_DTR) on_attach(); else on_detach();` and USBSerial.cpp#L322-L366 `on_main_loop`: `if (attach != attached) { if (attach) { ... } else { attached = false; THEKERNEL->streams->remove_stream(this); txbuf.flush(); rxbuf.flush(); nl_in_rx = 0; } }` runs before `if (nl_in_rx) { ... }` line dispatch. Closing drops DTR on Linux because Chromium keeps the tty's existing HUPCL bit (serial_io_handler_posix.cc ConfigurePortImpl only sets CLOCAL/CREAD, size, parity, stop bits and CRTSCTS); the Windows side was not verified. https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/libs/USBDevice/USBSerial/USBSerial.cpp#L322-L366
+- reproduction: `src/__audit_repro__/TC/tc-3-smoothie-disconnect-cleanup-before-detach.test.ts` FAILS: `tx M5`, `tx M9`, `close` at 3000 ms; the two `ok`s at 3020 ms.
+- fix (local): for a driver without a realtime reset (or when none was sent), wait for the cleanup lines' owed acknowledgements with a short bound (for example 1 s) before closing; keep the existing unconfirmed-stop notice when the bound expires.
+
+### TC-4 - The main-thread transport never closes its port when the read side ends on its own (worker parity gap)
+
+- severity: low
+- verdict: CONFIRMED
+- status: new (parity gap with ADR-354 decision 6 / audit transport-3, which fixed the worker path only)
+- failure scenario: an UnknownError read (Chromium SYSTEM_ERROR, not fatal per spec), or eight line errors in a row with no data (recovery budget), ends the main-thread session: the store is told the port closed, but `port.close()` is never called. The OS port stays open, DTR asserted, and held by the page until the next KerfDesk Connect's stale-port sweep or a reload; another program cannot open the controller meanwhile. The native worker closes its port on the same events.
+- kerfdesk evidence: `src/platform/web/web-serial.ts:194-201` `handleDroppedConnection` = `removeEventListener`, `void closeStreamsOnce()`, `fireClose()` (the read loop's `onEnd`); only the explicit `closeConnection` / `forgetConnection` call `port.close()` (`:203-241`). Worker: `native-serial-worker-runtime.ts:48-55,223-241` (`closed` from the core -> `close()` -> `port.close()`), pinned by `native-serial-worker-runtime.test.ts` "closes native ownership after eof/read-error/disconnect".
+- upstream evidence: Web Serial spec 4.10 close(), Example 7: "it is better to place the call to port.close() as the last step of readUntilClosed() so that the port is also closed when a fatal error is encountered and port.readable becomes null." 4.6 readable: UnknownError only "invoke[s] the steps to handle closing the readable stream"; only "If the port was disconnected" sets [[readFatal]]. Chromium `ReceiveErrorIsFatal(SYSTEM_ERROR)` returns false (third_party/blink/renderer/modules/serial/serial_port.cc). https://wicg.github.io/serial/
+- reproduction: `src/__audit_repro__/TC/tc-4-main-thread-port-left-open.test.ts` - both cases FAIL (`port.opened` stays true).
+- fix (local): in `handleDroppedConnection`, after `closeStreamsOnce()` settles, `await port.close().catch(() => undefined)` (a disconnected port rejects harmlessly), before or after firing close.
+
 ## Checked and correct (so far)
 
 - Line framing: LF/CRLF, splits across chunks, 64 KiB cap with discard-to-newline; invalid UTF-8 becomes U+FFFD without swallowing following ASCII bytes (node TextDecoder check); GRBL/grblHAL/FluidNC/Marlin all terminate with LF or CRLF (grblHAL stream.h `ASCII_EOL "\r\n"`, FluidNC Channel.cpp `print_msg` writes msg then "\n", Marlin serial.h `SERIAL_EOL() SERIAL_CHAR('\n')`).

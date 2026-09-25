@@ -19,7 +19,7 @@
 //    acknowledged motion line holds one planner block until it runs.
 // KerfDesk (cnc-resume-point.ts:38-45) rewinds a fixed 256 lines on grblHAL and
 // 64 on FluidNC, so on a controller configured with a larger (valid) planner
-// the passes it labels "proven-complete" (✓ in CncPassRecoveryWizard) can be
+// the passes it labels "proven-complete" (check mark in CncPassRecoveryWizard) can be
 // passes that never ran, and the default resume starts a deeper pass on uncut
 // material.
 

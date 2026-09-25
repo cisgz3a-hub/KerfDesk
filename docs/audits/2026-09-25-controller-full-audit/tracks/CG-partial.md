@@ -12,7 +12,10 @@ Upstream root: `/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a6457
 - severity: high on Marlin (no placement mode can Frame, so nothing can Start, once "Set origin here"
   was used); medium on Smoothieware (User Origin never resolves; Verified Origin works)
 - verdict: CONFIRMED (repro + upstream)
-- status: new
+- status: new. Overlaps: MA-2 (Marlin User/Current/Absolute refusals) and SM-1 (Smoothieware Absolute
+  displacement, same root cause). Unique here: Smoothieware User Origin refusal, and Marlin Verified
+  Origin — which MA-2 lists as the one mode that works — is refused at Frame dispatch too, so no
+  placement mode can Frame on Marlin once an origin is set.
 - failure scenario:
   - Smoothieware: jog, "Set origin here" (G92 X0 Y0, acknowledged), Frame in User Origin (the
     default for no-homing profiles, and the mode Set origin switches Absolute to) → refused forever:
@@ -108,6 +111,9 @@ Upstream root: `/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a6457
   currentPosition {100,50}); `src/__audit_repro__/CG/g92-only-origin-frame.test.ts` "Marlin: preparing
   a Frame after Set origin does not write G54…" (FAILS: G54 written) and "Smoothieware: preparing a
   Frame after Set origin keeps the origin…" (FAILS: "Verified Origin needs a custom work origin").
+- note: GP-1 proposes nulling `activeWcs` after every `$H` so Frame re-selects G54; with the current
+  normalization that would route every post-Home Frame on every driver through this origin-erasing
+  path. Fix CG-2 first.
 - fix: local — (1) run the owned `$G` readback whenever `modalStateQuery` exists, not only after a
   `$$` read (Falcon); (2) do not select G54 on drivers whose programs do not carry it (Marlin) and treat
   `activeWcs === null` as "read it first", not "not G54"; (3) when the selected WCS was already G54 (or
@@ -115,8 +121,9 @@ Upstream root: `/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a6457
 
 ### CG-3 — After Abort on Smoothieware, controller qualification stays "Waiting for fresh Idle" for the rest of the session
 
-- severity: medium (blocks supervised recovery/resume after an Abort until reconnect; permanent
-  misleading status line)
+- severity: medium (blocks the ADR-364 laser recovery and CNC supervised recovery after an Abort
+  until reconnect: `finalRecoveryStartAssertion` → "Controller qualification is still in progress…";
+  permanent misleading status line)
 - verdict: CONFIRMED (repro against an upstream-shaped Smoothie fake + upstream source)
 - status: new (ADR-364 made Smoothieware resume possible; this blocks it after an in-session Abort)
 - failure scenario: Smoothieware connected and qualified ('not-required') → Abort (Ctrl-X) → board
@@ -171,12 +178,8 @@ Upstream root: `/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a6457
   click sends M9 again. fix: local — clear `airAssistOn` when the driver's own tool-off lines include
   M9, or drop M9 from the jog prefix.
 
-### CG-6 (low) — Firmware simulators diverge from upstream on exactly these paths
-
-- `src/__fixtures__/controllers/smoothie-simulator.ts:157-164` Ctrl-X emits a `Smoothie` banner and
-  halts only when moving; upstream always halts and prints no banner (hid CG-3).
-- `smoothie-simulator.ts` and `marlin-simulator.ts` route `G92 X0 Y0` through handleMotion, so the
-  simulated head MOVES to X0 Y0 and no offset is modelled (hid CG-1/CG-2). fix: local (test fixtures).
+### (dropped as duplicate) Simulator fidelity — covered by SM-4 (Smoothieware) and MA "Simulator
+fidelity" (Marlin). Note for SM-4: the Ctrl-X banner is also what hides CG-3.
 
 ### CG-7 (low) — "Read ($$)" is offered on drivers without a settings query
 
@@ -185,14 +188,23 @@ Upstream root: `/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a6457
   `readMachineSettings` only marks qualification 'not-required' (`grbl-settings-actions.ts:80-90`);
   nothing is read. fix: local — gate on `capabilities.settings !== 'none'`.
 
+### CG-8 (low) — Wake from Sleep is reported as failed on stock GRBL 1.1h too (extends HF-5)
+
+- verdict: CONFIRMED (repro). HF-5 covers grblHAL and FluidNC and left stock GRBL to another track.
+  GRBL `protocol.c:52-54` re-enters ALARM after a reset from Sleep; `wakeController` waits for Idle
+  (`src/ui/state/laser-controller-recovery-actions.ts:90`) and rejects "Controller entered Alarm.".
+  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L52-L54
+- reproduction: `src/__audit_repro__/CG/grbl-wake-from-sleep.test.ts` (FAILS: 'Controller entered Alarm.').
+- fix: as HF-5.
+
 ## Driver × action matrix (so far; only wrong/unverifiable cells listed)
 
-- grbl (stock 1.1): origin/Frame OK (activeWcs read via `$G`); Wake reports failure because stock GRBL
-  wakes into ALARM (guide handles it; SleepBanner copy says "report Idle") — low, not filed yet.
+- grbl (stock 1.1): origin/Frame OK (activeWcs read via `$G`); Wake → CG-8.
 - grblhal: as grbl. Frame normalization only when `$G` readback failed.
 - fluidnc: no wrong cells found (checked realtime bytes, `$SLP`, Door substates, `$32` proxy, overrides).
 - falcon-grbl / falcon-grblhal: Frame/origin → CG-2 (`$G` never read); settings panel → CG-7.
-- marlin: set origin + Frame (all placement modes) → CG-1; Frame → CG-2 (G54 sent); settings panel → CG-7.
+- marlin: set origin + Frame (all placement modes) → CG-1 (+MA-2); Frame → CG-2 (G54 sent); Abort does
+  not stop the planner → MA-7; settings panel → CG-7.
 - smoothieware: User Origin / Absolute offset → CG-1; Frame → CG-2; Abort → CG-3; alarm recovery → CG-4;
   manual air → CG-5; settings panel → CG-7.
 - ruida: file-only; every live control gated off by transport (checked).

@@ -72,7 +72,7 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
 
 ### HF-3 — grblHAL critical alarms (1, 2, 10, 17, 20) refuse `$X`/`$H` until reset; banner advice and error:79 give no way out
 - severity: low
-- verdict: CONFIRMED (traced; grblHAL source)
+- verdict: CONFIRMED (repro + grblHAL source)
 - status: new (partly generic: stock GRBL 1.1h also needs a reset after ALARM:1/2 — other track)
 - failure scenario: grblHAL ALARM:1 or ALARM:2 → `[MSG:Reset to continue]`, grblHAL blocks
   until reset and answers `$X`, `$H`, `$HX`, `$SLP` with `error:79` ("Not allowed while critical
@@ -87,13 +87,14 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
   `system.c:1179-1181` `if(sys.blocking_event && !...allow_blocking) retval = Status_NotAllowedCriticalEvent;`
   (`X`, `H`, `HX`… have no `allow_blocking`, `system.c:990-1012`); `errors.h:113` = 79.
   https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L1179-L1181
-- reproduction: traced only (unit repro pending).
+- reproduction: `src/__audit_repro__/HF/hf-3-grblhal-critical-alarm-guidance.test.ts` — 3 cases
+  FAIL on current code (alarm 1/2 actions do not mention a reset; `presentError('grblhal', 79)` is null).
 - fix: local for text (grblHAL alarm 1/2 actions say "soft-reset first"; describe error 79/46/45/50);
   offering a Reset control in the Alarm banner needs a product decision (it is a new control).
 
 ### HF-4 — Falcon: a refused Release motors tells the operator to set `$62=1`, which the Falcon Console refuses
 - severity: low (misleading text)
-- verdict: CONFIRMED (traced)
+- verdict: CONFIRMED (reproduced through the store)
 - status: new (same class as the ADR-370 `$152` advice)
 - failure scenario: Falcon profile (kind grblhal). Release motors → `$SLP` → `error:3` (sleep
   disabled or unsupported on the vendor build) → `sleepRefusalMessage('grblhal', 'error:3')`
@@ -104,13 +105,15 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
   `src/core/controllers/falcon-command-contract.ts:46,54-58`; `console-setting-writes.ts:21-36`.
 - upstream evidence: grblHAL `system.c:572-576` `if(!settings.flags.sleep_enable) return Status_InvalidStatement;`;
   `settings.c:2141-2143` `$62` exists only when `SLEEP_DURATION > 0`.
-- reproduction: traced only (unit repro pending).
+- reproduction: `src/__audit_repro__/HF/hf-4-falcon-sleep-refusal-advice.test.ts` FAILS on current
+  code: the Falcon Console refuses `$62=1` ("does not send numeric $ setting writes…") while the
+  Release motors refusal reads "…Set $62=1 in the controller settings…".
 - fix (local): only name `$62=1` when the driver can write it (`capabilities.settings === 'grbl-dollar'`);
   otherwise say the firmware refused sleep.
 
 ### HF-5 — Wake from Sleep is reported as failed on grblHAL and FluidNC; both reboot into Alarm by design
 - severity: low
-- verdict: CONFIRMED (traced)
+- verdict: CONFIRMED (reproduced through the store for both firmwares)
 - status: new (stock GRBL 1.1h behaves the same — other track; the GRBL simulator models Idle)
 - failure scenario: Release motors (`$SLP`) → Sleep → Wake/Reset (Ctrl-X). grblHAL re-enters Alarm
   with `[MSG:'$H'|'$X' to unlock]`; FluidNC prints `ALARM:3` before its banner. `wakeController`
@@ -123,9 +126,34 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
 - upstream evidence: grblHAL `protocol.c:167-174` ("Re-initialize the sleep state as an ALARM mode");
   FluidNC v4.0.3 `Protocol.cpp:1158-1159` `else if (state_is(State::Sleep)) { protocol_do_alarm((void*)ExecAlarm::AbortCycle); }`;
   gnea/grbl `protocol.c:49-54`.
-- reproduction: traced only (repro pending).
+- reproduction: `src/__audit_repro__/HF/hf-5-wake-from-sleep-alarm.test.ts` — both cases FAIL on
+  current code (grblHAL: 'Controller entered Alarm.'; FluidNC: 'ALARM:3').
 - fix (local): accept the post-reset Alarm as a completed wake (hand over to the Alarm banner) and
   fix the simulator's reset-from-Sleep state.
+
+### HF-6 — FluidNC's long-form command names bypass the Console policy (`$Settings/Restore=` is `$RST=`)
+- severity: low
+- verdict: CONFIRMED (repro + FluidNC source)
+- status: incomplete fix of ADR-362 decision 1 (audit settings-console-8, "every `$RST=` form is blocked")
+- failure scenario: FluidNC profile, Console input `$Settings/Restore=#` (FluidNC's long name for
+  `$RST=#`). KerfDesk blocks `$RST=#` but prepares the long form as an ordinary command
+  (`machine-state`, no confirmation) and sends it; FluidNC resets every G54-G59/G28/G30 offset
+  (`=$` restores settings defaults, `=*` both). KerfDesk's `machine-state` effect keeps its
+  persistent-origin state. Same class, milder: `$Home`/`$Home/X`/`$H=XY` are classified
+  `machine-state` instead of `reference`, `$Alarm/Disable` is not treated as an unlock,
+  `$Settings/Erase` (`$NVX`) is not blocked. The Frame-first contract still shows the real outline.
+- kerfdesk evidence: `src/core/controllers/grbl/console-command.ts:55,83-86,144-146`
+  (`/^\$RST=/` only); `src/core/controllers/fluidnc/driver.ts:38-53` adds only read-only reports.
+- upstream evidence: FluidNC v4.0.3 `ProcessSettings.cpp:1067`
+  `new UserCommand("RST", "Settings/Restore", restore_settings, notIdleOrAlarm, WA);`;
+  `ProcessSettings.cpp:1100-1101` matches the Grbl name or the long name case-insensitively;
+  `restore_settings` l.546-556 + `settings_restore` l.157-163; authentication compiled out by
+  default (`Config.h:29`). https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/ProcessSettings.cpp#L1067
+- reproduction: `src/__audit_repro__/HF/hf-6-fluidnc-long-form-restore.test.ts` — control
+  (`$RST=#` blocked) passes; the 3 long-form cases FAIL on current code.
+- fix (local): in `prepareFluidncConsoleCommand`, map FluidNC long names to their Grbl names
+  (from the pinned command table) before the shared classifier, or at least block
+  `$Settings/Restore=`/`$Settings/Erase` and classify `$Home…` as `reference`.
 
 ## Checked and correct (so far)
 - grblHAL alarm table 1-22 matches `alarms.h:29-53`/`alarms.c:29-52`; alarm 10 split by firmware.
@@ -146,8 +174,6 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
 - FluidNC line limits: 254 retained, >127 → error:14 (`GCode.cpp:246-249`); fixtures faithful.
 
 ## Still to check
-- Unit repros for HF-3, HF-4, HF-5.
 - Falcon banner/firmware identity (unknown in repo): consequences for detection advisory,
   native bed frame (`native-bed-frame.ts:98-107`) and RX window reconciliation.
 - select-controller-driver Falcon command set on fluidnc/marlin reachability (appears harmless).
-- Remaining console classification gaps for FluidNC long-form commands (`$Home`, `$H=XY`, `$MD`).
