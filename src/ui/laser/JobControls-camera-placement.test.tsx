@@ -173,7 +173,7 @@ describe('JobControls camera placement', () => {
         root = createRoot(host);
         root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
       });
-      expect(host.textContent).toContain('Start framed job');
+      expect(startButton(host).disabled).toBe(false);
       expect(host.textContent).toContain('Ready to start');
 
       const framedRun = useLaserStore.getState().framedRun;
@@ -185,7 +185,7 @@ describe('JobControls camera placement', () => {
         }),
       );
 
-      expect(host.textContent).toContain('Start framed job');
+      expect(startButton(host).disabled).toBe(false);
       expect(host.textContent).toContain('Ready to start');
       expect(useLaserStore.getState().framedRun).toBe(framedRun);
     } finally {
@@ -194,3 +194,9 @@ describe('JobControls camera placement', () => {
     }
   });
 });
+
+function startButton(host: HTMLElement): HTMLButtonElement {
+  const match = [...host.querySelectorAll('button')].find((item) => item.textContent === 'Start');
+  if (match === undefined) throw new Error('Start button not rendered');
+  return match;
+}

@@ -57,7 +57,7 @@ G1 X70.000 Y348.000 F3000 S0 ; kerfdesk:laser-off-motion
 G1 X50.000 Y348.000 F3000 S350
 G1 X45.000 Y348.000 F3000 S0 ; kerfdesk:laser-off-motion
 ; image layer image-gray color #808080 power 45%
-; 10 × 5 px, 10.000 × 5.000 mm
+; 10 x 5 px, 10.000 x 5.000 mm
 ; feed 2500 mm/min, overscan 5.000 mm, dot width correction 0.000 mm
 M5
 M4 S0

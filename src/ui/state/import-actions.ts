@@ -16,19 +16,20 @@ import { applyRasterizedTraceToExisting } from './rasterized-trace-mutation';
 import {
   applyFreshImport,
   applyTraceToExisting,
+  type ImportOutcome,
   type MutationResult,
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
+import { applyImportBedFit } from './import-bed-fit';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
 import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import {
   DEFAULT_LAYER_DEFAULTS_STATE,
-  defaultSettingsForColor,
+  defaultSettingsForOperation,
   type LayerDefaultsState,
 } from './layer-default-actions';
-import { sourceColorForOperation } from './operation-source-color';
 import { applyCameraTraceImport } from './camera-trace-import';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
@@ -46,7 +47,7 @@ export function imageImportActions(
   set: ImportSet,
   get: () => ProjectSlice,
 ): {
-  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
+  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly traceExistingImage: (
     sourceId: string,
     traced: TracedImage,
@@ -61,11 +62,19 @@ export function imageImportActions(
 } {
   return {
     importRasterImage: (object, batchIdx) => {
+      let outcome: ImportOutcome = { kind: 'added' };
       // batchIdx staggers multi-image drops by 10 mm each (F-A3); a single
       // import or the toolbar picker passes nothing → 0.
-      set((s) => withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)));
+      set((s) => {
+        const fitted = applyImportBedFit(
+          withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)),
+        );
+        outcome = fitted.outcome;
+        return fitted.state;
+      });
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
+      return outcome;
     },
     traceExistingImage: (sourceId, traced, options) => {
       set((s) =>
@@ -105,8 +114,7 @@ function withFreshCncLayers(state: ImportState, result: MutationResult): Mutatio
   const defaults = state.layerDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE;
   const layers = result.project.scene.layers.map((layer) => {
     if (existingIds.has(layer.id)) return layer;
-    const sourceColor = sourceColorForOperation(result.project.scene.objects, layer) ?? layer.color;
-    const savedCnc = defaultSettingsForColor(defaults, sourceColor).cnc;
+    const savedCnc = defaultSettingsForOperation(defaults, result.project.scene.objects, layer).cnc;
     if (savedCnc === undefined) return layer;
     savedDefaultLayerIds.add(layer.id);
     // Image and trace mutations own structural settings such as mode and

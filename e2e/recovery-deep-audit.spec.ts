@@ -49,7 +49,7 @@ async function startHeld(page: Page, kerfdesk: KerfDeskFixture, status = IDLE): 
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
   const baselineLines = serialWriteLineCount(await kerfdesk.events());
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(
     page,
     kerfdesk,

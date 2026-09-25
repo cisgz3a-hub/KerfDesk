@@ -1,4 +1,5 @@
 import { boundedSplitRunwayLengths } from '../raster/raster-sweep-plan';
+import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { isEmittableFillSegment } from './fill-emission-resolution';
 import { effectiveFillOverscanMm } from './fill-overscan';
 import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
@@ -16,19 +17,24 @@ export type FillSweepPlan = {
   readonly runwayMotion: FillRunwayMotion;
 };
 
-/** Bounds a configured feed-matched runway to the shared split-gap threshold. */
+/**
+ * Bounds a configured feed-matched runway to the shared split-gap threshold.
+ * This is ADR-234's 4040-safe Scan Line entry length (ADR-239 contour entries
+ * reuse it), chosen to keep those runways within ADR-035's 5 mm blank-feed cap.
+ */
 export function feedMatchedFillRunwayMm(configuredMm: number): number {
   return Math.min(Math.max(0, configuredMm), FILL_GAP_RAPID_THRESHOLD_MM);
 }
 
 /**
  * Generic Scan Line never starts powered motion directly after a rapid.
- * A stored zero predates the universal-runway contract, so use the bounded
- * generic default instead of treating it as an opt-out.
+ * A stored zero predates the universal-runway contract, so use the generic
+ * default instead of treating it as an opt-out. A positive value applies in
+ * full: split sweeps already share their gap without overlap, and the 4040
+ * bound above is that profile's decision, not a geometric limit.
  */
 export function genericFeedMatchedFillRunwayMm(configuredMm: number): number {
-  const configuredRunwayMm = feedMatchedFillRunwayMm(configuredMm);
-  return configuredRunwayMm > 0 ? configuredRunwayMm : FILL_GAP_RAPID_THRESHOLD_MM;
+  return Number.isFinite(configuredMm) && configuredMm > 0 ? configuredMm : DEFAULT_OVERSCAN_MM;
 }
 
 /**

@@ -4,8 +4,12 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
   const align = ALIGN_COMMANDS.map((spec) =>
     ctx.canAlignSelection
       ? enabled(spec.id, 'arrange', spec.label, spec.title, () => ctx.alignSelection(spec.kind))
-      : disabled(spec.id, 'arrange', spec.label, 'Select at least two objects to align.', () =>
-          ctx.alignSelection(spec.kind),
+      : disabled(
+          spec.id,
+          'arrange',
+          spec.label,
+          'Select at least two objects or groups to align.',
+          () => ctx.alignSelection(spec.kind),
         ),
   );
   const distribute = DISTRIBUTE_COMMANDS.map((spec) =>
@@ -17,7 +21,7 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
           spec.id,
           'arrange',
           spec.label,
-          'Select at least three objects to distribute.',
+          'Select at least three objects or groups to distribute.',
           () => ctx.distributeSelection(spec.kind),
         ),
   );

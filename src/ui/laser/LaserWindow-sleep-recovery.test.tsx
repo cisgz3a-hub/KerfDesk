@@ -65,7 +65,7 @@ describe('LaserWindow Sleep recovery', () => {
 
       expect(host.textContent).toContain('Controller is asleep');
       expect(host.textContent).toContain('Wake (Ctrl-X)');
-      expect(button(host, 'Set up & Frame').disabled).toBe(false);
+      expect(button(host, 'Start').disabled).toBe(true);
       expect(button(host, 'Frame job').disabled).toBe(true);
 
       await act(async () => {

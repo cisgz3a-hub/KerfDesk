@@ -165,7 +165,8 @@ describe('CncToolPicture', () => {
   it('does not load the catalog pictures until a family is expanded', async () => {
     const onAdd = vi.fn();
     await act(async () => root.render(<CncBitCatalogPanel customTools={[]} onAdd={onAdd} />));
-    expect(host.querySelectorAll('[data-cnc-tool-picture]')).toHaveLength(13);
+    expect(host.querySelectorAll('[data-cnc-tool-picture]')).toHaveLength(14);
+    expect(host.querySelector('[data-cnc-tool-picture="bit-tapered-ball-nose"]')).not.toBeNull();
     expect(host.querySelector('img')).toBeNull();
     const oBall = host.querySelector(
       '[data-cnc-tool-picture="bit-o-flute-ball-nose"]',

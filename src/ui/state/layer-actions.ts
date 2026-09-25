@@ -19,7 +19,7 @@ import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
-import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
+import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
@@ -156,11 +156,13 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
       const normalized = normalizeLayerColor(color);
       if (normalized === null) return {};
       if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
-      const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
-      const base = applyLayerDefaultSettings(
-        createLayer({ id: normalized, color: normalized }),
-        defaults,
+      const created = createLayer({ id: normalized, color: normalized });
+      const defaults = defaultSettingsForOperation(
+        state.layerDefaults,
+        state.project.scene.objects,
+        created,
       );
+      const base = applyLayerDefaultSettings(created, defaults);
       const machine = state.project.machine;
       const layer =
         machine?.kind === 'cnc' && defaults.cnc === undefined

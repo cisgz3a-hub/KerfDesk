@@ -41,6 +41,7 @@ import {
   selectionHasUnlockedVectorObject,
   selectionHasVectorObject,
   selectionTouchesGroup,
+  selectionUnitCount,
 } from './selection-command-state';
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 
@@ -101,6 +102,7 @@ function appCommandContext(
 ): AppCommandContext {
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
+  const arrangeUnits = selectionUnitCount(app.project, selectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
   const selection = { selected, selectedIds, imageMaskPair };
   const hasMaskedRasterSelection =
@@ -157,8 +159,8 @@ function appCommandContext(
     canLockSelection: selectionHasUnlockedObject(app.project, selectedIds),
     hasLockedObjects: app.project.scene.objects.some((object) => object.locked === true),
     canTransformSelection: selected !== null,
-    canAlignSelection: selectedIds.length >= 2,
-    canDistributeSelection: selectedIds.length >= 3,
+    canAlignSelection: arrangeUnits >= 2,
+    canDistributeSelection: arrangeUnits >= 3,
     canBreakApartSelection: selectionCanBreakApart(app.project, selectedIds),
     focusTestAvailable:
       profileSupportsCapability(app.project.device, 'z-axis') &&

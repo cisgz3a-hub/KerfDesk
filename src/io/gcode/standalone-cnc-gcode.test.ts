@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from '../../core/preflight';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { emitStandaloneCncGcode } from './standalone-cnc-gcode';
@@ -36,7 +37,9 @@ describe('emitStandaloneCncGcode', () => {
     expect(result.preflight).toEqual({ ok: true, issues: [] });
     expect(result.gcode).toContain('; KerfDesk\n; version: 1.2.3');
     expect(result.gcode).toContain('; emitter: surfacing-test');
-    expect(result.gcode).toContain(`; profile-name: ${cncProject().device.name}`);
+    expect(result.gcode).toContain(
+      `; profile-name: ${sanitizeGcodeCommentValue(cncProject().device.name)}`,
+    );
     expect(result.gcode).toContain(`; profile-id: ${cncProject().device.profileId}`);
     expect(result.gcode).toContain('; assumes: GRBL $30=12000');
     expect(result.gcode.indexOf('G0 Z3.810')).toBeLessThan(result.gcode.indexOf('M3 S12000'));

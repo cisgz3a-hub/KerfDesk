@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
-/** The button whose attempt was refused. Start with no permit runs the Frame,
- * so a refusal raised while framing reads as a Frame refusal. */
+/** The button whose attempt was refused. Frame job and Start are separate
+ * buttons, and Start never runs a Frame, so the notice names the one pressed. */
 export type BlockedAttempt = 'start' | 'frame';
 
 type StartBlockerState = {

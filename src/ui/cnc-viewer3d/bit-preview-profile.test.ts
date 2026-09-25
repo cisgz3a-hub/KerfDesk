@@ -65,6 +65,23 @@ describe('bitPreviewProfile', () => {
     },
   );
 
+  it('models a tapered ball nose only with its ball tip and taper', () => {
+    const taperedBall: CncTool = {
+      id: 'tbn',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    };
+    expect(bitPreviewProfile(taperedBall)).toEqual(toolProfile(taperedBall));
+    expect(() => bitPreviewProfile({ ...taperedBall, tipDiameterMm: 6.25 })).toThrow(
+      /ball tip diameter above 0 and under 6.25 mm/,
+    );
+    const { tipAngleDeg: _angle, ...noAngle } = taperedBall;
+    expect(() => bitPreviewProfile(noAngle)).toThrow(/included taper angle is required/);
+  });
+
   // An engraving bit is a truncated cone. Once CncTool could carry the tip land
   // (tipDiameterMm) the envelope became modelable, so the refusal narrowed from
   // "every engraving bit" to "one whose included angle is unknown".

@@ -11,6 +11,7 @@ import { parseDxfOffThread, type ImportWorkerRequestOptions } from '../import/im
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
+import { describeImportBedFit } from './import-bed-fit-notice';
 import { describeReimportOutcome } from './import-toasts';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { claimImportSuccessIndex } from './import-success-index';
@@ -62,6 +63,8 @@ export async function importDxfFiles(
         continue;
       }
       ctx.pushToast(successMessage(file.name, result.pathCount, result.skippedSummary), 'success');
+      const fitNotice = describeImportBedFit(file.name, outcome);
+      if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
     } catch (err) {
       ctx.pushToast(
         isImportCancellation(err)

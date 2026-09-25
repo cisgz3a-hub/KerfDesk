@@ -156,7 +156,8 @@ function hasDefaultHandlers(
   return (
     props.onMakeDefault !== undefined &&
     props.onMakeDefaultForAll !== undefined &&
-    props.onResetToDefault !== undefined
+    props.onResetToDefault !== undefined &&
+    props.makeDefaultColor !== undefined
   );
 }
 

@@ -130,6 +130,30 @@ describe('useAppCommands store subscriptions', () => {
     act(() => useStore.setState({ additionalSelectedIds: new Set() }));
     expect(latest.find((command) => command.id === 'tools.union-silhouette')?.enabled).toBe(true);
   });
+
+  it('counts a selected group as one object for Align and Distribute', () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: ['a', 'b', 'c'].map((id) => repairArtwork(id, [repairRectangle(0, 0, 10, 10)])),
+          layers: [createLayer({ id: 'cut', color: '#000000' })],
+          groups: [{ id: 'group', name: 'Group 1', objectIds: ['a', 'b'] }],
+        },
+      },
+      selectedObjectId: 'a',
+      additionalSelectedIds: new Set(['b']),
+    }));
+    render();
+    const enabled = (id: string): boolean | undefined =>
+      latest.find((command) => command.id === id)?.enabled;
+    expect(enabled('arrange.align-left')).toBe(false);
+
+    act(() => useStore.setState({ additionalSelectedIds: new Set(['b', 'c']) }));
+    expect(enabled('arrange.align-left')).toBe(true);
+    expect(enabled('arrange.distribute-horizontal-centers')).toBe(false);
+  });
 });
 
 function Probe(): null {

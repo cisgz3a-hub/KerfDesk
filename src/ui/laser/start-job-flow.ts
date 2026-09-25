@@ -50,8 +50,7 @@ import {
   FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE,
   reviewFramedRunForStart,
 } from './framed-run-start-review';
-import { runFrameNow } from './use-frame-action';
-import { frameExpiryRestartMessage, takeFrameExpiryReason } from './frame-expiry-note';
+import { frameExpiredStartMessage, frameExpiryReason } from './frame-expiry-note';
 import {
   claimCurrentFramedRunStart,
   releaseFramedRunStartClaim,
@@ -61,9 +60,8 @@ import {
 export async function runStartJobFlow(
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  // Start with no permit prepares and Frames the job, so a repeat press joins
-  // that one preparation through runFrameNow. A permitted Start keeps its own
-  // single-owner permit claim (start-job-authorization) and is not coalesced.
+  // A permitted Start keeps its own single-owner permit claim
+  // (start-job-authorization) and is not coalesced.
   await runFreshFramedJobFlow(repository);
 }
 
@@ -71,18 +69,20 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
   clearStartBlockers();
   const permit = useLaserStore.getState().framedRun;
   const issue = framedRunReadinessIssue(permit);
-  const expiredBecause = takeFrameExpiryReason();
   if (issue !== null) {
-    if (permit !== null) {
-      useLaserStore.setState({ framedRun: null, frameVerification: null });
-      useToastStore.getState().pushToast(issue, 'warning');
-    } else if (expiredBecause !== null) {
-      useToastStore.getState().pushToast(frameExpiryRestartMessage(expiredBecause), 'warning');
-    }
-    // Start is the primary action: with no current permit it launches the same
-    // dialog-free prepare/Frame flow as the Frame button. A successful trace
-    // arms the exact job; pressing Start again opens the one Job Review.
-    await runFrameNow();
+    // Start is disabled until a clean Frame of this exact job completes; only
+    // the keyboard shortcut or a permit expiring under the click reaches here.
+    // Frame is the operator's own step, so Start says so instead of framing.
+    if (permit !== null) useLaserStore.setState({ framedRun: null, frameVerification: null });
+    const expiredBecause = frameExpiryReason();
+    useToastStore
+      .getState()
+      .pushToast(
+        permit === null && expiredBecause !== null
+          ? frameExpiredStartMessage(expiredBecause)
+          : issue,
+        'warning',
+      );
     return;
   }
   if (permit === null) return;

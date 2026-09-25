@@ -121,7 +121,7 @@ describe('CNC toolpath represented Z', () => {
       '-0.026',
       '-0.051',
     ]);
-    expect(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE)).toContain('Z-0.026 I-5.000 J0.000');
+    expect(cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE)).toContain('Z-0.026 I5.000 J0.000');
   });
 
   it('does not parse an ordinary plunge twice at a non-idempotent GRBL float boundary', () => {
@@ -193,8 +193,8 @@ describe('CNC toolpath represented Z', () => {
         : [],
     );
 
-    expect(gcode).toContain('Z-6553.605 I-5.000 J0.000');
-    expect(gcode).toContain('Z-6553.606 I-5.000 J0.000');
+    expect(gcode).toContain('Z-6553.605 I5.000 J0.000');
+    expect(gcode).toContain('Z-6553.606 I5.000 J0.000');
     expect(seamDepths).toEqual([
       parseGrblCncCoordinate('-6553.604'),
       parseGrblCncCoordinate('-6553.605'),

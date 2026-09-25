@@ -3,6 +3,7 @@
 export {
   cncHelicalContourCanEmit,
   cncHelicalContourPoints,
+  cncHelicalContourRepresentedMidSeams,
   cncHelicalContourRepresentedSeams,
   cncHelicalContourRepresentedSeamZs,
 } from '../cnc-helical-representation';

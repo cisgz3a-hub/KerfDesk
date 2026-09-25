@@ -6,7 +6,9 @@
 // 3. Walk every geometry-bearing element (shape-to-polylines.ts) in document
 //    order — deterministic for snapshot tests.
 // 4. Attribute each element to stroke color, falling back to visible fill
-//    color for fill-only logo artwork. Elements with neither are skipped.
+//    color for fill-only logo artwork. Colors cascade from presentation
+//    attributes, <style> rules and the style attribute; an unset fill is
+//    SVG's initial black. Elements that paint neither are skipped.
 // 5. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
 
 import {
@@ -36,6 +38,7 @@ import {
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
 import { inheritedSvgFillRule } from './svg-fill-rule';
+import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
 
 export { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
@@ -152,6 +155,7 @@ type WalkContext = {
   readonly counts: { text: number; image: number };
   readonly budget: SvgImportBudget;
   readonly resolveId: SvgIdResolver;
+  readonly cascadeStyles: SvgStyleCascade;
 };
 
 function walkGeometry(
@@ -161,10 +165,12 @@ function walkGeometry(
 ): void {
   // The unit scale seeds the transform stack root so every element's
   // geometry lands in mm (H9), composing with element/group transforms.
-  const rootState = presentationStateFor(svgEl, {
-    ...INITIAL_PRESENTATION_STATE,
-    transform: { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 },
-  });
+  const transform = { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 };
+  const rootState = presentationStateFor(
+    svgEl,
+    { ...INITIAL_PRESENTATION_STATE, transform },
+    context.cascadeStyles,
+  );
   for (const child of Array.from(svgEl.children)) {
     walkElement(child, rootState, context, 0);
   }
@@ -176,6 +182,12 @@ function walkGeometry(
 // SVG's nesting depth (security audit 2026-06-14).
 const MAX_WALK_DEPTH = 256;
 
+// Containers whose children never render in place: definitions paint only
+// through <use>, and clip paths, masks, markers and patterns only through the
+// property that references them. Walked as artwork, an unstyled clip rectangle
+// would import with SVG's initial black fill.
+const NEVER_RENDERED = new Set(['defs', 'symbol', 'clippath', 'mask', 'marker', 'pattern']);
+
 function walkElement(
   el: Element,
   parent: PresentationState,
@@ -183,13 +195,13 @@ function walkElement(
   depth: number,
 ): void {
   if (depth > MAX_WALK_DEPTH) return;
-  const state = presentationStateFor(el, parent);
+  const state = presentationStateFor(el, parent, context.cascadeStyles);
   const tag = el.tagName.toLowerCase();
   if (tag === 'text' || tag === 'tspan') {
     context.counts.text += 1;
   } else if (tag === 'image') {
     context.counts.image += 1;
-  } else if (tag === 'defs' || tag === 'symbol') {
+  } else if (NEVER_RENDERED.has(tag)) {
     return;
   } else if (tag === 'use' && !state.hidden) {
     appendUseGeometry(el, state, context, depth);
@@ -226,6 +238,13 @@ function appendUseGeometry(
   walkElement(referenced, placedState, context, depth + 1);
 }
 
+// SVG's initial fill is black, so a shape that nothing styles still paints and
+// imports exactly as an explicit fill="#000000" does. A <line> has no interior
+// and is never filled (SVG 1.1 §9.5), so it still needs a stroke.
+function initialFill(el: Element): string | null {
+  return el.tagName.toLowerCase() === 'line' ? null : '#000000';
+}
+
 function appendElementGeometry(el: Element, state: PresentationState, context: WalkContext): void {
   // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
   // the mm chord tolerance by this transform's distance stretch (audit C2).
@@ -233,7 +252,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
   if (subs.length === 0) return;
   const strokeColor = state.strokeOpacity > 0 ? normalizeColor(state.stroke) : '';
-  const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';
+  const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill ?? initialFill(el)) : '';
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
   // Explicit SVG rules apply to each element's compound path. Different
@@ -274,16 +293,21 @@ function walkReferencedDefinition(
   context: WalkContext,
   depth: number,
 ): void {
-  const state = presentationStateFor(el, parent);
+  const state = presentationStateFor(el, parent, context.cascadeStyles);
   for (const child of Array.from(el.children)) {
     walkElement(child, state, context, depth + 1);
   }
 }
 
-function presentationStateFor(el: Element, parent: PresentationState): PresentationState {
+function presentationStateFor(
+  el: Element,
+  parent: PresentationState,
+  cascadeStyles: SvgStyleCascade,
+): PresentationState {
   // Parsed once and passed down: each of the eight lookups below used to re-read
-  // and re-split the whole style attribute for the same element.
-  const styles = styleMap(el.getAttribute('style'));
+  // and re-split the whole style attribute for the same element. Matching
+  // <style> rules merge in here, so every lookup sees the winning declaration.
+  const styles = cascadeStyles(el, styleMap(el.getAttribute('style')));
   const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
   const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
   const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;
@@ -387,9 +411,10 @@ export function parseSvgDocument(
   const byColor = new Map<string, PathBucket>();
   const counts = { text: 0, image: 0 };
   const budget = createSvgImportBudget();
+  const cascadeStyles = createSvgStyleCascade(svgEl);
   walkGeometry(
     svgEl,
-    { byColor, counts, budget, resolveId: createSvgIdResolver(svgEl) },
+    { byColor, counts, budget, resolveId: createSvgIdResolver(svgEl), cascadeStyles },
     unitScale,
   );
 

@@ -30,6 +30,7 @@ import { duplicateSceneSelection } from './duplicate-scene-selection';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
+import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 
 export { positionTraceOverRasterSource } from './trace-placement';
@@ -41,7 +42,11 @@ export const HISTORY_DEPTH = 50;
 const MULTI_IMPORT_OFFSET_MM = 10;
 
 export type ImportOutcome =
-  | { readonly kind: 'added' }
+  | {
+      readonly kind: 'added';
+      // Present only when art larger than the bed was scaled down to fit it.
+      readonly bedFit?: BedFit;
+    }
   | {
       readonly kind: 'replaced';
       readonly source: string;
@@ -189,31 +194,26 @@ export function applyFreshImport(
   object: SceneObject,
   batchOffsetIdx: number,
 ): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
-  // Auto-fit ordinary artwork so a 1000 mm SVG dropped on a 400 mm bed does
-  // not disappear off the corner. An explicit depth map keeps its authored
-  // physical scale: the import toast and relief editor promise that width, so
-  // only center it and let Job Review/Frame disclose an over-bed outline.
-  const placementMode =
-    object.kind === 'relief' && object.reliefSource.kind === 'heightfield-v1'
-      ? 'center-only'
-      : 'fit';
-  const fitted = fitObjectToBed(
+  // Artwork arrives at its file size, centered. Shrinking art larger than the
+  // bed is applyImportBedFit's separate undo step, run by the store actions
+  // after they finish the new layers.
+  const centered = fitObjectToBed(
     object,
     s.project.device.bedWidth,
     s.project.device.bedHeight,
-    placementMode,
+    'center-only',
   );
   // Multi-import stagger (F-A3): shift Nth file by 10 mm × N right+down.
   const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
   let positioned: SceneObject =
     offset === 0
-      ? fitted
+      ? centered
       : {
-          ...fitted,
+          ...centered,
           transform: {
-            ...fitted.transform,
-            x: fitted.transform.x + offset,
-            y: fitted.transform.y + offset,
+            ...centered.transform,
+            x: centered.transform.x + offset,
+            y: centered.transform.y + offset,
           },
         };
   // Re-colour an imported raster onto a free/own image layer if its preferred

@@ -6,18 +6,52 @@ export const INTENTIONAL_LASER_OFF_MOTION_COMMENT = 'kerfdesk:laser-off-motion';
 const DEFAULT_MAX_COMMENT_VALUE_BYTES = 96;
 const TRUNCATION_SUFFIX = '...';
 
+// GRBL acts on every received byte above 0x7F as a realtime command before
+// the line is parsed, comments included (serial.c: "Real-time control
+// characters are extended ACSII only"). KerfDesk's streamer never sends
+// comment lines, but a saved file can be streamed by a sender that does, and
+// UTF-8 '×' carries 0x97 (rapid override 25%) while 'Ä' carries 0x84 (safety
+// door). Written comment values are therefore folded to printable ASCII.
+const ASCII_FOLDS: Readonly<Record<string, string>> = {
+  '×': 'x',
+  '°': 'deg',
+  '–': '-',
+  '—': '-',
+  '‘': "'",
+  '’': "'",
+  '′': "'",
+  '“': '"',
+  '”': '"',
+  '″': '"',
+  '…': '...',
+  µ: 'u',
+  μ: 'u',
+  '±': '+/-',
+  '½': '1/2',
+  '¼': '1/4',
+  '¾': '3/4',
+  ß: 'ss',
+  æ: 'ae',
+  Æ: 'AE',
+  ø: 'o',
+  Ø: 'O',
+  œ: 'oe',
+  Œ: 'OE',
+};
+const PRINTABLE_ASCII = /^[\x20-\x7e]*$/;
+const COMBINING_MARKS = /[\u0300-\u036f]/g;
+
 /**
- * Flatten an untrusted label into one G-code comment line and cap its UTF-8
- * size without splitting a code point. Controllers and third-party senders do
- * not all agree on comment-buffer limits, so emitted diagnostic labels stay
- * deliberately short.
+ * Flatten an untrusted label into one printable-ASCII G-code comment line and
+ * cap its size. Controllers and third-party senders do not all agree on
+ * comment-buffer limits, so emitted diagnostic labels stay deliberately short.
  */
 export function sanitizeGcodeCommentValue(
   value: string,
   maxUtf8Bytes: number = DEFAULT_MAX_COMMENT_VALUE_BYTES,
 ): string {
   const sanitized = Array.from(value, (char) =>
-    isGcodeCommentLineBreakOrControl(char) ? ' ' : char,
+    isGcodeCommentLineBreakOrControl(char) ? ' ' : asciiFold(char),
   )
     .join('')
     .trim();
@@ -34,6 +68,12 @@ export function sanitizeGcodeCommentValue(
     bytes += charBytes;
   }
   return `${result.trimEnd()}${suffix}`;
+}
+
+function asciiFold(char: string): string {
+  if (PRINTABLE_ASCII.test(char)) return char;
+  const folded = ASCII_FOLDS[char] ?? char.normalize('NFKD').replace(COMBINING_MARKS, '');
+  return folded.length > 0 && PRINTABLE_ASCII.test(folded) ? folded : '?';
 }
 
 function normalizedByteLimit(value: number): number {
