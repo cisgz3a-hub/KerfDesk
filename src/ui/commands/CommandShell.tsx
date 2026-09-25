@@ -27,6 +27,7 @@ import { runImagePickAction } from './image-pick-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
 import { pickPlatformImageFiles } from './platform-image-files';
+import { traceTargetPxPerMm } from '../trace/trace-commit-grid';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
@@ -323,8 +324,10 @@ async function pickAndRunMultiFileTrace(
     pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
     return;
   }
+  const { project } = useStore.getState();
   await runMultiFileTrace(files, pushToast, {
     write: (file) => writeTraceSvgFileWithPlatform(platform, file),
+    targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
   });
 }
 

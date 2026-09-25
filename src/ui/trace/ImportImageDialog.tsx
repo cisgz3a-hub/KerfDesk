@@ -29,6 +29,7 @@ import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
 import { useTracePreset } from './use-trace-preset';
 import { resolveTraceCommitResult } from './trace-commit-result';
+import { TraceCommitGridNote, traceCommitGridForClaim } from './trace-commit-grid-note';
 import {
   captureTraceCommitOwner,
   claimTraceCommitOwner,
@@ -259,6 +260,7 @@ function TracePreviewPanel(props: {
           disabled={props.submission.busy}
         />
       ) : null}
+      <TraceCommitGridNote preview={props.preview} source={props.seed} />
     </>
   );
 }
@@ -372,6 +374,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     const result = await resolveTraceCommitResult({
       ...args,
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
+      commitGrid: traceCommitGridForClaim(ctx.claimOwner()),
       signal: ctx.signal,
     });
     const owner = ctx.claimOwner();

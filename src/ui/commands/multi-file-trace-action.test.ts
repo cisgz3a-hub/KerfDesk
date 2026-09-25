@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
-import { TRACE_PRESETS, type RawImageData } from '../../core/trace';
+import { TRACE_PRESETS, type RawImageData, type TraceOptions } from '../../core/trace';
 import {
   buildMultiFileTraceExports,
   runMultiFileTrace,
   type MultiFileTraceFile,
   writeTraceSvgFileWithPlatform,
 } from './multi-file-trace-action';
+import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
+import {
+  planTraceCommitGridFor,
+  traceCommitPixelBudget,
+  traceOptionsForCommitGrid,
+} from '../trace/trace-commit-grid';
 
 const SQUARE_PATH: ColoredPath = {
   color: '#000000',
@@ -101,6 +107,58 @@ describe('buildMultiFileTraceExports', () => {
 
     expect(loadImage).toHaveBeenCalledTimes(2);
     expect(files.map((file) => file.filename)).toEqual(['oversized-trace.svg', 'small-trace.svg']);
+  });
+
+  it('decodes each file on the commit working-grid policy, one at a time (ADR-401)', async () => {
+    const natural = { width: 6000, height: 4000 };
+    const events: string[] = [];
+    const loadImage = vi.fn(async (file: MultiFileTraceFile, maxEdge?: number) => {
+      events.push(`load ${file.name}`);
+      const grid = scaleToCap(natural.width, natural.height, maxEdge ?? PREVIEW_MAX_EDGE_PX);
+      return rawImage(grid.width, grid.height);
+    });
+    const trace = vi.fn(async (image: RawImageData, _options: TraceOptions) => {
+      events.push(`trace ${image.width}`);
+      return [SQUARE_PATH];
+    });
+    const files = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
+      loadImage,
+      readNaturalSize: async () => natural,
+      trace,
+      targetPxPerMm: 20,
+      deviceMemoryGb: 8,
+    });
+
+    // The same plan a dialog commit makes for this source at its import size.
+    const size = { width: (6000 / 254) * 25.4, height: (4000 / 254) * 25.4 };
+    const plan = planTraceCommitGridFor(
+      natural,
+      { outputMm: size, targetPxPerMm: 20, deviceMemoryGb: 8 },
+      TRACE_PRESETS['Line Art']!,
+    );
+    expect(plan?.limit).toBe('memory');
+    expect(loadImage).toHaveBeenNthCalledWith(1, namedFile('a.png'), plan?.maxEdge);
+    expect(plan!.grid.width * plan!.grid.height).toBeLessThanOrEqual(
+      traceCommitPixelBudget(TRACE_PRESETS['Line Art']!, 8),
+    );
+    // Options keep their preview-grid meaning on the finer grid.
+    const ratio = plan!.grid.width / plan!.preview.width;
+    expect(trace.mock.calls[0]?.[1]).toEqual(
+      traceOptionsForCommitGrid(TRACE_PRESETS['Line Art']!, plan!),
+    );
+    expect(trace.mock.calls[0]?.[1]?.despeckleMinPixels).toBeCloseTo(
+      (TRACE_PRESETS['Line Art']!.despeckleMinPixels ?? 0) * ratio * ratio,
+      9,
+    );
+    // Each large decode is made on its turn, not all up front.
+    expect(events).toEqual([
+      'load a.png',
+      `trace ${plan!.grid.width}`,
+      'load b.png',
+      `trace ${plan!.grid.width}`,
+    ]);
+    // The physical size is the import size, whatever grid was traced.
+    expect(files[0]?.svg).toContain('width="600mm"');
   });
 });
 

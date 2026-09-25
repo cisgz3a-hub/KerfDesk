@@ -10,7 +10,9 @@ export type BatchTracePhysicalSize = {
 
 export type BatchTraceImageJob = {
   readonly sourceName: string;
-  readonly image: RawImageData;
+  // A decoded image, or a loader called on this job's turn so a batch of large
+  // images holds one decoded image at a time (ADR-401).
+  readonly image: RawImageData | (() => Promise<RawImageData>);
   readonly physicalSizeMm?: BatchTracePhysicalSize;
   readonly options?: TraceOptions;
 };
@@ -39,14 +41,15 @@ export async function traceImagesToSvgFiles(
   const files: BatchTraceSvgFile[] = [];
   for (const job of jobs) {
     const options = job.options ?? DEFAULT_TRACE_OPTIONS;
-    const paths = await trace(job.image, options);
+    const image = typeof job.image === 'function' ? await job.image() : job.image;
+    const paths = await trace(image, options);
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
     files.push({
       filename: `${stem}-trace.svg`,
       svg: coloredPathsToSvg(
         paths,
-        job.image.width,
-        job.image.height,
+        image.width,
+        image.height,
         job.physicalSizeMm,
         options.traceMode,
       ),
