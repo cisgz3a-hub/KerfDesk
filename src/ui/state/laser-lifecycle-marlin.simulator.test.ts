@@ -180,7 +180,8 @@ describe('Marlin lifecycle against the simulator', () => {
     await pump(100);
     expect(sim.state().laserMode).toBe('continuous');
     expect(useLaserStore.getState().streamer).not.toBeNull();
-    await pump(4000);
+    // Five moves of 1 s run one after another, then the M400 settle.
+    await pump(7000);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state().inlineBurnPowers).toEqual([64]);
     expect(sim.state().laserMode).toBe('standard');
@@ -205,15 +206,15 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(sim.state().pos.x).toBe(39);
   });
 
-  it('stops with beam-off lines instead of a soft-reset byte', async () => {
+  it('stops with the M107 / M410 / M5 I quickstop instead of a soft-reset byte', async () => {
     const sim = await connectMarlinIdle();
     await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
     await pump(20);
+    const before = sim.outbound().length;
     await useLaserStore.getState().stopJob();
     await pump(50);
     expect(sim.outbound()).not.toContain('\x18');
-    expect(sim.outbound()).toContain('M5 I\n');
-    expect(sim.outbound()).toContain('M107\n');
+    expect(sim.outbound().slice(before)).toEqual(['M107\n', 'M410\n', 'M5 I\n']);
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
 
@@ -308,19 +309,36 @@ describe('Marlin lifecycle against the simulator', () => {
     });
   });
 
-  it('treats a text Error: as terminal, fires beam-off cleanup, auto-releases at Idle', async () => {
-    const sim = await connectMarlinIdle({
-      rejectLines: [{ pattern: /X13\b/, error: 'Unknown command' }],
-    });
-    await startTestLaserJob(jobLines(30), { streamingMode: 'ping-pong' });
+  // Marlin answers a command its build lacks with `echo:Unknown command: "M8"`
+  // and then `ok` (gcode.cpp L1101-L1122), never a terminal `Error:` (MA-12).
+  it('stops a job whose line the build skipped, quick-stops, and auto-releases at Idle', async () => {
+    const sim = await connectMarlinIdle({ build: { airAssist: false } });
+    const job = `M8\n${jobLines(30)}`;
+    await startTestLaserJob(job, { streamingMode: 'ping-pong' });
     await pump(50);
-    expect(useLaserStore.getState().safetyNotice).not.toBeNull();
-    expect(sim.outbound()).toContain('M107\n');
+    const notice = useLaserStore.getState().safetyNotice;
+    expect(notice).toMatchObject({ kind: 'controller-error', rejectedLine: 'M8' });
+    expect(notice?.message).toContain('AIR_ASSIST');
+    expect(sim.outbound().filter((write) => write.startsWith('G1 '))).toEqual([]);
+    expect(sim.outbound()).toEqual(expect.arrayContaining(['M107\n', 'M410\n', 'M5 I\n']));
     expect(sim.outbound()).not.toContain('\x18');
     // With no alarm state on Marlin, the errored stream releases at the next
     // Idle report from the resumed M114 polls — no manual unlock step exists.
-    await pump(600);
+    // M410's own `ok` follows its one-second quickstop window.
+    await pump(2_000);
     expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it('keeps a handler Error: and the ok Marlin sends after it on one line', async () => {
+    const sim = await connectMarlinIdle({
+      rejectLines: [{ pattern: /X13\b/, error: 'G2/G3 bad parameters' }],
+    });
+    await startTestLaserJob(jobLines(30), { streamingMode: 'ping-pong' });
+    await pump(50);
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({ kind: 'controller-error' });
+    expect(sim.outbound()).not.toContain('G1 X14 Y1 F600 S200\n');
+    await pump(2_000);
+    expect(useLaserStore.getState()).toMatchObject({ streamer: null, pendingUntrackedAcks: 0 });
   });
 
   it('owns console M115 without treating its firmware identity as a reboot', async () => {

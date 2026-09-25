@@ -49,6 +49,10 @@ export type ControllerCapabilities = {
   // `!` / `~` realtime feed hold. false ⇒ pause is stream-side only (stop
   // sending; buffered motion drains) and the UI must say so.
   readonly realtimePause: boolean;
+  // Stream-side pause also queues a beam-off behind the buffered motion, and
+  // Resume switches the beam back on in the program's own commands (Marlin,
+  // driver.planStreamPauseBeam). Absent means false.
+  readonly streamPauseBeamOff?: boolean;
   // Realtime soft reset / abort byte exists (GRBL \x18).
   readonly softStop: boolean;
   readonly statusQuery: StatusQueryCapability;

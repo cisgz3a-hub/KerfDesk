@@ -4,7 +4,7 @@ import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state';
-import { describeStreamHold, type StreamHold } from '../state/laser-stream-hold';
+import { describeStreamHold, streamHoldHeading, type StreamHold } from '../state/laser-stream-hold';
 import { isActiveJobStatus, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
 import {
   streamProgressPercent,
@@ -94,6 +94,9 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const resumeJob = useLaserStore((state) => state.resumeJob);
   const continueToolChange = useLaserStore((state) => state.continueToolChange);
   const hasRealtimePause = useLaserStore((state) => state.capabilities.realtimePause);
+  const streamPauseBeamOff = useLaserStore(
+    (state) => state.capabilities.streamPauseBeamOff === true,
+  );
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
@@ -113,7 +116,7 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     return (
       <LiveMotionActionButton
         label="Pause"
-        title={pauseControlMessage(machineKind, hasRealtimePause)}
+        title={pauseControlMessage(machineKind, hasRealtimePause, streamPauseBeamOff)}
         onClick={pauseJob}
       />
     );
@@ -122,7 +125,7 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     return (
       <LiveMotionActionButton
         label="Resume"
-        title={resumeControlTitle(resumeAdvisory, hasRealtimePause)}
+        title={resumeControlTitle(resumeAdvisory, hasRealtimePause, streamPauseBeamOff)}
         onClick={resumeJob}
       />
     );
@@ -244,7 +247,7 @@ function streamHoldDescription(
 ): { readonly heading: string; readonly detail: string } | null {
   if (streamHold === null || streamProgress.status !== 'streaming') return null;
   return {
-    heading: 'CONTROLLER HOLDING PROGRAM',
+    heading: streamHoldHeading(streamHold),
     detail: describeStreamHold(streamHold, falconAirTimerHint),
   };
 }

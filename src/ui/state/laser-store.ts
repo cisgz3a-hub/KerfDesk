@@ -324,6 +324,8 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
+  /** Last Marlin busy keepalive; restarts the ack watchdog (MA-9). */
+  controllerBusyAt?: number | null;
 } & TranscriptBufferRefs &
   ResetCleanupRefs &
   ResetAlarmRefs &
@@ -518,7 +520,7 @@ export const useLaserStore = create<LaserState>((set, get) => {
       set,
       get,
       refs,
-      (line, action) => safeWrite(set, get, line, action),
+      (line, action, source) => safeWrite(set, get, line, action, source),
       () => refs.driver,
     ),
     ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),

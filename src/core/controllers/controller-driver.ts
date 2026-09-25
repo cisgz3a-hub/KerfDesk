@@ -52,6 +52,12 @@ export type ControllerCommands = {
   /** Best-effort de-energize lines written after a job Abort
    *  (GRBL: ['M9']; Marlin: ['M5', 'M107']). No trailing newlines. */
   readonly stopLaserLines: ReadonlyArray<string>;
+  /** A controller without a realtime reset stops with these ordinary lines,
+   *  written in this order wherever a realtime reset would be sent (Abort,
+   *  ABORT MOTION, the stop after a stream error, Disconnect with a job
+   *  running). Each owes an acknowledgement. Absent: the driver's stop is its
+   *  realtime softReset, or it has no stop but stopLaserLines. No newlines. */
+  readonly quickStopLines?: ReadonlyArray<string>;
   /** Queued tool-off lines dispatched and acknowledged before any Frame motion.
    *  These must explicitly de-energize every driver-owned cutting accessory;
    *  unlike stopLaserLines, callers cannot rely on a preceding soft reset. */
@@ -91,6 +97,17 @@ export type ConsoleSettingWrite = {
   readonly meaning: string;
 };
 
+/** What a stream-side Pause (no realtime hold) must do about the beam the
+ * lines already sent left on. `offLines` are queued behind the buffered motion
+ * at Pause. At Resume, `restoreLines` are sent before the stream refills, and
+ * `restatedLine` replaces the queued line at `queueIndex + offset` (the next
+ * burn move, given the power the program held). No trailing newlines. */
+export type StreamPauseBeamPlan = {
+  readonly offLines: ReadonlyArray<string>;
+  readonly restoreLines: ReadonlyArray<string>;
+  readonly restatedLine: { readonly offset: number; readonly line: string } | null;
+};
+
 export type ControllerDriver = {
   readonly kind: ControllerKind;
   readonly commandSet?: ControllerCommandSet;
@@ -110,4 +127,11 @@ export type ControllerDriver = {
   /** True when a write payload contains setup-only lines that must be blocked
    *  while a job is active (GRBL: any `$` line). */
   readonly isSetupOnlyPayload: (payload: string) => boolean;
+  /** Stream-side Pause beam handling, from the job's stream lines (each
+   *  newline-terminated) and the index of the first unsent one. Absent: Pause
+   *  only stops sending. */
+  readonly planStreamPauseBeam?: (
+    streamLines: ReadonlyArray<string>,
+    queueIndex: number,
+  ) => StreamPauseBeamPlan;
 };

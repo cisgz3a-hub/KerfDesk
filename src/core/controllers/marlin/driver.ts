@@ -1,8 +1,8 @@
 // Marlin ControllerDriver (ADR-095 kickoff). The deepest divergence from the
 // GRBL family: NO realtime bytes exist, so pause is stream-side (buffered
-// motion drains), stop is stop-sending + beam-off lines, status is a queued
-// M114 polled only while nothing is streaming, and settings are read-only
-// text (exposed via console M503, not the settings panel).
+// motion drains, then a queued beam-off), stop is the M107 / M410 / M5 I
+// quickstop sequence, status is a queued M114 polled only while nothing is
+// streaming, and settings are read-only text (console M503, not the panel).
 
 import type { ControllerDriver } from '../controller-driver';
 import {
@@ -15,10 +15,13 @@ import {
   MARLIN_CMD_SETTLE,
   MARLIN_CMD_SETTINGS_DUMP,
   MARLIN_CMD_TEMPERATURES,
+  MARLIN_HALT_RECOVERY,
+  MARLIN_QUICK_STOP_LINES,
   MARLIN_STOP_LASER_LINES,
 } from './commands';
 import { prepareMarlinConsoleCommand } from './console-command';
 import { classifyMarlinResponse } from './response';
+import { planMarlinStreamPauseBeam } from './stream-pause-beam';
 
 export const MARLIN_DEFAULT_BAUD_RATE = 250000;
 
@@ -32,6 +35,7 @@ export const marlinDriver: ControllerDriver = {
     jog: 'gcode-relative',
     jogCancel: false,
     realtimePause: false,
+    streamPauseBeamOff: true,
     softStop: false,
     statusQuery: 'queued-poll',
     settings: 'none',
@@ -68,6 +72,9 @@ export const marlinDriver: ControllerDriver = {
     offsetsQuery: null,
     queuedStatusQuery: MARLIN_CMD_POSITION,
     stopLaserLines: MARLIN_STOP_LASER_LINES,
+    quickStopLines: MARLIN_QUICK_STOP_LINES,
+    // The Frame's tool-off prefix stays M5 I + M107: M410 would drop nothing
+    // before a Frame and would cost the position certainty a quickstop costs.
     frameToolOffLines: MARLIN_STOP_LASER_LINES,
     settleDwell: MARLIN_CMD_SETTLE,
     setOriginHere: 'G92 X0 Y0',
@@ -92,10 +99,11 @@ export const marlinDriver: ControllerDriver = {
     {
       label: MARLIN_CMD_EMERGENCY_STOP,
       command: MARLIN_CMD_EMERGENCY_STOP,
-      hint: 'EMERGENCY STOP (halts firmware; reconnect required)',
+      hint: `EMERGENCY STOP (halts the firmware; ${MARLIN_HALT_RECOVERY})`,
     },
   ],
   // M500/M502 persist firmware state; block them inside streamed payloads the
   // same way GRBL blocks $-lines mid-job.
   isSetupOnlyPayload: (payload) => /(^|\n)\s*M50[02]\b/i.test(payload),
+  planStreamPauseBeam: planMarlinStreamPauseBeam,
 };

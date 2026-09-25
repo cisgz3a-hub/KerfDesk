@@ -11,6 +11,7 @@ import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import { airOffLines, noResetStopLines } from './laser-quick-stop';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
@@ -216,26 +217,30 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   return null;
 }
 
+// A running job gets the driver's stop: the realtime reset, or on a controller
+// without one its quickstop lines (Marlin M107, M410, M5 I; MA-7). Air assist
+// that may be on gets M9 when the stop lines do not already send it (CG-10).
 export function disconnectStopCommands(
   state: LaserState,
   driver: ControllerDriver,
 ): ReadonlyArray<string> {
   const fireOff = state.fireActive ? ['M5\n'] : [];
+  const softReset = driver.realtime.softReset;
   if (isActiveJob(state.streamer) || state.controllerOperation?.kind === 'probe') {
-    const softReset = driver.realtime.softReset;
-    return [
-      ...(softReset === null ? [] : [softReset]),
-      ...fireOff,
-      ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
-    ];
+    return softReset === null
+      ? [...fireOff, ...noResetStopLines(driver, state)]
+      : [softReset, ...fireOff, ...terminated(driver.commands.stopLaserLines)];
   }
-  if (state.fireActive) {
-    return [...fireOff, ...driver.commands.stopLaserLines.map((line) => `${line}\n`)];
-  }
-  if (state.airAssistOn) return driver.commands.stopLaserLines.map((line) => `${line}\n`);
+  const beamOff = terminated([...driver.commands.stopLaserLines, ...airOffLines(driver, state)]);
+  if (state.fireActive) return [...fireOff, ...beamOff];
+  if (state.airAssistOn) return beamOff;
   if (state.motionOperation === null) return [];
   const jogCancel = driver.realtime.jogCancel;
   return jogCancel === null ? [] : [jogCancel];
+}
+
+function terminated(lines: ReadonlyArray<string>): ReadonlyArray<string> {
+  return lines.map((line) => `${line}\n`);
 }
 
 export function assertAutofocusIdle(state: LaserState): void {
