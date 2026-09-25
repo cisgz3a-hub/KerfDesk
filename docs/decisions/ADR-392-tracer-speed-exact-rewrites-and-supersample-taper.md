@@ -50,15 +50,24 @@ Profiles of the base (`claude/tracer-lead-potrace`, fa8939b8d) put the time in:
 2. **A corner-rebuild budget per trace.** Attempts are capped at max(32,768, 0.1 x working pixels).
    It is a worst-case bound for colour noise thresholded into meandering outlines (measured 0.12 to
    0.14 attempts per pixel); traced art stays far inside it (owl 0.043 per pixel at most, hummingbird
-   0.033, every perceptual fixture 0.025 or less), so no fixture reaches it. Once spent, remaining
-   rings keep their dense geometry. A per-loop noise gate was rejected: owl rings with 65-89% of
+   0.033, every perceptual fixture 0.025 or less), so no fixture reaches it. Uniform RGB noise does:
+   from about 240² up (measured at 240², 280², 320², 700² and 1024² in Line Art) the budget runs out
+   and the output differs from an uncapped trace; 192² noise stays inside the 32,768 floor. Once
+   spent, remaining rings keep their dense geometry. A per-loop noise gate was rejected: owl rings with 65-89% of
    vertices past the quick turn gate carry 52-109 genuine rebuilt corners each.
-3. **A supersample taper at the budget edge.** Where the 2x grid would fill between 75% and 100% of
-   the budget (sources 1060²-1224² for the outline presets, 866²-1000² for Edge Detection and
-   Centerline), the factor eases from 2 to sqrt(1.2) so working pixels fall linearly from 4x to 1.2x
-   of the source, on a rounded bilinear grid (`upscaleToWorkingGrid`), mapped back per axis. The
-   support restoration of ADR-128 follows the rounded grid, and the pinhole radius cap rounds up to
-   whole pixels (both reduce to the old arithmetic on integer grids).
+3. **A supersample taper at the budget edge, for the outline presets only.** Where the 2x grid would
+   fill between 75% and 100% of the contour budget (sources 1060²-1224²), the factor eases from 2 to
+   sqrt(1.2) so working pixels fall linearly from 4x to 1.2x of the source, on a rounded bilinear grid
+   (`upscaleToWorkingGrid`), mapped back per axis (elliptical arcs through the exact affine ellipse
+   transform, `transformVectorCurve`). The support restoration of ADR-128 follows the rounded grid,
+   and the pinhole radius cap rounds up to whole pixels (both reduce to the old arithmetic on integer
+   grids). Centerline and Edge Detection do not taper: they read the position of 1-px strokes from
+   the working grid, and a fractional grid samples each row at a different sub-pixel phase. On a 950²
+   page of 1-px lines (1.51x) the row-150 Centerline drifted up to 0.81 px off the stroke centre and
+   grew hooked ends (13 points instead of 2; 2x keeps every row at +0.25 to +0.35 px, native +0.00
+   to +0.19), and the Edge Detection outline offset varied from row to row (low side -1.04 to -1.59
+   px; 2x gives -1.28/+1.30 on every row). Those two modes keep the integer policy and its 4x step
+   at 1000²/1001² of their 4 M-pixel budget.
 
 ### Measurements
 
@@ -73,7 +82,10 @@ agents (a quieter hour gave owl Line Art 3.66 s to 1.83 s and hummingbird 2.43 s
 | value noise 192², cell 3 | 0.79 -> 0.10 | 1.80 -> 0.26 | 0.56 -> 0.09 | 0.57 -> 0.13 | 0.13 -> 0.08 |
 
 Photo shading is unchanged (under 0.1 s). The ring image (1200², 1-px rings every 4 px) traces in
-1.2 s in Line Art (base 2.2 s). Uniform noise at 1024² traces in about 13 s in Line Art and Smooth.
+1.2 s in Line Art (base 2.2 s). Uniform noise at 1024² traces in about 10-13 s in Line Art and Smooth.
+That trace exhausts the corner budget, but the budget is not where its time went: with the cap
+lifted, the same process measured 700² at 4.87 s against 4.96 s capped and 1024² at 10.61 s
+against 10.34 s, so the speed-up over the bake-off's 178 s comes from the exact rewrites.
 
 Owl in Line Art either side of the old cliff (single runs): base 9.5 s at 1224² and 4.0 s at 1225²,
 a 2.4x step; now 2.4-2.6 s and 1.9-2.0 s. Entering the band (1059² exact 2x to 1061² at 1.9987x)
@@ -87,7 +99,10 @@ three noise images, in all six presets. The intended differences are:
   source: 1061² 0.817 (2x 0.816, native 0.804), 1150² 0.819 (2x 0.824, native 0.814), 1224² 0.818
   (2x 0.831, native 0.823). Thin-stroke art can change more: 1-px rings at 1100² in Smooth trace
   with IoU 0.72 where the 2x grid kept 0.08, and take 12 s instead of 2.6 s to finish the intact rings.
-- A trace that exhausts the corner budget (none measured).
+  Straight 1-px lines in Line Art at 1100²-1200² trace as curved outlines of about 2,200 points
+  per four lines within +-0.8 px of the stroke centre, where the same page at 800²-990² on the 2x grid gave 25 points within +-1.03 px.
+- Traces that exhaust the corner budget: no art fixture, but uniform noise from about 240² up
+  (700² Line Art: 456,948 points capped against 456,783 uncapped).
 
 ### Consequences
 

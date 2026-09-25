@@ -11,10 +11,11 @@
 //
 // Pure-core compliant: no clock, no random, no I/O. Data in, data out.
 
+import { transformVectorCurve } from '../geometry/vector-curve-transform';
 import {
+  IDENTITY_TRANSFORM,
   transformCurveSubpathUniform,
   type ColoredPath,
-  type CurveSubpath,
   type Polyline,
   type Vec2,
 } from '../scene';
@@ -261,6 +262,10 @@ export function restoreFromWorkingGrid(
   const scaleX = source.width / working.width;
   const scaleY = source.height / working.height;
   const point = (p: Vec2): Vec2 => ({ x: p.x * scaleX, y: p.y * scaleY });
+  // Axis scaling is affine: Bezier control points map exactly, and an
+  // elliptical arc gets the exact axes and rotation of its scaled ellipse
+  // (per-axis radius scaling is only right at 0 or 180 degrees).
+  const axisScale = { ...IDENTITY_TRANSFORM, scaleX, scaleY };
   return paths.map((path) => ({
     color: path.color,
     polylines: path.polylines.map((polyline) => ({
@@ -269,38 +274,8 @@ export function restoreFromWorkingGrid(
     })),
     ...(path.curves === undefined
       ? {}
-      : { curves: path.curves.map((curve) => scaleCurveAxes(curve, point, scaleX, scaleY)) }),
+      : { curves: path.curves.map((curve) => transformVectorCurve(curve, axisScale)) }),
   }));
-}
-
-// Axis scaling is affine, so Bezier control points map exactly.
-function scaleCurveAxes(
-  curve: CurveSubpath,
-  point: (p: Vec2) => Vec2,
-  scaleX: number,
-  scaleY: number,
-): CurveSubpath {
-  return {
-    start: point(curve.start),
-    closed: curve.closed,
-    segments: curve.segments.map((segment) => {
-      if (segment.kind === 'line') return { ...segment, to: point(segment.to) };
-      if (segment.kind === 'cubic') {
-        return {
-          ...segment,
-          control1: point(segment.control1),
-          control2: point(segment.control2),
-          to: point(segment.to),
-        };
-      }
-      return {
-        ...segment,
-        radiusX: segment.radiusX * scaleX,
-        radiusY: segment.radiusY * scaleY,
-        to: point(segment.to),
-      };
-    }),
-  };
 }
 
 // 2x convenience wrapper retained for the existing thin-stroke callers/tests.

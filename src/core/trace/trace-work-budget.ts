@@ -39,6 +39,13 @@ export function fitsTraceWorkingPixelBudget(
 // slight blur (measured on the owl scaled to 1220²: IoU 0.812 at 1.03x
 // against 0.823 native), so the remaining step to native is kept at 1.2x of
 // working pixels, well inside neighbouring-size time budgets.
+// Only the outline presets taper. Centerline and Edge Detection read the
+// position of 1-px strokes from the working grid, and a fractional grid
+// samples them at a different sub-pixel phase on every row: on a 950² page of
+// 1-px lines the Centerline of one row drifted 0.81 px off the stroke centre
+// with hooked ends, and the Edge Detection outline offset varied 0.95-1.21 px
+// between rows (1.12 on every row on the 2x grid). Those two modes keep the
+// integer policy and its step at their smaller budget.
 export const SUPERSAMPLE_TAPER_START = 0.75;
 const TAPER_END_AREA_FACTOR = 1.2;
 const TAPERED_FACTOR = 2;
@@ -46,7 +53,8 @@ const TAPERED_FACTOR = 2;
 /**
  * The fractional supersample factor for a source inside the taper band just
  * below the largest size a 2x working raster fits, or null outside the band
- * (the integer policy applies there unchanged).
+ * and for Centerline and Edge Detection (the integer policy applies there
+ * unchanged).
  */
 export function taperedSupersampleFactor(
   image: { readonly width: number; readonly height: number },
@@ -54,6 +62,7 @@ export function taperedSupersampleFactor(
   options: TraceOptions,
 ): number | null {
   if (factor !== TAPERED_FACTOR) return null;
+  if (options.traceMode === 'centerline' || options.traceMode === 'edge') return null;
   const pixels = image.width * image.height;
   const limit = traceWorkingPixelBudget(options) / (TAPERED_FACTOR * TAPERED_FACTOR);
   const start = limit * SUPERSAMPLE_TAPER_START;

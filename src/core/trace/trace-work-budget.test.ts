@@ -74,10 +74,17 @@ describe('supersample taper at the budget edge', () => {
     const inBand = taperedSupersampleFactor(square(1150), 2, contour);
     expect(inBand).toBeGreaterThan(1);
     expect(inBand).toBeLessThan(2);
-    for (const options of [contour, { ...contour, traceMode: 'edge' as const }]) {
-      for (let side = 900; side < 1400; side += 1) {
-        const step = workAt(side, options) / workAt(side + 1, options);
-        expect(Math.max(step, 1 / step)).toBeLessThanOrEqual(1.25);
+    for (let side = 900; side < 1400; side += 1) {
+      const step = workAt(side, contour) / workAt(side + 1, contour);
+      expect(Math.max(step, 1 / step)).toBeLessThanOrEqual(1.25);
+    }
+  });
+
+  it('never tapers Centerline or Edge Detection, which read 1-px stroke positions', () => {
+    for (const traceMode of ['centerline', 'edge'] as const) {
+      const options = { ...contour, traceMode };
+      for (let side = 800; side <= 1000; side += 1) {
+        expect(taperedSupersampleFactor(square(side), 2, options)).toBeNull();
       }
     }
   });
