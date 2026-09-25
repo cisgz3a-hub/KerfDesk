@@ -19,6 +19,7 @@ export function useInspectorCamera(
   const { point, progress } = focus;
   const missingPoint = point === null;
   useEffect(() => {
+    if (state !== 'ready') return;
     handleRef.current?.setCameraTracking({ mode: cameraMode, point, progress });
     // Status snapshots may repeat the same coordinates; avoid restarting the
     // settling animation just because another report object arrived.

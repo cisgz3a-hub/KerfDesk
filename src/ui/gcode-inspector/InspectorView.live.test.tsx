@@ -27,6 +27,7 @@ const scene = vi.hoisted(() => ({
   captureImage: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
+  prepareToShow: vi.fn(async () => undefined),
 }));
 
 vi.mock('../viewer3d', async (importOriginal) => {
