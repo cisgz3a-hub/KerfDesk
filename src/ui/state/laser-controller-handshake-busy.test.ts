@@ -29,6 +29,8 @@ type Script = {
   /** False while the board is still booting: everything written is dropped. */
   readonly listening?: (elapsedMs: number) => boolean;
   readonly buildInfo?: ReadonlyArray<string>;
+  /** Lines to answer any other written line with. */
+  readonly reply?: (data: string) => ReadonlyArray<string>;
 };
 
 const IDLE = '<Idle|MPos:40.000,0.000,0.000|FS:0,0>';
@@ -60,6 +62,8 @@ function scriptedController(script: Script): Controller {
         emitLater([...(script.buildInfo ?? ['[VER:1.1h.20190830:]', '[OPT:VM,15,128]']), 'ok']);
       }
       if (data === '$G\n') emitLater(['[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', 'ok']);
+      const reply = script.reply?.(data) ?? [];
+      if (reply.length > 0) emitLater(reply);
     },
     onLine: (handler) => {
       handlers.add(handler);
@@ -126,16 +130,41 @@ describe('connect handshake while the controller is still busy (audit TC-1)', ()
     expect(Math.max(...gaps)).toBeLessThanOrEqual(260);
   });
 
-  it('keeps the wait open while a busy controller keeps answering, past the 8 s timeout', async () => {
+  it('hands a controller still busy after the bounded wait to the scheduler, which keeps waiting', async () => {
     const controller = scriptedController({ status: (ms) => (ms < 20_000 ? RUN : IDLE) });
     await useLaserStore.getState().connect(adapter(controller.connection));
-    await vi.advanceTimersByTimeAsync(15_000);
-
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualifying');
+    await vi.advanceTimersByTimeAsync(7_000);
     expect(useLaserStore.getState().controllerOperation?.kind).toBe('connection-handshake');
 
-    const qualifiedAt = await msUntilQualified(10_000);
-    expect(qualifiedAt).not.toBeNull();
+    // The handshake releases its operation; the busy controller's fresh Run
+    // reports keep qualification pending, well past the scheduler's own 8 s.
+    await vi.advanceTimersByTimeAsync(10_000);
+    const busy = useLaserStore.getState();
+    expect(busy.controllerOperation).toBeNull();
+    expect(busy.controllerQualification.kind).toBe('qualifying');
+    expect(busy.lastWriteError).toBeNull();
+
+    expect(await msUntilQualified(10_000)).not.toBeNull();
+  });
+
+  it('releases the handshake so the Console can take a controller out of Check mode', async () => {
+    // A board that does not reset on open, left in Check mode: every query
+    // answers Check. The Console's `$C` needs the handshake's operation gone.
+    let checkMode = true;
+    const controller = scriptedController({
+      status: () => (checkMode ? '<Check|MPos:0.000,0.000,0.000|FS:0,0>' : IDLE),
+      // GRBL leaves Check mode with a second `$C`, which resets (system.c:147-157).
+      reply: (data) => {
+        if (data !== '$C\n') return [];
+        checkMode = false;
+        return ['[MSG:Disabled]', "Grbl 1.1h ['$' for help]"];
+      },
+    });
+    await useLaserStore.getState().connect(adapter(controller.connection));
+    await vi.advanceTimersByTimeAsync(9_000);
+
+    await expect(useLaserStore.getState().sendConsoleCommand('$C')).resolves.toBeUndefined();
+    expect(await msUntilQualified(5_000)).not.toBeNull();
   });
 
   it('hands a silent wait to the qualification scheduler instead of failing', async () => {

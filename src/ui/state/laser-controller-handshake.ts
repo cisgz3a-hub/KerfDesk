@@ -21,7 +21,7 @@ import {
 } from './laser-controller-build-info';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { createLaserStatusPollWriter } from './laser-status-poll-writer';
+import { awaitHandshakeIdle } from './laser-handshake-idle-query';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -38,8 +38,6 @@ const PASSIVE_STARTUP_WAIT_MS = 250;
 const ACTIVE_HANDSHAKE_WAIT_MS = 1_750;
 const HANDSHAKE_WINDOW_MS = PASSIVE_STARTUP_WAIT_MS + ACTIVE_HANDSHAKE_WAIT_MS;
 const LATE_BANNER_SETTLE_MS = 300;
-// The status-poll cadence (laser-connection-actions STATUS_POLL_MS).
-const HANDSHAKE_STATUS_QUERY_MS = 250;
 
 type HandshakeEpochGuard = {
   expectedWriteEpoch: number;
@@ -346,18 +344,14 @@ function qualificationCompleted(state: LaserState, expectedEpoch: number): boole
  * wait ends without one while the controller may still be alive, so the caller
  * hands qualification to the scheduler instead of failing it (audit TC-1).
  *
- * GRBL reports status only when asked (grbl protocol.c: EXEC_STATUS_REPORT),
- * and the ordinary status poll starts only when the handshake returns, so a
- * single `?` left a controller that was busy at connect (buffered motion still
- * draining, a Jog, a Hold or Door) or still printing boot text unanswered: the
- * wait expired 8 s later and latched "failed", and nothing re-ran qualification
- * when the machine reached Idle. The realtime query now repeats on the
- * status-poll cadence. Every fresh report restarts the Idle wait's
- * status-silence timeout (observeControllerIdleWait), so a controller that
- * answers Run, Jog, Home, Hold, Door or Check keeps the wait open. The wait
- * ends without Idle only after that much silence, or when an in-session Alarm
- * or Sleep cancels it; the qualification scheduler then runs qualification on
- * the first fresh Idle.
+ * A single `?` left a controller that was busy at connect (buffered motion
+ * still draining, a Jog, a Hold or Door) or still printing boot text
+ * unanswered: the wait expired 8 s later and latched "failed", and nothing
+ * re-ran qualification when the machine reached Idle. The realtime query now
+ * repeats on the status-poll cadence for a bounded wait
+ * (laser-handshake-idle-query.ts); after it, or after an in-session Alarm or
+ * Sleep, the qualification scheduler runs qualification on the first fresh
+ * Idle and keeps waiting while fresh reports arrive.
  */
 async function waitForHandshakeIdle(
   get: GetFn,
@@ -380,7 +374,7 @@ async function waitForHandshakeIdle(
   try {
     if (realtimeQuery !== null) {
       await safeWrite(realtimeQuery, undefined, 'system');
-      return await awaitIdleWhileQuerying(idle, safeWrite, realtimeQuery);
+      return await awaitHandshakeIdle(refs, idle, safeWrite, realtimeQuery);
     }
     await Promise.all([
       idle,
@@ -397,22 +391,6 @@ async function waitForHandshakeIdle(
     await idle.catch(() => undefined);
     throw error;
   }
-}
-
-async function awaitIdleWhileQuerying(
-  idle: Promise<void>,
-  safeWrite: SafeWriteFn,
-  realtimeQuery: string,
-): Promise<boolean> {
-  // One unresolved query at a time, like the status poll that takes over later.
-  const query = createLaserStatusPollWriter((line) => safeWrite(line, undefined, 'system'));
-  const timer = setInterval(() => void query(realtimeQuery), HANDSHAKE_STATUS_QUERY_MS);
-  const sawIdle = await idle.then(
-    () => true,
-    () => false,
-  );
-  clearInterval(timer);
-  return sawIdle;
 }
 
 function settleAfterControllerLine(sawWelcomeBoundary: boolean): Promise<void> {
