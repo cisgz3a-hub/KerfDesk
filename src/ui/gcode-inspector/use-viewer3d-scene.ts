@@ -71,7 +71,7 @@ export function useViewer3dScene(
   }, [canvasRef]);
 
   // Registers before useSceneSync so geometry lands before view state.
-  useViewer3dModelInstallation({ model, state, handleRef, drawnModelRef, setState });
+  useViewer3dModelInstallation({ model, state, handleRef, drawnModelRef, setState, setReason });
 
   useEffect(() => {
     const canvas = canvasRef.current;
