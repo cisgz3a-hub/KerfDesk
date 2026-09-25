@@ -12,7 +12,7 @@ import {
 } from '../../../core/saved-machines/saved-machine-list';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
-import { takeFrameExpiryReason } from '../frame-expiry-note';
+import { clearFrameExpiryNote, frameExpiryReason } from '../frame-expiry-note';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
@@ -57,7 +57,7 @@ beforeEach(async () => {
     list: addSavedMachine(EMPTY_SAVED_MACHINE_LIST, FALCON),
     persistFailed: false,
   });
-  takeFrameExpiryReason();
+  clearFrameExpiryNote();
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -76,7 +76,7 @@ afterEach(async () => {
   resetStore();
   useLaserStore.setState(initialLaserState());
   useSavedMachinesStore.setState({ list: EMPTY_SAVED_MACHINE_LIST, persistFailed: false });
-  takeFrameExpiryReason();
+  clearFrameExpiryNote();
 });
 
 describe('My machines in Machine Setup', () => {
@@ -99,6 +99,6 @@ describe('My machines in Machine Setup', () => {
     expect(device.bedWidth).toBe(FALCON_A1_PRO_GRBLHAL_PROFILE.bedWidth);
     expect(device.controllerKind).toBe(FALCON_A1_PRO_GRBLHAL_PROFILE.controllerKind);
     expect(useLaserStore.getState().frameVerification).toBeNull();
-    expect(takeFrameExpiryReason()).toBe('The machine changed to “Workshop Falcon” after Frame.');
+    expect(frameExpiryReason()).toBe('The machine changed to “Workshop Falcon” after Frame.');
   });
 });

@@ -17,7 +17,7 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
-import { takeFrameExpiryReason } from '../laser/frame-expiry-note';
+import { clearFrameExpiryNote, frameExpiryReason } from '../laser/frame-expiry-note';
 import { ensureFramedRunInvalidationSubscriptions } from '../laser/framed-run-invalidation';
 import {
   idleControllerStatusForFrameTest,
@@ -103,14 +103,14 @@ beforeEach(() => {
     controllerSettingsObservation: { sessionEpoch: 7, observedAt: 1 },
   });
   ensureFramedRunInvalidationSubscriptions();
-  takeFrameExpiryReason();
+  clearFrameExpiryNote();
 });
 
 afterEach(() => {
   resetStore();
   useLaserStore.setState(initialLaserState());
   useSavedMachinesStore.setState({ list: EMPTY_SAVED_MACHINE_LIST, persistFailed: false });
-  takeFrameExpiryReason();
+  clearFrameExpiryNote();
 });
 
 describe('saved machines and the completed Frame', () => {
@@ -124,7 +124,7 @@ describe('saved machines and the completed Frame', () => {
     expect(useLaserStore.getState().framedRun).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(useLaserStore.getState().frameTrace ?? null).toBeNull();
-    expect(takeFrameExpiryReason()).toBe('The machine changed to “Bench clone” after Frame.');
+    expect(frameExpiryReason()).toBe('The machine changed to “Bench clone” after Frame.');
   });
 
   it('expires the Frame and says why when switching to a different machine', async () => {
@@ -135,7 +135,7 @@ describe('saved machines and the completed Frame', () => {
 
     expect(useLaserStore.getState().framedRun).toBeNull();
     expect(useStore.getState().project.device.bedWidth).toBe(600);
-    expect(takeFrameExpiryReason()).toBe('The machine changed to “Wide bed” after Frame.');
+    expect(frameExpiryReason()).toBe('The machine changed to “Wide bed” after Frame.');
   });
 
   it('keeps the Frame when the open machine is saved to My machines', async () => {
@@ -145,7 +145,7 @@ describe('saved machines and the completed Frame', () => {
 
     expect(useStore.getState().project.device.savedMachineId).toBe(machine.id);
     expect(useLaserStore.getState().framedRun).toBe(permit);
-    expect(takeFrameExpiryReason()).toBeNull();
+    expect(frameExpiryReason()).toBeNull();
   });
 
   it('says nothing about a Frame when none had completed', () => {
@@ -153,6 +153,6 @@ describe('saved machines and the completed Frame', () => {
 
     switchToSavedMachine('clone');
 
-    expect(takeFrameExpiryReason()).toBeNull();
+    expect(frameExpiryReason()).toBeNull();
   });
 });
