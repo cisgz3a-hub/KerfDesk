@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { effectiveFillOverscanMm } from '../../../core/job/fill-overscan';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -63,6 +64,19 @@ describe('laserOperationDetail', () => {
 
     expect(laserOperationDetail(layer)).toContain('stored overscan 50 mm · applied at most 25 mm');
     expect(laserOperationDetail({ ...layer, fillOverscanMm: 25 })).not.toContain('applied');
+  });
+
+  it('does not claim the Scan Line cap for Island Fill travel', () => {
+    const layer: Layer = { ...baseLayer, mode: 'fill', fillStyle: 'island', fillOverscanMm: 50 };
+    const sweep = [
+      { x: 0, y: 0 },
+      { x: 120, y: 0 },
+    ];
+
+    expect(effectiveFillOverscanMm(sweep, layer.fillOverscanMm, layer.fillStyle)).toBe(50);
+    expect(laserOperationDetail(layer)).toContain('stored overscan 50 mm');
+    expect(laserOperationDetail(layer)).not.toContain('applied at most 25 mm');
+    expect(laserOperationDetail({ ...layer, fillStyle: 'offset' })).not.toContain('applied');
   });
 
   it('summarizes an image operation: dither, resolution, extras only when set', () => {

@@ -52,7 +52,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
-    ...(settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
+    ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
       ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
       : []),
     ...localScanOffsetPart(settings),
