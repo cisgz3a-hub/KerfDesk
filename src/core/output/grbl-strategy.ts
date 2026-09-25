@@ -30,6 +30,8 @@ import { fillRunwayCommentText } from './fill-runway-comment';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
+import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
+import { arcBurnLines } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
 
 const LINE_END = '\n';
@@ -116,17 +118,34 @@ type SegmentEmissionContext = {
   readonly dialect: GrblGcodeDialect;
   readonly entryRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
+  /** ADR-407: the machine takes G2/G3, so fitted arc moves may be written. */
+  readonly arcMoves?: boolean;
 };
-type GroupEmissionContext = Pick<SegmentEmissionContext, 'device' | 'dialect' | 'entryBounds'>;
+type GroupEmissionContext = Pick<
+  SegmentEmissionContext,
+  'device' | 'dialect' | 'entryBounds' | 'arcMoves'
+>;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
-  const { s, feed, dialect } = context;
   const first = seg.polyline[0];
   // A one-point polyline has nothing to cut — emitting its rapid alone would
   // be a pointless stray G0 (defense in depth; producers filter these).
   if (first === undefined || seg.polyline.length < 2) {
     return '';
   }
+  const burnLines = arcBurnLines(seg, first, context) ?? polylineBurnLines(seg, first, context);
+  // If the entire segment collapses at emit precision, omit its laser-off seek
+  // as well; it has no executable burn motion to position for.
+  if (burnLines.length === 0) return '';
+  return [...segmentApproachLines(seg, first, context), ...burnLines].join(LINE_END) + LINE_END;
+}
+
+function polylineBurnLines(
+  seg: CutSegment,
+  first: { readonly x: number; readonly y: number },
+  context: SegmentEmissionContext,
+): string[] {
+  const { s, feed, dialect } = context;
   const burnLines: string[] = [];
   let headX = formatGcodeCoordinateMm(first.x);
   let headY = formatGcodeCoordinateMm(first.y);
@@ -148,10 +167,7 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
     headX = targetX;
     headY = targetY;
   }
-  // If the entire segment collapses at emit precision, omit its laser-off seek
-  // as well; it has no executable burn motion to position for.
-  if (!burnEmitted) return '';
-  return [...segmentApproachLines(seg, first, context), ...burnLines].join(LINE_END) + LINE_END;
+  return burnLines;
 }
 
 // ADR-239: with an entry runway, seek to the tangential entry point instead of
@@ -472,6 +488,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     job.contourEntryBounds === undefined
       ? { widthMm: device.bedWidth, heightMm: device.bedHeight }
       : job.contourEntryBounds;
+  const arcMoves = laserArcMovesEnabled(device);
   for (const [index, group] of job.groups.entries()) {
     const wantedMode = powerModeForGroup(group, dialect);
     if (wantedMode === 'M3' && mode !== 'M3') {
@@ -489,7 +506,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     const nextCoolant = plan[index] ?? 'off';
     parts.push(coolantTransition(coolant, nextCoolant));
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, { device, dialect, entryBounds }));
+    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, arcMoves }));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
   parts.push(coolantTransition(coolant, 'off'));

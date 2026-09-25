@@ -4,7 +4,9 @@
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
+import { extendBoundsByArcMoves } from '../geometry/arc-fit';
 import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
+import { validCutArcMoves } from './cut-arc-moves';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import {
@@ -155,6 +157,14 @@ function extendBoundsForCnc(
 function extendBoundsForCut(b: MutableBounds, group: CutGroup | FillGroup): boolean {
   let any = false;
   for (const seg of group.segments) {
+    // ADR-407: an arc bulges past its chords; bound what the emitter writes.
+    const arcMoves = validCutArcMoves(seg);
+    const first = seg.polyline[0];
+    if (arcMoves !== null && first !== undefined) {
+      extendBoundsByArcMoves(b, first, arcMoves);
+      any = true;
+      continue;
+    }
     for (const p of seg.polyline) {
       extendBoundsForPoint(b, p);
       any = true;

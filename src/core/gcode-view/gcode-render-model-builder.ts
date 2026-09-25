@@ -13,6 +13,7 @@ import {
   stripInlineComments,
 } from '../gcode';
 import { sampleArcPoints } from '../geometry';
+import { controllerArcPoints } from './controller-arc-points';
 import {
   createLaserRenderState,
   isLaserOffFeed,
@@ -54,6 +55,7 @@ const XY_PLANE = 17;
 
 type BuildContext = {
   readonly coordinateRepresentation: BuildRenderModelOptions['coordinateRepresentation'];
+  readonly controllerArcToleranceMm: number | undefined;
   readonly laser: LaserRenderState;
   readonly modal: RenderModal;
   readonly segments: SegmentBuilder;
@@ -76,6 +78,7 @@ export function createGcodeRenderModelBuilder(
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
     coordinateRepresentation: options.coordinateRepresentation,
+    controllerArcToleranceMm: options.controllerArcToleranceMm,
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
     segments: createSegmentBuilder(1024, options.retainPreciseSegmentLengths),
@@ -349,7 +352,10 @@ function emitArc(
   const samePoint =
     Math.abs(from.x - target.x) <= AXIS_EPSILON && Math.abs(from.y - target.y) <= AXIS_EPSILON;
   const sweep = arcSweepAngle(startAngle, endAngle, clockwise, samePoint);
-  const points = sampleArcPoints(center, radius, startAngle, sweep);
+  const points =
+    context.controllerArcToleranceMm === undefined
+      ? sampleArcPoints(center, radius, startAngle, sweep)
+      : controllerArcPoints(center, radius, startAngle, sweep, context.controllerArcToleranceMm);
   points[points.length - 1] = { x: target.x, y: target.y };
   pushArcPairs(context, points, target, sweep * radius, line, clockwise);
   return true;

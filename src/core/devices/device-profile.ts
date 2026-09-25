@@ -227,6 +227,10 @@ export type DeviceProfile = {
   // to get per-operation air back on an A1 once `$152=100` is set on the
   // controller or the firmware is updated.
   readonly airAssistRestartUnreliable?: boolean;
+  // ADR-407: 'off' keeps every laser burn move a G1 line. Absent lets the
+  // laser emitter write G2/G3 arcs for curved line-mode work on controllers
+  // known to accept them (laserArcMovesEnabled in laser-arc-moves.ts).
+  readonly laserArcMoves?: 'off' | undefined;
   // Optional Z metadata. XY bed dimensions are used for bounds checks today;
   // Z is informational/setup-facing until a dedicated Z workflow is enabled.
   // Bidirectional fill/raster compensation. Empty keeps emitted output

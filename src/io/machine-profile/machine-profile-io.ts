@@ -308,6 +308,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       ? { workerHostedStreaming: profile.workerHostedStreaming }
       : {}),
     ...(profile.airAssistRestartUnreliable === true ? { airAssistRestartUnreliable: true } : {}),
+    ...(profile.laserArcMoves === 'off' ? { laserArcMoves: 'off' as const } : {}),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,

@@ -264,6 +264,8 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     ),
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+    // ADR-407: only an explicit 'off' survives; anything else means automatic.
+    laserArcMoves: dev['laserArcMoves'] === 'off' ? 'off' : undefined,
     ...compatibleControllerFields,
     scanningOffsets,
     bidirectionalScanPolicy: isBidirectionalScanPolicy(dev['bidirectionalScanPolicy'])
