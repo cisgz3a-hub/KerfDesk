@@ -2108,6 +2108,9 @@ their archive before transmission.
    stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
+   A job placed at the head's current position does not frame on after Home, because the cycle
+   parks the head at the switches: the Frame stops and asks the operator to jog the head back
+   into place and Frame again (ADR-367 Amendment 1).
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
