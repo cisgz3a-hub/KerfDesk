@@ -1,5 +1,14 @@
 import type { ControllerSettingsSnapshot as GrblControllerSettingsSnapshot } from '../controllers/grbl';
 import type { Project } from '../scene';
+import {
+  laserMaxPowerMismatchMessage,
+  laserModeDisabledMessage,
+  laserModeUnverifiedMessage,
+  readinessSettingsSource,
+  routerLaserModeMessage,
+  spindleScaleMismatchMessage,
+  type ReadinessSettingsSource,
+} from './controller-readiness-messages';
 
 export type ControllerSettingsSnapshot = GrblControllerSettingsSnapshot;
 
@@ -49,6 +58,7 @@ export function runControllerReadiness(
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
   const cncMachine =
     project.machine !== undefined && project.machine.kind === 'cnc' ? project.machine : null;
+  const source = readinessSettingsSource(settingsCapability);
 
   // Firmwares with NO numeric $-settings dump at all (Marlin, Smoothie)
   // cannot prove $30/$32 agreement. The power scale then rests on the device
@@ -71,7 +81,7 @@ export function runControllerReadiness(
     // incorrectly. Let the profile assumptions reach Job Review as warnings,
     // matching controllers that expose no settings dump at all. CNC remains
     // strict because unknown $30/$32 changes spindle and plunge semantics.
-    if (cncMachine === null) return laserReadiness(project, {}, 'warn');
+    if (cncMachine === null) return laserReadiness(project, {}, 'warn', source);
     errors.push({
       code: 'controller-settings-unknown',
       message:
@@ -96,14 +106,14 @@ export function runControllerReadiness(
   // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
   // "; assumes: ... $32=0 (router mode)").
   if (cncMachine !== null) {
-    return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy);
+    return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy, source);
   }
   // Missing laser settings are review warnings; known mismatches are still
   // errors inside laserReadiness. Neither refuses Start — the Start path
   // demotes every error returned here to a Job Review warning (#291), and
   // since #482 the Save/export path states them as advisories rather than
   // refusing, so nothing returned here gates an action on its own.
-  return laserReadiness(project, controller, 'warn');
+  return laserReadiness(project, controller, 'warn', source);
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
@@ -118,15 +128,6 @@ const CNC_LATHE_MODE_MESSAGE =
 const LASER_LATHE_MODE_MESSAGE =
   'Controller reports $32=2 (grblHAL lathe mode), so GRBL laser mode is NOT enabled. The beam will not gate with motion the way a laser job expects. Set $32=1 before burning.';
 
-/** The laser `max-power-mismatch` message text. Operator Start treats this
- * reported contradiction as a refusal; missing evidence remains review-grade. */
-function laserMaxPowerMismatchMessage(
-  controllerMaxPowerS: number,
-  projectMaxPowerS: number,
-): string {
-  return `Controller $30 is ${controllerMaxPowerS} but this project is set to max S ${projectMaxPowerS}. Apply the detected setting before starting.`;
-}
-
 // What to do when the dump did not report a setting: 'error' blocks Start;
 // 'warn' states the gap and proceeds through Job Review. Laser uses the
 // warning path for missing evidence; CNC uses it only for partial read-only
@@ -137,6 +138,7 @@ function cncReadiness(
   spindleMaxRpm: number,
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
+  source: ReadinessSettingsSource,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
@@ -156,7 +158,7 @@ function cncReadiness(
   } else if (controller.maxPowerS !== spindleMaxRpm) {
     errors.push({
       code: 'spindle-scale-mismatch',
-      message: `Controller $30 is ${controller.maxPowerS} but this machine's spindle max RPM is ${spindleMaxRpm}. Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`,
+      message: spindleScaleMismatchMessage(controller.maxPowerS, spindleMaxRpm, source),
     });
   }
   if (controller.machineMode?.kind === 'lathe') {
@@ -176,11 +178,7 @@ function cncReadiness(
       });
     }
   } else if (controller.laserModeEnabled) {
-    errors.push({
-      code: 'laser-mode-enabled',
-      message:
-        'Controller reports $32=1 (laser mode). Set $32=0 for spindle work: laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.',
-    });
+    errors.push({ code: 'laser-mode-enabled', message: routerLaserModeMessage(source) });
   }
   return { ok: errors.length === 0, errors, warnings };
 }
@@ -189,6 +187,7 @@ function laserReadiness(
   project: Project,
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
+  source: ReadinessSettingsSource,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
@@ -208,7 +207,7 @@ function laserReadiness(
   } else if (controller.maxPowerS !== project.device.maxPowerS) {
     errors.push({
       code: 'max-power-mismatch',
-      message: laserMaxPowerMismatchMessage(controller.maxPowerS, project.device.maxPowerS),
+      message: laserMaxPowerMismatchMessage(controller.maxPowerS, project.device.maxPowerS, source),
     });
   }
 
@@ -222,18 +221,10 @@ function laserReadiness(
           'Controller did not report GRBL $32 laser mode. KerfDesk cannot prove safe laser-mode behavior.',
       });
     } else {
-      warnings.push({
-        code: 'laser-mode-unverified',
-        message:
-          'Controller settings did not confirm $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller configuration before burning.',
-      });
+      warnings.push({ code: 'laser-mode-unverified', message: laserModeUnverifiedMessage(source) });
     }
   } else if (!controller.laserModeEnabled) {
-    errors.push({
-      code: 'laser-mode-disabled',
-      message:
-        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.',
-    });
+    errors.push({ code: 'laser-mode-disabled', message: laserModeDisabledMessage(source) });
   }
 
   if (controller.minPowerS !== undefined && controller.minPowerS > 0) {
