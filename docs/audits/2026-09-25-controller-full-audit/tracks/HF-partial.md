@@ -43,7 +43,10 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
   dispatched). A genuine failure still arrives as `ALARM:N` or `error:N` on the owned command.
 
 ### HF-2 — FluidNC acks `$X` in its Critical state without unlocking; KerfDesk records "unlocked"
-- severity: low (misleading state/guidance; no motion)
+- severity: medium (false "unlocked" record; a machine without homing, typical for diode lasers,
+  is offered only Unlock and stays locked until Disconnect, which sends Ctrl-X; no motion risk —
+  every action still gates on the Alarm status. FluidNC `$H` does work from Critical,
+  `Machine/Homing.cpp:204`, `Settings.cpp:58-60`)
 - verdict: CONFIRMED (reproduced; FluidNC v4.0.3 and main source)
 - status: new
 - failure scenario: FluidNC hard limit, soft limit (e.g. a job past travel) or hard stop →

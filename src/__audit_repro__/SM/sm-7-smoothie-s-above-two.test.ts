@@ -71,7 +71,7 @@ function burnPowers(gcode: string): number[] {
 
 describe('SM-7: Smoothieware S words of 2 or more', () => {
   it.each([100, 255])(
-    'a 50%% cut on a maxPowerS=%i profile fires at 50%% (or the profile is refused)',
+    'a half-power cut on a maxPowerS=%i profile fires at half power (or the profile is refused)',
     (maxPowerS) => {
       const device: DeviceProfile = {
         ...DEFAULT_DEVICE_PROFILE,
