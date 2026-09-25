@@ -77,6 +77,9 @@ export type GrblSimOptions = {
   readonly rejectLines: ReadonlyArray<GrblSimRejectRule>;
   /** Stock GRBL 1.1h, or grblHAL's differences on top of it (grbl-sim-machine.ts). */
   readonly firmware: GrblSimFirmware;
+  /** grblHAL only: "report when homing", bit 12 of `$10`, off by default
+   *  (config.h:751-753). With it on grblHAL answers `?` while it homes. */
+  readonly reportWhenHoming?: boolean;
 };
 
 export function emit(line: string, opts: GrblSimOptions): GrblSimEffect {

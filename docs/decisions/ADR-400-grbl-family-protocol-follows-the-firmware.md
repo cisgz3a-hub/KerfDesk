@@ -96,7 +96,8 @@ moment of a session, the same way.
    - Work-Z recovery converts a `$#` read under `$13=1` to millimetres.
 9. **Simulator.** The GRBL simulator answers like GRBL 1.1h (15 planner blocks, a 128-byte RX
    ring, `error:9` in Jog, no status while homing, silence after `ALARM:1/2`, CR and LF each ending a
-   line), with a grblHAL mode for its differences, the latched error included.
+   line), with a grblHAL mode for its differences, the latched error included. That mode answers
+   `?` while homing only when "report when homing" is set, as grblHAL does.
 
 ### Consequences
 

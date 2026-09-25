@@ -25,10 +25,11 @@
 //    (protocol.c:167-174) and FluidNC (Protocol.cpp:1158) do.
 //  * The planner holds 15 usable blocks (grbl-sim-planner.ts) and the RX ring
 //    128 bytes (grbl-sim-rx-window.ts); every byte above 0x7F is realtime.
-// `firmware: 'grblhal'` adds grblHAL behaviour: status reports while homing
-// (machine_limits.c:445-447) and in a critical alarm, `$X`/`$H` answered
-// error:79 in a critical alarm, the sticky G-code error (protocol.c:245-286)
-// and a CRLF pair read as one end of line.
+// `firmware: 'grblhal'` adds grblHAL behaviour: status reports in a critical
+// alarm (and while homing with `reportWhenHoming`, off by default:
+// machine_limits.c:336-337, :445-447), `$X`/`$H` answered error:79 in a
+// critical alarm, the sticky G-code error (protocol.c:245-286) and a CRLF pair
+// read as one end of line.
 //
 // Remaining simplifications, documented so tests don't lie:
 //  * Acks are immediate unless `createGrblSimulator({ plannerBlocks })` opts in
@@ -237,11 +238,13 @@ function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions)
 }
 
 // Stock GRBL answers no status query while homing (limits.c:320 "No time to run
-// protocol_execute_realtime() in this loop") or in the critical-alarm loop;
-// grblHAL answers both.
+// protocol_execute_realtime() in this loop") or in the critical-alarm loop.
+// grblHAL answers in a critical alarm, and while homing only with "report when
+// homing" on (machine_limits.c:336-337, :445-447).
 function reportsStatus(state: GrblSimState, opts: GrblSimOptions): boolean {
-  if (opts.firmware === 'grblhal') return true;
-  return state.machine !== 'Home' && !state.critical;
+  const grblHal = opts.firmware === 'grblhal';
+  if (state.machine === 'Home') return grblHal && opts.reportWhenHoming === true;
+  return grblHal || !state.critical;
 }
 
 function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {

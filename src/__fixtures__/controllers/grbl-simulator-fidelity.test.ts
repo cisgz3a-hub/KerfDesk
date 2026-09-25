@@ -193,8 +193,21 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
 });
 
 describe('GRBL simulator grblHAL differences', () => {
-  it('answers <Home|...> while homing (machine_limits.c:445-447)', async () => {
+  it('answers no status query while homing at its default settings (machine_limits.c:336-337)', async () => {
     const { conn, lines } = await openSim({ firmware: 'grblhal', homingMs: 500 });
+    await conn.write('$H\n');
+    await pump(50);
+    await conn.write('?');
+    await pump(5);
+    expect(lines).toEqual([]);
+  });
+
+  it('answers <Home|...> while homing with report when homing on ($10 bit 12; machine_limits.c:445-447)', async () => {
+    const { conn, lines } = await openSim({
+      firmware: 'grblhal',
+      reportWhenHoming: true,
+      homingMs: 500,
+    });
     await conn.write('$H\n');
     await pump(50);
     await conn.write('?');
