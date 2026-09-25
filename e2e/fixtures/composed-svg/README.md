@@ -43,3 +43,18 @@ SHA-256 source identities:
 771e70fe9df7f1598f4692f30707dfb7fed2d0d8f00bf56d010d8bb578b1850d  composition-clipped-image.svg
 6078fcff85fcfa6288383f0e8334920e169eada37d5dfd3cf331e864e47d9cd2  composition-visible-mask.svg
 ```
+
+The three `inkscape-*.svg` files are unchanged Inkscape 1.4.4 plain-SVG exports of
+KerfDesk's authored-size output from production source
+`4a468d957f0937f161c26954ec052695fc67c731`. A separate official portable Inkscape
+CLI pass opened, rendered and re-saved each file on 2026-09-25. The browser suite
+imports these through the ordinary picker and repeats the fit/history and native
+SVG comparisons. They retain the same object counts and physical extents as their
+corresponding composition fixtures. They exercise an actual external editor's
+serialization, without claiming universal Inkscape format coverage.
+
+```text
+febba35983f6ad542bf5c236baa2bc8e99e4932a7f5cd360ac878959e019c6bd  inkscape-mixed.svg
+4c2c3ff57c79f75fc687392dd3f5b4f3cd78edf33d9335c562b707b030d1d46b  inkscape-clipped-image.svg
+d2e4b6d934c2df2068c55cbb398f8d85bf0d500b0725c353561694a471f7e70f  inkscape-visible-mask.svg
+```

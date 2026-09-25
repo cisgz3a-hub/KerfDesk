@@ -19,6 +19,9 @@ const fixtures = [
   { name: 'composition-mixed.svg', objects: 4, images: 2, shouldFit: true },
   { name: 'composition-clipped-image.svg', objects: 1, images: 1, shouldFit: false },
   { name: 'composition-visible-mask.svg', objects: 5, images: 2, shouldFit: true },
+  { name: 'inkscape-mixed.svg', objects: 4, images: 2, shouldFit: true },
+  { name: 'inkscape-clipped-image.svg', objects: 1, images: 1, shouldFit: false },
+  { name: 'inkscape-visible-mask.svg', objects: 5, images: 2, shouldFit: true },
 ] as const;
 
 function fixtureText(name: string): string {
