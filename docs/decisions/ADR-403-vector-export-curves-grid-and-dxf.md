@@ -48,18 +48,23 @@ hummingbird 1,699,567 bytes with 112,343.
      elliptical arcs through the shared parametric flattener, whose sagitta bound on the major
      circle bounds the ellipse.
 2. **Artwork SVG export** (`exportSceneSvg`) takes `{ precisionMm, groupContours }`. Precision is in
-   world millimetres (default 0.001; `null` keeps the historical exact form). Coordinates stay in
-   each object's local frame under its matrix, so the local step is `precision / gain` with `gain`
-   the matrix's largest singular value, and no world point moves more than half a world grid
-   diagonal. The page is the exact extent of the geometry actually written, rounded outward onto
-   the grid, with the historical 0.01 mm minimum for a zero-height line.
+   world millimetres (default 0.001; `null` keeps exact coordinate values, though the path text is
+   still the new compact form and the page is still the exact curve extent). Coordinates stay in
+   each object's local frame under its matrix, on a local grid of step at most `precision / gain`
+   with `gain` the matrix's largest singular value. World points are therefore not on a world grid;
+   each lies within half a world grid diagonal of its true position. The page is the exact extent
+   of the geometry actually written, rounded outward onto the grid, with the historical 0.01 mm
+   minimum for a zero-height line.
 3. **Multi-File Trace** opens a small dialog first (preset, SVG or DXF, precision 0.1 / 0.01 /
    0.001 / 0.0001 mm, and for SVG an option to put each shape and its holes in their own `<g>`);
    its primary button then opens the file picker, as the first await in the click handler. Each
-   image is written from `ColoredPath.curves` in millimetres on the source image's page, keeping
-   the paint rules (filled closed curves even-odd without stroke, Centerline and open curves stroked
-   one source pixel wide) and the `<stem>-trace.<ext>` naming. An image with no visible geometry
-   writes nothing and is named in the completion message; the other images are still written.
+   image is written from `ColoredPath.curves` in millimetres on the source image's page (its size
+   rounded outward onto the grid, so edge geometry is never clipped), keeping the paint rules
+   (filled closed curves even-odd without stroke, Centerline and open curves stroked one source
+   pixel wide, the width printed within 0.05% of its value so a pixel finer than the grid never
+   becomes a zero-width stroke) and the `<stem>-trace.<ext>` naming. An image with no visible
+   geometry writes nothing and is named in the completion message; the other images are still
+   written.
    `traceImagesToVectorFiles` also accepts a loader in place of a decoded image, matching the
    native-resolution branch's additive change to the same job type.
 4. **DXF writer** (`io/dxf/dxf-writer.ts`), written from Autodesk's published DXF reference: ASCII
@@ -103,20 +108,30 @@ hummingbird 1,699,567 bytes with 112,343.
 - Artwork SVG export changes text but not geometry beyond the grid: coordinates are relative and
   rounded to 0.001 mm, and the page no longer includes control points outside the curve. Arc
   subpaths and image clips keep exact absolute data.
-- Grouping is opt-in. It follows even-odd nesting; for nonzero text glyphs whose contours cross one
-  another it can put a contour in a different island than the fill rule implies.
+- Grouping is opt-in and exact only for contours that are pairwise nested or disjoint, which every
+  traced contour is. It does not detect crossing or identical contours: under even-odd those land
+  in separate `<path>`s and their overlap is filled where one path would cancel it, and for nonzero
+  text glyphs whose contours cross, a contour can land in a different island than the fill rule
+  implies. Multi-File Trace output is therefore safe; the scene exporter's `groupContours` option
+  has no UI control.
 - Tests: `vector-export.test.ts` (grid printing and outward rounding, exact arc transform under
   shear and mirror, cubic bounds by derivative roots, bulge signs, island grouping and a shared
   saddle vertex); `export-scene-svg-precision.test.ts` (exact page extent, outward page rounding,
   golden relative path data, grouping, importer read-back, extreme object scales held to the world
   grid); `batch-trace.test.ts` (curves not polylines, precision goldens, grouping golden, skipped
-  blank images, loader jobs, DXF hand-off); `multi-file-trace-action.test.ts` (a batch with one
-  blank image writes the others and reports the skip; chosen preset; DXF files);
+  blank images, loader jobs, DXF hand-off, a stroke finer than half a grid step, outward page
+  size); `multi-file-trace-action.test.ts` (a batch with one blank image writes the others and
+  reports the skip; chosen preset; DXF files);
   `export-dxf.test.ts` (round trip through `parseDxf` within 0.01 + 0.001 mm by Hausdorff distance
   per colour under rotation, mirror and non-uniform scale; exact circle bulges; units, version and
-  unique handles; omitted bitmaps; traced-page registration); `export-artwork-dxf.test.ts`.
+  unique handles; omitted bitmaps; traced-page registration); `export-artwork-dxf.test.ts` (an
+  image-only selection warns before the save picker); `MultiFileTraceDialog.test.tsx` (the picker
+  opens inside the submit, and the chosen preset, format and precision reach the batch).
 - Not verified here: opening the DXF in AutoCAD, LibreCAD or another CAD/CAM program, and rendered
-  comparison in an independent vector editor. Those remain acceptance steps, as in ADR-350.
+  comparison in an independent vector editor. Those remain acceptance steps, as in ADR-350. The
+  file carries no LAYOUT or PLOTSETTINGS objects, no BLOCK_RECORD layout pointers (340) and no
+  LAYER plot-style handles (390); if a strict AutoCAD-family reader refuses it, add `ACAD_LAYOUT`
+  with Model and Layout1 or write AC1015 with the same content.
 
 Not part of this decision: PDF, EPS, PostScript and GeoJSON writers; fitting arcs to cubics for
 DXF bulges; a tight page (Potrace `--tight`) for traced files; a precision control for the scene

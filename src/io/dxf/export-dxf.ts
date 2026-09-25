@@ -66,6 +66,18 @@ export function exportSceneDxf(
   }
 }
 
+/**
+ * Whether the scene (or the selection) holds anything DXF can carry. Callers
+ * check this before opening a save picker, so an image-only selection never
+ * asks for a file name it cannot fill.
+ */
+export function hasDxfVectorArtwork(project: Project, selectedIds?: readonly string[]): boolean {
+  const selected = selectedIds === undefined ? null : new Set(selectedIds);
+  return project.scene.objects.some(
+    (object) => (selected === null || selected.has(object.id)) && isVectorObject(object),
+  );
+}
+
 function isVectorObject(object: SceneObject): object is VectorObject {
   return object.kind !== 'raster-image' && object.kind !== 'relief' && 'paths' in object;
 }

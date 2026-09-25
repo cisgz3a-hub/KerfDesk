@@ -1,7 +1,11 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
 import { err } from '../../core/result';
-import { exportSceneDxf, type DxfArtworkExport } from '../../io/dxf/export-dxf';
+import {
+  exportSceneDxf,
+  hasDxfVectorArtwork,
+  type DxfArtworkExport,
+} from '../../io/dxf/export-dxf';
 import type { PlatformAdapter } from '../../platform/types';
 import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
@@ -27,8 +31,9 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
     recordIndex: variables.recordIndex,
     serialValue: variables.serialValue,
   };
-  if (project.scene.objects.length === 0) {
-    ctx.pushToast('There is no artwork to export.', 'warning');
+  const nothing = nothingToExport(project, ids);
+  if (nothing !== null) {
+    ctx.pushToast(nothing, 'warning');
     return;
   }
   try {
@@ -61,6 +66,16 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
       'error',
     );
   }
+}
+
+/** Why the picker must not open, or null when there is vector artwork to write. */
+function nothingToExport(project: Project, ids: readonly string[] | undefined): string | null {
+  if (project.scene.objects.length === 0) return 'There is no artwork to export.';
+  // Images and reliefs have no DXF form: refuse before asking for a file name.
+  if (!hasDxfVectorArtwork(project, ids)) {
+    return 'DXF holds vector artwork only. Select vector, text or traced artwork.';
+  }
+  return null;
 }
 
 function exportedMessage(result: DxfArtworkExport, displayName: string): string {

@@ -3,14 +3,20 @@
 // A closed contour's nesting depth is the number of other closed contours
 // that contain it. Under the even-odd rule, even depth is ink (an outer
 // contour) and odd depth is a hole; each hole belongs to its smallest
-// container. Grouping an outer with its direct holes therefore reproduces the
+// container. For contours that never cross or duplicate one another (every
+// traced contour), grouping an outer with its direct holes reproduces the
 // even-odd picture exactly while letting an editor select one island at a
 // time.
 //
-// Containment of whole contours is decided by one vertex: traced and
-// imported contours do not cross one another, so a single interior test is
-// exact whenever the vertex is not ON the other boundary. Vertices shared at
-// saddle joins are skipped until a decisive one is found.
+// PRECONDITION: contours are pairwise nested or disjoint. Crossing or
+// identical contours are not detected: they land in separate islands, and two
+// <path>s fill an overlap that even-odd in one path would cancel. Callers with
+// arbitrary artwork must keep grouping opt-in.
+//
+// Under that precondition, containment of whole contours is decided by one
+// vertex: a single interior test is exact whenever the vertex is not ON the
+// other boundary. Vertices shared at saddle joins are skipped until a
+// decisive one is found.
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 

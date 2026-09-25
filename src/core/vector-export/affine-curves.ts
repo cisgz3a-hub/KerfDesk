@@ -28,22 +28,8 @@ export type AffineMatrix = {
   readonly f: number;
 };
 
-export const IDENTITY_AFFINE: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-
 export function applyAffine(m: AffineMatrix, p: Vec2): Vec2 {
   return { x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f };
-}
-
-/** `outer ∘ inner`: apply `inner` first. */
-export function composeAffine(outer: AffineMatrix, inner: AffineMatrix): AffineMatrix {
-  return {
-    a: outer.a * inner.a + outer.c * inner.b,
-    b: outer.b * inner.a + outer.d * inner.b,
-    c: outer.a * inner.c + outer.c * inner.d,
-    d: outer.b * inner.c + outer.d * inner.d,
-    e: outer.a * inner.e + outer.c * inner.f + outer.e,
-    f: outer.b * inner.e + outer.d * inner.f + outer.f,
-  };
 }
 
 /** Largest singular value of the linear part: the matrix's worst-case length gain. */

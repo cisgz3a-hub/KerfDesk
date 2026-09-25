@@ -16,7 +16,9 @@ import { groupContoursWithHoles } from '../vector-export/contour-nesting';
 import {
   DEFAULT_EXPORT_PRECISION_MM,
   decimalGridAtMost,
+  formatGridIndex,
   formatOnGrid,
+  outwardGridIndices,
   type DecimalGrid,
 } from '../vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../vector-export/svg-path-data';
@@ -72,15 +74,18 @@ export function tracedLayersToSvg(
   const grid = physical
     ? decimalGridAtMost(options.precisionMm ?? DEFAULT_EXPORT_PRECISION_MM)
     : null;
-  const number = (value: number): string =>
-    grid === null ? String(value) : formatOnGrid(value, grid);
-  const width = number(page.pixelWidth * scale.x);
-  const height = number(page.pixelHeight * scale.y);
+  // Round the page outward so it never clips geometry at its right/bottom edge.
+  const extent = (size: number): string =>
+    grid === null ? String(size) : formatGridIndex(outwardGridIndices(0, size, grid).hi, grid);
+  const width = extent(page.pixelWidth * scale.x);
+  const height = extent(page.pixelHeight * scale.y);
   const size = physical
     ? ` width="${width}mm" height="${height}mm"`
     : ' width="100%" height="100%"';
-  // One source pixel wide, as the preview draws it.
-  const strokeWidth = number(Math.max(scale.x, scale.y));
+  // One source pixel wide, as the preview draws it. A width, not a position:
+  // print it within 0.05% of its value so a pixel finer than half a grid step
+  // never collapses to stroke-width="0".
+  const strokeWidth = strokeWidthText(Math.max(scale.x, scale.y), grid);
   const body = layers
     .map((layer) =>
       layerMarkup(layer, grid, traceMode, strokeWidth, options.groupContours === true),
@@ -124,6 +129,11 @@ function layerMarkup(
       : `<path d="${formatSvgPathData(stroked, grid)}" fill="none" stroke="${layer.color}"` +
         ` stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
   return filled + line;
+}
+
+function strokeWidthText(width: number, grid: DecimalGrid | null): string {
+  if (grid === null) return String(width);
+  return formatOnGrid(width, decimalGridAtMost(Math.min(grid.step, width / 1000)));
 }
 
 function pageScale(page: TracedSvgPage): { readonly x: number; readonly y: number } {

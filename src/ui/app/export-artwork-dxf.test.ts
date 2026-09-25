@@ -96,6 +96,24 @@ describe('DXF export action', () => {
     );
   });
 
+  it('warns without opening the save picker when the selection holds only images', async () => {
+    const pushToast = vi.fn();
+    const pickFileForSave = vi.fn(async () => destination().target);
+    await handleExportArtworkDxf({
+      platform: { ...mockPlatform(), pickFileForSave },
+      project: withImage(projectWithTwoLines()),
+      selectedIds: ['photo'],
+      savedName: null,
+      pushToast,
+      renderer,
+    });
+    expect(pickFileForSave).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'DXF holds vector artwork only. Select vector, text or traced artwork.',
+      'warning',
+    );
+  });
+
   it('stays silent when the save picker is cancelled', async () => {
     const pushToast = vi.fn();
     await handleExportArtworkDxf({

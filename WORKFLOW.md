@@ -695,8 +695,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
-   Vector coordinates are written on a 0.001 mm world grid and the page is the exact extent of the
-   drawn curves, not their control points (ADR-403).
+   Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
+   true position, and the page is the exact extent of the drawn curves, not their control points
+   (ADR-403).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips

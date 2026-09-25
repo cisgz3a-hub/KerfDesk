@@ -17,7 +17,7 @@ export type BatchTracePhysicalSize = {
 export type BatchTraceImageJob = {
   readonly sourceName: string;
   // A decoded image, or a loader called on this job's turn so a batch of large
-  // images holds one decoded image at a time (ADR-401).
+  // images holds one decoded image at a time (ADR-403).
   readonly image: RawImageData | (() => Promise<RawImageData>);
   readonly physicalSizeMm?: BatchTracePhysicalSize;
   readonly options?: TraceOptions;

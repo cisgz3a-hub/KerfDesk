@@ -190,6 +190,39 @@ describe('traceImagesToVectorFiles', () => {
     expect(await run(0.1)).toContain('d="M.1 .2h1.9l-.5 1.1z"');
   });
 
+  it('keeps a sub-grid stroke width and rounds the page outward at a coarse grid', async () => {
+    const stroke: ColoredPath = {
+      color: '#000000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 1, y: 1 },
+            { x: 999, y: 999 },
+          ],
+        },
+      ],
+    };
+    const result = await traceImagesToVectorFiles(
+      [
+        {
+          sourceName: 'fine.png',
+          image: rawImage(1000, 1000),
+          options: { ...DEFAULT_TRACE_OPTIONS, traceMode: 'centerline' },
+          // 1 px = 0.04233 mm: under half of the 0.1 mm grid step.
+          physicalSizeMm: { widthMm: 42.33, heightMm: 42.33 },
+        },
+      ],
+      { trace: async () => [stroke] },
+      { precisionMm: 0.1 },
+    );
+    const text = result.files[0]?.text ?? '';
+    // 42.33 mm rounds up to 42.4, never down to 42.3 (which would clip the edge).
+    expect(text).toContain('viewBox="0 0 42.4 42.4" width="42.4mm" height="42.4mm"');
+    expect(text).toContain('stroke-width="0.04233"');
+    expect(text).not.toContain('stroke-width="0"');
+  });
+
   it('groups each outer contour with its own holes when asked', async () => {
     const path: ColoredPath = {
       color: '#000000',
