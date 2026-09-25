@@ -163,7 +163,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.multi-file-trace': {
     family: 'tools',
-    tooltip: 'Trace multiple image files to standalone SVG exports without changing the workspace.',
+    tooltip:
+      'Trace multiple image files with one preset to standalone SVG or DXF files without changing the workspace. Images with nothing to trace are skipped and listed.',
   },
   'tools.convert-to-path': {
     family: 'tools',
