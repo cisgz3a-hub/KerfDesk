@@ -4,8 +4,11 @@
 // with `requestPort()` and the SerialPort objects defined in
 // src/vite-env.d.ts. Electron's renderer inherits the same API.
 //
-// Read pipeline: port.readable → TextDecoderStream → newline splitter →
-// `onLine(handler)` callbacks. Write pipeline: string → UTF-8 → port.writable
+// Read pipeline: port.readable → TextDecoder('utf-8', streaming) → newline
+// splitter → `onLine(handler)` callbacks (serial-read-loop.ts). Write pipeline:
+// string → one byte per character (`encodeWireBytes`, serial-wire.ts), NOT
+// UTF-8, so GRBL's single-byte realtime commands above 0x7F (jog cancel 0x85,
+// overrides 0x90–0xA2) reach the controller as one byte → port.writable
 // (single shared writer per connection).
 //
 // Disconnect handling: the `disconnect` event fires when the OS drops the
@@ -191,10 +194,21 @@ function makeConnection(port: SerialPort): SerialConnection {
     for (const h of closeSubs) h();
   };
 
+  // The read side ended on its own: the OS dropped the port, a read error that
+  // leaves no fresh stream (UnknownError), or the line-error recovery budget
+  // ran out. Close the port too, as the worker transport does
+  // (native-serial-worker-runtime.ts): otherwise the page keeps holding the OS
+  // port open, DTR asserted, until the next Connect's stale-port sweep or a
+  // reload, and no other program can open the controller (audit TC-4). The Web
+  // Serial spec's own read loop closes the port as its last step (4.10 close(),
+  // Example 7). A Disconnect already closing the port owns that close; a
+  // disconnected port rejects it harmlessly.
   const handleDroppedConnection = (): void => {
     port.removeEventListener('disconnect', handleDroppedConnection);
-    void closeStreamsOnce();
+    const closesPort = !ctx.closed;
+    const streamsClosed = closeStreamsOnce();
     fireClose();
+    if (closesPort) void streamsClosed.then(() => port.close()).catch(() => undefined);
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
