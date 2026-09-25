@@ -6,7 +6,7 @@ import {
   type Polyline,
 } from '../scene';
 import type { CncPass } from '../job';
-import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
+import { passNeedsTabs, settingsWithStockTabGate, tabTopZMm } from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
 import {
   contourPassFromPolyline,
@@ -63,13 +63,15 @@ export type CncLayerPassesResult = {
 
 export function passesForCncLayerWithEvidence(
   polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
+  layerSettings: CncLayerSettings,
   tool: CncTool,
   config: CncMachineConfig,
   handedness: FrameHandedness,
   sourceContours: ReadonlyArray<CollectedCncContour> = [],
   vcarveLadder?: VCarveLadder,
 ): CncLayerPassesResult {
+  // ADR-258 amendment 1: no tabs where the floor under the cut holds the part.
+  const settings = settingsWithStockTabGate(layerSettings, config.stock.thicknessMm);
   const specialized = resolvedSpecializedPasses(
     polylines,
     settings,

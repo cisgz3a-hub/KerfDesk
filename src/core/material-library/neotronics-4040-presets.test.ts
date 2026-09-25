@@ -38,7 +38,45 @@ describe('NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS', () => {
     );
     expect(isUnsupportedPreset(clearAcrylic!)).toBe(true);
     expect(materialPresetWarnings(clearAcrylic!)).toContain(
-      'Clear acrylic is not recommended for a 450/455 nm diode laser.',
+      'A 450/455 nm diode laser cannot cut or engrave clear acrylic.',
     );
+
+    const blackAcrylic = NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS.find((preset) =>
+      preset.id.includes('black-acrylic'),
+    );
+    expect(materialPresetWarnings(blackAcrylic!).join(' ')).toMatch(/clear, white or blue/);
+  });
+
+  it('cuts thin stock in dynamic power so slowed corners do not overburn', () => {
+    const paper = presetById('neotronics-lt4lds-paper-card-felt-thin-cut');
+
+    expect(paper.recipe).toMatchObject({ powerMode: 'dynamic', power: 90, speed: 4000 });
+    expect(materialPresetWarnings(paper).join(' ')).toMatch(/not for corrugated/i);
+  });
+
+  it('cuts 3 mm MDF slower than plywood, in two passes, with a test piece first', () => {
+    const mdf = presetById('neotronics-lt4lds-mdf-3mm-cut');
+    const plywood = presetById('neotronics-lt4lds-plywood-3mm-cut');
+
+    expect(mdf.recipe).toMatchObject({ power: 100, speed: 480, passes: 2, airAssist: true });
+    expect(mdf.recipe.speed).toBeLessThan(plywood.recipe.speed);
+    expect(materialPresetWarnings(mdf).join(' ')).toMatch(/test piece first/i);
+  });
+
+  it('gives presets changed by the audit a new revision so linked layers read as stale', () => {
+    const plywood = presetById('neotronics-lt4lds-plywood-3mm-cut');
+
+    for (const id of [
+      'neotronics-lt4lds-mdf-3mm-cut',
+      'neotronics-lt4lds-paper-card-felt-thin-cut',
+    ]) {
+      expect(presetById(id).revision).not.toBe(plywood.revision);
+    }
   });
 });
+
+function presetById(id: string): (typeof NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS)[number] {
+  const found = NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS.find((preset) => preset.id === id);
+  if (found === undefined) throw new Error(`missing preset ${id}`);
+  return found;
+}

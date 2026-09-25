@@ -18,7 +18,7 @@ import {
   automaticTabAnchorPoints,
   splitClosedPolylineForTabsAtAnchors,
 } from '../geometry/tabs-bridges';
-import type { Polyline, Vec2 } from '../scene';
+import { DEFAULT_CNC_STOCK, type CncLayerSettings, type Polyline, type Vec2 } from '../scene';
 
 export type CncTabSettings = {
   readonly tabWidthMm: number;
@@ -44,6 +44,33 @@ export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number)
   // "tabs everywhere" case unreachable from compilation (ADR-258).
   if (!(depthMm > tabHeightMm + TAB_EPS)) return false;
   return zMm < tabTopZMm(depthMm, tabHeightMm) - TAB_EPS;
+}
+
+// ADR-258 amendment 1: tabs belong on cuts that can free the part. A floor at
+// least one tab height thick under the cut holds the part better than tabs, and
+// tabs there only leave bumps along the groove; Easel likewise adds tabs only
+// when the cut depth reaches the material thickness. A floor thinner than a tab
+// keeps them, so a stock thickness set slightly off still gets tabs. The shipped
+// stock thickness is indistinguishable from never having set it, so on that
+// value any cut may go through and the depth-only rule above stays in force.
+export function cutCanFreePart(
+  depthMm: number,
+  tabHeightMm: number,
+  stockThicknessMm: number,
+): boolean {
+  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return true;
+  return stockThicknessMm - depthMm < tabHeightMm - TAB_EPS;
+}
+
+/** The layer settings the pass builders see: tabs off where the floor holds the part. */
+export function settingsWithStockTabGate(
+  settings: CncLayerSettings,
+  stockThicknessMm: number,
+): CncLayerSettings {
+  if (!settings.tabsEnabled) return settings;
+  return cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
+    ? settings
+    : { ...settings, tabsEnabled: false };
 }
 
 export function splitPassForTabs(

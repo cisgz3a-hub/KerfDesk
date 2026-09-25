@@ -20,7 +20,8 @@ describe('CNC bit picture mapping', () => {
     expect(oBall).toBeDefined();
     if (oBall === undefined) throw new Error('O-flute ball-nose catalog fixture missing');
     expect(cncToolFamilyLabel({ ...oBall.tool, id: 'test' })).toBe('O-flute ball-nose bits');
-    expect(oBall.tool.fluteCount).toBeUndefined();
+    // Amana's O-flute ball-nose bits are single-flute (ToolsToday 51814, 51818).
+    expect(oBall.tool.fluteCount).toBe(1);
   });
 
   it('never lets an unknown or conflicting custom family override its geometry kind', () => {

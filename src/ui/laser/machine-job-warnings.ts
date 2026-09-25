@@ -17,6 +17,7 @@ import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnin
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncMissingPrimaryToolWarnings } from './cnc-missing-primary-tool-warnings';
 import { detectCncOffsetLadderWarnings } from './cnc-offset-ladder-warnings';
+import { detectCncOnPathSizeWarnings } from './cnc-on-path-size-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
@@ -43,6 +44,7 @@ export function detectMachineJobWarnings(
       ? [
           ...detectCncStockWarnings(project, prepared),
           ...detectCncThroughCutTabWarnings(project),
+          ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, prepared?.job),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),

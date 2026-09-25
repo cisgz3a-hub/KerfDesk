@@ -83,6 +83,31 @@ describe('researched catalogue output contracts', () => {
     expect(boundsWarning('xtool-d1-pro', 20, 395)).toBe(true);
   });
 
+  it('uses the xTool LightBurn device file origin and baud rate', () => {
+    // xTool-D1ProV3.lbdev: "MirrorY": true (rear origin), "BaudRate": 230400.
+    for (const id of ['xtool-d1-pro', 'xtool-d1-pro-5w', 'xtool-d1-pro-10w', 'xtool-d1-pro-40w']) {
+      expect(profile(id)).toMatchObject({
+        origin: 'rear-left',
+        homing: { direction: 'rear-left' },
+        baudRate: 230400,
+      });
+    }
+    // Rear origin: the top of the design stays at the machine's low Y (the back).
+    const xtool = profile('xtool-d1-pro');
+    expect(emitGcode(lineProject(xtool, 20, 20)).gcode).toContain('Y20.000');
+    const frontLeft: DeviceProfile = {
+      ...xtool,
+      origin: 'front-left',
+      homing: { enabled: false, direction: 'front-left' },
+    };
+    expect(emitGcode(lineProject(frontLeft, 20, 20)).gcode).not.toContain('Y20.000');
+  });
+
+  it('keeps the Sculpfun S30 inside the published 380 x 385 mm engraving area', () => {
+    expect(profile('sculpfun-s30')).toMatchObject({ bedWidth: 380, bedHeight: 385 });
+    expect(boundsWarning('sculpfun-s30', 390, 20)).toBe(true);
+  });
+
   it('changes the bounds advisory for the fitted Ortur head', () => {
     expect(boundsWarning('ortur-laser-master-3', 20, 390)).toBe(false);
     expect(boundsWarning('ortur-laser-master-3-20w', 20, 390)).toBe(true);

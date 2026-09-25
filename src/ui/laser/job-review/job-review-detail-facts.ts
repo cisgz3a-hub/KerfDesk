@@ -4,6 +4,9 @@
 // table renders these as a muted detail line under each row.
 
 import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core/cnc';
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
+// (scripts/index-export-baseline.json) and may only shrink.
+import { cutCanFreePart } from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
@@ -78,7 +81,7 @@ function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<st
 }
 
 /** The read-only strategy a CNC operation cuts with, joined for one line. */
-export function cncOperationDetail(settings: CncLayerSettings): string {
+export function cncOperationDetail(settings: CncLayerSettings, stockThicknessMm?: number): string {
   // Read the pass count from the same helper the compiler steps with, rather
   // than re-deriving it: zPassDepths carries an epsilon and a per-pass clamp,
   // and a bare Math.ceil disagreed with the emitter on imperial depths
@@ -87,7 +90,7 @@ export function cncOperationDetail(settings: CncLayerSettings): string {
     ...cncDepthParts(settings),
     ...cncStepoverPart(settings),
     ...cncDirectionPart(settings),
-    ...cncProfileTabsPart(settings),
+    ...cncProfileTabsPart(settings, stockThicknessMm),
     ...cncEntryPart(settings),
     ...cncVCarveClearPart(settings),
     ...cncFinishAllowancePart(settings),
@@ -106,8 +109,11 @@ function cncDirectionPart(settings: CncLayerSettings): ReadonlyArray<string> {
     : [settings.cutDirection];
 }
 
-function cncProfileTabsPart(settings: CncLayerSettings): ReadonlyArray<string> {
-  return isProfileCutType(settings.cutType) ? [cncTabsPart(settings)] : [];
+function cncProfileTabsPart(
+  settings: CncLayerSettings,
+  stockThicknessMm: number | undefined,
+): ReadonlyArray<string> {
+  return isProfileCutType(settings.cutType) ? [cncTabsPart(settings, stockThicknessMm)] : [];
 }
 
 function cncVCarveClearPart(settings: CncLayerSettings): ReadonlyArray<string> {
@@ -182,9 +188,18 @@ function laserTabsPart(settings: LayerOperationSettings): string {
   return `tabs ${settings.tabsPerShape} × ${formatMm(settings.tabSizeMm)} mm`;
 }
 
-function cncTabsPart(settings: CncLayerSettings): string {
+function cncTabsPart(settings: CncLayerSettings, stockThicknessMm: number | undefined): string {
   if (!settings.tabsEnabled) return 'tabs off';
-  return `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ${formatMm(settings.tabHeightMm)} mm)`;
+  const configured = `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ${formatMm(settings.tabHeightMm)} mm)`;
+  // ADR-258 amendment 1: the compiler drops tabs where the floor holds the part,
+  // so say so rather than list tabs that will not be cut.
+  if (
+    stockThicknessMm === undefined ||
+    cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
+  ) {
+    return configured;
+  }
+  return `${configured}, skipped: the ${formatMm(stockThicknessMm - settings.depthMm)} mm floor holds the part`;
 }
 
 function cncEntryPart(settings: CncLayerSettings): ReadonlyArray<string> {

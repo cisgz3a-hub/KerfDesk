@@ -151,6 +151,15 @@ describe('material library recipes', () => {
     expect(updated.bidirectionalScanOffsetMm).toBe(0.12);
   });
 
+  it('returns a dynamic layer to Auto when the applied recipe has no power mode', () => {
+    const target = makeLayer({ powerMode: 'dynamic' });
+    const autoRecipe = captureMaterialRecipe(makeLayer({ power: 100, speed: 500 }));
+    const dynamicRecipe = captureMaterialRecipe(makeLayer({ powerMode: 'dynamic' }));
+
+    expect(applyMaterialRecipe(target, autoRecipe).powerMode).toBeUndefined();
+    expect(applyMaterialRecipe(makeLayer(), dynamicRecipe).powerMode).toBe('dynamic');
+  });
+
   it('returns a normalized layer patch without session fields', () => {
     const recipe = captureMaterialRecipe(
       makeLayer({

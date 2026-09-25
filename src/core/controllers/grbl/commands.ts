@@ -24,8 +24,9 @@ export const RT_HOLD = '!';
 /** Safety Door. GRBL stops motion and de-energizes spindle/coolant outputs. */
 export const RT_SAFETY_DOOR = '\x84';
 
-/** Soft reset (Ctrl-X = 0x18). Clears alarm, empties planner, no position loss
- *  if already idle. */
+/** Soft reset (Ctrl-X = 0x18). Empties the planner; no position loss if already
+ *  idle. It does not clear an alarm: GRBL comes back still locked and needs $X
+ *  or $H. */
 export const RT_SOFT_RESET = '\x18';
 
 // --- Line commands ($-prefixed) ---
@@ -38,8 +39,10 @@ export const CMD_UNLOCK = '$X';
 
 /** Sleep — de-energizes the steppers so the gantry can be pushed by hand. GRBL
  *  stays asleep until a soft-reset (Ctrl-X), which also clears the G92 work
- *  origin, so the operator must re-set the origin after waking. The only
- *  portable GRBL v1.1 way to release the motors (no $MD / M18 in stock GRBL). */
+ *  origin, and wakes into ALARM, so the operator must unlock or home and then
+ *  re-set the origin. Stock GRBL has no $MD / M18; apart from the $1 idle
+ *  delay (anything but 255 releases the motors after each move), this is the
+ *  portable way to release them. */
 export const CMD_SLEEP = '$SLP';
 
 /** Settings dump. */
@@ -74,8 +77,8 @@ export const CMD_SET_ORIGIN_HERE = 'G92 X0 Y0';
 
 /** Clear the G92 offset, returning the work coordinate system to its
  *  underlying G54 origin (typically machine zero). G92.1 zeros the active
- *  offset, G92.2 disables without clearing, G92.3 re-enables; we use .1 so
- *  the operator's next "Set origin here" starts from a clean state. */
+ *  offset; stock GRBL rejects G92.2/G92.3 (error:20), so .1 is the only
+ *  portable form and the operator's next "Set origin here" starts clean. */
 export const CMD_CLEAR_ORIGIN = 'G92.1';
 
 /** Zero the work Z at the current bit/head height (CNC: touch the bit to the
@@ -106,9 +109,10 @@ export type JogParams = {
 };
 
 /**
- * Build a `$J=` jog command. Per GRBL v1.1 docs, jog commands are streamed
- * like normal G-code but live in a separate motion queue that can be cancelled
- * with the real-time `\x85` byte without affecting the planner.
+ * Build a `$J=` jog command. Per GRBL v1.1 docs, jog commands are streamed like
+ * normal G-code and planned like normal moves, but they leave the G-code parser
+ * state untouched. The real-time `\x85` byte cancels them with a feed hold that
+ * flushes the queued jog motions.
  */
 export function buildJogCommand(params: JogParams): string {
   assertFiniteOptionalAxis(params.dx, 'dx');
@@ -183,9 +187,9 @@ function assertFiniteOptionalAxis(value: number | undefined, label: string): voi
 }
 
 /** A jog with no nonzero axis would emit `$J=G91 G21 F…` — no axis word —
- *  which GRBL rejects with error:16 on the wire. Fail loudly at the caller
- *  instead (audit F11). Shared by the Marlin/Smoothie builders, whose
- *  axis-less `G0 F…` would silently do nothing. */
+ *  which moves nothing (stock GRBL just answers ok). Fail loudly at the
+ *  caller instead (audit F11). Shared by the Marlin/Smoothie builders, whose
+ *  axis-less `G0 F…` would silently do nothing too. */
 export function assertJogHasAxis(params: JogParams): void {
   const moves = [params.dx, params.dy, params.dz].some(
     (value) => typeof value === 'number' && (params.relative === false || value !== 0),

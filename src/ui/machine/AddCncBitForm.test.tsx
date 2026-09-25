@@ -99,6 +99,9 @@ describe('AddCncBitForm', () => {
       const angle = host.querySelector('[aria-label="New bit included angle (deg)"]');
       expect(angle).toBeInstanceOf(HTMLInputElement);
       expect((angle as HTMLInputElement).value).toBe('');
+      // A shank size typed here would let V-carves run far deeper than the cone.
+      expect((diameter as HTMLInputElement).placeholder).toBe('Cutting Ø mm');
+      expect((diameter as HTMLInputElement).title).toContain('not the shank');
 
       await setInput(host, 'New bit name', 'Shop V-bit');
       await setInput(host, 'New bit diameter (mm)', '3');
