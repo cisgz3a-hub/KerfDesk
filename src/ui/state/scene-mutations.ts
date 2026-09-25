@@ -353,11 +353,19 @@ export function applyReimport(
   // Swap content + bounds but keep id and transform so the user's
   // chosen position/scale/rotation survives. Layer settings carry
   // over for any color still present (layers are keyed by color,
-  // scene-wide).
-  const { operationIds: _incomingOperationIds, ...incomingWithoutOperationIds } = incoming;
+  // scene-wide). A parsed source never supplies operation settings: an SVG
+  // fragment entry's mode override only tells a fresh import which operation
+  // to create, and kept here it would silently switch the object's existing
+  // operation between Line and Fill (ADR-358: legacy re-import keeps its
+  // colour-based reconciliation).
+  const {
+    operationIds: _incomingOperationIds,
+    operationOverride: _sourceMode,
+    ...incomingContent
+  } = incoming;
   const inheritedPaths = inheritPathOperationIds(existing, incoming);
   const replaced: ImportedSvg = {
-    ...incomingWithoutOperationIds,
+    ...incomingContent,
     id: existing.id,
     transform: existing.transform,
     paths: inheritedPaths,
