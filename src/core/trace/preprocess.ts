@@ -35,6 +35,11 @@
 
 import type { RawImageData } from './trace-image';
 import { medianSourceOverPaper, repairIsolatedMedianChanges } from './auto-median';
+import {
+  createSaddleResolver,
+  type SaddlePolicyInput,
+  type SaddleResolver,
+} from './saddle-connectivity';
 
 // ITU-R BT.601 luma weights. Matches thresholdToMonochrome in
 // trace-image.ts so the threshold cutoff is consistent regardless
@@ -289,24 +294,30 @@ function totalScatter(hist: Uint32Array, mean: number): number {
 // tiny holes" — preserving hole topology is critical for letters
 // like O / B / R / etc.
 //
-// Contours use four-connected ink; Centerline opts into eight-connectivity
-// so a diagonal stroke is one component rather than a row of isolated specks.
+// Connectivity must match the stage that consumes the mask. Centerline opts
+// into eight-connectivity so a diagonal stroke is one component rather than a
+// row of isolated specks. Contours pass their saddle policy instead
+// (saddle-connectivity.ts): two diagonally-touching ink pixels are one
+// region exactly when the contour walker will trace them as one loop, so a
+// 1-px diagonal hairline the walker keeps is never erased pixel by pixel.
+// Plain 4 remains the historical four-connected rule.
 // BFS using a single Uint8 visited mask + an index queue. O(N) total
 // work for N pixels regardless of region count.
 export function despeckle(
   image: RawImageData,
   minPixels: number,
-  connectivity: 4 | 8 = 4,
+  connectivity: 4 | 8 | SaddlePolicyInput = 4,
 ): RawImageData {
   if (minPixels <= 1) return image;
   const { width: w, height: h } = image;
   const out = new Uint8ClampedArray(image.data);
   const visited = new Uint8Array(w * h);
+  const diagonal = diagonalLinks(image, connectivity);
   for (let startIdx = 0; startIdx < w * h; startIdx += 1) {
     if (visited[startIdx] !== 0) continue;
     visited[startIdx] = 1;
     if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
-    const region = bfsInkRegion(out, visited, w, h, startIdx, connectivity);
+    const region = bfsInkRegion(out, visited, w, h, startIdx, diagonal);
     if (region.length < minPixels) {
       eraseRegion(out, region);
     }
@@ -314,16 +325,42 @@ export function despeckle(
   return { width: w, height: h, data: out };
 }
 
+// Which diagonal ink steps join a region: none (4), all (8), or those whose
+// saddle corner the contour policy resolves in favour of ink. A diagonal
+// step whose corner is NOT a saddle (one of the two in-between pixels is
+// ink) is always allowed — those pixels are four-connected through it.
+type DiagonalLinks =
+  | 'none'
+  | 'all'
+  | { readonly ink: Uint8Array; readonly saddles: SaddleResolver };
+
+function diagonalLinks(
+  image: RawImageData,
+  connectivity: 4 | 8 | SaddlePolicyInput,
+): DiagonalLinks {
+  if (connectivity === 4) return 'none';
+  if (connectivity === 8) return 'all';
+  const ink = new Uint8Array(image.width * image.height);
+  for (let i = 0; i < ink.length; i += 1) ink[i] = lumaAt(image.data, i * 4) < 128 ? 1 : 0;
+  const mask = { width: image.width, height: image.height, ink };
+  const saddles = createSaddleResolver(
+    mask,
+    connectivity.turnPolicy,
+    connectivity.field,
+    connectivity.pixelScale,
+  );
+  return { ink, saddles };
+}
+
 // BFS the connected ink region (luma < 128) starting at `startIdx`.
-// Marks every visited cell in `visited`. Diagonal neighbours participate only
-// for callers whose stroke topology uses eight-connected ink.
+// Marks every visited cell in `visited`.
 function bfsInkRegion(
   out: Uint8ClampedArray,
   visited: Uint8Array,
   w: number,
   h: number,
   startIdx: number,
-  connectivity: 4 | 8,
+  diagonal: DiagonalLinks,
 ): number[] {
   const region: number[] = [startIdx];
   const queue: number[] = [startIdx];
@@ -335,14 +372,39 @@ function bfsInkRegion(
     visitNeighbour(out, visited, w, h, cx + 1, cy, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy - 1, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy + 1, region, queue);
-    if (connectivity === 8) {
-      visitNeighbour(out, visited, w, h, cx - 1, cy - 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx + 1, cy - 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx - 1, cy + 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx + 1, cy + 1, region, queue);
+    if (diagonal === 'none') continue;
+    for (const [sx, sy] of DIAGONAL_STEPS) {
+      if (!diagonalStepJoins(diagonal, w, cx, cy, sx, sy)) continue;
+      visitNeighbour(out, visited, w, h, cx + sx, cy + sy, region, queue);
     }
   }
   return region;
+}
+
+const DIAGONAL_STEPS: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
+
+function diagonalStepJoins(
+  diagonal: DiagonalLinks,
+  w: number,
+  cx: number,
+  cy: number,
+  sx: number,
+  sy: number,
+): boolean {
+  if (diagonal === 'all') return true;
+  if (diagonal === 'none') return false;
+  const nx = cx + sx;
+  const ny = cy + sy;
+  // Out-of-image targets are rejected by visitNeighbour; the in-between
+  // pixels of an in-image target are always in the image.
+  if (nx < 0 || nx >= w || ny < 0 || ny * w >= diagonal.ink.length) return false;
+  if ((diagonal.ink[cy * w + nx] ?? 0) === 1 || (diagonal.ink[ny * w + cx] ?? 0) === 1) return true;
+  return diagonal.saddles(Math.max(cx, nx), Math.max(cy, ny));
 }
 
 function visitNeighbour(

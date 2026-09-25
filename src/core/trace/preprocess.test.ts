@@ -275,6 +275,42 @@ describe('despeckle', () => {
     expect(img.data).toEqual(before);
   });
 
+  it('follows the contour saddle policy: a diagonal hairline is one region', () => {
+    // 12-pixel one-pixel diagonal + a 3-pixel diagonal fleck. Under the
+    // walker's auto policy both are single regions (ADR-395), so the long
+    // hairline survives minPixels 12 while the fleck goes; the historical
+    // four-connected rule erased the hairline pixel by pixel.
+    const size = 16;
+    const luma = Array.from({ length: size }, () => Array.from({ length: size }, () => 255));
+    for (let i = 1; i <= 12; i += 1) (luma[i] as number[])[i] = 0;
+    for (let i = 0; i < 3; i += 1) (luma[13 + i] as number[])[2 + i] = 0;
+    const img = gridImage(luma);
+    const auto = despeckle(img, 12, { turnPolicy: 'auto', field: null });
+    for (let i = 1; i <= 12; i += 1) expect(lumaOf(auto, i, i)).toBe(0);
+    for (let i = 0; i < 3; i += 1) expect(lumaOf(auto, 2 + i, 13 + i)).toBe(255);
+    const paper = despeckle(img, 12, { turnPolicy: 'connect-paper' });
+    for (let i = 1; i <= 12; i += 1) expect(lumaOf(paper, i, i)).toBe(255);
+    expect(despeckle(img, 12, 4).data).toEqual(paper.data);
+  });
+
+  it('keeps two corner-touching squares as separate regions under auto', () => {
+    // 2×2 squares kissing at a corner tie the minority window, so they stay
+    // two 4-pixel regions (as the walker traces them) and minPixels 5
+    // removes both.
+    const img = gridImage([
+      [0, 0, 255, 255],
+      [0, 0, 255, 255],
+      [255, 255, 0, 0],
+      [255, 255, 0, 0],
+    ]);
+    const out = despeckle(img, 5, { turnPolicy: 'auto' });
+    expect(lumaOf(out, 0, 0)).toBe(255);
+    expect(lumaOf(out, 3, 3)).toBe(255);
+    const joined = despeckle(img, 5, { turnPolicy: 'connect-ink' });
+    expect(lumaOf(joined, 0, 0)).toBe(0);
+    expect(lumaOf(joined, 3, 3)).toBe(0);
+  });
+
   it('preserves holes inside letter-like shapes (topology preserving)', () => {
     // 5×5 ink ring with a white hole in the middle — like the
     // interior of a letter O. The hole is a 1-pixel BACKGROUND
