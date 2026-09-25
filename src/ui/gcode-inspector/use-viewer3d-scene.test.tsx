@@ -83,6 +83,7 @@ async function withMountedScene(
     useSceneSync({
       handleRef: nextBinding.handleRef,
       state: nextBinding.state,
+      model: props.model,
       playhead: null,
       colorOf: COLOR_OF,
       live: null,
@@ -131,6 +132,19 @@ beforeEach(() => {
 });
 
 describe('useViewer3dScene', () => {
+  it('applies the initial view settings before submitting GPU preparation', async () => {
+    SCENE_MOCKS.prepareToShow.mockImplementation(async () => {
+      expect(SCENE_MOCKS.setPlayhead).toHaveBeenCalledOnce();
+      expect(SCENE_MOCKS.recolor).toHaveBeenCalledOnce();
+      expect(SCENE_MOCKS.setDirectionArrows).toHaveBeenCalledOnce();
+      expect(SCENE_MOCKS.setLiveMachine).toHaveBeenCalledOnce();
+    });
+    await withMountedScene(renderModel(FIRST_PROGRAM), ({ getBinding }) => {
+      expect(getBinding()?.state).toBe('ready');
+      expect(SCENE_MOCKS.prepareToShow).toHaveBeenCalledOnce();
+    });
+  });
+
   it('keeps preparing until the current model GPU frame is complete', async () => {
     let finish!: () => void;
     SCENE_MOCKS.prepareToShow.mockImplementation(
@@ -141,9 +155,10 @@ describe('useViewer3dScene', () => {
     );
     await withMountedScene(renderModel(FIRST_PROGRAM), async ({ getBinding }) => {
       expect(getBinding()?.state).toBe('preparing');
-      expect(SCENE_MOCKS.setPlayhead).not.toHaveBeenCalled();
+      expect(SCENE_MOCKS.setPlayhead).toHaveBeenCalledOnce();
       await act(async () => finish());
       expect(getBinding()?.state).toBe('ready');
+      expect(SCENE_MOCKS.setPlayhead).toHaveBeenCalledOnce();
     });
   });
 
@@ -178,7 +193,7 @@ describe('useViewer3dScene', () => {
     await withMountedScene(renderModel(FIRST_PROGRAM), ({ getBinding }) => {
       expect(getBinding()?.state).toBe('no-webgl');
       expect(getBinding()?.reason).toBe('GPU context lost');
-      expect(SCENE_MOCKS.setPlayhead).not.toHaveBeenCalled();
+      expect(SCENE_MOCKS.setPlayhead).toHaveBeenCalledOnce();
       expect(getBinding()?.handleRef.current).toBeNull();
       expect(SCENE_MOCKS.dispose).toHaveBeenCalledOnce();
     });
