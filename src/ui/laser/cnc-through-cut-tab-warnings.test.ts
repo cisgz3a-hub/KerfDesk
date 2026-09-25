@@ -11,6 +11,7 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../../core/scene';
+import { settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 
 function cncProjectWithLayerCnc(cnc: CncLayerSettings | undefined): Project {
@@ -188,5 +189,68 @@ describe('detectCncThroughCutTabWarnings', () => {
 
   it('returns nothing for a laser project', () => {
     expect(detectCncThroughCutTabWarnings(createProject())).toEqual([]);
+  });
+});
+
+describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', () => {
+  function projectWith(stockThicknessMm: number, cnc: CncLayerSettings): Project {
+    const project = cncProjectWithLayerCnc(cnc);
+    const stock = { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockThicknessMm };
+    return { ...project, machine: { ...DEFAULT_CNC_MACHINE_CONFIG, stock } };
+  }
+
+  it('names the stock thickness it relied on when tabs are dropped', () => {
+    // A 12.7 mm value left from a 1/2" job while 1/4" plywood is cut 6.8 mm deep:
+    // the compiler emits no tabs, and nothing else in Job Review says so.
+    const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 6.8, tabsEnabled: true };
+    const warnings = detectCncThroughCutTabWarnings(projectWith(12.7, cnc));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('skips its holding tabs');
+    expect(warnings[0]).toContain('Stock thickness is 12.7 mm');
+    expect(warnings[0]).toContain('6.8 mm cut leaves a 5.9 mm floor');
+  });
+
+  it('is silent wherever the tabs are still cut or never apply', () => {
+    const tabs = { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: true };
+    const shipped = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
+    // A floor thinner than a tab keeps them.
+    expect(detectCncThroughCutTabWarnings(projectWith(12.7, { ...tabs, depthMm: 11.5 }))).toEqual(
+      [],
+    );
+    // The shipped thickness counts as "not set", so any cut keeps its tabs.
+    expect(detectCncThroughCutTabWarnings(projectWith(shipped, { ...tabs, depthMm: 3 }))).toEqual(
+      [],
+    );
+    // No deeper than a tab, and tabs switched off: nothing was dropped.
+    expect(detectCncThroughCutTabWarnings(projectWith(12.7, { ...tabs, depthMm: 2 }))).toEqual([]);
+    expect(
+      detectCncThroughCutTabWarnings(
+        projectWith(12.7, { ...tabs, depthMm: 6.8, tabsEnabled: false }),
+      ),
+    ).toEqual([]);
+    // Pockets never get tabs.
+    expect(
+      detectCncThroughCutTabWarnings(
+        projectWith(12.7, { ...tabs, depthMm: 6.8, cutType: 'pocket' as const }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fires exactly where the compiler drops tabs a profile asked for', () => {
+    for (const stockThicknessMm of [3, 6.35, 9, 12.7, 18]) {
+      for (const depthMm of [0.5, 1, 2, 2.5, 4, 6.8, 9, 12, 18, 19]) {
+        const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm, tabsEnabled: true };
+        const gated = settingsWithStockTabGate(cnc, stockThicknessMm);
+        const dropped = depthMm > cnc.tabHeightMm && !gated.tabsEnabled;
+        const warned = detectCncThroughCutTabWarnings(projectWith(stockThicknessMm, cnc)).some(
+          (warning) => warning.includes('skips its holding tabs'),
+        );
+        expect({ stockThicknessMm, depthMm, warned }).toEqual({
+          stockThicknessMm,
+          depthMm,
+          warned: dropped,
+        });
+      }
+    }
   });
 });

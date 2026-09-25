@@ -57,10 +57,18 @@ export function spindleScaleMismatchMessage(
     : `${mismatch} Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
 }
 
+// GRBL's laser mode passes zero spindle speed on every non-cutting motion and
+// skips the spin-up delay, at the dwell after M3 and on Resume (CNC audit JR-1,
+// MC-1: gcode.c, protocol.c).
+const ROUTER_LASER_MODE_EFFECTS =
+  'in laser mode the spindle only turns during cutting moves, so the spin-up dwell after M3 runs with it off, plunges start with the bit not at speed, and Resume after a pause restarts motion with no spin-up.';
+
+export const CNC_LASER_MODE_ENABLED_MESSAGE = `Controller reports $32=1 (laser mode). Set $32=0 for spindle work: ${ROUTER_LASER_MODE_EFFECTS}`;
+
+export const FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE = `Controller reports $32=1: its spindle is configured as Laser. FluidNC's $32 follows the spindle type and cannot be set with $32=0, so configure the router's spindle (not Laser) in the FluidNC YAML config for spindle work: ${ROUTER_LASER_MODE_EFFECTS}`;
+
 export function routerLaserModeMessage(source: ReadinessSettingsSource): string {
-  const reason =
-    'laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.';
   return source === 'fluidnc-yaml'
-    ? `Controller reports $32=1: its spindle is configured as Laser. FluidNC's $32 follows the spindle type and cannot be set with $32=0, so configure the router's spindle (not Laser) in the FluidNC YAML config for spindle work: ${reason}`
-    : `Controller reports $32=1 (laser mode). Set $32=0 for spindle work: ${reason}`;
+    ? FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE
+    : CNC_LASER_MODE_ENABLED_MESSAGE;
 }

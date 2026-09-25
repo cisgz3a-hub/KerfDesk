@@ -15,6 +15,8 @@ const LASER_CAPABILITIES: ReadonlyArray<ProfileCapability> = [
   'rotary',
 ];
 const RESEARCHED_AT = '2026-09-19';
+// Catalog version of the presets #894 corrected (preset-corrections.ts).
+const PRESET_CORRECTED_AT = '2026-09-24';
 const CONFIGURED_TRAVEL_NOTE =
   'Controller-reported configured travel is not a measurement of usable travel with the fitted head. Confirm firmware, homing, S range and usable work area.';
 
@@ -84,6 +86,9 @@ function xtoolProfile(power: 5 | 10 | 20 | 40, bedHeight: number): DeviceProfile
       source: `${power === 40 ? XTOOL_40W_SOURCE : XTOOL_SOURCE}; ${XTOOL_LIGHTBURN_DEVICE}`,
       note: `${power} W head on the standard frame: 430 x ${bedHeight} mm. Extension rails and other heads need their own dimensions. xTool's LightBurn device file puts the origin at the rear-left, uses 230400 baud and sets EnableGrblJCommand: false, so LightBurn does not jog it with $J=. KerfDesk's Jog and Frame use $J= jog commands: if Jog or Frame fails with an error on this firmware, the machine is not compatible with $J= jogging.`,
     }),
+    // Content corrected on this date (origin, baud); the sources above were
+    // checked on RESEARCHED_AT. See preset-corrections.ts.
+    catalogVersion: PRESET_CORRECTED_AT,
     origin: 'rear-left',
     homing: { enabled: false, direction: 'rear-left' },
     baudRate: 230400,
@@ -97,7 +102,7 @@ export const XTOOL_D1_PRO_PROFILES: ReadonlyArray<DeviceProfile> = [
   xtoolProfile(40, 348),
 ];
 
-const SCULPFUN_S30_BASE = diodeProfile({
+const SCULPFUN_S30_DIODE = diodeProfile({
   profileId: 'sculpfun-s30',
   vendor: 'Sculpfun',
   model: 'S30 (5 W, stock automatic air)',
@@ -113,6 +118,8 @@ const SCULPFUN_S30_BASE = diodeProfile({
     'https://www.sculpfun.com/products/sculpfun-s30-5w-laser-engraver-rotary-roller-40-40cm-honeycomb-panel',
   note: 'Base S30: 380 x 385 mm engraving area and a supplied M8-controlled pump. Sculpfun firmware ships with homing and hard limits on ($22=1, $21=1) and M9 drops the pump to low air rather than off. Pro/Max heads and extension kits differ.',
 });
+// Bed corrected from 410 x 400 mm on this date; see preset-corrections.ts.
+const SCULPFUN_S30_BASE = { ...SCULPFUN_S30_DIODE, catalogVersion: PRESET_CORRECTED_AT };
 
 export const SCULPFUN_S30_PROFILE: DeviceProfile = {
   ...SCULPFUN_S30_BASE,

@@ -35,6 +35,21 @@ export const HOME_OFFER_PROMPT =
   'OK: home now and continue when the cycle finishes.\n' +
   'Cancel: leave it blocked.';
 
+// A job placed at the head's current position is anchored wherever the head is
+// when it is framed, and the homing cycle parks the head at the switches.
+export const HOME_OFFER_CURRENT_POSITION_PROMPT =
+  'The controller is in Alarm.\n\n' +
+  'Home runs the homing cycle to re-establish machine position. Make sure the machine ' +
+  'is clear before it moves.\n\n' +
+  'This job starts where the head is, and homing moves the head, so framing stops after ' +
+  'the cycle: jog the head back to where the job should start, then Frame again.\n\n' +
+  'OK: home now.\n' +
+  'Cancel: leave it blocked.';
+
+export const HOMED_PLACE_HEAD_NEXT_STEP_MESSAGE =
+  'Homed. This job starts where the head is: jog the head to where the job should start, ' +
+  'then Frame again.';
+
 // grblHAL raises ALARM:10 while its E-stop input is asserted and refuses both
 // Home and Unlock until the E-stop is released and the controller reset, so
 // neither is offered and the alarm's own instructions stand. Stock GRBL 1.1h
@@ -92,13 +107,23 @@ async function offerUnlock(): Promise<BlockedStartRepair> {
 }
 
 async function offerHomeCycle(): Promise<BlockedStartRepair> {
-  if (!jobAwareConfirm(HOME_OFFER_PROMPT)) return 'unrepaired';
+  const placedAtHead = useStore.getState().jobPlacement.startFrom === 'current-position';
+  if (!jobAwareConfirm(placedAtHead ? HOME_OFFER_CURRENT_POSITION_PROMPT : HOME_OFFER_PROMPT)) {
+    return 'unrepaired';
+  }
   try {
     // GRBL acks $H only after the physical cycle completes, so this await
     // spans the whole homing run.
     await useLaserStore.getState().home();
   } catch (cause) {
     return repairFailed('Homing failed', cause);
+  }
+  // Continuing would frame a job placed at the head's position at the switches,
+  // and a clean trace there enables Start: hand back the step that places it,
+  // as the Unlock path does.
+  if (placedAtHead) {
+    useToastStore.getState().pushToast(HOMED_PLACE_HEAD_NEXT_STEP_MESSAGE, 'info');
+    return 'handled';
   }
   return settleThenRetry(
     (state) => state.alarmCode === null && state.statusReport?.state === 'Idle',

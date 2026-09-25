@@ -1383,8 +1383,8 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits for it to reach speed, then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming.
-2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues.
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported.
+2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
    fresh `Run`/`Idle` proof releases host refill. Every immediately stageable owned stream write
@@ -1980,7 +1980,11 @@ that window reconciles, once the 5 s Start owner lease has expired, into a capsu
 acknowledged lines with an `unknown` interruption, backed by the fingerprint-only stand-in; if the
 archive was already stored, that verified archive backs the capsule instead and the run is added
 to the execution history (ADR-341 Amendment 3). Supervised recovery Starts still stage and verify
-their archive before transmission.
+their archive before transmission. The window that starts a run holds a lock named for it while the
+run is pending or active. A window opened meanwhile leaves that run alone, and turns an active run
+into an **Interrupted job saved** card only when no live window holds its lock. The browser drops
+the lock when the owning window closes, reloads or crashes, so crash recovery is unchanged
+(ADR-369 Amendment 1).
 
 #### Success — resume after a crash
 1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
@@ -2069,12 +2073,14 @@ their archive before transmission.
    the newest capsule with zero diagnostic acknowledgements and an explicit
    acceptance-unknown reason. It may be a conservative false positive when the
    app died before the first program byte, but the older source is never offered
-   after a newer Start may have changed machine state. A still-live tab renews a
-   five-second owner lease every second until its handoff closes, including while
-   it stores the execution archive after the controller has accepted the program.
-   Another tab reconciles the Start only after that lease has gone unrenewed for a
-   whole lease on its own clock, which a live tab avoids unless it is frozen for
-   several seconds (ADR-369).
+   after a newer Start may have changed machine state. For a fresh Start, a still-live
+   tab renews a five-second owner lease every second until its handoff closes,
+   including while it stores the execution archive after the controller has accepted
+   the program. Another tab reconciles the Start only after that lease has gone
+   unrenewed for a whole lease on its own clock, which a live tab avoids unless it is
+   frozen for several seconds (ADR-369). A supervised recovery Start, like this one,
+   does not renew: it stages and verifies its archive before arming, so its lease
+   covers only the Start boundary (ADR-369 item 4).
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires
@@ -2108,6 +2114,9 @@ their archive before transmission.
    stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
+   A job placed at the head's current position does not frame on after Home, because the cycle
+   parks the head at the switches: the Frame stops and asks the operator to jog the head back
+   into place and Frame again (ADR-367 Amendment 1).
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
    transport permission, advances epochs, and clears controller/live-run/recovery/
    replay/evidence/error/log state. It preserves the canvas, layers, profile,
@@ -2216,7 +2225,11 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
    machines also have CNC presets. A profile card is one option in a radio group: a pointer
    anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
-   sits outside the choice so reading the evidence selects nothing. Detected matches are
+   sits outside the choice so reading the evidence selects nothing. Choosing copies the preset
+   whole, so a later correction to the preset never reaches that copy; when a saved copy still
+   holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
+   410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
+   Amendment 1). Detected matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
    ceiling. Controller family, baud, output dialect,
@@ -3570,6 +3583,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    It never blocks save or Start: ADR-228 made a completed Frame the sole Start
    gate, and F-A10 documents the same non-blocking behavior.
 
+#### Warning — tabs skipped because of the stock thickness
+1. A profile with tabs on keeps them only where the cut can free the part (ADR-258
+   Amendment 1): a floor at least one tab height thick under the cut drops them. Stock
+   thickness is only what the project says, so when it drops tabs Job Review names the
+   thickness, the cut depth and the floor it relied on, and asks the operator to check Stock
+   thickness (ADR-258 Amendment 2). A value left from thicker stock would otherwise free the
+   parts on the final pass with no tabs. The warning never blocks save or Start.
+
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
    emitted for it.
@@ -3577,6 +3598,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Edge — open paths on a profile-outside layer
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
+
+#### Warning — a tapered ball nose sets pocket or profile offsets
+1. A tapered ball nose is modelled for relief finishing (ADR-368), but pocket and
+   profile offsets, and relief roughing, still step by its widest diameter at the
+   top of the flutes. When one is the main bit of a pocket, an inside or outside
+   profile, or a relief, Job Review warns that the result comes out off-size or
+   ribbed and suggests a flat end mill or the 3D removal preview (ADR-368
+   Amendment 1). The warning never blocks save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
