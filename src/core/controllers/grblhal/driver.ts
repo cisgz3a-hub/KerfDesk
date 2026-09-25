@@ -13,6 +13,11 @@ export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'grblhal',
   label: 'grblHAL',
+  capabilities: {
+    ...grblDriver.capabilities,
+    // grblHAL's homing loop serves status requests (machine_limits.c:445-447).
+    statusWhileHoming: true,
+  },
   commands: {
     ...grblDriver.commands,
     // grblHAL extends `$I`; do not treat a variant response as stock proof.

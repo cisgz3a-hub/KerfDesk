@@ -5,7 +5,13 @@ import {
   waitForFreshIdle,
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
-import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { grblHomingDurationBoundMs } from '../../core/controllers/grbl/grbl-homing-duration';
+import {
+  controllerErrorNotice,
+  homeUnfinishedNotice,
+  type LaserSafetyAction,
+  type LaserSafetyNotice,
+} from './laser-safety-notice';
 import { resetRequiredBlockMessage } from './controller-reset-required';
 import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
@@ -50,6 +56,22 @@ let nextHomeOperationId = 1;
 // status polling pauses during a pending command (Marlin) it must cover the
 // whole cycle.
 const HOME_COMMAND_TIMEOUT_MS = 120_000;
+
+// Stock GRBL answers no status query while it homes, so status silence says
+// nothing there. The wait is the longest cycle its own `$$` settings allow,
+// with room for acceleration and startup lines, and a long backstop when the
+// settings were not read; GRBL itself raises ALARM:8/9 when a switch is not
+// found (controller audit 2026-09-25 ST-4).
+const SILENT_HOME_MARGIN = 1.5;
+const SILENT_HOME_EXTRA_MS = 30_000;
+const SILENT_HOME_BACKSTOP_MS = 30 * 60_000;
+
+function homeLineTimeoutMs(state: LaserState, driver: ControllerDriver): number {
+  if (driver.capabilities.statusWhileHoming !== false) return HOME_COMMAND_TIMEOUT_MS;
+  const bound = grblHomingDurationBoundMs(state.grblSettingsRows);
+  if (bound === null) return SILENT_HOME_BACKSTOP_MS;
+  return Math.max(HOME_COMMAND_TIMEOUT_MS, bound * SILENT_HOME_MARGIN + SILENT_HOME_EXTRA_MS);
+}
 
 const PENDING_WRITE_HOME_MESSAGE =
   'Home is blocked until the previous controller write and terminal acknowledgement settle.';
@@ -160,11 +182,11 @@ async function executeHomeSequence(
     if (index > 0) set(reopenHomeAlarmReplyWindow);
     await startControllerCommand(refs, safeWrite, {
       kind: 'home',
-      label: 'home',
+      label: 'Home',
       command: `${command}\n`,
       action: 'home',
       source: 'motion',
-      timeoutMs: HOME_COMMAND_TIMEOUT_MS,
+      timeoutMs: homeLineTimeoutMs(get(), driver),
       timeoutMode: 'non-idle-status-activity',
     });
     assertHomeCurrent(get(), refs, epochs);
@@ -223,10 +245,20 @@ function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void
       homingProof: null,
       ...refusedHomePositionPatch(state, operation, error, epochs),
       lastWriteError: message,
-      safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
+      safetyNotice: state.safetyNotice ?? homeFailureNotice(error, message),
       log: pushLog(state, `[lf2] Home failed: ${message}`),
     };
   });
+}
+
+// Only a line the controller answered with error:N was rejected; a timeout, an
+// alarm or a voided attempt is a Home that did not finish (audit ST-4).
+function homeFailureNotice(error: unknown, message: string): LaserSafetyNotice {
+  if (!(error instanceof ControllerCommandRefusedError)) return homeUnfinishedNotice(message);
+  const code = /^error:(\d+)$/i.exec(message.trim());
+  return code === null
+    ? controllerErrorNotice(null, 'command', message)
+    : controllerErrorNotice(Number(code[1]), 'command');
 }
 
 // KD-HOME-03/04 hides status positions after a failed Home because the cycle

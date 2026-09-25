@@ -75,7 +75,7 @@ function noticeKind(status: StreamerStatus, notice: LaserSafetyNotice): JobInter
   if (notice.kind === 'disconnect-stop-unconfirmed') {
     return status === 'cancelled' ? 'cancelled' : 'disconnect';
   }
-  if (notice.kind === 'frame-limit') return 'unknown';
+  if (notice.kind === 'frame-limit' || notice.kind === 'home-unfinished') return 'unknown';
   return notice.kind;
 }
 

@@ -73,6 +73,10 @@ export type LaserSafetyNotice =
   | {
       readonly kind: 'frame-limit';
       readonly message: string;
+    }
+  | {
+      readonly kind: 'home-unfinished';
+      readonly message: string;
     };
 
 // M13 (AUDIT-2026-06-10): the streamer is ack-driven — if GRBL stops
@@ -144,18 +148,32 @@ export function disconnectStopUnconfirmedNotice(): LaserSafetyNotice {
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the
 // job box, i.e. the job does not fit the travel from this hand-set origin. The
 // alarm cleared the origin (G92) and the verification, so the operator must
-// unlock, re-home the origin somewhere safer (or shrink the job), and re-frame.
+// reset, unlock, re-home the origin somewhere safer (or shrink the job), and
+// re-frame. A hard limit is a critical event: the controller takes only a soft
+// reset until it gets one (ADR-393).
 export function frameHitLimitMessage(axisLabel: string | null): string {
   const where = axisLabel === null ? 'a limit switch' : `the ${axisLabel} limit switch`;
   return (
     `The Verified Frame hit ${where} — the job does not fit the travel from this origin. ` +
-    'Unlock ($X), move the origin away from that edge or shrink the job, set the origin again, ' +
-    'then re-frame before starting.'
+    'Press Reset (Ctrl-X), then Unlock ($X), move the origin away from that edge or shrink the ' +
+    'job, set the origin again, then re-frame before starting.'
   );
 }
 
 export function frameHitLimitNotice(axisLabel: string | null): LaserSafetyNotice {
   return { kind: 'frame-limit', message: frameHitLimitMessage(axisLabel) };
+}
+
+/** Home ended without the controller confirming it: a timeout, an alarm, or a
+ *  change that voided the attempt. Not a rejection, so it is not worded as one
+ *  (controller audit 2026-09-25 ST-4). */
+export function homeUnfinishedNotice(reason: string): LaserSafetyNotice {
+  return {
+    kind: 'home-unfinished',
+    message:
+      `Home did not finish: ${reason} The machine may have stopped anywhere or may still be ` +
+      'homing. Wait until it stops, check it, then Home again.',
+  };
 }
 
 export function writeFailedMessage(action: LaserSafetyAction): string {

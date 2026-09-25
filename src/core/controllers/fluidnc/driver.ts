@@ -66,5 +66,7 @@ export const fluidncDriver: ControllerDriver = {
     ...grblDriver.capabilities,
     settings: 'readonly-dump',
     firmwareSetupPanel: 'none',
+    // FluidNC homes from its event loop, which goes on serving `?`.
+    statusWhileHoming: true,
   },
 };

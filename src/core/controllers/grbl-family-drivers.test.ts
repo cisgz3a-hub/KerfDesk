@@ -25,7 +25,13 @@ describe('GRBL-family variant drivers', () => {
     expect(grblHalDriver.label).toBe('grblHAL');
     expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
-    expect(grblHalDriver.capabilities).toEqual(grblDriver.capabilities);
+    // grblHAL's homing loop serves `?`; stock GRBL's does not (audit ST-4).
+    expect(grblHalDriver.capabilities).toEqual({
+      ...grblDriver.capabilities,
+      statusWhileHoming: true,
+    });
+    expect(grblDriver.capabilities.statusWhileHoming).toBe(false);
+    expect(fluidncDriver.capabilities.statusWhileHoming).toBe(true);
     expect(grblHalDriver.defaultBaudRate).toBe(115200);
   });
 

@@ -83,4 +83,10 @@ export type ControllerCapabilities = {
   // sequence (M400 first) cannot run there (controller audit 2026-09-25
   // CG-4). Absent means true.
   readonly homeFromAlarm?: boolean;
+  // Whether the firmware answers a status query while it homes. Stock GRBL
+  // 1.1 services no realtime request inside its homing loop (limits.c:319-320,
+  // "No time to run protocol_execute_realtime() in this loop"), so its Home
+  // cannot be timed on status silence (controller audit 2026-09-25 ST-4).
+  // Absent means true.
+  readonly statusWhileHoming?: boolean;
 };
