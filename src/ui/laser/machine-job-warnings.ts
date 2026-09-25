@@ -5,6 +5,7 @@
 // branch in ONE place so both call sites stay simple.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import { smoothiePowerScaleWarning } from '../../core/devices/smoothie-power-scale';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
@@ -64,6 +65,12 @@ export function detectMachineJobWarnings(
           ...detectLaserReliefWarnings(project),
           ...detectJobIntentWarnings(project, prepared?.job),
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
+          // A saved Smoothieware profile above S 2 (controller audit SM-7).
+          ...warningList(smoothiePowerScaleWarning(project.device)),
         ];
   return [...detectActiveWcsMismatchWarnings(activeWcs), ...machineWarnings];
+}
+
+function warningList(warning: string | null): ReadonlyArray<string> {
+  return warning === null ? [] : [warning];
 }
