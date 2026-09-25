@@ -7,7 +7,7 @@
 // qualified: the host has to keep asking `?` while it waits, because GRBL only
 // reports status when asked (grbl/protocol.c protocol_exec_rt_system:
 // "if (rt_exec & EXEC_STATUS_REPORT) { report_realtime_status(); ...}" -
-// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L193-L196),
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L250-L253),
 // and the ordinary status poll is only started after the handshake returns
 // (src/ui/state/laser-connection-actions.ts startConnectedControllerHandshake
 // .finally).

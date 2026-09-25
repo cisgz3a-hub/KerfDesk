@@ -86,18 +86,18 @@ describe('MA-8: Marlin G0 moves at the modal feed', () => {
       .connect(marlin.adapter, { controllerKind: 'marlin', baudRate: 250000 });
     marlin.emitLine('start');
     await vi.advanceTimersByTimeAsync(1_500);
-    // A Frame or jog commonly leaves 6000 mm/min modal before Start.
-    await useLaserStore.getState().jog({ dx: 0.1, feed: 6_000 });
-    await vi.advanceTimersByTimeAsync(2_000);
+    // The first travel runs at whatever feed is modal (Marlin's power-on
+    // DEFAULT_FEEDRATE_MM_M 4000 here, a Frame's or jog's F in practice).
 
     const startedAt = Date.now();
     await startTestLaserJob(program, {
       streamingMode: 'ping-pong',
       ...laserCountdownTestHandoff({ gcode: program, retentionKey: 'ma-8', capability: 'settle-only' }),
     });
+    await vi.advanceTimersByTimeAsync(100);
     const timing = useLaserStore.getState().liveCanvasRun?.timing;
     const planned =
-      timing !== undefined && 'plan' in timing ? (timing.plan as { totalSeconds: number }).totalSeconds : NaN;
+      timing !== undefined && 'plan' in timing ? timing.plan.totalSeconds : Number.NaN;
     expect(Number.isFinite(planned)).toBe(true);
 
     let finishedAt = Number.NaN;
