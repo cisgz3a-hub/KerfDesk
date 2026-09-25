@@ -381,7 +381,7 @@ function traceNumberTitle(label: string): string {
     case 'Remove ink specks':
       return 'Remove ink marks below this pixel area. Lower values keep fine detail; holes stay intact.';
     case 'Smoothness':
-      return 'Smooth traced edges to reduce jagged vector paths.';
+      return 'Low keeps sharp pixel corners; high rounds corners and smooths jagged edges.';
     case 'Optimize':
       return 'Simplify traced paths while preserving shape.';
     case 'Sensitivity':

@@ -282,7 +282,7 @@ describe('trace controls describe the options the engine actually receives', () 
         expect(input.title).toContain(role);
         expect(hint?.textContent).toBe(input.title);
       }
-      expect(controls.host.textContent).not.toContain('Smooth traced edges');
+      expect(controls.host.textContent).not.toContain('keeps sharp pixel corners');
     });
   });
 });

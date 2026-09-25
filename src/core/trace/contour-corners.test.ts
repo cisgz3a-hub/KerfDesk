@@ -39,10 +39,11 @@ function square(side: number) {
   return raster(size, size, (x, y) => inside(x) && inside(y));
 }
 
-function disc(radius: number) {
-  const centre = radius + MARGIN + 0.37;
-  const size = Math.ceil(2 * centre);
-  return raster(size, size, (x, y) => Math.hypot(x + 0.5 - centre, y + 0.5 - centre) <= radius);
+function disc(radius: number, offsetX = 0.37, offsetY = offsetX) {
+  const cx = radius + MARGIN + offsetX;
+  const cy = radius + MARGIN + offsetY;
+  const size = Math.ceil(2 * Math.max(cx, cy));
+  return raster(size, size, (x, y) => Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= radius);
 }
 
 function sprite(rows: ReadonlyArray<string>, cell: number) {
@@ -191,21 +192,75 @@ describe('corner dial', () => {
       expect(dialCorners(image.width, image.height, mask, 1), `r=${radius}`).toBe(0);
     }
   });
+
+  it("finds no corner on digitized circles at Sharp's own Smoothness", () => {
+    // A disc centred on a pixel centre ends in one-pixel nipples, and an
+    // off-centre one in short caps one pixel proud of a longer row: caps no
+    // longer than their flanks, which the circle through their surroundings
+    // accounts for (fails on the first corner-dial commit: 14 of these 60).
+    const sharp = TRACE_PRESETS.Sharp!.smoothness!;
+    for (let radius = 5; radius <= 24; radius += 1) {
+      for (const offset of [0, 0.37, 0.5]) {
+        const { image, mask } = disc(radius, offset);
+        const corners = dialCorners(image.width, image.height, mask, sharp);
+        expect(corners, `r=${radius} offset=${offset}`).toBe(0);
+      }
+    }
+    for (let radius = 9; radius <= 30; radius += 3) {
+      for (const [x, y] of [
+        [0.13, 0],
+        [0.25, 0.5],
+        [0.5, 0.25],
+        [0.13, 0.5],
+      ] as const) {
+        const { image, mask } = disc(radius, x, y);
+        for (const s of [sharp, 0.75]) {
+          const corners = dialCorners(image.width, image.height, mask, s);
+          expect(corners, `r=${radius} offset=${x},${y} s=${s}`).toBe(0);
+        }
+      }
+    }
+  });
+
+  it('keeps one-pixel teeth and notches on straight edges as pixel features', () => {
+    const sharp = TRACE_PRESETS.Sharp!.smoothness!;
+    const toothed = raster(
+      40,
+      30,
+      (x, y) => (y >= 10 && y < 20 && x >= 10 && x < 30) || (y === 9 && x === 20),
+    );
+    const notched = raster(
+      40,
+      30,
+      (x, y) => y >= 10 && y < 20 && x >= 10 && x < 30 && !(y === 10 && x === 20),
+    );
+    for (const { image, mask } of [toothed, notched]) {
+      // 4 square corners + the 2 corners of the tooth or notch.
+      expect(dialCorners(image.width, image.height, mask, sharp)).toBeGreaterThanOrEqual(6);
+    }
+  });
 });
 
 describe('pixel-exact corners through the whole trace', () => {
   it('traces binary squares from 8 px up with exact right-angle apexes at Line Art', async () => {
+    // The small canvases take Line Art's supersampled route; low Smoothness
+    // must not round what s = 1 keeps (fails on the first corner-dial commit
+    // at s <= 0.5: 0.33 px).
     for (const side of [8, 12, 16, 32, 64, 120]) {
       const { image } = square(side);
-      const traced = rings(await traceImageToColoredPaths(image, TRACE_PRESETS['Line Art']!));
-      const apexes = [
-        { x: MARGIN, y: MARGIN },
-        { x: MARGIN + side, y: MARGIN },
-        { x: MARGIN + side, y: MARGIN + side },
-        { x: MARGIN, y: MARGIN + side },
-      ];
-      for (const apex of apexes) {
-        expect(distanceToRings(apex, traced), `side ${side}`).toBeLessThanOrEqual(0.05);
+      for (const smoothness of side <= 16 ? [0, 0.5, 1] : [1]) {
+        const options: TraceOptions = { ...TRACE_PRESETS['Line Art']!, smoothness };
+        const traced = rings(await traceImageToColoredPaths(image, options));
+        const apexes = [
+          { x: MARGIN, y: MARGIN },
+          { x: MARGIN + side, y: MARGIN },
+          { x: MARGIN + side, y: MARGIN + side },
+          { x: MARGIN, y: MARGIN + side },
+        ];
+        for (const apex of apexes) {
+          const gap = distanceToRings(apex, traced);
+          expect(gap, `side ${side} s=${smoothness}`).toBeLessThanOrEqual(0.05);
+        }
       }
     }
   });
@@ -230,12 +285,44 @@ describe('pixel-exact corners through the whole trace', () => {
         1,
       ),
     ];
-    const options: TraceOptions = { ...TRACE_PRESETS.Sharp!, smoothness: 0 };
-    for (const { image, mask } of sprites) {
+    // The 1/128 px saddle inset must separate the diagonal contacts under
+    // every saddle policy the walker can use (ADR-395).
+    for (const turnPolicy of ['auto', 'connect-ink', 'connect-paper'] as const) {
+      const options: TraceOptions = { ...TRACE_PRESETS.Sharp!, smoothness: 0, turnPolicy };
+      for (const { image, mask } of sprites) {
+        const traced = rings(await traceImageToColoredPaths(image, options));
+        const distance = pixelBoundaryDistance(traced, image.width, image.height, mask);
+        expect(distance, turnPolicy).toBeLessThanOrEqual(0.01);
+      }
+    }
+  });
+
+  it('lets Edge Detection read the dial too', async () => {
+    // The edge lane shares the contour finisher; before it passed its own
+    // Smoothness, every setting got the neutral s = 1 threshold.
+    const side = 32;
+    const { image } = square(side);
+    const apexGap = async (smoothness: number) => {
+      const options: TraceOptions = { ...TRACE_PRESETS['Edge Detection']!, smoothness };
       const traced = rings(await traceImageToColoredPaths(image, options));
-      expect(pixelBoundaryDistance(traced, image.width, image.height, mask)).toBeLessThanOrEqual(
-        0.01,
-      );
+      return distanceToRings({ x: MARGIN, y: MARGIN }, traced);
+    };
+    expect(await apexGap(4 / 3)).toBeGreaterThan((await apexGap(1)) + 0.02);
+  });
+
+  it('keeps small sprites square at low Smoothness on the supersampled Line Art route', async () => {
+    // Fails on the first corner-dial commit: 0.455 and 0.437 px at s <= 0.5.
+    const sprites = [
+      sprite(['####', '####', '####', '####'], 1),
+      sprite(['##..', '##..', '####', '####'], 3),
+    ];
+    for (const smoothness of [0, 0.5]) {
+      const options: TraceOptions = { ...TRACE_PRESETS['Line Art']!, smoothness };
+      for (const { image, mask } of sprites) {
+        const traced = rings(await traceImageToColoredPaths(image, options));
+        const distance = pixelBoundaryDistance(traced, image.width, image.height, mask);
+        expect(distance, `s=${smoothness}`).toBeLessThanOrEqual(0.15);
+      }
     }
   });
 });

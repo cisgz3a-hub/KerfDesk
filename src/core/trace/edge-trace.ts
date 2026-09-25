@@ -24,6 +24,7 @@ import {
   flattenStrengthFromSmoothness,
   optimizationToleranceScaleFromOptimize,
 } from './contour-trace';
+import { cornerThresholdFromSmoothness } from './contour-corners';
 import { edgeTraceInputMatches, prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 import { withCanonicalTraceCurves } from './trace-curves';
@@ -72,8 +73,10 @@ export function* traceImageToEdgePathsSteps(
         scale *
         toleranceScale,
       fitToleranceScale: toleranceScale,
-      // Same Smoothness → flatten-strength ramp as the contour lane.
+      // Same Smoothness → corner dial and flatten-strength ramp as the
+      // contour lane (ADR-404).
       flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
+      cornerThresholdPx: cornerThresholdFromSmoothness(options.smoothness),
       pixelScale: scale,
       crackField,
     },

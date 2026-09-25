@@ -14,13 +14,16 @@
 //
 // * Lattice turns (binary loops): every turn of the pixel staircase costs at
 //   least tan(22.5°) ≈ 0.414 px, the gap a fillet across a one-pixel step
-//   cuts, so thresholds below that keep every pixel corner: Smoothness 0 is
-//   the exact pixel polygon.
+//   cuts, so on a native-resolution mask thresholds below that keep every
+//   pixel corner: Smoothness 0 is the exact pixel polygon. (A supersampled
+//   mask's steps are the upscaler's rounding, not source pixels; it is priced
+//   on features and legs alone.)
 // * Pixel features (binary loops): a cap — a run the staircase U-turns around
 //   — no longer than its flanks is drawn detail (a tooth, a notch, a stem end,
 //   a pixel-art square); smoothing melts it, so rounding it costs its height.
 //   A digitized straight line never has a cap and a digitized convex curve has
-//   them only at its extremes, as its longest runs.
+//   them only at its extremes, as its longest runs or as a short cap the
+//   circle through its surroundings accounts for.
 // * Leg corners (every loop): two straight legs, each the longest run of crack
 //   points within a line tolerance, meeting at a turn. The corner vertex is
 //   the legs' intersection — sub-pixel exact for slanted and anti-aliased
@@ -56,12 +59,18 @@ import {
 
 export type { ContourCorner, CornerDialInput } from './contour-corner-types';
 
-// The dial: threshold(s) = SCALE · s / (4/3 − s). Zero at s = 0 (every pixel
-// corner), 2 px at the neutral default 1 (a right angle needs legs of ~5 px;
-// pixel squares from 4 px stay square as pixel features, digitized discs stay
-// round), and unbounded at the LightBurn slider maximum 4/3 (no corners).
+// The dial reads the slider as a fraction of a quarter turn, phi = (s / smax)
+// * 90 degrees, and prices it on the same tangent scale as the fillet costs
+// below: threshold(s) = SCALE * tan(phi). The slider maximum (4/3, LightBurn's
+// range) is the quarter turn, where the tangent and the threshold are
+// unbounded (no corners). SCALE = 2 tan(22.5 deg) puts the neutral default s = 1
+// (phi = 67.5 deg) at exactly 2 px, the fillet gap of a right angle with legs
+// of ~5 px: pixel squares from 4 px stay square as pixel features and
+// digitized discs stay round. s = 0 is 0 (every pixel corner). The lattice
+// step cost is reached at s ~ 0.39, so the pixel-staircase plateau covers the
+// bottom ~30% of the slider.
 const SMOOTHNESS_MAX = 4 / 3;
-const THRESHOLD_SCALE_PX = 2 / 3;
+const THRESHOLD_SCALE_PX = 2 * Math.tan(Math.PI / 8);
 const DEFAULT_SMOOTHNESS = 1;
 
 // Two corners conflict when one's apex lies inside the other's straight legs
@@ -73,7 +82,7 @@ export function cornerThresholdFromSmoothness(smoothness: number | undefined): n
   const s = Number.isFinite(smoothness) ? (smoothness as number) : DEFAULT_SMOOTHNESS;
   if (s <= 0) return 0;
   if (s >= SMOOTHNESS_MAX) return Infinity;
-  return (THRESHOLD_SCALE_PX * s) / (SMOOTHNESS_MAX - s);
+  return THRESHOLD_SCALE_PX * Math.tan((Math.PI / 2) * (s / SMOOTHNESS_MAX));
 }
 
 /** Decide the loop's corners, ordered by `from`. */
@@ -83,7 +92,12 @@ export function decideContourCorners(input: CornerDialInput): ContourCorner[] {
   const threshold = input.thresholdPx;
   if (!(threshold < Infinity)) return [];
   const scale = Math.max(1, input.pixelScale);
-  const latticeRegime = !input.measured && threshold < LATTICE_STEP_COST_PX;
+  // Only a native-resolution staircase is the pixel polygon. A supersampled
+  // mask's staircase draws the upscaler's rounding at every source corner in
+  // sub-source-pixel steps; keeping those steps would round the corners the
+  // leg candidates place exactly, so a supersampled loop is always priced on
+  // features and legs (at s = 0 every compatible one is kept).
+  const latticeRegime = !input.measured && scale === 1 && threshold < LATTICE_STEP_COST_PX;
   const lattice = latticeCandidates(input, scale);
   // Past the one-pixel step, a lattice turn is only a candidate as a pixel
   // feature: every other drawn corner has straight legs and is priced as a

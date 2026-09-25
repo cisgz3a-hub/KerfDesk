@@ -2,6 +2,7 @@
 // turn, their intersection as the apex, and the rounding cost of that corner.
 
 import type { Vec2 } from '../scene';
+import { fitCircle } from './contour-corner-circle';
 import { latticeBarriers } from './contour-corner-lattice';
 import {
   KEPT_FEATURE,
@@ -397,51 +398,11 @@ function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
 }
 
-// RMS radial residual of the algebraic (Kåsa 1976) least-squares circle
-// through `count` consecutive points from `start`. A near-straight set yields
-// a huge radius whose residual equals the line residual.
+// RMS radial residual of the one-circle model through `count` consecutive
+// points from `start`. A near-straight set yields a huge radius whose residual
+// equals the line residual (an exactly straight one, 0).
 function circleRms(pts: ReadonlyArray<Vec2>, start: number, count: number): number {
-  const n = pts.length;
-  const at = (k: number): Vec2 => pts[(start + k) % n] as Vec2;
-  let mx = 0;
-  let my = 0;
-  for (let k = 0; k < count; k += 1) {
-    mx += at(k).x;
-    my += at(k).y;
-  }
-  mx /= count;
-  my /= count;
-  let suu = 0;
-  let suv = 0;
-  let svv = 0;
-  let suuu = 0;
-  let svvv = 0;
-  let suvv = 0;
-  let svuu = 0;
-  for (let k = 0; k < count; k += 1) {
-    const u = at(k).x - mx;
-    const v = at(k).y - my;
-    suu += u * u;
-    suv += u * v;
-    svv += v * v;
-    suuu += u * u * u;
-    svvv += v * v * v;
-    suvv += u * v * v;
-    svuu += v * u * u;
-  }
-  const det = suu * svv - suv * suv;
-  if (Math.abs(det) < 1e-9) return 0;
-  const r1 = 0.5 * (suuu + suvv);
-  const r2 = 0.5 * (svvv + svuu);
-  const uc = (r1 * svv - r2 * suv) / det;
-  const vc = (r2 * suu - r1 * suv) / det;
-  const radius = Math.sqrt(uc * uc + vc * vc + (suu + svv) / count);
-  let sumSq = 0;
-  for (let k = 0; k < count; k += 1) {
-    const d = Math.hypot(at(k).x - mx - uc, at(k).y - my - vc);
-    sumSq += (d - radius) ** 2;
-  }
-  return Math.sqrt(sumSq / count);
+  return fitCircle(pts, start, count)?.rms ?? 0;
 }
 
 export function growLeg(
