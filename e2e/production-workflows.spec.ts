@@ -584,9 +584,16 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
     .poll(async () => serialWrites(await kerfdesk.events()).slice(abortWritesBefore))
     .toContain('M9\n');
 
-  await kerfdesk.emitSerialLine('ALARM:3');
-  // ALARM:3 is diagnostic text; update the fixture's polled state after Abort too.
-  await kerfdesk.emitSerialLine('<Alarm|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  // Publish diagnostic text and its matching polled state in one browser task.
+  // A poll between separate evaluations could otherwise report the old Run/Idle
+  // state, correctly clearing the alarm code before the Alarm report arrives.
+  await page.evaluate(() => {
+    const fixture = (
+      window as typeof window & { __KERFDESK_E2E__: { emitSerialLine: (line: string) => void } }
+    ).__KERFDESK_E2E__;
+    fixture.emitSerialLine('ALARM:3');
+    fixture.emitSerialLine('<Alarm|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  });
   await expect(page.getByRole('alert')).toContainText('Alarm 3');
   await kerfdesk.setAutoAcknowledge(false);
   await kerfdesk.setSerialStatusAfterCommand(
