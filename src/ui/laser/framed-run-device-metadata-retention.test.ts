@@ -96,6 +96,7 @@ describe('completed Frame retention across descriptive device metadata', () => {
     ['model', { model: 'Operator model note' }],
     ['profileSource', { profileSource: 'imported' }],
     ['catalogVersion', { catalogVersion: '2099-01-01' }],
+    ['savedMachineId', { savedMachineId: 'machine-linked-later' }],
     [
       'evidence',
       {

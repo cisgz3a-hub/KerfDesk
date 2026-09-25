@@ -7,7 +7,6 @@ import type { Sketch } from '../../core/design';
 import type { DesignApplyRecord } from './design-apply-record';
 import type { DeviceProfile } from '../../core/devices';
 import {
-  createProject,
   type BoardShape,
   type CncMachineConfig,
   type EmbeddedFont,
@@ -30,6 +29,7 @@ import type { ProjectSaveWriteCoordinator } from './project-save-write-coordinat
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
 import { projectActions, type ProjectActions } from './project-actions';
+import { startupProject } from './saved-machine-startup';
 import type { ProjectBedReconciliationNotice } from './project-bed-reconciliation';
 import { initialProjectWorkspaceState } from './store-initial-project-state';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
@@ -389,7 +389,7 @@ export type AppState = ObjectPropertiesActions &
   };
 
 function initialState(
-  project = createProject(),
+  project = startupProject(),
 ): Pick<
   AppState,
   | 'project'

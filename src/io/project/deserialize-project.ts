@@ -37,6 +37,7 @@ import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 import { normalizeControllerPatch } from './project-controller-normalization';
+import { optionalDeviceFields } from './project-device-optional-fields';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -220,21 +221,6 @@ function normalizeStockOriginOffset(
   return { x, y };
 }
 
-/**
- * Preserve an explicit worker-transport opt-out as well as opt-in. Absent stays
- * absent so old projects use the compatible driver's default. The unreliable
- * air restart flag remains true-only; malformed values gain no authority.
- */
-function optionalDeviceFlags(dev: Record<string, unknown>): Record<string, boolean | undefined> {
-  return {
-    workerHostedStreaming:
-      typeof dev['workerHostedStreaming'] === 'boolean' ? dev['workerHostedStreaming'] : undefined,
-    ...(dev['airAssistRestartUnreliable'] === true
-      ? { airAssistRestartUnreliable: true as const }
-      : {}),
-  };
-}
-
 function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> {
   const controllerKind = isKnownControllerKind(dev['controllerKind'])
     ? dev['controllerKind']
@@ -251,7 +237,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
   });
   const normalized = {
     ...dev,
-    ...optionalDeviceFlags(dev),
+    ...optionalDeviceFields(dev),
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
     junctionDeviationMm: numberOrDefault(
       dev['junctionDeviationMm'],

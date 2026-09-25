@@ -9,7 +9,6 @@ import {
   validateMachineProfile,
   type DeviceProfile,
   type MachineProfileSource,
-  type NoGoZone,
   type Origin,
 } from '../../core/devices';
 import { recoverCncSubProfile } from '../../core/devices/cnc-sub-profile-validation';
@@ -20,6 +19,11 @@ import {
   normalizeCameraProfile,
 } from '../../core/camera';
 import { validateMachineProfileShape } from './machine-profile-shape';
+import { parseNoGoZones } from './machine-profile-no-go-zones';
+import {
+  calibrationForProvenance,
+  type MachineProfileProvenance,
+} from './machine-profile-provenance';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -63,6 +67,14 @@ export function serializeCanonicalDeviceProfile(profile: DeviceProfile): string 
 
 export function deserializeMachineProfileDocument(
   jsonText: string,
+  options: { readonly provenance?: MachineProfileProvenance } = {},
+): DeserializeMachineProfileDocumentResult {
+  return deserializeDocument(jsonText, options.provenance ?? 'file');
+}
+
+function deserializeDocument(
+  jsonText: string,
+  provenance: MachineProfileProvenance,
 ): DeserializeMachineProfileDocumentResult {
   let raw: unknown;
   try {
@@ -96,7 +108,7 @@ export function deserializeMachineProfileDocument(
   const reviewNotes = parseReviewNotes(raw['reviewNotes']);
   if (reviewNotes.kind === 'invalid') return reviewNotes;
 
-  const profile = parseProfile(raw['profile']);
+  const profile = parseProfile(raw['profile'], provenance);
   if (profile.kind === 'invalid') return profile;
 
   return {
@@ -153,7 +165,10 @@ function parseReviewNotes(
   return { kind: 'ok', reviewNotes: value };
 }
 
-function parseProfile(value: unknown):
+function parseProfile(
+  value: unknown,
+  provenance: MachineProfileProvenance,
+):
   | {
       readonly kind: 'ok';
       readonly profile: DeviceProfile;
@@ -194,7 +209,8 @@ function parseProfile(value: unknown):
     scanningOffsets: normalizeScanOffsetTable(recoveredValue['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
-  const profile = profileWithImportedCalibrationPending(canonical);
+  const calibrated = calibrationForProvenance(canonical, provenance);
+  const profile = calibrated.profile;
   const validationErrors = validateMachineProfile(profile);
   if (validationErrors.length > 0) {
     return { kind: 'invalid', reason: `profile is invalid: ${validationErrors.join('; ')}` };
@@ -213,63 +229,15 @@ function parseProfile(value: unknown):
         (issue) =>
           `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
       ),
-      ...importedCalibrationRecoveryNotes(canonical),
+      ...calibrated.notes,
     ],
   };
-}
-
-function profileWithImportedCalibrationPending(profile: DeviceProfile): DeviceProfile {
-  return profile.scanningOffsets.length > 0
-    ? { ...profile, scanOffsetCalibrationStatus: 'pending' }
-    : profile;
-}
-
-function importedCalibrationRecoveryNotes(profile: DeviceProfile): ReadonlyArray<string> {
-  return profile.scanningOffsets.length > 0
-    ? [
-        'Imported scan-offset values were kept but marked verification pending because the file does not bind them to this physical machine and laser head.',
-      ]
-    : [];
 }
 
 function validatedDeviceProfile(value: Record<string, unknown>): DeviceProfile {
   // validateProfileShape proves the imported JSON has DeviceProfile's required
   // fields and nested safety fields; TypeScript cannot infer that from Record.
   return value as unknown as DeviceProfile;
-}
-
-function parseNoGoZones(
-  value: unknown,
-):
-  | { readonly kind: 'ok'; readonly noGoZones: ReadonlyArray<NoGoZone> }
-  | { readonly kind: 'invalid'; readonly reason: string } {
-  if (value === undefined) return { kind: 'ok', noGoZones: [] };
-  if (!Array.isArray(value)) return { kind: 'invalid', reason: 'profile.noGoZones is invalid' };
-  const zones: NoGoZone[] = [];
-  for (const [index, zone] of value.entries()) {
-    if (!isRecord(zone)) return invalidNoGoZone(index);
-    if (
-      !isNonEmptyString(zone['id']) ||
-      !isNonEmptyString(zone['name']) ||
-      typeof zone['enabled'] !== 'boolean' ||
-      !isNonNegativeFinite(zone['x']) ||
-      !isNonNegativeFinite(zone['y']) ||
-      !isPositiveFinite(zone['width']) ||
-      !isPositiveFinite(zone['height'])
-    ) {
-      return invalidNoGoZone(index);
-    }
-    zones.push({
-      id: zone['id'],
-      name: zone['name'],
-      enabled: zone['enabled'],
-      x: zone['x'],
-      y: zone['y'],
-      width: zone['width'],
-      height: zone['height'],
-    });
-  }
-  return { kind: 'ok', noGoZones: zones };
 }
 
 function canonicalDocument(document: MachineProfileDocument): MachineProfileDocument {
@@ -366,6 +334,7 @@ function canonicalFireControl(profile: DeviceProfile): Partial<DeviceProfile> {
 
 function canonicalIdentityMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
   return {
+    ...(profile.savedMachineId !== undefined ? { savedMachineId: profile.savedMachineId } : {}),
     ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
     ...(profile.vendor !== undefined ? { vendor: profile.vendor } : {}),
     ...(profile.model !== undefined ? { model: profile.model } : {}),
@@ -415,24 +384,12 @@ function canonicalZMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
   };
 }
 
-function invalidNoGoZone(index: number): { readonly kind: 'invalid'; readonly reason: string } {
-  return { kind: 'invalid', reason: `profile.noGoZones[${index}] is invalid` };
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isProfileSource(value: unknown): value is MachineProfileSource {

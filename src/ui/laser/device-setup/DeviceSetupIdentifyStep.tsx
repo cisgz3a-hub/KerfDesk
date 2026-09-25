@@ -21,6 +21,7 @@ import {
 } from './device-setup-flow';
 import { DeviceSetupCncPreset } from './DeviceSetupCncPreset';
 import { DeviceSetupProfilePicker } from './DeviceSetupProfilePicker';
+import { DeviceSetupSavedMachines } from './DeviceSetupSavedMachines';
 import {
   machineSetupControllerGuide,
   machineSetupControllerGuides,
@@ -33,6 +34,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
   const update = (patch: Partial<DeviceProfile>): void => dispatch({ kind: 'edit', patch });
   return (
     <section style={sectionStyle}>
+      <DeviceSetupSavedMachines state={state} dispatch={dispatch} />
       {deviceSetupSupportsMachineKind(state, 'laser') ? (
         <DeviceSetupProfilePicker state={state} dispatch={dispatch} />
       ) : null}

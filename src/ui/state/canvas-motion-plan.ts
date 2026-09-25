@@ -236,6 +236,9 @@ const DESCRIPTIVE_DEVICE_FIELDS: ReadonlySet<keyof DeviceProfile> = new Set([
   'profileSource',
   'catalogVersion',
   'evidence',
+  // Linking a project to My machines is bookkeeping; a switch expires the
+  // Frame explicitly instead (saved-machine-frame-expiry.ts).
+  'savedMachineId',
 ]);
 
 function retainedDeviceFields(device: DeviceProfile): Readonly<Record<string, unknown>> {

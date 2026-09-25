@@ -6,6 +6,7 @@ import {
   type ProjectMachineCapabilityLoadResult,
 } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
+import { newProjectMachine } from './saved-machine-startup';
 import type { AppState } from './store';
 import {
   canonicalizeOpenedProjectBed,
@@ -54,11 +55,15 @@ export function projectActions(
     },
     newProject: () =>
       set((state) => {
-        const blankProject = createProject(state.project.device);
+        const start = newProjectMachine({
+          device: state.project.device,
+          machineKind: machineKindOf(state.project.machine),
+        });
+        const blankProject = createProject(start.device);
         const project = resolveProjectMachineCapability(
           blankProject,
           state.cncLibrary.customTools,
-          machineKindOf(state.project.machine),
+          start.machineKind,
         ).project;
         return {
           ...initialState(project),

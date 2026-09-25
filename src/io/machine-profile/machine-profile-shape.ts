@@ -104,7 +104,13 @@ function validateProfileIdentity(value: Record<string, unknown>): string | null 
   if (value['profileId'] !== undefined && !isNonEmptyString(value['profileId'])) {
     return 'profile.profileId must be a non-empty string';
   }
-  for (const field of ['vendor', 'model', 'catalogVersion', 'machineFamily'] as const) {
+  for (const field of [
+    'vendor',
+    'model',
+    'catalogVersion',
+    'machineFamily',
+    'savedMachineId',
+  ] as const) {
     if (value[field] !== undefined && !isNonEmptyString(value[field])) {
       return `profile.${field} must be a non-empty string`;
     }

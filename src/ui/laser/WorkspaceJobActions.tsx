@@ -1,3 +1,4 @@
+import { ActiveMachineLabel } from '../saved-machines/ActiveMachineLabel';
 import { useLaserStore } from '../state/laser-store';
 import { JobActionControls } from './JobActionControls';
 import { StartBlockerNotice } from './StartBlockerNotice';
@@ -14,6 +15,7 @@ export function WorkspaceJobActions(): JSX.Element {
   );
   return (
     <section className="lf-workspace-job-actions" aria-label="Job actions">
+      <ActiveMachineLabel />
       <CompletedJobNotice />
       <JobActionControls
         docked

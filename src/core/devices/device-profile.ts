@@ -166,6 +166,9 @@ export function effectiveBidirectionalScanPolicy(
 
 export type DeviceProfile = {
   readonly name: string;
+  // The My machines entry (ADR-374) this copy was saved as or switched from.
+  // A label only: output never reads it, and a missing entry means unlinked.
+  readonly savedMachineId?: string;
   readonly profileId?: string;
   readonly vendor?: string;
   readonly model?: string;

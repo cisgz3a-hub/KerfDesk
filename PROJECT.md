@@ -257,6 +257,11 @@ Verified end-to-end against scripted firmware simulators
   The buffered receive window is bounded by the capacity the controller reports
   (ADR-331). Policy findings are advisory in Job Review; completed Frame for the
   exact job remains the sole ordinary Start policy gate (ADRs 228/230/232/237).
+- **I.7 — My machines** (ADR-374): a workstation list of the operator's complete machine
+  profiles, each with an optional recorded controller. Switch to replaces every profile field in
+  one undoable change and ends the completed Frame. A project keeps its own copy and names its
+  saved machine; differences are offered, never forced. On connect, exactly one matching saved
+  machine is offered as a switch, never applied automatically.
 
 **Qualification:** The 2026-09-19 audit found no reproducible physical evidence supporting
 the former Falcon hardware-verification claim. The catalogue now separates researched,
@@ -515,6 +520,7 @@ Project
     maxPowerS ($30 value, e.g. 1000)
     origin: 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center'
     homing, airAssist, camera/calibration, no-go/safety metadata
+    savedMachineId? (the My machines entry this copy came from; a label, ADR-374)
   workspace: { width, height, units: 'mm' }
   scene
     objects: SceneObject[]
@@ -580,6 +586,7 @@ src/
     output/                      G-code strategies and raster/vector emitters
     preflight/                   bed bounds, power, laser-off, safety checks
     raster/                      raster budgets, luma, vector-to-bitmap conversion
+    saved-machines/              My machines list, controller recognition (ADR-374)
     scene/                       Scene, Layer, transforms, SceneObject union
     shapes/                      generated rectangle/ellipse/polygon/polyline paths
     text/                        font parsing and text-to-path derivation
@@ -591,6 +598,7 @@ src/
     machine-profile/             machine profile serialization and fixtures
     material-library/            material library serialization/import
     project/                     .lf2 serializer and migrations
+    saved-machines/              My machines storage format
     svg/                         DOMParser + DOMPurify sanitization
   platform/
     types.ts                     PlatformAdapter interface
@@ -607,6 +615,7 @@ src/
     layers/                      Cuts/Layers window
     material-library/            material and preset UI
     raster/                      raster/image controls
+    saved-machines/              My machines dialog, switch, notices
     state/                       app/project state glue
     text/                        text tool UI
     theme/                       theme tokens
@@ -670,7 +679,8 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Manufacturer setting profile packs, LightBurn `.clb` export, and LightBurn
   `LinkPath` synchronization. Bounded `.clb` import and refreshable native
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
-- Multi-machine, networked control.
+- Multi-machine, networked control. (My machines, the workstation list of the operator's own
+  machine profiles, is in scope under ADR-374: one project still drives one connected machine.)
 - Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
 - ~~DXF~~ and PDF import. **DXF moved in-scope by Phase H.6 (clean-room
   parser, ADR-098)**; PDF import remains out of scope.

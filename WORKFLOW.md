@@ -50,7 +50,9 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    - Max power S: 1000
    - Origin: front-left
    - Homing: disabled
-5. The user can override this in Settings → Device Profile (Phase C; in Phase A it lives in a `device-profile.json` file the user can edit directly, with a doc in `README`).
+5. When a default machine is set in **My machines** (F-H5, ADR-374), the blank project starts
+   with that machine's complete profile and mode instead. The machine is changed in Machine Setup
+   (F-C7) or My machines.
 
 #### Success — returning run (had a project last session)
 1. App opens to empty workspace.
@@ -824,7 +826,13 @@ the completed physical Frame is the spatial source of truth.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
-- _Not yet implemented:_ a status-bar warning that the embedded profile is unknown to this machine (`Project's device profile … is not configured locally`). It needs an app-level device-profile registry to compare against, which does not exist yet (see the machine-profile lifecycle / app-level device-list work). Until then the embedded profile is simply used with no such warning.
+- The machine rail says whether that profile is one of **My machines** (ADR-374): "Saved in My
+  machines", "Saved as “…”" when the project renamed its copy, or "Not in My machines" when the
+  project names no saved machine or one removed from this workstation.
+- When the project's copy differs from its saved machine, a non-blocking **Saved machine differs**
+  banner names the differing groups (for example Work area, Scan offsets) and offers **Update
+  saved machine**, **Use saved settings** (one undoable switch) or **Keep project copy**. Nothing
+  changes until one is chosen. The banner waits while the opened-project machine banner is showing.
 
 ---
 
@@ -834,6 +842,8 @@ the completed physical Frame is the spatial source of truth.
 1. `File → New` (`Cmd/Ctrl+N`).
 2. Workspace returns to empty state (F-A2).
 3. Window title resets.
+4. The new project keeps the open machine. When a default machine is set in My machines (F-H5),
+   it starts with that machine's complete profile and mode instead (ADR-374).
 
 #### Edge — current project has unsaved changes
 1. Modal: `Save changes to <project-name>?` with `Save`, `Don't Save`, `Cancel`.
@@ -975,6 +985,16 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller or an app restart; picking both identical adapters in one run is still
    ambiguous and uses the window port (ADR-366).
+
+#### Recognise a saved machine (ADR-374)
+1. Once the connection is qualified, KerfDesk compares what the controller reported with each
+   entry in My machines that recorded its controller. The comparison covers the banner firmware,
+   stock GRBL `$I`, USB ids and the identity `$$` settings.
+2. When exactly one saved machine matches and the open project uses another, the machine rail
+   shows: "This controller looks like your saved machine “…” (matched …). The open project uses
+   “…”." with **Switch** and **Not now**.
+3. **Switch** applies that machine as in F-H5. **Not now** hides the notice for this connection.
+   Two or more matches show nothing, and KerfDesk never switches by itself.
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -2120,6 +2140,9 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    the selected controller family reported, lists those values, and carries **Use detected values**
    (ADR-347). While nothing is connected it says that connecting the controller below reads those
    values into the draft, and that offline setup still works; a file-only controller has no lane.
+   When **My machines** has entries, they are listed before the catalog. Choosing one loads that
+   saved machine's complete profile, and its mode when the draft allows it, into the draft. Save
+   then counts as a machine switch and ends any completed Frame (ADR-374).
    Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
    machines also have CNC presets. A profile card is one option in a radio group: a pointer
@@ -5688,6 +5711,59 @@ as the pane's design record.
 #### Error — raster layers present
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
+
+### F-H5. My machines (ADR-374)
+
+A workstation list of the operator's own complete machine profiles. Each project still keeps its
+own copy of its machine.
+
+#### Success — save a machine
+1. Set the machine up in Machine Setup (F-C7), ideally while connected.
+2. Open **My machines** from the machine rail, or with **Change** beside Frame and Start.
+3. Leave **Remember the connected controller** ticked when a controller is connected, then press
+   **Save current machine**. The entry holds every profile setting, including scan offsets,
+   camera calibration, no-go zones, rotary and CNC settings, plus the Laser or CNC mode.
+4. The project now names the entry; the rail says "Saved in My machines". A completed Frame is
+   kept, because saving changes no machine setting.
+
+#### Success — switch machines
+1. In My machines, press **Switch to** on another machine. The Machine Setup choice in F-C7 and
+   the connect notice in F-B1 do the same.
+2. Every profile setting and the mode are replaced in one undoable change, and the workspace
+   becomes that machine's bed.
+3. Any completed Frame ends. The status line says "Switched to “…”. Frame the job again before
+   Start." The next Start frames first and says the machine changed.
+4. When the connection was opened for another controller driver, the message also says to
+   disconnect and reconnect.
+
+#### Success — manage the list
+1. **Rename** refuses an empty name or one another entry has, ignoring case.
+2. **Duplicate** copies every setting as "<name> (Duplicate)".
+3. **Set default** makes KerfDesk and File > New start with that machine; **Clear default**
+   returns New to keeping the open machine.
+4. **Export…** writes a `.lfmachine.json` file; **Import…** adds one. Imported scan offsets are
+   marked for a new verification burn.
+5. **Remove** asks inside the row (**Remove machine** or **Keep**). Projects that used the machine
+   keep their copy.
+
+#### Edge — the project copy differs from the saved machine
+1. Editing a linked project's machine in Machine Setup leaves the saved machine unchanged.
+2. The **Saved machine differs** banner (F-A12) offers **Update saved machine**, **Use saved
+   settings** or **Keep project copy**. My machines also offers **Save changes to saved machine**
+   and **Save as new machine**.
+
+#### Error — the machine is busy
+1. Switch refuses while a job is active, Start is handing off, the machine is moving, auto-focus or
+   a probe is running, or test fire is on. The message says what to wait for, and nothing changes.
+
+#### Error — storage full or blocked
+1. The dialog warns that My machines could not be written to this workstation. The change lasts
+   until KerfDesk closes. Unreadable stored text is copied to a backup key, never cleared.
+
+#### Manual check (hardware, not yet run)
+1. Save the 4040 router, the Falcon and the Neotronics laser, each while connected.
+2. Reconnect each one with another machine open. Exactly the matching machine should be offered,
+   and nothing should switch until **Switch** is pressed.
 
 ## Phase K flows (box generator — ADR-106)
 

@@ -42,6 +42,8 @@ import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
+import { MyMachinesDialogHost } from '../saved-machines/MyMachinesDialogHost';
+import { SavedMachineProjectBanner } from '../saved-machines/SavedMachineProjectBanner';
 
 export function App(): JSX.Element {
   return (
@@ -50,6 +52,7 @@ export function App(): JSX.Element {
       <DesktopCloseNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
+      <SavedMachineProjectBanner />
       <ExternalGcodePreviewBanner />
       <main style={mainStyle}>
         <ToolStrip />
@@ -82,6 +85,7 @@ export function App(): JSX.Element {
       <JobReviewDialog />
       <SecondPassHost />
       <MachineSetupDialogHost />
+      <MyMachinesDialogHost />
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />

@@ -7,6 +7,10 @@ import { useStore } from '../../state';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
+import {
+  expireFrameAfterMachineChange,
+  frameEvidencePresent,
+} from '../../saved-machines/saved-machine-frame-expiry';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupProfile } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
@@ -37,6 +41,7 @@ export function useMachineSetupSave(input: {
   const saveAndSync = async (): Promise<void> => {
     const before = useStore.getState().project;
     const profile = machineSetupProfile(input.state);
+    const hadFrame = frameEvidencePresent();
     const replacement =
       input.state.draftMachine.kind === 'cnc'
         ? replaceCncStartupSetup(profile, input.state.draftMachine, input.state.cncDraft, {
@@ -45,6 +50,11 @@ export function useMachineSetupSave(input: {
             materialApplyRequested: input.materialApplyRequested,
           })
         : replaceMachineSetup(profile, input.state.draftMachine, input.state.cncDraft);
+    // Choosing one of My machines here is a machine switch even when its
+    // settings match, so it ends the completed Frame like Switch to does.
+    if (profile.savedMachineId !== before.device.savedMachineId) {
+      expireFrameAfterMachineChange(profile.name, hadFrame);
+    }
     if (replacement.kind === 'applied-with-capability-warning') {
       pushToast(machineCapabilityWarningMessage(replacement.requestedKind), 'warning');
     }

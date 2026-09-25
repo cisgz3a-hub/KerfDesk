@@ -5,6 +5,7 @@ import { connectOptionsForDevice } from '../commands/connect-options';
 import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { ActiveMachineBar } from '../saved-machines/ActiveMachineBar';
 import { ConnectionBar } from './ConnectionBar';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { DeviceSetupControls } from './device-setup';
@@ -47,6 +48,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         reconnectDisabled={!supportsSerial || props.motionOperation !== null || isFileOnlyProfile}
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
+      <ActiveMachineBar />
       <DeviceSetupControls />
       <ConnectedMachineProfile />
       <ConnectionBar
