@@ -112,6 +112,24 @@ describe('DeviceSetupWizard router commit', () => {
       await view.unmount();
     }
   });
+
+  // CN-4 (2026-09-25 controller audit): the dialect choice shapes laser output
+  // only; CNC output is byte-identical for every choice.
+  it('names the output dialect as the laser dialect when the setup includes CNC', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(view.host.querySelector('[aria-label="Laser G-code output dialect"]')).not.toBeNull();
+      expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
+      expect(view.host.textContent).toContain('Laser output dialect');
+      expect(view.host.textContent).toContain(
+        "CNC programs always use KerfDesk's GRBL CNC dialect.",
+      );
+    } finally {
+      await view.unmount();
+    }
+  });
 });
 
 async function renderWizard(): Promise<{

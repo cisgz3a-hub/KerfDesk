@@ -79,7 +79,6 @@ function ControllerContract(props: {
     props.controllerKind,
     props.state.draft.controllerCommandSet,
   );
-  const dialects = props.controllerKind === 'marlin' ? MARLIN_GCODE_DIALECTS : GRBL_GCODE_DIALECTS;
   return (
     <div className="lf-setup-fields" style={settingsStyle}>
       <Row label="Controller">
@@ -106,28 +105,55 @@ function ControllerContract(props: {
         <BaudRow state={props.state} guide={guide} update={props.update} />
       ) : null}
       {driver.capabilities.transport === 'serial' ? (
-        <Row label="Output dialect">
-          <select
-            aria-label="G-code output dialect"
-            title="Choose the output syntax expected by the selected controller firmware."
-            value={props.state.draft.gcodeDialect.dialectId}
-            onChange={(event) =>
-              props.update({
-                gcodeDialect: {
-                  dialectId: event.target.value as DeviceProfile['gcodeDialect']['dialectId'],
-                },
-              })
-            }
-          >
-            {dialects.map((dialect) => (
-              <option key={dialect.id} value={dialect.id}>
-                {dialect.label}
-              </option>
-            ))}
-          </select>
-        </Row>
+        <OutputDialectRow
+          state={props.state}
+          controllerKind={props.controllerKind}
+          update={props.update}
+        />
       ) : null}
     </div>
+  );
+}
+
+// The dialect shapes laser output only: every CNC program is emitted in
+// KerfDesk's GRBL CNC dialect whatever is chosen here (cnc-grbl-strategy.ts
+// ignores it), so a setup that includes CNC names it as the laser dialect
+// (controller audit CN-4).
+const CNC_DIALECT_HINT = "CNC programs always use KerfDesk's GRBL CNC dialect.";
+
+function OutputDialectRow(props: {
+  readonly state: DeviceSetupStepProps['state'];
+  readonly controllerKind: ControllerKind;
+  readonly update: (patch: Partial<DeviceProfile>) => void;
+}): JSX.Element {
+  const dialects = props.controllerKind === 'marlin' ? MARLIN_GCODE_DIALECTS : GRBL_GCODE_DIALECTS;
+  const includesCnc = deviceSetupSupportsMachineKind(props.state, 'cnc');
+  return (
+    <Row label={includesCnc ? 'Laser output dialect' : 'Output dialect'}>
+      <select
+        aria-label={includesCnc ? 'Laser G-code output dialect' : 'G-code output dialect'}
+        title={
+          includesCnc
+            ? `Choose the laser output syntax expected by the selected controller firmware. ${CNC_DIALECT_HINT}`
+            : 'Choose the output syntax expected by the selected controller firmware.'
+        }
+        value={props.state.draft.gcodeDialect.dialectId}
+        onChange={(event) =>
+          props.update({
+            gcodeDialect: {
+              dialectId: event.target.value as DeviceProfile['gcodeDialect']['dialectId'],
+            },
+          })
+        }
+      >
+        {dialects.map((dialect) => (
+          <option key={dialect.id} value={dialect.id}>
+            {dialect.label}
+          </option>
+        ))}
+      </select>
+      {includesCnc ? <span style={mutedInlineStyle}>{CNC_DIALECT_HINT}</span> : null}
+    </Row>
   );
 }
 
