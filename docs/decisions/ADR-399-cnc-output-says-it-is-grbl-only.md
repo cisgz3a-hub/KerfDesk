@@ -31,10 +31,12 @@ controllers hobby CNC machines ship with is in the audit report
 ### Decision
 
 1. **Exports warn.** When the profile's controller cannot run KerfDesk CNC jobs, Save G-code of
-   a CNC project, tile export and surfacing export each push one warning. It names the
-   GRBL-family requirement and what the controller does differently (Marlin reads `G4 P` as
-   milliseconds; Smoothieware ignores `M0`). The warning appears whether or not a controller is
-   connected. Bytes, saves and routing are unchanged.
+   a CNC project, tile export and surfacing export each push one warning. It says the file is
+   written for a GRBL-family controller (`G4 P` in seconds, `M0` at each tool change), names the
+   profile's controller, and says that controller may read these commands differently: a `G4 P`
+   taken as milliseconds lets the bit plunge before the spindle is at speed, and a skipped `M0`
+   cuts the next section with the previous bit. The warning appears whether or not a controller
+   is connected. Bytes, saves and routing are unchanged.
 2. **The CNC Frame refuses first, with the reason.** The Frame's own existing refusal now comes
    right after the controller-queue check, before WCS normalization and the Work Z prompt:
    "CNC Frame is unavailable: KerfDesk CNC jobs require a GRBL-family controller (GRBL, grblHAL,

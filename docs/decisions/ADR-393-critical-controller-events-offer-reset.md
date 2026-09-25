@@ -60,7 +60,7 @@ reset brings the controller back locked in Alarm was reported as a failure (HF-5
    (`M999`), with the hint "Unlock first: this controller cannot home while halted."
 6. **A Wake can end in Alarm.** `wakeController()` resolves `'idle'` or `'alarm'`. A reset that
    brings the controller back locked in Alarm (GRBL, grblHAL and FluidNC all do this after a
-   reset from Sleep with homing enabled) completes as `'alarm'` with the alarm latched, and the
+   reset from Sleep; GRBL protocol.c:49-54) completes as `'alarm'` with the alarm latched, and the
    no-homing guide shows its alarm step instead of a failure.
 
 ### Consequences
