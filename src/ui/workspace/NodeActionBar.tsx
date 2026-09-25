@@ -3,6 +3,7 @@
 // clicking it, that segment's. The same edits have keys while the pointer is
 // over the artwork, and each tooltip names its key.
 
+import { openEndOfSegment } from '../../core/geometry/curve-extend';
 import { explicitCurveSubpath } from '../../core/geometry/curve-segment-geometry';
 import { curveNodeCount, type PathSegment, type Project } from '../../core/scene';
 import {
@@ -13,7 +14,7 @@ import {
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import type { PathSegmentRef } from '../state/path-segment-ref';
 import { useStore } from '../state/store';
-import { useToastStore } from '../state/toast-store';
+import { warnUnlessExtended, warnUnlessTrimmed } from './node-edit-keys';
 import { resolveSelectedSegment, useNodeEditStore } from './node-edit-store';
 
 type NodeToolButtonRef = React.RefObject<HTMLButtonElement | null>;
@@ -47,16 +48,64 @@ function NodeActions(props: {
 }): JSX.Element | null {
   const project = useStore((state) => state.project);
   const selectedNodes = useStore((state) => state.selectedPathNodes);
-  const setSmoothness = useStore((state) => state.setPathNodeSmoothness);
-  const convert = useStore((state) => state.convertPathSegment);
   const setStart = useStore((state) => state.setSelectedCurveStart);
   const breakAt = useStore((state) => state.breakPathAtNode);
+  const extend = useStore((state) => state.extendPathAtNode);
   const join = useStore((state) => state.joinSelectedCurveNodes);
   const align = useStore((state) => state.alignSelectedPathNodes);
   const { node } = props;
   const info = nodeInfo(project, node);
   if (info === null) return null;
   const anchors = selectedNodes.filter((ref) => ref.handle === undefined);
+  return (
+    <div role="toolbar" aria-label="Curve node actions" className="lf-toolstrip__node-actions">
+      <NodeShapeActions node={node} info={info} />
+      <NodeAction
+        label="Start"
+        title="Use this node as the closed path start point"
+        disabled={node.geometry !== 'curve' || !info.closed || info.nodeIndex === 0}
+        onClick={setStart}
+      />
+      <NodeAction
+        label="Break"
+        title="Break the path open at this node (B)"
+        disabled={info.openEnd}
+        onClick={() => breakAt(node)}
+      />
+      <NodeAction
+        label="Extend"
+        title="Run this open end on to the nearest line in its way (E)"
+        disabled={!info.openEnd}
+        onClick={() => warnUnlessExtended(extend(node))}
+      />
+      <NodeAction
+        label="Join"
+        title="Join two selected open curve endpoints"
+        disabled={anchors.filter((ref) => ref.geometry === 'curve').length !== 2}
+        onClick={() => {
+          const outcome = join();
+          if (outcome.kind !== 'unchanged') props.nodeToolButtonRef.current?.focus();
+        }}
+      />
+      {anchors.length >= 2 ? (
+        <NodeAction
+          label="Align"
+          title="Line the selected nodes up across their smaller spread, on the one selected last (A)"
+          onClick={align}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Smooth and Corner shape the node; Curve and Line the segment leaving it.
+function NodeShapeActions(props: {
+  readonly node: PathNodeRef;
+  readonly info: NodeInfo;
+}): JSX.Element {
+  const setSmoothness = useStore((state) => state.setPathNodeSmoothness);
+  const convert = useStore((state) => state.convertPathSegment);
+  const { node, info } = props;
   const outgoing: PathSegmentRef = {
     objectId: node.objectId,
     pathIndex: node.pathIndex,
@@ -64,7 +113,7 @@ function NodeActions(props: {
     segmentIndex: info.nodeIndex,
   };
   return (
-    <div role="toolbar" aria-label="Curve node actions" className="lf-toolstrip__node-actions">
+    <>
       <NodeAction
         label="Smooth"
         title="Align the incoming and outgoing curve handles (S)"
@@ -87,35 +136,7 @@ function NodeActions(props: {
         disabled={info.outgoing === undefined || info.outgoing.kind === 'line'}
         onClick={() => convert(outgoing, 'line')}
       />
-      <NodeAction
-        label="Start"
-        title="Use this node as the closed path start point"
-        disabled={node.geometry !== 'curve' || !info.closed || info.nodeIndex === 0}
-        onClick={setStart}
-      />
-      <NodeAction
-        label="Break"
-        title="Break the path open at this node (B)"
-        disabled={info.openEnd}
-        onClick={() => breakAt(node)}
-      />
-      <NodeAction
-        label="Join"
-        title="Join two selected open curve endpoints"
-        disabled={anchors.filter((ref) => ref.geometry === 'curve').length !== 2}
-        onClick={() => {
-          const outcome = join();
-          if (outcome.kind !== 'unchanged') props.nodeToolButtonRef.current?.focus();
-        }}
-      />
-      {anchors.length >= 2 ? (
-        <NodeAction
-          label="Align"
-          title="Line the selected nodes up across their smaller spread, on the one selected last (A)"
-          onClick={align}
-        />
-      ) : null}
-    </div>
+    </>
   );
 }
 
@@ -128,10 +149,11 @@ function SegmentActions(props: {
   const remove = useStore((state) => state.deletePathSegment);
   const removeObjects = useStore((state) => state.removeSceneObjects);
   const trim = useStore((state) => state.trimPathSegment);
+  const extend = useStore((state) => state.extendPathSegment);
   const convert = useStore((state) => state.convertPathSegment);
   const align = useStore((state) => state.alignPathSegmentAngle);
   const { segment } = props;
-  const kind = segmentKind(props.project, segment);
+  const info = segmentInfo(props.project, segment, props.t);
   // Converting keeps the segment where it was, so it stays picked for the next button.
   const convertKeepingPick = (to: 'line' | 'cubic'): void => {
     if (!convert(segment, to)) return;
@@ -154,26 +176,24 @@ function SegmentActions(props: {
       <NodeAction
         label="Trim"
         title="Cut the clicked part back to where other lines cross it (T)"
-        onClick={() => {
-          if (trim(segment, props.t) !== 'no-crossing') return;
-          useToastStore
-            .getState()
-            .pushToast(
-              'Nothing crosses that segment, so there is nowhere to trim it back to.',
-              'warning',
-            );
-        }}
+        onClick={() => warnUnlessTrimmed(trim(segment, props.t))}
+      />
+      <NodeAction
+        label="Extend"
+        title="Run the open end this segment leads to on to the nearest line in its way (E)"
+        disabled={!info.leadsToOpenEnd}
+        onClick={() => warnUnlessExtended(extend(segment, props.t))}
       />
       <NodeAction
         label="Curve"
         title="Convert the segment to a cubic curve (C or S)"
-        disabled={kind === 'cubic'}
+        disabled={info.kind === 'cubic'}
         onClick={() => convertKeepingPick('cubic')}
       />
       <NodeAction
         label="Line"
         title="Convert the segment to a straight line (L)"
-        disabled={kind === 'line'}
+        disabled={info.kind === 'line'}
         onClick={() => convertKeepingPick('line')}
       />
       <NodeAction
@@ -220,10 +240,17 @@ function nodeInfo(project: Project, node: PathNodeRef): NodeInfo | null {
   };
 }
 
-function segmentKind(project: Project, ref: PathSegmentRef): PathSegment['kind'] | null {
+function segmentInfo(
+  project: Project,
+  ref: PathSegmentRef,
+  t: number,
+): { readonly kind: PathSegment['kind'] | null; readonly leadsToOpenEnd: boolean } {
   const object = nodeEditableObject(project, ref.objectId);
   const subpath =
     object === null ? null : canonicalSubpath(object, ref.pathIndex, ref.polylineIndex);
-  if (subpath === null) return null;
-  return explicitCurveSubpath(subpath).segments[ref.segmentIndex]?.kind ?? null;
+  if (subpath === null) return { kind: null, leadsToOpenEnd: false };
+  return {
+    kind: explicitCurveSubpath(subpath).segments[ref.segmentIndex]?.kind ?? null,
+    leadsToOpenEnd: openEndOfSegment(subpath, ref.segmentIndex, t) !== null,
+  };
 }

@@ -99,6 +99,30 @@ describe('node editor keys over a segment', () => {
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'warning' });
   });
 
+  it('E runs an open end on to the artwork ahead and warns when it cannot', () => {
+    const post: ImportedSvg = {
+      ...artwork('post', [line([-10, 10])]),
+      bounds: { minX: -10, minY: 0, maxX: 10, maxY: 0 },
+      transform: { ...IDENTITY_TRANSFORM, x: 30, rotationDeg: 90 },
+    };
+    load([artwork('art', [line([0, 10, 20, 25])]), post]);
+    useToastStore.setState({ toasts: [] });
+    pointAt({ x: 22, y: 0.2 });
+
+    press('e');
+    expect(curveOf('art').segments.at(-1)?.to.x).toBeCloseTo(30, 9);
+
+    pointAt({ x: 15, y: 0.2 });
+    press('e');
+    pointAt({ x: 0.1, y: 0.1 });
+    press('e');
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(useToastStore.getState().toasts.map((toast) => toast.variant)).toEqual([
+      'warning',
+      'warning',
+    ]);
+  });
+
   it('C and S make the segment a curve and L makes it a line again', () => {
     load([artwork('art', [line([0, 10, 20])])]);
     pointAt({ x: 5, y: 0.2 });

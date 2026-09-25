@@ -5,17 +5,20 @@
 // acts on the edited shape rather than on a stale highlight.
 //
 // Segment: I inserts a node at the pointer, M at the midpoint, D deletes the
-// segment, T trims it back to the nearest crossings, C or S makes it a curve
-// and L a line. Node: D deletes it, B breaks the path there, C makes a corner
-// and S toggles smooth. A lines up two or more selected nodes, or else turns
-// the artwork so the segment under the pointer is level, upright or at 45°.
-// Delete removes a segment picked by clicking it.
+// segment, T trims it back to the nearest crossings, E extends the open end it
+// leads to, C or S makes it a curve and L a line. Node: D deletes it, B breaks
+// the path there, E extends an open end, C makes a corner and S toggles
+// smooth. A lines up two or more selected nodes, or else turns the artwork so
+// the segment under the pointer is level, upright or at 45°. Delete removes a
+// segment picked by clicking it.
 
 import { useEffect } from 'react';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useStore } from '../state';
 import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
+import type { PathEndExtendOutcome } from '../state/path-segment-extend-actions';
 import type { PathSegmentRef } from '../state/path-segment-ref';
+import type { PathSegmentTrimOutcome } from '../state/path-segment-trim-actions';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
@@ -25,7 +28,8 @@ import type { PathSegmentHit } from './path-segment-hit-test';
 
 type App = ReturnType<typeof useStore.getState>;
 
-const NODE_EDIT_KEYS: ReadonlySet<string> = new Set(['i', 'm', 'd', 'b', 't', 'c', 'l', 's', 'a']);
+// LightBurn's Edit Nodes letters, in lower case.
+const NODE_EDIT_KEYS: ReadonlySet<string> = new Set([...'imdbteclsa']);
 
 /** Registered in the capture phase so a handled key never also reaches the
  *  global shortcuts (plain T would otherwise switch to the Text tool). */
@@ -96,7 +100,10 @@ function runSegmentKey(app: App, key: string, hit: PathSegmentHit): void {
       deleteSegment(app, hit.ref);
       return;
     case 't':
-      trimSegment(app, hit);
+      warnUnlessTrimmed(app.trimPathSegment(hit.ref, hit.t));
+      return;
+    case 'e':
+      warnUnlessExtended(app.extendPathSegment(hit.ref, hit.t));
       return;
     case 'c':
     case 's':
@@ -115,6 +122,7 @@ function runNodeKey(app: App, key: string, ref: PathNodeRef): void {
   const { handle, ...anchor } = ref;
   if (key === 'd' && handle === undefined) deleteNode(app, ref);
   else if (key === 'b') app.breakPathAtNode(anchor);
+  else if (key === 'e') warnUnlessExtended(app.extendPathAtNode(anchor));
   else if (key === 'c') app.setPathNodeSmoothness(anchor, 'corner');
   else if (key === 's') app.setPathNodeSmoothness(anchor, 'toggle');
 }
@@ -133,11 +141,22 @@ function deleteSegment(app: App, ref: PathSegmentRef): void {
   if (app.deletePathSegment(ref) === 'last-segment') app.removeSceneObjects([ref.objectId]);
 }
 
-function trimSegment(app: App, hit: PathSegmentHit): void {
-  if (app.trimPathSegment(hit.ref, hit.t) !== 'no-crossing') return;
+/** Trim and Extend, from a key or the toolbar, say why nothing changed. */
+export function warnUnlessTrimmed(outcome: PathSegmentTrimOutcome): void {
+  if (outcome !== 'no-crossing') return;
   useToastStore
     .getState()
     .pushToast('Nothing crosses that segment, so there is nowhere to trim it back to.', 'warning');
+}
+
+const EXTEND_WARNINGS: Partial<Record<PathEndExtendOutcome, string>> = {
+  'no-crossing': 'Nothing lies ahead of that end, so there is nowhere to extend it to.',
+  'no-open-end': 'Extend runs on from an open end: point at the first or last segment or node.',
+};
+
+export function warnUnlessExtended(outcome: PathEndExtendOutcome): void {
+  const message = EXTEND_WARNINGS[outcome];
+  if (message !== undefined) useToastStore.getState().pushToast(message, 'warning');
 }
 
 function deleteClickedSegment(app: App, event: KeyboardEvent): boolean {

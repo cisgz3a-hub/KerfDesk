@@ -8,10 +8,15 @@ import {
   type PathNodeInteractionActions,
 } from './path-node-interaction-actions';
 import { pathSegmentEditActions, type PathSegmentEditActions } from './path-segment-edit-actions';
+import {
+  pathSegmentExtendActions,
+  type PathSegmentExtendActions,
+} from './path-segment-extend-actions';
 import { pathSegmentTrimActions, type PathSegmentTrimActions } from './path-segment-trim-actions';
 
 export type PathNodeEditorActions = PathSegmentEditActions &
   PathSegmentTrimActions &
+  PathSegmentExtendActions &
   PathNodeAlignActions &
   PathNodeInteractionActions;
 
@@ -21,6 +26,7 @@ export function pathNodeEditorActions(set: Setter): PathNodeEditorActions {
   return {
     ...pathSegmentEditActions(set),
     ...pathSegmentTrimActions(set),
+    ...pathSegmentExtendActions(set),
     ...pathNodeAlignActions(set),
     ...pathNodeInteractionActions(set),
   };

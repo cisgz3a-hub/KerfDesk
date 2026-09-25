@@ -86,6 +86,19 @@ describe('NodeActionBar for a clicked segment', () => {
     expect(useStore.getState().project.scene.objects).toEqual([]);
   });
 
+  it('extends an end segment to the artwork ahead, but not an interior one', async () => {
+    const post = { ...artwork('post', [line([30, 30], [-5, 5])]), bounds: POST_BOUNDS };
+    load([artwork('art', [line([0, 10, 20, 25])]), post]);
+    await pickSegment(1);
+    expect(button('Extend').disabled).toBe(true);
+
+    await pickSegment(2);
+    await click('Extend');
+
+    expect(curveOf('art').segments.at(-1)?.to).toEqual({ x: 30, y: 0 });
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
   it('warns when there is nothing to trim back to', async () => {
     load([artwork('art', [line([0, 10, 20])])]);
     await pickSegment(0);
@@ -108,6 +121,21 @@ describe('NodeActionBar for selected nodes', () => {
     expect(curves).toHaveLength(2);
     await selectNode(curveNode('art', 0));
     expect(button('Break').disabled).toBe(true);
+  });
+
+  it('extends from an open end node only', async () => {
+    const post = {
+      ...artwork('post', [line([-8, -8], [-5, 5])]),
+      bounds: { ...POST_BOUNDS, minX: -8, maxX: -8 },
+    };
+    load([artwork('art', [line([0, 10, 20])]), post]);
+    await selectNode(curveNode('art', 1));
+    expect(button('Extend').disabled).toBe(true);
+    await selectNode(curveNode('art', 0));
+
+    await click('Extend');
+
+    expect(curveOf('art').start).toEqual({ x: -8, y: 0 });
   });
 
   it('lines up two selected nodes with Align', async () => {
@@ -151,6 +179,8 @@ describe('NodeActionBar for selected nodes', () => {
     expect(button('Start').disabled).toBe(true);
   });
 });
+
+const POST_BOUNDS = { minX: 30, minY: -5, maxX: 30, maxY: 5 };
 
 function toolbar(): string | null {
   return host.querySelector('[role="toolbar"]')?.getAttribute('aria-label') ?? null;

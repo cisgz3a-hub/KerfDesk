@@ -84,19 +84,38 @@ export function trimCutters(
   object: NodeEditableObject,
   ref: PathSegmentRef,
 ): ReadonlyArray<TrimCutter> {
+  const trimmed = object.paths[ref.pathIndex]?.polylines[ref.polylineIndex];
+  const reach =
+    trimmed === undefined ? null : pointsBounds(scenePolyline(trimmed, object.transform));
+  return artworkCutters(scene, object, {
+    skip: ref,
+    reaches: (bounds) => reach !== null && overlaps(bounds, reach),
+  });
+}
+
+/** Scene polylines of visible vector artwork: the object's own lines but
+ *  `skip`, and those of other artwork whose box `reaches` accepts. */
+export function artworkCutters(
+  scene: Scene,
+  object: NodeEditableObject,
+  options: {
+    readonly skip: { readonly pathIndex: number; readonly polylineIndex: number } | null;
+    readonly reaches: (bounds: Bounds) => boolean;
+  },
+): ReadonlyArray<TrimCutter> {
   const lookup = sceneLayerVisibility.lookup(scene.layers);
+  const { skip } = options;
   const own = visiblePolylines(object, lookup).flatMap((entry) =>
-    entry.pathIndex === ref.pathIndex && entry.polylineIndex === ref.polylineIndex
+    skip !== null &&
+    entry.pathIndex === skip.pathIndex &&
+    entry.polylineIndex === skip.polylineIndex
       ? []
       : [scenePolyline(entry.polyline, object.transform)],
   );
-  const trimmed = object.paths[ref.pathIndex]?.polylines[ref.polylineIndex];
-  if (trimmed === undefined) return own;
-  const reach = pointsBounds(scenePolyline(trimmed, object.transform));
   const others = scene.objects.flatMap((other) => {
     if (other.id === object.id || !('paths' in other) || isRegistrationBox(other)) return [];
     if (!sceneLayerVisibility.hasObject(other, lookup)) return [];
-    if (reach === null || !overlaps(transformedBBox(other), reach)) return [];
+    if (!options.reaches(transformedBBox(other))) return [];
     return visiblePolylines(other, lookup).map((entry) =>
       scenePolyline(entry.polyline, other.transform),
     );
