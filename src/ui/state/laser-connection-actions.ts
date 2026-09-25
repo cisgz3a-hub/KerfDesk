@@ -16,7 +16,6 @@ import {
   teardownConnectionRefs,
   type IntentionalDisconnectRequest,
 } from './laser-connection-teardown';
-import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine } from './laser-line-handler';
 import {
   disconnectedControllerQualification,
@@ -33,17 +32,12 @@ import {
 import {
   retainedDisconnectSafetyNotice,
   retainedUnavailableTransportSafetyNotice,
-  safetyNoticeLeavesPhysicalStopUncertain,
   unconfirmedDisconnectStopNotice,
   withRetainedDisconnectSafety,
 } from './laser-disconnect-safety';
+import { stopBeforeDisconnect } from './laser-disconnect-stop';
 import { disconnectedStatePatch } from './laser-disconnected-state';
-import {
-  buildPortClosePatch,
-  disconnectStopCommands,
-  initialLaserState,
-  pushLog,
-} from './laser-store-helpers';
+import { buildPortClosePatch, initialLaserState, pushLog } from './laser-store-helpers';
 import {
   containActiveStreamWriteFailure,
   containLostStreamHeartbeat,
@@ -313,7 +307,7 @@ async function runOwnedIntentionalDisconnect(
 ): Promise<void> {
   let retainedSafetyNotice = unconfirmedDisconnectStopNotice(get(), refs.driver);
   try {
-    await stopBeforeDisconnect(set, get, refs, safeWrite);
+    await stopBeforeDisconnect(set, get, refs, safeWrite, connection);
   } catch {
     retainedSafetyNotice = writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
@@ -339,32 +333,6 @@ async function runOwnedIntentionalDisconnect(
   }
   if (closeError !== null) {
     throw closeError instanceof Error ? closeError : new Error(String(closeError));
-  }
-}
-
-async function stopBeforeDisconnect(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  if (isGrblFamilyDriver(refs.driver)) {
-    await runGrblDisconnectTransaction(set, refs, safeWrite);
-    return;
-  }
-  const state = get();
-  const ordinaryStopCommands = disconnectStopCommands(state, refs.driver);
-  const stopCommands =
-    ordinaryStopCommands.length === 0 &&
-    state.safetyNotice !== null &&
-    safetyNoticeLeavesPhysicalStopUncertain(state.safetyNotice)
-      ? [
-          ...(refs.driver.realtime.softReset === null ? [] : [refs.driver.realtime.softReset]),
-          ...refs.driver.commands.stopLaserLines.map((line) => `${line}\n`),
-        ]
-      : ordinaryStopCommands;
-  for (const stopCommand of stopCommands) {
-    await safeWrite(stopCommand, 'disconnect');
   }
 }
 
