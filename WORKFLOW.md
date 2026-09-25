@@ -3570,6 +3570,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    It never blocks save or Start: ADR-228 made a completed Frame the sole Start
    gate, and F-A10 documents the same non-blocking behavior.
 
+#### Warning — tabs skipped because of the stock thickness
+1. A profile with tabs on keeps them only where the cut can free the part (ADR-258
+   Amendment 1): a floor at least one tab height thick under the cut drops them. Stock
+   thickness is only what the project says, so when it drops tabs Job Review names the
+   thickness, the cut depth and the floor it relied on, and asks the operator to check Stock
+   thickness (ADR-258 Amendment 2). A value left from thicker stock would otherwise free the
+   parts on the final pass with no tabs. The warning never blocks save or Start.
+
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
    emitted for it.

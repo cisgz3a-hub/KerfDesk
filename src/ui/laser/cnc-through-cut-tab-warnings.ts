@@ -12,14 +12,22 @@
 // This is an advisory, not a hard gate — through-cutting onto a spoilboard is a
 // legitimate workflow. KerfDesk warns rather than silently auto-adding tabs
 // (divergence from Easel's auto-tab default, recorded in the CNC-defaults ADR).
+//
+// ADR-258 amendment 2: the compiler drops enabled tabs where the project's stock
+// thickness leaves a floor under the cut (cutCanFreePart). That thickness is
+// only what the project says, and a value left from thicker stock frees the
+// parts with no tabs, so a skip always names the thickness it relied on.
 
 import { isProfileCutType } from '../../core/cnc';
+import { cutCanFreePart } from '../../core/cnc/cnc-tabs';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
+  type CncLayerSettings,
   type Layer,
   type Project,
 } from '../../core/scene';
+import { formatMm } from './job-review/job-review-format';
 
 export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
@@ -33,29 +41,56 @@ export function detectCncThroughCutTabWarnings(project: Project): ReadonlyArray<
     // physical evidence when every object on the operation is a relief; the
     // prepared-job warning below uses the exact rough/finish pass depth.
     if (layerCarriesOnlyReliefs(project, layer)) continue;
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    const cutsThrough =
-      isProfileCutType(settings.cutType) &&
-      settings.depthMm >= stockThicknessMm &&
-      !settings.tabsEnabled;
-    if (cutsThrough) {
-      warnings.push(
-        `Layer ${layer.id} cuts through the stock (${settings.depthMm} mm ≥ ${stockThicknessMm} mm) ` +
-          'with no holding tabs — the part and any hole slugs come free on the final pass. ' +
-          'Enable Tabs or reduce the cut depth.',
-      );
-    } else if (settings.depthMm > stockThicknessMm && settings.cutType !== 'v-carve') {
-      // Spoilboard overcut. Legitimate on purpose, so this informs and never
-      // refuses; the free-part case above is the louder one and wins the row.
-      const pastMm = settings.depthMm - stockThicknessMm;
-      warnings.push(
-        `Layer ${layer.id} cuts ${settings.depthMm} mm into ${stockThicknessMm} mm stock — ` +
-          `${pastMm.toFixed(2)} mm past the bottom, into the spoilboard. ` +
-          'Reduce the cut depth if that is not intended.',
-      );
-    }
+    const warning = layerStockWarning(layer, stockThicknessMm);
+    if (warning !== null) warnings.push(warning);
   }
   return warnings;
+}
+
+function layerStockWarning(layer: Layer, stockThicknessMm: number): string | null {
+  const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const cutsThrough =
+    isProfileCutType(settings.cutType) &&
+    settings.depthMm >= stockThicknessMm &&
+    !settings.tabsEnabled;
+  if (cutsThrough) {
+    return (
+      `Layer ${layer.id} cuts through the stock (${settings.depthMm} mm ≥ ${stockThicknessMm} mm) ` +
+      'with no holding tabs — the part and any hole slugs come free on the final pass. ' +
+      'Enable Tabs or reduce the cut depth.'
+    );
+  }
+  if (settings.depthMm > stockThicknessMm && settings.cutType !== 'v-carve') {
+    // Spoilboard overcut. Legitimate on purpose, so this informs and never
+    // refuses; the free-part case above is the louder one and wins the row.
+    const pastMm = settings.depthMm - stockThicknessMm;
+    return (
+      `Layer ${layer.id} cuts ${settings.depthMm} mm into ${stockThicknessMm} mm stock — ` +
+      `${pastMm.toFixed(2)} mm past the bottom, into the spoilboard. ` +
+      'Reduce the cut depth if that is not intended.'
+    );
+  }
+  if (stockSkipsTabs(settings, stockThicknessMm)) {
+    return (
+      `${layer.name} skips its holding tabs: Stock thickness is ${formatMm(stockThicknessMm)} mm, ` +
+      `so the ${formatMm(settings.depthMm)} mm cut leaves a ` +
+      `${formatMm(stockThicknessMm - settings.depthMm)} mm floor that holds the part. ` +
+      'If the material is thinner than that, the parts come free on the final pass — ' +
+      'check Stock thickness before starting.'
+    );
+  }
+  return null;
+}
+
+/** True when the compiler drops tabs this profile asks for (cnc-tabs.ts). */
+function stockSkipsTabs(settings: CncLayerSettings, stockThicknessMm: number): boolean {
+  return (
+    isProfileCutType(settings.cutType) &&
+    settings.tabsEnabled &&
+    // No deeper than the tab, a pass never gets tabs anyway (passNeedsTabs).
+    settings.depthMm > settings.tabHeightMm &&
+    !cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
+  );
 }
 
 function layerCarriesOnlyReliefs(project: Project, layer: Layer): boolean {
