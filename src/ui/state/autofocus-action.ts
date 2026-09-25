@@ -16,6 +16,7 @@
 // focus duration or proof that an unresponsive machine has stopped moving.
 
 import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
+import { consoleTextRefusal } from '../../core/controllers/console-text';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { TranscriptSource } from './laser-transcript';
@@ -83,6 +84,18 @@ function checkPreflight(args: RunAutofocusArgs): AutofocusResult | null {
     return {
       kind: 'preflight-failed',
       reason: 'Autofocus command must be a single line',
+    };
+  }
+  const textRefusal = consoleTextRefusal(command);
+  if (textRefusal !== null) return { kind: 'preflight-failed', reason: textRefusal };
+  // GRBL-family firmware acts on `!`, `~` and `?` wherever they appear: a `!`
+  // holds the controller before the command runs, so it would never answer
+  // (audit GP-3).
+  const realtime = /[!~?]/.exec(command);
+  if (realtime !== null) {
+    return {
+      kind: 'preflight-failed',
+      reason: `Autofocus command contains "${realtime[0]}", which the controller runs as a realtime command the moment it arrives. Remove it from the command in Machine Setup.`,
     };
   }
   return null;

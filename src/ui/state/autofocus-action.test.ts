@@ -78,6 +78,18 @@ describe('runAutofocus — preflight', () => {
     if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/single line/i);
   });
 
+  // Controller audit 2026-09-25 GP-3: a `!` in the command would hold a
+  // GRBL-family controller before the command runs, so nothing would answer.
+  it.each(['$HZ1 (focus!)', 'M8 ~', '$HZ1?'])(
+    'rejects %s, which carries a realtime character',
+    async (command) => {
+      const harness = makeHarness();
+      const result = await runAutofocus(harness.args({ command }));
+      expect(result.kind).toBe('preflight-failed');
+      if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/realtime command/);
+    },
+  );
+
   it('rejects when controller is not Idle', async () => {
     const harness = makeHarness();
     const result = await runAutofocus(

@@ -1,4 +1,4 @@
-import { CMD_BUILD_INFO, CMD_SETTINGS, CMD_UNLOCK, RT_STATUS } from './commands';
+import { CMD_BUILD_INFO, CMD_SETTINGS, CMD_UNLOCK, RT_RESUME, RT_STATUS } from './commands';
 import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
 import { consoleTextRefusal, normalizeConsoleSpaces } from '../console-text';
 
@@ -7,6 +7,8 @@ export const CMD_MODAL_STATE = '$G';
 
 export type ConsoleCommandKind =
   | 'realtime-status'
+  | 'realtime-cycle-start'
+  | 'check-mode'
   | 'settings-query'
   | 'offset-query'
   | 'build-info-query'
@@ -23,6 +25,10 @@ export type PreparedConsoleCommand = {
   readonly requiresNoActiveOperation: boolean;
   readonly requiresConfirmation: boolean;
   readonly stateEffect: ConsoleStateEffect;
+  /** Controller states the firmware accepts this `$` command in, when that is
+   * not Idle alone. GRBL's system.c takes `$C` in Idle or Check mode (the second
+   * `$C` is the documented way out of Check) and `$H`/`$SLP` in Idle or Alarm. */
+  readonly allowedStates?: ReadonlyArray<string>;
 };
 
 export type ConsoleCommandResult =
@@ -33,6 +39,22 @@ const EMPTY_REASON = 'Enter one GRBL or G-code command.';
 const MULTILINE_REASON = 'Console commands and saved macros must contain exactly one line.';
 const BLOCKED_PERSISTENT_REASON =
   'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.';
+
+// GRBL-family firmware executes these bytes the moment they arrive, anywhere
+// in the stream and even inside a comment (gnea/grbl serial.c ISR; grblHAL's
+// legacy realtime characters; FluidNC Channel::pollLine). A `!` inside a line
+// holds the controller before the line is parsed, so no `ok` ever comes and
+// the exchange wedges until a cycle start (audit GP-3).
+const FEED_HOLD_REASON =
+  '"!" is the controller\'s feed-hold command: it acts the moment it arrives, even inside a comment, and holds the machine before this line runs. Remove it (use Pause on the machine rail to hold a job).';
+const CYCLE_START_REASON =
+  '"~" is the controller\'s cycle-start command: it acts the moment it arrives, even inside a comment. Send "~" on its own to resume a hold, or remove it from the line.';
+const STATUS_QUERY_REASON =
+  '"?" is the controller\'s status query: it acts the moment it arrives, even inside a comment, and is removed from the line. Send "?" on its own, or remove it from the line.';
+const CMD_CHECK_MODE = '$C';
+const HOME_OR_SLEEP_RE = /^\$(?:H[XYZABC]?|SLP)$/i;
+const IDLE_OR_ALARM: ReadonlyArray<string> = ['Idle', 'Alarm'];
+const IDLE_OR_CHECK: ReadonlyArray<string> = ['Idle', 'Check'];
 
 const SETTING_WRITE_RE = /^\$\d+=\S.*$/;
 const STARTUP_WRITE_RE = /^\$N\d*=/i;
@@ -58,6 +80,13 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   if (normalized === RT_STATUS) {
     return ok('realtime-status', normalized, RT_STATUS, false, false, false);
   }
+  if (normalized === RT_RESUME) {
+    // A lone `~` resumes a hold outside a job (a `!` or a door the operator
+    // closed). It owes no acknowledgement; a job is resumed from the rail.
+    return ok('realtime-cycle-start', normalized, RT_RESUME, false, true, false);
+  }
+  const realtimeRefusal = embeddedRealtimeRefusal(normalized);
+  if (realtimeRefusal !== null) return { ok: false, reason: realtimeRefusal };
   if (upper === CMD_SETTINGS) return ok('settings-query', CMD_SETTINGS, `${CMD_SETTINGS}\n`);
   if (upper === CMD_OFFSETS) return ok('offset-query', CMD_OFFSETS, `${CMD_OFFSETS}\n`);
   if (upper === CMD_BUILD_INFO) {
@@ -68,6 +97,18 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   }
   if (upper === CMD_UNLOCK) {
     return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
+  }
+  if (upper === CMD_CHECK_MODE) {
+    return ok(
+      'check-mode',
+      CMD_CHECK_MODE,
+      `${CMD_CHECK_MODE}\n`,
+      false,
+      true,
+      false,
+      'machine-state',
+      IDLE_OR_CHECK,
+    );
   }
   if (SETTING_WRITE_RE.test(compact)) {
     return ok(
@@ -80,10 +121,19 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
       settingWriteStateEffect(compact),
     );
   }
-  const stateEffect = /^\$H(?:[XYZABC])?$/i.test(compact)
-    ? 'reference'
-    : commonConsoleStateEffect(compact);
+  if (HOME_OR_SLEEP_RE.test(compact)) {
+    const stateEffect = /^\$SLP$/i.test(compact) ? 'machine-state' : 'reference';
+    return ok('gcode', compact, `${compact}\n`, false, true, false, stateEffect, IDLE_OR_ALARM);
+  }
+  const stateEffect = commonConsoleStateEffect(compact);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
+}
+
+function embeddedRealtimeRefusal(line: string): string | null {
+  if (line.includes('!')) return FEED_HOLD_REASON;
+  if (line.includes('~')) return CYCLE_START_REASON;
+  if (line.includes(RT_STATUS)) return STATUS_QUERY_REASON;
+  return null;
 }
 
 function consoleLineRefusal(trimmed: string): string | null {
@@ -122,6 +172,7 @@ function ok(
   requiresNoActiveOperation = true,
   requiresConfirmation = false,
   stateEffect: ConsoleStateEffect = 'read-only',
+  allowedStates?: ReadonlyArray<string>,
 ): ConsoleCommandResult {
   return {
     ok: true,
@@ -133,6 +184,7 @@ function ok(
       requiresNoActiveOperation,
       requiresConfirmation,
       stateEffect,
+      ...(allowedStates === undefined ? {} : { allowedStates }),
     },
   };
 }

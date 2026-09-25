@@ -18,7 +18,12 @@ export function consoleCommandBlockReason(
   state: LaserState,
   command: Pick<
     PreparedConsoleCommand,
-    'kind' | 'normalized' | 'requiresIdle' | 'requiresNoActiveOperation' | 'stateEffect'
+    | 'kind'
+    | 'normalized'
+    | 'requiresIdle'
+    | 'requiresNoActiveOperation'
+    | 'stateEffect'
+    | 'allowedStates'
   >,
   checkIdle: boolean,
 ): string | null {
@@ -30,11 +35,27 @@ export function consoleCommandBlockReason(
   }
   const operationBlock = consoleOperationBlockForCommand(state, command, recoveryCommand);
   if (operationBlock !== null) return operationBlock;
-  if (!checkIdle || !command.requiresIdle || recoveryCommand) return null;
+  if (!checkIdle || recoveryCommand) return null;
+  if (command.allowedStates !== undefined) {
+    return consoleAllowedStateReason(state.statusReport, command.allowedStates);
+  }
+  if (!command.requiresIdle) return null;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   return state.statusReport.state === 'Idle'
     ? null
     : `Machine must be Idle before sending this console command (currently ${state.statusReport.state}).`;
+}
+
+/** A `$` command the firmware takes in more than Idle (`$C` in Check mode,
+ *  `$H`/`$SLP` in Alarm): the firmware itself refuses any other state with
+ *  `error:8`, so the last reported state is enough to decide (audit GP-4). */
+export function consoleAllowedStateReason(
+  report: LaserState['statusReport'],
+  allowedStates: ReadonlyArray<string>,
+): string | null {
+  if (report === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (allowedStates.includes(report.state)) return null;
+  return `The controller accepts this command only in ${allowedStates.join(' or ')} (currently ${report.state}).`;
 }
 
 function consoleOperationBlockForCommand(
