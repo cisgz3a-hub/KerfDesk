@@ -3578,6 +3578,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
+#### Warning — a tapered ball nose sets pocket or profile offsets
+1. A tapered ball nose is modelled for relief finishing (ADR-368), but pocket and
+   profile offsets, and relief roughing, still step by its widest diameter at the
+   top of the flutes. When one is the main bit of a pocket, an inside or outside
+   profile, or a relief, Job Review warns that the result comes out off-size or
+   ribbed and suggests a flat end mill or the 3D removal preview (ADR-368
+   Amendment 1). The warning never blocks save or Start.
+
 ### F-CNC3. CNC preflight and save G-code
 
 #### Success
