@@ -8,8 +8,8 @@
 export type { DitherAlgorithm, DitherInput, DitherOptions } from './dither';
 export { dither } from './dither';
 
-export type { EmitRasterInput } from './emit-raster';
-export { emitRasterGroup } from './emit-raster';
+export type { EmitRasterInput, RasterGroupEnd } from './emit-raster';
+export { emitRasterGroup, emitRasterGroupWithEnd } from './emit-raster';
 
 export type { LumaAdjustments } from './luma-adjust';
 export { applyLumaAdjustments, maybeInvertLuma } from './luma-adjust';

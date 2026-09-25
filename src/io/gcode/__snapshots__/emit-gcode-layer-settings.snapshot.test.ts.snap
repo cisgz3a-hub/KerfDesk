@@ -11,7 +11,6 @@ M4 S0
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1200 S600
 ; pass 2 of 2
-M4 S0
 G0 X10.000 Y390.000 S0
 G1 X30.000 Y390.000 F1200 S600
 ; fill layer fill-blue color #0000ff power 35% speed 3000 mm/min passes 1 overscan 5.000 mm (feed-matched entry and exit up to 5.000 mm on every Scan Line sweep)
