@@ -42,6 +42,12 @@ controllers hobby CNC machines ship with is in the audit report
    "CNC Frame is unavailable: KerfDesk CNC jobs require a GRBL-family controller (GRBL, grblHAL,
    FluidNC), and the connected controller cannot run them. …". This is the same refusal of a
    Frame that cannot be built, earlier and in the right words; it is not a new gate.
+   - The Laser/CNC toggle, switching to CNC on a profile whose controller cannot run KerfDesk
+     CNC jobs, warns "CNC mode is active, but this profile's controller (Marlin) cannot run
+     KerfDesk CNC jobs: they need a GRBL-family controller …", whatever the profile's capability
+     label says. The mode still switches.
+   - When the setup includes CNC, Machine Setup's controller list marks those controllers
+     "— laser only".
 3. **Ruida.** An untiled CNC Save on the Ruida profile says a router job cannot be a Ruida `.rd`
    laser file (ADR-394). A tiled Save still writes GRBL tiles, now with the item 1 warning. A
    refusal would take a working file away from an operator whose tile cutter runs GRBL.
@@ -57,4 +63,5 @@ controllers hobby CNC machines ship with is in the audit report
 - Regression tests: `cnc-export-controller-advisory.test.ts`,
   `cnc-export-controller-advisory-exports.test.ts`, `use-frame-action.cnc-controller.test.ts`,
   `cnc-frame-lines.test.ts`, `emit-rd-cnc-refusal.test.ts`,
-  `emit-gcode-cnc-dialect-independence.test.ts`, `DeviceSetupWizard.cnc.test.tsx`.
+  `emit-gcode-cnc-dialect-independence.test.ts`, `DeviceSetupWizard.cnc.test.tsx`,
+  `MachineModeToggle.hybrid.test.tsx`.

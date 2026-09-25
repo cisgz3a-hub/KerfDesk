@@ -130,7 +130,43 @@ describe('DeviceSetupWizard router commit', () => {
       await view.unmount();
     }
   });
+
+  // CN-2: the controller list says which controllers cannot run CNC jobs.
+  it('marks the controllers that cannot run CNC jobs as laser only when the setup includes CNC', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(controllerOptionLabels(view.host)).toEqual([
+        'GRBL v1.1',
+        'grblHAL',
+        'FluidNC',
+        'Marlin — laser only',
+        'Smoothieware — laser only',
+        'Ruida (.rd export) — laser only',
+      ]);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('lists controllers by name alone in a laser-only setup', async () => {
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(controllerOptionLabels(view.host)).toContain('Marlin');
+      expect(controllerOptionLabels(view.host).join()).not.toContain('laser only');
+    } finally {
+      await view.unmount();
+    }
+  });
 });
+
+function controllerOptionLabels(host: HTMLElement): ReadonlyArray<string> {
+  const select = host.querySelector('select[aria-label="Controller firmware"]');
+  if (!(select instanceof HTMLSelectElement)) throw new Error('controller select missing');
+  return [...select.options].map((option) => option.textContent ?? '');
+}
 
 async function renderWizard(): Promise<{
   readonly host: HTMLDivElement;

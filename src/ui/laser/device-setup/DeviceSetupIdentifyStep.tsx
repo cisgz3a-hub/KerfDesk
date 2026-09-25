@@ -79,6 +79,7 @@ function ControllerContract(props: {
     props.controllerKind,
     props.state.draft.controllerCommandSet,
   );
+  const includesCnc = deviceSetupSupportsMachineKind(props.state, 'cnc');
   return (
     <div className="lf-setup-fields" style={settingsStyle}>
       <Row label="Controller">
@@ -95,7 +96,7 @@ function ControllerContract(props: {
         >
           {machineSetupControllerGuides().map((item) => (
             <option key={item.kind} value={item.kind}>
-              {item.label}
+              {controllerOptionLabel(item, includesCnc)}
             </option>
           ))}
         </select>
@@ -113,6 +114,16 @@ function ControllerContract(props: {
       ) : null}
     </div>
   );
+}
+
+// A setup that includes CNC marks the controllers that cannot run KerfDesk
+// CNC jobs (`cncJobs` false), so the operator learns it before a CNC setup on
+// one is refused at save (device-setup-flow.ts; controller audit CN-2).
+function controllerOptionLabel(
+  guide: { readonly label: string; readonly cncSupported: boolean },
+  includesCnc: boolean,
+): string {
+  return includesCnc && !guide.cncSupported ? `${guide.label} — laser only` : guide.label;
 }
 
 // The dialect shapes laser output only: every CNC program is emitted in
