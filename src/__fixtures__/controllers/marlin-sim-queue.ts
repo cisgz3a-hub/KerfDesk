@@ -9,9 +9,10 @@
 //    and `ok` is sent when the handler returns (L1122), also after an
 //    `Error:` a handler printed and after `echo:Unknown command: "..."` for a
 //    command whose build option is off (L489-L505, L591-L594, L1101-L1122).
-//  - module/planner.h get_next_free_block(): a G0/G1 waits for one of the
-//    BLOCK_BUFFER_SIZE (16) planner slots (L774-L777); planned moves run one
-//    after another in the stepper ISR.
+//  - module/planner.h get_next_free_block(): a G0/G1 waits for a free planner
+//    slot (L774-L777). The ring keeps one of its BLOCK_BUFFER_SIZE (16) slots
+//    free, so it holds 15 moves, the busy one included (moves_free(), L752,
+//    L765). Planned moves run one after another in the stepper ISR.
 //  - Planner::synchronize() (planner.cpp L1803): M400, M3/M4 (M3-M5.cpp L81,
 //    L111), M5 (L143), M7/M8/M9 (M7-M9.cpp), G4 and G28 wait for the planner
 //    to drain before they answer.
@@ -23,6 +24,8 @@
 
 export const MARLIN_BUFSIZE = 4;
 export const MARLIN_BLOCK_BUFFER_SIZE = 16;
+/** Moves the planner holds at once: BLOCK_BUFFER_SIZE - 1 (planner.h L765). */
+export const MARLIN_PLANNER_MOVES = MARLIN_BLOCK_BUFFER_SIZE - 1;
 export const MARLIN_KEEPALIVE_MS = 2_000;
 export const MARLIN_QUICKSTOP_MS = 1_000;
 

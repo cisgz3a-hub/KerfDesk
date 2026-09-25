@@ -16,7 +16,7 @@ import { parseMotionWords, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode'
 import { executeMarlinLine, powerUpMarlin, type MarlinBurn } from './marlin-laser-power-model';
 import {
   createMarlinSimQueue,
-  MARLIN_BLOCK_BUFFER_SIZE,
+  MARLIN_PLANNER_MOVES,
   MARLIN_KEEPALIVE_MS,
   type MarlinSimHandler,
 } from './marlin-sim-queue';
@@ -55,7 +55,7 @@ export type CreateMarlinSimulatorOptions = {
   readonly build?: Partial<MarlinSimBuild>;
   /** HOST_KEEPALIVE_FEATURE interval; 0 turns the busy keepalive off. */
   readonly keepaliveMs?: number;
-  /** BLOCK_BUFFER_SIZE. */
+  /** Moves the planner holds: BLOCK_BUFFER_SIZE - 1 (15 on a stock build). */
   readonly plannerBlocks?: number;
 };
 
@@ -157,7 +157,7 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
   const queue = createMarlinSimQueue({
     motionMs: options.motionMs ?? 10,
     keepaliveMs: options.keepaliveMs ?? MARLIN_KEEPALIVE_MS,
-    plannerBlocks: options.plannerBlocks ?? MARLIN_BLOCK_BUFFER_SIZE,
+    plannerBlocks: options.plannerBlocks ?? MARLIN_PLANNER_MOVES,
     emit,
     run: (line, firstRun) => runLine(line, firstRun),
     onRead: (line) => readLine(line),

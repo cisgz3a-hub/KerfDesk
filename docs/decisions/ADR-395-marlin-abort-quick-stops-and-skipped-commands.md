@@ -58,9 +58,9 @@ MA-9, MA-10, MA-11, MA-12, CG-10 and ST-5.
 6. **Console and halts.** The Marlin Console refuses a comment-only line. `Error:Printer halted.
    kill() called!` raises a notice that the controller needs its reset button or a power cycle,
    and no stop lines are written after it. The M112 quick command says the same.
-7. **Simulator.** The Marlin simulator models the 4-line command buffer, the 16-block planner,
-   planner-synchronizing commands, busy lines, silent comment lines, build options, M410, M112,
-   and G92 with its position echo.
+7. **Simulator.** The Marlin simulator models the 4-line command buffer, the 16-block planner
+   (15 moves, with one slot kept free), planner-synchronizing commands, busy lines, silent
+   comment lines, build options, M410, M112, and G92 with its position echo.
 
 ### Consequences
 

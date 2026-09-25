@@ -62,14 +62,14 @@ describe('Marlin simulator fidelity', () => {
     expect(sim.state().pendingMotions).toBe(0);
   });
 
-  it('delays the ok of a move until one of the 16 planner blocks frees', async () => {
+  it('delays the ok of a move until a slot frees in its 15-move planner (planner.h L765)', async () => {
     const { sim, lines, write } = await openSim({ motionMs: 1_000 });
-    for (let x = 1; x <= 17; x += 1) await write(`G1 X${x} F600\n`);
+    for (let x = 1; x <= 16; x += 1) await write(`G1 X${x} F600\n`);
     await vi.advanceTimersByTimeAsync(50);
-    expect(lines.filter((line) => line === 'ok')).toHaveLength(16);
-    expect(sim.state().pendingMotions).toBe(16);
+    expect(lines.filter((line) => line === 'ok')).toHaveLength(15);
+    expect(sim.state().pendingMotions).toBe(15);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(lines.filter((line) => line === 'ok')).toHaveLength(17);
+    expect(lines.filter((line) => line === 'ok')).toHaveLength(16);
   });
 
   it('follows a handler Error: with the ok for the same line', async () => {
