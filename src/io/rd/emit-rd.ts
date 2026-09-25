@@ -97,6 +97,8 @@ function describeRdEncodeError(error: RdEncodeError): string {
   switch (error.kind) {
     case 'empty-job':
       return 'Nothing to export — enable Output on at least one layer with geometry.';
+    case 'cnc-unsupported':
+      return 'A CNC router job cannot be exported as a Ruida .rd laser file. Switch the project to Laser mode, or choose a GRBL-family machine profile for router jobs.';
     case 'raster-unsupported':
       return `Layer ${error.layerId} uses Fill/Image raster output, which the experimental .rd encoder does not support yet. Use Line mode layers for Ruida export.`;
     case 'too-many-layers':

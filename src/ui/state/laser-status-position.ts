@@ -48,7 +48,8 @@ export function statusPositionPatch(
       wcoCache: null,
     };
   }
-  if (report.wco === null) {
+  const frameWco = report.wco ?? sameFrameWorkOffset(report);
+  if (frameWco === null) {
     return { statusReport: report, ...ovPatch, ...accessoryPatch, ...airPatch };
   }
   // A non-trivial WCO always means a custom origin. A zero WCO is ambiguous: on a
@@ -58,15 +59,33 @@ export function statusPositionPatch(
   // must NOT demote it. Only an explicit app-set origin carries that intent;
   // 'unknown' after Home/reset is reconciled by this fresh WCO, not latched
   // forever. Classify in mm while retaining the original report-unit cache.
-  const active = hasActiveXyOrigin(state, report.wco);
+  const active = hasActiveXyOrigin(state, frameWco);
   return {
     statusReport: report,
     ...ovPatch,
     ...accessoryPatch,
     ...airPatch,
-    wcoCache: unchangedOr(state.wcoCache, report.wco),
+    wcoCache: unchangedOr(state.wcoCache, frameWco),
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
+  };
+}
+
+// Smoothieware reports MPos and WPos from one sample and never a WCO: field, so
+// the work offset is MPos - WPos: the same quantity GRBL's WCO: carries (WCS
+// offset, G92 and tool offset; Smoothieware Kernel.cpp:207-234 and 262-288,
+// Robot.cpp:448-456 mcs2wcs at 38e2cc08). Taking it from the report re-learns a
+// G92 the board keeps through a reconnect, halt, M999 or Home, which KerfDesk
+// had forgotten (controller audit 2026-09-25 SM-1, CG-1). GRBL-family
+// controllers report MPos or WPos, never both. Rounded to the reports' own
+// 4-decimal resolution so float noise cannot change the cached value.
+function sameFrameWorkOffset(report: StatusReport): WorkCoordinateOffset | null {
+  if (report.mPos === null || report.wPos === null) return null;
+  const difference = (a: number, b: number): number => Math.round((a - b) * 10_000) / 10_000;
+  return {
+    x: difference(report.mPos.x, report.wPos.x),
+    y: difference(report.mPos.y, report.wPos.y),
+    z: difference(report.mPos.z, report.wPos.z),
   };
 }
 

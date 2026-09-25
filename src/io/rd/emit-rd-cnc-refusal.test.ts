@@ -1,16 +1,7 @@
-// Audit track CN (2026-09-25) — Save of a CNC project on a Ruida (.rd export)
-// profile.
-//
-// Correct behaviour: the refusal is factual (the .rd encoder cannot represent
-// a CNC router job, ADR-097), so refusing is right, but the message must name
-// that reason — a CNC (router) job cannot be exported as a Ruida .rd laser
-// file — not blame "Fill/Image raster output" and advise "Use Line mode layers",
-// which a CNC layer does not have. rd-encoder.ts:68-71 maps every group whose
-// kind is not 'cut' (including kind 'cnc') to the 'raster-unsupported' error.
-// (Ruida: laser-only DSP controllers; meerk40t ruida/ driver/emulator in the
-// pinned upstream tree has no router/spindle concept.)
-//
-// Expected result on current code: the "correct behaviour" test FAILS.
+// A CNC project on the Ruida profile is refused as a router job, not as an
+// unsupported raster layer (controller audit 2026-09-25 CN-3). The .rd layer
+// model is laser power and speed; meerk40t's Ruida code has no spindle or RPM
+// concept (meerk40t @7e82652f meerk40t/ruida/*.py).
 
 import { describe, expect, it } from 'vitest';
 
@@ -26,7 +17,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { emitRdFile } from '../../io/rd';
+import { emitRdFile } from './emit-rd';
 
 function square(): SceneObject {
   return {
@@ -67,12 +58,12 @@ function ruidaCncProject(): Project {
 }
 
 describe('CN: CNC project saved on a Ruida profile', () => {
-  it('refuses to produce an .rd file (fact, correct)', () => {
+  it('refuses to produce an .rd file', () => {
     const result = emitRdFile(ruidaCncProject());
     expect(result.ok).toBe(false);
   });
 
-  it('correct: the refusal names the CNC/router reason, not raster (FAILS on current code)', () => {
+  it('names the CNC/router reason, not raster', () => {
     const result = emitRdFile(ruidaCncProject());
     if (result.ok) throw new Error('expected a refusal');
     const text = result.messages.join('\n');

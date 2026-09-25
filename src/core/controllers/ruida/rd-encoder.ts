@@ -31,6 +31,8 @@ import { swizzleBytes } from './swizzle';
 export type RdEncodeError =
   | { readonly kind: 'empty-job' }
   | { readonly kind: 'raster-unsupported'; readonly layerId: string }
+  /** A router layer: .rd is a laser job format (controller audit 2026-09-25 CN-3). */
+  | { readonly kind: 'cnc-unsupported'; readonly layerId: string }
   | { readonly kind: 'too-many-layers'; readonly count: number }
   | {
       readonly kind: 'coordinate-out-of-range';
@@ -70,6 +72,9 @@ export function encodeRdJob(
 ): RdEncodeResult {
   const cutGroups: CutGroup[] = [];
   for (const group of job.groups) {
+    if (group.kind === 'cnc') {
+      return { ok: false, error: { kind: 'cnc-unsupported', layerId: group.layerId } };
+    }
     if (group.kind !== 'cut') {
       return { ok: false, error: { kind: 'raster-unsupported', layerId: group.layerId } };
     }

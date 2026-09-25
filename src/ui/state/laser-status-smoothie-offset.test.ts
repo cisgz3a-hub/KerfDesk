@@ -1,13 +1,8 @@
-// Audit SM-1 repro: Smoothieware keeps a G92 origin that KerfDesk has
-// forgotten, and Absolute placement then ignores the offset the board reports.
-//
-// Correct behaviour: when a Smoothieware status report shows WPos != MPos, the
-// board is applying a work offset (G92). Absolute placement must either
-// compensate that offset (as it does for GRBL's `WCO:` field, resolveAbsolute ->
-// preflightMotionOffset -> absoluteProgramOffset) or refuse; it must never
-// resolve with a zero offset, because the Frame and the job would then run
-// displaced by the retained offset while every on-screen position (all taken
-// from WPos) looks right.
+// Smoothieware keeps a G92 origin through a reconnect, halt, M999 and Home, and
+// reports the work offset only as the difference of MPos and WPos. KerfDesk now
+// derives the offset from that difference (laser-status-position.ts), so
+// Absolute placement compensates it instead of running displaced (controller
+// audit 2026-09-25 SM-1, CG-1).
 //
 // Upstream evidence (Smoothieware edge 38e2cc08):
 // - Robot::on_gcode_received is the only place g92_offset changes (G92, G92.1,
@@ -25,22 +20,16 @@
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/modules/robot/Robot.cpp#L624-L662
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/libs/Kernel.cpp#L261-L287
 //
-// KerfDesk: originUnknownAfterControllerReset (laser-status-line.ts) and
-// controllerUnlockedPatch (laser-console-completion.ts) drop a 'g92' origin on
-// every Alarm report and every Unlock; connectingStatePatch starts each session
-// with no origin; statusPositionPatch learns an offset only from `WCO:`; and
-// resolveAbsolute (job-placement.ts) then resolves with no offset.
-// The simulator cannot show this by itself: it executes `G92 X0 Y0` as a move
-// to X0 Y0 and always reports WPos = MPos, so these tests emit the report the
-// real firmware prints.
+// The simulator executes `G92 X0 Y0` as a move to X0 Y0 and always reports
+// WPos = MPos, so these tests emit the report the real firmware prints.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSmoothieSimulator, type SmoothieSimulator } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
-import { resolveLiveFramePlacement } from '../../ui/laser/camera-frame-placement';
+import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
+import { resolveLiveFramePlacement } from '../laser/camera-frame-placement';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -103,8 +92,8 @@ function expectOffsetHonoured(
   expect(placement.preflightMotionOffset, JSON.stringify(placement)).toEqual(offset);
 }
 
-describe('SM-1: a G92 origin Smoothieware still holds', () => {
-  it('is ignored by Absolute placement after a reconnect (the board kept its G92)', async () => {
+describe('a G92 origin Smoothieware still holds', () => {
+  it('is honoured by Absolute placement after a reconnect (the board kept its G92)', async () => {
     const sim = await connectSmoothieIdle();
     // Real report of a board whose origin was set at machine X110 Y60 before this
     // connection (by KerfDesk in an earlier session, or by another host).
@@ -112,14 +101,16 @@ describe('SM-1: a G92 origin Smoothieware still holds', () => {
       '<Idle|MPos:110.0000,60.0000,0.0000|WPos:0.0000,0.0000,0.0000|F:4000.0,100.0>',
     );
     await pump(1);
-    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    // The offset is re-learned from MPos - WPos, so the origin is known again.
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: 110, y: 60, z: 0 });
 
-    // Fails today: { ok: true } with no offset, so the job runs 110/60 mm away
+    // Before the fix: { ok: true } with no offset, so the job ran 110/60 mm away
     // from the drawn Absolute coordinates.
     expectOffsetHonoured(absolutePlacement(), { x: 110, y: 60 });
   });
 
-  it('is forgotten after Abort, Unlock and Home, and Absolute then runs displaced', async () => {
+  it('is re-learned after a halt, Unlock and Home, so Absolute is not displaced', async () => {
     const sim = await connectSmoothieIdle();
     await settle(useLaserStore.getState().setOriginHere());
     expect(useLaserStore.getState()).toMatchObject({
@@ -144,10 +135,10 @@ describe('SM-1: a G92 origin Smoothieware still holds', () => {
     );
     await pump(1);
 
-    // KerfDesk believes there is no origin although the board applies one.
-    expect(useLaserStore.getState().workOriginActive).toBe(false);
+    // The board still applies the G92, and KerfDesk knows it again.
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
     // Work offset = MPos - WPos = (110, 60), the G92 the operator set before the
-    // halt. Fails today: { ok: true } with no offset.
+    // halt. Before the fix: { ok: true } with no offset.
     expectOffsetHonoured(absolutePlacement(), { x: 110, y: 60 });
   });
 });
