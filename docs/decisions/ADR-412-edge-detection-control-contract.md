@@ -5,7 +5,9 @@
 This refines the Edge Detection lane of ADR-115 (local-contrast detection) and its dialog mapping.
 The detector itself is unchanged: a pixel is ink when its luma is below the box mean of its
 neighbourhood minus a contrast delta, or below 128, and the closed outlines of that mask are
-committed as a line layer. Output for the preset and for every stored option set is unchanged.
+committed as a line layer. Output is unchanged for the preset and for every stored option set
+without Trace alpha mask; with the mask on a transparent source, Edge now traces coverage
+(Decision 3).
 
 ### Context
 
@@ -42,8 +44,9 @@ replaces. Edge keeps its own automatic median (`edgeMedianFilter`). None of thes
 
 1. **One detector setting per stop.** Sensitivity moves in steps of 10 over the 11 contrast deltas
    (0 = 12 luma levels, 100 = 2). Detail moves in steps of 5 over 21 neighbourhood radii
-   (0 = 24 source px, 100 = 4). A typed value between stops takes the nearest one. The engine
-   still reads `edgeLowThresholdRatio` and `edgeBlurSigma`; `edge-input.ts` now exports the
+   (0 = 24 source px, 100 = 4). A typed value between stops takes the nearest one, and the
+   number box shows that stop once it loses focus. The engine still reads `edgeLowThresholdRatio`
+   and `edgeBlurSigma`; `edge-input.ts` now exports the
    conversions both ways (`edgeContrastDelta`, `edgeLowThresholdRatioForDelta`,
    `edgeSourceRadiusPx`, `edgeBlurSigmaForRadius`), and the dialog uses them, so the displayed
    value is derived from the field the detector reads. The preset shows Sensitivity 60 and
@@ -62,6 +65,14 @@ replaces. Edge keeps its own automatic median (`edgeMedianFilter`). None of thes
    (`traceTransparency: false` on the enlarged grid). Without that, the enlarged grid converted
    the already-opaque coverage a second time and traced the whole frame (radial error 14.9 px on a
    48 px disc). The dialog shows the **Transparency** section for Edge Detection.
+   Coverage goes through the same local-contrast test as luma, not the 50% alpha cut of the
+   other lanes, so semi-transparent regions (drop shadows, glows, soft halos) are outlined like
+   grey tones: an opaque disc (r 60 px) with a 16%-opacity shadow out to r 80 px gives 3
+   outlines, at Sensitivity 0 as well as at the preset, where Line Art's alpha mask gives 1.
+   Such a shadow needs the 50% cut of a filled style's alpha mask, or removing it from the
+   source. Whether Edge should cut coverage at 50% before detection is a product call left open.
+   Dialog overrides survive a preset switch, so an alpha mask ticked under another style now
+   applies when switching to Edge Detection.
 
 ### Consequences
 
@@ -77,8 +88,10 @@ Measured with the scratch harness from the reviewed commits (not committed), owl
 | White disc on transparency + alpha mask, 48 / 400 px | 0 outlines | 1 outline, RMS 0.103 / 0.109 px |
 
 - The preset traces are identical because the removed entries were never read.
-- Sensitivity has fewer positions, but each one changes the mask, and it now reaches deltas 11
-  and 12 (less sensitive than before). Detail now reaches radius 4 and stops at 24 instead of 25.
+- Sensitivity has fewer positions, but each one is a distinct detector setting (it changes the
+  mask wherever local contrast is in the mid-tones; hard black-on-white art, decided by the
+  luma < 128 floor, may trace the same at every stop), and it now reaches deltas 11 and 12 (less
+  sensitive than before). Detail now reaches radius 4 and stops at 24 instead of 25.
   A stored radius above 24 still traces as stored and shows as Detail 0.
 - The scale policy still reads luma, so white art on transparency is traced at native size even
   when it is small. Dark art on transparency takes the small-source supersample as before and now

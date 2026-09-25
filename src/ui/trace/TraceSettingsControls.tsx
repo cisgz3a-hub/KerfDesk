@@ -43,6 +43,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
           min={0}
           max={100}
           step={EDGE_SENSITIVITY_STEP}
+          snapToStep
           value={props.overrides.edgeSensitivity ?? edgeSensitivityFromOptions(props.preset)}
           onChange={(edgeSensitivity) => set({ edgeSensitivity })}
         />
@@ -51,6 +52,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
           min={0}
           max={100}
           step={EDGE_DETAIL_STEP}
+          snapToStep
           value={props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset)}
           onChange={(edgeDetail) => set({ edgeDetail })}
         />
@@ -330,9 +332,11 @@ function NumberRow(props: {
   readonly max: number;
   readonly step: number;
   readonly value: number;
+  readonly snapToStep?: boolean; // show the traced stop once typing ends (ADR-412)
   readonly onChange: (next: number) => void;
 }): JSX.Element {
   const inputId = useId();
+  const snapped = clamp(Math.round(props.value / props.step) * props.step, props.min, props.max);
   const hintId = useId();
   const unit = props.max === 10000 ? 'px²' : props.label === 'Minimum line' ? 'px' : undefined;
   const hasSlider = props.max <= 255;
@@ -350,6 +354,9 @@ function NumberRow(props: {
             step={props.step}
             value={props.value}
             onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
+            onBlur={() => {
+              if (props.snapToStep === true && snapped !== props.value) props.onChange(snapped);
+            }}
             aria-label={`Trace ${props.label}`}
             aria-describedby={hintId}
             title={traceNumberTitle(props.label)}

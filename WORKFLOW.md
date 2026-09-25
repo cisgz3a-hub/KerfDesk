@@ -2526,9 +2526,12 @@ settings and Job Review keep their existing read-only setup references.
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
    darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
-   steps of 10 and **Detail** in steps of 5, and every step changes the detected outlines
-   (ADR-412). **Trace alpha mask** also applies to Edge Detection: it outlines the image's
-   transparency, and Invert is unavailable while it is on. Centerline follows stroke centres.
+   steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
+   detail appears or drops out; hard black-on-white art may not change) (ADR-412). A typed value
+   between steps shows the step being traced once the field loses focus. **Trace alpha mask**
+   also applies to Edge Detection: it outlines the image's transparency, and Invert is
+   unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
+   tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
