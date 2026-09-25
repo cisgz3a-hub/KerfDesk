@@ -65,6 +65,9 @@ minimumReleaseAgeExclude:
 # uncatchable stack-overflow DoS via crafted archive) needs 7.5.21, so that pin
 # moves rather than gaining a second entry.
 overrides:
+  # PDF.js runs only in the browser renderer. Remove its unused optional Node
+  # canvas edge so native binaries are absent from the resolved runtime closure.
+  'pdfjs-dist@6.3.289>@napi-rs/canvas': '-'
   tmp@<0.2.6: ^0.2.6
   esbuild@<0.28.1: ^0.28.1
   ws@<8.21.0: 8.21.0

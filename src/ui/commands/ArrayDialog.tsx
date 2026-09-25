@@ -50,8 +50,7 @@ export function ArrayDialog(props: {
       onSubmit={(event) => {
         event.preventDefault();
         const spec = arraySpecFromDraft(mode, draft);
-        if (mode === 'grid' && advanceVariables) props.onApply(spec, true);
-        else props.onApply(spec);
+        return advanceVariables ? props.onApply(spec, true) : props.onApply(spec);
       }}
     >
       <ArrayModes mode={mode} onChange={setMode} />
@@ -72,7 +71,8 @@ export function ArrayDialog(props: {
         />
       )}
       <VariableArrayOption
-        visible={mode === 'grid' && props.hasVariableText === true}
+        visible={props.hasVariableText === true}
+        mode={mode}
         checked={advanceVariables}
         onChange={setAdvanceVariables}
       />
@@ -115,6 +115,7 @@ function ArrayModes(props: {
 
 function VariableArrayOption(props: {
   readonly visible: boolean;
+  readonly mode: ArraySpec['kind'];
   readonly checked: boolean;
   readonly onChange: (checked: boolean) => void;
 }): JSX.Element | null {
@@ -125,21 +126,29 @@ function VariableArrayOption(props: {
         <input
           type="checkbox"
           checked={props.checked}
-          title="Assign each grid copy a variable record using the current range and advance settings."
+          title="Assign each array copy a variable record using the current range and advance settings."
           onChange={(event) => props.onChange(event.currentTarget.checked)}
         />{' '}
         Advance variables per copy
       </label>
       {props.checked ? (
         <p style={{ margin: 0, fontSize: 13 }}>
-          Records run left to right in each row, using Advance by and wrapping at range ends.
-          Spacing fits all current values. Later data changes keep your placements; preview again.
-          Creating copies does not advance the current record.
+          {VARIABLE_ARRAY_HINTS[props.mode]} Values use Advance by and wrap at range ends. Later
+          data changes keep your placements; preview again. Creating copies does not advance the
+          current record.
         </p>
       ) : null}
     </div>
   );
 }
+
+const VARIABLE_ARRAY_HINTS: Record<ArraySpec['kind'], string> = {
+  grid: 'Records run left to right in each row. Spacing fits all current values.',
+  circular:
+    'Records follow increasing angles from the start angle. Each copy is centred on the chosen ring. The radius stays fixed, so wide copies can overlap.',
+  'point-rotation':
+    'Records start at the original placement and follow the signed total angle. All copies share the first evaluated design’s centre. Rotated copies can overlap.',
+};
 
 function ModeButton(props: {
   readonly active: boolean;

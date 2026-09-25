@@ -1,3 +1,4 @@
+import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
 // Slice factories keep the create call within ADR-015's size rule.
 
@@ -81,7 +82,7 @@ import {
   savedLibrariesActions,
   type SavedLibrariesActions,
 } from './saved-libraries-actions';
-import { materialPresetActions, type MaterialPresetActions } from './material-preset-actions';
+import { libraryActions, type LibraryActions } from './material-library-store-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { operationActions, type OperationActions } from './operation-actions';
 import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
@@ -174,12 +175,13 @@ export type AppState = ObjectPropertiesActions &
   ObjectDeleteActions &
   SceneClipboardActions &
   SceneGroupActions &
+  SvgFragmentActions &
   SceneLockActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions &
   ReturnType<typeof currentSavedLibrariesState> &
   SavedLibrariesActions &
-  MaterialPresetActions &
+  LibraryActions &
   CncLibrarySlice &
   CncLiveCapsState &
   CncLiveCapsActions &
@@ -255,11 +257,6 @@ export type AppState = ObjectPropertiesActions &
     // Fresh imports always append, even when another object has the same
     // display filename. Explicit re-import is a separate selected-target
     // action so filename collisions cannot silently replace artwork.
-    readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-    readonly reimportSvgObject: (
-      targetObjectId: string,
-      object: SceneObject,
-    ) => ImportOutcome | null;
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
     readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
@@ -454,7 +451,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),
   ...savedLibrariesActions(set, get),
-  ...materialPresetActions(set),
+  ...libraryActions(set),
   ...objectPropertiesActions(set),
   ...operationActions(set),
   ...artworkOrderActions(set),

@@ -45,7 +45,9 @@ export function planArrayFirstPlacement(
         .filter((object) => !protectedSourceIds.has(object.id))
         .map((object) => [
           object.id,
-          remapSceneObjectCopyDependencies(placedObject(object, placement), protectedCopies.ids),
+          remapSceneObjectCopyDependencies(placedObject(object, placement), protectedCopies.ids, {
+            preserveSvgImport: true,
+          }),
         ]),
     ),
     copiedObjects: protectedCopies.objects,

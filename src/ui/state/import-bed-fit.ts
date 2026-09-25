@@ -5,26 +5,49 @@
 // so one Undo restores the original size and a second removes the import. The
 // returned outcome carries the fit so the import notice can say what changed.
 
-import { replaceObject, type SceneObject } from '../../core/scene';
-import { measureBedFit, scaleObjectAboutCenter } from '../../core/scene/fit-to-bed';
+import { combinedBBox, type SceneObject } from '../../core/scene';
+import { measureBoundsBedFit } from '../../core/scene/fit-to-bed';
 import { pushUndo, type ImportOutcome, type MutationResult } from './scene-mutations';
 
-export function applyImportBedFit<T extends MutationResult>(
+type ImportPlacement = Pick<MutationResult, 'project' | 'undoStack'> & {
+  readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds?: ReadonlySet<string>;
+};
+
+export function applyImportBedFit<T extends ImportPlacement>(
   placed: T,
 ): { readonly state: T; readonly outcome: ImportOutcome } {
   const { project } = placed;
-  // A fresh import is the sole selection (F-A3), so the selection names it.
-  const object = project.scene.objects.find((o) => o.id === placed.selectedObjectId);
-  if (object === undefined || keepsAuthoredScale(object)) {
+  // A composed SVG selects every component in one atomic import. Fit the
+  // union with one world-space scale so registration and clips stay aligned.
+  const ids = new Set([placed.selectedObjectId, ...(placed.additionalSelectedIds ?? [])]);
+  const objects = project.scene.objects.filter((object) => ids.has(object.id));
+  const footprint = combinedBBox(objects);
+  if (footprint === null || objects.some(keepsAuthoredScale)) {
     return { state: placed, outcome: { kind: 'added' } };
   }
-  const bedFit = measureBedFit(object, project.device.bedWidth, project.device.bedHeight);
+  const bedFit = measureBoundsBedFit(footprint, project.device.bedWidth, project.device.bedHeight);
   if (bedFit.scale >= 1) return { state: placed, outcome: { kind: 'added' } };
-  const scaled = scaleObjectAboutCenter(object, bedFit.scale);
+  const centerX = (footprint.minX + footprint.maxX) / 2;
+  const centerY = (footprint.minY + footprint.maxY) / 2;
+  const scaled = project.scene.objects.map((object) =>
+    !ids.has(object.id)
+      ? object
+      : {
+          ...object,
+          transform: {
+            ...object.transform,
+            x: centerX + bedFit.scale * (object.transform.x - centerX),
+            y: centerY + bedFit.scale * (object.transform.y - centerY),
+            scaleX: object.transform.scaleX * bedFit.scale,
+            scaleY: object.transform.scaleY * bedFit.scale,
+          },
+        },
+  );
   return {
     state: {
       ...placed,
-      project: { ...project, scene: replaceObject(project.scene, object.id, scaled) },
+      project: { ...project, scene: { ...project.scene, objects: scaled } },
       undoStack: pushUndo(project, placed.undoStack),
     },
     outcome: { kind: 'added', bedFit },

@@ -1,9 +1,10 @@
 // Commit-level pin for the CNC trace fairing pass (chatter audit 2026-07-25):
 // A CNC vector trace conditions geometry toward a practical chord target
 // without exceeding its boundary-deviation budget. Boundary fidelity wins when
-// the constraints are incompatible. Laser commits pass the tracer's output
-// through untouched. The dense jittery ring below reproduces the measured
-// chatter class (audit: ~0.6px segments, p95 turn ~20deg).
+// the constraints are incompatible. Laser commits keep the traced geometry
+// within the 0.025 mm machine curve tolerance instead (ADR-391). The dense
+// jittery ring below reproduces the measured chatter class (audit: ~0.6px
+// segments, p95 turn ~20deg).
 
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -46,6 +47,8 @@ const JITTER_AMPLITUDE_PX = 0.45;
 const MIN_SEGMENT_MM = 0.4;
 const MAX_DEVIATION_MM = 0.05;
 const DEVIATION_ORACLE_ERROR_MM = 0.005;
+const LASER_TOLERANCE_MM = 0.025;
+const LASER_ORACLE_ERROR_MM = 0.001;
 const MIN_SEGMENT_TOLERANCE = 0.95;
 const FLOAT_TOLERANCE_MM = 1e-6;
 const COMPILED_LENGTH_PRECISION = 8;
@@ -378,11 +381,35 @@ describe('CNC trace commit fairs the toolpath (chatter audit)', () => {
     expect(traced.paths[0]?.polylines.length).toBe(3);
   });
 
-  it('passes laser commits through untouched', async () => {
+  it('simplifies laser commits to fewer moves within the machine curve tolerance', async () => {
+    const rawPaths = mockTraceResult();
+    const source = seedRaster();
+    const ctx = ctxWith(LASER_MACHINE_CONFIG, source);
+    await commit({ ...commitArgs(source), traceFillStyle: 'scanline' }, ctx);
+
+    const traced = committedTrace(ctx);
+    const polyline = committedPolyline(ctx);
+    const rawPolyline = rawPaths[0]?.polylines[0];
+    if (rawPolyline === undefined) throw new Error('expected raw trace geometry');
+    expect(polyline.points.length).toBeLessThan(rawPolyline.points.length);
+    const placement = positionTraceOverRasterSource(source, traced).transform;
+    const deviation = polylineDeviationBounds(
+      positionedPolyline(source, traced).points,
+      rawPolyline.points.map((point) => applyTransform(point, placement)),
+      LASER_ORACLE_ERROR_MM,
+    );
+    expect(deviation.upperBound).toBeLessThanOrEqual(
+      LASER_TOLERANCE_MM + LASER_ORACLE_ERROR_MM + FLOAT_TOLERANCE_MM,
+    );
+    // Compile reads the curves: they must carry the simplified geometry.
+    expect(traced.paths[0]?.curves?.[0]).toEqual(polylineToCurveSubpath(polyline));
+    expect(polyline.points.at(-1)).toEqual(polyline.points[0]);
+  });
+
+  it('keeps Photo shading as traced when committing to a laser', async () => {
     const rawPaths = mockTraceResult();
     const ctx = ctxWith(LASER_MACHINE_CONFIG);
-    await commit({ ...commitArgs(seedRaster()), traceFillStyle: 'scanline' }, ctx);
-
+    await commit({ ...commitArgs(seedRaster()), options: TRACE_PRESETS['Photo shading']! }, ctx);
     expect(committedTrace(ctx).paths).toEqual(rawPaths);
   });
 

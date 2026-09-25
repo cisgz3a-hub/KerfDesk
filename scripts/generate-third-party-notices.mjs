@@ -121,6 +121,24 @@ function electronSection(rootDir) {
   ].join('\n');
 }
 
+function pdfResourceLicenseSections(rootDir) {
+  const pdfRoot = path.join(rootDir, 'node_modules/pdfjs-dist');
+  return [
+    'cmaps/LICENSE',
+    'standard_fonts/LICENSE_FOXIT',
+    'wasm/LICENSE_JBIG2',
+    'wasm/LICENSE_OPENJPEG',
+    'wasm/LICENSE_PDFJS_JBIG2',
+    'wasm/LICENSE_PDFJS_OPENJPEG',
+  ].map(
+    (file) =>
+      '--- PDF.js bundled resource: ' +
+      file +
+      ' ---\n' +
+      fs.readFileSync(path.join(pdfRoot, file), 'utf8').trim(),
+  );
+}
+
 export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
   const header = [
     'Third-Party Notices',
@@ -146,6 +164,8 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     '== Bundled fonts ==',
     ...outlineFontSections(rootDir),
     ...cncStrokeFontSections(),
+    '== PDF import resource licenses ==',
+    ...pdfResourceLicenseSections(rootDir),
     '== Bundled OpenClipart artwork ==',
     ...openClipartSections(rootDir),
     '== pnpm production dependency closure ==',

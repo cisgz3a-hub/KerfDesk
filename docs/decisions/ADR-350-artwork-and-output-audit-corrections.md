@@ -63,9 +63,10 @@ No new machine policy gate is introduced. A completed Frame for the exact review
 sole ordinary Start policy gate. No hardware operation, provider-state change, deployment or main
 merge is part of this decision's local implementation.
 
-No additional runtime dependency is introduced. Reusable operation recipes, personal artwork
-libraries, broader file formats, circular variable imposition and live data sources remain separate
-feature work. The companion workspace usability fixes are recorded in ADR-351.
+No additional runtime dependency is introduced in this priority slice. Reusable operation recipes,
+personal artwork libraries/templates, broader file formats and circular variable copies are now
+covered by the separately authorized ADR-357 follow-up. Live data sources remain separate feature
+work. The companion workspace usability fixes are recorded in ADR-351.
 
 ### Verification
 

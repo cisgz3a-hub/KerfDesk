@@ -6,6 +6,8 @@ export type FixtureEvent = Readonly<Record<string, unknown>> & { readonly kind: 
 export interface OpenFileFixture {
   readonly name: string;
   readonly text?: string;
+  readonly base64?: string;
+  readonly mimeType?: string;
   readonly kind?: 'text' | 'png-fixture';
   readonly width?: number;
   readonly height?: number;

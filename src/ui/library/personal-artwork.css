@@ -1,0 +1,63 @@
+.lf-personal-artwork {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 16px;
+}
+.lf-library-source-tabs {
+  justify-content: flex-start;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--lf-border);
+}
+.lf-library-source-tabs [aria-pressed='true'] {
+  background: var(--lf-bg-2);
+  font-weight: 600;
+}
+.lf-personal-artwork p {
+  margin: 0;
+}
+.lf-personal-artwork fieldset,
+.lf-personal-artwork__controls,
+.lf-personal-artwork__selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+.lf-personal-artwork label {
+  display: grid;
+  gap: 4px;
+}
+.lf-personal-artwork input,
+.lf-personal-artwork select,
+.lf-personal-artwork button {
+  padding: 6px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  font: inherit;
+}
+.lf-personal-artwork button:disabled {
+  opacity: 0.55;
+}
+.lf-personal-artwork button[aria-pressed='true'] {
+  border-color: var(--lf-accent);
+}
+.lf-personal-artwork__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+.lf-personal-artwork__items button {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 4px;
+}
+.lf-personal-artwork__selection p {
+  flex-basis: 100%;
+}

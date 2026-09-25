@@ -38,6 +38,12 @@ vi.mock('../raster/convert-bitmap-worker-client', () => ({
   },
 }));
 
+// sRGB decoding written out from CSS Color 4, independent of the tracer.
+function linear(byte: number): number {
+  const c = byte / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
 const image = decodePngFile(resolve('src/__fixtures__/perceptual/assets/astronaut.png'));
 const source: RasterImage = {
   kind: 'raster-image',
@@ -86,14 +92,16 @@ describe('uncropped photo raster output', () => {
       expect(raster.pixelHeight).toBe(640);
       const luma = Uint8Array.from(atob(raster.lumaBase64 ?? ''), (c) => c.charCodeAt(0));
       expect(luma.length).toBe(640 * 640);
-      // Independent source RGBA integral. Photo vectors encode exactly this
-      // area; bounds differ from the source only at the outer ribbon edges.
+      // Independent source RGBA integral. Photo vectors leave uncovered the
+      // source's linear-light luminance (ADR-390), and the bitmap stores that
+      // uncovered share; bounds differ only at the outer ribbon edges.
       let sourceLuma = 0;
       for (let offset = 0; offset < image.data.length; offset += 4) {
         sourceLuma +=
-          0.2126 * image.data[offset]! +
-          0.7152 * image.data[offset + 1]! +
-          0.0722 * image.data[offset + 2]!;
+          255 *
+          (0.2126 * linear(image.data[offset]!) +
+            0.7152 * linear(image.data[offset + 1]!) +
+            0.0722 * linear(image.data[offset + 2]!));
       }
       const actualMean = luma.reduce((sum, value) => sum + value, 0) / luma.length;
       expect(Math.abs(actualMean - sourceLuma / (image.width * image.height))).toBeLessThan(0.8);

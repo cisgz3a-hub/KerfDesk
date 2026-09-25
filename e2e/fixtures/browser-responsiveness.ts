@@ -130,6 +130,7 @@ export function assertResponsivePhase(
   measurement: ResponsivenessMeasurement,
 ): void {
   recordResponsivenessPhase(testInfo, phase, measurement);
+  expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
   expect(measurement.maxGapMs, `${phase} maximum heartbeat gap`).toBeLessThan(
     MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
   );
@@ -147,13 +148,16 @@ export function assertOffThreadPhase(
   measurement: ResponsivenessMeasurement,
 ): void {
   recordResponsivenessPhase(testInfo, phase, measurement);
+  expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
   expect(measurement.longTaskObserverSupported, `${phase} Long Task observer`).toBe(true);
   expect(measurement.maxLongTaskMs, `${phase} maximum Long Task`).toBeLessThan(
     MAX_ACCEPTABLE_MAIN_THREAD_GAP_MS,
   );
 }
 
-/** Records diagnostic A/B phases that are intentionally absent from production. */
+/** Records telemetry only, including preview readiness and retired-pane A/B
+ * phases. Readiness is asserted at those call sites; strict performance phases
+ * use the assert helpers above to require samples and enforce their budgets. */
 export function recordResponsivenessPhase(
   testInfo: TestInfo,
   phase: string,
@@ -163,7 +167,6 @@ export function recordResponsivenessPhase(
     type: 'measurement',
     description: `${phase}: ${formatMeasurement(measurement)}`,
   });
-  expect(measurement.ticks, `${phase} heartbeat ticks`).toBeGreaterThan(10);
 }
 
 function formatMeasurement(measurement: ResponsivenessMeasurement): string {

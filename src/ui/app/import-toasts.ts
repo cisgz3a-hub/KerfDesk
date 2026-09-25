@@ -19,14 +19,15 @@ export function describeImportResult(
 ): ReadonlyArray<ToastDescriptor> {
   const out: ToastDescriptor[] = [];
 
-  if (result.object === null) {
+  const count = importObjectCount(result);
+  if (count === 0) {
     out.push({ message: `${filename} has no drawable content`, variant: 'warning' });
     return out;
   }
 
-  const colorCount = result.object.paths.length;
+  const colorCount = result.object?.paths.length ?? 0;
   out.push({
-    message: `Imported ${filename} — 1 object, ${colorCount} color${colorCount === 1 ? '' : 's'}`,
+    message: `Imported ${filename} — ${count} object${count === 1 ? '' : 's'}, ${colorCount} color${colorCount === 1 ? '' : 's'}`,
     variant: 'success',
   });
 
@@ -46,9 +47,13 @@ export function describeImportResult(
   if (result.ignoredImageElements > 0) {
     const n = result.ignoredImageElements;
     out.push({
-      message: `${filename}: ${n} embedded image${n === 1 ? '' : 's'} ignored — Phase E will support these`,
+      message: `${filename}: ${n} image${n === 1 ? '' : 's'} ignored — no embedded bitmap data`,
       variant: 'info',
     });
+  }
+
+  for (const note of result.notes.filter((note) => note.startsWith('SVG presentation:'))) {
+    out.push({ message: `${filename}: ${note}`, variant: 'warning' });
   }
 
   return out;
@@ -74,8 +79,9 @@ export function describeReimportOutcome(
   if (outcome.added > 0) parts.push(`${outcome.added} new`);
   if (outcome.removed > 0) parts.push(`${outcome.removed} removed`);
   const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+  const settings = outcome.kept > 0 ? 'layer settings preserved' : 'new layer settings';
   return {
-    message: `Re-imported ${outcome.source} — layer settings preserved${detail}`,
+    message: `Re-imported ${outcome.source} — ${settings}${detail}`,
     variant: 'success',
   };
 }
@@ -94,4 +100,8 @@ function describeStripped(s: ParseSvgResult['stripped']): string | null {
   }
   if (parts.length === 0) return null;
   return `sanitized ${parts.join(', ')}`;
+}
+
+function importObjectCount(result: ParseSvgResult): number {
+  return result.fragment?.entries.length ?? (result.object === null ? 0 : 1);
 }

@@ -1,11 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { parseSvg } from './parse-svg';
+import { parseSvg, type ParseSvgResult } from './parse-svg';
 import { parseSvgInWorker } from './parse-svg-worker';
 
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
 
 const svg = (body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10">${body}</svg>`;
+
+function expectComposedFill(result: ParseSvgResult): void {
+  const filled = result.fragment?.entries[0];
+  if (filled?.kind !== 'imported-svg') throw new Error('Expected fill fragment');
+  expect(filled.operationOverride?.mode).toBe('fill');
+  expect(filled.paths[0]?.fillRule).toBe('evenodd');
+  expect(filled.paths[0]?.polylines[0]?.closed).toBe(true);
+  expect(filled.paths[0]?.curves?.[0]?.closed).toBe(true);
+}
+
+function expectComposedImage(result: ParseSvgResult): void {
+  const bitmap = result.fragment?.entries[1];
+  if (bitmap?.kind !== 'svg-image') throw new Error('Expected image fragment');
+  expect(bitmap.transform).toMatchObject({ x: 3, y: 2 });
+  expect(bitmap.imageClip?.[0]?.polylines).toHaveLength(2);
+  expect(result.ignoredImageElements).toBe(0);
+}
 
 function colors(svgText: string): ReadonlyArray<string> {
   return parseSvg(args(svgText)).object?.paths.map((path) => path.color) ?? [];
@@ -163,11 +180,77 @@ describe('parseSvg initial fill', () => {
           <mask id="m"><rect width="20" height="10" fill="#ffffff"/></mask>
           <marker id="k"><path d="M0 0 L2 1 L0 2 Z"/></marker>
           <pattern id="p" width="2" height="2"><circle cx="1" cy="1" r="1"/></pattern>
-          <g clip-path="url(#c)"><path stroke="#ff0000" d="M0 0 L5 0"/></g>`),
+          <path stroke="#ff0000" d="M0 0 L5 0"/>`),
       ),
     );
 
     expect(result.object?.paths.map((path) => path.color)).toEqual(['#ff0000']);
     expect(result.object?.paths[0]?.polylines).toHaveLength(1);
   });
+
+  it('rejects unsupported vector clipping instead of silently importing unclipped artwork', () => {
+    expect(() =>
+      parseSvg(
+        args(
+          svg(`<style>.clipped { clip-path: url(#c) }</style>
+            <clipPath id="c"><rect width="20" height="10"/></clipPath>
+            <g class="clipped"><path stroke="#ff0000" d="M0 0 L5 0"/></g>`),
+        ),
+      ),
+    ).toThrow(/vector clipping is not supported/i);
+  });
+});
+
+describe('stylesheet presentation in composed SVG fragments', () => {
+  const pixel =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLSsAAAAASUVORK5CYII=';
+  const image = (presentation: string) =>
+    `<image ${presentation} width="4" height="4" preserveAspectRatio="none" href="${pixel}"/>`;
+
+  it('preserves paint order, fill closure and owned image clips through the full cascade', () => {
+    const definition = `<defs><clipPath id="crop" clipPathUnits="userSpaceOnUse">
+      <path clip-rule="evenodd" d="M0 0H4V4H0Z M1 1H3V3H1Z"/>
+    </clipPath></defs>`;
+    const styled = svg(`<style>
+      g.paint { fill: red; fill-rule: evenodd }
+      .solid { fill: blue }
+      #shape { fill: green }
+      .offset { transform: translate(3px, 2px) }
+      image { opacity: 25% }
+      .photo { opacity: 100% !important; clip-path: url(#crop) }
+      .line { fill: none; stroke: blue }
+      .off { display: none }
+    </style>${definition}
+    <g class="paint"><path id="shape" class="solid" style="fill: orange" d="M0 0H4V4"/></g>
+    <g class="offset">${image('class="photo" opacity="50%" style="opacity: 75%"')}</g>
+    <path class="line" d="M12 1L18 8"/>
+    ${image('class="off"')}`);
+    const attributes = svg(`${definition}
+      <g fill="red" fill-rule="evenodd"><path fill="orange" d="M0 0H4V4"/></g>
+      <g transform="translate(3 2)">${image('clip-path="url(#crop)" opacity="1"')}</g>
+      <path fill="none" stroke="blue" d="M12 1L18 8"/>
+      ${image('display="none"')}`);
+    const result = parseSvg(args(styled));
+    expect(result).toEqual(parseSvg(args(attributes)));
+    expect(parseSvgInWorker(args(styled))).toEqual(result);
+    expect(result.fragment?.entries.map((entry) => entry.kind)).toEqual([
+      'imported-svg',
+      'svg-image',
+      'imported-svg',
+    ]);
+    expectComposedFill(result);
+    expect(result.object?.paths[0]?.polylines[0]?.closed).toBe(false);
+    expectComposedImage(result);
+  });
+
+  it.each(['opacity: 50%', 'filter: url(#effect)', 'mask: url(#effect)'])(
+    'rejects unsupported image presentation from ancestor rules: %s',
+    (declaration) => {
+      const markup = svg(`<style>.effect { ${declaration} }</style>
+        <path fill="red" d="M0 0H4V4Z"/>
+        <g class="effect">${image('')}</g>`);
+      expect(() => parseSvg(args(markup))).toThrow(/opacity, filters and SVG masks/i);
+      expect(() => parseSvgInWorker(args(markup))).toThrow(/opacity, filters and SVG masks/i);
+    },
+  );
 });

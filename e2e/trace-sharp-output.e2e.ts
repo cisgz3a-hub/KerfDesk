@@ -46,6 +46,10 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
   };
   let crashes = 0;
   const errors: string[] = [];
+  const outputWorkers: string[] = [];
+  page.on('worker', (worker) => {
+    if (worker.url().includes('output-preparation-worker')) outputWorkers.push(worker.url());
+  });
   page.on('crash', () => {
     crashes += 1;
     record('renderer-crash');
@@ -97,11 +101,26 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
         (total, path) => total + path.polylines.reduce((n, line) => n + line.points.length, 0),
         0,
       ),
+      validClosedContours: object.paths.reduce(
+        (total, path) =>
+          total +
+          path.polylines.filter(
+            (line) =>
+              line.closed &&
+              line.points.length >= 3 &&
+              line.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+          ).length,
+        0,
+      ),
       width: object.tracePixelWidth,
       height: object.tracePixelHeight,
     };
   });
-  expect(trace.vertices).toBeGreaterThan(100_000);
+  // ADR-391 intentionally reduces compatibility samples below the old 100k
+  // floor. Thousands of nonempty contours still exercise dense output; the
+  // five-preset test independently proves commit fidelity at physical scale.
+  expect(trace.contours).toBeGreaterThan(1_000);
+  expect(trace.validClosedContours).toBe(trace.contours);
   record('committed', trace);
 
   await (await toolbarCommand(page, 'Preview')).click();
@@ -148,7 +167,8 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
   await expect(
     page.getByText('Ready to start — framed job unchanged', { exact: true }),
   ).toBeVisible({ timeout: 180_000 });
-  record('simulated-frame-complete');
+  expect(outputWorkers.length).toBeGreaterThan(0);
+  record('simulated-frame-complete', { outputWorkers });
   await expect(page.getByText(/Background output preparation queue is full/)).toHaveCount(0);
   await expect(page.getByText(/job or machine setup changed during preparation/)).toHaveCount(0);
   await expect(page.getByText(/requires the custom work origin to be cleared/)).toHaveCount(0);

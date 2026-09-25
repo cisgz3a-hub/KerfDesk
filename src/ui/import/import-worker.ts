@@ -1,7 +1,7 @@
 // Import parsing worker (Phase 3 of the large-file import plan).
 //
 // Reads the Blob and runs the parse away from the React/UI thread, so a large
-// DXF / G-code / STL import no longer freezes the canvas for the seconds the
+// DXF / HPGL / G-code / STL import no longer freezes the canvas for the seconds the
 // parse takes (measured: ~11.4 s for a 100 MB DXF, ~7.6 s for 100 MB of G-code).
 //
 // Vite bundles this via the direct
@@ -12,9 +12,11 @@
 /// <reference lib="webworker" />
 
 import { parseStlBlob } from '../../io/stl/parse-stl-blob';
+import { parseHpgl } from '../../io/hpgl';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
 import { packDxfResult } from './packed-dxf-result';
 import { packGcodeResult } from './packed-gcode-result';
+import { packHpglResult } from './packed-hpgl-result';
 import { parseDxfBlob } from './parse-dxf-blob';
 import { parseGcodeBlob } from './parse-gcode-blob';
 import { prepareParsedStlImport } from './stl-import-preparation';
@@ -41,6 +43,7 @@ async function handleRequest(request: ImportWorkerRequest): Promise<void> {
 
 async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerResponse> {
   postProgress(request.id, 'reading');
+  if (request.kind === 'hpgl') return parseHpglRequest(request);
   if (request.kind === 'dxf') {
     return {
       id: request.id,
@@ -99,6 +102,18 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
     id: request.id,
     kind: 'stl',
     result: prepareParsedStlImport(parsed, request.options),
+  };
+}
+
+async function parseHpglRequest(
+  request: Extract<ImportWorkerRequest, { kind: 'hpgl' }>,
+): Promise<ImportWorkerResponse> {
+  const text = await request.blob.text();
+  postProgress(request.id, 'parsing', request.blob.size, request.blob.size);
+  return {
+    id: request.id,
+    kind: 'hpgl',
+    result: packHpglResult(parseHpgl({ text, id: request.objectId, source: request.source })),
   };
 }
 

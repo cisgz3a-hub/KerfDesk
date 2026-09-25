@@ -101,7 +101,7 @@ describe('importSvgFiles', () => {
     );
 
     const messages = pushToast.mock.calls.map(([message]) => String(message));
-    expect(messages.at(-2)).toMatch(/text element.*ignored/);
+    expect(messages.slice(0, -1)).toContainEqual(expect.stringMatching(/text element.*ignored/));
     expect(pushToast).toHaveBeenLastCalledWith(
       'banner.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% ' +
         'to fit. Undo restores the original size.',

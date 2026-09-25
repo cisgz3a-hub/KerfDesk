@@ -13,6 +13,7 @@
 
 import type { PackedDxfResult } from './packed-dxf-result';
 import type { PackedGcodeResult } from './packed-gcode-result';
+import type { PackedHpglResult } from './packed-hpgl-result';
 import type {
   PreparedStlImportResult,
   StlImportPreparationOptions,
@@ -26,6 +27,13 @@ export type ImportWorkerRequest =
   | {
       readonly id: number;
       readonly kind: 'dxf';
+      readonly blob: Blob;
+      readonly objectId: string;
+      readonly source: string;
+    }
+  | {
+      readonly id: number;
+      readonly kind: 'hpgl';
       readonly blob: Blob;
       readonly objectId: string;
       readonly source: string;
@@ -56,6 +64,7 @@ export type ImportWorkerResponse =
       readonly totalBytes?: number;
     }
   | { readonly id: number; readonly kind: 'dxf'; readonly result: PackedDxfResult }
+  | { readonly id: number; readonly kind: 'hpgl'; readonly result: PackedHpglResult }
   | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
   | { readonly id: number; readonly kind: 'stl'; readonly result: PreparedStlImportResult }
   | {

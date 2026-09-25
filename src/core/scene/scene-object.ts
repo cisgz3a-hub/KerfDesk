@@ -140,6 +140,13 @@ export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
 };
 
 export type ObjectPowerScale = {
+  // Shared source fragment identity and authored placement for SVG re-import.
+  readonly svgImport?: {
+    readonly mode?: 'line' | 'fill' | 'image';
+    readonly id: string;
+    readonly source: string;
+    readonly transform: Transform;
+  };
   // Named process operations used by the whole artwork. A path-level binding
   // takes precedence for imported artwork that needs independent operations.
   readonly operationIds?: ReadonlyArray<string>;
@@ -342,6 +349,11 @@ export type RasterImage = ObjectPowerScale & {
   // Non-destructive Apply Mask to Image. The referenced scene object remains
   // editable; raster processing whites pixels outside its closed geometry.
   readonly imageMaskId?: string;
+  // One compound even-odd clip in image-local coordinates. Absent is unmasked;
+  // an empty clip hides every pixel. Raster/display use compatibility polylines,
+  // while matching native curves preserve editable geometry through SVG export.
+  // The owned clip intersects any external imageMaskId mask.
+  readonly imageClip?: ReadonlyArray<ColoredPath>;
   // Pre-extracted greyscale luma buffer (one byte per pixel, ITU-R
   // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
   // round-trip through .lf2's JSON. Length after decode equals

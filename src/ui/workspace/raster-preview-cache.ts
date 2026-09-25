@@ -31,6 +31,7 @@ export type RasterContentToken = {
   readonly lumaByteLength: number | undefined;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+  readonly imageClip: RasterImage['imageClip'];
 };
 
 type PreviewCacheRecord = {
@@ -52,6 +53,7 @@ export function rasterContentToken(obj: RasterImage): RasterContentToken {
     lumaByteLength: obj.imageAsset?.lumaByteLength,
     pixelWidth: obj.pixelWidth,
     pixelHeight: obj.pixelHeight,
+    imageClip: obj.imageClip,
   };
 }
 
@@ -62,7 +64,8 @@ export function sameRasterContent(content: RasterContentToken, obj: RasterImage)
     content.lumaAssetId === obj.imageAsset?.lumaAssetId &&
     content.lumaByteLength === obj.imageAsset?.lumaByteLength &&
     content.pixelWidth === obj.pixelWidth &&
-    content.pixelHeight === obj.pixelHeight
+    content.pixelHeight === obj.pixelHeight &&
+    content.imageClip === obj.imageClip
   );
 }
 

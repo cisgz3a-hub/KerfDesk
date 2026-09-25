@@ -1,3 +1,4 @@
+import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // Keyboard shortcut handlers (WORKFLOW.md F-A15). Each category has its own
 // handler and bindings table so individual functions stay small per ADR-015.
 //
@@ -36,6 +37,7 @@ const NUDGE_BIG_MM = 10;
 export type FileCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
+  readonly importSvgFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
   readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly importRasterImage: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly setProject: (p: Project) => ProjectMachineCapabilityLoadResult;
@@ -159,6 +161,7 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
     void handleUnifiedArtworkImport(c.platform, {
       getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
       importSvgObject: c.importSvgObject,
+      ...(c.importSvgFragment === undefined ? {} : { importSvgFragment: c.importSvgFragment }),
       importRasterImage: c.importRasterImage,
       pushToast: c.pushToast,
     }),

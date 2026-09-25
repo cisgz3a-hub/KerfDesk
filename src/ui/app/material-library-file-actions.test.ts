@@ -278,7 +278,7 @@ describe('material library file actions', () => {
     expect(setMaterialLibrary).not.toHaveBeenCalled();
     expect(toast.messages).toEqual([]);
     expect(alert).toHaveBeenCalledWith(
-      'This material library was saved with a newer KerfDesk (schemaVersion 2). Update the app to open it.',
+      `This material library was saved with a newer KerfDesk (schemaVersion ${tooNew.librarySchemaVersion}). Update the app to open it.`,
     );
   });
 

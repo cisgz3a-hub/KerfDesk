@@ -140,10 +140,12 @@ opportunity, without an extra branding delay. It introduces no startup interacti
       strips `<script>`, `<foreignObject>`, event handlers, external references, and non-image data
       URIs. If the Worker cannot start, the warning-disclosed main-thread fallback uses DOMPurify
       (`USE_PROFILES: { svg: true, svgFilters: true }`) plus its reference-removal hook.
-   3. Geometry walked out of the sanitized DOM into internal Scene objects.
-   4. Object is placed centered on the bed by default, at its natural mm size from the SVG `viewBox`.
-   5. Object is auto-selected (selection handles visible).
-   6. Artwork Operations auto-populates with one named operation for the imported artwork. Its
+   3. Geometry and embedded bitmaps become ordered editable Scene objects. All image decoding
+      completes before the file is inserted together in one Undo step (ADR-358).
+   4. The complete composition is centered with one translation at its natural physical size.
+      Objects retain their relative positions, transforms and authored millimetre dimensions.
+   5. The file's objects are selected together and grouped when there is more than one.
+   6. Artwork Operations auto-populates with named Line, Fill and Image operations. Their
       presentation color is assigned from the automatic high-contrast palette; source SVG colors
       are preserved inside the artwork.
    7. Toast: `Imported design.svg — 1 artwork`.
@@ -156,8 +158,12 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 5. Toast: `Imported 3 designs · 3 artwork operations`.
 
 #### Success — SVG with embedded raster image
-1. Phase A ignores embedded raster (`<image>` elements).
-2. Sanitized count appears in toast: `Imported design.svg · 1 embedded image ignored (Phase E will support these)`.
+1. Embedded PNG, JPEG, BMP and WebP pixels are decoded into raster artwork, preserving the SVG
+   image bounds, rotation, unequal scale and mirroring. Bitmap DPI does not change SVG placement.
+2. KerfDesk-exported image clips and holes remain owned by the image, with no extra mask artwork
+   or cutting operation. Image clips intersect an independently assigned image mask.
+3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
+   and document replacement leave the complete file uninserted and release staged image assets.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
@@ -187,6 +193,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    larger than the bed in either axis is scaled down, uniformly, to fit inside 90% of the bed,
    centered (a staggered multi-file import keeps its 10 mm offset). The margin keeps the scaled
    outline clear of the bed edges for overscan, kerf, and Frame.
+   Composed SVG artwork is fitted as one complete selection; its components retain their relative
+   placement, transforms and shared scale.
 2. A warning toast, after the import's other toasts, reports it:
    `design.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% to fit. Undo restores the original size.`
    DXF, image, and STL imports follow the same rule and notice; a height-map relief keeps its
@@ -194,7 +202,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. The scale-to-fit is its own undo step: the first Undo returns the design to its file size,
    centered and extending past the bed; a second Undo removes the import.
 4. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
-5. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
+5. Out-of-bounds geometry remains a Job Review warning. A completed Frame for the exact reviewed
+   job remains the sole ordinary Start policy gate (ADRs 228, 230, 232 and 237).
 
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
@@ -209,13 +218,41 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 ### F-A4. Import artwork — via File menu
 
 Identical to the format-specific import flows except:
-- Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PNG/JPG, or STL input.
+- Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PDF/compatible AI,
+  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF, or STL input.
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
+
+**Document pages and additional formats (ADR-357):**
+
+- PDF/compatible AI opens a page picker with a preview and physical size. Choose **Editable paths**
+  for complete simple vector pages, or **Image for engraving or tracing** with a chosen DPI.
+  Editable strokes become centrelines; choose the operation's Line/Fill settings after import.
+  Text, clips, effects and embedded images use the whole-page image route so content is not
+  silently dropped. Unlock protected PDFs first; export legacy Illustrator files as SVG/PDF.
+- TIFF also uses the page picker, preserving the selected page's original pixels and orientation.
+  Its embedded X/Y density sets size; missing density uses 254 DPI. Engraving pixels are 8-bit
+  RGB over white. Unsupported encodings are reported so the file can be exported as PNG.
+- BMP honours embedded density. GIF imports a still image of the first/default frame.
+- HPGL/PLT imports supported pen geometry at 40 plotter units/mm. Scaling needs explicit reference
+  points. Unsupported drawing commands reject the file with their source location. Pen colours
+  are display assignments; filled boundaries need the chosen Fill operation.
+- Cancelling a page imports nothing. Replacing the project while a file is being read discards
+  its completion. Successful mixed imports keep their original order without gaps for failures.
 
 ---
 
 ### F-A5. Selection
+
+Reusable designs (ADR-357): open **Design Library → My artwork**, select artwork on the canvas and
+save it with a name/category. Search or filter saved entries, insert independent editable copies,
+or exchange .lfart library files using Import/Export. Copies retain saved positions, groups,
+fonts, full pixels, dependencies and their own operation settings. Inserting is one undo step.
+Variable text with a different dataset needs a new or matching project.
+
+Use **File → Save template** for a complete reusable project, including unused operations and
+notes. **File → Open template** starts a dirty new project. Its first ordinary Save asks for a
+destination and cannot overwrite the template source.
 
 #### Single object — click
 1. Click on an object's visible geometry.
@@ -353,7 +390,7 @@ Identical to the format-specific import flows except:
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Grid can optionally **Advance variables per copy** (F-D6);
+7. Array settings remain transient. Every mode can optionally **Advance variables per copy** (F-D6);
    its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
    compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
@@ -660,9 +697,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
-4. The SVG works as artwork interchange. KerfDesk's current SVG importer still ignores embedded
-   raster images, so re-importing a mixed image/vector SVG is not a complete project round trip.
-   Use the project format to preserve editable text and machining data.
+4. Re-import preserves the supported vector/image composition, physical size and image clips
+   (ADR-358). Use the project format to preserve editable text and machining data. Software tests
+   do not replace rendered verification in KerfDesk and an independent vector editor.
+5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
+   Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
+   receive new operations. Copies are independent of the original source's replacement set.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
@@ -913,7 +953,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
-- `Cmd/Ctrl+I` — Import SVG, DXF, PNG/JPG, or STL through the unified picker
+- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
@@ -2339,16 +2379,18 @@ settings and Job Review keep their existing read-only setup references.
   approximation. See ADR-321.
 - F-D5. Convert text to paths (one-way conversion for further editing as imported geometry)
 
-### F-D6. Distinct variable values in a Grid array (ADR-350, amending ADR-279)
+### F-D6. Distinct variable values in arrays (ADR-350/357, amending ADR-279)
 
 **Success:**
 
-1. Select a design containing variable text, open **Arrange → Array...**, choose **Grid**, and
-   enable **Advance variables per copy**. The option defaults off. Circular and Point Rotation
-   arrays retain ordinary copying.
-2. Slots advance in row-major order using the existing record/serial stride and wrap settings.
+1. Select a design containing variable text, open **Arrange → Array...**, choose any array mode,
+   and enable **Advance variables per copy**. The option defaults off.
+2. Grid slots advance in row-major order using the existing record/serial stride and wrap settings.
    Existing relative slot spans and token-level serial offsets are preserved. All text renders
    against one captured clock before spacing uses the largest rendered envelope in the batch.
+   Circular uses each evaluated copy's centre on the requested ring, retaining its radius even
+   when wider values overlap. Point Rotation uses one pivot from the first evaluated selection.
+   Both rotate in the existing signed, exclusive-endpoint order shown in the dialog.
 3. **Create array** commits one undo step and consumes no production records. Each text copy stores
    its sequence offset; project schema 8 preserves it through save/reopen and text edits. Generator
    parameters remain transient. Objects remain editable and can be moved individually.
@@ -2427,16 +2469,25 @@ settings and Job Review keep their existing read-only setup references.
    Escape closes the dialog and returns focus
    to its opener without deselecting the source image.
 2. For portraits and photographs, choose **Photo shading**. It keeps light, middle and dark
-   tones as fine filled lines. Adjust **Detail**, **Brightness**, **Contrast** and **Midtones**
-   while comparing Original and Trace. Midtones starts at 1; raising it lightens middle shades
-   while preserving black and white. More detail creates narrower lines and more geometry.
+   tones as fine filled lines whose covered area follows the photo's brightness in linear
+   light, so a mid-grey (sRGB 128) area is about 78% covered. Adjust **Detail**, **Brightness**,
+   **Contrast** and **Midtones** while comparing Original and Trace. Midtones starts at 1,
+   where line coverage matches the photo's midtones; raising it lightens middle shades while
+   preserving black and white, and about 2.2 gives the lighter response of earlier versions.
+   **Invert** puts the lines where the photo is light, for a mark lighter than the material or
+   light artwork on a dark background. More detail creates narrower lines and more geometry.
+   Detail's range follows the image size: on images under 320 px the top of the slider still
+   adds lines, up to one per pixel column at 100. Line widths include no allowance for the
+   laser spot; if midtones engrave too dark, raise Midtones.
    Cell-centred reconstruction retains local tone transitions; if its fixed point budget is
    reached, one consistent area-preserving reconstruction applies across the entire image.
    **Photo output tips** explains physical size, scan direction, resolution and the original
    Image layer's grayscale/dither route. Editable vectors
    need a Fill operation with scan lines crossing the traced lines for shaded laser output.
    Check the scan direction after rotating a vector photo. The dialog's Raster scan output preserves
-   thin line coverage before applying the Image operation. Full-photo raster conversion uses
+   thin line coverage before applying the Image operation. Its bitmap stores that coverage as
+   grey for the operation to engrave, so midtones look darker on the canvas than in the photo.
+   Full-photo raster conversion uses
    compact contour buffers and checks its geometry and pixel memory before starting. A
    geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
@@ -2495,8 +2546,14 @@ settings and Job Review keep their existing read-only setup references.
    successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
    In a CNC project, smoothing retains established stroke junctions at the
-   source image's current physical size. Selection bounds follow the conditioned
-   geometry while the trace remains registered over its full source image.
+   source image's current physical size. In a laser project, outlines keep the
+   tracer's fitted curves and store the chords the job burns within 0.025 mm;
+   straight-segment outlines and Centerline strokes are reduced at the source
+   image's current physical size to the fewest straight moves within 0.025 mm.
+   Drawn corners and stroke ends keep their exact positions, and Photo shading
+   and Raster scan output keep the traced geometry. Selection bounds follow the
+   conditioned geometry while the trace remains registered over its full source
+   image.
 
 **Error — worker stalls or crashes**:
 - A worker request has a bounded execution timeout. The failed worker is
@@ -3265,6 +3322,16 @@ maintainer's perceptual pass (CLAUDE.md §2); green tests are not
 fidelity proof.
 
 ### F-ML1. Material library — save, load, and session persistence
+
+**Process recipes (ADR-357).** Open **Materials** in laser mode or **Recipes** in CNC mode.
+Select one artwork, name its process and choose **Save selected process**. The recipe includes
+ordered operations, disabled/visible states, effective laser settings and referenced CNC cutters.
+Select one or more destination artworks and choose **Apply recipe to selection** to replace only
+their operation bindings with independent copies. Undo restores the prior process. Geometry,
+image edits, stock, machine settings, origin and clearance stay with the current project.
+Path-specific recipes require matching path count/order; the panel reports incompatible targets.
+Native library version 2 exports/imports recipes and accepts older version-1 libraries. Existing
+single-preset Apply/Link keeps its established behavior. CNC still follows its tool/clearing order.
 
 **Superseded (ADR-093, 2026-06-26).** The manual Save... / Load... /
 Unload rail controls and the single-library `localStorage` slot

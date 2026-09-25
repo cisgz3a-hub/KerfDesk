@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryEntry } from './design-library-types';
-import { insertLibraryEntryForDocument } from './library-entry-insert';
+import { insertLibraryEntryForDocument, librarySvgObjectFor } from './library-entry-insert';
+import { ownedClipImage } from '../../__fixtures__/owned-image-clip';
 
 function deferred<T>(): {
   readonly promise: Promise<T>;
@@ -35,6 +36,18 @@ function entry(loadSvgText: () => Promise<string>): LibraryEntry {
 }
 
 describe('library insertion document ownership', () => {
+  it('explicitly refuses composed image content in a singular vector destination', async () => {
+    const svg =
+      '<svg viewBox="0 0 10 10"><path d="M0 0L10 10"/><image width="10" height="10" preserveAspectRatio="none" href="' +
+      ownedClipImage().dataUrl +
+      '"/></svg>';
+    await expect(
+      librarySvgObjectFor(
+        entry(async () => svg),
+        'mixed',
+      ),
+    ).rejects.toThrow(/contains bitmap content/);
+  });
   it('silently discards a deferred asset load after a replacement document opens', async () => {
     const loaded = deferred<string>();
     let epoch = 4;

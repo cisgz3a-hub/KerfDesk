@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  type ArraySpec,
   type Project,
 } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
@@ -50,16 +51,16 @@ afterEach(() => {
 });
 
 type Format = 'gcode' | 'rd' | 'tiles';
-async function sheet(format: Format): Promise<Project> {
+async function sheet(format: Format, spec: ArraySpec = GRID): Promise<Project> {
   const state = fixtureState();
-  const prepared = await prepareVariableArray(state, GRID, {
+  const prepared = await prepareVariableArray(state, spec, {
     render: renderFixture,
     clock: () => NOW,
   });
   if (!prepared.ok) throw new Error(prepared.message);
   const project = {
     ...state,
-    ...applyArraySelection(state, GRID, undefined, prepared.materialized),
+    ...applyArraySelection(state, spec, undefined, prepared.materialized),
   }.project;
   return {
     ...project,
@@ -117,6 +118,55 @@ function platform(
 }
 
 describe('variable sheets across actual export actions', () => {
+  for (const kind of ['circular', 'point-rotation'] as const) {
+    for (const format of ['gcode', 'rd', 'tiles'] as const) {
+      it.each(['success', 'cancel', 'write-failure'] as const)(
+        `${kind} ${format}: consumes only a complete %s`,
+        async (outcome) => {
+          const spec: ArraySpec =
+            kind === 'circular'
+              ? {
+                  kind,
+                  count: 6,
+                  centerX: 80,
+                  centerY: 60,
+                  radius: 35,
+                  startAngleDeg: 0,
+                  rotateCopies: true,
+                }
+              : { kind, count: 6, totalAngleDeg: -180 };
+          const project = await sheet(format, spec);
+          useStore.setState({ project });
+          const selectedObjectIds = project.scene.objects.flatMap((object) =>
+            object.kind === 'text' && [1, 3].includes(object.variableTemplate?.sequenceOffset ?? -1)
+              ? [object.id]
+              : [],
+          );
+          const writes: Array<string | Blob> = [];
+          await handleSaveGcode({
+            project,
+            savedName: null,
+            platform: platform(outcome, writes),
+            pushToast: vi.fn(),
+            advanceVariablesAfter: useStore.getState().advanceVariablesAfter,
+            outputScope: {
+              cutSelectedGraphics: true,
+              useSelectionOrigin: false,
+              selectedObjectIds,
+            },
+          });
+          expect(mocks.alert).not.toHaveBeenCalled();
+          expect(useStore.getState().project.variables).toMatchObject(
+            outcome === 'success'
+              ? { serialValue: 14, recordIndex: 4 }
+              : { serialValue: 10, recordIndex: 0 },
+          );
+          expect(writes.length > 0).toBe(outcome === 'success');
+        },
+      );
+    }
+  }
+
   it.each(['gcode', 'rd', 'tiles'] as const)(
     '%s advances only through the last selected copy',
     async (format) => {

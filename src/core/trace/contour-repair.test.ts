@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Polyline } from '../scene';
 import { preserveContourTopologySteps, type FinishedContour } from './contour-topology';
+import { ContourMeasurements } from './contour-topology-cache';
 import { runTraceSteps } from './trace-steps';
 
 function square(x: number, size: number): Polyline {
@@ -41,6 +42,35 @@ describe('contour refinement correction', () => {
     expect(result[2]).toBe(distant.polyline);
     expect(distant.refine).not.toHaveBeenCalled();
   });
+  it('tries the finish without rebuilt corners before backing off the smoothing', () => {
+    const withoutCorners = { ...candidate(square(0, 1.05)), refine: vi.fn(() => square(0, 1)) };
+    const first = {
+      ...candidate(square(0, 1), square(0, 2)),
+      withoutRebuiltCorners: () => withoutCorners,
+    };
+    const second = candidate(square(1.1, 1));
+    const result = runTraceSteps(preserveContourTopologySteps([first, second]));
+    expect(result[0]).toBe(withoutCorners.polyline);
+    expect(first.refine).not.toHaveBeenCalled();
+    expect(withoutCorners.refine).not.toHaveBeenCalled();
+  });
+  it('backs off the finish without rebuilt corners when it still conflicts', () => {
+    const crossing = square(0, 2);
+    const withoutCorners = {
+      polyline: crossing,
+      baseline: crossing,
+      refine: vi.fn(() => crossing),
+    };
+    const first = {
+      ...candidate(square(0, 1), crossing),
+      withoutRebuiltCorners: () => withoutCorners,
+    };
+    const second = candidate(square(1.1, 1));
+    const result = runTraceSteps(preserveContourTopologySteps([first, second]));
+    expect(result[0]).toBe(first.source);
+    expect(withoutCorners.refine).toHaveBeenCalledWith(0.5);
+    expect(first.refine).not.toHaveBeenCalled();
+  });
   it('retains source boundaries if earlier fitting geometry is also invalid', () => {
     const source = square(0, 2);
     const invalid: Polyline = {
@@ -62,5 +92,35 @@ describe('contour refinement correction', () => {
     const result = runTraceSteps(preserveContourTopologySteps([input]));
     expect(result).toEqual([source]);
     expect(input.polyline).toBe(invalid);
+  });
+
+  it('passes over back-off steps that return the geometry the contour already has', () => {
+    // Every weaker step returns the invalid ring itself, as the laser commit
+    // guard's fixed steps return its source. Each round measures every
+    // contour once: the conflict round and the round that accepts the source.
+    const source = square(0, 2);
+    const invalid: Polyline = {
+      closed: true,
+      points: [
+        source.points[0]!,
+        source.points[2]!,
+        source.points[1]!,
+        source.points[3]!,
+        source.points[0]!,
+      ],
+    };
+    const input: FinishedContour = {
+      source,
+      baseline: invalid,
+      polyline: invalid,
+      refine: vi.fn(() => invalid),
+    };
+    const measured = vi.spyOn(ContourMeasurements.prototype, 'get');
+    const result = runTraceSteps(preserveContourTopologySteps([input]));
+    expect(result[0]).toBe(source);
+    expect(input.refine).toHaveBeenCalledTimes(4);
+    // Two rounds, each measuring the source and the candidate once.
+    expect(measured).toHaveBeenCalledTimes(4);
+    measured.mockRestore();
   });
 });

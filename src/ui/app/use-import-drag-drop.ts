@@ -19,6 +19,7 @@ import { dispatchImportFilesInOrder } from './import-dispatch';
 export function useImportDragDrop(
   openGcodeInspector: (name: string, source: GcodeInspectionSource) => void,
 ): void {
+  const importSvgFragment = useStore((s) => s.importSvgFragment);
   const importSvgObject = useStore((s) => s.importSvgObject);
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -52,6 +53,7 @@ export function useImportDragDrop(
       routeDroppedFiles(e.dataTransfer, {
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject,
+        importSvgFragment,
         importRasterImage,
         openGcodeInspector,
         pushToast,
@@ -67,7 +69,14 @@ export function useImportDragDrop(
       window.removeEventListener('dragleave', onDragLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [importSvgObject, importRasterImage, openGcodeInspector, pushToast, setDragOverlay]);
+  }, [
+    importSvgFragment,
+    importSvgObject,
+    importRasterImage,
+    openGcodeInspector,
+    pushToast,
+    setDragOverlay,
+  ]);
 }
 
 type DropImportActions = Parameters<typeof dispatchImportFilesInOrder>[1] & {

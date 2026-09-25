@@ -6,7 +6,12 @@
 // constructors use consistent literal-shape orderings, so output is
 // byte-deterministic given a byte-deterministic Project.
 
-import { polylineToCurveSubpath, type Project, type SceneObject } from '../../core/scene';
+import {
+  polylineToCurveSubpath,
+  type ColoredPath,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
 import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
 import { stringifyProjectJson } from './stringify-project-json';
 
@@ -42,15 +47,18 @@ function withCurveGeometry(project: Project): Project {
 }
 
 function withSerializableObject(object: SceneObject): SceneObject {
+  if (object.kind === 'raster-image' && object.imageClip !== undefined)
+    return { ...object, imageClip: serializablePaths(object.imageClip) };
   if (!('paths' in object)) return object;
   if (object.kind === 'traced-image') {
     return { ...object, paths: object.paths.map(compactLineGeometry) };
   }
-  return {
-    ...object,
-    paths: object.paths.map((path) => ({
-      ...path,
-      curves: path.curves ?? path.polylines.map(polylineToCurveSubpath),
-    })),
-  };
+  return { ...object, paths: serializablePaths(object.paths) };
+}
+
+function serializablePaths(paths: readonly ColoredPath[]): readonly ColoredPath[] {
+  return paths.map((path) => ({
+    ...path,
+    curves: path.curves ?? path.polylines.map(polylineToCurveSubpath),
+  }));
 }

@@ -15,6 +15,7 @@ import { SecondPassHost } from '../laser/second-pass/SecondPassHost';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
+import { PagedImportDialog } from '../import/PagedImportDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { DesignStudioHost } from '../design-studio';
 import { ImageEditorHost } from '../image-editor/ImageEditorHost';
@@ -79,6 +80,7 @@ export function App(): JSX.Element {
       <AddTextDialog />
       <DesignLibraryDialog />
       <ImportImageDialog />
+      <PagedImportDialog />
       <ConfirmSaveDialog />
       <SaveFilenamePanel />
       <JobReviewDialog />

@@ -19,6 +19,7 @@ vi.mock('../commands/import-image-action', () => ({
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 type OpenGcodeInspector = (name: string, source: GcodeInspectionSource) => void;
+const roots = new Set<Root>();
 
 function Harness(props: { readonly openGcodeInspector: OpenGcodeInspector }): null {
   useImportDragDrop(props.openGcodeInspector);
@@ -31,15 +32,15 @@ async function renderHarness(openGcodeInspector: OpenGcodeInspector = vi.fn()): 
 }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  let root: Root | null = null;
+  const root = createRoot(host);
+  roots.add(root);
   await act(async () => {
-    root = createRoot(host);
     root.render(<Harness openGcodeInspector={openGcodeInspector} />);
   });
   return {
     openGcodeInspector,
     unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
+      if (roots.delete(root)) await act(async () => root.unmount());
       host.remove();
     },
   };
@@ -69,7 +70,12 @@ function gcodeFile(name: string, text = 'G21\nG1 X10'): File {
   return file;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => {
+    for (const root of roots) root.unmount();
+    roots.clear();
+  });
+  document.body.replaceChildren();
   imageMocks.importImageFile.mockClear();
   useStore.getState().newProject();
   for (const toast of useToastStore.getState().toasts) {
@@ -102,7 +108,7 @@ describe('useImportDragDrop image routing (M26)', () => {
     await unmount();
   });
 
-  it('names ignored files in a mixed drop instead of discarding them silently', async () => {
+  it('reports unsupported files in a mixed drop instead of discarding them silently', async () => {
     const { unmount } = await renderHarness();
 
     await dropFiles([
@@ -111,7 +117,7 @@ describe('useImportDragDrop image routing (M26)', () => {
     ]);
 
     expect(imageMocks.importImageFile).toHaveBeenCalledTimes(1);
-    expect(toastMessages().some((m) => m.includes('Ignored 1 file(s)'))).toBe(true);
+    expect(toastMessages().some((m) => m.includes('Ignored 1 unsupported file(s)'))).toBe(true);
 
     await unmount();
   });

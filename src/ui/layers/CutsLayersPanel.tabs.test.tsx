@@ -77,7 +77,7 @@ describe('CutsLayersPanel tabs', () => {
     }
   });
 
-  it('hides Materials in CNC mode even when it was the last selected view', async () => {
+  it('opens the reusable process library as Recipes in CNC mode', async () => {
     useUiStore.getState().setCutsLayersView('materials');
     useStore.getState().setMachineKind('cnc');
     const { host, root } = await renderPanel();
@@ -86,9 +86,13 @@ describe('CutsLayersPanel tabs', () => {
         host.querySelector('[role="tablist"][aria-label="Artwork panel view"]'),
       ).not.toBeNull();
       expect(host.querySelector('#cuts-layers-run-order-tab')).not.toBeNull();
-      expect(host.querySelector('#cuts-layers-materials-tab')).toBeNull();
-      expect(host.querySelector('section[aria-label="Material Library"]')).toBeNull();
-      expect(host.textContent).toContain('Import or draw artwork to create its first operation.');
+      const recipes = host.querySelector('#cuts-layers-materials-tab');
+      expect(recipes?.textContent).toBe('Recipes');
+      expect(recipes?.getAttribute('title')).toBe('Show recipes');
+      expect(recipes?.getAttribute('aria-selected')).toBe('true');
+      expect(host.querySelector('section[aria-label="Process Library"]')).not.toBeNull();
+      expect(host.textContent).toContain('Process Library');
+      expect(host.textContent).not.toContain('Starter Presets');
     } finally {
       await act(async () => root.unmount());
     }
