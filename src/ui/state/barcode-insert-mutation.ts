@@ -1,8 +1,8 @@
 // barcode-insert-mutation — commits a generated barcode (ADR-386). A new code
 // lands centred on the bed, unscaled, on its own Fill operation: only filled
-// modules scan, so the operation stays Fill even when the operator's layer
-// defaults would start it as a line. Editing replaces the code in place and
-// keeps its placement, bindings and per-object settings. One undo step each.
+// modules scan, so only a saved Fill default seeds that operation. Editing
+// replaces the code in place and keeps its placement, bindings and per-object
+// settings. One undo step each.
 
 import { isBarcodeObject } from '../../core/barcode';
 import {
@@ -48,7 +48,7 @@ export function applyInsertBarcode(
   const defaulted = applyLayerDefaultsToFreshLayers(
     s.project.scene.layers,
     inserted,
-    s.layerDefaults,
+    fillDefaultsOnly(s.layerDefaults),
     s.cncLiveCaps,
   );
   const layers = defaulted.project.scene.layers.map((layer) =>
@@ -57,6 +57,19 @@ export function applyInsertBarcode(
   return {
     ...defaulted,
     project: { ...defaulted.project, scene: { ...defaulted.project.scene, layers } },
+  };
+}
+
+// A saved default is a whole operation (captureLayerDefaultSettings). One
+// captured from a line cut carries cutting power, speed and passes, which a
+// Fill would sweep across every module, so it is skipped as if absent: the
+// lookup falls through to the next default, or to a plain new operation.
+function fillDefaultsOnly(defaults: LayerDefaultsState): LayerDefaultsState {
+  return {
+    byColor: Object.fromEntries(
+      Object.entries(defaults.byColor).filter(([, settings]) => settings.mode === 'fill'),
+    ),
+    allColors: defaults.allColors?.mode === 'fill' ? defaults.allColors : null,
   };
 }
 
