@@ -14,7 +14,7 @@ export type SyntheticJpegOptions = {
   readonly xmpBeforeExif?: boolean;
 };
 
-export function syntheticJpegBytes(options: SyntheticJpegOptions): Uint8Array {
+export function syntheticJpegBytes(options: SyntheticJpegOptions): Uint8Array<ArrayBuffer> {
   const bytes: number[] = [0xff, 0xd8];
   if (options.jfifDpi !== undefined) {
     const { x, y } = options.jfifDpi;
