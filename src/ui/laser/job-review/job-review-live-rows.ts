@@ -431,5 +431,6 @@ function travelFact(
 
 function parkLabel(parkXMm: number | undefined, parkYMm: number | undefined): string {
   if (parkXMm === undefined || parkYMm === undefined) return 'Machine origin';
-  return `X ${formatMm(parkXMm)} · Y ${formatMm(parkYMm)}`;
+  // A bed position that moves with the job (ADR-392).
+  return `Bed X ${formatMm(parkXMm)} · Y ${formatMm(parkYMm)}`;
 }

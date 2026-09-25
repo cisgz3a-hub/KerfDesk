@@ -201,6 +201,9 @@ function outputOptions(options: PrepareOutputSnapshotOptions): PrepareOutputOpti
     ...(options.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: options.absoluteProgramOffset }),
+    ...(options.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: options.workZeroBedPosition }),
   };
 }
 
@@ -233,6 +236,7 @@ function snapshotCacheKey(
     outputScope: options.outputScope ?? null,
     contourEntryBounds: options.contourEntryBounds,
     absoluteProgramOffset: options.absoluteProgramOffset,
+    workZeroBedPosition: options.workZeroBedPosition,
     registration: options.registration ?? null,
   });
 }

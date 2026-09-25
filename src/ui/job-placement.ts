@@ -177,7 +177,10 @@ export function runtimeCoordinatePreparationOptions(
   device: DeviceProfile,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
   evidence: NativeBedEvidence & Pick<MachinePlacementSnapshot, 'workOriginActive'>,
-): Pick<PrepareOutputOptions, 'contourEntryBounds' | 'absoluteProgramOffset'> {
+): Pick<
+  PrepareOutputOptions,
+  'contourEntryBounds' | 'absoluteProgramOffset' | 'workZeroBedPosition'
+> {
   const absolute =
     placement.jobOrigin === undefined || placement.jobOrigin.startFrom === 'absolute';
   const offset = trustedMotionOffsetForPreflight(device, placement, evidence);
@@ -201,7 +204,11 @@ export function runtimeCoordinatePreparationOptions(
       minY: bed.minY - offset.y,
       maxY: bed.maxY - offset.y,
     },
-    ...(absolute ? { absoluteProgramOffset: { x: -offset.x, y: -offset.y } } : {}),
+    // Absolute artwork is shifted by the inverse; a placed job's configured
+    // CNC park needs zero's bed position itself (ADR-392).
+    ...(absolute
+      ? { absoluteProgramOffset: { x: -offset.x, y: -offset.y } }
+      : { workZeroBedPosition: offset }),
   };
 }
 
