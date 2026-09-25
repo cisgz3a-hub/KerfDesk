@@ -2,9 +2,8 @@
 //
 // Some vendor firmware cannot be trusted to restart air assist inside a
 // running program. Creality's A1 family delays the real shutoff after M9 by
-// `$152`, and its shipped build has dropped the pump seconds after a fresh M8,
-// which is the documented "air works while engraving but stops when it cycles
-// over to cutting". Emitting `M9` then `M8` across an Air-off operation is
+// `$152`, and LightBurn staff confirmed a firmware bug on the A1 and A1 Pro
+// that drops the pump after a fresh M8. Emitting `M9` then `M8` across an Air-off operation is
 // exactly the sequence such a controller fails to honour, and the operations
 // that lose their air are the ones AFTER the gap, not the one that asked for
 // none.

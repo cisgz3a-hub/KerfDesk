@@ -8,8 +8,19 @@ export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color'>>;
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
+// A calibration-coupon marker and a runtime binding id describe one layer, not
+// a reusable setting. A saved 'baseline' marker would let every new layer skip
+// the verified-offset rule for bidirectional scanning (scan-direction-policy.ts),
+// so neither is captured, and neither is applied from an older saved default.
 export function captureLayerDefaultSettings(layer: Layer): LayerDefaultSettings {
-  const { id: _id, color: _color, cnc, ...settings } = layer;
+  const {
+    id: _id,
+    color: _color,
+    scanOffsetCalibrationMode: _calibrationMode,
+    bindingOperationId: _bindingOperationId,
+    cnc,
+    ...settings
+  } = layer;
   return {
     ...settings,
     ...(cnc === undefined ? {} : { cnc: cncSettingsForArtworkPaste(cnc, undefined) }),
@@ -17,7 +28,12 @@ export function captureLayerDefaultSettings(layer: Layer): LayerDefaultSettings 
 }
 
 export function applyLayerDefaultSettings(layer: Layer, settings: LayerDefaultSettings): Layer {
-  const { cnc, ...artwork } = settings;
+  const {
+    cnc,
+    scanOffsetCalibrationMode: _calibrationMode,
+    bindingOperationId: _bindingOperationId,
+    ...artwork
+  } = settings;
   return {
     ...layer,
     ...artwork,

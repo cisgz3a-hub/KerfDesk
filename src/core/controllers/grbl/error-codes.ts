@@ -1,4 +1,4 @@
-// GRBL v1.1 error codes. Source: gnea/grbl wiki "Error Codes".
+// GRBL v1.1 error codes. Source: gnea/grbl doc/csv/error_codes_en_US.csv.
 //
 // Errors arrive as `error:N` after a line GRBL couldn't accept. Unlike
 // alarms, the machine stays in its previous state and can keep running;
@@ -23,7 +23,8 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   {
     code: 4,
     title: 'Negative value not allowed',
-    detail: 'A setting received a negative number where positive was required.',
+    detail:
+      'A negative number was sent where only positive values are allowed ($ settings, F, N, P, S or T words).',
   },
   {
     // Official: "Homing cycle failure. Homing is not enabled via settings."
@@ -43,7 +44,12 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
     detail: 'Settings were reset to defaults; verify with $$.',
   },
   { code: 8, title: 'Not idle', detail: 'The command needs the controller to be idle.' },
-  { code: 9, title: 'G-code lock', detail: 'Alarm or jog state active — unlock with $X first.' },
+  {
+    code: 9,
+    title: 'G-code lock',
+    detail:
+      'G-code is locked out during an alarm or a jog. Clear the alarm ($X or $H) or wait for the jog to end.',
+  },
   {
     // Official: "Soft limits cannot be enabled without homing also enabled."
     // Fires when writing $20=1 while $22=0.
@@ -54,12 +60,14 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   {
     code: 11,
     title: 'Line overflow',
-    detail: 'A streamed line exceeded the buffer; shorten lines.',
+    detail:
+      'A line exceeded the controller line length (80 characters on stock GRBL) and was not run.',
   },
   {
     code: 12,
     title: 'Step rate exceeds maximum',
-    detail: 'Reduce feed rate or check $11x settings.',
+    detail:
+      'A steps/mm ($100-$102) or max rate ($110-$112) write would exceed the firmware step-rate limit.',
   },
   { code: 13, title: 'Safety door open', detail: 'Close the safety door before resuming.' },
   { code: 14, title: 'Build info too long', detail: '$I value exceeds storage.' },
@@ -91,10 +99,14 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   },
   {
     code: 24,
-    title: 'Two G-code commands in axis words',
-    detail: 'Conflicting commands in one line.',
+    title: 'Axis command conflict',
+    detail: 'More than one command in the line needs the axis words.',
   },
-  { code: 25, title: 'Repeated G-code word', detail: 'Same axis word used twice.' },
+  {
+    code: 25,
+    title: 'Repeated G-code word',
+    detail: 'The same word (for example two X or two F values) appears twice in one line.',
+  },
   { code: 26, title: 'No axis words', detail: 'A motion command needs at least one axis word.' },
   { code: 27, title: 'Invalid line number', detail: 'N-word value out of range.' },
   {
@@ -112,13 +124,17 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   {
     code: 32,
     title: 'No axis words in plane',
-    detail: 'G2/G3 needs at least two axis words in the active plane.',
+    detail: 'G2/G3 arcs need at least one axis word in the active plane.',
   },
-  { code: 33, title: 'Arc invalid target', detail: 'G2/G3 target is not on a valid arc radius.' },
+  {
+    code: 33,
+    title: 'Invalid motion target',
+    detail: 'The motion target is invalid, for example an arc end point that is not on the arc.',
+  },
   {
     code: 34,
     title: 'Arc radius too small',
-    detail: 'Radius would produce an arc of zero length.',
+    detail: 'The arc radius (R) is too small to reach the end point.',
   },
   {
     code: 35,

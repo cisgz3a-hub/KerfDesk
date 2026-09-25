@@ -24,6 +24,13 @@ const TOOL_KIND_OPTIONS: ReadonlyArray<{ readonly value: CncToolKind; readonly l
   { value: 'tapered-ball-nose', label: 'Tapered ball nose' },
 ];
 
+// The diameter is the cutting diameter, never the shank: V-carve depth is
+// limited by it, so a shank size on a fine engraving bit carves far too deep.
+const CONE_DIAMETER_TITLE =
+  'Widest cutting diameter of the cone in millimeters, not the shank. V-carve depth is limited by this width, so a fine engraving bit on a 1/8-inch shank needs its small cone diameter here.';
+const CUTTER_DIAMETER_TITLE =
+  "Enter the cutter's actual cutting diameter in millimeters, not the shank.";
+
 export function AddCncBitForm(
   props: {
     readonly onAdd?: (tool: Omit<CncTool, 'id'>) => void;
@@ -124,6 +131,10 @@ function BitFields(props: BitFieldsProps): JSX.Element {
   // A tapered bit's stored diameter is where its flutes END, not its tip; the
   // field says so because sellers often call the tip the cutting diameter.
   const tapered = props.kind === 'tapered-ball-nose';
+  const cutDiameterTitle =
+    props.kind === 'v-bit' || props.kind === 'engraving'
+      ? CONE_DIAMETER_TITLE
+      : CUTTER_DIAMETER_TITLE;
   return (
     <>
       <input
@@ -155,14 +166,14 @@ function BitFields(props: BitFieldsProps): JSX.Element {
         min={MIN_TOOL_DIAMETER_MM}
         max={MAX_TOOL_DIAMETER_MM}
         step={0.1}
-        placeholder={tapered ? 'Top dia mm' : 'Diameter mm'}
+        placeholder={tapered ? 'Top dia mm' : 'Cutting Ø mm'}
         aria-label={
           tapered ? 'New bit cut diameter at the top of the flutes (mm)' : 'New bit diameter (mm)'
         }
         title={
           tapered
             ? 'Diameter where the tapered flutes end. For most carving bits this equals the shank diameter; it is not the tip size.'
-            : "Enter the cutter's actual diameter in millimeters."
+            : cutDiameterTitle
         }
         style={numberInputStyle}
       />

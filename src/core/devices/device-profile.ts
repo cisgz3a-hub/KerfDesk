@@ -216,12 +216,12 @@ export type DeviceProfile = {
   // Vendor firmware that cannot be trusted to restart air assist inside a
   // running program. Creality's A1 family idles the pump (and powers the laser
   // module down) `$152` seconds after it decides work has finished — 0..100,
-  // default 30, 100 = never (Creality wiki, GRBL configuration parameters) —
-  // and its shipped 1.0.6 build has dropped the pump seconds after a fresh M8
-  // (LightBurn staff: confirmed firmware bug, fixed in 1.0.7) — the documented
-  // "air works while engraving but stops when it cycles over to cutting". For
-  // such a machine the emitter holds air on across an Air-off operation that
-  // sits between two Air-on ones instead of cycling M9/M8 over it (ADR-335).
+  // 100 = never, default reported as 20 or 30 (Creality wiki, GRBL configuration
+  // parameters) — and LightBurn staff confirmed a firmware bug that cuts air
+  // after about 30 s on both the A1 and the A1 Pro (the A1 fix was a 1.0.7
+  // debug build; A1 Pro firmware is numbered separately). For such a machine
+  // the emitter holds air on across an Air-off operation that sits between two
+  // Air-on ones instead of cycling M9/M8 over it (ADR-335).
   // Absent keeps the plain per-operation cycling that stock GRBL, grblHAL,
   // FluidNC, Marlin and Smoothieware each honour immediately, and is also how
   // to get per-operation air back on an A1 once `$152=100` is set on the
@@ -262,12 +262,12 @@ export type DeviceProfile = {
   // cut speeds doesn't also slow framing. The firmware still enforces its
   // own $110/$111 max-rate limits, but the app must not collapse this value
   // back to a low burn/feed setting.
-  // 6000 mm/min matches LightBurn's default and most diode-laser
-  // jog speeds from the Creality Falcon / xTool class.
+  // 6000 mm/min is a generic starting value; no published LightBurn
+  // default was found to match, so tune it to the machine.
   readonly framingFeedMmPerMin: number;
   // GRBL acceleration ($120/$121) in mm/sec². Used by the job-time
-  // estimator's planner. Generic default of 500 sits in the middle of
-  // the hobby/diode-laser range (real machines run 100-2500). Tune
+  // estimator's planner. Generic default of 500; stock GRBL ships 10
+  // mm/sec^2 (defaults.h), so read $120/$121 from the controller or tune
   // per machine if estimates are systematically off. Phase D will
   // auto-read this from the `$$` settings dump on connect.
   readonly accelMmPerSec2: number;
@@ -406,7 +406,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
     {
       label: 'Neotronics and LASER TREE public specifications',
       status: 'public-spec-starter',
-      note: 'Public specifications checked 2026-09-19: 400 x 400 x 75 mm geometry; this combination assumes the separately specified 500 W / 12,000 RPM spindle, not the 710 W alternative. LT-4LDS-V2 optical data comes from LASER TREE. Sources: https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct and https://lasertree.com/products/20w-optical-power-laser-cutting-module . Neither source establishes the combined controller revision or wiring. Confirm GRBL build, configured travel, usable work area, S scale, homing, feed limits, selector and air wiring.',
+      note: 'Public specifications checked 2026-09-19: 400 x 400 x 75 mm geometry; this combination assumes the separately specified 500 W spindle (3,000-12,000 RPM on its own page; the machine page lists 1-20,000 RPM across variants), not the 710 W alternative. LT-4LDS-V2 optical data comes from LASER TREE; its fixed focus lever is described in the module manual. Sources: https://neotronics.co.za/index.php?product_id=1018&route=product%2Fproduct , https://neotronics.co.za/index.php?product_id=297&route=product%2Fproduct , https://lasertree.com/products/20w-optical-power-laser-cutting-module and https://manuals.plus/laser-tree/lt-4lds-v2-20w-optical-power-laser-module-manual . None of these sources establishes the combined controller revision or wiring. Confirm GRBL build, configured travel, usable work area, S scale, homing, feed limits, selector and air wiring.',
     },
   ],
   zTravelMm: 75,

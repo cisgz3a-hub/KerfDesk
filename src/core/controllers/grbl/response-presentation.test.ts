@@ -139,4 +139,27 @@ describe('controller-family response presentation', () => {
       positionLost: true,
     });
   });
+
+  it('uses the stock GRBL meaning of alarm 10 (dual-axis homing), not grblHAL E-stop', () => {
+    // gnea/grbl doc/csv/alarm_codes_en_US.csv row 10: "Homing fail. Second dual
+    // axis limit switch failed to trigger within configured search distance".
+    expect(presentAlarm('grbl-v1.1', 10)).toMatchObject({
+      code: 10,
+      title: 'Homing fail — dual-axis switch',
+      positionLost: true,
+    });
+    expect(presentAlarm('grbl-v1.1', 10)?.title).not.toMatch(/e-stop/i);
+  });
+
+  it('describes grblHAL alarms 14–22 and keeps them as the stock fallback', () => {
+    expect(presentAlarm('grblhal', 15)?.title).toBe('Homing fail — auto-squared axis (grblHAL)');
+    expect(presentAlarm('grblhal', 22)?.title).toBe('Buffer overflow (grblHAL)');
+    expect(presentAlarm('grbl-v1.1', 11)?.title).toBe('Homing required (grblHAL)');
+    expect(presentAlarm('grblhal', 23)).toBeNull();
+  });
+
+  it('gives the GRBL recovery steps for homing pull-off and search failures', () => {
+    expect(presentAlarm('grbl-v1.1', 8)?.action).toContain('$27');
+    expect(presentAlarm('grbl-v1.1', 9)?.action).toContain('$130');
+  });
 });

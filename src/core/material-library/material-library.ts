@@ -105,7 +105,14 @@ export function materialRecipePatch(recipe: MaterialRecipe): MaterialRecipe {
 }
 
 export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer {
-  const { bidirectionalScanOffsetMm: _existingOffset, ...withoutLocalOffset } = layer;
+  // A recipe without a power mode was captured from an Auto layer, so applying
+  // it returns the layer to Auto. Keeping the old override would carry one
+  // preset's dynamic power into the next preset's cut.
+  const {
+    bidirectionalScanOffsetMm: _existingOffset,
+    powerMode: _existingPowerMode,
+    ...withoutLocalOffset
+  } = layer;
   return {
     ...withoutLocalOffset,
     ...materialRecipePatch(recipe),
