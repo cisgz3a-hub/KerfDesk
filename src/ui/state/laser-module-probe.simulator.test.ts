@@ -18,9 +18,7 @@ import {
   type SmoothieSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
-import { LASER_MODULE_ABSENT_MESSAGE } from '../../core/preflight/laser-module-readiness';
 import { SMOOTHIE_NO_LASER_MODULE_FIRE_REASON } from '../../core/controllers/smoothieware/laser-module';
-import type { FramedRunCandidate } from './framed-run';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
@@ -111,34 +109,24 @@ describe('SM-3: a Smoothieware board without the Laser module', () => {
     }).toEqual({ outcome: 'done', homingCycles: 1, owed: 0 });
   });
 
-  it('refuses a laser job with the factual reason and sends none of its bytes', async () => {
+  it('runs a laser job: Start refuses nothing, and the program streams to its end', async () => {
     const sim = await connectSmoothie({ laserModule: 'absent' });
-    const written = sim.outbound().length;
-    const start = settled(startTestLaserJob('fire off\nG1 X10 F600 S0.5\n'));
-    await pump(2_000);
-    expect(await start).toContain(LASER_MODULE_ABSENT_MESSAGE);
-    expect(
-      sim
-        .outbound()
-        .slice(written)
-        .some((line) => line.includes('G1 X10')),
-    ).toBe(false);
+    // The program as Start prepares it for this board: no `fire off` (ADR-397).
+    const start = settled(startTestLaserJob('G1 X10 F600 S0.5\n'));
+    await pump(5_000);
+    expect(await start).toBe('done');
+    expect(sim.state().pos.x).toBe(10);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
-  it("refuses a laser job's Frame, but not a plain Frame of an area", async () => {
+  it('Frames without `fire`: the tool-off prefix leaves it out', async () => {
     const sim = await connectSmoothie({ laserModule: 'absent' });
-    const project = useStore.getState().project;
-    const candidate = { project } as unknown as FramedRunCandidate;
     const bounds = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
-    const jobFrame = settled(useLaserStore.getState().frame(bounds, 1_000, candidate));
-    await pump(2_000);
-    expect(await jobFrame).toBe(LASER_MODULE_ABSENT_MESSAGE);
-
-    const plainFrame = settled(useLaserStore.getState().frame(bounds, 1_000));
+    const frame = settled(useLaserStore.getState().frame(bounds, 1_000));
     await pump(10_000);
-    expect(await plainFrame).toBe('done');
+    expect(await frame).toBe('done');
     expect(sim.outbound().some((line) => line.includes('fire'))).toBe(false);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
   it('checks the module again when the board reboots (boot banner)', async () => {

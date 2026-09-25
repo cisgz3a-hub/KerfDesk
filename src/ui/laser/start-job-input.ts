@@ -73,7 +73,6 @@ export function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyA
   if (machine.autofocusBusy === true) {
     issues.push('Auto-focus is running. Wait for it to finish before starting a job.');
   }
-  if (machine.laserOutputRefusal != null) issues.push(machine.laserOutputRefusal);
   if (machine.alarmCode !== null) issues.push(ALARM_ACTIVE_START_MESSAGE);
   if (machine.statusReport === null) {
     issues.push(CONTROLLER_STATUS_UNKNOWN_START_MESSAGE);

@@ -11,6 +11,7 @@ import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-
 import { scenePreparationTooComplex, type Job } from '../../core/job';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
+import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-readiness';
 import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
@@ -26,6 +27,11 @@ export function demotedPolicyWarnings(project: Project, machine: MachineStartSna
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
   }
+  // A board without its Laser module runs the job with the laser off
+  // (controller audit SM-3): stated, never refused (ADR-397).
+  const noLaserModule =
+    machineKind === 'laser' ? laserModuleAbsentJobWarning(machine.laserModuleReport) : null;
+  if (noLaserModule !== null) warnings.push(noLaserModule);
   warnings.push(...cncOverrideStartIssues(project, machine.ovCache));
   warnings.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
   const workZeroIssue = cncWorkZeroStartIssue(

@@ -7,8 +7,8 @@
 // after the boot banner.
 //
 // With no module the session driver drops the module's own commands (`fire
-// off`), which nothing on the board would ever answer, and live laser output
-// is refused with that fact (laser-module-readiness.ts).
+// off`), which nothing on the board would ever answer; test Fire is refused,
+// and a laser job gets a Job Review warning (laser-module-readiness.ts).
 
 import {
   selectControllerDriver,

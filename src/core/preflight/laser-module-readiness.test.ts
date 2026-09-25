@@ -1,6 +1,8 @@
 // Controller audit SM-3/SM-2: what the Smoothieware M221 laser report means for
-// laser output. The absent module is a factual refusal; a build without M221 P
-// is a Job Review warning for constant-power (M3 -> `M221 S100 P1`) output.
+// laser output. Without the module test Fire is refused (nothing answers
+// `fire`), a laser job gets a Job Review warning and a program without `fire
+// off` (ADR-397); a build without M221 P is a Job Review warning for
+// constant-power (M3 -> `M221 S100 P1`) output.
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
@@ -9,8 +11,11 @@ import { smoothiewareStrategy } from '../output/smoothieware-strategy';
 import {
   CONSTANT_POWER_UNSUPPORTED_MESSAGE,
   constantPowerModeWarning,
+  LASER_MODULE_ABSENT_JOB_WARNING,
   LASER_MODULE_ABSENT_MESSAGE,
-  laserOutputRefusal,
+  laserFireRefusal,
+  laserModuleAbsentJobWarning,
+  programForLaserModule,
 } from './laser-module-readiness';
 
 const ABSENT = { module: 'absent', constantPowerMode: null } as const;
@@ -49,12 +54,24 @@ function smoothieOutput(cutPowerMode: 'constant' | 'dynamic'): string {
   return smoothiewareStrategy.emit(job, device);
 }
 
-describe('laserOutputRefusal', () => {
-  it('refuses laser output only when the module is absent', () => {
-    expect(laserOutputRefusal(ABSENT)).toBe(LASER_MODULE_ABSENT_MESSAGE);
-    expect(laserOutputRefusal(PRE_2021)).toBeNull();
-    expect(laserOutputRefusal(EDGE)).toBeNull();
-    expect(laserOutputRefusal(null)).toBeNull();
+describe('a board without the Laser module', () => {
+  it('refuses test Fire and warns for a laser job only when the module is absent', () => {
+    expect(laserFireRefusal(ABSENT)).toBe(LASER_MODULE_ABSENT_MESSAGE);
+    expect(laserModuleAbsentJobWarning(ABSENT)).toBe(LASER_MODULE_ABSENT_JOB_WARNING);
+    for (const evidence of [PRE_2021, EDGE, null]) {
+      expect(laserFireRefusal(evidence)).toBeNull();
+      expect(laserModuleAbsentJobWarning(evidence)).toBeNull();
+    }
+  });
+
+  it('streams the program without its `fire off`, which nothing would answer', () => {
+    const program = smoothieOutput('dynamic');
+    expect(program.split('\n')[0]).toBe('fire off');
+    const streamed = programForLaserModule(program, ABSENT);
+    expect(streamed.split('\n')).not.toContain('fire off');
+    expect(streamed).toBe(program.split('\n').slice(1).join('\n'));
+    expect(programForLaserModule(program, EDGE)).toBe(program);
+    expect(programForLaserModule(program, null)).toBe(program);
   });
 });
 

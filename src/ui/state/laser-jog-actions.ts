@@ -5,13 +5,10 @@
 // active driver), and the connection-bound safe write. Type-only LaserState /
 // LiveRefs import — no runtime cycle.
 
-import { laserOutputRefusal } from '../../core/preflight/laser-module-readiness';
-import { machineKindOf } from '../../core/scene';
 import { isAtOrAboveSafeZ } from './cnc-frame-lines';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
-import { connectedLaserModuleEvidence } from './laser-module-probe';
 import {
   markMotionOperationDispatched,
   startMotionOperation,
@@ -182,7 +179,6 @@ async function runFrame(
   const { set, get, refs, safeWrite } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
-  assertFrameLaserOutput(set, get, candidate);
   assertMotionQueueSettled(set, get, 'framing again');
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'frame');
   // A new physical Frame voids every earlier proof, traced or permitted.
@@ -352,21 +348,6 @@ function assertCncPointMoveWorkZReady(set: SetFn, get: GetFn): void {
     'CNC point move blocked: set or probe Work Z before moving. The safe-Z retract uses absolute work coordinates.';
   set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
   throw new Error(message);
-}
-
-// A laser job's Frame leads only to a Start the controller factually cannot
-// run when its laser module is not loaded (controller audit SM-3). A Frame
-// without a job candidate (recovery area) is plain motion and stays allowed.
-function assertFrameLaserOutput(
-  set: SetFn,
-  get: GetFn,
-  candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
-): void {
-  const refusal = laserOutputRefusal(connectedLaserModuleEvidence(get()));
-  if (refusal === null || candidate === undefined) return;
-  if (machineKindOf(candidate.project.machine) !== 'laser') return;
-  set({ lastWriteError: refusal, log: pushLog(get(), `[lf2] Frame blocked: ${refusal}`) });
-  throw new Error(refusal);
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {
