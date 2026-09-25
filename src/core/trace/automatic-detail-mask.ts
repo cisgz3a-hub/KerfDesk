@@ -1,7 +1,9 @@
 import type { CrackSubPixelField } from './contour-boundary';
+import { lightSolidIso } from './light-solid-fill';
 import type { RawImageData, TraceOptions } from './trace-image';
 
-/** Automatic recovery adds local detail to the preset's brightness band.
+/** Automatic recovery adds local detail to the preset's brightness band, and
+ * fills light solids that the local test alone would hollow (ADR-393).
  * Deliberate Sketch remains local contrast only, including shadow removal. */
 export function prepareAutomaticDetailMask(
   image: RawImageData,
@@ -12,31 +14,58 @@ export function prepareAutomaticDetailMask(
   const threshold = options.thresholdLuma ?? 128;
   const lo = Math.max(0, Math.min(255, Math.min(cutoff, threshold)));
   const hi = Math.max(0, Math.min(255, Math.max(cutoff, threshold)));
+  const { width, height } = image;
+  const plane = classifyDetail(localField, width, height, lo, hi);
+  const solidIso = lightSolidIso(plane, hi);
   const data = new Uint8ClampedArray(image.data.length);
-  for (let y = 0; y < image.height; y += 1) {
-    for (let x = 0; x < image.width; x += 1) {
-      const luma = localField.lumaAt(x, y);
-      const solid = luma >= lo && luma <= hi;
-      const detail = luma < localField.thresholdAt(x, y);
-      const value = solid || detail ? 0 : 255;
-      const offset = (y * image.width + x) * 4;
-      data[offset] = value;
-      data[offset + 1] = value;
-      data[offset + 2] = value;
-      data[offset + 3] = 255;
-    }
+  for (let i = 0; i < plane.ink.length; i += 1) {
+    const filled =
+      plane.ink[i] === 1 ||
+      (solidIso !== null && (plane.luma[i] as number) <= (solidIso[i] as number));
+    const value = filled ? 0 : 255;
+    const offset = i * 4;
+    data[offset] = value;
+    data[offset + 1] = value;
+    data[offset + 2] = value;
+    data[offset + 3] = 255;
   }
   return {
-    prepared: { width: image.width, height: image.height, data },
+    prepared: { width, height, data },
     // A nonzero lower cutoff can produce two disjoint luma intervals.
     // As with manual bands, use measured topology and midpoint positions.
-    crackField: lo === 0 ? automaticCrackField(localField, hi) : null,
+    crackField: lo === 0 ? automaticCrackField(localField, hi, solidIso, width, height) : null,
   };
+}
+
+/** Brightness band ∪ local contrast, with the luma plane it was read from. */
+function classifyDetail(
+  localField: CrackSubPixelField,
+  width: number,
+  height: number,
+  lo: number,
+  hi: number,
+): { width: number; height: number; luma: Float32Array; ink: Uint8Array } {
+  const luma = new Float32Array(width * height);
+  const ink = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = y * width + x;
+      const l = localField.lumaAt(x, y);
+      luma[i] = l;
+      const solid = l >= lo && l <= hi;
+      const detail = l < localField.thresholdAt(x, y);
+      ink[i] = solid || detail ? 1 : 0;
+    }
+  }
+  return { width, height, luma, ink };
 }
 
 function automaticCrackField(
   localField: CrackSubPixelField,
   solidThreshold: number,
+  solidIso: Float32Array | null,
+  width: number,
+  height: number,
 ): CrackSubPixelField {
   return {
     lumaAt: localField.lumaAt,
@@ -48,7 +77,13 @@ function automaticCrackField(
       const strictLocalThreshold = Number.isInteger(localThreshold)
         ? localThreshold - Number.EPSILON * Math.max(1, Math.abs(localThreshold))
         : localThreshold;
-      return Math.max(solidThreshold, strictLocalThreshold);
+      const base = Math.max(solidThreshold, strictLocalThreshold);
+      if (solidIso === null) return base;
+      // Filled light solids carry their own tone/paper midpoint iso; the
+      // walker clamps its queries to the grid the same way the local field does.
+      const cx = Math.min(width - 1, Math.max(0, x));
+      const cy = Math.min(height - 1, Math.max(0, y));
+      return Math.max(base, solidIso[cy * width + cx] as number);
     },
   };
 }
