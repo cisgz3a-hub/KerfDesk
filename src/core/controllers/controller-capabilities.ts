@@ -99,4 +99,13 @@ export type ControllerCapabilities = {
   // (laser-parser-rearm.ts; controller audit 2026-09-25 HF-7). Absent means
   // false.
   readonly stickyLineError?: boolean;
+  // Where the work offset comes from. 'reported' (GRBL-family, Smoothieware):
+  // the status report carries it (WCO:, or MPos and WPos). 'host-recorded'
+  // (Marlin): M114 reports only the work position, with the G92 shift applied
+  // (motion.cpp:192-212), so KerfDesk keeps the shift it writes itself: a G92
+  // sets it, homing and a restart clear it (motion.cpp:2346-2349), and Reset
+  // origin restores machine coordinates with a computed G92, because a stock
+  // build compiles no G92.1 (G92.cpp:62-70; controller audit 2026-09-25 MA-2,
+  // CG-1, CG-11). Absent means 'reported'.
+  readonly workOffsetSource?: 'reported' | 'host-recorded';
 };

@@ -12,7 +12,9 @@ const BUSY_RE = /^echo:\s*busy/i;
 const ERROR_RE = /^Error:/i;
 const RESEND_RE = /^Resend:\s*(\d+)/i;
 const FIRMWARE_RE = /FIRMWARE_NAME:/i;
-const POSITION_RE = /^X:(-?\d+(?:\.\d+)?)\s+Y:(-?\d+(?:\.\d+)?)\s+Z:(-?\d+(?:\.\d+)?)/;
+// M114 prints one label per configured axis (motion.cpp report_logical_position),
+// so a build without Z prints X and Y only (controller audit 2026-09-25 MA-6).
+const POSITION_RE = /^X:(-?\d+(?:\.\d+)?)\s+Y:(-?\d+(?:\.\d+)?)(?:\s+Z:(-?\d+(?:\.\d+)?))?/;
 const ECHO_RE = /^echo:\s*(.*)$/i;
 // parser.cpp unknown_command_warning: SERIAL_ECHO_MSG("Unknown command: \"",
 // command_ptr, "\""), then gcode.cpp L1122 answers the line with `ok`.
@@ -89,19 +91,22 @@ export function marlinBuildRequirement(command: string): string | null {
  * default M114 reports the projected destination rather than proving physical
  * motion has drained. The Idle-shaped report is status evidence only; motion
  * authorization first crosses an owned M400 marker. Feed/spindle/WCO remain
- * unknown on this firmware. */
+ * unknown on this firmware. The position is the logical one, with the G92
+ * shift applied (motion.cpp:192-212 `rpos.asLogical()`), so it is the work
+ * position; KerfDesk keeps the shift it wrote (controller audit 2026-09-25
+ * MA-2). A build without a Z axis reports Z as 0. */
 export function parseMarlinPositionReport(line: string): StatusReport | null {
   const match = POSITION_RE.exec(line);
   if (match === null) return null;
   const x = Number.parseFloat(match[1] ?? '');
   const y = Number.parseFloat(match[2] ?? '');
-  const z = Number.parseFloat(match[3] ?? '');
+  const z = match[3] === undefined ? 0 : Number.parseFloat(match[3]);
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
   return {
     state: 'Idle',
     subState: null,
-    mPos: { x, y, z },
-    wPos: null,
+    mPos: null,
+    wPos: { x, y, z },
     feed: null,
     spindle: null,
     wco: null,

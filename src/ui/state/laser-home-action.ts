@@ -13,6 +13,7 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import { resetRequiredBlockMessage } from './controller-reset-required';
+import { NO_WORK_OFFSET } from './host-recorded-origin';
 import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
 import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
@@ -136,12 +137,7 @@ export async function runHomeAction(
     statusObservation: null,
     trustedPositionEpoch: (expectedPositionEpoch = (state.trustedPositionEpoch ?? 0) + 1),
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    wcoCache: null,
-    // Home establishes machine position, not the absence of G92/G54 offsets.
-    // Keep a prior origin unresolved until a fresh accepted WCO proves it.
-    workOriginActive: state.workOriginActive || state.workOriginSource !== 'none',
-    workOriginSource:
-      state.workOriginActive || state.workOriginSource !== 'none' ? 'unknown' : 'none',
+    ...homeOriginPatch(state),
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
@@ -210,6 +206,22 @@ async function executeHomeSequence(
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
   confirmHome(set, get, epochs);
+}
+
+// Home establishes machine position, not the absence of G92/G54 offsets: a
+// prior origin stays unresolved until a fresh accepted WCO proves it. Marlin is
+// the exception: homing clears its G92 shift (motion.cpp:2346-2349), which
+// KerfDesk records itself (host-recorded-origin.ts; audit MA-2).
+function homeOriginPatch(state: LaserState): Partial<LaserState> {
+  if (state.capabilities.workOffsetSource === 'host-recorded') {
+    return { wcoCache: NO_WORK_OFFSET, workOriginActive: false, workOriginSource: 'none' };
+  }
+  const keepsOrigin = state.workOriginActive || state.workOriginSource !== 'none';
+  return {
+    wcoCache: null,
+    workOriginActive: keepsOrigin,
+    workOriginSource: keepsOrigin ? 'unknown' : 'none',
+  };
 }
 
 function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {

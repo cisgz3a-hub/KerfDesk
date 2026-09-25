@@ -7,6 +7,13 @@
 // import — no runtime cycle.
 
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import {
+  HOST_RECORDED_RESET_UNKNOWN_MESSAGE,
+  hostRecordedClearedOriginPatch,
+  hostRecordedMachinePosition,
+  hostRecordedZeroZPatch,
+  machineFrameRestoreLine,
+} from './host-recorded-origin';
 import { useStore } from './store';
 import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
@@ -137,6 +144,9 @@ async function setOriginHere(
   let sawFreshWcoFrame = true;
   const sessionEpoch = get().controllerSessionEpoch;
   const writeEpoch = refs.writeEpoch;
+  // Marlin reports only the work position; the shift this G92 writes is the
+  // machine position it is written at (controller audit 2026-09-25 MA-2).
+  const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
     set,
     get,
@@ -160,7 +170,7 @@ async function setOriginHere(
       return transientXyOriginPatch(
         // wcoCache intentionally stores the controller's reported units; the
         // canonical millimetre selector is used at every consumer boundary.
-        inferCurrentMachinePosition(statusReport, wcoCache),
+        machineBeforeG92 ?? inferCurrentMachinePosition(statusReport, wcoCache),
         wcoCache,
       );
     },
@@ -187,6 +197,7 @@ async function zeroZHere(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   await assertOriginActionReady(set, get, refs, safeWrite);
+  const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
     set,
     get,
@@ -200,6 +211,7 @@ async function zeroZHere(
         get().workZReferenceEpoch,
         selectedCncToolId(useStore.getState().project),
       ),
+      ...hostRecordedZeroZPatch(machineBeforeG92, get().wcoCache),
     }),
   );
 }
@@ -211,6 +223,10 @@ async function resetOrigin(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   await assertOriginActionReady(set, get, refs, safeWrite);
+  if (get().capabilities.workOffsetSource === 'host-recorded') {
+    await restoreHostRecordedMachineFrame(set, get, refs, safeWrite);
+    return;
+  }
   await runOriginTransaction(
     set,
     get,
@@ -222,6 +238,30 @@ async function resetOrigin(
       get().workOriginSource === 'g54-persistent'
         ? persistentOriginAfterTransientClearPatch()
         : clearedOriginPatch(),
+    { changesXyOrigin: true },
+  );
+}
+
+// Marlin's G92.1 needs CNC_COORDINATE_SYSTEMS; a stock build acknowledges it and
+// keeps the shift. A G92 to the machine position restores machine coordinates
+// on every build (host-recorded-origin.ts; audit CG-11).
+async function restoreHostRecordedMachineFrame(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  const machine = hostRecordedMachinePosition(get());
+  if (machine === null) throw new Error(HOST_RECORDED_RESET_UNKNOWN_MESSAGE);
+  const line = machineFrameRestoreLine(machine, get().wcoCache);
+  await runOriginTransaction(
+    set,
+    get,
+    refs,
+    safeWrite,
+    'Reset transient origin',
+    (write) => write(`${line}\n`),
+    hostRecordedClearedOriginPatch,
     { changesXyOrigin: true },
   );
 }

@@ -1,6 +1,7 @@
 import type { StatusReport } from '../../core/controllers/grbl';
 import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { LaserState } from './laser-store';
+import { hostRecordedWorkOffset } from './host-recorded-origin';
 import { hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
 
 export function statusPositionPatch(
@@ -48,7 +49,7 @@ export function statusPositionPatch(
       wcoCache: null,
     };
   }
-  const frameWco = report.wco ?? sameFrameWorkOffset(report);
+  const frameWco = reportedWorkOffset(state, report);
   if (frameWco === null) {
     return { statusReport: report, ...ovPatch, ...accessoryPatch, ...airPatch };
   }
@@ -61,13 +62,41 @@ export function statusPositionPatch(
   // forever. Classify in mm while retaining the original report-unit cache.
   const active = hasActiveXyOrigin(state, frameWco);
   return {
-    statusReport: report,
+    statusReport: withHostRecordedMachinePosition(state, report, frameWco),
     ...ovPatch,
     ...accessoryPatch,
     ...airPatch,
     wcoCache: unchangedOr(state.wcoCache, frameWco),
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
+  };
+}
+
+// The work offset this report proves: its own WCO: field, the difference of
+// its MPos and WPos, or the shift KerfDesk recorded for a controller that
+// reports only the work position.
+function reportedWorkOffset(state: LaserState, report: StatusReport): WorkCoordinateOffset | null {
+  return report.wco ?? sameFrameWorkOffset(report) ?? hostRecordedWorkOffset(state, report);
+}
+
+// A controller that reports only its work position (Marlin) gets its machine
+// position from the recorded shift, so consumers that read MPos (the DRO, Print
+// and Cut, Job Review) see the machine frame (host-recorded-origin.ts).
+function withHostRecordedMachinePosition(
+  state: LaserState,
+  report: StatusReport,
+  offset: WorkCoordinateOffset,
+): StatusReport {
+  if (state.capabilities.workOffsetSource !== 'host-recorded') return report;
+  if (report.mPos !== null || report.wPos === null) return report;
+  const sum = (a: number, b: number): number => Math.round((a + b) * 10_000) / 10_000;
+  return {
+    ...report,
+    mPos: {
+      x: sum(report.wPos.x, offset.x),
+      y: sum(report.wPos.y, offset.y),
+      z: sum(report.wPos.z, offset.z),
+    },
   };
 }
 

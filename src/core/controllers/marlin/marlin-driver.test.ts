@@ -64,7 +64,13 @@ describe('classifyMarlinResponse', () => {
 
   it('parses M114 position lines into Idle status reports', () => {
     const report = parseMarlinPositionReport('X:10.50 Y:5.00 Z:0.00 E:0.00 Count X:840 Y:400 Z:0');
-    expect(report).toMatchObject({ state: 'Idle', mPos: { x: 10.5, y: 5, z: 0 }, wco: null });
+    // M114 is the logical (work) position (audit MA-2).
+    expect(report).toMatchObject({
+      state: 'Idle',
+      mPos: null,
+      wPos: { x: 10.5, y: 5, z: 0 },
+      wco: null,
+    });
     expect(classifyMarlinResponse('X:1.00 Y:2.00 Z:3.00 E:0.00 Count X:0 Y:0 Z:0')).toMatchObject({
       kind: 'status',
     });

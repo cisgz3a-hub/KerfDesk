@@ -1,28 +1,19 @@
-// Audit CG-1 / CG-2 repro: origin workflows on the g92-only drivers (Marlin,
-// Smoothieware) and the Frame's G54 "normalization".
+// Origin workflows on the g92-only drivers (Marlin, Smoothieware) and the
+// Frame's G54 normalization (controller audit 2026-09-25 CG-1, CG-2).
 //
-// Correct behaviour:
-// CG-1  After "Set origin here" succeeds on Smoothieware, a User Origin Frame must be
-//       able to resolve its placement. Smoothieware prints BOTH MPos and WPos in every
-//       `?` report, idle or running (Kernel::get_query_string, Smoothieware edge
-//       38e2cc08 src/libs/Kernel.cpp L206-L234 and L261-L285), so the work offset is
-//       MPos - WPos of the same report. It never prints a `WCO:` field.
-//       KerfDesk's resolveUserOrigin requires wcoCache/report.wco, which a g92-only
-//       controller never supplies, so User Origin is refused forever with
-//       "The work origin is set, but the controller has not reported where it is yet".
-// CG-2  The Frame must not send `G54` to Marlin, and must not forget an origin that is
-//       still set on the controller. KerfDesk never reads the active WCS on drivers
-//       without a settings query (activeWcs stays null), so every first Frame of a
-//       session runs selectPrimaryWcsForFrame(): it writes `G54` and applies the Console
-//       'coordinates-all' effect (workOriginActive=false, workOriginSource='none').
-//       On Marlin 2.1.2.8 with CNC_COORDINATE_SYSTEMS (the driver's documented origin
-//       contract) the boot state is active_coordinate_system = -1
-//       (Marlin/src/gcode/gcode.cpp L111), a G92 made there only changes position_shift
-//       (gcode/geometry/G92.cpp L98-L128), and G54 -> select_coordinate_system(0)
-//       replaces position_shift with coordinate_system[0]
-//       (gcode/geometry/G53-G59.cpp L33-L46), i.e. it erases the operator's origin.
-//       KerfDesk's own Marlin emitter strips G54 for exactly this reason
-//       (src/core/output/marlin-inline-transform.ts withoutGrblWorkspacePreamble).
+// CG-1  Smoothieware prints both MPos and WPos in every `?` report and never a
+//       `WCO:` field (Kernel::get_query_string, Smoothieware edge 38e2cc08
+//       src/libs/Kernel.cpp L206-L234 and L261-L285), so the work offset is
+//       MPos - WPos of the same report (laser-status-position.ts). Marlin's M114
+//       is the work position, and KerfDesk records the shift it writes
+//       (host-recorded-origin.ts). Before, User Origin was refused forever on
+//       both after Set origin.
+// CG-2  The Frame sends no G54 to Marlin and keeps an origin that is still set
+//       on the controller. On Marlin 2.1.2.8 with CNC_COORDINATE_SYSTEMS, G54 ->
+//       select_coordinate_system(0) replaces position_shift with
+//       coordinate_system[0] (gcode/geometry/G53-G59.cpp L33-L46), which erases
+//       the operator's origin; stock builds answer "Unknown command". KerfDesk's
+//       Marlin emitter strips G54 for this reason (marlin-inline-transform.ts).
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/libs/Kernel.cpp#L177-L300
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/geometry/G53-G59.cpp#L33-L46
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/gcode.cpp#L111
@@ -35,12 +26,12 @@ import {
   type SmoothieSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
-import { resolveLiveFramePlacement } from '../../ui/laser/camera-frame-placement';
-import { normalizeFrameWorkCoordinateSystem } from '../../ui/laser/frame-controller-readiness';
-import { currentWorkXy } from '../../ui/laser/frame-dispatch-support';
+import { useLaserStore } from '../state/laser-store';
+import { useStore } from '../state/store';
+import { resetStore } from '../state/test-helpers';
+import { resolveLiveFramePlacement } from './camera-frame-placement';
+import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
+import { currentWorkXy } from './frame-dispatch-support';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -111,8 +102,6 @@ describe('CG-1: User Origin on a g92-only controller', () => {
     useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'front-left' } });
 
     const placement = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
-
-    // Fails today: { ok: false, messages: ['The work origin is set, but the
     // controller has not reported where it is yet. ...'] }
     expect(placement.ok, JSON.stringify(placement)).toBe(true);
   });
@@ -130,8 +119,8 @@ describe('CG-1: Smoothieware offset left on the board', () => {
     await pump(1);
     useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
     const placement = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
-    // GRBL's WCO gets exactly this compensation (resolveAbsolute). Fails today:
-    // { ok: true } with no offset, so the Absolute job runs 110/60 mm off.
+    // GRBL's WCO gets exactly this compensation (resolveAbsolute). Before the
+    // fix: { ok: true } with no offset, so the Absolute job ran 110/60 mm off.
     expect(placement, JSON.stringify(placement)).toMatchObject({
       ok: true,
       preflightMotionOffset: { x: 110, y: 60 },
@@ -158,9 +147,6 @@ describe('CG-1: Marlin after Set origin', () => {
       const framePosition = currentWorkXy(laser);
       return { startFrom, placement, framePosition };
     });
-    // Fails today: absolute and current-position need a WCO, user-origin needs a
-    // WCO, and verified-origin resolves but has no work position (M114 carries
-    // no WCO and workOriginActive makes reportedWorkPositionMm return null).
     expect(
       outcomes.some((o) => o.placement.ok && o.framePosition !== undefined),
       JSON.stringify(outcomes),
@@ -176,8 +162,6 @@ describe('CG-2: the Frame G54 normalization on g92-only controllers', () => {
     expect(useLaserStore.getState().activeWcs).toBeNull(); // never read on Marlin
 
     await settle(normalizeFrameWorkCoordinateSystem());
-
-    // Fails today: `G54\n` is written (erasing a CNC_COORDINATE_SYSTEMS build's
     // G92 origin from its boot-time machine space) ...
     expect(sim.outbound()).not.toContain('G54\n');
     // ... and the store forgets the origin it just set.
@@ -196,8 +180,8 @@ describe('CG-2: the Frame G54 normalization on g92-only controllers', () => {
     await settle(normalizeFrameWorkCoordinateSystem());
 
     // Smoothieware keeps G92 separate from the G54-G59 selection, so the origin is
-    // still set on the controller. Fails today: workOriginActive=false and the
-    // Verified Origin Frame is refused with "Click 'Set origin here' first".
+    // still set on the controller. Before the fix: workOriginActive=false and
+    // the Verified Origin Frame was refused with "Click 'Set origin here' first".
     const after = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
     expect(after.ok, JSON.stringify(after)).toBe(true);
     expect(useLaserStore.getState().workOriginActive).toBe(true);

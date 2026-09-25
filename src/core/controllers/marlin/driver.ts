@@ -41,11 +41,11 @@ export const marlinDriver: ControllerDriver = {
     settings: 'none',
     unlock: false,
     sleep: false,
-    // Qualified origin contract: CNC_COORDINATE_SYSTEMS on a non-SCARA build.
-    // G92 itself is more widely available, but Marlin 2.1.2.6 compiles G92.1
-    // only with that prerequisite; NO_WORKSPACE_OFFSETS alone is insufficient.
-    // This is a documented build requirement, not detected firmware evidence.
+    // G92 only. Marlin 2.1.2.8 compiles G92.1 only with CNC_COORDINATE_SYSTEMS
+    // (off in stock builds), so Reset origin writes a G92 that restores machine
+    // coordinates instead (workOffsetSource below).
     wcs: 'g92-only',
+    workOffsetSource: 'host-recorded',
     homing: true,
     console: true,
     firmwareSetupPanel: 'none',
