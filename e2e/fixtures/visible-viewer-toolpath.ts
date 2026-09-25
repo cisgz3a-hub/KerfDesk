@@ -23,7 +23,7 @@ export async function expectVisibleViewerToolpath(page: Page, testInfo: TestInfo
         const red = data[offset] ?? 0;
         const green = data[offset + 1] ?? 0;
         const blue = data[offset + 2] ?? 0;
-        // This flat laser fixture is blue in the initial depth/pass lens;
+        // This fixture's shallow cutting moves are blue in the depth/pass lens;
         // exclude neutral furniture, text, background and copper controls.
         if (blue > red + 20 && blue > green + 8) count += 1;
       }
