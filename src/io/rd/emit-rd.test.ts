@@ -6,8 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { profileCatalogEntryById } from '../../core/devices/profile-catalog';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
-import { emitRdFile } from './emit-rd';
+import { splitRdCommands } from '../../__fixtures__/controllers/ruida-decoder';
+import { emitRdFile, type EmitRdOptions } from './emit-rd';
 
 function ruidaLineProject(offsetX = 0): Project {
   return {
@@ -83,8 +85,9 @@ describe('emitRdFile', () => {
     if (result.ok) expect(result.bytes.length).toBeGreaterThan(0);
   });
 
-  // The .rd path runs no post-compile preflight, so this field is the only way
-  // a pre-emit finding can reach the operator (handleSaveRd toasts it).
+  // advisories is how an export finding reaches the operator (handleSaveRd
+  // toasts it). The post-compile checks repeat this pre-emit finding, and it
+  // is reported once.
   it('carries the policy finding out as an advisory', () => {
     const base = ruidaLineProject();
     const result = emitRdFile({
@@ -103,5 +106,52 @@ describe('emitRdFile', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.advisories).toEqual([]);
+  });
+});
+
+// Controller audit 2026-09-25 RU-2: every file used to declare D8 12 "Ref Point
+// Mode 0 — Current Position". The reference point now follows the placement
+// (meerk40t rdjob.py L135-137: D8 10 machine zero, D8 11 anchor point, D8 12
+// current position), in meerk40t's write_header preamble (L1409-1414).
+describe('emitRdFile reference point', () => {
+  function genericRuidaSquare(): Project {
+    const entry = profileCatalogEntryById('generic-ruida-rd-export');
+    if (entry === undefined) throw new Error('missing generic Ruida profile');
+    return { ...ruidaLineProject(100), device: entry.profile };
+  }
+
+  function commands(bytes: Uint8Array): ReadonlyArray<string> {
+    return splitRdCommands(bytes).map((command) =>
+      command
+        .slice(0, 2)
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join(''),
+    );
+  }
+
+  const cases: ReadonlyArray<readonly [string, EmitRdOptions, string]> = [
+    ['no placement', {}, 'd810'],
+    ['Absolute', { jobOrigin: { startFrom: 'absolute', anchor: 'front-left' } }, 'd810'],
+    ['User Origin', { jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' } }, 'd811'],
+    ['Verified Origin', { jobOrigin: { startFrom: 'verified-origin', anchor: 'center' } }, 'd811'],
+    [
+      'Current Position',
+      {
+        jobOrigin: {
+          startFrom: 'current-position',
+          anchor: 'front-left',
+          currentPosition: { x: 0, y: 0 },
+        },
+      },
+      'd812',
+    ],
+  ];
+
+  it.each(cases)('%s writes %s, then Set Absolute ... Start Process', (_label, options, mode) => {
+    const result = emitRdFile(genericRuidaSquare(), options);
+    if (!result.ok) throw new Error(result.messages.join('\n'));
+    const codes = commands(result.bytes);
+    expect(codes.slice(0, 5)).toEqual([mode, 'e601', 'f0', 'f102', 'd800']);
+    expect(codes.filter((code) => code.startsWith('d81'))).toEqual([mode]);
   });
 });

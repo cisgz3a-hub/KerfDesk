@@ -1,34 +1,24 @@
-// .rd job encoder (ADR-097). Assembles the minimal Ruida command stream for a
-// vector cut job — bounds metadata, per-layer speed/power/color, travel + cut
-// moves per segment and pass, EOF — then swizzles every byte. Deterministic:
-// same Job + DeviceProfile → byte-identical output (non-negotiable #5, pinned
-// by the same-process double-encode test in ruida.test.ts). NO reference .rd
+// .rd job encoder (ADR-097). Assembles the Ruida command stream for a vector
+// cut job in meerk40t's writer order — file header with the part table and
+// array records, then per layer its own speed/power/air settings, travel + cut
+// moves per segment and pass and the layer end, then the file sum and EOF —
+// and swizzles every byte. Deterministic: same Job + DeviceProfile + options →
+// byte-identical output (non-negotiable #5, pinned by the same-process
+// double-encode test in ruida.test.ts and the golden bytes). NO reference .rd
 // from real hardware or LightBurn exists to diff against yet — see the STATUS
 // HONESTY note below and ADR-097.
 //
 // STATUS HONESTY: byte meanings follow public reverse-engineering; the
-// encoder round-trips through this repo's own decoder (geometry/power/speed
-// proven internally consistent) but NO output has been accepted by a real
-// Ruida controller yet. Raster/image groups are refused rather than guessed.
+// encoder round-trips through this repo's own decoder and its output is read
+// by meerk40t's RDJob parser with the layer speeds and powers intact, but NO
+// output has been accepted by a real Ruida controller yet. Raster/image
+// groups are refused rather than guessed.
 
 import type { DeviceProfile } from '../../devices';
-import type { Job } from '../../job';
-import {
-  blockEnd,
-  cutAbsolute,
-  fileEnd,
-  jobMaxCorner,
-  jobMaxCornerEx,
-  jobMinCorner,
-  jobMinCornerEx,
-  layerColor,
-  layerMaxPower,
-  layerMinPower,
-  layerSpeed,
-  moveAbsolute,
-  selectLayer,
-  streamStart,
-} from './rd-commands';
+import type { CutGroup, Job, JobOriginPlacement } from '../../job';
+import type { RdReferencePoint } from './rd-file-commands';
+import { writeRdJob } from './rd-job-writer';
+import { planRdMotion, type RdMotionPart } from './rd-motion-plan';
 import {
   isCoord35Encodable,
   mmPerMinToUmPerSec,
@@ -58,13 +48,27 @@ export type RdEncodeError =
     };
 
 export type RdEncodeResult =
-  | { readonly ok: true; readonly bytes: Uint8Array }
+  | {
+      readonly ok: true;
+      readonly bytes: Uint8Array;
+      /** The moves the bytes command, per part, for the export's checks. */
+      readonly motion: ReadonlyArray<RdMotionPart>;
+    }
   | { readonly ok: false; readonly error: RdEncodeError };
+
+export type RdEncodeOptions = {
+  /** The export placement; it decides the file's reference-point mode. */
+  readonly jobOrigin?: JobOriginPlacement;
+};
 
 const MAX_RD_LAYERS = 100;
 
-export function encodeRdJob(job: Job, device: DeviceProfile): RdEncodeResult {
-  const cutGroups = [];
+export function encodeRdJob(
+  job: Job,
+  _device: DeviceProfile,
+  options: RdEncodeOptions = {},
+): RdEncodeResult {
+  const cutGroups: CutGroup[] = [];
   for (const group of job.groups) {
     if (group.kind !== 'cut') {
       return { ok: false, error: { kind: 'raster-unsupported', layerId: group.layerId } };
@@ -79,36 +83,31 @@ export function encodeRdJob(job: Job, device: DeviceProfile): RdEncodeResult {
   }
   const representationError = validateRepresentation(cutGroups);
   if (representationError !== null) return { ok: false, error: representationError };
-
-  const payload: number[] = [];
-  const push = (bytes: ReadonlyArray<number>): void => {
-    payload.push(...bytes);
-  };
-
-  push(streamStart());
-  pushJobBounds(push, cutGroups, device);
-  cutGroups.forEach((group, layerIndex) => {
-    push(layerSpeed(layerIndex, mmPerMinToUmPerSec(group.speed)));
-    push(layerMinPower(layerIndex, group.power));
-    push(layerMaxPower(layerIndex, group.power));
-    push(layerColor(layerIndex, parseColor(group.color)));
-  });
-  cutGroups.forEach((group, layerIndex) => {
-    push(selectLayer(layerIndex));
-    for (let pass = 0; pass < Math.max(1, group.passes); pass += 1) {
-      for (const segment of group.segments) {
-        pushSegment(push, segment.polyline, segment.closed);
-      }
-    }
-  });
-  push(blockEnd());
-  push(fileEnd());
-  return { ok: true, bytes: swizzleBytes(payload) };
+  const motion = planRdMotion(cutGroups);
+  // Every segment collapsed to a single µm point: there is nothing to burn.
+  if (motion.length === 0) return { ok: false, error: { kind: 'empty-job' } };
+  const payload = writeRdJob(motion, rdReferencePointFor(options.jobOrigin));
+  return { ok: true, bytes: swizzleBytes(payload), motion };
 }
 
-function validateRepresentation(
-  groups: ReadonlyArray<Extract<Job['groups'][number], { readonly kind: 'cut' }>>,
-): RdEncodeError | null {
+/** Audit RU-2 (lead's product decision): the reference-point mode follows the
+ *  export placement. Absolute (or no placement) is machine coordinates from
+ *  machine zero; User Origin and Verified Origin are relative to the anchor
+ *  point set on the controller; Current Position is relative to the head. */
+export function rdReferencePointFor(jobOrigin: JobOriginPlacement | undefined): RdReferencePoint {
+  switch (jobOrigin?.startFrom) {
+    case undefined:
+    case 'absolute':
+      return 'machine-zero';
+    case 'user-origin':
+    case 'verified-origin':
+      return 'anchor-point';
+    case 'current-position':
+      return 'current-position';
+  }
+}
+
+function validateRepresentation(groups: ReadonlyArray<CutGroup>): RdEncodeError | null {
   for (const group of groups) {
     const speed = mmPerMinToUmPerSec(group.speed);
     if (!isCoord35Encodable(speed) || speed < 0) {
@@ -142,53 +141,4 @@ function validateRepresentation(
     }
   }
   return null;
-}
-
-type PushFn = (bytes: ReadonlyArray<number>) => void;
-type Point = { readonly x: number; readonly y: number };
-
-function pushSegment(push: PushFn, polyline: ReadonlyArray<Point>, closed: boolean): void {
-  const first = polyline[0];
-  if (first === undefined || polyline.length < 2) return;
-  push(moveAbsolute(mmToUm(first.x), mmToUm(first.y)));
-  for (let i = 1; i < polyline.length; i += 1) {
-    const point = polyline[i];
-    if (point === undefined) continue;
-    push(cutAbsolute(mmToUm(point.x), mmToUm(point.y)));
-  }
-  if (closed) push(cutAbsolute(mmToUm(first.x), mmToUm(first.y)));
-}
-
-function pushJobBounds(
-  push: PushFn,
-  groups: ReadonlyArray<{
-    readonly segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Point> }>;
-  }>,
-  _device: DeviceProfile,
-): void {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const group of groups) {
-    for (const segment of group.segments) {
-      for (const point of segment.polyline) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-      }
-    }
-  }
-  if (!Number.isFinite(minX)) return;
-  push(jobMinCorner(mmToUm(minX), mmToUm(minY)));
-  push(jobMaxCorner(mmToUm(maxX), mmToUm(maxY)));
-  push(jobMinCornerEx(mmToUm(minX), mmToUm(minY)));
-  push(jobMaxCornerEx(mmToUm(maxX), mmToUm(maxY)));
-}
-
-function parseColor(color: string): number {
-  const hex = /^#?([0-9a-f]{6})$/i.exec(color.trim());
-  if (hex === null) return 0;
-  return Number.parseInt(hex[1] ?? '0', 16);
 }
