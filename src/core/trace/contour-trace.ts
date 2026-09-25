@@ -5,10 +5,10 @@
 // MIT-release blocker): binarize via the shared preprocessing, walk the ink
 // boundary on the corner lattice (contour-boundary.ts), then finish each
 // closed loop with the SAME proven stage sequence the centerline tracer uses
-// (corner rebuild → curvature evening → arc/line evening → simplify →
+// (corner dial → curvature evening → arc/line evening → simplify →
 // bounded spline resample).
 
-import type { ColoredPath, Polyline } from '../scene';
+import type { ColoredPath, Polyline, Vec2 } from '../scene';
 import {
   inkMaskFromPrepared,
   refineChainForOutput,
@@ -17,8 +17,6 @@ import {
   smoothRawChain,
   type InkMask,
 } from './centerline';
-import { sharpenChainBendsSteps } from './centerline/sharpen-bends';
-import { squaredDistanceFieldSteps } from './centerline/distance-field';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 import {
   midCrackChainWithStats,
@@ -38,6 +36,13 @@ import { smoothArcNoise } from './smooth-arc-noise';
 import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
 import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
+import {
+  chainWithCorners,
+  cornerThresholdFromSmoothness,
+  decideContourCorners,
+  separateSaddleApexes,
+  type CornerChain,
+} from './contour-corners';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
   closeContour,
@@ -71,21 +76,16 @@ export function isBinaryContourPreset(options: TraceOptions): boolean {
 // TraceOptions lineTolerance contract scales it (higher = fewer vertices).
 const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_LOOP_POINTS = 3;
-// Corner rebuild is worth its cost only on SMALL loops (glyphs, counters),
-// where it restores drawn corners to ~0.01px. On big hand-drawn art
-// boundaries it changes nothing measurable (arch-house IoU 0.9648 vs 0.9644)
-// but its closed-ring rescans are quadratic-ish and cost seconds — above
-// this dense-point count the hard-turn pinning in the evening/refine stages
-// handles corners instead (~0.55px rounding, sub-pixel at engrave scale).
-const SHARPEN_MAX_CHAIN_POINTS = 4096;
-// ...and NOT worth its risk on TINY loops (glyph-scale letters): the bend
-// window's arm is comparable to the whole feature there, so the rebuild
-// pins false corners on round bowls and the spline renders them as
-// polygons (the melted LANGEBAAN "B", 12-15 pinned corners on one ~30px
-// letter). Below this dense-point count the sparse-stage hard-turn
-// detection (≥60° in curve-refine/chain-smoothing) owns the corners:
-// genuine stem corners still break the spline, bowls stay round.
-const SHARPEN_MIN_CHAIN_POINTS = 260;
+// Loop size classes for the SMOOTHING tail (corners are decided for every
+// loop by the corner dial, contour-corners.ts). Loops from this many chain
+// points up are big enough for the dense arc-noise evening and, when
+// measured, the fairing-by-fitting tail; glyph-scale loops below it keep the
+// simplify + spline tail, whose ±7px evening window would be a large fraction
+// of the feature.
+const ARC_EVENING_MIN_CHAIN_POINTS = 260;
+// Measured loops above this size are organic art boundaries: Whittaker-faired
+// between their corners before the looser organic fit.
+const ORGANIC_MIN_CHAIN_POINTS = 4096;
 const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
@@ -105,8 +105,9 @@ const FIT_TOLERANCE_ORGANIC_PX = 0.55;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
-/** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
- *  evening strength. Default ON at the conservative 1px amplitude cap — the
+/** Smoothness drives two things: the corner dial (which turns are corners,
+ *  {@link cornerThresholdFromSmoothness}) and this edge-denoise strength for
+ *  the straight-run flattener and arc-noise evening. Default ON at the conservative 1px amplitude cap — the
  *  earlier default-off mapping left nominally straight stems visibly wobbly
  *  on thresholded real sources (maintainer verdict, 2026-07-07). The
  *  max(0, 6s − 5) ramp keeps Sharp's 0.55 (anything ≤ ~0.83) fully off for
@@ -160,6 +161,7 @@ export function* traceImageToContourColoredPathsSteps(
       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
     fitToleranceScale: toleranceScale,
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
+    cornerThresholdPx: cornerThresholdFromSmoothness(options.smoothness),
     pixelScale: scale,
     turnPolicy: normalizeTurnPolicy(options.turnPolicy),
     ...(crackField === null ? {} : { crackField }),
@@ -174,11 +176,14 @@ export type ContourFinishOptions = {
   readonly minAreaPx: number;
   /** Douglas-Peucker tolerance and spline deviation cap, px. */
   readonly epsilonPx: number;
-  /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
+  /** Edge-denoise strength (see flatten-straight-runs.ts); 0 = off. */
   readonly flattenStrength: number;
+  /** Corner-dial threshold in source px (contour-corners.ts); omitted = the
+   *  neutral Smoothness 1. */
+  readonly cornerThresholdPx?: number;
   readonly fitToleranceScale?: number;
-  /** Supersampling factor of the mask; scales the sharpener's chain-length
-   *  regime bounds so glyphs stay in the same regime they were tuned in. */
+  /** Supersampling factor of the mask; scales every px knob and the
+   *  chain-length size classes so glyphs stay in the class they were tuned in. */
   readonly pixelScale?: number;
   /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
    *  mid-crack vertices (binary-only callers like the edge lane). */
@@ -206,10 +211,9 @@ export function* contourPolylinesFromMaskSteps(
       : 1;
   const finish: LoopFinish = {
     mask,
-    distSq: yield* squaredDistanceFieldSteps(mask),
-    width: mask.width,
     epsilonPx: options.epsilonPx,
     flattenStrength: options.flattenStrength,
+    cornerThresholdPx: options.cornerThresholdPx ?? cornerThresholdFromSmoothness(undefined),
     fitToleranceScale: options.fitToleranceScale ?? 1,
     pixelScale,
     crackField: options.crackField,
@@ -224,7 +228,7 @@ export function* contourPolylinesFromMaskSteps(
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
     if (Math.abs(loop.area) < options.minAreaPx) continue;
-    const finished = yield* finishLoopSteps(loop.points, finish);
+    const finished = finishLoop(loop.points, finish);
     if (finished !== null) contours.push(finished);
   }
   return yield* preserveContourTopologySteps(contours);
@@ -232,10 +236,9 @@ export function* contourPolylinesFromMaskSteps(
 
 type LoopFinish = {
   readonly mask: InkMask;
-  readonly distSq: Float64Array;
-  readonly width: number;
   readonly epsilonPx: number;
   readonly flattenStrength: number;
+  readonly cornerThresholdPx: number;
   readonly fitToleranceScale: number;
   readonly pixelScale: number;
   readonly crackField: CrackSubPixelField | undefined;
@@ -252,19 +255,11 @@ function featureAnchorsForLoop(
     : NO_CORNERS;
 }
 
-function* finishLoopSteps(
-  staircase: ReadonlyArray<Polyline['points'][number]>,
-  finish: LoopFinish,
-): TraceSteps<FinishedContour | null> {
-  const { distSq, width } = finish;
+function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): FinishedContour | null {
   if (staircase.length < MIN_LOOP_POINTS) return null;
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
-  // when the pre-threshold field is available), then the SAME raw Taubin
-  // pre-smoothing the skeleton tracer applies — without it the residual
-  // staircase jogs read as corners downstream and long straight edges come
-  // out wobbly (maintainer-observed on the arch-house H stems).
+  // when the pre-threshold field is available).
   const crack = midCrackChainWithStats(staircase, finish.crackField);
-  const dense = smoothRawChain(crack.points, true);
   // The wobble stages (straight-run flattener, arc-noise evening) are
   // quantization-noise medicine. When most cracks carried real sub-pixel
   // information, the boundary is a MEASUREMENT — chord-replacing it
@@ -272,106 +267,172 @@ function* finishLoopSteps(
   // verdicts, 2026-07-11) and evening it fights drawn texture. Binary
   // sources (saturated steps, fraction ~0) keep the full 1x behaviour.
   const subPixelInformed = crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION;
-  // When quantization smoothing is off, a terminal pixel is deliberate
-  // detail. Keep its cap through the bend rebuild and simplification. The
-  // pins are existing pre-smoothed points, so the spline can still round
-  // them; they are not drawn corners. Measured AA loops keep their own tail.
-  const featureAnchors = featureAnchorsForLoop(staircase, dense, finish, subPixelInformed);
-  // The chain-length regime bounds were tuned at 1x; a supersampled chain is
-  // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
-  // must stay in the same (sparse-detection) regime it was tuned for.
-  const sharpenMin = SHARPEN_MIN_CHAIN_POINTS * finish.pixelScale;
-  const sharpenMax = SHARPEN_MAX_CHAIN_POINTS * finish.pixelScale;
-  const inSharpenRange = dense.length >= sharpenMin && dense.length <= sharpenMax;
-  // Measured loops skip the wobble stages entirely: the chord flattener
-  // fabricates joint steps on measured stems, and above-range loops now get
-  // the principled Whittaker fairing instead of the arc-noise evening.
-  const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
-  const arcStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
-  const sharpened = inSharpenRange
-    ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors)
-    : { points: dense, corners: NO_CORNERS };
-  const finishFrom = (bends: typeof sharpened): ContourRefinement => {
-    const fixedPoints =
-      featureAnchors.size === 0 ? bends.corners : new Set([...bends.corners, ...featureAnchors]);
-    const evened = smoothChainCurvature(bends.points, true, fixedPoints);
-    // Mid-wavelength curvature noise (the "small wobble in the O") is evened
-    // on the DENSE chain, where a local moving circle fit has rich statistics
-    // and cannot average away drawn structure the way long-span fits do
-    // (measured: run-level arc replacement cost 10 IoU points on real art).
-    // LARGE loops only — the same size class as the corner rebuild: glyph
-    // bowls at counter scale already render correctly and a ±7px window is a
-    // large fraction of such a feature.
-    const arcSmoothed =
-      dense.length >= sharpenMin
-        ? smoothArcNoise(evened, true, bends.corners, arcStrengthEff, finish.pixelScale)
-        : evened;
-    // Measured loops with an evidence-based corner set (sharpener range) take
-    // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
-    // points replace simplify+flatten+spline — the fit averages ~0.1px noise
-    // into fair curves with no chord joints and no per-vertex facets
-    // (research brief #2). Tiny glyphs and beyond-range art loops keep the
-    // approved legacy tail until the fit path earns them.
-    const refined =
-      subPixelInformed && dense.length >= sharpenMin
-        ? finishMeasuredLoop(arcSmoothed, bends, inSharpenRange, finish)
-        : finishLegacyLoop(arcSmoothed, bends.corners, flattenStrengthEff, finish, featureAnchors);
-    // The area policy has already admitted this boundary. A tolerance larger
-    // than the loop can collapse the finishing tail to two anchors; Optimize
-    // must not become another area-removal control. Retain the measured crack
-    // boundary in that case (one bounded fallback, no new fitting search), and
-    // include it in the same topology repair as every other admitted contour.
-    return refined ?? contourRefinement(crack.points, () => crack.points);
-  };
-  const retained = finishFrom(sharpened);
+  // The corner dial decides every corner of the loop on the RAW cracks,
+  // before any smoothing can round them, and splices each apex in exactly.
+  const decided = decideContourCorners({
+    staircase,
+    cracks: crack.points,
+    measured: subPixelInformed,
+    pixelScale: finish.pixelScale,
+    thresholdPx: finish.cornerThresholdPx,
+    // The straight-run flattener erases wobble up to 1px × strength; apexes
+    // sit on the lines it will draw (binary loops only — measured loops skip it).
+    edgeNoisePx: subPixelInformed ? 0 : finish.flattenStrength,
+  });
+  const corners = separateSaddleApexes(decided, crack.points, (vertex) =>
+    isSaddleVertex(finish.mask, vertex),
+  );
+  const spliced = chainWithCorners(crack.points, corners);
+  // The area policy has already admitted this boundary. A tolerance larger
+  // than the loop can collapse the finishing tail to two anchors; Optimize
+  // must not become another area-removal control. Retain the measured crack
+  // boundary in that case (one bounded fallback, no new fitting search), and
+  // include it in the same topology repair as every other admitted contour.
+  const retainCracks = (): ContourRefinement => contourRefinement(crack.points, () => crack.points);
+  const retained = finishDenseLoop(staircase, spliced, subPixelInformed, finish) ?? retainCracks();
   const source = closeContour(crack.points);
-  if (sharpened.corners.size === 0) return { ...retained, source };
-  // A rebuilt corner extends the bend's straight sides to where they meet,
-  // bounded by the bend's own size, not by neighbouring outlines, so on dense
-  // art it is the usual reason a finished loop crosses a neighbour. The
-  // topology repair tries this finish without rebuilt corners, with full
-  // smoothing, before it backs the smoothing off.
+  if (spliced.corners.size === 0) return { ...retained, source };
+  // A corner apex extends the legs to where they meet, bounded by the corner
+  // itself, not by neighbouring outlines, so on dense art it is the usual
+  // reason a finished loop crosses a neighbour. The topology repair tries
+  // this finish without corners, with full smoothing, before it backs the
+  // smoothing off.
   return {
     ...retained,
     source,
-    withoutRebuiltCorners: () => finishFrom({ points: dense, corners: NO_CORNERS }),
+    withoutRebuiltCorners: () =>
+      finishDenseLoop(staircase, chainWithCorners(crack.points, []), subPixelInformed, finish) ??
+      retainCracks(),
   };
 }
 
-// Measured loops end in the fairing-by-fitting tail: least-squares cubics
-// THROUGH the measured points, with no chord joints or per-vertex facets.
-// In-range loops carry the sharpener's evidence-backed corners; larger loops
-// (arch bands, waves, house outline) detect theirs from windowed dense turns
-// so needle tips and roof corners still pin exactly, then are Whittaker-
-// faired between those pins before the tighter fit.
-function finishMeasuredLoop(
-  arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
-  sharpened: { readonly corners: ReadonlySet<Polyline['points'][number]> },
-  inSharpenRange: boolean,
-  finish: LoopFinish,
-): ContourRefinement | null {
-  if (inSharpenRange) {
-    return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
-  }
-  const corners = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
-  const faired = fairChainSegments(arcSmoothed, true, corners, finish.pixelScale);
-  return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
+// A lattice vertex where ink touches ink only diagonally (a 2x2 checkerboard):
+// two boundary passages meet there, one per touching component or twice for
+// one pinched loop.
+function isSaddleVertex(mask: InkMask, vertex: Vec2): boolean {
+  const { x, y } = vertex;
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
+  const at = (px: number, py: number): number =>
+    px < 0 || py < 0 || px >= mask.width || py >= mask.height
+      ? 0
+      : (mask.ink[py * mask.width + px] ?? 0);
+  const a = at(x - 1, y - 1);
+  const b = at(x, y - 1);
+  const c = at(x - 1, y);
+  const d = at(x, y);
+  return a === d && b === c && a !== b;
 }
 
-// The legacy tail (binary / pixel-fidelity sources): simplify → straight-run
-// flatten → corner-aware spline resample → close the ring.
+// Smooth the spliced chain between its corners, then run the size-class tail.
+// Null when the tail collapses the loop (the caller retains the cracks).
+function finishDenseLoop(
+  staircase: ReadonlyArray<Vec2>,
+  spliced: CornerChain,
+  subPixelInformed: boolean,
+  finish: LoopFinish,
+): ContourRefinement | null {
+  const corners = spliced.corners;
+  // The same raw Taubin pre-smoothing the skeleton tracer applies — without it
+  // the residual staircase jogs read as corners downstream and long straight
+  // edges come out wobbly (maintainer-observed on the arch-house H stems) —
+  // run span by span so every corner apex stays exactly where it was decided.
+  const dense = smoothBetweenCorners(spliced.points, corners);
+  // When quantization smoothing is off, a terminal pixel is deliberate
+  // detail. Keep its cap through simplification. The pins are existing
+  // pre-smoothed points, so the spline can still round them; they are not
+  // drawn corners. Measured AA loops keep their own tail.
+  const aligned = Array.from(spliced.crackIndex, (index) => dense[index] as Vec2);
+  const featureAnchors = featureAnchorsForLoop(staircase, aligned, finish, subPixelInformed);
+  // The size classes were tuned at 1x; a supersampled chain is pixelScale×
+  // denser, so the bounds scale with it — a LANGEBAAN-size glyph must stay in
+  // the class it was tuned for.
+  const arcMin = ARC_EVENING_MIN_CHAIN_POINTS * finish.pixelScale;
+  const organicMin = ORGANIC_MIN_CHAIN_POINTS * finish.pixelScale;
+  // Measured loops skip the denoise stages entirely: the chord flattener
+  // fabricates joint steps on measured stems, and organic loops get the
+  // principled Whittaker fairing instead of the arc-noise evening.
+  const denoiseStrength = subPixelInformed ? 0 : finish.flattenStrength;
+  const pinned = featureAnchors.size === 0 ? corners : new Set([...corners, ...featureAnchors]);
+  const evened = smoothChainCurvature(dense, true, pinned);
+  // Mid-wavelength curvature noise (the "small wobble in the O") is evened on
+  // the DENSE chain, where a local moving circle fit has rich statistics and
+  // cannot average away drawn structure the way long-span fits do (measured:
+  // run-level arc replacement cost 10 IoU points on real art). LARGE loops
+  // only: glyph bowls at counter scale already render correctly and a ±7px
+  // window is a large fraction of such a feature.
+  const arcSmoothed =
+    dense.length >= arcMin
+      ? smoothArcNoise(evened, true, corners, denoiseStrength, finish.pixelScale)
+      : evened;
+  // Measured loops take the fairing-by-fitting tail: least-squares cubics
+  // THROUGH the measured points replace simplify+flatten+spline — the fit
+  // averages ~0.1px noise into fair curves with no chord joints and no
+  // per-vertex facets (research brief #2). Organic-size loops are
+  // Whittaker-faired between their corners first. Tiny glyphs keep the
+  // approved legacy tail until the fit path earns them.
+  if (subPixelInformed && dense.length >= arcMin) {
+    return dense.length > organicMin
+      ? fitLoopTail(
+          fairChainSegments(arcSmoothed, true, corners, finish.pixelScale),
+          corners,
+          finish,
+          FIT_TOLERANCE_ORGANIC_PX,
+        )
+      : fitLoopTail(arcSmoothed, corners, finish, FIT_TOLERANCE_PX);
+  }
+  return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, pinned);
+}
+
+// Taubin pre-smoothing between corner apexes: each span between two corners
+// is smoothed as an open chain, so its end apexes stay fixed as the same
+// objects. Without corners this is exactly the closed-ring pass. The output
+// is index-aligned with the input.
+function smoothBetweenCorners(points: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): Vec2[] {
+  if (corners.size === 0) return smoothRawChain(points, true);
+  const n = points.length;
+  const first = points.findIndex((point) => corners.has(point));
+  const out: Vec2[] = new Array<Vec2>(n);
+  let spanStart = 0;
+  for (let k = 1; k <= n; k += 1) {
+    if (k < n && !corners.has(points[(first + k) % n] as Vec2)) continue;
+    const span: Vec2[] = [];
+    for (let j = spanStart; j <= k; j += 1) span.push(points[(first + j) % n] as Vec2);
+    const smoothed = smoothRawChain(span, false);
+    for (let j = 0; j < smoothed.length - 1; j += 1) {
+      out[(first + spanStart + j) % n] = smoothed[j] as Vec2;
+    }
+    spanStart = k;
+  }
+  return out;
+}
+
+// The legacy tail (binary / pixel-fidelity sources): straight-run flatten →
+// simplify → flatten → corner-aware spline resample → close the ring.
 function finishLegacyLoop(
   arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
   corners: ReadonlySet<Polyline['points'][number]>,
   flattenStrength: number,
   finish: LoopFinish,
-  featureAnchors: ReadonlySet<Polyline['points'][number]>,
+  pinned: ReadonlySet<Polyline['points'][number]>,
 ): ContourRefinement | null {
-  const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx, featureAnchors);
+  // Rough source edges leave long-wavelength waviness that survives evening
+  // (nominally straight stems trace wobbly); collapse curvature-safe straight
+  // runs. On a loop with corners (a polygon or glyph outline, whose edges
+  // between corners are the straight-run hypothesis) first on the DENSE
+  // chain, where a run's fit sees every sample — Douglas-Peucker keeps
+  // exactly the wobble extremes, so a run fitted only through them is biased
+  // and breaks on its own outliers (measured on an 18-bar jittered sweep:
+  // mean edge RMS 0.33 → 0.15 px). A corner-free loop is a closed curve,
+  // where every dense secant risks faceting it; it skips that pass. Then once
+  // more on the simplified chain, whose longer vertex spacing lets runs
+  // bridge what the dense pass left.
+  const flattened =
+    corners.size === 0
+      ? arcSmoothed
+      : flattenStraightRuns(arcSmoothed, true, corners, flattenStrength, finish.pixelScale);
+  // Corners and feature anchors survive simplification by reference.
+  const simplified = simplifyChain(flattened, true, finish.epsilonPx, pinned);
   if (simplified.length < MIN_LOOP_POINTS) return null;
-  // Rough source edges leave long-wavelength waviness that survives both
-  // evening and simplification (nominally straight stems trace wobbly);
-  // collapse curvature-safe straight runs before the spline resample.
   const straightened = flattenStraightRuns(
     simplified,
     true,
@@ -388,8 +449,8 @@ function finishLegacyLoop(
   );
 }
 
-// The measured-loop output tail: G1 cubic fit segmented at the sharpener's
-// evidence-backed corners, resampled to the polyline contract. The cubics
+// The measured-loop output tail: G1 cubic fit segmented at the dial's
+// corners, resampled to the polyline contract. The cubics
 // stay the ring's canonical curve (trace-curves.ts, ADR-391).
 function fitLoopTail(
   chain: ReadonlyArray<Polyline['points'][number]>,
@@ -408,86 +469,4 @@ function fitLoopTail(
     );
   const candidate = contourRefinement(chain, refine);
   return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
-}
-
-// Windowed hard-turn corner detection for loops the sharpener never saw
-// (above its chain-length range): chord tangents ±span px around each
-// vertex, pin turns ≥ the shared 60° hard-turn convention, greedy non-max
-// suppression so one physical corner yields one pin.
-const DENSE_CORNER_SPAN_PX = 2;
-// A drawn corner's direction change PERSISTS when the window widens; a
-// brush-texture bump's net turn reverts toward zero (the edge continues the
-// same way). Requiring the turn at ±2px AND at ±6px separates structural
-// corners (eaves, wave tips — pinned) from ink texture (faired) — an angle
-// bar alone cannot, because both classes turn 60-80° up close.
-const DENSE_CORNER_TURN_RAD = (60 * Math.PI) / 180;
-const DENSE_CORNER_PERSIST_SPAN_PX = 6;
-const DENSE_CORNER_PERSIST_TURN_RAD = (50 * Math.PI) / 180;
-
-function denseHardTurnCorners(
-  points: ReadonlyArray<Polyline['points'][number]>,
-  pixelScale: number,
-): ReadonlySet<Polyline['points'][number]> {
-  const n = points.length;
-  const corners = new Set<Polyline['points'][number]>();
-  if (n < 8) return corners;
-  const perimeter = ringPerimeter(points);
-  const avgSpacing = Math.max(1e-6, perimeter / n);
-  const k = Math.max(2, Math.round((DENSE_CORNER_SPAN_PX * pixelScale) / avgSpacing));
-  const kPersist = Math.max(
-    k + 1,
-    Math.round((DENSE_CORNER_PERSIST_SPAN_PX * pixelScale) / avgSpacing),
-  );
-  const turns: number[] = new Array<number>(n);
-  for (let i = 0; i < n; i += 1) {
-    const near = windowedTurn(points, i, k);
-    // Zero out candidates whose turn does not persist at the wider span —
-    // they are texture, not structure.
-    turns[i] =
-      near >= DENSE_CORNER_TURN_RAD &&
-      windowedTurn(points, i, kPersist) >= DENSE_CORNER_PERSIST_TURN_RAD
-        ? near
-        : 0;
-  }
-  const order = Array.from({ length: n }, (_, i) => i).sort(
-    (a, b) => (turns[b] ?? 0) - (turns[a] ?? 0),
-  );
-  const taken = new Uint8Array(n);
-  for (const i of order) {
-    if ((turns[i] ?? 0) < DENSE_CORNER_TURN_RAD) break;
-    if (taken[i] === 1) continue;
-    corners.add(points[i] as Polyline['points'][number]);
-    for (let d = -2 * k; d <= 2 * k; d += 1) {
-      taken[(i + d + n) % n] = 1;
-    }
-  }
-  return corners;
-}
-
-function ringPerimeter(points: ReadonlyArray<Polyline['points'][number]>): number {
-  let length = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i] as Polyline['points'][number];
-    const b = points[(i + 1) % points.length] as Polyline['points'][number];
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
-}
-
-function windowedTurn(
-  points: ReadonlyArray<Polyline['points'][number]>,
-  i: number,
-  k: number,
-): number {
-  const n = points.length;
-  const prev = points[(i - k + n) % n] as Polyline['points'][number];
-  const at = points[i] as Polyline['points'][number];
-  const next = points[(i + k) % n] as Polyline['points'][number];
-  const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
-  const outLen = Math.hypot(next.x - at.x, next.y - at.y);
-  if (inLen < 1e-9 || outLen < 1e-9) return 0;
-  const dot =
-    ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +
-    ((at.y - prev.y) / inLen) * ((next.y - at.y) / outLen);
-  return Math.acos(Math.max(-1, Math.min(1, dot)));
 }

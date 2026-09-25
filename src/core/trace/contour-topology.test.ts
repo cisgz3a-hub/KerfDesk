@@ -48,6 +48,8 @@ describe('contour finishing topology', () => {
       ignoreLessThanPixels: 0,
     });
     const [a, b] = paths.flatMap((path) => path.polylines);
-    expect(contourGap(a!, b!)).toBe(0.11049530850844717);
+    // Two 40px squares one paper column apart: the corner dial keeps both
+    // squares pixel-exact, so the traced gap is the drawn one (ADR-404).
+    expect(contourGap(a!, b!)).toBe(1);
   });
 });
