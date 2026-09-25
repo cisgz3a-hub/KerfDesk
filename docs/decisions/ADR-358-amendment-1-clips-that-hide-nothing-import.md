@@ -22,11 +22,20 @@ is `userSpaceOnUse`. The 2026-09-25 audit of PRs #845-#904 found both (ART-2).
 1. A vector clip is accepted when KerfDesk can prove it hides none of the element it clips. All of
    the following must hold:
    - the clip is in user-space units;
-   - it holds exactly one shape, with no nested clip;
+   - it holds exactly one visible shape, with no nested clip; presentation attributes, inline
+     styles, stylesheet rules and inherited visibility are resolved on the clip definition;
    - the shape's outline, after the referencing element's transform and the clip's and shape's
      own transforms, is a single convex ring;
-   - every document-space point of the clipped element lies inside it, within 10⁻⁶.
+   - every document-space point of the clipped element lies inside it, within 10⁻⁶. Native
+     curves are tested by their retained cubic control hull, including converted arcs, rather
+     than only the flattened samples. A control hull outside the clip is not proven contained.
    Ignoring such a clip changes nothing that is cut.
+   The clip proof supports linear path/polygon outlines and the inscribed outlines of convex
+   primitives (rectangles including rounded corners, circles and ellipses). A nonlinear path
+   used as the clip needs an exact convexity proof and is still refused: flattening could hide
+   a concave section. CSS geometry and transform properties (including transform origin/box)
+   are also refused until their geometry is parsed. SVG transform attributes must contain
+   supported operations with finite arguments; malformed tokens cannot establish containment.
 2. Every other vector clip is still refused, including concave clips, several shapes,
    `objectBoundingBox` units, and a clip that cuts. Masks and filters are still refused.
 3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`. The rest of the image clip

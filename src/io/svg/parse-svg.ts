@@ -24,7 +24,7 @@ import { applySvgMatrix, transformSvgCurveSubpath } from './svg-curve-transform'
 import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
 import { createSvgIdResolver, type SvgIdResolver } from './svg-id-resolver';
-import { clipsKeepWholeGeometry } from './svg-vector-clip';
+import { clipsKeepWholeGeometry, vectorContainmentPoints } from './svg-vector-clip';
 import { linearScaleMagnitude } from './transform-scale';
 import {
   assertSvgImportPoints,
@@ -180,7 +180,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
   recordVectorPresentation(state, context, strokeColor, fillColor, () =>
-    subs.flatMap((sub) => sub.points.map((point) => applySvgMatrix(state.transform, point))),
+    vectorContainmentPoints(subs, state.transform),
   );
   // Explicit SVG rules apply to each element's compound path. Different
   // elements paint independently even when their colours/rules match.
@@ -234,7 +234,7 @@ function recordVectorPresentation(
   // A clip that provably hides none of this element changes nothing that is cut.
   if (
     state.clips.length > 0 &&
-    !clipsKeepWholeGeometry(state.clips, documentPoints(), context.resolveId)
+    !clipsKeepWholeGeometry(state.clips, documentPoints(), context.resolveId, context.cascadeStyles)
   ) {
     throw new Error(
       'SVG vector clipping is not supported. Apply the clip to the paths before importing.',

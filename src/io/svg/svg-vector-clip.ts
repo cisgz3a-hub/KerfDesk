@@ -7,11 +7,13 @@
 // Amendment 1; 2026-09-25 PR audit, ART-2). Anything else is still refused.
 
 import type { Vec2 } from '../../core/scene';
+import type { SubPath } from './parse-path-d';
 import { elementToSubPaths } from './shape-to-polylines';
-import { applySvgMatrix } from './svg-curve-transform';
+import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
+import { vectorClipTransform } from './svg-clip-presentation';
 import type { SvgIdResolver } from './svg-id-resolver';
 import type { SvgClipReference } from './svg-presentation';
-import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute';
+import type { SvgStyleCascade } from './svg-stylesheet';
 import { linearScaleMagnitude } from './transform-scale';
 
 // Points this close outside an outline count as on it: float noise, far below
@@ -24,9 +26,11 @@ export function clipsKeepWholeGeometry(
   clips: ReadonlyArray<SvgClipReference>,
   points: ReadonlyArray<Vec2>,
   resolveId: SvgIdResolver,
+  cascade: SvgStyleCascade,
 ): boolean {
+  if (points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return false;
   return clips.every((clip) => {
-    const outline = convexClipOutline(clip, resolveId);
+    const outline = convexClipOutline(clip, resolveId, cascade);
     return outline !== null && points.every((point) => insideConvexOutline(outline, point));
   });
 }
@@ -34,6 +38,7 @@ export function clipsKeepWholeGeometry(
 function convexClipOutline(
   reference: SvgClipReference,
   resolveId: SvgIdResolver,
+  cascade: SvgStyleCascade,
 ): ReadonlyArray<Vec2> | null {
   const clip = resolveId(reference.id);
   if (clip === null || clip.tagName.toLowerCase() !== 'clippath') return null;
@@ -43,20 +48,46 @@ function convexClipOutline(
     (child) => !['title', 'desc'].includes(child.tagName.toLowerCase()),
   );
   const shape = shapes.length === 1 ? shapes[0] : undefined;
-  if (shape === undefined || clip.hasAttribute('clip-path') || shape.hasAttribute('clip-path'))
-    return null;
-  const world = multiplySvgMatrix(
-    multiplySvgMatrix(reference.transform, parseSvgTransform(clip.getAttribute('transform'))),
-    parseSvgTransform(shape.getAttribute('transform')),
-  );
+  if (shape === undefined) return null;
+  const world = vectorClipTransform(reference, clip, shape, cascade);
+  if (world === null) return null;
   const subpaths = elementToSubPaths(
     shape,
     linearScaleMagnitude(world.a, world.b, world.c, world.d),
   );
-  const ring = subpaths.length === 1 ? subpaths[0] : undefined;
-  if (ring === undefined) return null;
+  const ring = supportedClipSubpath(subpaths);
+  if (ring === null) return null;
   const outline = withoutClosingPoint(ring.points.map((point) => applySvgMatrix(world, point)));
   return isConvexRing(outline) ? outline : null;
+}
+
+function supportedClipSubpath(subpaths: ReadonlyArray<SubPath>): SubPath | null {
+  const ring = subpaths.length === 1 ? subpaths[0] : undefined;
+  if (ring === undefined) return null;
+  // Flattening can hide a concave curve between its sampled vertices. Rounded
+  // rectangles, circles and ellipses yield inscribed convex polygons directly;
+  // a path with native nonlinear segments needs an exact convexity proof first.
+  if (ring.curve?.segments.some((segment) => segment.kind !== 'line')) return null;
+  return ring;
+}
+
+/** A cubic stays within its control hull, unlike a chord-tolerance sample. */
+export function vectorContainmentPoints(
+  subpaths: ReadonlyArray<SubPath>,
+  transform: SvgMatrix,
+): ReadonlyArray<Vec2> {
+  return subpaths.flatMap((subpath) => {
+    const points = subpath.points.map((point) => applySvgMatrix(transform, point));
+    if (subpath.curve === undefined) return points;
+    // This is the same arc-to-cubic transform used for retained native output.
+    const curve = transformSvgCurveSubpath(subpath.curve, transform);
+    points.push(curve.start);
+    for (const segment of curve.segments) {
+      points.push(segment.to);
+      if (segment.kind === 'cubic') points.push(segment.control1, segment.control2);
+    }
+    return points;
+  });
 }
 
 function withoutClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
@@ -95,6 +126,7 @@ function isConvexRing(outline: ReadonlyArray<Vec2>): boolean {
 
 function insideConvexOutline(outline: ReadonlyArray<Vec2>, point: Vec2): boolean {
   const sense = Math.sign(signedArea(outline));
+  if (!Number.isFinite(sense) || sense === 0) return false;
   for (let index = 0; index < outline.length; index += 1) {
     const a = at(outline, index);
     const b = at(outline, index + 1);
@@ -105,11 +137,14 @@ function insideConvexOutline(outline: ReadonlyArray<Vec2>, point: Vec2): boolean
 }
 
 function signedArea(outline: ReadonlyArray<Vec2>): number {
+  // Subtract one vertex first so a distant translated clip does not lose its
+  // small area to cancellation between huge world-coordinate products.
+  const origin = at(outline, 0);
   let twice = 0;
   for (let index = 0; index < outline.length; index += 1) {
     const a = at(outline, index);
     const b = at(outline, index + 1);
-    twice += a.x * b.y - b.x * a.y;
+    twice += (a.x - origin.x) * (b.y - origin.y) - (b.x - origin.x) * (a.y - origin.y);
   }
   return twice / 2;
 }
