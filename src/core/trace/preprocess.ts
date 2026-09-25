@@ -12,7 +12,9 @@
 //   2. otsuThreshold — picks the optimal binary cutoff from the
 //      image's luma histogram by maximising between-class variance
 //      (Otsu, 1979). Auto-adapts to bright/dark sources where the
-//      naive 128 cutoff under- or over-burns.
+//      naive 128 cutoff under- or over-burns. otsuSeparation also
+//      reports the paper's separability measure, which the uneven-
+//      lighting fallback in background-flatten.ts compares.
 //   3. despeckle — connected-component flood fills the binarised
 //      image and removes ink regions smaller than `minPixels`. Kills
 //      the tiny black dots imagetracerjs invents on JPEG artefacts.
@@ -203,13 +205,30 @@ function rawLumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
 // between-class variance of the source's histogram. For bimodal
 // inputs (a clear foreground + background) the result is the optimal
 // binary threshold; for unimodal inputs it picks a sensible boundary
-// that minimises misclassification. Far better than the fixed-128
-// default for images shot under uneven lighting or with a coloured
-// background.
+// that minimises misclassification. A single global cut cannot follow
+// uneven lighting; background-flatten.ts handles that case before this
+// runs (see otsuBinarization).
 //
 // Implementation follows the cumulative-sum form (linear in pixel
 // count + 256 histogram passes). Returns a value in [0, 255].
 export function otsuThreshold(image: RawImageData): number {
+  return otsuSeparation(image).threshold;
+}
+
+export type OtsuSeparation = {
+  /** Cutoff in thresholdToMonochrome's convention: luma < threshold is ink. */
+  readonly threshold: number;
+  /** Otsu's separability η = σ²_between / σ²_total at the chosen cut, in
+   *  [0, 1]; 0 for a single-valued image. Near 1 means two tight, well
+   *  separated populations; a smooth ramp split in two scores about 0.75. */
+  readonly separability: number;
+  /** Mean luma above the cut minus mean luma below it. */
+  readonly contrast: number;
+};
+
+/** Otsu's cut plus the goodness measures from the same paper, computed from
+ *  one histogram pass. The threshold is identical to otsuThreshold. */
+export function otsuSeparation(image: RawImageData): OtsuSeparation {
   const hist = new Uint32Array(256);
   let total = 0;
   for (let i = 0; i < image.data.length; i += 4) {
@@ -217,13 +236,18 @@ export function otsuThreshold(image: RawImageData): number {
     hist[luma] = (hist[luma] ?? 0) + 1;
     total += 1;
   }
-  if (total === 0) return 128;
+  if (total === 0) return { threshold: 128, separability: 0, contrast: 0 };
+  return otsuFromHistogram(hist, total);
+}
+
+function otsuFromHistogram(hist: Uint32Array, total: number): OtsuSeparation {
   let sumTotal = 0;
   for (let t = 0; t < 256; t += 1) sumTotal += t * (hist[t] ?? 0);
   let sumB = 0;
   let wB = 0;
   let maxVar = 0;
   let bestT = 0;
+  let contrast = 0;
   for (let t = 0; t < 256; t += 1) {
     wB += hist[t] ?? 0;
     if (wB === 0) continue;
@@ -236,6 +260,7 @@ export function otsuThreshold(image: RawImageData): number {
     if (varBetween > maxVar) {
       maxVar = varBetween;
       bestT = t;
+      contrast = mF - mB;
     }
   }
   // bestT is the largest luma still classified as ink. thresholdToMonochrome
@@ -243,7 +268,18 @@ export function otsuThreshold(image: RawImageData): number {
   // <= bestT to be ink and pixels with luma > bestT to be background. The
   // cutoff that satisfies that is bestT + 1. Clamp at 255 just in case
   // (degenerate inputs where everything is at 255 already).
-  return Math.min(255, bestT + 1);
+  const threshold = Math.min(255, bestT + 1);
+  const spread = totalScatter(hist, sumTotal / total);
+  // varBetween is wB·wF·Δ² in counts; σ²_between/σ²_total = it / (N · scatter).
+  const separability = spread === 0 ? 0 : Math.min(1, maxVar / (total * spread));
+  return { threshold, separability, contrast };
+}
+
+// Σ count·(luma − mean)², the histogram's total scatter.
+function totalScatter(hist: Uint32Array, mean: number): number {
+  let scatter = 0;
+  for (let t = 0; t < 256; t += 1) scatter += (hist[t] ?? 0) * (t - mean) * (t - mean);
+  return scatter;
 }
 
 // Connected-component despeckle on a binary (or near-binary) image.
