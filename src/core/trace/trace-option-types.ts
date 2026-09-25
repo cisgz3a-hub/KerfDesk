@@ -4,6 +4,8 @@
 // existing `import { ..., type TraceOptions } from './trace-image'` sites are
 // unchanged.
 
+import type { ColourLayerOptions } from './colour-layer-options';
+
 export type TraceOptions = {
   // Photo shading traces continuous tones as black filled ribbons. Presence
   // selects the photo backend; 0..100 controls the bounded detail grid. Shades
@@ -16,6 +18,10 @@ export type TraceOptions = {
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
+  // Colour layers (ADR-402): presence selects the colour-layer backend, which
+  // quantises the image to a few flat colours and traces one filled path per
+  // colour with shared boundaries (colour-layer-trace.ts).
+  readonly colourLayers?: ColourLayerOptions;
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more
   // layers and (usually) more visual fidelity. Range 2-16.

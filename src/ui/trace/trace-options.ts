@@ -8,8 +8,12 @@
 // Image-level tone edits stay in Adjust Image.
 
 import type { TraceOptions } from '../../core/trace';
+import {
+  mergeColourLayerSettings,
+  type ColourLayerSettingOverrides,
+} from './colour-layer-settings';
 
-export type LightBurnTraceSettingOverrides = {
+export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly photoDetail?: number;
   readonly photoBrightness?: number;
   readonly photoContrast?: number;
@@ -44,6 +48,7 @@ export function mergeLightBurnTraceSettings(
   settings: LightBurnTraceSettingOverrides,
 ): TraceOptions {
   if (preset.photoDetail !== undefined) return mergePhotoSettings(preset, settings);
+  if (preset.colourLayers !== undefined) return mergeColourLayerSettings(preset, settings);
   const out: Record<string, unknown> = { ...preset };
   applyDetectionSettings(out, preset, settings);
   if (settings.ignoreLessThanPixels !== undefined) {

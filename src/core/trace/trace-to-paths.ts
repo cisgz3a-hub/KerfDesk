@@ -37,7 +37,7 @@ import { prepareUpscaledTraceInput } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
-import { traceImageToPhotoPathsSteps } from './photo-trace';
+import { dedicatedTraceSteps } from './dedicated-trace-backends';
 import { invertImage } from './raster-prep';
 
 export { boundsFromColoredPaths } from './trace-bounds';
@@ -150,11 +150,9 @@ export async function traceImageToColoredPaths(
   progress?: TraceProgress,
 ): Promise<ColoredPath[]> {
   const run = reportingTraceRunner(runner, progress);
-  // Photo tone is encoded in ribbon coverage, before any binary detection or
-  // contour supersampling can discard it. The backend owns its bounded grid.
-  if (requestedOptions.photoDetail !== undefined) {
-    return run(traceImageToPhotoPathsSteps(requestedImage, requestedOptions));
-  }
+  // Photo shading and Colour layers own their whole pipeline.
+  const dedicated = dedicatedTraceSteps(requestedImage, requestedOptions);
+  if (dedicated !== undefined) return run(dedicated);
   const { image, options } = invertBeforePolicy(
     requestedImage,
     resolveTraceSourceOptions(requestedImage, requestedOptions),

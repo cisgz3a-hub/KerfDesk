@@ -193,4 +193,21 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // them off — the opposite of "every notch matters". A blueprint's thin lines
     // are intentional pixel geometry here, not a small-scale tracing artefact.
   },
+  'Colour layers': {
+    // One filled layer per flat colour (ADR-402): OKLab quantisation to an
+    // automatic palette (or the dialog's 2-8 colours), paper colour excluded,
+    // neighbouring colours sharing one boundary. The imagetracerjs fields
+    // below are inert on this backend; despeckleMinPixels is the area below
+    // which a colour region joins its neighbour (12 px, as Line Art).
+    traceMode: 'filled-contours',
+    colourLayers: { output: 'cut-out' },
+    numberOfColors: 8,
+    pathOmit: 0,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: false,
+    despeckleMinPixels: 12,
+  },
 };

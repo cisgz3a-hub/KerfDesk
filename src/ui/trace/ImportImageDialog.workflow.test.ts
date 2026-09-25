@@ -151,6 +151,7 @@ describe('Trace Image workflow controls', () => {
           Sharp: false,
           Centerline: false,
           'Edge Detection': false,
+          'Colour layers': false,
         });
       });
     } finally {

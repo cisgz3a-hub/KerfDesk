@@ -32,6 +32,8 @@ import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
+import type { ColourLayerOutput } from '../../core/trace/colour-layer-options';
+import { withColourLayerPowers } from '../../core/trace/colour-layer-power';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -76,6 +78,8 @@ export type TraceExistingImageOptions = {
   readonly cameraSource?: RasterImage;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
+  /** Colour-layer trace (ADR-402): set each colour's laser operation power by darkness. */
+  readonly colourLayerOutput?: ColourLayerOutput;
 };
 
 type PreparedTraceSource = {
@@ -301,10 +305,16 @@ export function applyTraceToExisting(
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
   });
-  const operations = applyFreshTraceScanDirection(
+  const scanned = applyFreshTraceScanDirection(
     positionedTrace,
     created.operations,
     s.project.device,
+  );
+  const operations = withColourLayerPowers(
+    created.object,
+    scanned,
+    options.colourLayerOutput,
+    s.project.machine,
   );
   scene = replaceInPlace
     ? replaceObject(scene, positionedTrace.id, created.object)

@@ -1,4 +1,5 @@
 import type { Project, RasterImage, TracedImage } from '../../core/scene';
+import type { TraceOptions } from '../../core/trace';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
 import { projectWithCameraTraceSource } from '../state/camera-trace-import';
 import { useStore } from '../state/store';
@@ -19,6 +20,9 @@ export type TraceOutputCommitArgs = {
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
   readonly notices?: ReadonlyArray<TraceNotice>;
+  /** The trace's options; a colour-layer trace gives each colour its own
+   *  operation with a darkness-ordered power (ADR-402). */
+  readonly options?: Pick<TraceOptions, 'colourLayers'>;
 };
 
 export type TraceOutputCommitContext = {
@@ -62,7 +66,7 @@ export async function commitTraceOutput(
     return commitRasterTraceOutput(args, ctx, traced, outputProject, traceOptions, sourceStatus);
   }
   if (ctx.claimOwner() === null) return false;
-  ctx.traceExistingImage(args.seed.id, traced, traceOptions);
+  ctx.traceExistingImage(args.seed.id, traced, withColourLayerOutput(traceOptions, args));
   ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false), 'success');
   return true;
 }
@@ -147,6 +151,17 @@ async function buildOwnedRaster(
   }
 }
 
+// A colour-layer trace gives each colour's operation a darkness-ordered power
+// (ADR-402); the store needs to know which output the powers are for.
+function withColourLayerOutput(
+  options: TraceExistingImageOptions,
+  args: TraceOutputCommitArgs,
+): TraceExistingImageOptions {
+  const colourLayers = args.options?.colourLayers;
+  if (colourLayers === undefined) return options;
+  return { ...options, colourLayerOutput: colourLayers.output ?? 'cut-out' };
+}
+
 function traceSuccessMessage(
   args: TraceOutputCommitArgs,
   traced: TracedImage,
@@ -155,6 +170,10 @@ function traceSuccessMessage(
 ): string {
   const colorCount = traced.paths.length;
   const output = raster ? ' as a raster scan' : '';
-  const summary = `Traced ${args.seed.source}${output} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`;
+  const colours =
+    args.options?.colourLayers !== undefined && !raster
+      ? `${colorCount} colour layer${colorCount === 1 ? '' : 's'}, power set by darkness`
+      : `${colorCount} color${colorCount === 1 ? '' : 's'}`;
+  const summary = `Traced ${args.seed.source}${output} — ${colours}, ${sourceStatus}`;
   return [summary, ...(args.notices ?? []).map(traceNoticeMessage)].join('. ');
 }
