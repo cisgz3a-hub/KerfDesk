@@ -118,7 +118,7 @@ describe('automaticRestart with a planner backlog', () => {
 
 // OR-3 (2026-09-25 controller audit): a planner-discarding stop without a
 // status report that showed a backlog. Adapted from the audit's reproduction
-// (src/__audit_repro__/OR/abort-restart-without-bf.test.ts).
+// test.
 describe('automaticRestart without a reported backlog (OR-3)', () => {
   const aborted = (plannerBacklog: JobInterruption['plannerBacklog']): JobInterruption => ({
     kind: 'cancelled',

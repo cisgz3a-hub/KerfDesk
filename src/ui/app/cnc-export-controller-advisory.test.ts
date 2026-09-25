@@ -1,7 +1,7 @@
 // CN-1 (2026-09-25 controller audit): a CNC export for a profile whose
 // controller cannot run KerfDesk CNC jobs says the file is GRBL-dialect, as a
 // non-blocking advisory; the bytes and the save are unchanged. Adapted from
-// src/__audit_repro__/CN/cnc-export-non-grbl-controller.test.ts.
+// the audit's reproduction test.
 //
 // Marlin 2.1.2.8 gcode/motion/G4.cpp:33 reads the emitted `G4 P3.000` as 3 ms;
 // Smoothieware (38e2cc08) Robot.cpp:694-696 has M0 commented out.

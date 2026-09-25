@@ -71,7 +71,7 @@ describe('LightBurn .lbdev import', () => {
 });
 
 // OR-5 (2026-09-25 controller audit): LightBurn writes device files as JSON.
-// Adapted from src/__audit_repro__/OR/lbdev-json-import.test.ts. The keys and
+// Adapted from the audit's reproduction test. The keys and
 // values are those of xTool's official D1 Pro file
 // (https://xtool.zendesk.com/hc/article_attachments/7316804567447/xTool-D1ProV3.lbdev).
 const XTOOL_D1_PRO_LBDEV = JSON.stringify(

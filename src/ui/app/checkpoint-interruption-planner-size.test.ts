@@ -1,8 +1,7 @@
 // OR-3 (2026-09-25 controller audit; incomplete fix of ADR-362 item 8): after
 // a stop that discards the planner, the automatic laser restart must not start
 // after moves the stop threw away, even when no status report showed a `Bf`
-// backlog. Adapted from the audit's reproduction
-// (src/__audit_repro__/OR/abort-restart-without-bf.test.ts).
+// backlog. Adapted from the audit's reproduction test.
 //
 // Upstream:
 //  - GRBL 1.1h defaults.h:50 `DEFAULT_STATUS_REPORT_MASK 1 // MPos enabled`;

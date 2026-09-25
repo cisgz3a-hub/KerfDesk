@@ -127,8 +127,8 @@ describe('buildCncFrameMotion', () => {
     expect(motion({ preFrameWorkZMm: SAFE_Z, hasCurrentWorkZEvidence: true })).toEqual(PERIMETER);
   });
 
-  // CN-2 (2026-09-25 controller audit): adapted from
-  // src/__audit_repro__/CN/cnc-frame-non-grbl-reason.test.ts. The same refusal
+  // CN-2 (2026-09-25 controller audit): adapted from the audit's reproduction
+  // test. The same refusal
   // as before (Marlin and Smoothieware have no retract builder), checked first
   // and worded as the real reason.
   it.each([marlinDriver, smoothiewareDriver])(

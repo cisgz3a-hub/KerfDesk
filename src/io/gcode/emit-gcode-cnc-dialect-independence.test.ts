@@ -2,7 +2,7 @@
 // laser output only. CNC projects always emit through the GRBL CNC strategy,
 // which ignores the device's dialect, so Machine Setup labels the choice
 // "Laser output dialect" when the setup includes CNC. This pins the fact the
-// label rests on. Moved from src/__audit_repro__/CN/cnc-output-dialect-ignored.test.ts.
+// label rests on. Moved from the audit's reproduction tests.
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type GcodeDialectId } from '../../core/devices';

@@ -1,6 +1,6 @@
 // OR-1 (2026-09-25 controller audit): constant-power (M3) output never makes
 // GRBL drain its planner while the beam is still lit mid-job. Adapted from the
-// audit's reproduction (src/__audit_repro__/OR/m3-lit-planner-drain.test.ts).
+// audit's reproduction test.
 //
 // Upstream: gnea/grbl 1.1h gcode.c:917-923 / :940-947 / :951-957 and
 // motion_control.c:67-76 (drains), stepper.c:392-398 (only an M4 block is

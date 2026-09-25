@@ -2,7 +2,7 @@
 // F the program set (G0_FEEDRATE is commented out, Configuration_adv.h:3721;
 // gcode.cpp:213-214 sets the one modal feed from any move's F). KerfDesk timed
 // Marlin G0 as a rapid at the profile's max feed while the bytes let it crawl
-// at the cut feed. Adapted from src/__audit_repro__/MA/ma-8-g0-modal-feed.test.ts:
+// at the cut feed. Adapted from the audit's reproduction test:
 // the FIFO firmware model there is replaced by the same modal-feed rule
 // applied line by line.
 

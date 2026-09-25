@@ -3,7 +3,7 @@
 // cannot run KerfDesk CNC jobs. With tiling on, Save on the file-only Ruida
 // profile keeps its routing (tiling runs before the .rd route and writes GRBL
 // tiles) and now says so. Warning only; bytes and saves unchanged. Adapted from
-// src/__audit_repro__/CN/cnc-other-exports-non-grbl.test.ts.
+// the audit's reproduction test.
 
 import { describe, expect, it, vi } from 'vitest';
 import { mockPlatform, toasts } from '../../__fixtures__/file-actions';

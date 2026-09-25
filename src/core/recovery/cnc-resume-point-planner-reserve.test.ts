@@ -1,6 +1,6 @@
 // OR-2 (2026-09-25 controller audit): CNC pass recovery never labels a pass
 // proven complete while it may still have been queued. Adapted from the audit's
-// reproduction (src/__audit_repro__/OR/cnc-resume-planner-reserve.test.ts).
+// reproduction test.
 //
 // A controller acknowledges a line once it is parsed into the planner, not once
 // it has moved (GRBL 1.1h motion_control.c:57-68, protocol.c:104), so the
