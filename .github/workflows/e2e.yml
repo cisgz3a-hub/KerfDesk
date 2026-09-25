@@ -48,16 +48,20 @@ jobs:
       - name: Verify browser test discovery
         run: pnpm check:e2e-discovery
 
-      - name: Run development and production-bundle browser smoke
-        id: browser_smoke
+      - name: Check cold startup and viewer responsiveness
+        id: browser_preflight
         # Check viewer responsiveness early so its failure trace is available
         # without waiting for the full suite. The complete suite still follows.
-        run: pnpm test:e2e:cold && pnpm test:e2e e2e/connected-script-gcode-viewer.e2e.ts && pnpm test:e2e && pnpm test:e2e:production-bundle
+        run: pnpm test:e2e:cold && pnpm test:e2e e2e/connected-script-gcode-viewer.e2e.ts
+
+      - name: Run development and production-bundle browser smoke
+        id: browser_smoke
+        run: pnpm test:e2e && pnpm test:e2e:production-bundle
 
       - name: Record SHA-correlated readiness lanes
         if: always()
         env:
-          BROWSER_STATE: ${{ steps.browser_smoke.outcome }}
+          BROWSER_STATE: ${{ steps.browser_preflight.outcome == 'success' && steps.browser_smoke.outcome || steps.browser_preflight.outcome }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
