@@ -400,13 +400,25 @@ export function vertexHugsChain(
   to: number,
   maxOffsetPx: number,
 ): boolean {
+  const nearest = vertexOffset(vertex, pts, from, to);
+  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
+}
+
+/** How far a rebuilt vertex stands from the chain it replaces: its distance
+ *  to the nearest point of `pts[from - 1 .. to]`. */
+export function vertexOffset(
+  vertex: Vec2,
+  pts: ReadonlyArray<Vec2>,
+  from: number,
+  to: number,
+): number {
   let nearest = Infinity;
   for (let k = Math.max(0, from - 1); k <= Math.min(pts.length - 1, to); k += 1) {
     const p = pts[k];
     if (p === undefined) continue;
     nearest = Math.min(nearest, Math.hypot(p.x - vertex.x, p.y - vertex.y));
   }
-  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
+  return nearest;
 }
 
 // Ink-support gate for rebuilt apexes. The rebuilt corner claims "the drawn
