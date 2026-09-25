@@ -1,52 +1,27 @@
-import { afterEach, beforeAll, beforeEach, it, vi } from 'vitest';
-import { writeFileSync, appendFileSync } from 'node:fs';
-import { createMarlinSimulator } from '../../__fixtures__/controllers';
-import { grblDriver } from '../../core/controllers';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { marlinStrategy } from '../../core/output/marlin-strategy';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { startTestLaserJob } from '../../ui/state/laser-test-start-helpers';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
+import { createFifoMarlin } from './marlin-fifo-model';
 
-const OUT = '/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a645748ec6e/scratchpad/ma-explore4.txt';
-beforeAll(() => writeFileSync(OUT, ''));
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
-});
-afterEach(async () => {
-  await useLaserStore.getState().disconnect();
-  useLaserStore.setState({
-    capabilities: grblDriver.capabilities,
-    activeControllerKind: grblDriver.kind,
-    detectedControllerKind: null,
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    safetyNotice: null,
-    motionOperation: null,
-    controllerOperation: null,
-    streamer: null,
-    log: [],
-    transcript: [],
-  });
-  resetStore();
-  vi.useRealTimers();
-  vi.restoreAllMocks();
-});
+beforeEach(() => { vi.useFakeTimers(); vi.spyOn(console, 'error').mockImplementation(() => undefined); });
+afterEach(async () => { await useLaserStore.getState().disconnect(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-it('error+ok during stream', async () => {
-  const sim = createMarlinSimulator({ motionMs: 3000 });
-  sim.port.onWrite((data) => {
-    if (/X13\b/.test(data)) sim.port.emitLine('Error:G2/G3 bad parameters');
-  });
-  useStore.getState().updateDeviceProfile({ controllerKind: 'marlin' });
-  await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'marlin' });
-  await vi.advanceTimersByTimeAsync(1200);
-  const job = Array.from({ length: 30 }, (_, i) => `G1 X${i} Y1 F600 S200`).join('\n');
-  await startTestLaserJob(job, { streamingMode: 'ping-pong' });
-  for (let t = 0; t < 60; t += 1) {
-    await vi.advanceTimersByTimeAsync(t < 40 ? 5 : 200);
-    const s = useLaserStore.getState();
-    appendFileSync(OUT, `t=${t} streamer=${s.streamer?.status}/${s.streamer?.completed} inflight=${s.streamer?.inFlight.length} pending=${s.pendingUntrackedAcks} sim.pending=${sim.state().pendingMotions} status=${s.statusReport?.state} notice=${s.safetyNotice?.kind} out=${JSON.stringify(sim.outbound().slice(-3))}\n`);
-  }
-  appendFileSync(OUT, `transcript=${JSON.stringify(useLaserStore.getState().log.slice(-15))}\n`);
+it('model: M410 + M5 I stops the beam promptly', async () => {
+  const marlin = createFifoMarlin();
+  await useLaserStore.getState().connect(marlin.adapter, { controllerKind: 'marlin', baudRate: 250000 });
+  marlin.emitLine('start');
+  await vi.advanceTimersByTimeAsync(1500);
+  const pts = [[50,50],[250,50],[250,55],[50,55],[50,60],[250,60],[250,65],[50,65],[50,70],[250,70]].map(([x,y]) => ({x: x!, y: y!}));
+  const program = marlinStrategy.emit({ groups: [{ kind: 'cut', layerId: 'L1', color: '#f00', power: 80, speed: 300, passes: 1, airAssist: false, segments: [{ polyline: pts, closed: false }] }] },
+    { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'marlin', maxPowerS: 255, gcodeDialect: { dialectId: 'marlin-inline' } });
+  await startTestLaserJob(program, { streamingMode: 'ping-pong' });
+  await vi.advanceTimersByTimeAsync(5000);
+  const conn = await (await marlin.adapter.serial.requestPort()).open({ baudRate: 250000 });
+  const t0 = Date.now();
+  await conn.write('M410\nM5 I\n');
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(marlin.beamOnMsSince(t0)).toBeLessThan(500);
+  expect(marlin.state().plannedBlocks).toBe(0);
 });

@@ -57,6 +57,24 @@ Cloned read-only at these revisions; findings cite file and line at the same rev
 
 To recreate them: `git clone https://github.com/<project>.git` and check out the revision.
 
+## Lead verification so far
+
+- **RU (Ruida):** RU-1 to RU-5 checked against meerk40t's writer (`rdjob.py` `write_header`
+  L1401-1504, `write_settings` L1517-1548, `write_layer_end` L1511-1515, `write_tail`, `mark`
+  L1577-1580) and hold. RU-6 (menu Connect opens a port for the file-only profile:
+  `ui/commands/laser-command-family.ts`, `ui/state/laser-connect-action.ts`) and RU-7 (`.rd`
+  export runs no post-compile checks: `io/rd/emit-rd.ts`) hold in code. RU-8 is latent (no
+  caller). RU-2's User Origin mapping (`D8 11`) is unverified upstream: map the reference mode
+  per placement (Absolute `D8 10`, User Origin `D8 11`, Current Position `D8 12`) and say so in
+  the ADR.
+
+## If this session stops: continuing in a new session
+
+A track's findings reach the lead only when the track finishes. A track still marked
+"running" above has no saved report; its reproduction tests in `src/__audit_repro__/<ID>/` are
+kept. Re-run that track with `method.md` as its brief, after cloning the upstream sources at
+the revisions above into a scratch folder and pointing the brief's source root there.
+
 ## Remaining steps
 
 1. Save each track's findings to `tracks/<ID>.md` as it reports.

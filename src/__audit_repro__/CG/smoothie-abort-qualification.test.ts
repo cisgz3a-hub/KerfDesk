@@ -24,71 +24,11 @@
 // ConnectionBar depend on it.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFakeSerialPort, type FakeSerialPort } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { useStore } from '../../ui/state/store';
 import { resetStore } from '../../ui/state/test-helpers';
-
-const HALT_ALLOWED_M = new Set([2, 5, 9, 30, 105, 114, 115, 119, 80, 81, 911, 503, 106, 107]);
-
-/** Smoothieware V1 (non-grbl mode) serial behaviour for the lines this test uses. */
-function createUpstreamSmoothie(): FakeSerialPort {
-  const port = createFakeSerialPort();
-  let halted = false;
-  let rx = '';
-  const emit = (line: string): void => {
-    setTimeout(() => port.emitLine(line), 1);
-  };
-  const status = (): string =>
-    `<${halted ? 'Alarm' : 'Idle'}|MPos:0.0000,0.0000,0.0000|WPos:0.0000,0.0000,0.0000|F:4000.0,100.0>`;
-  const handleLine = (line: string): void => {
-    if (line === 'fire off') {
-      if (!halted) emit('turning laser off and returning to auto mode');
-      return;
-    }
-    const m = /^M(\d+)/i.exec(line);
-    if (m !== null && Number(m[1]) === 999) {
-      if (halted) {
-        halted = false;
-        emit('WARNING: After HALT you should HOME as position is currently unknown');
-      }
-      emit('ok');
-      return;
-    }
-    if (halted && (m === null || !HALT_ALLOWED_M.has(Number(m[1])))) {
-      emit('!!');
-      return;
-    }
-    emit('ok');
-  };
-  port.onOpen(() => {
-    emit('Smoothie');
-    emit('ok');
-  });
-  port.onWrite((data) => {
-    for (const ch of data) {
-      if (ch === '?') {
-        emit(status());
-        continue;
-      }
-      if (ch === '\x18') {
-        halted = true;
-        rx = '';
-        emit('HALTED, M999 or $X to exit HALT state');
-        continue;
-      }
-      if (ch === '\n') {
-        const line = rx.trim();
-        rx = '';
-        if (line !== '') handleLine(line);
-        continue;
-      }
-      if (ch !== '\r') rx += ch;
-    }
-  });
-  return port;
-}
+import { createUpstreamSmoothie } from './upstream-smoothie-fake';
 
 beforeEach(() => {
   vi.useFakeTimers();

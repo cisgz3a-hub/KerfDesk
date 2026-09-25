@@ -44,9 +44,9 @@ import { useLaserStore } from '../../ui/state/laser-store';
 import { startTestLaserJob } from '../../ui/state/laser-test-start-helpers';
 import { createFifoMarlin } from './marlin-fifo-model';
 
-// A 200 x 100 mm rectangle cut three times at 300 mm/min: 12 burn moves of
-// 20-40 s each, 6 minutes of cutting that all fit in Marlin's planner.
-const RECTANGLE_CUT: Job = {
+// One serpentine cut at 300 mm/min: five 200 mm passes joined by 5 mm steps,
+// 1020 mm (about 204 s) of burning that fits in Marlin's 16-block planner.
+const SERPENTINE_CUT: Job = {
   groups: [
     {
       kind: 'cut',
@@ -54,17 +54,23 @@ const RECTANGLE_CUT: Job = {
       color: '#ff0000',
       power: 80,
       speed: 300,
-      passes: 3,
+      passes: 1,
       airAssist: false,
       segments: [
         {
           polyline: [
             { x: 50, y: 50 },
             { x: 250, y: 50 },
-            { x: 250, y: 150 },
-            { x: 50, y: 150 },
+            { x: 250, y: 55 },
+            { x: 50, y: 55 },
+            { x: 50, y: 60 },
+            { x: 250, y: 60 },
+            { x: 250, y: 65 },
+            { x: 50, y: 65 },
+            { x: 50, y: 70 },
+            { x: 250, y: 70 },
           ],
-          closed: true,
+          closed: false,
         },
       ],
     },
@@ -100,19 +106,19 @@ describe('MA-7: Marlin ABORT leaves the planned burn running', () => {
     await vi.advanceTimersByTimeAsync(1_500);
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
 
-    const program = marlinStrategy.emit(RECTANGLE_CUT, MARLIN_INLINE);
+    const program = marlinStrategy.emit(SERPENTINE_CUT, MARLIN_INLINE);
     await startTestLaserJob(program, { streamingMode: 'ping-pong' });
     await vi.advanceTimersByTimeAsync(5_000);
     // Burning, with most of the job already accepted into the planner.
     expect(marlin.state().output).toBeGreaterThan(0);
-    expect(marlin.state().plannedBlocks).toBeGreaterThan(8);
+    expect(marlin.state().plannedBlocks).toBeGreaterThan(5);
 
     const abortAt = Date.now();
     await useLaserStore.getState().stopJob();
-    await vi.advanceTimersByTimeAsync(7 * 60_000);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
 
     // Current code: the beam stays on for the rest of the planned job
-    // (about 355 s here). Correct: off within half a second.
+    // (about 199 s here). Correct: off within half a second.
     expect(marlin.beamOnMsSince(abortAt)).toBeLessThan(500);
   });
 });
