@@ -30,6 +30,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMarlinSimulator } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import type { Job } from '../../core/job';
+import { marlinStrategy } from '../../core/output/marlin-strategy';
+import { createFifoMarlin } from './marlin-fifo-model';
 import { laserCountdownTestHandoff } from '../../ui/state/laser-countdown-test-handoff';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { startTestLaserJob } from '../../ui/state/laser-test-start-helpers';
@@ -100,6 +104,64 @@ describe('MA-4: Marlin post-job settle ignores busy keepalives', () => {
     // Current code: "post-job settle marker timed out." at 30 s.
     expect(laser.log.some((line) => /Post-job controller settle failed/.test(line))).toBe(false);
     expect(laser.safetyNotice).toBeNull();
+    expect(laser.liveCanvasRun?.timing).toMatchObject({ kind: 'complete' });
+  });
+
+  it('completes KerfDesk\'s own program whose closing park runs at the cut feed', async () => {
+    // A 60 mm cut at 300 mm/min ending at (260, 200): the emitted program
+    // closes with `M5 I` then `G0 X0.000 Y0.000 S0`. Without G0_FEEDRATE that
+    // park runs at the modal 300 mm/min: 328 mm, about 66 s after its `ok`.
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cut',
+          layerId: 'L1',
+          color: '#ff0000',
+          power: 50,
+          speed: 300,
+          passes: 1,
+          airAssist: false,
+          segments: [
+            {
+              polyline: [
+                { x: 200, y: 200 },
+                { x: 260, y: 200 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    const program = marlinStrategy.emit(job, {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'marlin',
+      maxPowerS: 255,
+      gcodeDialect: { dialectId: 'marlin-inline' },
+    });
+    expect(program.trimEnd().split('\n').slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 S0']);
+
+    const marlin = createFifoMarlin();
+    await useLaserStore
+      .getState()
+      .connect(marlin.adapter, { controllerKind: 'marlin', baudRate: 250000 });
+    marlin.emitLine('start');
+    await vi.advanceTimersByTimeAsync(1_500);
+    await startTestLaserJob(program, {
+      streamingMode: 'ping-pong',
+      ...laserCountdownTestHandoff({
+        gcode: program,
+        retentionKey: 'ma-4-fifo',
+        capability: 'settle-only',
+      }),
+    });
+    await vi.advanceTimersByTimeAsync(3 * 60_000);
+    expect(marlin.state().plannedBlocks).toBe(0);
+
+    const laser = useLaserStore.getState();
+    // Current code: the M400 settle times out at 30 s while Marlin is still
+    // parking and printing `echo:busy: processing` every 2 s.
+    expect(laser.log.some((line) => /Post-job controller settle failed/.test(line))).toBe(false);
     expect(laser.liveCanvasRun?.timing).toMatchObject({ kind: 'complete' });
   });
 });
