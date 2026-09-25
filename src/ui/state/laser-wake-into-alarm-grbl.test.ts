@@ -30,6 +30,31 @@ function createStockGrbl(): FakeSerialPort {
   };
   const banner = (): void => emit("Grbl 1.1h ['$' for help]");
   port.onOpen(banner);
+  const answerLine = (line: string): void => {
+    if (line === '') return;
+    emit('ok');
+    if (line !== '$SLP') return;
+    state = 'Sleep';
+    emit('[MSG:Sleeping]');
+  };
+  const reset = (): void => {
+    // protocol_main_loop after the reset: Sleep (or Alarm) comes back as Alarm.
+    state = state === 'Idle' ? 'Idle' : 'Alarm';
+    banner();
+    if (state === 'Alarm') emit("[MSG:'$H'|'$X' to unlock]");
+  };
+  const receive = (ch: string): void => {
+    if (ch === '?') {
+      emit(`<${state}|MPos:0.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>`);
+    } else if (ch === '\x18') {
+      reset();
+    } else if (ch === '\n') {
+      answerLine(rx.trim());
+      rx = '';
+    } else if (ch !== '\r') {
+      rx += ch;
+    }
+  };
   port.onWrite((data) => {
     respondToTestGrblHandshake(data, (line) => emit(line));
     if (data === '$$\n') {
@@ -39,32 +64,7 @@ function createStockGrbl(): FakeSerialPort {
       return;
     }
     if (data === '$I\n' || data === '$G\n') return; // answered by the handshake helper
-    for (const ch of data) {
-      if (ch === '?') {
-        emit(`<${state}|MPos:0.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>`);
-        continue;
-      }
-      if (ch === '\x18') {
-        // protocol_main_loop after the reset: Sleep (or Alarm) comes back as Alarm.
-        state = state === 'Idle' ? 'Idle' : 'Alarm';
-        banner();
-        if (state === 'Alarm') emit("[MSG:'$H'|'$X' to unlock]");
-        continue;
-      }
-      if (ch === '\n') {
-        const line = rx.trim();
-        rx = '';
-        if (line === '$SLP') {
-          emit('ok');
-          state = 'Sleep';
-          emit('[MSG:Sleeping]');
-        } else if (line !== '') {
-          emit('ok');
-        }
-        continue;
-      }
-      if (ch !== '\r') rx += ch;
-    }
+    for (const ch of data) receive(ch);
   });
   return port;
 }
