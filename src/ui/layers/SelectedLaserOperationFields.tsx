@@ -6,7 +6,11 @@ import { hasMixedFields, type MixedOperationFields } from './selected-operation-
 import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { LaserProcessField } from './LaserProcessField';
+import { NewPresetFromOperation } from './NewPresetFromOperation';
 import './laser-operation-settings.css';
+
+const MIXED_PRESET_REASON =
+  'The selected artworks use different settings. Select one to save its settings as a preset.';
 
 export function LaserOperationFields(props: {
   readonly operation: Layer;
@@ -66,6 +70,11 @@ export function LaserOperationFields(props: {
       >
         Advanced cut settings
       </button>
+      <NewPresetFromOperation
+        operation={props.operation}
+        machineKind="laser"
+        {...(hasMixedFields(props.mixedFields) ? { unavailableReason: MIXED_PRESET_REASON } : {})}
+      />
       {settingsOpen ? (
         <LayerRowCutSettings
           key={props.reconcileKey}

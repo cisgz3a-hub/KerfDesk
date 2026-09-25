@@ -78,7 +78,7 @@ export function buildPreset(args: {
 }): MaterialPreset {
   const name = args.identity.materialName.trim();
   return {
-    ...preservedMetadata(args.existing),
+    ...preservedPresetMetadata(args.existing),
     id: args.id,
     materialName: name,
     material: name,
@@ -115,7 +115,7 @@ function defaultOperation(mode: LayerMode): MaterialRecipeOperation {
 
 // Carries provenance forward when editing (calibration source, device, etc.);
 // material and operation are re-derived above, so they are excluded here.
-function preservedMetadata(existing: MaterialPreset | null): Partial<MaterialPreset> {
+export function preservedPresetMetadata(existing: MaterialPreset | null): Partial<MaterialPreset> {
   if (existing === null) return {};
   return {
     ...(existing.profileId !== undefined ? { profileId: existing.profileId } : {}),

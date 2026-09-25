@@ -10,6 +10,7 @@ import { assertNever } from '../../../core/scene';
 import type { MaterialPreset } from '../../../io/material-library';
 import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
+import { useToastStore } from '../../state/toast-store';
 import { WizardCutSettingsStep } from './WizardCutSettingsStep';
 import { WizardDetailsStep } from './WizardDetailsStep';
 import { WizardIdentityStep } from './WizardIdentityStep';
@@ -21,6 +22,7 @@ import {
   nextPresetId,
   readRecipeFromForm,
 } from './wizard-recipe';
+import type { MaterialPresetWizardSeed } from './wizard-seed';
 import {
   EMPTY_IDENTITY,
   identityComplete,
@@ -37,14 +39,17 @@ const EMPTY_ENTRIES: ReadonlyArray<MaterialPreset> = [];
 
 export function MaterialPresetWizard(props: {
   readonly existingPreset?: MaterialPreset | null;
+  /** Prefill for a new preset (ADR-381); ignored when editing. */
+  readonly seed?: MaterialPresetWizardSeed;
   readonly onClose: () => void;
   readonly onSaved?: (id: string) => void;
 }): JSX.Element {
   const existing = props.existingPreset ?? null;
+  const seed = existing === null ? props.seed : undefined;
   const entries = useStore((s) => s.materialLibrary?.entries ?? EMPTY_ENTRIES);
   const device = useStore((s) => s.project.device);
   const upsertMaterialPreset = useStore((s) => s.upsertMaterialPreset);
-  const [state, dispatch] = useReducer(wizardReducer, existing, seedState);
+  const [state, dispatch] = useReducer(wizardReducer, { existing, seed }, seedState);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -60,7 +65,7 @@ export function MaterialPresetWizard(props: {
       dispatch({ kind: 'next' });
       return;
     }
-    save(existing, state, entries, upsertMaterialPreset, props.onSaved);
+    save({ existing, seed, state, entries, upsertMaterialPreset, onSaved: props.onSaved });
     props.onClose();
   };
 
@@ -91,6 +96,7 @@ export function MaterialPresetWizard(props: {
         <p className="lf-subheading">
           Step {stepNumber(state.step)} of {WIZARD_STEPS.length} — {stepHeading(state.step)}
         </p>
+        {seed === undefined ? null : <p className="lf-subheading">{seed.source}</p>}
       </header>
       <WizardStepBody
         state={state}
@@ -138,15 +144,17 @@ function WizardStepBody(props: {
   }
 }
 
-function save(
-  existing: MaterialPreset | null,
-  state: WizardState,
-  entries: ReadonlyArray<MaterialPreset>,
-  upsertMaterialPreset: (preset: MaterialPreset) => boolean,
-  onSaved: ((id: string) => void) | undefined,
-): void {
+function save(args: {
+  readonly existing: MaterialPreset | null;
+  readonly seed: MaterialPresetWizardSeed | undefined;
+  readonly state: WizardState;
+  readonly entries: ReadonlyArray<MaterialPreset>;
+  readonly upsertMaterialPreset: (preset: MaterialPreset) => boolean;
+  readonly onSaved: ((id: string) => void) | undefined;
+}): void {
+  const { existing, seed, state } = args;
   const id =
-    existing?.id ?? nextPresetId(state.identity, new Set(entries.map((entry) => entry.id)));
+    existing?.id ?? nextPresetId(state.identity, new Set(args.entries.map((entry) => entry.id)));
   const preset = buildPreset({
     identity: state.identity,
     recipe: state.recipe,
@@ -154,13 +162,37 @@ function save(
     id,
     revision: `manual-${Date.now()}`,
   });
-  if (upsertMaterialPreset(preset)) onSaved?.(id);
+  // A prefilled preset can start from the canvas before any library exists;
+  // it then gets one named after the machine, like the Saved Libraries page.
+  if (seed !== undefined) ensureActiveLibrary();
+  if (!args.upsertMaterialPreset({ ...preset, ...seed?.metadata })) return;
+  args.onSaved?.(id);
+  if (seed !== undefined) {
+    const library = useStore.getState().materialLibrary?.name ?? 'the material library';
+    useToastStore
+      .getState()
+      .pushToast(`Saved ${preset.materialName} — ${preset.description} to ${library}.`, 'success');
+  }
 }
 
-function seedState(existing: MaterialPreset | null): WizardState {
+function ensureActiveLibrary(): void {
+  const state = useStore.getState();
+  if (state.materialLibrary === null) state.createLibrary(`${state.project.device.name} Library`);
+}
+
+function seedState(args: {
+  readonly existing: MaterialPreset | null;
+  readonly seed: MaterialPresetWizardSeed | undefined;
+}): WizardState {
+  if (args.existing !== null) {
+    return initialWizardState({
+      identity: identityFromPreset(args.existing),
+      recipe: args.existing.recipe,
+    });
+  }
   return initialWizardState({
-    identity: existing === null ? EMPTY_IDENTITY : identityFromPreset(existing),
-    recipe: existing === null ? defaultRecipe() : existing.recipe,
+    identity: args.seed?.identity ?? EMPTY_IDENTITY,
+    recipe: args.seed?.recipe ?? defaultRecipe(),
   });
 }
 

@@ -19,6 +19,8 @@ type CutSettingsDialogProps = {
   readonly operationMembershipEditable?: boolean;
   readonly onCancel: () => void;
   readonly onApply: (patch: LayerPatch) => void;
+  /** Offers "New preset from these settings..." with the form's current values. */
+  readonly onSaveAsPreset?: (patch: LayerPatch) => void;
 } & Partial<CutSettingsDefaultHandlers>;
 
 export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
@@ -28,14 +30,16 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
   useEffect(() => {
     changedFields.current.clear();
   }, [signature]);
+  const readPatch = (form: HTMLFormElement): LayerPatch =>
+    readCutSettingsPatch(new FormData(form), props.layer, {
+      ...(maxFeed === null ? {} : { maxFeed }),
+      deferArtworkBounds: props.selectionCount !== undefined,
+    });
   const onSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
-    const patch = readCutSettingsPatch(new FormData(form), props.layer, {
-      ...(maxFeed === null ? {} : { maxFeed }),
-      deferArtworkBounds: props.selectionCount !== undefined,
-    });
+    const patch = readPatch(form);
     props.onApply(
       props.selectionCount !== undefined
         ? changedCutSettingsPatch(form, patch, changedFields.current)
@@ -75,6 +79,17 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       </div>
       {hasDefaultHandlers(props) ? <CutSettingsDefaultActions {...props} /> : null}
       <DialogActions>
+        {props.onSaveAsPreset === undefined ? null : (
+          <Button
+            title="Start a material preset from the values in this dialog, applied or not."
+            onClick={(event) => {
+              const form = event.currentTarget.form;
+              if (form !== null) props.onSaveAsPreset?.(readPatch(form));
+            }}
+          >
+            New preset from these settings...
+          </Button>
+        )}
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary">
           Apply settings

@@ -15,6 +15,7 @@ import { CncLayerFields } from './CncLayerFields';
 import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
+import { NewPresetFromOperation } from './NewPresetFromOperation';
 import {
   OperationContextActions,
   OperationNameInput,
@@ -121,7 +122,10 @@ function SelectedOperationEditor(props: {
         </p>
       ) : null}
       {props.machineKind === 'cnc' ? (
-        <CncLayerFields layer={props.active} />
+        <>
+          <CncLayerFields layer={props.active} />
+          <NewPresetFromOperation operation={props.active} machineKind="cnc" />
+        </>
       ) : (
         <LaserOperationFields
           key={selectionKey}
