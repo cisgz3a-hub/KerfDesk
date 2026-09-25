@@ -112,6 +112,58 @@ describe('qualification while the controller waits for the operator', () => {
     expect(h.run).toHaveBeenCalledTimes(1);
   });
 
+  // Audit TC-1: a controller still busy when the connect handshake hands over
+  // is as alive as one waiting in Alarm.
+  it.each(['Run', 'Jog', 'Home', 'Hold', 'Door', 'Check'] as const)(
+    'keeps waiting through fresh %s reports and qualifies on the first Idle',
+    async (busy) => {
+      vi.useFakeTimers();
+      const h = harness();
+      scheduleControllerQualification(h.set, h.get, h.refs, 4);
+      for (let second = 0; second < 20; second += 1) {
+        h.state = { ...h.state, statusReport: { state: busy } as LaserState['statusReport'] };
+        h.state = {
+          ...h.state,
+          statusObservation: {
+            sessionEpoch: 4,
+            positionEpoch: 0,
+            sequence: 1,
+            observedAt: Date.now(),
+          },
+        };
+        await vi.advanceTimersByTimeAsync(1_000);
+      }
+      expect(h.state.controllerQualification.kind).toBe('qualifying');
+
+      report(h, 'Idle');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(h.run).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  // The store clears the status observation on every Alarm or Sleep report
+  // (laser-status-line handleInvalidatingStatus); the report sequence still
+  // moves, and that alone proves the controller is answering.
+  it('counts Alarm reports that carry no status observation by the moving report sequence', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.state = { ...h.state, statusSequence: 0 };
+    scheduleControllerQualification(h.set, h.get, h.refs, 4);
+    for (let second = 0; second < 20; second += 1) {
+      h.state = {
+        ...h.state,
+        statusReport: { state: 'Alarm' } as LaserState['statusReport'],
+        statusObservation: null,
+        statusSequence: h.state.statusSequence + 1,
+      };
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+    expect(h.state.controllerQualification.kind).toBe('qualifying');
+
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(h.state.controllerQualification.kind).toBe('failed');
+  });
+
   it('leaves a different connection or session alone', () => {
     const h = harness();
     h.state = {
