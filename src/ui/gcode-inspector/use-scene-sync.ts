@@ -1,13 +1,11 @@
-// useSceneSync — pushes the Inspector's derived view state into the 3D scene
-// (ADR-255 stage 9 extraction). Both effects depend on `state` so they re-run
-// once the scene finishes loading, otherwise the first playhead and the
-// current lens would be dropped on the floor.
+// Apply the initial view while hidden so GPU preparation covers it. Publishing
+// ready must not submit an identical, unfenced frame to the visible canvas.
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { ArrowPlacement, PlayheadMarker, Viewer3dSceneHandle } from '../viewer3d';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
-export function useSceneSync(args: {
+type SceneSyncArgs = {
   readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
   readonly model?: unknown;
@@ -20,49 +18,87 @@ export function useSceneSync(args: {
   /** Direction arrowheads, or null when the overlay is off. */
   readonly arrows: ReadonlyArray<ArrowPlacement> | null;
   readonly travelVisible: boolean;
-}): void {
-  const {
-    handleRef,
-    state,
-    model,
-    playhead,
-    colorOf,
-    live,
-    arrows,
-    travelVisible,
-    hidePlaybackMarker,
-  } = args;
+};
 
-  useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.setTravelVisible(travelVisible);
-  }, [handleRef, state, model, travelVisible]);
+type AppliedSceneSync = SceneSyncArgs & { readonly handle: Viewer3dSceneHandle };
 
-  // Initial geometry owns the preparing phase. Sync once after ready so these
-  // effects do not redraw the same scene both before and after publication.
+export function useSceneSync(args: SceneSyncArgs): void {
+  const applied = useRef<AppliedSceneSync | null>(null);
+  // Observe each commit, but only mutate fields whose values changed. A new
+  // status object with the same coordinates must not schedule another frame.
   useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.setPlayhead(
-      playhead === null ? null : { ...playhead, hideMarker: hidePlaybackMarker === true },
-    );
-  }, [handleRef, playhead, state, model, hidePlaybackMarker]);
+    const { state, model } = args;
+    const handle = args.handleRef.current;
+    if (handle === null || (state !== 'preparing' && state !== 'ready')) {
+      applied.current = null;
+      return;
+    }
+    const previous = applied.current;
+    if (shouldDeferSync(previous, handle, args)) return;
+    const force =
+      previous === null ||
+      previous.handle !== handle ||
+      previous.model !== model ||
+      (state === 'preparing' && previous.state !== 'preparing');
+    syncSceneValues(handle, args, previous, force);
+    applied.current = { ...args, handle };
+  });
+}
 
-  useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.recolor(colorOf);
-  }, [handleRef, colorOf, state, model]);
+function shouldDeferSync(
+  previous: AppliedSceneSync | null,
+  handle: Viewer3dSceneHandle,
+  next: SceneSyncArgs,
+): boolean {
+  if (previous === null || previous.handle !== handle) return false;
+  // A replacement first commits preparing, then swaps geometry. Never apply
+  // its lens to the old geometry. Continuous live changes also must not
+  // restart the same model's fence; ready applies their latest values.
+  return (
+    (next.state === 'ready' && previous.model !== next.model) ||
+    (next.state === 'preparing' && previous.state === 'preparing' && previous.model === next.model)
+  );
+}
 
-  useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.setDirectionArrows(arrows);
-  }, [handleRef, arrows, state, model]);
+function syncSceneValues(
+  handle: Viewer3dSceneHandle,
+  next: SceneSyncArgs,
+  previous: AppliedSceneSync | null,
+  force: boolean,
+): void {
+  if (force || previous === null) {
+    handle.setTravelVisible(next.travelVisible);
+    setScenePlayhead(handle, next);
+    handle.recolor(next.colorOf);
+    handle.setDirectionArrows(next.arrows);
+    handle.setLiveMachine(next.live);
+    return;
+  }
+  if (previous.travelVisible !== next.travelVisible) handle.setTravelVisible(next.travelVisible);
+  if (
+    !samePlayhead(previous.playhead, next.playhead) ||
+    Boolean(previous.hidePlaybackMarker) !== Boolean(next.hidePlaybackMarker)
+  ) {
+    setScenePlayhead(handle, next);
+  }
+  if (previous.colorOf !== next.colorOf) handle.recolor(next.colorOf);
+  if (previous.arrows !== next.arrows) handle.setDirectionArrows(next.arrows);
+  if (!samePoint(previous.live, next.live)) handle.setLiveMachine(next.live);
+}
 
-  // Depends on the coordinates, not the object identity: status reports
-  // arrive continuously and a fresh object each poll would re-render the
-  // scene even when the machine has not moved.
-  useEffect(() => {
-    if (state !== 'ready') return;
-    handleRef.current?.setLiveMachine(live);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-  }, [handleRef, state, model, live?.x, live?.y, live?.z, live === null]);
+function setScenePlayhead(handle: Viewer3dSceneHandle, next: SceneSyncArgs): void {
+  handle.setPlayhead(
+    next.playhead === null
+      ? null
+      : { ...next.playhead, hideMarker: next.hidePlaybackMarker === true },
+  );
+}
+
+function samePlayhead(left: PlayheadMarker | null, right: PlayheadMarker | null): boolean {
+  if (left === null || right === null) return left === right;
+  return left.segmentIndex === right.segmentIndex && samePoint(left.point, right.point);
+}
+
+function samePoint(left: SceneSyncArgs['live'], right: SceneSyncArgs['live']): boolean {
+  return left?.x === right?.x && left?.y === right?.y && left?.z === right?.z;
 }
