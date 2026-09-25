@@ -177,8 +177,9 @@ export function prepareTraceForContour(
   // The automatic cut levels detectably uneven lighting first (ADR-394); the
   // crack field then interpolates the same luma that was cut. Uniform pages,
   // and explicit Cutoff/Threshold values, get `prepared` itself back.
-  const leveled = levelForAutomaticThreshold(prepared, options);
-  const thresholded = applyThresholdWithIso(leveled, options);
+  const level = levelForAutomaticThreshold(prepared, options);
+  const leveled = level.source;
+  const thresholded = applyThresholdWithIso(leveled, options, level.threshold);
   const field =
     thresholded.thresholdLuma === null ? null : lumaCrackField(leveled, thresholded.thresholdLuma);
   if (options.faintLineRecovery === true) {
@@ -235,9 +236,12 @@ export function crackFieldForTrace(
 
 const BACKGROUND_LUMA = 255;
 
+// `automaticCut`, when given, is otsuThreshold(prepared) already computed by
+// levelForAutomaticThreshold; it saves a second histogram pass.
 function applyThresholdWithIso(
   prepared: RawImageData,
   options: TraceOptions,
+  automaticCut: number | null = null,
 ): { readonly prepared: RawImageData; readonly thresholdLuma: number | null } {
   if (options.cutoffLuma !== undefined) {
     const upper = options.thresholdLuma ?? 128;
@@ -253,7 +257,7 @@ function applyThresholdWithIso(
     };
   }
   if (options.useOtsuThreshold === true) {
-    const thresholdLuma = otsuThreshold(prepared);
+    const thresholdLuma = automaticCut ?? otsuThreshold(prepared);
     return {
       prepared: thresholdToMonochrome(prepared, thresholdLuma),
       thresholdLuma,

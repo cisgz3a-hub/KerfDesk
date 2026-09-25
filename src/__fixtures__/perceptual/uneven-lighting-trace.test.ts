@@ -44,6 +44,15 @@ const BACKGROUNDS: Readonly<Record<string, (x: number, y: number) => number>> = 
   },
   // Lamp at the top-right corner: 255 there, 140 at the far corner.
   'bright corner': (x, y) => 140 + 115 * (1 - Math.hypot(x - W, y) / Math.hypot(W, H)),
+  // The ramp inside a 20 px white (255) margin: scanner lid around a smaller
+  // sheet. The margin is brighter than any paper and joins the sheet at its
+  // lit end, so it must not be taken for the paper level. (The top bar lies
+  // in the margin band: ink on white there.)
+  'ramp in a white margin': (x, y) =>
+    x < 20 || y < 20 || x >= W - 20 || y >= H - 20 ? 255 : 150 + (100 * x) / (W - 1),
+  // A 150 → 220 ramp with a 40×40 white glare patch away from the ink.
+  'ramp with a glare patch': (x, y) =>
+    x >= 300 && x < 340 && y >= 30 && y < 70 ? 255 : 150 + (70 * x) / (W - 1),
 };
 
 function page(background: (x: number, y: number) => number): { image: RawImageData; truth: Mask } {

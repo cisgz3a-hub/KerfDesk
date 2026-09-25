@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { flattenUnevenBackground, otsuBinarization } from './background-flatten';
+import {
+  flattenUnevenBackground,
+  levelForAutomaticThreshold,
+  otsuBinarization,
+} from './background-flatten';
 import { otsuSeparation, otsuThreshold } from './preprocess';
 import type { RawImageData } from './trace-image';
 
@@ -44,13 +48,24 @@ function inkClassification(image: RawImageData, threshold: number): { fp: number
   return { fp, fn };
 }
 
+function greyPixels(values: readonly number[]): RawImageData {
+  const data = new Uint8ClampedArray(values.length * 4);
+  values.forEach((v, i) => data.set([v, v, v, 255], i * 4));
+  return { width: values.length, height: 1, data };
+}
+
 describe('otsuSeparation', () => {
-  it('reports the same cut as otsuThreshold and a separability in [0, 1]', () => {
-    const image = paintedImage(ramp);
-    const result = otsuSeparation(image);
-    expect(result.threshold).toBe(otsuThreshold(image));
-    expect(result.separability).toBeGreaterThan(0);
-    expect(result.separability).toBeLessThanOrEqual(1);
+  it('matches a hand-computed cut, separability and class contrast', () => {
+    // Luma {0, 0, 100, 200}: mean 75, total scatter 2·75² + 25² + 125² =
+    // 27,500. Cut after 0: classes {0, 0} | {100, 200}, between-class
+    // scatter wB·wF·Δ²/N = 2·2·150²/4 = 22,500. Cut after 100: {0, 0, 100}
+    // | {200}, 3·1·(200 − 100/3)²/4 ≈ 20,833. So the cut is after 0
+    // (threshold 1: luma < 1 is ink), η = 22,500 / 27,500 = 9/11, and the
+    // class means are 150 apart.
+    const result = otsuSeparation(greyPixels([0, 0, 100, 200]));
+    expect(result.threshold).toBe(1);
+    expect(result.separability).toBeCloseTo(9 / 11, 12);
+    expect(result.contrast).toBe(150);
   });
 
   it('reads a clean two-level page as almost perfectly separable', () => {
@@ -86,6 +101,18 @@ describe('flattenUnevenBackground', () => {
     // Light-on-dark art has no smooth bright paper surface to divide by.
     const image = paintedImage((x, y) => (x % 60 < 4 || y % 50 < 4 ? 240 : 25));
     expect(flattenUnevenBackground(image)).toBeNull();
+  });
+
+  it('keeps the global cut for light strokes on an unevenly lit dark page', () => {
+    // The dark page is the largest smooth region, so it is taken as the
+    // paper; flattening saturates the light strokes into it and leaves no
+    // second class, so the historical path is kept.
+    const image = paintedImage((x, y) =>
+      x % 60 < 4 || y % 50 < 4 ? 230 : Math.round(40 + (40 * x) / W),
+    );
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(false);
+    expect(result.source).toBe(image);
   });
 
   it('levels a 150→250 paper ramp so one cut separates ink from paper', () => {
@@ -133,6 +160,43 @@ describe('otsuBinarization', () => {
     expect(result.threshold).toBe(otsuThreshold(image));
   });
 
+  it('is not fooled by a white margin brighter than the paper', () => {
+    // A 20 px white (255) margin round the 150 → 250 ramp: scanner lid
+    // round a smaller sheet. The margin joins the sheet at its lit end, so
+    // only the surface fit can tell it is not paper. Seeding from the
+    // brightest cell, or a least-squares fit, took the margin as the paper
+    // and traced the dark half of the sheet as ink (IoU 0.04).
+    const margin = (x: number, y: number): number =>
+      x < 20 || y < 20 || x >= W - 20 || y >= H - 20 ? 255 : ramp(x);
+    const image = paintedImage(margin);
+    expect(inkClassification(image, otsuThreshold(image)).fp).toBeGreaterThan(10_000);
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(true);
+    expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
+  });
+
+  it('is not fooled by a white margin that never touches the paper level', () => {
+    // 150 → 220 paper inside a 20 px white margin: the margin is a separate
+    // sharp-edged region and saturates into the paper instead of forming a
+    // third histogram class above it.
+    const image = paintedImage((x, y) =>
+      x < 20 || y < 20 || x >= W - 20 || y >= H - 20 ? 255 : Math.round(150 + (70 * x) / (W - 1)),
+    );
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(true);
+    expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
+  });
+
+  it('is not fooled by a glare patch brighter than the paper', () => {
+    // A 40×40 white patch on a 150 → 220 ramp, away from the ink.
+    const image = paintedImage((x, y) =>
+      x >= 300 && x < 340 && y >= 30 && y < 70 ? 255 : Math.round(150 + (70 * x) / (W - 1)),
+    );
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(true);
+    expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
+  });
+
   it('flattens the ramp page and cuts between ink and paper', () => {
     const image = paintedImage(ramp);
     const result = otsuBinarization(image);
@@ -140,10 +204,14 @@ describe('otsuBinarization', () => {
     expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
   });
 
-  it('keeps a gentle slope under high-contrast ink cleanly classified', () => {
-    // 225 to 250: whichever path the policy takes, the cut stays between ink and paper.
+  it('flattens a gentle slope without harming a split the global cut already gets right', () => {
+    // Non-regression guard. 225 → 250 is just past the uniformity ratio
+    // (225 / 250 = 0.90 < 0.92), so the gate flattens; the global cut also
+    // classifies this page perfectly, and flattening must not undo that.
     const image = paintedImage((x) => Math.round(225 + (25 * x) / (W - 1)));
+    expect(inkClassification(image, otsuThreshold(image))).toEqual({ fp: 0, fn: 0 });
     const result = otsuBinarization(image);
+    expect(result.flattened).toBe(true);
     expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
   });
 
@@ -160,5 +228,31 @@ describe('otsuBinarization', () => {
     const result = otsuBinarization(image);
     expect(result.flattened).toBe(false);
     expect(result.source).toBe(image);
+  });
+});
+
+describe('levelForAutomaticThreshold', () => {
+  const automatic = { useOtsuThreshold: true } as const;
+
+  it('hands back the automatic cut of the luma it returns', () => {
+    // The caller thresholds with this value instead of a second Otsu pass.
+    for (const image of [paintedImage(() => 235), paintedImage(ramp)]) {
+      const level = levelForAutomaticThreshold(image, automatic);
+      expect(level.threshold).toBe(otsuThreshold(level.source));
+    }
+  });
+
+  it('leaves explicit cut settings alone', () => {
+    const image = paintedImage(ramp);
+    for (const options of [
+      { useOtsuThreshold: true, thresholdLuma: 128 },
+      { useOtsuThreshold: true, cutoffLuma: 0, thresholdLuma: 128 },
+      { useOtsuThreshold: false },
+    ]) {
+      expect(levelForAutomaticThreshold(image, options)).toEqual({
+        source: image,
+        threshold: null,
+      });
+    }
   });
 });

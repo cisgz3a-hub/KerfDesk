@@ -13,7 +13,7 @@
 //      image's luma histogram by maximising between-class variance
 //      (Otsu, 1979). Auto-adapts to bright/dark sources where the
 //      naive 128 cutoff under- or over-burns. otsuSeparation also
-//      reports the paper's separability measure, which the uneven-
+//      reports Otsu's separability measure (η), which the uneven-
 //      lighting fallback in background-flatten.ts compares.
 //   3. despeckle — connected-component flood fills the binarised
 //      image and removes ink regions smaller than `minPixels`. Kills
@@ -43,7 +43,7 @@ const LUMA_R = 0.299;
 const LUMA_G = 0.587;
 const LUMA_B = 0.114;
 
-function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
+export function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
   const r = data[pixelOffset] ?? 0;
   const g = data[pixelOffset + 1] ?? 0;
   const b = data[pixelOffset + 2] ?? 0;
@@ -226,7 +226,7 @@ export type OtsuSeparation = {
   readonly contrast: number;
 };
 
-/** Otsu's cut plus the goodness measures from the same paper, computed from
+/** Otsu's cut plus the goodness measures defined by Otsu (1979), computed from
  *  one histogram pass. The threshold is identical to otsuThreshold. */
 export function otsuSeparation(image: RawImageData): OtsuSeparation {
   const hist = new Uint32Array(256);
