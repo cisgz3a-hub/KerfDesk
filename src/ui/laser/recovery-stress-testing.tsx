@@ -12,6 +12,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import {
   createGrblSimulator,
+  GRBL_PLANNER_BLOCKS,
   type CreateGrblSimulatorOptions,
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
@@ -45,10 +46,10 @@ import { runFrameNow } from './use-frame-action';
 
 export const PROMPT_TEXT = 'Would you like to darken selected areas?';
 export const STRESS_TIMEOUT_MS = 60_000;
-// Planner back-pressure makes the simulator withhold `ok` while its 16-block
-// planner is full, so acknowledgements arrive at motion pace (25 ms per
-// segment) and a yank can land at any acknowledged line.
-const SIM_OPTIONS = { plannerBlocks: 16, motionMs: 25 } as const;
+// Planner back-pressure makes the simulator withhold `ok` while its stock
+// 15-block planner is full, so acknowledgements arrive at motion pace (25 ms
+// per segment) and a yank can land at any acknowledged line.
+const SIM_OPTIONS = { plannerBlocks: GRBL_PLANNER_BLOCKS, motionMs: 25 } as const;
 const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
 
 /** GRBL takes these out of the stream before its line buffer: the ASCII

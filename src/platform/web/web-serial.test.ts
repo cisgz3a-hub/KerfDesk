@@ -142,7 +142,9 @@ describe('webSerial connection cleanup', () => {
     expect(port.reader.releaseLock).toHaveBeenCalledTimes(1);
     expect(port.writer.close).toHaveBeenCalledTimes(1);
     expect(port.writer.releaseLock).toHaveBeenCalledTimes(1);
-    expect(port.close).not.toHaveBeenCalled();
+    // The OS port is released like the worker transport releases it (audit
+    // TC-4); the pairing stays so the operator can plug back in.
+    expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.forget).not.toHaveBeenCalled();
   });
 
@@ -157,6 +159,7 @@ describe('webSerial connection cleanup', () => {
     expect(port.reader.releaseLock).toHaveBeenCalledTimes(1);
     expect(port.writer.close).toHaveBeenCalledTimes(1);
     expect(port.writer.releaseLock).toHaveBeenCalledTimes(1);
+    expect(port.close).toHaveBeenCalledTimes(1);
     expect(port.forget).not.toHaveBeenCalled();
   });
 

@@ -16,7 +16,6 @@ import {
   teardownConnectionRefs,
   type IntentionalDisconnectRequest,
 } from './laser-connection-teardown';
-import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine } from './laser-line-handler';
 import {
   disconnectedControllerQualification,
@@ -31,12 +30,12 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import {
-  disconnectStopPlan,
   retainedDisconnectSafetyNotice,
   retainedUnavailableTransportSafetyNotice,
   unconfirmedDisconnectStopNotice,
   withRetainedDisconnectSafety,
 } from './laser-disconnect-safety';
+import { stopBeforeDisconnect } from './laser-disconnect-stop';
 import { disconnectedStatePatch } from './laser-disconnected-state';
 import { buildPortClosePatch, initialLaserState, pushLog } from './laser-store-helpers';
 import {
@@ -308,7 +307,7 @@ async function runOwnedIntentionalDisconnect(
 ): Promise<void> {
   let retainedSafetyNotice = unconfirmedDisconnectStopNotice(get(), refs.driver);
   try {
-    await stopBeforeDisconnect(set, get, refs, safeWrite);
+    await stopBeforeDisconnect(set, get, refs, safeWrite, connection);
   } catch {
     retainedSafetyNotice = writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
@@ -334,21 +333,6 @@ async function runOwnedIntentionalDisconnect(
   }
   if (closeError !== null) {
     throw closeError instanceof Error ? closeError : new Error(String(closeError));
-  }
-}
-
-async function stopBeforeDisconnect(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  if (isGrblFamilyDriver(refs.driver)) {
-    await runGrblDisconnectTransaction(set, refs, safeWrite);
-    return;
-  }
-  for (const stopCommand of disconnectStopPlan(get(), refs.driver).commands) {
-    await safeWrite(stopCommand, 'disconnect');
   }
 }
 

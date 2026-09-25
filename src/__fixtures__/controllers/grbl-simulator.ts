@@ -4,6 +4,11 @@
 // answers, exactly like real serial latency. Run tests under vi.useFakeTimers
 // and drive with vi.advanceTimersByTimeAsync.
 //
+// Host bytes land in an RX ring and the main loop reads a line only while the
+// firmware model parses lines (grblSimParsesLines): a G4 or M0 in progress, a
+// completed feed hold or door, homing, sleep and a stock critical alarm all
+// leave later lines waiting in the ring, as on GRBL 1.1h.
+//
 // Planner back-pressure is OPT-IN (ADR-265). Pass `plannerBlocks` and the
 // simulator withholds `ok` while its planner is full, exactly as real GRBL
 // does — the failure mode a character-counting sender exists to prevent. Left
@@ -12,9 +17,10 @@
 // `grbl-sim-backpressure.ts` for the firmware citations.
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
-import { createBackpressureFeeder, type BackpressureFeeder } from './grbl-sim-backpressure';
+import { createBackpressureFeeder } from './grbl-sim-backpressure';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
+  grblSimParsesLines,
   initialGrblSimState,
   reduceGrblSim,
   type GrblSimEffect,
@@ -23,11 +29,21 @@ import {
   type GrblSimState,
 } from './grbl-sim-machine';
 import { createPlanner, type GrblSimPlanner } from './grbl-sim-planner';
-import { createRxWindow, GRBL_RX_USABLE_BYTES, type GrblSimRxWindow } from './grbl-sim-rx-window';
+import {
+  acceptRxBytes,
+  createRxWindow,
+  GRBL_RX_USABLE_BYTES,
+  takeRxLine,
+  type GrblSimLineEnding,
+  type GrblSimRxWindow,
+} from './grbl-sim-rx-window';
 import { defaultGrblSimSettings } from './grbl-sim-settings';
 import type { PlatformAdapter } from '../../platform/types';
 
-const REALTIME_BYTES = new Set(['?', '!', '~', '\x18', '\x84', '\x85']);
+// grbl serial.c ISR: `?`, `!`, `~` and Ctrl-X, plus every byte above 0x7F
+// (door, jog cancel, overrides, unassigned), are taken off the stream and
+// never stored in the RX ring (serial.c:150-196).
+const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', '\x18']);
 const SOFT_RESET_BYTE = '\x18';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
@@ -37,12 +53,13 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   readonly emitBannerOnOpen?: boolean;
   /**
    * Model GRBL's bounded planner with this many motion blocks (stock grbl 1.1
-   * is 16). Unset means acks stay immediate — the historical behaviour.
+   * has 15 usable, GRBL_PLANNER_BLOCKS). Unset means acks stay immediate — the
+   * historical behaviour.
    */
   readonly plannerBlocks?: number;
   /** Simulated time one planner block takes to retire. Defaults to `motionMs`. */
   readonly blockRetireMs?: number;
-  /** Usable RX ring bytes. Defaults to grbl's 127 (128 less the reserved slot). */
+  /** Usable RX ring bytes. Defaults to grbl's 128. */
   readonly rxBufferBytes?: number;
 };
 
@@ -62,27 +79,50 @@ export type GrblSimulator = {
   readonly planner: () => GrblSimPlanner;
 };
 
-type HostByteFeeder = Pick<BackpressureFeeder, 'acceptBytes' | 'reset'>;
+type HostByteFeeder = {
+  /** Deliver non-realtime host bytes into the RX ring, then read what the main loop can. */
+  readonly acceptBytes: (data: string) => void;
+  /** Read every complete line the main loop takes now. */
+  readonly drain: () => void;
+  /** Soft reset: the RX ring is flushed and queued motion dropped. */
+  readonly reset: () => void;
+  /** An alarm without a reset: queued motion dropped, the RX ring kept. */
+  readonly wipePlanner: () => void;
+};
 
-/** The pre-existing zero-latency path: every complete line is consumed at once. */
-function createImmediateFeeder(dispatch: (event: GrblSimEvent) => void): HostByteFeeder {
-  let rxBuffer = '';
+type FeederDeps = {
+  readonly reduceLine: (line: string) => ReadonlyArray<GrblSimEffect>;
+  readonly runEffect: (effect: GrblSimEffect) => void;
+  readonly parsesLines: () => boolean;
+  readonly lineEnding: GrblSimLineEnding;
+};
+
+/** The zero-latency path: a complete line is consumed as soon as the main loop reads. */
+function createImmediateFeeder(deps: FeederDeps): HostByteFeeder {
+  let rx = createRxWindow(Number.POSITIVE_INFINITY);
+  const drain = (): void => {
+    while (deps.parsesLines()) {
+      const taken = takeRxLine(rx, deps.lineEnding);
+      rx = taken.window;
+      if (taken.line === null) return;
+      for (const effect of deps.reduceLine(taken.line)) deps.runEffect(effect);
+    }
+  };
   return {
     acceptBytes: (data) => {
-      for (const ch of data) {
-        if (ch === '\n') {
-          const line = rxBuffer.trim();
-          rxBuffer = '';
-          dispatch({ kind: 'rx-line', line });
-          continue;
-        }
-        if (ch !== '\r') rxBuffer += ch;
-      }
+      rx = acceptRxBytes(rx, data);
+      drain();
     },
+    drain,
     reset: () => {
-      rxBuffer = '';
+      rx = createRxWindow(Number.POSITIVE_INFINITY);
     },
+    wipePlanner: () => undefined,
   };
+}
+
+function isRealtimeByte(ch: string): boolean {
+  return ASCII_REALTIME_BYTES.has(ch) || ch.charCodeAt(0) > 0x7f;
 }
 
 /**
@@ -94,19 +134,17 @@ function createImmediateFeeder(dispatch: (event: GrblSimEvent) => void): HostByt
 function routeHostBytes(
   data: string,
   feeder: HostByteFeeder,
-  dispatch: (event: GrblSimEvent) => void,
+  onRealtime: (byte: string) => void,
 ): void {
   let buffered = '';
   for (const ch of data) {
-    if (!REALTIME_BYTES.has(ch)) {
+    if (!isRealtimeByte(ch)) {
       buffered += ch;
       continue;
     }
     feeder.acceptBytes(buffered);
     buffered = '';
-    dispatch({ kind: 'rx-realtime', byte: ch });
-    // A soft reset flushes the receive buffer and the planner on real hardware.
-    if (ch === SOFT_RESET_BYTE) feeder.reset();
+    onRealtime(ch);
   }
   feeder.acceptBytes(buffered);
 }
@@ -135,19 +173,31 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     setTimeout(() => dispatch(effect.event), effect.afterMs);
   };
 
-  const dispatch = (event: GrblSimEvent): void => {
+  const apply = (event: GrblSimEvent): void => {
     const reaction = reduceGrblSim(state, event, opts);
     state = reaction.state;
     for (const effect of reaction.effects) runEffect(effect);
   };
 
-  const reduceLine = (line: string): ReadonlyArray<GrblSimEffect> => {
-    const reaction = reduceGrblSim(state, { kind: 'rx-line', line }, opts);
-    state = reaction.state;
-    return reaction.effects;
+  // An event can unblock the main loop (a dwell ends, cycle start, homing
+  // done), so the ring is read again after every one.
+  const dispatch = (event: GrblSimEvent): void => {
+    apply(event);
+    feeder.drain();
   };
 
-  const backpressure: BackpressureFeeder | null =
+  const deps: FeederDeps = {
+    reduceLine: (line) => {
+      const reaction = reduceGrblSim(state, { kind: 'rx-line', line }, opts);
+      state = reaction.state;
+      return reaction.effects;
+    },
+    runEffect,
+    parsesLines: () => grblSimParsesLines(state, opts),
+    lineEnding: opts.firmware === 'grblhal' ? 'pair' : 'each',
+  };
+
+  const backpressure =
     plannerBlocks === undefined
       ? null
       : createBackpressureFeeder(
@@ -156,11 +206,20 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
             retireMs: blockRetireMs ?? opts.motionMs,
             rxCapacity: rxBufferBytes ?? GRBL_RX_USABLE_BYTES,
           },
-          { reduceLine, runEffect, retireMotion: () => dispatch({ kind: 'motion-finished' }) },
+          // The feeder reads the ring itself once a retired block frees the
+          // main loop, after it releases the withheld ack.
+          { ...deps, retireMotion: () => apply({ kind: 'motion-finished' }) },
         );
-  const feeder: HostByteFeeder = backpressure ?? createImmediateFeeder(dispatch);
+  const feeder: HostByteFeeder = backpressure ?? createImmediateFeeder(deps);
   const inertRxWindow = createRxWindow(0);
   const inertPlanner = createPlanner(0);
+
+  const onRealtime = (byte: string): void => {
+    apply({ kind: 'rx-realtime', byte });
+    // A soft reset flushes the receive buffer and the planner on real hardware.
+    if (byte === SOFT_RESET_BYTE) feeder.reset();
+    feeder.drain();
+  };
 
   port.onOpen(() => {
     feeder.reset();
@@ -169,7 +228,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     }
   });
 
-  port.onWrite((data) => routeHostBytes(data, feeder, dispatch));
+  port.onWrite((data) => routeHostBytes(data, feeder, onRealtime));
 
   return {
     adapter: port.adapter,
@@ -177,9 +236,13 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     state: () => state,
     outbound: () => port.outbound(),
     triggerAlarm: (code) => {
-      state = { ...state, machine: 'Alarm', locked: true, pendingMotions: 0 };
-      feeder.reset();
-      setTimeout(() => port.emitLine(`ALARM:${code}`), opts.responseDelayMs);
+      apply({ kind: 'alarm', code });
+      // grblHAL resets its read buffer on a critical alarm (protocol.c:491);
+      // stock GRBL keeps the bytes until the reset re-initializes it.
+      const critical = code === 1 || code === 2;
+      if (critical && opts.firmware === 'grblhal') feeder.reset();
+      else feeder.wipePlanner();
+      feeder.drain();
     },
     yankCable: () => port.emitClose(),
     rxWindow: () => backpressure?.rxWindow() ?? inertRxWindow,

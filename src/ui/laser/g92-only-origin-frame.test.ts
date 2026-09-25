@@ -32,6 +32,7 @@ import { resetStore } from '../state/test-helpers';
 import { resolveLiveFramePlacement } from './camera-frame-placement';
 import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
 import { currentWorkXy } from './frame-dispatch-support';
+import { disconnectOnTestClock } from '../state/laser-disconnect-testing';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -39,7 +40,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

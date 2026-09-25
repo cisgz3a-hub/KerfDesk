@@ -16,6 +16,7 @@ import { STREAM_HOLD_VISIBLE_MS } from './laser-stream-hold';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const SERPENTINE_CUT: Job = {
   groups: [
@@ -50,7 +51,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

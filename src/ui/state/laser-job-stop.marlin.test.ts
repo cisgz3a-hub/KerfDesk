@@ -19,6 +19,7 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 // One serpentine cut at 300 mm/min: five 200 mm passes joined by 5 mm steps,
 // 1020 mm (about 204 s) of burning that fits in Marlin's 16-block planner.
@@ -69,7 +70,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

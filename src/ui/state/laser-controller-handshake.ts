@@ -21,6 +21,7 @@ import {
 import { qualifyWithoutSettingsDump } from './laser-module-probe';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
+import { awaitHandshakeIdle } from './laser-handshake-idle-query';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -99,8 +100,8 @@ export async function runControllerHandshake(
   await settleAfterControllerLine(guard.sawWelcomeBoundary);
   if (!guard.acceptControllerLineEpoch()) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
-  await waitForHandshakeIdle(get, refs, safeWrite);
-  if (!guard.acceptControllerLineEpoch()) return resume();
+  const sawIdle = await waitForHandshakeIdle(get, refs, safeWrite);
+  if (!guard.acceptControllerLineEpoch() || !sawIdle) return resume();
   if (parkHandshakeForMpg(set, get, refs, connection, guard)) return;
   await qualifyConnectedController(set, get, refs, safeWrite, connection, guard);
 }
@@ -356,17 +357,31 @@ function qualificationCompleted(state: LaserState, expectedEpoch: number): boole
   );
 }
 
+/**
+ * Resolves true once the controller reports a fresh Idle, and false when the
+ * wait ends without one while the controller may still be alive, so the caller
+ * hands qualification to the scheduler instead of failing it (audit TC-1).
+ *
+ * A single `?` left a controller that was busy at connect (buffered motion
+ * still draining, a Jog, a Hold or Door) or still printing boot text
+ * unanswered: the wait expired 8 s later and latched "failed", and nothing
+ * re-ran qualification when the machine reached Idle. The realtime query now
+ * repeats on the status-poll cadence for a bounded wait
+ * (laser-handshake-idle-query.ts); after it, or after an in-session Alarm or
+ * Sleep, the qualification scheduler runs qualification on the first fresh
+ * Idle and keeps waiting while fresh reports arrive.
+ */
 async function waitForHandshakeIdle(
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
-): Promise<void> {
+): Promise<boolean> {
   const state = get();
   if (
     state.statusReport?.state === 'Idle' &&
     state.statusObservation?.sessionEpoch === state.controllerSessionEpoch
   ) {
-    return;
+    return true;
   }
   const realtimeQuery = refs.driver.realtime.statusQuery;
   const queuedQuery = refs.driver.commands.queuedStatusQuery;
@@ -377,8 +392,7 @@ async function waitForHandshakeIdle(
   try {
     if (realtimeQuery !== null) {
       await safeWrite(realtimeQuery, undefined, 'system');
-      await idle;
-      return;
+      return await awaitHandshakeIdle(refs, idle, safeWrite, realtimeQuery);
     }
     await Promise.all([
       idle,
@@ -389,6 +403,7 @@ async function waitForHandshakeIdle(
         source: 'system',
       }),
     ]);
+    return true;
   } catch (error) {
     cancelControllerLifecycleRefs(refs, 'Initial controller qualification failed.');
     await idle.catch(() => undefined);

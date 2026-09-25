@@ -21,6 +21,7 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const BUSY = { kind: 'busy' } as const;
 
@@ -34,7 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,
@@ -111,10 +112,11 @@ describe('Marlin post-job settle and Home through a long drain', () => {
     expect(laser.liveCanvasRun?.timing).toMatchObject({ kind: 'complete' });
   });
 
-  it("completes KerfDesk's own program whose closing park runs at the cut feed", async () => {
-    // A 60 mm cut at 300 mm/min ending at (260, 200): the emitted program
-    // closes with `M5 I` then `G0 X0.000 Y0.000 S0`, which runs at the modal
-    // 300 mm/min without G0_FEEDRATE: 328 mm, about 66 s after its `ok`.
+  it("completes KerfDesk's own program, whose closing park carries the travel feed", async () => {
+    // A 60 mm cut at 300 mm/min ending at (260, 200). Stock Marlin has no
+    // G0_FEEDRATE, so a bare G0 runs at the modal feed; the closing park used to
+    // take the 300 mm/min cut feed, 328 mm or about 66 s after its `ok`. Travel
+    // now carries its own feed (MA-8).
     const job: Job = {
       groups: [
         {
@@ -143,7 +145,7 @@ describe('Marlin post-job settle and Home through a long drain', () => {
       maxPowerS: 255,
       gcodeDialect: { dialectId: 'marlin-inline' },
     });
-    expect(program.trimEnd().split('\n').slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 S0']);
+    expect(program.trimEnd().split('\n').slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 F6000 S0']);
     const marlin = createFifoMarlin();
     await useLaserStore
       .getState()

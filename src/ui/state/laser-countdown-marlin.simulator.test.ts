@@ -10,6 +10,7 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 // No synchronizing footer: the move's ACK leaves buffered motion for M400.
 const BUFFERED_MOTION_JOB = 'G1 X10 Y0 F600 S100\n';
@@ -23,7 +24,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

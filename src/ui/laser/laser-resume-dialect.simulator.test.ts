@@ -43,6 +43,7 @@ import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/ex
 import { resetStore } from '../state/test-helpers';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 import { prepareStartJob } from './start-job-readiness';
+import { disconnectOnTestClock } from '../state/laser-disconnect-testing';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -118,7 +119,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState(initialLaserState());
   resetStore();
   vi.useRealTimers();

@@ -107,6 +107,7 @@ export function scheduleControllerQualification(
   cancelScheduledControllerQualification(refs);
   refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
   let alarmSeen = options.afterAlarm !== true;
+  let reportSequence = get().statusSequence;
   const poll = (): void => {
     refs.qualificationTimer = null;
     const state = get();
@@ -115,7 +116,9 @@ export function scheduleControllerQualification(
       return;
     }
     const controllerBusy = controllerQualificationIsBusy(state);
-    if (controllerBusy || waitingOnOperator(state)) {
+    const freshReport = state.statusSequence !== reportSequence;
+    reportSequence = state.statusSequence;
+    if (controllerBusy || controllerReportsLive(state, freshReport)) {
       refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
     }
     const reported = state.statusReport?.state;
@@ -220,16 +223,21 @@ export function awaitPolledQualification(
   }, POLLED_RESPONSE_TIMEOUT_MS);
 }
 
-// A fresh Alarm or Sleep report is a controller answering and waiting for the
-// operator ($X, $H or Wake), not a dead link. After a Stop mid-motion GRBL
-// reboots into ALARM:3, and the 8 s deadline used to latch "Controller
-// qualification failed" on every such Stop, with nothing re-arming it once the
-// operator unlocked (audit connect-3). Qualification now runs on the first
-// fresh Idle however long the operator takes; reports that stop arriving
-// still time out.
-function waitingOnOperator(state: LaserState): boolean {
+// A fresh report that is not Idle is a live controller: waiting for the
+// operator (Alarm, Sleep: $X, $H or Wake) or still busy (Run, Jog, Home, Hold,
+// Door, Check), not a dead link. After a Stop mid-motion GRBL reboots into
+// ALARM:3, and the 8 s deadline used to latch "Controller qualification
+// failed" on every such Stop, with nothing re-arming it once the operator
+// unlocked (audit connect-3); a controller still busy when the connect
+// handshake handed over did the same (audit TC-1). Qualification now runs on
+// the first fresh Idle however long that takes; reports that stop arriving
+// still time out. An Alarm or Sleep report clears the status observation
+// (laser-status-line handleInvalidatingStatus), so a report also counts as
+// fresh when the status sequence moved since the previous poll.
+function controllerReportsLive(state: LaserState, freshReport: boolean): boolean {
   const reported = state.statusReport?.state;
-  if (reported !== 'Alarm' && reported !== 'Sleep') return false;
+  if (reported === undefined || reported === 'Idle') return false;
+  if (freshReport) return true;
   const observedAt = state.statusObservation?.observedAt;
   return observedAt !== undefined && Date.now() - observedAt <= QUALIFICATION_READY_TIMEOUT_MS;
 }

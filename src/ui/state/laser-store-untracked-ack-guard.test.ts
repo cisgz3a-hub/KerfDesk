@@ -4,6 +4,7 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -78,7 +79,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.useRealTimers();
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,

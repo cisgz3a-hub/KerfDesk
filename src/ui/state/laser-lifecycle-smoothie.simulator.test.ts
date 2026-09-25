@@ -21,6 +21,7 @@ import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { nativeLaserProject } from '../../__fixtures__/controllers/native-laser-project';
 import { emitGcode } from '../../io/gcode/emit-gcode';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 const DRAINED_PAUSE_JOB = 'G1 X10 Y0 F600 S100\n';
@@ -32,7 +33,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

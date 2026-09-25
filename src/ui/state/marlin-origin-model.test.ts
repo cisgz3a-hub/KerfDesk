@@ -22,6 +22,7 @@ import { normalizeFrameWorkCoordinateSystem } from '../laser/frame-controller-re
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 type Xy = { x: number; y: number };
 
@@ -101,7 +102,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

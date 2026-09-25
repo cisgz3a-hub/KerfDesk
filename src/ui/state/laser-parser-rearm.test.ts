@@ -287,7 +287,9 @@ describe('HF-7 grblHAL sticky last_error', () => {
 
   it('Falcon contract: a refused Release motors ($SLP -> error:3) does not refuse the next G1 jog', async () => {
     const fake = await connectFalcon();
-    expect(await settle(useLaserStore.getState().releaseMotors(), 2000)).toMatch(/\$62/);
+    expect(await settle(useLaserStore.getState().releaseMotors(), 2000)).toMatch(
+      /refused \$SLP \(error:3\)/,
+    );
     await settle(useLaserStore.getState().jog({ dx: 1, feed: 600 }), 2000);
     expect(fake.executed()).toContain('G1 X1.000 F600 S0');
   });

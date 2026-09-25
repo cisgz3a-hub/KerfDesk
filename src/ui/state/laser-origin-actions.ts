@@ -336,7 +336,7 @@ async function releaseMotors(
     // `$SLP` refused before it ran: the motors are energized and the origin
     // stands (controller-sleep.ts).
     if (!(error instanceof ControllerCommandRefusedError)) throw error;
-    throw new Error(sleepRefusalMessage(get().activeControllerKind, error.message));
+    throw new Error(sleepRefusalMessage(get(), error.message));
   }
 }
 

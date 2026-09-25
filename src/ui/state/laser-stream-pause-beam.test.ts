@@ -21,6 +21,7 @@ import { STREAM_PAUSE_RESUME_WAIT_MESSAGE } from './laser-stream-pause-beam';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const CUT_JOB: Job = {
   groups: [
@@ -68,7 +69,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

@@ -9,6 +9,7 @@ import {
   type MarlinSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import { DISCONNECT_CLEANUP_ACK_WAIT_MS } from './laser-disconnect-stop';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
@@ -23,7 +24,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore.getState().disconnect();
+  await settleDisconnect(useLaserStore.getState().disconnect());
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,
@@ -55,6 +56,14 @@ afterEach(async () => {
 
 async function pump(ms = 10): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms);
+}
+
+/** Disconnect or Forget on the fake clock. With no realtime reset, Disconnect
+ * waits (bounded) for the beam-off lines' acknowledgements before it closes
+ * the port (audit TC-3). */
+async function settleDisconnect(operation: Promise<void> | undefined): Promise<void> {
+  await pump(DISCONNECT_CLEANUP_ACK_WAIT_MS + 100);
+  await operation;
 }
 
 async function connectMarlin(options: CreateMarlinSimulatorOptions = {}): Promise<MarlinSimulator> {
@@ -222,7 +231,7 @@ describe('Marlin lifecycle against the simulator', () => {
     const sim = await connectMarlinIdle({ responseDelayMs: 100 });
     await startTestLaserJob(jobLines(40), { streamingMode: 'ping-pong' });
 
-    await useLaserStore.getState().forgetDevice?.();
+    await settleDisconnect(useLaserStore.getState().forgetDevice?.());
 
     expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
@@ -245,7 +254,7 @@ describe('Marlin lifecycle against the simulator', () => {
       },
     });
 
-    await useLaserStore.getState().disconnect();
+    await settleDisconnect(useLaserStore.getState().disconnect());
 
     expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
@@ -266,7 +275,7 @@ describe('Marlin lifecycle against the simulator', () => {
       },
     });
 
-    await useLaserStore.getState().forgetDevice?.();
+    await settleDisconnect(useLaserStore.getState().forgetDevice?.());
 
     expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
@@ -286,7 +295,7 @@ describe('Marlin lifecycle against the simulator', () => {
       safetyNotice: { kind: 'disconnect-stop-unconfirmed' },
     });
 
-    await useLaserStore.getState().forgetDevice?.();
+    await settleDisconnect(useLaserStore.getState().forgetDevice?.());
 
     expect(sim.outbound()).toContain('M5 I\n');
     expect(sim.outbound()).toContain('M107\n');
@@ -300,7 +309,7 @@ describe('Marlin lifecycle against the simulator', () => {
   it('keeps an idle Marlin Forget clean', async () => {
     await connectMarlinIdle();
 
-    await useLaserStore.getState().forgetDevice?.();
+    await settleDisconnect(useLaserStore.getState().forgetDevice?.());
 
     expect(useLaserStore.getState()).toMatchObject({
       connection: { kind: 'disconnected' },
