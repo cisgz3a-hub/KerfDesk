@@ -51,10 +51,11 @@ track.
    Default M4 output changes only by losing the between-pass `M4 S0`.
 2. **Restarts step back over the planner.** A planner-discarding stop with no report of its
    backlog records the controller's whole planner at the stop (`bound: 'planner-size'`). That is
-   `$I` or the idle `Bf` when seen, else GRBL 15, grblHAL 100, FluidNC 15 and Smoothieware 32
-   blocks. A report that showed an empty planner is a frontier: the restart begins at the first
-   move acknowledged after it. The restart hint says which bound applied. Marlin's Abort discards
-   nothing (ADR-395) and keeps no step-back. CNC pass proof uses the firmware maximum plus its
+   `$I` or the idle `Bf` when seen, else GRBL 15, grblHAL 100, FluidNC 15, Smoothieware 32 and
+   Marlin 15 blocks. Marlin reports no planner, and the `M410` its Abort sends drops the whole
+   planner (ADR-395; planner.cpp:1688-1689). A report that showed an empty planner is a frontier:
+   the restart begins at the first move acknowledged after it. The restart hint says which bound
+   applied. CNC pass proof uses the firmware maximum plus its
    segment buffer when the planner size is unknown (grblHAL 1010 lines, FluidNC 140, stock GRBL
    32), and the recorded planner size when it is known. A restart may re-burn moves that had
    already run; that is preferred to skipping moves that never ran.

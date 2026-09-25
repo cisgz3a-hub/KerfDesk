@@ -14,6 +14,9 @@
 //  - Smoothieware 38e2cc08: the status string (Kernel.cpp:177-334) has no buffer
 //    field; Conveyor.cpp:77 planner_queue_size 32; ^X (Abort's soft reset)
 //    halts and flushes the queue (USBSerial.cpp:204-206, Conveyor.cpp:89-96).
+//  - Marlin 2.1.2.8: M114 is polled only while idle, so no report comes
+//    mid-job; BLOCK_BUFFER_SIZE 16 (Configuration_adv.h:2393-2399), one kept
+//    free (planner.h:765); Abort's M410 drops them all (planner.cpp:1688-1689).
 
 import { describe, expect, it } from 'vitest';
 import { createStreamer, parseStatusReport } from '../../core/controllers/grbl';
@@ -51,16 +54,14 @@ function streaming(completed: number, activeControllerKind: ControllerKind) {
   };
 }
 
-/** The recorded Abort, as use-job-checkpoint writes it, and its restart line. */
+/** The recorded Abort, as use-job-checkpoint writes it, and its restart line.
+ *  A null status line is a controller that sent no status report mid-job. */
 function abortRestart(
   state: ReturnType<typeof streaming>,
-  statusLine: string,
+  statusLine: string | null,
   acked: number,
 ): number {
-  const report = parseStatusReport(statusLine);
-  if (report === null) throw new Error('status report did not parse');
-  const patch = statusBufferPatch(state as unknown as EvidenceState, report, 0);
-  const live = { ...state, ...patch };
+  const live = statusLine === null ? state : withStatusReport(state, statusLine);
   const interruption = checkpointInterruption(
     'cancelled',
     null,
@@ -68,6 +69,12 @@ function abortRestart(
     currentRunPlannerBacklog(live),
   );
   return automaticRestart(PROGRAM, acked, interruption ?? undefined).line;
+}
+
+function withStatusReport(state: ReturnType<typeof streaming>, statusLine: string) {
+  const report = parseStatusReport(statusLine);
+  if (report === null) throw new Error('status report did not parse');
+  return { ...state, ...statusBufferPatch(state as unknown as EvidenceState, report, 0) };
 }
 
 describe('OR-3: an Abort restart steps back over the planner without a Bf backlog', () => {
@@ -100,6 +107,13 @@ describe('OR-3: an Abort restart steps back over the planner without a Bf backlo
       42,
     );
     expect(line).toBeLessThanOrEqual(6 + 37 - 32);
+  });
+
+  it('Marlin (no status report mid-job): steps back the 15 blocks its M410 quick stop drops', () => {
+    // Marlin answers a G1 once it is in the planner, and Abort's M410 drops
+    // every planned move (planner.cpp:1688-1689). 5 setup lines + 30 moves
+    // acknowledged: raw 6 + (30 - 15) = 21.
+    expect(abortRestart(streaming(35, 'marlin'), null, 35)).toBe(21);
   });
 
   it('a last report with an empty planner still steps back over moves acknowledged after it', () => {

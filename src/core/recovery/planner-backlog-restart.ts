@@ -25,9 +25,11 @@
 //  - FluidNC v4.0.3: planner_blocks default 16, one kept free
 //    (Machine/MachineConfig.h:98, Planner.cpp:445);
 //  - Smoothieware: planner_queue_size default 32 (Conveyor.cpp:77), flushed
-//    by the ^X halt Abort sends (Conveyor.cpp:89-96).
-// Marlin has none: Abort queues its stop behind accepted motion instead of
-// discarding the planner. Ruida is never streamed.
+//    by the ^X halt Abort sends (Conveyor.cpp:89-96);
+//  - Marlin 2.1.2.8: BLOCK_BUFFER_SIZE 16 (Configuration_adv.h:2393-2399), one
+//    kept free (planner.h:765), all dropped by the M410 quick stop that Abort
+//    sends (planner.cpp:1688-1689; ADR-395).
+// Ruida is never streamed.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
 import type { ControllerKind } from '../devices';
@@ -38,6 +40,7 @@ export const DEFAULT_PLANNER_BLOCKS: Readonly<Partial<Record<ControllerKind, num
   grblhal: 100,
   fluidnc: 15,
   smoothieware: 32,
+  marlin: 15,
 };
 
 const COMMENT = /\([^)]*\)|;.*$/g;

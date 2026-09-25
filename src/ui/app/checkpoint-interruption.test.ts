@@ -181,7 +181,11 @@ describe('planner backlog on the recorded cause', () => {
         controllerBuildInfoObservation: { sessionEpoch: 2, observedAt: 1 },
       }),
     ).toMatchObject({ queuedBlocks: 35 });
-    // Marlin's Abort keeps its planner; nothing to step back over.
-    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'marlin' })).toBeUndefined();
+    // Marlin's Abort sends M410, which drops its 15-block planner (ADR-395).
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'marlin' })).toMatchObject({
+      queuedBlocks: 15,
+    });
+    // Ruida is never streamed.
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'ruida' })).toBeUndefined();
   });
 });

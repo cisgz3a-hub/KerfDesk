@@ -127,8 +127,8 @@ export type PlannerSizeSource = {
 /**
  * The current controller session's usable planner size: the larger of its idle
  * `Bf` blocks free and its `$I` OPT block count, else the controller family's
- * default (planner-backlog-restart.ts). Undefined for a controller whose stop
- * keeps its planner (controller audit OR-3).
+ * default (planner-backlog-restart.ts). Undefined for a controller KerfDesk
+ * never streams (controller audit OR-3).
  */
 export function controllerPlannerSizeBlocks(state: PlannerSizeSource): number | undefined {
   const session = state.controllerSessionEpoch;
