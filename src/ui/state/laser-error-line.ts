@@ -15,6 +15,7 @@ import {
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { requalifyAfterHaltingReset } from './laser-controller-qualification';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { advanceStream } from './laser-stream-ack';
 import { noteRefusedLine } from './laser-parser-rearm';
@@ -67,7 +68,9 @@ export function handleErrorLine(
     return;
   }
   // A halted controller runs nothing more, so no stop line is written to it.
-  if (rejection.halted !== true) requestRealtimeStopAfterStreamError(set, refs, state, safeWrite);
+  if (rejection.halted !== true) {
+    requestRealtimeStopAfterStreamError(set, get, refs, state, safeWrite);
+  }
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -103,7 +106,7 @@ export function handleResendLine(
       undefined,
     ),
   });
-  requestRealtimeStopAfterStreamError(set, refs, current, safeWrite);
+  requestRealtimeStopAfterStreamError(set, get, refs, current, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -150,6 +153,7 @@ function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
 
 function requestRealtimeStopAfterStreamError(
   set: SetFn,
+  get: GetFn,
   refs: HandlerRefs,
   state: LaserState,
   safeWrite: SafeWriteFn,
@@ -173,6 +177,7 @@ function requestRealtimeStopAfterStreamError(
   }
   clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
+  requalifyAfterHaltingReset(set, get, refs, driver.capabilities);
   // Arm before the realtime write, exactly like operator Abort. Web Serial can
   // reject its promise after the reset byte reached the controller and a boot
   // banner can arrive immediately; pre-arming preserves that evidence race and

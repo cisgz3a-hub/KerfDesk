@@ -4,8 +4,10 @@
 // 400-line cap.
 //
 // A GRBL-family or Smoothieware controller gets its realtime soft reset and
-// the beam-off cleanup after the reboot banner. A controller without a
-// realtime reset gets the driver's ordered stop lines (Marlin: M107, M410,
+// the beam-off cleanup after the reboot banner, or after a short fallback
+// delay. Smoothieware halts instead of rebooting and prints no banner, so its
+// qualification is re-armed here (controller audit CG-3). A controller without
+// a realtime reset gets the driver's ordered stop lines (Marlin: M107, M410,
 // M5 I, then M9 when air may be on; laser-quick-stop.ts) as ordinary lines
 // that owe acknowledgements (controller audit MA-7, CG-10). Only a stop that
 // sent a reset byte forgets the work origin (MA-3): Marlin keeps its G92
@@ -17,6 +19,10 @@ import type { SerialConnection } from '../../platform/types';
 import { clearCncLiveCaps } from './detected-settings-action';
 import type { JobStopReason } from './job-stop-request';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import {
+  requalifyAfterHaltingReset,
+  type ControllerQualificationScheduleRefs,
+} from './laser-controller-qualification';
 import { releaseHostedRefill } from './laser-hosted-refill';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
@@ -49,7 +55,8 @@ export type JobStopContext = {
   readonly set: SetFn;
   readonly get: () => LaserState;
   readonly refs: ResetCleanupRefs &
-    ControllerLifecycleRefs & {
+    ControllerLifecycleRefs &
+    ControllerQualificationScheduleRefs & {
       readonly driver: ControllerDriver;
       readonly connection?: SerialConnection | null;
     };
@@ -128,6 +135,7 @@ async function stopWithReset(
       ? {}
       : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
   }));
+  requalifyAfterHaltingReset(set, context.get, refs, driver().capabilities);
   armResetCleanup(refs, safeWrite, cleanupLines);
   // The reset goes to the transport before the hosted refill is taken back.
   // A worker that receives it retires its own refill queue (ADR-334 §4), so

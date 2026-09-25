@@ -108,4 +108,11 @@ export type ControllerCapabilities = {
   // build compiles no G92.1 (G92.cpp:62-70; controller audit 2026-09-25 MA-2,
   // CG-1, CG-11). Absent means 'reported'.
   readonly workOffsetSource?: 'reported' | 'host-recorded';
+  // Whether the realtime soft reset reboots the firmware, which then prints
+  // its banner. GRBL-family firmware does. Smoothieware halts instead: Ctrl-X
+  // sets halt_flag (USBSerial.cpp:204-208) and on_idle prints `HALTED, M999
+  // or $X to exit HALT state` (:298-311), with no banner, so KerfDesk re-arms
+  // qualification itself (controller audit 2026-09-25 CG-3). Absent means
+  // true.
+  readonly softResetReboots?: boolean;
 };

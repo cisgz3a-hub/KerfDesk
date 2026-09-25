@@ -26,8 +26,7 @@ import {
   assertProgramHasSendableLine,
   assertStartControllerEvidence,
 } from './laser-start-program-assertions';
-import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
-import type { ResetCleanupRefs } from './laser-reset-cleanup';
+import { startControllerCommand } from './laser-interactive-command';
 import { frameProofReset } from './laser-session-reset';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -48,7 +47,7 @@ import { effectiveStartStreamOptions } from './laser-job-effective-stream-option
 import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
 import { liveCanvasExecutionAcceptedPatch, liveCanvasStartPatch } from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
-import { runStopJob } from './laser-job-stop';
+import { runStopJob, type JobStopContext } from './laser-job-stop';
 import {
   containActiveStreamWriteFailure,
   streamWriteOwner,
@@ -56,7 +55,6 @@ import {
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 import { laserStartOverrideReset } from './laser-start-override-reset';
-import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
@@ -77,11 +75,7 @@ type StartSetupEpoch = CncControllerEpoch;
 type JobActionContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: ResetCleanupRefs &
-    ControllerLifecycleRefs & {
-      readonly driver: ControllerDriver;
-      readonly connection?: SerialConnection | null;
-    };
+  readonly refs: JobStopContext['refs'];
   readonly safeWrite: SafeWriteFn;
   readonly driver: DriverFn;
 };

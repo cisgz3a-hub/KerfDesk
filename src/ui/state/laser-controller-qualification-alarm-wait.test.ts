@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   qualifyingController,
+  requalifyAfterHaltingReset,
   resumeQualificationInSession,
   scheduleControllerQualification,
   type ControllerQualificationScheduleRefs,
@@ -110,6 +111,35 @@ describe('qualification while the controller waits for the operator', () => {
     report(h, 'Idle');
     await vi.advanceTimersByTimeAsync(100);
     expect(h.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('after a halting reset, runs only on an Idle that follows an Alarm (CG-3)', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    // A report the board printed before the Ctrl-X landed.
+    report(h, 'Idle');
+    requalifyAfterHaltingReset(h.set, h.get, h.refs, { softResetReboots: false });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(h.run).not.toHaveBeenCalled();
+
+    report(h, 'Alarm');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(h.run).not.toHaveBeenCalled();
+
+    report(h, 'Idle');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a rebooting controller to its banner', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    report(h, 'Idle');
+    requalifyAfterHaltingReset(h.set, h.get, h.refs, {});
+    requalifyAfterHaltingReset(h.set, h.get, h.refs, { softResetReboots: true });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.refs.qualificationTimer ?? null).toBeNull();
   });
 
   it('leaves a different connection or session alone', () => {

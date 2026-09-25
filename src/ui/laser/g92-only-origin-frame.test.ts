@@ -186,4 +186,31 @@ describe('CG-2: the Frame G54 normalization on g92-only controllers', () => {
     expect(after.ok, JSON.stringify(after)).toBe(true);
     expect(useLaserStore.getState().workOriginActive).toBe(true);
   });
+
+  it('Smoothieware: an Absolute Frame after the normalization still compensates the G92 the board keeps', async () => {
+    const sim = await connectSmoothieIdle();
+    await settle(useLaserStore.getState().jog({ dx: 110, dy: 60, feed: 6_000 }));
+    await pump(2_000);
+    await settle(useLaserStore.getState().setOriginHere());
+    await pump(1_000);
+    expect(useLaserStore.getState().statusReport).toMatchObject({
+      mPos: { x: 110, y: 60 },
+      wPos: { x: 0, y: 0 },
+    });
+    const placement = { startFrom: 'absolute', anchor: 'front-left' } as const;
+    useStore.setState({ jobPlacement: placement });
+
+    await settle(normalizeFrameWorkCoordinateSystem());
+    await pump(1_000);
+
+    // `$G` reads G54 back (SimpleShell.cpp L218-L222), so no G54 is written,
+    // and the offset the board still applies is compensated as before.
+    expect(sim.outbound()).toContain('$G\n');
+    expect(sim.outbound()).not.toContain('G54\n');
+    const after = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
+    expect(after, JSON.stringify(after)).toMatchObject({
+      ok: true,
+      preflightMotionOffset: { x: 110, y: 60 },
+    });
+  });
 });

@@ -53,6 +53,8 @@ export const smoothiewareDriver: ControllerDriver = {
     // A halted board answers its Home sequence's first line (M400) with `!!`
     // until M999 (GcodeDispatch.cpp:158-180).
     homeFromAlarm: false,
+    // Ctrl-X halts the board; it does not reboot or print a banner (CG-3).
+    softResetReboots: false,
   },
   realtime: {
     statusQuery: RT_STATUS,

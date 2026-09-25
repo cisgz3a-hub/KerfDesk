@@ -1,3 +1,4 @@
+import type { ControllerCapabilities } from '../../core/controllers/controller-capabilities';
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
@@ -91,22 +92,25 @@ export function failedControllerQualificationPatch(
   return { controllerQualification: { kind: 'failed', epoch: expectedEpoch, message } };
 }
 
+type QualificationScheduleOptions = {
+  /** Run only on an Idle that follows an Alarm report. */
+  readonly afterAlarm?: boolean;
+};
+
 export function scheduleControllerQualification(
   set: SetFn,
   get: GetFn,
   refs: ControllerQualificationScheduleRefs,
   epoch: number,
+  options: QualificationScheduleOptions = {},
 ): void {
   cancelScheduledControllerQualification(refs);
   refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
+  let alarmSeen = options.afterAlarm !== true;
   const poll = (): void => {
     refs.qualificationTimer = null;
     const state = get();
-    if (!qualificationScheduleIsCurrent(state, refs, epoch)) {
-      refs.qualificationDeadline = null;
-      return;
-    }
-    if (qualificationIsTerminal(state.controllerQualification)) {
+    if (!qualificationStillPending(state, refs, epoch)) {
       refs.qualificationDeadline = null;
       return;
     }
@@ -114,11 +118,11 @@ export function scheduleControllerQualification(
     if (controllerBusy || waitingOnOperator(state)) {
       refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
     }
-    if (!controllerBusy && state.statusReport?.state === 'Idle') {
+    const reported = state.statusReport?.state;
+    if (reported === 'Alarm') alarmSeen = true;
+    if (!controllerBusy && alarmSeen && reported === 'Idle') {
       refs.qualificationDeadline = null;
-      const run = refs.runControllerQualification;
-      if (run == null) return;
-      void run().catch(() => undefined);
+      startQualificationRun(refs);
       return;
     }
     if (Date.now() >= (refs.qualificationDeadline ?? 0)) {
@@ -135,6 +139,25 @@ export function scheduleControllerQualification(
     refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
   };
   refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
+}
+
+/**
+ * A soft reset that halts the firmware instead of rebooting it (Smoothieware)
+ * prints no banner, so no banner re-arms qualification (controller audit
+ * 2026-09-25 CG-3). The halted board reports Alarm until the operator clears
+ * it with M999. Qualification runs on the first fresh Idle after that Alarm,
+ * so a report printed before the reset landed cannot start it.
+ */
+export function requalifyAfterHaltingReset(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerQualificationScheduleRefs,
+  capabilities: Pick<ControllerCapabilities, 'softResetReboots'>,
+): void {
+  if (capabilities.softResetReboots !== false) return;
+  scheduleControllerQualification(set, get, refs, get().controllerSessionEpoch, {
+    afterAlarm: true,
+  });
 }
 
 /**
@@ -226,6 +249,23 @@ function qualificationScheduleIsCurrent(
 
 function qualificationIsTerminal(qualification: ControllerQualification): boolean {
   return qualification.kind === 'qualified' || qualification.kind === 'failed';
+}
+
+function startQualificationRun(refs: ControllerQualificationScheduleRefs): void {
+  const run = refs.runControllerQualification;
+  if (run == null) return;
+  void run().catch(() => undefined);
+}
+
+function qualificationStillPending(
+  state: LaserState,
+  refs: ControllerQualificationScheduleRefs,
+  epoch: number,
+): boolean {
+  return (
+    qualificationScheduleIsCurrent(state, refs, epoch) &&
+    !qualificationIsTerminal(state.controllerQualification)
+  );
 }
 
 function controllerQualificationIsBusy(state: LaserState): boolean {

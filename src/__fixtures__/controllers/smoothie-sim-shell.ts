@@ -44,7 +44,8 @@ export type SmoothieShellReply = {
   readonly clearsHalt: boolean;
 };
 
-const MODAL_STATE_LINE = '[G0 G54 G17 G21 G90 G94 M0 M5 M9 T0 F4000.0000 S0.8000]';
+// SimpleShell `state` (SimpleShell.cpp L879-L890 at 38e2cc08), printed for $G and $I.
+const MODAL_STATE_LINE = '[GC:G0 G54 G17 G21 G90 G94 M0 M5 M9 T0 F4000.0000 S0.8000]';
 const KNOWN_TEXT_COMMANDS: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
   ['help', ['Commands:', 'version', 'mem [-v]', 'ls [-s] [folder]']],
   ['mem', ['Unused Heap: 2048 bytes', 'Used Heap Size: 30720']],
