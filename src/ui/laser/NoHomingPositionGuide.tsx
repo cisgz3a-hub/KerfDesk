@@ -143,28 +143,33 @@ function useGuideActions(
       setError(null);
       void wakeController()
         .then(async (outcome) => {
-          // GRBL, grblHAL and FluidNC come back from the reset locked in Alarm
-          // by design: offer Unlock instead of setting an origin on a locked
-          // controller (controller audit 2026-09-25 HF-5).
-          if (outcome === 'alarm') {
-            setPhase('alarmed');
-            return;
-          }
+          if (outcome === 'alarm') return setPhase('alarmed');
           await finishHandPosition({ setOriginHere, setJobPlacement });
           setPhase('ready');
           pushToast('Hand position is ready. Frame the job before Start.', 'success');
         })
-        .catch((cause: unknown) => {
-          if (useLaserStore.getState().statusReport?.state === 'Alarm') {
-            setPhase('alarmed');
-            setError(null);
-            return;
-          }
-          fail(cause);
-        });
+        .catch((cause: unknown) => wakeFailed(cause, setPhase, setError, fail));
     },
     onUnlock: () => unlockAndWait(unlockAlarm, setPhase, setError),
   };
+}
+
+// GRBL, grblHAL and FluidNC come back from the reset locked in Alarm by design:
+// the wake resolves 'alarm' and the guide offers Unlock instead of setting an
+// origin on a locked controller (controller audit 2026-09-25 HF-5). A failed
+// wake that still left the controller in Alarm is handled the same way.
+function wakeFailed(
+  cause: unknown,
+  setPhase: (phase: GuidePhase) => void,
+  setError: (error: string | null) => void,
+  fail: (cause: unknown) => void,
+): void {
+  if (useLaserStore.getState().statusReport?.state === 'Alarm') {
+    setPhase('alarmed');
+    setError(null);
+    return;
+  }
+  fail(cause);
 }
 
 const UNLOCK_IDLE_WAIT_MS = 5_000;
