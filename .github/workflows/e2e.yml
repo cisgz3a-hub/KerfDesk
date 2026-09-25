@@ -50,7 +50,9 @@ jobs:
 
       - name: Run development and production-bundle browser smoke
         id: browser_smoke
-        run: pnpm test:e2e:cold && pnpm test:e2e && pnpm test:e2e:production-bundle
+        # Check viewer responsiveness early so its failure trace is available
+        # without waiting for the full suite. The complete suite still follows.
+        run: pnpm test:e2e:cold && pnpm test:e2e e2e/connected-script-gcode-viewer.e2e.ts && pnpm test:e2e && pnpm test:e2e:production-bundle
 
       - name: Record SHA-correlated readiness lanes
         if: always()
@@ -65,7 +67,7 @@ jobs:
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
-          "--evidence=browser=3 checks: cold dev start, full dev suite, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
+          "--evidence=browser=4 checks: cold dev start, viewer responsiveness, full dev suite, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()
