@@ -1,6 +1,6 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
-import type { StatusQueryCapability } from '../../core/controllers';
+import type { LaserModuleEvidence, StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
 import type { SimilarityTransform } from '../../core/registration';
@@ -149,6 +149,11 @@ export type MachineStartSnapshot = {
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation?: SessionObservationStamp | null;
+  /** The connection's laser-module probe result (Smoothieware M221). */
+  readonly laserModuleReport?: LaserModuleEvidence | null;
+  /** The factual refusal of laser output (no laser module), set only for
+   *  laser projects; Frame and Start preparation report it. */
+  readonly laserOutputRefusal?: string | null;
 };
 
 export function prepareStartJob(

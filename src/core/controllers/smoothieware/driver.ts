@@ -11,7 +11,9 @@ import {
   buildSmoothieJogCommand,
   SMOOTHIE_CMD_FIRMWARE_INFO,
   SMOOTHIE_CMD_HOME,
+  SMOOTHIE_CMD_POP_STATE,
   SMOOTHIE_CMD_POSITION,
+  SMOOTHIE_CMD_PUSH_STATE,
   SMOOTHIE_CMD_SETTLE,
   SMOOTHIE_CMD_UNLOCK,
   SMOOTHIE_CMD_VERSION,
@@ -19,6 +21,7 @@ import {
   SMOOTHIE_FRAME_TOOL_OFF_LINES,
 } from './commands';
 import { prepareSmoothieConsoleCommand } from './console-command';
+import { smoothieLaserModuleProbe } from './laser-module';
 import { classifySmoothieResponse } from './response';
 
 export const SMOOTHIE_DEFAULT_BAUD_RATE = 115200;
@@ -81,6 +84,7 @@ export const smoothiewareDriver: ControllerDriver = {
     clearPersistentOrigin: null,
     buildJog: buildSmoothieJogCommand,
     buildFrameLines: buildSmoothieFrameLines,
+    frameModalState: { push: SMOOTHIE_CMD_PUSH_STATE, pop: SMOOTHIE_CMD_POP_STATE },
   },
   classifyLine: classifySmoothieResponse,
   prepareConsoleCommand: prepareSmoothieConsoleCommand,
@@ -98,4 +102,7 @@ export const smoothiewareDriver: ControllerDriver = {
   // config-set/config-load persist Smoothie configuration; block them inside
   // streamed payloads the same way GRBL blocks $-lines mid-job.
   isSetupOnlyPayload: (payload) => /(^|\n)\s*config-(set|load)\b/i.test(payload),
+  // `fire off` and the M221 power modes exist only while the Laser module is
+  // loaded; qualification asks the board with M221 (laser-module.ts).
+  laserModuleProbe: smoothieLaserModuleProbe,
 };

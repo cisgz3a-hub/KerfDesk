@@ -9,7 +9,6 @@ import {
 } from './laser-interactive-command';
 import {
   failedControllerQualificationPatch,
-  qualifiedController,
   qualifyingController,
   resumeQualificationInSession,
 } from './laser-controller-qualification';
@@ -19,6 +18,7 @@ import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
 } from './laser-controller-build-info';
+import { qualifyWithoutSettingsDump } from './laser-module-probe';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
@@ -169,11 +169,18 @@ async function qualifyConnectedController(
   const settingsQuery = refs.driver.commands.settingsQuery;
   const qualificationEpoch = guard.expectedSessionEpoch;
   if (settingsQuery === null) {
-    set({
-      controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),
-      log: pushLog(get(), '[lf2] Connected.'),
+    // Drivers without a settings dump may still prove their laser module
+    // (Smoothieware M221); GRBL-family drivers never reach this branch.
+    return qualifyWithoutSettingsDump({
+      set,
+      get,
+      refs,
+      write: safeWrite,
+      epoch: qualificationEpoch,
+      isCurrent: () => handshakeIsCurrent(refs, connection, guard.expectedWriteEpoch),
+      parkForMpg: () => parkHandshakeForMpg(set, get, refs, connection, guard),
+      resume: () => resumeQualificationInSession(set, get, refs, connection, qualificationEpoch),
     });
-    return;
   }
   set({
     controllerOperation: { kind: 'connection-handshake', phase: 'settings' },

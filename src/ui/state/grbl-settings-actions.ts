@@ -15,7 +15,6 @@ import {
 } from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
-  qualifiedController,
   qualifyingController,
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
@@ -26,6 +25,7 @@ import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import { beginReportUnitsWrite, retainControllerReportUnits } from './controller-report-units';
+import { requalifyWithoutSettingsDump } from './laser-module-probe';
 import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
@@ -78,15 +78,7 @@ async function readMachineSettingsAction(
   if (blocked !== null) return blockRead(set, get, blocked);
   const qualificationEpoch = get().controllerSessionEpoch;
   if (settingsQuery === null) {
-    set((state) => ({
-      controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),
-      lastWriteError: null,
-      log: pushLog(
-        state,
-        `[lf2] ${refs.driver.label} does not require a controller settings dump.`,
-      ),
-    }));
-    return;
+    return requalifyWithoutSettingsDump(set, get, refs, write, qualificationEpoch);
   }
   beginSettingsCollection(refs, qualificationEpoch);
   set({

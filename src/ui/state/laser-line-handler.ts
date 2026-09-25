@@ -42,6 +42,7 @@ import {
 } from './laser-interactive-command';
 import { handleErrorLine, handleResendLine } from './laser-error-line';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import { restoreInterruptedFrameModalState } from './laser-frame-modal-restore';
 import {
   acknowledgeMotionSettlementMarker,
   takeNextAcknowledgedFramePrefixLine,
@@ -115,6 +116,7 @@ function handleNonBannerLine(
     // new boot, not the reset that raised it (laser-reset-alarm.ts).
     forgetAlarmBeforeBanner(refs);
     handleStatusLine(set, get, refs, safeWrite, cls.report);
+    restoreInterruptedFrameModalState(set, get, refs, safeWrite, cls.report);
     return;
   }
   if (cls.kind === 'alarm') {

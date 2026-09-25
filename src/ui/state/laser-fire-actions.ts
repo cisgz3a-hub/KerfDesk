@@ -1,5 +1,7 @@
 import { cappedFirePowerS, profileSupportsCapability } from '../../core/devices';
+import { laserOutputRefusal } from '../../core/preflight/laser-module-readiness';
 import { machineKindOf } from '../../core/scene';
+import { connectedLaserModuleEvidence } from './laser-module-probe';
 import { useExperimentalLaserFeatures } from './experimental-laser-features';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -151,6 +153,9 @@ function fireControllerStateBlockMessage(state: LaserState): string | null {
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
   const mpgBlock = mpgCommandBlockMessage(state);
   if (mpgBlock !== null) return mpgBlock;
+  // No laser module: the controller factually cannot fire (controller audit SM-3).
+  const noLaserOutput = laserOutputRefusal(connectedLaserModuleEvidence(state));
+  if (noLaserOutput !== null) return noLaserOutput;
   if (state.alarmCode !== null) return 'Clear the controller alarm before using Fire.';
   if (state.statusReport === null) {
     return 'Controller status is not known yet. Wait for an Idle position report.';

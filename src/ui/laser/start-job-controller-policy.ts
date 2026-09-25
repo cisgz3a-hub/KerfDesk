@@ -1,5 +1,7 @@
+import type { LaserModuleEvidence } from '../../core/controllers';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { ControllerReadinessResult } from '../../core/preflight';
+import { constantPowerModeWarning } from '../../core/preflight/laser-module-readiness';
 import { evaluateM7AirAssistReadiness } from '../../core/preflight/m7-air-assist-readiness';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
 
@@ -7,6 +9,7 @@ export type StartControllerPolicyMachine = {
   readonly controllerSessionEpoch?: number;
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
+  readonly laserModuleReport?: LaserModuleEvidence | null;
 };
 
 export function startControllerPolicy(
@@ -23,10 +26,14 @@ export function startControllerPolicy(
     machine.controllerBuildInfo ?? null,
     buildInfoObservationIsCurrent(machine),
   );
+  // A Smoothieware build without M221 P runs constant-power layers
+  // speed-proportional (controller audit SM-2): stated, never refused.
+  const constantPower = constantPowerModeWarning(gcode, machine.laserModuleReport);
   return {
     advisories: [
       ...controller.errors.map((issue) => issue.message),
       ...(m7.kind === 'unsupported' || m7.kind === 'unknown' ? [m7.message] : []),
+      ...(constantPower === null ? [] : [constantPower]),
     ],
   };
 }
