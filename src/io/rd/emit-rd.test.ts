@@ -85,8 +85,9 @@ describe('emitRdFile', () => {
     if (result.ok) expect(result.bytes.length).toBeGreaterThan(0);
   });
 
-  // The .rd path runs no post-compile preflight, so this field is the only way
-  // a pre-emit finding can reach the operator (handleSaveRd toasts it).
+  // advisories is how an export finding reaches the operator (handleSaveRd
+  // toasts it). The post-compile checks repeat this pre-emit finding, and it
+  // is reported once.
   it('carries the policy finding out as an advisory', () => {
     const base = ruidaLineProject();
     const result = emitRdFile({

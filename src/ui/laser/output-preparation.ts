@@ -98,8 +98,8 @@ async function prepareRdOutput(
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
   const prepared = await prepareWithOptionalSnapshot(project, request, context);
-  // The same options as the direct path: the placement picks the file's
-  // reference point (audit RU-2).
+  // The same options as the direct path: placement picks the reference point
+  // and the preflight frame decides the post-compile checks (audit RU-2/RU-7).
   return { kind: 'rd', result: emitPreparedRdFile(prepared, request.options) };
 }
 

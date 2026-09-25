@@ -35,12 +35,13 @@ describe('Ruida background output preparation', () => {
     EQUIVALENCE_TIMEOUT_MS,
   );
 
-  // Audit RU-2: the worker encoded without the request options, so its file
-  // could name a different reference point than the direct path.
-  it('encodes with the request placement', async () => {
+  // Audit RU-2/RU-7: the worker encoded without the request options, so its
+  // file could name a different reference point and skip the Save frame.
+  it('encodes with the request placement and preflight frame', async () => {
     const project = heavyRuidaLineProject(1);
     const options: EmitRdOptions = {
       jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+      preflightCoordinateMode: 'relative-origin',
     };
     const direct = emitRdFile(project, options);
     if (!direct.ok) throw new Error('direct fixture emission failed');
