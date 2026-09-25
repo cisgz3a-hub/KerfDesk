@@ -194,7 +194,7 @@ describe('parseSvg initial fill', () => {
         args(
           svg(`<style>.clipped { clip-path: url(#c) }</style>
             <clipPath id="c"><rect width="20" height="10"/></clipPath>
-            <g class="clipped"><path stroke="#ff0000" d="M0 0 L5 0"/></g>`),
+            <g class="clipped"><path stroke="#ff0000" d="M0 5 L30 5"/></g>`),
         ),
       ),
     ).toThrow(/vector clipping is not supported/i);

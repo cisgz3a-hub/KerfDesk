@@ -165,6 +165,15 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
    and document replacement leave the complete file uninserted and release staged image assets.
 
+#### Edge — SVG with a vector clip
+1. A vector clip that hides none of the artwork imports as if it were absent, such as the frame or
+   artboard rectangle Figma and Illustrator wrap exported content in. KerfDesk accepts it when
+   the clip is one shape in user-space units (SVG's default) with a single convex outline, and
+   every point of the clipped artwork lies inside it (ADR-358 Amendment 1).
+2. Any other vector clip, and every vector mask and filter, still rejects the whole file with its
+   reason, because importing it unclipped could cut what the design hides.
+3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`, the SVG default.
+
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
 2. If not SVG: toast (error variant, red): `Not a valid SVG: <filename>`. No state change.
