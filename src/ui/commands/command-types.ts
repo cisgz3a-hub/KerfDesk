@@ -143,6 +143,9 @@ export type AppCommandContext = {
   readonly dirty: boolean;
   readonly savedName: string | null;
   readonly serialSupported: boolean;
+  // The profile's controller driver has no live transport (ADR-097: Ruida
+  // .rd export), so Connect is unavailable on every surface.
+  readonly fileOnlyTransport: boolean;
   readonly connected: boolean;
   readonly machineBusy: boolean;
   readonly jobActive: boolean;

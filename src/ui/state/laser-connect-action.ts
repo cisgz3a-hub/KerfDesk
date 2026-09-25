@@ -31,11 +31,48 @@ type AttachConnectionFn = (
 ) => void;
 type ConnectingPatchFn = (state: LaserState, refs: LiveRefs) => Partial<LaserState>;
 
+/** Why a file-only profile (ADR-097: Ruida .rd export) cannot Connect. The
+ *  menu and palette Connect command shows the same text as its disabled reason. */
+export const FILE_ONLY_CONNECT_REFUSAL =
+  'This machine profile exports .rd files only; it has no live connection.';
+
 export async function runConnectAction(
   set: SetFn,
   refs: LiveRefs,
   adapter: PlatformAdapter,
   options: ConnectControllerOptions,
+  closePrevious: ClosePreviousFn,
+  connectingPatch: ConnectingPatchFn,
+  attachConnection: AttachConnectionFn,
+): Promise<void> {
+  // A file-only driver has no protocol to speak over a serial port, so this
+  // refusal is a factual transport inability, not a policy gate. It comes
+  // before the picker and before any live connection or attempt is touched
+  // (audit RU-6).
+  const driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
+  if (driver.capabilities.transport === 'file-only') {
+    set((state) => ({ log: pushLog(state, FILE_ONLY_CONNECT_REFUSAL) }));
+    useToastStore.getState().pushToast(FILE_ONLY_CONNECT_REFUSAL, 'error');
+    return;
+  }
+  await connectSerialController(
+    set,
+    refs,
+    adapter,
+    options,
+    driver,
+    closePrevious,
+    connectingPatch,
+    attachConnection,
+  );
+}
+
+async function connectSerialController(
+  set: SetFn,
+  refs: LiveRefs,
+  adapter: PlatformAdapter,
+  options: ConnectControllerOptions,
+  driver: ControllerDriver,
   closePrevious: ClosePreviousFn,
   connectingPatch: ConnectingPatchFn,
   attachConnection: AttachConnectionFn,
@@ -64,7 +101,7 @@ export async function runConnectAction(
   }
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   refs.nextTranscriptId = 1;
-  refs.driver = selectControllerDriver(options.controllerKind, options.controllerCommandSet);
+  refs.driver = driver;
   set((state) => connectingPatch(state, refs));
   try {
     const portRef = await adapter.serial.requestPort();
