@@ -1,5 +1,6 @@
-// ST-1 repro — Continue at a CNC tool-change hold is offered, and streams the
-// next section, while the operator's own jog is still moving the machine.
+// Controller audit 2026-09-25 ST-1 (regression): Continue at a CNC tool-change
+// hold used to stream the next section while the operator's own jog was still
+// moving the machine.
 //
 // Correct behaviour: Continue must not put G-code on the wire while the
 // controller is still in its Jog state. GRBL 1.1h locks every non-`$` line out
@@ -11,15 +12,11 @@
 //   https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L99-L101
 // grblHAL does the same (protocol.c:256 `else if(state_get() & (STATE_ALARM|STATE_ESTOP|STATE_JOG))`
 // ... `gc_state.last_error = Status_SystemGClock;`).
-// KerfDesk's own owned-motion settlement already knows this ("GRBL rejects the
-// G4 marker while jogging", laser-owned-motion-settlement.ts), but the Continue
-// gate (toolChangeContinueBlockMessage) only checks the hold's latched fresh
-// Idle, the drained tail and work-Z evidence — not an active jog owner or the
-// controller's current state. So Continue is enabled mid-jog, the first resumed
-// line is rejected with error:9, the stream becomes 'errored', and the auto-stop
-// soft-resets a controller that is still jogging (mc_reset during STATE_JOG
-// raises ALARM:3 and kills the steppers: motion_control.c:380-385). The job is
-// lost at the tool change.
+// Before the fix the Continue gate (toolChangeContinueBlockMessage) only
+// checked the hold's latched fresh Idle, the drained tail and work-Z evidence,
+// so Continue was enabled mid-jog, the first resumed line was rejected with
+// error:9, the stream errored, and the auto-stop soft-reset a jogging
+// controller (mc_reset during STATE_JOG raises ALARM:3: motion_control.c:380-385).
 //
 // The device below is a minimal GRBL 1.1h stand-in that models only the
 // protocol.c:99 lock-out (the shared grbl-simulator accepts G-code in Jog and
@@ -29,11 +26,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { cncControllerEpochOf, createCncSetupAttestation } from '../../ui/state/cnc-setup-attestation';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { toolChangeContinueBlockMessage } from '../../ui/state/laser-store-helpers';
-import { respondToTestGrblBuildInfo } from '../../ui/state/laser-test-start-helpers';
-import { useStore } from '../../ui/state/store';
+import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
+import { useLaserStore } from './laser-store';
+import { toolChangeContinueBlockMessage } from './laser-store-helpers';
+import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
+import { useStore } from './store';
 
 type Machine = 'Idle' | 'Jog' | 'Alarm';
 type Device = SerialConnection & {
@@ -67,8 +64,7 @@ function softReset(device: Device, later: (line: string) => void): void {
 
 function isHandshakeBuildInfo(data: string): boolean {
   return (
-    data === '$I\n' &&
-    useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+    data === '$I\n' && useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
   );
 }
 
@@ -161,7 +157,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect().catch(() => undefined);
+  await useLaserStore
+    .getState()
+    .disconnect()
+    .catch(() => undefined);
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,

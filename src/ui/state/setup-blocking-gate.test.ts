@@ -9,6 +9,8 @@ import {
   ACTIVE_JOB_COMMAND_MESSAGE,
   MPG_ACTIVE_MOTION_MESSAGE,
   TOOL_CHANGE_NOT_IDLE_MESSAGE,
+  TOOL_CHANGE_ACK_OWED_MESSAGE,
+  TOOL_CHANGE_MOTION_ACTIVE_MESSAGE,
   TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE,
   activeJobCommandBlockMessage,
   jogFrameCommandBlockMessage,
@@ -147,6 +149,7 @@ describe('toolChangeContinueBlockMessage', () => {
     const needsZZero = gateState({
       streamer: drainedToolChangeStreamer(),
       toolChangeIdleSeen: true,
+      statusReport: statusReport('Idle'),
       workZZeroEvidence: null,
     });
     expect(toolChangeContinueBlockMessage(needsZZero)).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);
@@ -167,5 +170,48 @@ describe('toolChangeContinueBlockMessage', () => {
         },
       }),
     ).toBeNull();
+  });
+});
+
+// Controller audit 2026-09-25 ST-1: Continue hands the controller back to the
+// job stream, so the operator's own work in the hold must be finished first.
+describe('toolChangeContinueBlockMessage handoff facts', () => {
+  function readyState(): LaserState {
+    const base = gateState({
+      streamer: drainedToolChangeStreamer(),
+      toolChangeIdleSeen: true,
+      statusReport: statusReport('Idle'),
+      workZZeroEvidence: null,
+    });
+    return {
+      ...base,
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: base.workZReferenceEpoch },
+    };
+  }
+
+  it('is clear for a drained hold that reports Idle with fresh work Z', () => {
+    expect(toolChangeContinueBlockMessage(readyState())).toBeNull();
+  });
+
+  it('waits while a jog still moves the machine', () => {
+    const state = readyState();
+    expect(
+      toolChangeContinueBlockMessage({
+        ...state,
+        statusReport: statusReport('Jog'),
+      }),
+    ).toMatch(/reports Jog/);
+    expect(
+      toolChangeContinueBlockMessage({
+        ...state,
+        motionOperation: { kind: 'jog' } as unknown as LaserState['motionOperation'],
+      }),
+    ).toBe(TOOL_CHANGE_MOTION_ACTIVE_MESSAGE);
+  });
+
+  it('waits while an operator command still owes its answer', () => {
+    expect(toolChangeContinueBlockMessage({ ...readyState(), pendingUntrackedAcks: 1 })).toBe(
+      TOOL_CHANGE_ACK_OWED_MESSAGE,
+    );
   });
 });

@@ -227,6 +227,16 @@ describe('LiveMotionBar', () => {
     useLaserStore.setState({
       streamer: readyToolChangeStreamer(),
       toolChangeIdleSeen: true,
+      // Continue hands back only a controller that reports Idle (audit ST-1).
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        feed: 0,
+        spindle: 0,
+        wco: null,
+      },
       workZZeroEvidence: null,
       continueToolChange,
     });
